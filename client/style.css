@@ -90,6 +90,10 @@ body,
   .webqq-workspace[data-color-mode="auto"] .webqq-message-bubble,
   .webqq-workspace[data-color-mode="auto"] .webqq-composer {
     color: #e5edf7;
+  }
+
+  .webqq-workspace[data-color-mode="auto"] .webqq-message-bubble,
+  .webqq-workspace[data-color-mode="auto"] .webqq-composer::before {
     border-color: rgb(148 163 184 / 24%);
     background: rgb(30 41 59 / 90%);
   }
@@ -671,34 +675,55 @@ body,
   right: calc(50% - 230px);
   bottom: 0;
   z-index: 1;
+  isolation: isolate;
   display: flex;
-  width: min(calc(460px + var(--webqq-composer-extra-width, 0px)), calc(100% - 96px));
+  width: 460px;
+  max-width: calc(100% - 96px);
   min-height: 44px;
   align-items: center;
   gap: 4px;
   padding: 4px;
-  border: 1px solid rgb(255 255 255 / 66%);
+  border: 1px solid transparent;
   border-radius: 999px;
   color: var(--webqq-text);
-  background: rgb(255 255 255 / 94%);
-  box-shadow: 0 8px 18px rgb(15 23 42 / 8%);
+  background: transparent;
   pointer-events: auto;
-  transition: width 0.18s ease;
 }
 
-.webqq-workspace.is-frosted .webqq-composer {
+.webqq-composer::before {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  bottom: -1px;
+  left: calc(-1px - var(--webqq-composer-visual-extension, 0px));
+  z-index: -1;
+  box-sizing: border-box;
+  border: 1px solid rgb(255 255 255 / 66%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 94%);
+  box-shadow: 0 8px 18px rgb(15 23 42 / 8%);
+  content: "";
+  pointer-events: none;
+  transition: left 0.18s ease;
+}
+
+.webqq-workspace.is-frosted .webqq-composer::before {
   background: rgb(255 255 255 / 62%);
   backdrop-filter: saturate(180%) blur(22px);
 }
 
 .webqq-composer-user-layout-root {
+  position: relative;
   display: inline-flex;
+  width: var(--webqq-user-layout-width, 36px);
   height: 36px;
   flex: 0 0 auto;
 }
 
 .webqq-composer-user-capsule {
-  position: relative;
+  position: absolute;
+  top: 0;
+  right: 0;
   z-index: 2;
   display: inline-flex;
   width: var(--webqq-user-capsule-collapsed-width, 36px);
@@ -788,7 +813,7 @@ body,
   color: inherit;
   background: transparent;
   cursor: pointer;
-  transition: opacity 0.12s ease;
+  transition: right 0.18s ease, opacity 0.12s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -832,7 +857,7 @@ body,
   line-height: 1;
   text-align: left;
   pointer-events: none;
-  transition: opacity 0.12s ease;
+  transition: right 0.18s ease, opacity 0.12s ease;
   will-change: opacity;
 }
 
@@ -875,7 +900,6 @@ body,
 .webqq-composer-user-stack.is-overflow-collapsing .webqq-composer-user-switch.is-collapsed-extra {
   opacity: 1;
   pointer-events: none;
-  transition: none;
 }
 
 .webqq-composer-user-stack.is-overflow-collapsing .webqq-composer-user-overflow {
@@ -982,6 +1006,10 @@ body,
 .webqq-workspace[data-color-mode="dark"] .webqq-message-bubble,
 .webqq-workspace[data-color-mode="dark"] .webqq-composer {
   color: #e5edf7;
+}
+
+.webqq-workspace[data-color-mode="dark"] .webqq-message-bubble,
+.webqq-workspace[data-color-mode="dark"] .webqq-composer::before {
   border-color: rgb(148 163 184 / 24%);
   background: rgb(30 41 59 / 90%);
 }

@@ -136,7 +136,7 @@
           <div ref="composerLayoutRef" class="webqq-composer-layout-root">
             <form class="webqq-composer" :style="composerStyle" @submit.prevent="sendMessage">
               <span v-if="errorMessage" class="webqq-composer-error" role="alert">{{ errorMessage }}</span>
-              <div ref="userStackLayoutRef" class="webqq-composer-user-layout-root">
+              <div ref="userStackLayoutRef" class="webqq-composer-user-layout-root" :style="userLayoutStyle">
                 <div
                   :class="['webqq-composer-user-capsule', { 'has-user-stack': hasMultipleUsers, 'is-expanded': userStackVisualExpanded }]"
                   :style="userCapsuleStyle"
@@ -415,7 +415,7 @@ let suppressUserStackCollapse = false
 let suppressUserStackCollapseTimer: ReturnType<typeof setTimeout> | undefined
 let userStackOverflowMotionTimer: ReturnType<typeof setTimeout> | undefined
 let userStackLayout: AutoLayout | undefined
-let userStackAnimation: Promise<void> | undefined
+let userStackTransitionUntil = 0
 type SidebarTab = 'recent' | 'friends' | 'groups'
 const sidebarTab = ref<SidebarTab>('recent')
 
@@ -437,15 +437,19 @@ const userStackMetrics = computed(() => getUserStackMetrics(userStackUsers.value
 const hasUserStackOverflow = computed(() => userStackMetrics.value.overflowCount > 0)
 const userStackVisualExpanded = computed(() => userStackExpanded.value || !hasUserStackOverflow.value)
 const userOverflowPreview = computed(() => userStackUsers.value[userStackMetrics.value.collapsedVisibleCount])
-const visibleUserStackWidth = computed(() => userStackVisualExpanded.value
-  ? userStackMetrics.value.expandedWidth
-  : userStackMetrics.value.collapsedWidth)
 const composerStyle = computed(() => {
-  const extraWidth = hasMultipleUsers.value ? Math.max(0, visibleUserStackWidth.value - USER_AVATAR_SIZE) : 0
+  const extraWidth = hasMultipleUsers.value ? Math.max(0, userStackMetrics.value.collapsedWidth - USER_AVATAR_SIZE) : 0
+  const visualExtension = hasMultipleUsers.value && userStackVisualExpanded.value
+    ? Math.max(0, userStackMetrics.value.expandedWidth - userStackMetrics.value.collapsedWidth)
+    : 0
   return {
-    '--webqq-composer-extra-width': `${extraWidth}px`,
+    width: `${460 + extraWidth}px`,
+    '--webqq-composer-visual-extension': `${visualExtension}px`,
   }
 })
+const userLayoutStyle = computed(() => ({
+  '--webqq-user-layout-width': `${userStackMetrics.value.collapsedWidth}px`,
+}))
 const userCapsuleStyle = computed(() => ({
   '--webqq-user-capsule-collapsed-width': `${userStackMetrics.value.collapsedWidth}px`,
   '--webqq-user-capsule-expanded-width': `${userStackMetrics.value.expandedWidth}px`,
@@ -585,8 +589,8 @@ function isUserCollapsedHidden(index: number) {
 
 function ensureUserStackLayout() {
   if (userStackLayout || !userStackLayoutRef.value) return userStackLayout
-  // 独立 wrapper 让 FLIP 同时记录胶囊和头像栈，但不包含发送框主体；这样既能捕获
-  // 胶囊展开造成的头像位移，也不会再次把整个右锚定发送控件带进动画。
+  // 用户重排只记录头像区；发送框正文位于同一外壳内，不能像 WebQQ 胶囊那样把外壳
+  // 加入 FLIP，否则 Anime.js 会连正文一起投影，重现整个发送控件横向移动的问题。
   userStackLayout = createLayout(userStackLayoutRef.value, {
     children: [
       '.webqq-composer-user-capsule',
@@ -610,18 +614,13 @@ async function animateUserStackLayout(layout?: AutoLayout) {
   await layout.animate({ duration: 260, ease: 'out(3)' })
 }
 
-function startUserStackAnimation(layout?: AutoLayout) {
-  const animation = animateUserStackLayout(layout)
-  userStackAnimation = animation
-  void animation.finally(() => {
-    if (userStackAnimation === animation) userStackAnimation = undefined
-  })
-  return animation
+async function waitForUserStackTransition() {
+  const remaining = userStackTransitionUntil - performance.now()
+  if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining))
 }
 
 function setUserStackExpanded(expanded: boolean) {
   if (!hasMultipleUsers.value || !hasUserStackOverflow.value || userStackExpanded.value === expanded) return
-  const layout = recordUserStackLayout()
   userStackOverflowMotion.value = expanded ? 'expanding' : 'collapsing'
   if (userStackOverflowMotionTimer) clearTimeout(userStackOverflowMotionTimer)
   userStackOverflowMotionTimer = setTimeout(() => {
@@ -629,7 +628,7 @@ function setUserStackExpanded(expanded: boolean) {
     userStackOverflowMotionTimer = undefined
   }, 280)
   userStackExpanded.value = expanded
-  void startUserStackAnimation(layout)
+  userStackTransitionUntil = performance.now() + 180
 }
 
 // 与 WebQQ 胶囊保持一致：Chrome 在点击后会重新聚焦 keyed 按钮，重排期间的伪 focusout
@@ -667,9 +666,9 @@ async function selectComposerUser(userId: string) {
   if (userId === currentUserId.value) return
   suppressUserStackCollapse = true
   if (suppressUserStackCollapseTimer) clearTimeout(suppressUserStackCollapseTimer)
-  // 本地用户切换没有 WebQQ 选择机器人时的网络等待；若点击发生在展开 FLIP 内，
-  // 直接复用 AutoLayout 会覆盖上一段 timeline，导致切换头像瞬移。先等展开完成再记录重排。
-  await userStackAnimation
+  // 展开和折叠由同步 CSS transition 完成；等头像停止移动后再记录用户重排，
+  // 避免 Anime.js 在过渡中途读取坐标并吞掉点击切换动画。
+  await waitForUserStackTransition()
   const layout = recordUserStackLayout()
   applySelection(resolveWorkspaceSelection(snapshot.value, {
     currentUserId: userId,
@@ -677,7 +676,7 @@ async function selectComposerUser(userId: string) {
   }))
   input.value = ''
   detailsOpen.value = false
-  await startUserStackAnimation(layout)
+  await animateUserStackLayout(layout)
   suppressUserStackCollapseTimer = setTimeout(() => {
     suppressUserStackCollapse = false
     suppressUserStackCollapseTimer = undefined
