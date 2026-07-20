@@ -21,7 +21,7 @@ Koishi 原版 sandbox 适合快速发送消息和观察插件回复，但不足�
 
 创建 `onebot-sandbox` Koishi 插件，在一个服务端持有的沙盒场景中模拟用户、虚拟 OneBot 机器人、好友关系、群组、成员角色、消息、申请、通知、媒体和权限。插件同时提供：
 
-- 一个以 `onebot-webqq` 当前界面为视觉基线、使用 React、Tailwind CSS 和 shadcn/ui 重写的 WebQQ 工作台
+- 一个以 `onebot-webqq` 当前界面为视觉基线、使用 Vue、Tailwind CSS 和 shadcn-vue 重写的 WebQQ 工作台
 - 一个兼容标准 Koishi 行为、OneBot 原始事件、`bot.internal` 和底层 action 调用的虚拟 OneBot 机器人层
 - 可分别选择 NapCat 或 LLBot 实现配置的多机器人目录，以及按机器人禁用能力的能力覆盖
 - 默认以内存为唯一真实状态，并可选择 Koishi Database 进行场景持久化的状态层
@@ -146,10 +146,10 @@ WebQQ 与 MCP 共用同一个传输无关的测试控制服务。该服务是主
 ### WebQQ Workspace
 
 - The current `onebot-webqq` interface is the visual baseline and should be reproduced at one-to-one fidelity unless a difference is explicitly discussed and approved.
-- The theme framework and page structure are rewritten with React and Tailwind CSS rather than reusing the existing Vue components.
-- shadcn/ui is preferred for generic accessible interactions such as context menus, nested menus, dialogs, dropdowns, tooltips and forms.
-- Custom React components are used only where the WebQQ-specific visual structure cannot be represented cleanly by existing shadcn primitives.
-- The Koishi console boundary remains a thin Vue shell that mounts the React application.
+- The theme framework and page structure are rewritten with Vue and Tailwind CSS rather than directly reusing the existing onebot-webqq page components.
+- shadcn-vue is preferred for generic accessible interactions such as context menus, nested menus, dialogs, dropdowns, tooltips and forms.
+- Custom Vue components are used only where the WebQQ-specific visual structure cannot be represented cleanly by existing shadcn-vue primitives.
+- The WebQQ workspace is registered directly as a Koishi Vue console page without an additional cross-framework mounting layer.
 - The workspace is registered in the Koishi left navigation and fills the content area rather than opening through a capsule.
 - Layout and interactions use an 8 px spacing system, avoid arbitrary colors and gradients, and use SVG icons with Tabler Icons as the first choice.
 - Global appearance options live in Koishi plugin configuration. Browser-local storage is limited to the selected current user, active conversation and other view state.
