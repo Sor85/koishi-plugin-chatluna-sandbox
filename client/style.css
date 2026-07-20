@@ -691,6 +691,12 @@ body,
   backdrop-filter: saturate(180%) blur(22px);
 }
 
+.webqq-composer-user-layout-root {
+  display: inline-flex;
+  height: 36px;
+  flex: 0 0 auto;
+}
+
 .webqq-composer-user-capsule {
   position: relative;
   z-index: 2;

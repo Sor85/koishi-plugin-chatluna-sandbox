@@ -136,64 +136,65 @@
           <div ref="composerLayoutRef" class="webqq-composer-layout-root">
             <form class="webqq-composer" :style="composerStyle" @submit.prevent="sendMessage">
               <span v-if="errorMessage" class="webqq-composer-error" role="alert">{{ errorMessage }}</span>
-              <div
-                :class="['webqq-composer-user-capsule', { 'has-user-stack': hasMultipleUsers, 'is-expanded': userStackVisualExpanded }]"
-                :style="userCapsuleStyle"
-                @pointerenter="expandUserStack"
-                @pointerleave="collapseUserStack"
-                @focusin="focusUserStack"
-                @focusout="blurUserStack"
-              >
+              <div ref="userStackLayoutRef" class="webqq-composer-user-layout-root">
                 <div
-                  v-if="hasMultipleUsers"
-                  ref="userStackRef"
-                  :class="['webqq-composer-user-stack', {
-                    'is-expanded': userStackVisualExpanded,
-                    'is-overflow-expanding': userStackOverflowMotion === 'expanding',
-                    'is-overflow-collapsing': userStackOverflowMotion === 'collapsing',
-                  }]"
-                  :style="userStackStyle"
+                  :class="['webqq-composer-user-capsule', { 'has-user-stack': hasMultipleUsers, 'is-expanded': userStackVisualExpanded }]"
+                  :style="userCapsuleStyle"
+                  @pointerenter="expandUserStack"
+                  @pointerleave="collapseUserStack"
+                  @focusin="focusUserStack"
+                  @focusout="blurUserStack"
                 >
-                  <button
-                    v-for="(user, index) in userStackUsers"
-                    :key="user.id"
-                    type="button"
-                    :class="['webqq-composer-user-switch', {
-                      'is-active': user.id === currentUserId,
-                      'is-collapsed-extra': isUserCollapsedExtra(index),
+                  <div
+                    v-if="hasMultipleUsers"
+                    :class="['webqq-composer-user-stack', {
+                      'is-expanded': userStackVisualExpanded,
+                      'is-overflow-expanding': userStackOverflowMotion === 'expanding',
+                      'is-overflow-collapsing': userStackOverflowMotion === 'collapsing',
                     }]"
-                    :aria-label="user.id === currentUserId ? `当前用户：${user.name}` : `切换到用户：${user.name}`"
-                    :aria-pressed="user.id === currentUserId"
-                    :aria-hidden="isUserCollapsedHidden(index) ? 'true' : undefined"
-                    :tabindex="isUserCollapsedHidden(index) ? -1 : undefined"
-                    :style="getUserSwitchStyle(index)"
-                    @click="selectComposerUser(user.id)"
+                    :style="userStackStyle"
                   >
-                    <span class="webqq-composer-user-avatar">{{ getInitial(user.name) }}</span>
+                    <button
+                      v-for="(user, index) in userStackUsers"
+                      :key="user.id"
+                      type="button"
+                      :class="['webqq-composer-user-switch', {
+                        'is-active': user.id === currentUserId,
+                        'is-collapsed-extra': isUserCollapsedExtra(index),
+                      }]"
+                      :aria-label="user.id === currentUserId ? `当前用户：${user.name}` : `切换到用户：${user.name}`"
+                      :aria-pressed="user.id === currentUserId"
+                      :aria-hidden="isUserCollapsedHidden(index) ? 'true' : undefined"
+                      :tabindex="isUserCollapsedHidden(index) ? -1 : undefined"
+                      :style="getUserSwitchStyle(index)"
+                      @click="selectComposerUser(user.id)"
+                    >
+                      <span class="webqq-composer-user-avatar">{{ getInitial(user.name) }}</span>
+                    </button>
+                    <span
+                      v-if="userStackMetrics.overflowCount"
+                      class="webqq-composer-user-overflow"
+                      :style="userOverflowStyle"
+                      aria-hidden="true"
+                    >
+                      <span v-if="userOverflowPreview" class="webqq-composer-user-overflow-avatar">
+                        {{ getInitial(userOverflowPreview.name) }}
+                      </span>
+                      <span class="webqq-composer-user-overflow-label">
+                        <span class="webqq-composer-user-overflow-plus">+</span>
+                        <span class="webqq-composer-user-overflow-count">{{ userStackMetrics.overflowCount }}</span>
+                      </span>
+                    </span>
+                  </div>
+                  <button
+                    v-else
+                    type="button"
+                    class="webqq-composer-user-button"
+                    :aria-label="`当前用户：${currentUser?.name ?? '未选择'}`"
+                  >
+                    <span class="webqq-composer-user-avatar">{{ getInitial(currentUser?.name) }}</span>
                   </button>
-                  <span
-                    v-if="userStackMetrics.overflowCount"
-                    class="webqq-composer-user-overflow"
-                    :style="userOverflowStyle"
-                    aria-hidden="true"
-                  >
-                    <span v-if="userOverflowPreview" class="webqq-composer-user-overflow-avatar">
-                      {{ getInitial(userOverflowPreview.name) }}
-                    </span>
-                    <span class="webqq-composer-user-overflow-label">
-                      <span class="webqq-composer-user-overflow-plus">+</span>
-                      <span class="webqq-composer-user-overflow-count">{{ userStackMetrics.overflowCount }}</span>
-                    </span>
-                  </span>
                 </div>
-                <button
-                  v-else
-                  type="button"
-                  class="webqq-composer-user-button"
-                  :aria-label="`当前用户：${currentUser?.name ?? '未选择'}`"
-                >
-                  <span class="webqq-composer-user-avatar">{{ getInitial(currentUser?.name) }}</span>
-                </button>
               </div>
               <div class="webqq-composer-main">
                 <label class="sr-only" for="onebot-sandbox-input">消息内容</label>
@@ -404,7 +405,7 @@ const groupMemberSearch = ref('')
 const detailsOpen = ref(false)
 const hydrated = ref(false)
 const composerLayoutRef = ref<HTMLElement>()
-const userStackRef = ref<HTMLElement>()
+const userStackLayoutRef = ref<HTMLElement>()
 const userStackExpanded = ref(false)
 const userStackHovered = ref(false)
 const userStackFocused = ref(false)
@@ -414,6 +415,7 @@ let suppressUserStackCollapse = false
 let suppressUserStackCollapseTimer: ReturnType<typeof setTimeout> | undefined
 let userStackOverflowMotionTimer: ReturnType<typeof setTimeout> | undefined
 let userStackLayout: AutoLayout | undefined
+let userStackAnimation: Promise<void> | undefined
 type SidebarTab = 'recent' | 'friends' | 'groups'
 const sidebarTab = ref<SidebarTab>('recent')
 
@@ -582,11 +584,13 @@ function isUserCollapsedHidden(index: number) {
 }
 
 function ensureUserStackLayout() {
-  if (userStackLayout || !userStackRef.value) return userStackLayout
-  // FLIP 根节点必须收窄到头像组。若使用整个发送区域，Anime.js 会投影根节点的直接子元素，
-  // 即使 children 没有显式选择表单，也会让右锚定的发送控件产生临时 translate。
-  userStackLayout = createLayout(userStackRef.value, {
+  if (userStackLayout || !userStackLayoutRef.value) return userStackLayout
+  // 独立 wrapper 让 FLIP 同时记录胶囊和头像栈，但不包含发送框主体；这样既能捕获
+  // 胶囊展开造成的头像位移，也不会再次把整个右锚定发送控件带进动画。
+  userStackLayout = createLayout(userStackLayoutRef.value, {
     children: [
+      '.webqq-composer-user-capsule',
+      '.webqq-composer-user-stack',
       '.webqq-composer-user-switch',
       '.webqq-composer-user-overflow',
     ],
@@ -603,7 +607,16 @@ function recordUserStackLayout() {
 async function animateUserStackLayout(layout?: AutoLayout) {
   if (!layout) return
   await nextTick()
-  layout.animate({ duration: 260, ease: 'out(3)' })
+  await layout.animate({ duration: 260, ease: 'out(3)' })
+}
+
+function startUserStackAnimation(layout?: AutoLayout) {
+  const animation = animateUserStackLayout(layout)
+  userStackAnimation = animation
+  void animation.finally(() => {
+    if (userStackAnimation === animation) userStackAnimation = undefined
+  })
+  return animation
 }
 
 function setUserStackExpanded(expanded: boolean) {
@@ -616,7 +629,7 @@ function setUserStackExpanded(expanded: boolean) {
     userStackOverflowMotionTimer = undefined
   }, 280)
   userStackExpanded.value = expanded
-  void animateUserStackLayout(layout)
+  void startUserStackAnimation(layout)
 }
 
 // 与 WebQQ 胶囊保持一致：Chrome 在点击后会重新聚焦 keyed 按钮，重排期间的伪 focusout
@@ -652,16 +665,19 @@ function blurUserStack(event: FocusEvent) {
 
 async function selectComposerUser(userId: string) {
   if (userId === currentUserId.value) return
-  const layout = recordUserStackLayout()
   suppressUserStackCollapse = true
   if (suppressUserStackCollapseTimer) clearTimeout(suppressUserStackCollapseTimer)
+  // 本地用户切换没有 WebQQ 选择机器人时的网络等待；若点击发生在展开 FLIP 内，
+  // 直接复用 AutoLayout 会覆盖上一段 timeline，导致切换头像瞬移。先等展开完成再记录重排。
+  await userStackAnimation
+  const layout = recordUserStackLayout()
   applySelection(resolveWorkspaceSelection(snapshot.value, {
     currentUserId: userId,
     currentView: 'messages',
   }))
   input.value = ''
   detailsOpen.value = false
-  await animateUserStackLayout(layout)
+  await startUserStackAnimation(layout)
   suppressUserStackCollapseTimer = setTimeout(() => {
     suppressUserStackCollapse = false
     suppressUserStackCollapseTimer = undefined
