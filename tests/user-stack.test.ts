@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getUserStackMetrics, orderUsersByActive } from '../client/user-stack'
+import { getUserStackLayoutMetrics, getUserStackMetrics, orderUsersByActive } from '../client/user-stack'
 
 describe('发送框用户头像组', () => {
   const users = [
@@ -30,6 +30,21 @@ describe('发送框用户头像组', () => {
       overflowCount: 2,
       collapsedWidth: 99,
       expandedWidth: 144,
+    })
+  })
+
+  it('始终为末尾添加用户按钮预留头像位置', () => {
+    expect(getUserStackLayoutMetrics(0)).toEqual({
+      collapsedWidth: 36,
+      expandedWidth: 36,
+      addCollapsedRight: 0,
+      addExpandedRight: 0,
+    })
+    expect(getUserStackLayoutMetrics(5)).toEqual({
+      collapsedWidth: 99,
+      expandedWidth: 171,
+      addCollapsedRight: 63,
+      addExpandedRight: 135,
     })
   })
 })

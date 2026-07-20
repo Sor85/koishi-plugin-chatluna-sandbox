@@ -58,6 +58,42 @@
             >
           </label>
           <div v-webqq-scrollbar class="webqq-session-list">
+            <EnvironmentCreatePopover
+              v-if="sidebarTab === 'friends'"
+              type="bot"
+              :snapshot="snapshot"
+              :current-user-id="currentUserId"
+              :accent-color="workspace.appearance.webQQAccentColor"
+              @updated="applyWorkspaceUpdate"
+            >
+              <template #trigger>
+                <button type="button" class="webqq-session webqq-session-create">
+                  <span class="webqq-avatar webqq-avatar-create"><IconPlus :size="20" aria-hidden="true" /></span>
+                  <span class="webqq-session-copy">
+                    <strong>添加机器人</strong>
+                    <small>创建新的测试机器人</small>
+                  </span>
+                </button>
+              </template>
+            </EnvironmentCreatePopover>
+            <EnvironmentCreatePopover
+              v-if="sidebarTab === 'groups'"
+              type="group"
+              :snapshot="snapshot"
+              :current-user-id="currentUserId"
+              :accent-color="workspace.appearance.webQQAccentColor"
+              @updated="applyWorkspaceUpdate"
+            >
+              <template #trigger>
+                <button type="button" class="webqq-session webqq-session-create">
+                  <span class="webqq-avatar webqq-avatar-create"><IconPlus :size="20" aria-hidden="true" /></span>
+                  <span class="webqq-session-copy">
+                    <strong>添加群组</strong>
+                    <small>创建新的测试群组</small>
+                  </span>
+                </button>
+              </template>
+            </EnvironmentCreatePopover>
             <button
               v-for="conversation in filteredConversations"
               :key="conversation.id"
@@ -138,7 +174,7 @@
               <span v-if="errorMessage" class="webqq-composer-error" role="alert">{{ errorMessage }}</span>
               <div ref="userStackLayoutRef" class="webqq-composer-user-layout-root" :style="userLayoutStyle">
                 <div
-                  :class="['webqq-composer-user-capsule', { 'has-user-stack': hasMultipleUsers, 'is-expanded': userStackVisualExpanded }]"
+                  :class="['webqq-composer-user-capsule', { 'is-expanded': userStackVisualExpanded }]"
                   :style="userCapsuleStyle"
                   @pointerenter="expandUserStack"
                   @pointerleave="collapseUserStack"
@@ -146,7 +182,6 @@
                   @focusout="blurUserStack"
                 >
                   <div
-                    v-if="hasMultipleUsers"
                     :class="['webqq-composer-user-stack', {
                       'is-expanded': userStackVisualExpanded,
                       'is-overflow-expanding': userStackOverflowMotion === 'expanding',
@@ -185,15 +220,27 @@
                         <span class="webqq-composer-user-overflow-count">{{ userStackMetrics.overflowCount }}</span>
                       </span>
                     </span>
+                    <EnvironmentCreatePopover
+                      type="user"
+                      side="top"
+                      :snapshot="snapshot"
+                      :current-user-id="currentUserId"
+                      :accent-color="workspace.appearance.webQQAccentColor"
+                      @updated="applyWorkspaceUpdate"
+                      @open-change="handleCreateUserOpen"
+                    >
+                      <template #trigger>
+                        <button
+                          type="button"
+                          :class="['webqq-composer-user-add', { 'is-collapsed-hidden': hasUserStackOverflow && !userStackVisualExpanded }]"
+                          :style="userAddStyle"
+                          aria-label="添加测试用户"
+                        >
+                          <IconPlus :size="18" stroke-width="2" aria-hidden="true" />
+                        </button>
+                      </template>
+                    </EnvironmentCreatePopover>
                   </div>
-                  <button
-                    v-else
-                    type="button"
-                    class="webqq-composer-user-button"
-                    :aria-label="`当前用户：${currentUser?.name ?? '未选择'}`"
-                  >
-                    <span class="webqq-composer-user-avatar">{{ getInitial(currentUser?.name) }}</span>
-                  </button>
                 </div>
               </div>
               <div class="webqq-composer-main">
@@ -346,6 +393,7 @@ import {
   IconUsers,
 } from '@tabler/icons-vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import EnvironmentCreatePopover from './environment-create-popover.vue'
 import EnvironmentManager from './environment-manager.vue'
 import {
   loadWorkspacePreferences,
@@ -356,6 +404,7 @@ import {
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import {
   getUserStackMetrics,
+  getUserStackLayoutMetrics,
   orderUsersByActive,
   USER_AVATAR_SIZE,
   USER_STACK_COLLAPSED_STEP,
@@ -409,6 +458,7 @@ const userStackLayoutRef = ref<HTMLElement>()
 const userStackExpanded = ref(false)
 const userStackHovered = ref(false)
 const userStackFocused = ref(false)
+const createUserOpen = ref(false)
 type UserStackOverflowMotion = 'idle' | 'expanding' | 'collapsing'
 const userStackOverflowMotion = ref<UserStackOverflowMotion>('idle')
 let suppressUserStackCollapse = false
@@ -431,16 +481,16 @@ const sidebarTabs = [
 ]
 const snapshot = computed(() => workspace.value.snapshot)
 const currentUser = computed(() => snapshot.value.users.find(({ id }) => id === currentUserId.value))
-const hasMultipleUsers = computed(() => snapshot.value.users.length > 1)
 const userStackUsers = computed(() => orderUsersByActive(snapshot.value.users, currentUserId.value))
 const userStackMetrics = computed(() => getUserStackMetrics(userStackUsers.value.length))
+const userStackLayoutMetrics = computed(() => getUserStackLayoutMetrics(userStackUsers.value.length))
 const hasUserStackOverflow = computed(() => userStackMetrics.value.overflowCount > 0)
 const userStackVisualExpanded = computed(() => userStackExpanded.value || !hasUserStackOverflow.value)
 const userOverflowPreview = computed(() => userStackUsers.value[userStackMetrics.value.collapsedVisibleCount])
 const composerStyle = computed(() => {
-  const extraWidth = hasMultipleUsers.value ? Math.max(0, userStackMetrics.value.collapsedWidth - USER_AVATAR_SIZE) : 0
-  const visualExtension = hasMultipleUsers.value && userStackVisualExpanded.value
-    ? Math.max(0, userStackMetrics.value.expandedWidth - userStackMetrics.value.collapsedWidth)
+  const extraWidth = Math.max(0, userStackLayoutMetrics.value.collapsedWidth - USER_AVATAR_SIZE)
+  const visualExtension = userStackVisualExpanded.value
+    ? Math.max(0, userStackLayoutMetrics.value.expandedWidth - userStackLayoutMetrics.value.collapsedWidth)
     : 0
   return {
     width: `${460 + extraWidth}px`,
@@ -448,15 +498,19 @@ const composerStyle = computed(() => {
   }
 })
 const userLayoutStyle = computed(() => ({
-  '--webqq-user-layout-width': `${userStackMetrics.value.collapsedWidth}px`,
+  '--webqq-user-layout-width': `${userStackLayoutMetrics.value.collapsedWidth}px`,
 }))
 const userCapsuleStyle = computed(() => ({
-  '--webqq-user-capsule-collapsed-width': `${userStackMetrics.value.collapsedWidth}px`,
-  '--webqq-user-capsule-expanded-width': `${userStackMetrics.value.expandedWidth}px`,
+  '--webqq-user-capsule-collapsed-width': `${userStackLayoutMetrics.value.collapsedWidth}px`,
+  '--webqq-user-capsule-expanded-width': `${userStackLayoutMetrics.value.expandedWidth}px`,
 }))
 const userStackStyle = computed(() => ({
-  '--webqq-user-stack-collapsed-width': `${userStackMetrics.value.collapsedWidth}px`,
-  '--webqq-user-stack-expanded-width': `${userStackMetrics.value.expandedWidth}px`,
+  '--webqq-user-stack-collapsed-width': `${userStackLayoutMetrics.value.collapsedWidth}px`,
+  '--webqq-user-stack-expanded-width': `${userStackLayoutMetrics.value.expandedWidth}px`,
+}))
+const userAddStyle = computed(() => ({
+  '--webqq-user-add-collapsed-right': `${userStackLayoutMetrics.value.addCollapsedRight}px`,
+  '--webqq-user-add-expanded-right': `${userStackLayoutMetrics.value.addExpandedRight}px`,
 }))
 const userOverflowStyle = computed(() => {
   const collapsedRight = userStackMetrics.value.collapsedVisibleCount * USER_STACK_COLLAPSED_STEP
@@ -597,6 +651,7 @@ function ensureUserStackLayout() {
       '.webqq-composer-user-stack',
       '.webqq-composer-user-switch',
       '.webqq-composer-user-overflow',
+      '.webqq-composer-user-add',
     ],
   })
   return userStackLayout
@@ -620,7 +675,7 @@ async function waitForUserStackTransition() {
 }
 
 function setUserStackExpanded(expanded: boolean) {
-  if (!hasMultipleUsers.value || !hasUserStackOverflow.value || userStackExpanded.value === expanded) return
+  if (!hasUserStackOverflow.value || userStackExpanded.value === expanded) return
   userStackOverflowMotion.value = expanded ? 'expanding' : 'collapsing'
   if (userStackOverflowMotionTimer) clearTimeout(userStackOverflowMotionTimer)
   userStackOverflowMotionTimer = setTimeout(() => {
@@ -635,7 +690,12 @@ function setUserStackExpanded(expanded: boolean) {
 // 不能触发折叠，否则会中断 FLIP 并让头像停在错误位置。
 function syncUserStackExpanded() {
   if (suppressUserStackCollapse) return
-  setUserStackExpanded(userStackHovered.value || userStackFocused.value)
+  setUserStackExpanded(userStackHovered.value || userStackFocused.value || createUserOpen.value)
+}
+
+function handleCreateUserOpen(open: boolean) {
+  createUserOpen.value = open
+  syncUserStackExpanded()
 }
 
 function expandUserStack() {

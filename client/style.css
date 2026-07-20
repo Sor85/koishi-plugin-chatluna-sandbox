@@ -399,6 +399,11 @@ body,
   background: color-mix(in srgb, var(--webqq-accent) 14%, transparent);
 }
 
+.webqq-session-create {
+  padding-right: 12px;
+  cursor: pointer;
+}
+
 .webqq-avatar {
   width: 38px;
   height: 38px;
@@ -409,6 +414,15 @@ body,
 
 .webqq-avatar-bot {
   background: #59657a;
+}
+
+.webqq-avatar-create {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed color-mix(in srgb, var(--webqq-accent) 46%, transparent);
+  color: var(--webqq-accent);
+  background: color-mix(in srgb, var(--webqq-accent) 9%, var(--webqq-bg));
 }
 
 .webqq-session-copy,
@@ -756,23 +770,6 @@ body,
   font-weight: 700;
 }
 
-.webqq-composer-user-button {
-  position: relative;
-  z-index: 2;
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  color: inherit;
-  background: transparent;
-  cursor: default;
-  pointer-events: auto;
-}
-
 .webqq-composer-user-stack {
   position: relative;
   z-index: 2;
@@ -797,6 +794,10 @@ body,
 .webqq-composer-user-stack.is-expanded .webqq-composer-user-overflow {
   right: var(--webqq-user-overflow-expanded-right, var(--webqq-user-overflow-right, 0));
   opacity: 0;
+}
+
+.webqq-composer-user-stack.is-expanded .webqq-composer-user-add {
+  right: var(--webqq-user-add-expanded-right, var(--webqq-user-add-collapsed-right, 0));
 }
 
 .webqq-composer-user-switch {
@@ -826,6 +827,44 @@ body,
 
 .webqq-composer-user-switch:focus-visible {
   z-index: 20 !important;
+  outline: 2px solid var(--webqq-accent);
+  outline-offset: 3px;
+}
+
+.webqq-composer-user-add {
+  position: absolute;
+  top: 0;
+  right: var(--webqq-user-add-collapsed-right, 0);
+  z-index: 0;
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border: 1px dashed color-mix(in srgb, var(--webqq-accent) 52%, transparent);
+  border-radius: 50%;
+  color: var(--webqq-accent);
+  background: color-mix(in srgb, var(--webqq-accent) 11%, #fff);
+  box-shadow: 0 0 0 2px #fff;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: right 0.18s ease, opacity 0.12s ease, background-color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.webqq-composer-user-add.is-collapsed-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.webqq-composer-user-add:hover {
+  background: color-mix(in srgb, var(--webqq-accent) 18%, #fff);
+}
+
+.webqq-composer-user-add:focus-visible {
+  z-index: 20;
   outline: 2px solid var(--webqq-accent);
   outline-offset: 3px;
 }
@@ -1012,6 +1051,11 @@ body,
 .webqq-workspace[data-color-mode="dark"] .webqq-composer::before {
   border-color: rgb(148 163 184 / 24%);
   background: rgb(30 41 59 / 90%);
+}
+
+.webqq-workspace[data-color-mode="dark"] .webqq-composer-user-add {
+  background: color-mix(in srgb, var(--webqq-accent) 18%, #0f172a);
+  box-shadow: 0 0 0 2px #0f172a;
 }
 
 .webqq-profile {

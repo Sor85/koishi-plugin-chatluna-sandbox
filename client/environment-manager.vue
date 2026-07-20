@@ -29,14 +29,14 @@
 
     <p v-if="errorMessage" class="environment-error" role="alert">{{ errorMessage }}</p>
 
-    <div v-if="section === 'users'" class="environment-body">
-      <form class="environment-form" @submit.prevent="submitUser">
+    <div v-if="section === 'users'" :class="['environment-body', { 'is-editing': editingUserId }]">
+      <form v-if="editingUserId" class="environment-form" @submit.prevent="submitUser">
         <div class="form-heading">
           <div>
-            <h2>{{ editingUserId ? '编辑普通用户' : '新增普通用户' }}</h2>
+            <h2>编辑普通用户</h2>
             <p>QQ ID 创建后不可修改。</p>
           </div>
-          <button v-if="editingUserId" type="button" class="text-button" @click="clearUserDraft">取消</button>
+          <button type="button" class="text-button" @click="clearUserDraft">取消</button>
         </div>
         <label>
           <span>QQ ID</span>
@@ -47,7 +47,7 @@
           <input v-model="userDraft.name" required>
         </label>
         <button class="primary-button" type="submit" :disabled="busy">
-          {{ editingUserId ? '保存用户' : '创建用户' }}
+          保存用户
         </button>
       </form>
 
@@ -63,14 +63,14 @@
       </div>
     </div>
 
-    <div v-else-if="section === 'bots'" class="environment-body">
-      <form class="environment-form" @submit.prevent="submitBot">
+    <div v-else-if="section === 'bots'" :class="['environment-body', { 'is-editing': editingBotId }]">
+      <form v-if="editingBotId" class="environment-form" @submit.prevent="submitBot">
         <div class="form-heading">
           <div>
-            <h2>{{ editingBotId ? '编辑虚拟 OneBot 机器人' : '新增虚拟 OneBot 机器人' }}</h2>
+            <h2>编辑虚拟 OneBot 机器人</h2>
             <p>每个机器人独立选择 NapCat 或 LLBot。</p>
           </div>
-          <button v-if="editingBotId" type="button" class="text-button" @click="clearBotDraft">取消</button>
+          <button type="button" class="text-button" @click="clearBotDraft">取消</button>
         </div>
         <label>
           <span>QQ ID</span>
@@ -92,7 +92,7 @@
           <span>启用机器人</span>
         </label>
         <button class="primary-button" type="submit" :disabled="busy">
-          {{ editingBotId ? '保存机器人' : '创建机器人' }}
+          保存机器人
         </button>
       </form>
 
@@ -114,14 +114,14 @@
       </div>
     </div>
 
-    <div v-else class="environment-body is-groups">
-      <form class="environment-form group-form" @submit.prevent="submitGroup">
+    <div v-else :class="['environment-body', 'is-groups', { 'is-editing': editingGroupId }]">
+      <form v-if="editingGroupId" class="environment-form group-form" @submit.prevent="submitGroup">
         <div class="form-heading">
           <div>
-            <h2>{{ editingGroupId ? '编辑群组' : '新增群组' }}</h2>
+            <h2>编辑群组</h2>
             <p>成员关系由环境管理静默准备。</p>
           </div>
-          <button v-if="editingGroupId" type="button" class="text-button" @click="clearGroupDraft">取消</button>
+          <button type="button" class="text-button" @click="clearGroupDraft">取消</button>
         </div>
         <label>
           <span>群号</span>
@@ -158,7 +158,7 @@
           <p v-if="!groupDraft.members.length" class="empty-members">至少添加一位普通用户作为群主。</p>
         </div>
         <button class="primary-button" type="submit" :disabled="busy">
-          {{ editingGroupId ? '保存群组' : '创建群组' }}
+          保存群组
         </button>
       </form>
 
@@ -241,7 +241,7 @@ async function runAction(input: ManageSandboxEnvironmentInput): Promise<boolean>
 
 async function submitUser() {
   const succeeded = await runAction({
-    action: editingUserId.value ? 'update-user' : 'create-user',
+    action: 'update-user',
     data: { id: userDraft.id, name: userDraft.name },
   })
   if (succeeded) clearUserDraft()
@@ -267,7 +267,7 @@ async function deleteUser(user: SandboxUser) {
 
 async function submitBot() {
   const succeeded = await runAction({
-    action: editingBotId.value ? 'update-bot' : 'create-bot',
+    action: 'update-bot',
     data: { ...botDraft },
   })
   if (succeeded) clearBotDraft()
@@ -291,7 +291,7 @@ async function deleteBot(bot: SandboxBotProfile) {
 
 async function submitGroup() {
   const succeeded = await runAction({
-    action: editingGroupId.value ? 'update-group' : 'create-group',
+    action: 'update-group',
     data: {
       id: groupDraft.id,
       name: groupDraft.name,
@@ -457,10 +457,14 @@ function getInitial(name?: string) {
   display: grid;
   min-height: 0;
   flex: 1;
-  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 20px;
   overflow: auto;
   padding: 20px 28px 28px;
+}
+
+.environment-body.is-editing {
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
 }
 
 .environment-form,
