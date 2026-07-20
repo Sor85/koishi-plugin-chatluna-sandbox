@@ -461,6 +461,10 @@ body,
   background: var(--webqq-bg);
 }
 
+.webqq-chat.is-environment {
+  grid-template-rows: minmax(0, 1fr);
+}
+
 .webqq-chat-title {
   display: flex;
   align-items: center;
@@ -1466,8 +1470,12 @@ body,
 
   .webqq-workspace[data-mobile-view="contacts"] .webqq-conversations,
   .webqq-workspace[data-mobile-view="messages"] .webqq-chat,
-  .webqq-workspace[data-mobile-view="profile"] .webqq-profile {
+  .webqq-workspace[data-mobile-view="profile"] .webqq-chat {
     display: flex;
+  }
+
+  .webqq-workspace[data-mobile-view="profile"] .webqq-chat {
+    display: grid;
   }
 
   .webqq-workspace.is-details-open[data-mobile-view="messages"] .webqq-profile {

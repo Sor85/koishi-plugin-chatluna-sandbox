@@ -3,6 +3,7 @@ import type {} from '@koishijs/console'
 import type { SandboxControlService } from './control-service'
 import type {
   DeleteGroupAnnouncementInput,
+  ManageSandboxEnvironmentInput,
   SandboxAppearance,
   SandboxWorkspaceState,
   SendMessageInput,
@@ -14,6 +15,7 @@ interface ConsoleEventMap {
   'onebot-sandbox/send-message': (input: SendMessageInput) => Promise<SandboxWorkspaceState>
   'onebot-sandbox/set-group-announcement': (input: SetGroupAnnouncementInput) => SandboxWorkspaceState
   'onebot-sandbox/delete-group-announcement': (input: DeleteGroupAnnouncementInput) => SandboxWorkspaceState
+  'onebot-sandbox/manage-environment': (input: ManageSandboxEnvironmentInput) => SandboxWorkspaceState
 }
 
 export interface SandboxConsoleRegistrar {
@@ -53,6 +55,41 @@ export function registerConsole(
     control.deleteGroupAnnouncement(input)
     return getWorkspace()
   }, { authority: 4 })
+  console.addListener('onebot-sandbox/manage-environment', (input) => {
+    switch (input.action) {
+      case 'create-user':
+        control.createUser(input.data)
+        break
+      case 'update-user':
+        control.updateUser(input.data)
+        break
+      case 'delete-user':
+        control.deleteUser(input.data)
+        break
+      case 'create-bot':
+        control.createBot(input.data)
+        break
+      case 'update-bot':
+        control.updateBot(input.data)
+        break
+      case 'delete-bot':
+        control.deleteBot(input.data)
+        break
+      case 'create-group':
+        control.createGroup(input.data)
+        break
+      case 'update-group':
+        control.updateGroup(input.data)
+        break
+      case 'delete-group':
+        control.deleteGroup(input.data)
+        break
+      case 'reset-default':
+        control.resetDefaultScene()
+        break
+    }
+    return getWorkspace()
+  }, { authority: 4 })
 }
 
 declare module '@koishijs/console' {
@@ -61,5 +98,6 @@ declare module '@koishijs/console' {
     'onebot-sandbox/send-message'(input: SendMessageInput): Promise<SandboxWorkspaceState>
     'onebot-sandbox/set-group-announcement'(input: SetGroupAnnouncementInput): SandboxWorkspaceState
     'onebot-sandbox/delete-group-announcement'(input: DeleteGroupAnnouncementInput): SandboxWorkspaceState
+    'onebot-sandbox/manage-environment'(input: ManageSandboxEnvironmentInput): SandboxWorkspaceState
   }
 }

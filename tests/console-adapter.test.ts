@@ -53,21 +53,25 @@ describe('Koishi 控制台适配器', () => {
     const sendMessageListener = listeners.get('onebot-sandbox/send-message')
     const setGroupAnnouncementListener = listeners.get('onebot-sandbox/set-group-announcement')
     const deleteGroupAnnouncementListener = listeners.get('onebot-sandbox/delete-group-announcement')
+    const manageEnvironmentListener = listeners.get('onebot-sandbox/manage-environment')
     if (typeof snapshotListener !== 'function'
       || typeof sendMessageListener !== 'function'
       || typeof setGroupAnnouncementListener !== 'function'
-      || typeof deleteGroupAnnouncementListener !== 'function') {
+      || typeof deleteGroupAnnouncementListener !== 'function'
+      || typeof manageEnvironmentListener !== 'function') {
       throw new Error('控制台监听器未注册')
     }
 
-    expect(snapshotListener()).toMatchObject({
-      snapshot: {
-        users: [{ id: '10001' }, { id: '10002' }],
-        bots: [{ id: '20001' }],
-        groups: [{ id: '30001' }],
-      },
-      appearance,
-    })
+    const initialWorkspace = snapshotListener()
+    expect(initialWorkspace.snapshot.users.map(({ id }: { id: string }) => id)).toEqual([
+      '10001',
+      '10002',
+      '10003',
+      '10004',
+    ])
+    expect(initialWorkspace.snapshot.bots.map(({ id }: { id: string }) => id)).toEqual(['20001'])
+    expect(initialWorkspace.snapshot.groups.map(({ id }: { id: string }) => id)).toEqual(['30001'])
+    expect(initialWorkspace.appearance).toEqual(appearance)
 
     const snapshot = await sendMessageListener({
       actorUserId: '10001',
@@ -92,5 +96,13 @@ describe('Koishi 控制台适配器', () => {
       announcementId: updated.snapshot.groups[0].announcements[0].id,
     })
     expect(removed.snapshot.groups[0].announcements.some(({ content }: { content: string }) => content === '控制台发布的公告')).toBe(false)
+
+    const managed = manageEnvironmentListener({
+      action: 'create-user',
+      data: { id: '10099', name: '控制台用户' },
+    })
+    expect(managed.snapshot.users).toContainEqual({ id: '10099', name: '控制台用户' })
+    const reset = manageEnvironmentListener({ action: 'reset-default' })
+    expect(reset.snapshot.users.some(({ id }: { id: string }) => id === '10099')).toBe(false)
   })
 })

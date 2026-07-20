@@ -12,13 +12,19 @@ const snapshot: SandboxSnapshot = {
     { id: '10001', name: '测试用户' },
     { id: '10002', name: '协作用户' },
   ],
-  bots: [{ id: '20001', name: 'OneBot Sandbox' }],
+  bots: [{
+    id: '20001',
+    name: 'OneBot Sandbox',
+    implementation: 'napcat',
+    enabled: true,
+  }],
   groups: [],
   conversations: [
     { id: 'private:10001:20001', type: 'direct', userId: '10001', botId: '20001', messageIds: [] },
     { id: 'private:10002:20001', type: 'direct', userId: '10002', botId: '20001', messageIds: [] },
   ],
   messages: [],
+  requests: [],
 }
 
 describe('WebQQ 浏览器工作台状态', () => {

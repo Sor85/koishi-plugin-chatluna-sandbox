@@ -77,7 +77,13 @@
           </div>
         </aside>
 
-        <main class="webqq-chat">
+        <main :class="['webqq-chat', { 'is-environment': currentView === 'profile' }]">
+          <EnvironmentManager
+            v-if="currentView === 'profile'"
+            :snapshot="snapshot"
+            @updated="applyWorkspaceUpdate"
+          />
+          <template v-else>
           <header class="webqq-chat-header">
             <div class="webqq-chat-title">
               <span class="webqq-avatar webqq-avatar-bot">{{ getInitial(currentConversationTitle) }}</span>
@@ -213,17 +219,35 @@
               </button>
             </form>
           </div>
+          </template>
         </main>
 
-        <aside class="webqq-profile" :aria-label="currentGroup ? '群信息' : '私聊信息'">
+        <aside class="webqq-profile" :aria-label="currentView === 'profile' ? '环境摘要' : currentGroup ? '群信息' : '私聊信息'">
           <header class="webqq-info-header">
-            <strong>{{ currentGroup ? '群信息' : '私聊信息' }}</strong>
+            <strong>{{ currentView === 'profile' ? '环境摘要' : currentGroup ? '群信息' : '私聊信息' }}</strong>
             <button type="button" class="webqq-info-close" aria-label="关闭会话信息" @click="detailsOpen = false">
               <IconDots :size="22" aria-hidden="true" />
             </button>
           </header>
 
-          <div v-if="currentGroup" class="webqq-group-info-body">
+          <div v-if="currentView === 'profile'" v-webqq-scrollbar class="webqq-private-info">
+            <div class="webqq-profile-hero">
+              <span class="webqq-avatar webqq-avatar-profile webqq-avatar-bot">
+                <IconDatabase :size="32" aria-hidden="true" />
+              </span>
+              <h2>默认内存场景</h2>
+              <p>修订 {{ snapshot.revision }}</p>
+            </div>
+            <dl class="webqq-profile-details">
+              <div><dt>普通用户</dt><dd>{{ snapshot.users.length }}</dd></div>
+              <div><dt>虚拟机器人</dt><dd>{{ snapshot.bots.length }}</dd></div>
+              <div><dt>群组</dt><dd>{{ snapshot.groups.length }}</dd></div>
+              <div><dt>待处理申请</dt><dd>{{ snapshot.requests.length }}</dd></div>
+              <div><dt>状态来源</dt><dd>服务端内存</dd></div>
+            </dl>
+          </div>
+
+          <div v-else-if="currentGroup" class="webqq-group-info-body">
             <section v-webqq-scrollbar class="webqq-group-announcements">
               <div class="webqq-info-section-title">
                 <h3>群公告</h3>
@@ -308,6 +332,7 @@ import {
   IconAddressBook,
   IconBell,
   IconClock,
+  IconDatabase,
   IconDots,
   IconMessageCircle,
   IconPaperclip,
@@ -320,6 +345,7 @@ import {
   IconUsers,
 } from '@tabler/icons-vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import EnvironmentManager from './environment-manager.vue'
 import {
   loadWorkspacePreferences,
   resolveWorkspaceSelection,
@@ -356,6 +382,7 @@ const emptySnapshot: SandboxSnapshot = {
   groups: [],
   conversations: [],
   messages: [],
+  requests: [],
 }
 const workspace = ref<SandboxWorkspaceState>({
   snapshot: emptySnapshot,
@@ -507,6 +534,15 @@ function applySelection(selection: ReturnType<typeof resolveWorkspaceSelection>)
   currentUserId.value = selection.currentUserId
   activeConversationId.value = selection.activeConversationId
   currentView.value = selection.currentView
+}
+
+function applyWorkspaceUpdate(nextWorkspace: SandboxWorkspaceState) {
+  workspace.value = nextWorkspace
+  applySelection(resolveWorkspaceSelection(snapshot.value, {
+    currentUserId: currentUserId.value,
+    activeConversationId: activeConversationId.value,
+    currentView: currentView.value,
+  }))
 }
 
 function selectConversation(conversationId: string) {

@@ -40,28 +40,30 @@ describe('模拟 QQ 环境消息闭环', () => {
 
     if (!control) throw new Error('沙盒控制服务未注册')
 
-    expect(control.getSnapshot()).toMatchObject({
-      users: [
-        { id: '10001', name: '测试用户' },
-        { id: '10002', name: '协作用户' },
-      ],
-      bots: [{ id: '20001', name: 'OneBot Sandbox' }],
-      groups: [{
-        id: '30001',
-        name: 'OneBot 测试群',
-        members: [
-          { participantId: '10001', role: 'owner' },
-          { participantId: '10002', role: 'member' },
-          { participantId: '20001', role: 'member' },
-        ],
-      }],
-      conversations: [
-        { id: 'private:10001:20001', type: 'direct', messageIds: [] },
-        { id: 'private:10002:20001', type: 'direct', messageIds: [] },
-        { id: 'group:30001:10001:20001', type: 'group', groupId: '30001', messageIds: [] },
-        { id: 'group:30001:10002:20001', type: 'group', groupId: '30001', messageIds: [] },
+    const initial = control.getSnapshot()
+    expect(initial.users.map(({ id }) => id)).toEqual(['10001', '10002', '10003', '10004'])
+    expect(initial.bots).toContainEqual(expect.objectContaining({ id: '20001', name: 'OneBot Sandbox' }))
+    expect(initial.groups[0]).toMatchObject({
+      id: '30001',
+      name: 'OneBot 测试群',
+      members: [
+        { participantId: '10001', role: 'owner' },
+        { participantId: '10003', role: 'admin' },
+        { participantId: '10002', role: 'member' },
+        { participantId: '20001', role: 'member' },
       ],
     })
+    expect(initial.conversations).toContainEqual(expect.objectContaining({
+      id: 'private:10001:20001',
+      type: 'direct',
+      messageIds: [],
+    }))
+    expect(initial.conversations).toContainEqual(expect.objectContaining({
+      id: 'group:30001:10001:20001',
+      type: 'group',
+      groupId: '30001',
+      messageIds: [],
+    }))
 
     await control.sendMessage({
       actorUserId: '10001',

@@ -3,9 +3,29 @@ export interface SandboxUser {
   name: string
 }
 
+export interface CreateSandboxUserInput extends SandboxUser {}
+
+export interface UpdateSandboxUserInput extends SandboxUser {}
+
+export interface DeleteSandboxUserInput {
+  id: string
+}
+
+export type SandboxImplementationProfile = 'napcat' | 'llbot'
+
 export interface SandboxBotProfile {
   id: string
   name: string
+  implementation: SandboxImplementationProfile
+  enabled: boolean
+}
+
+export interface CreateSandboxBotInput extends SandboxBotProfile {}
+
+export interface UpdateSandboxBotInput extends SandboxBotProfile {}
+
+export interface DeleteSandboxBotInput {
+  id: string
 }
 
 export type SandboxGroupRole = 'owner' | 'admin' | 'member'
@@ -30,6 +50,30 @@ export interface SandboxGroup {
   announcements: SandboxGroupAnnouncement[]
 }
 
+export interface CreateSandboxGroupInput {
+  id: string
+  name: string
+  members: SandboxGroupMember[]
+}
+
+export interface UpdateSandboxGroupInput extends CreateSandboxGroupInput {}
+
+export interface DeleteSandboxGroupInput {
+  id: string
+}
+
+export type ManageSandboxEnvironmentInput =
+  | { action: 'create-user', data: CreateSandboxUserInput }
+  | { action: 'update-user', data: UpdateSandboxUserInput }
+  | { action: 'delete-user', data: DeleteSandboxUserInput }
+  | { action: 'create-bot', data: CreateSandboxBotInput }
+  | { action: 'update-bot', data: UpdateSandboxBotInput }
+  | { action: 'delete-bot', data: DeleteSandboxBotInput }
+  | { action: 'create-group', data: CreateSandboxGroupInput }
+  | { action: 'update-group', data: UpdateSandboxGroupInput }
+  | { action: 'delete-group', data: DeleteSandboxGroupInput }
+  | { action: 'reset-default' }
+
 export interface SandboxConversation {
   id: string
   type: 'direct' | 'group'
@@ -47,6 +91,16 @@ export interface SandboxMessage {
   createdAt: string
 }
 
+export interface SandboxRelationshipRequest {
+  id: string
+  type: 'friend' | 'group'
+  requesterId: string
+  targetId?: string
+  groupId?: string
+  status: 'pending'
+  createdAt: string
+}
+
 export interface SandboxSnapshot {
   revision: number
   users: SandboxUser[]
@@ -54,6 +108,7 @@ export interface SandboxSnapshot {
   groups: SandboxGroup[]
   conversations: SandboxConversation[]
   messages: SandboxMessage[]
+  requests: SandboxRelationshipRequest[]
 }
 
 export interface SandboxAppearance {
