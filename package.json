@@ -1,0 +1,84 @@
+{
+  "name": "koishi-plugin-onebot-sandbox",
+  "description": "在 Koishi 控制台中提供可验证 OneBot 插件行为的模拟 QQ 环境",
+  "version": "0.0.1",
+  "type": "commonjs",
+  "main": "lib/index.js",
+  "typings": "lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "require": "./lib/index.js",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "dist"
+  ],
+  "homepage": "https://github.com/Sor85/koishi-plugin-onebot-sandbox",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Sor85/koishi-plugin-onebot-sandbox.git"
+  },
+  "license": "MIT",
+  "scripts": {
+    "clean": "shx rm -rf lib dist",
+    "build": "yarn clean && yarn build:server && yarn build:client",
+    "build:types": "tsc -p tsconfig.json --emitDeclarationOnly",
+    "build:server": "yarn build:types && tsup src/index.ts --format cjs --out-dir lib --clean false",
+    "build:client": "vite build",
+    "typecheck": "vue-tsc -p tsconfig.typecheck.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "yarn test && yarn typecheck && yarn build"
+  },
+  "keywords": [
+    "bot",
+    "chatbot",
+    "koishi",
+    "onebot",
+    "sandbox",
+    "test"
+  ],
+  "koishi": {
+    "browser": true,
+    "public": [
+      "dist"
+    ],
+    "description": {
+      "zh": "在模拟 QQ 环境中验证 OneBot 插件行为"
+    },
+    "service": {
+      "required": [
+        "console"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@koishijs/plugin-console": "^5.30.11",
+    "koishi": "^4.18.10"
+  },
+  "dependencies": {
+    "@koishijs/console": "^5.30.11"
+  },
+  "devDependencies": {
+    "@koishijs/client": "^5.30.11",
+    "@koishijs/core": "^4.18.10",
+    "@koishijs/plugin-console": "^5.30.11",
+    "@tailwindcss/vite": "^4.1.11",
+    "@types/node": "^24.0.0",
+    "@vitejs/plugin-vue": "^6.0.2",
+    "koishi": "^4.18.10",
+    "shx": "^0.4.0",
+    "tailwindcss": "^4.1.11",
+    "tsup": "^8.0.0",
+    "typescript": "5.7.2",
+    "vite": "^6.0.0",
+    "vitest": "^3.2.4",
+    "vue": "^3.5.21",
+    "vue-tsc": "^3.0.0"
+  },
+  "packageManager": "yarn@4.15.0"
+}

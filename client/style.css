@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+.onebot-sandbox-page {
+  min-height: 100%;
+  background: #f8fafc;
+}
+
+@media (max-width: 768px) {
+  .onebot-sandbox-page {
+    margin-left: var(--activity-width, 3.5rem);
+    width: calc(100% - var(--activity-width, 3.5rem));
+  }
+}

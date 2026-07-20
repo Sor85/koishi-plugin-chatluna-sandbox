@@ -1,0 +1,16 @@
+node_modules
+.playwright-mcp
+.playwright-cli
+.pnp.*
+.yarn/*
+!.yarn/releases
+!.yarn/releases/**
+!.yarn/plugins
+!.yarn/plugins/**
+!.yarn/sdks
+!.yarn/sdks/**
+!.yarn/versions
+!.yarn/versions/**
+lib
+dist
+*.tsbuildinfo
