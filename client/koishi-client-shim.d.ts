@@ -1,6 +1,6 @@
 declare module '@koishijs/client' {
   import type { Component } from 'vue'
-  import type { SandboxSnapshot, SendMessageInput } from '../src/types'
+  import type { SandboxWorkspaceState, SendMessageInput } from '../src/types'
 
   export interface Context {
     page(options: {
@@ -13,6 +13,6 @@ declare module '@koishijs/client' {
     }): unknown
   }
 
-  export function send(event: 'onebot-sandbox/snapshot'): Promise<SandboxSnapshot>
-  export function send(event: 'onebot-sandbox/send-message', input: SendMessageInput): Promise<SandboxSnapshot>
+  export function send(event: 'onebot-sandbox/workspace'): Promise<SandboxWorkspaceState>
+  export function send(event: 'onebot-sandbox/send-message', input: SendMessageInput): Promise<SandboxWorkspaceState>
 }

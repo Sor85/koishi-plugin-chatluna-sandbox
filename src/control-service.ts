@@ -8,19 +8,29 @@ import type {
 } from './types'
 
 const DEFAULT_USER_ID = '10001'
+const SECONDARY_USER_ID = '10002'
 const DEFAULT_BOT_ID = '20001'
 const DEFAULT_CONVERSATION_ID = `private:${DEFAULT_USER_ID}:${DEFAULT_BOT_ID}`
+const SECONDARY_CONVERSATION_ID = `private:${SECONDARY_USER_ID}:${DEFAULT_BOT_ID}`
 
 export class SandboxControlService {
   readonly bot: SandboxBot
 
   private scene: SandboxSnapshot = {
     revision: 0,
-    users: [{ id: DEFAULT_USER_ID, name: '测试用户' }],
+    users: [
+      { id: DEFAULT_USER_ID, name: '测试用户' },
+      { id: SECONDARY_USER_ID, name: '协作用户' },
+    ],
     bots: [{ id: DEFAULT_BOT_ID, name: 'OneBot Sandbox' }],
     conversations: [{
       id: DEFAULT_CONVERSATION_ID,
       userId: DEFAULT_USER_ID,
+      botId: DEFAULT_BOT_ID,
+      messageIds: [],
+    }, {
+      id: SECONDARY_CONVERSATION_ID,
+      userId: SECONDARY_USER_ID,
       botId: DEFAULT_BOT_ID,
       messageIds: [],
     }],

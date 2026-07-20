@@ -2,6 +2,15 @@ import { App } from '@koishijs/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { registerConsole, type SandboxConsoleRegistrar } from '../src/console'
 import { SandboxControlService } from '../src/control-service'
+import type { SandboxAppearance } from '../src/types'
+
+const appearance: SandboxAppearance = {
+  enableWebQQFrostedGlass: true,
+  webQQChatStyle: 'tim',
+  webQQTimBubbleTail: true,
+  webQQColorMode: 'auto',
+  webQQAccentColor: '#2563eb',
+}
 
 const runningApps: App[] = []
 
@@ -33,22 +42,25 @@ describe('Koishi 控制台适配器', () => {
       },
     }
 
-    registerConsole(consoleRegistrar, control)
+    registerConsole(consoleRegistrar, control, appearance)
 
     expect(entries).toEqual([{
       dev: expect.stringContaining('client/index.ts'),
       prod: expect.stringContaining('dist'),
     }])
 
-    const snapshotListener = listeners.get('onebot-sandbox/snapshot')
+    const snapshotListener = listeners.get('onebot-sandbox/workspace')
     const sendMessageListener = listeners.get('onebot-sandbox/send-message')
     if (typeof snapshotListener !== 'function' || typeof sendMessageListener !== 'function') {
       throw new Error('控制台监听器未注册')
     }
 
     expect(snapshotListener()).toMatchObject({
-      users: [{ id: '10001' }],
-      bots: [{ id: '20001' }],
+      snapshot: {
+        users: [{ id: '10001' }, { id: '10002' }],
+        bots: [{ id: '20001' }],
+      },
+      appearance,
     })
 
     const snapshot = await sendMessageListener({
@@ -57,7 +69,7 @@ describe('Koishi 控制台适配器', () => {
       conversationId: 'private:10001:20001',
       content: '控制台消息',
     })
-    expect(snapshot.messages.map(({ content }: { content: string }) => content)).toEqual([
+    expect(snapshot.snapshot.messages.map(({ content }: { content: string }) => content)).toEqual([
       '控制台消息',
       '回复：控制台消息',
     ])

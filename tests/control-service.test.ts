@@ -41,9 +41,15 @@ describe('模拟 QQ 环境消息闭环', () => {
     if (!control) throw new Error('沙盒控制服务未注册')
 
     expect(control.getSnapshot()).toMatchObject({
-      users: [{ id: '10001', name: '测试用户' }],
+      users: [
+        { id: '10001', name: '测试用户' },
+        { id: '10002', name: '协作用户' },
+      ],
       bots: [{ id: '20001', name: 'OneBot Sandbox' }],
-      conversations: [{ id: 'private:10001:20001', messageIds: [] }],
+      conversations: [
+        { id: 'private:10001:20001', messageIds: [] },
+        { id: 'private:10002:20001', messageIds: [] },
+      ],
     })
 
     await control.sendMessage({

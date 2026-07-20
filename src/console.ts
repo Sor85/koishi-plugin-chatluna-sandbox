@@ -1,11 +1,15 @@
 import { resolve } from 'node:path'
 import type {} from '@koishijs/console'
 import type { SandboxControlService } from './control-service'
-import type { SandboxSnapshot, SendMessageInput } from './types'
+import type {
+  SandboxAppearance,
+  SandboxWorkspaceState,
+  SendMessageInput,
+} from './types'
 
 interface ConsoleEventMap {
-  'onebot-sandbox/snapshot': () => SandboxSnapshot
-  'onebot-sandbox/send-message': (input: SendMessageInput) => Promise<SandboxSnapshot>
+  'onebot-sandbox/workspace': () => SandboxWorkspaceState
+  'onebot-sandbox/send-message': (input: SendMessageInput) => Promise<SandboxWorkspaceState>
 }
 
 export interface SandboxConsoleRegistrar {
@@ -17,22 +21,31 @@ export interface SandboxConsoleRegistrar {
   ): unknown
 }
 
-export function registerConsole(console: SandboxConsoleRegistrar, control: SandboxControlService) {
+export function registerConsole(
+  console: SandboxConsoleRegistrar,
+  control: SandboxControlService,
+  appearance: SandboxAppearance,
+) {
   console.addEntry({
     dev: resolve(__dirname, '../client/index.ts'),
     prod: resolve(__dirname, '../dist'),
   })
 
-  console.addListener('onebot-sandbox/snapshot', () => control.getSnapshot(), { authority: 4 })
+  const getWorkspace = (): SandboxWorkspaceState => ({
+    snapshot: control.getSnapshot(),
+    appearance,
+  })
+
+  console.addListener('onebot-sandbox/workspace', getWorkspace, { authority: 4 })
   console.addListener('onebot-sandbox/send-message', async (input) => {
     await control.sendMessage(input)
-    return control.getSnapshot()
+    return getWorkspace()
   }, { authority: 4 })
 }
 
 declare module '@koishijs/console' {
   interface Events {
-    'onebot-sandbox/snapshot'(): SandboxSnapshot
-    'onebot-sandbox/send-message'(input: SendMessageInput): Promise<SandboxSnapshot>
+    'onebot-sandbox/workspace'(): SandboxWorkspaceState
+    'onebot-sandbox/send-message'(input: SendMessageInput): Promise<SandboxWorkspaceState>
   }
 }

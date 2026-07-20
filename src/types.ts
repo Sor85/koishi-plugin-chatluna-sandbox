@@ -31,6 +31,19 @@ export interface SandboxSnapshot {
   messages: SandboxMessage[]
 }
 
+export interface SandboxAppearance {
+  enableWebQQFrostedGlass: boolean
+  webQQChatStyle: 'tim' | 'qq'
+  webQQTimBubbleTail: boolean
+  webQQColorMode: 'auto' | 'light' | 'dark'
+  webQQAccentColor: string
+}
+
+export interface SandboxWorkspaceState {
+  snapshot: SandboxSnapshot
+  appearance: SandboxAppearance
+}
+
 export interface SendMessageInput {
   actorUserId: string
   botId: string

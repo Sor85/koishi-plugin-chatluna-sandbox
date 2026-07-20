@@ -6,14 +6,723 @@ body,
   min-height: 100%;
 }
 
+.onebot-sandbox-page .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .onebot-sandbox-page {
+  height: calc(100vh - var(--header-height, 3rem) - var(--footer-height, 1.75rem));
+  min-height: 0;
+  overflow: hidden;
+  background: #dfe7f2;
+}
+
+.onebot-sandbox-page .el-scrollbar,
+.onebot-sandbox-page .el-scrollbar__wrap,
+.onebot-sandbox-page .el-scrollbar__view,
+.onebot-sandbox-page .k-content {
+  height: 100%;
+  min-height: 0;
+}
+
+.onebot-sandbox-page .k-content {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+.webqq-workspace {
+  --webqq-bg: #e8edf5;
+  --webqq-rail: #eef3fa;
+  --webqq-surface: #ffffff;
+  --webqq-surface-muted: #f5f7fb;
+  --webqq-border: #dfe5ee;
+  --webqq-text: #202938;
+  --webqq-muted: #7a8494;
+  --webqq-hover: #edf2f8;
+  display: grid;
+  grid-template-columns: 72px minmax(230px, 300px) minmax(360px, 1fr) 280px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  color: var(--webqq-text);
+  background: var(--webqq-bg);
+}
+
+.webqq-workspace[data-color-mode="dark"] {
+  --webqq-bg: #111827;
+  --webqq-rail: #172033;
+  --webqq-surface: #1d2738;
+  --webqq-surface-muted: #162032;
+  --webqq-border: #2f3a4d;
+  --webqq-text: #edf2f7;
+  --webqq-muted: #9ba7b8;
+  --webqq-hover: #273247;
+}
+
+@media (prefers-color-scheme: dark) {
+  .webqq-workspace[data-color-mode="auto"] {
+    --webqq-bg: #111827;
+    --webqq-rail: #172033;
+    --webqq-surface: #1d2738;
+    --webqq-surface-muted: #162032;
+    --webqq-border: #2f3a4d;
+    --webqq-text: #edf2f7;
+    --webqq-muted: #9ba7b8;
+    --webqq-hover: #273247;
+  }
+}
+
+.webqq-rail,
+.webqq-conversations,
+.webqq-chat,
+.webqq-profile {
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid var(--webqq-border);
+  background: var(--webqq-surface);
+}
+
+.webqq-workspace.is-frosted .webqq-rail,
+.webqq-workspace.is-frosted .webqq-conversations,
+.webqq-workspace.is-frosted .webqq-profile {
+  background: color-mix(in srgb, var(--webqq-surface) 88%, transparent);
+  backdrop-filter: blur(20px);
+}
+
+.webqq-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 8px;
+  background: var(--webqq-rail);
+}
+
+.webqq-brand,
+.webqq-current-user,
+.webqq-menu-avatar,
+.webqq-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  color: #fff;
+  background: var(--webqq-accent);
+  user-select: none;
+}
+
+.webqq-brand {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 12px;
+  border-radius: 13px;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.webqq-rail-button,
+.webqq-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  color: var(--webqq-muted);
+  background: transparent;
+}
+
+.webqq-rail-button {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+}
+
+.webqq-rail-button:hover,
+.webqq-rail-button:focus-visible,
+.webqq-icon-button:hover,
+.webqq-icon-button:focus-visible {
+  color: var(--webqq-text);
+  background: var(--webqq-hover);
+  outline: none;
+}
+
+.webqq-rail-button.is-active {
+  color: #fff;
+  background: var(--webqq-accent);
+}
+
+.webqq-rail-spacer {
+  flex: 1;
+}
+
+.webqq-current-user {
+  width: 42px;
+  height: 42px;
+  border: 3px solid var(--webqq-surface);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--webqq-border);
+  font-weight: 700;
+}
+
+.webqq-menu-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.webqq-conversations,
+.webqq-profile {
+  display: flex;
+  flex-direction: column;
+}
+
+.webqq-pane-header,
+.webqq-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 76px;
+  padding: 16px;
+  border-bottom: 1px solid var(--webqq-border);
+}
+
+.webqq-pane-header p,
+.webqq-pane-header h1,
+.webqq-chat-title strong,
+.webqq-chat-title span {
+  margin: 0;
+}
+
+.webqq-pane-header p {
+  color: var(--webqq-muted);
+  font-size: 12px;
+}
+
+.webqq-pane-header h1 {
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.webqq-icon-button {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+
+.webqq-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  margin: 16px 16px 8px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--webqq-muted);
+  background: var(--webqq-surface-muted);
+}
+
+.webqq-search:focus-within {
+  border-color: var(--webqq-accent);
+}
+
+.webqq-search input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  outline: 0;
+  color: var(--webqq-text);
+  background: transparent;
+}
+
+.webqq-list-tabs {
+  display: flex;
+  gap: 16px;
+  padding: 0 16px 8px;
+  border-bottom: 1px solid var(--webqq-border);
+}
+
+.webqq-list-tabs button {
+  position: relative;
+  padding: 4px 0;
+  border: 0;
+  color: var(--webqq-muted);
+  background: transparent;
+  font-size: 13px;
+}
+
+.webqq-list-tabs button.is-active {
+  color: var(--webqq-text);
+  font-weight: 600;
+}
+
+.webqq-list-tabs button.is-active::after {
+  position: absolute;
+  right: 0;
+  bottom: -11px;
+  left: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--webqq-accent);
+  content: "";
+}
+
+.webqq-session-list {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.webqq-session {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 12px;
+  text-align: left;
+  color: var(--webqq-text);
+  background: transparent;
+}
+
+.webqq-session:hover,
+.webqq-session:focus-visible {
+  background: var(--webqq-hover);
+  outline: none;
+}
+
+.webqq-session.is-active {
+  background: color-mix(in srgb, var(--webqq-accent) 13%, var(--webqq-surface));
+}
+
+.webqq-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.webqq-avatar-bot {
+  background: #59657a;
+}
+
+.webqq-session-copy,
+.webqq-session-copy strong,
+.webqq-session-copy small {
+  min-width: 0;
+}
+
+.webqq-session-copy strong,
+.webqq-session-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webqq-session-copy strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.webqq-session-copy small,
+.webqq-session time {
+  color: var(--webqq-muted);
+  font-size: 12px;
+}
+
+.webqq-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--webqq-muted);
+  font-size: 13px;
+}
+
+.webqq-chat {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: var(--webqq-bg);
+}
+
+.webqq-chat-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.webqq-chat-title strong,
+.webqq-chat-title span {
+  display: block;
+}
+
+.webqq-chat-title span {
+  margin-top: 2px;
+  color: var(--webqq-muted);
+  font-size: 12px;
+}
+
+.webqq-messages {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px clamp(16px, 4vw, 48px);
+}
+
+.webqq-messages ol {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.webqq-welcome {
+  display: flex;
   min-height: 100%;
-  background: #f8fafc;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.webqq-avatar-large {
+  width: 68px;
+  height: 68px;
+  margin-bottom: 12px;
+  border-radius: 22px;
+  font-size: 24px;
+}
+
+.webqq-welcome strong {
+  font-size: 17px;
+}
+
+.webqq-welcome p {
+  max-width: 300px;
+  margin: 6px 0 0;
+  color: var(--webqq-muted);
+  font-size: 13px;
+}
+
+.webqq-message-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.webqq-message-row.is-outgoing {
+  flex-direction: row-reverse;
+}
+
+.webqq-message-author {
+  display: block;
+  margin: 0 4px 4px;
+  color: var(--webqq-muted);
+  font-size: 11px;
+}
+
+.webqq-message-row.is-outgoing .webqq-message-author {
+  text-align: right;
+}
+
+.webqq-message-bubble {
+  position: relative;
+  max-width: min(580px, 66vw);
+  margin: 0;
+  padding: 8px 16px;
+  border: 1px solid var(--webqq-border);
+  border-radius: 12px;
+  color: var(--webqq-text);
+  background: var(--webqq-surface);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.webqq-message-row.is-outgoing .webqq-message-bubble {
+  border-color: var(--webqq-accent);
+  color: #fff;
+  background: var(--webqq-accent);
+}
+
+.webqq-workspace[data-chat-style="qq"] .webqq-message-bubble {
+  border-radius: 18px;
+}
+
+.webqq-workspace[data-chat-style="tim"].has-tim-tail .webqq-message-row.is-outgoing .webqq-message-bubble::after {
+  position: absolute;
+  top: 12px;
+  right: -6px;
+  width: 10px;
+  height: 10px;
+  background: var(--webqq-accent);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+  content: "";
+}
+
+.webqq-composer {
+  margin: 0 16px 16px;
+  border: 1px solid var(--webqq-border);
+  border-radius: 14px;
+  background: var(--webqq-surface);
+  box-shadow: 0 10px 30px rgb(15 23 42 / 8%);
+}
+
+.webqq-composer-tools {
+  display: flex;
+  gap: 4px;
+  padding: 8px 8px 0;
+}
+
+.webqq-composer-tools button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--webqq-muted);
+  background: transparent;
+}
+
+.webqq-composer textarea {
+  display: block;
+  width: 100%;
+  min-height: 74px;
+  resize: none;
+  border: 0;
+  padding: 8px 16px;
+  outline: 0;
+  color: var(--webqq-text);
+  background: transparent;
+}
+
+.webqq-composer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 8px 8px 8px 16px;
+  color: #dc2626;
+  font-size: 12px;
+}
+
+.webqq-composer-footer button {
+  min-width: 74px;
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 9px;
+  color: #fff;
+  background: var(--webqq-accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.webqq-composer-footer button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.webqq-profile {
+  border-right: 0;
+  overflow-y: auto;
+}
+
+.webqq-profile-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 24px 24px;
+  border-bottom: 1px solid var(--webqq-border);
+  text-align: center;
+}
+
+.webqq-avatar-profile {
+  width: 76px;
+  height: 76px;
+  border-radius: 24px;
+  font-size: 26px;
+}
+
+.webqq-profile-hero h2 {
+  margin: 16px 0 4px;
+  font-size: 17px;
+}
+
+.webqq-profile-hero p {
+  margin: 0;
+  color: var(--webqq-muted);
+  font-size: 12px;
+}
+
+.webqq-online {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  color: #16a34a;
+  font-size: 12px;
+}
+
+.webqq-online i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.webqq-profile-details {
+  margin: 0;
+  padding: 16px;
+  border-bottom: 1px solid var(--webqq-border);
+}
+
+.webqq-profile-details div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  font-size: 13px;
+}
+
+.webqq-profile-details dt {
+  color: var(--webqq-muted);
+}
+
+.webqq-profile-details dd {
+  margin: 0;
+}
+
+.webqq-user-directory {
+  padding: 16px;
+}
+
+.webqq-section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.webqq-section-title h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.webqq-section-title span {
+  color: var(--webqq-muted);
+  font-size: 11px;
+}
+
+.webqq-user-directory button {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 10px;
+  text-align: left;
+  color: var(--webqq-text);
+  background: transparent;
+}
+
+.webqq-user-directory button:hover,
+.webqq-user-directory button:focus-visible,
+.webqq-user-directory button.is-active {
+  background: var(--webqq-hover);
+  outline: none;
+}
+
+.webqq-user-directory strong,
+.webqq-user-directory small {
+  display: block;
+}
+
+.webqq-user-directory strong {
+  font-size: 13px;
+}
+
+.webqq-user-directory small {
+  color: var(--webqq-muted);
+  font-size: 11px;
+}
+
+@media (max-width: 1180px) {
+  .webqq-workspace {
+    grid-template-columns: 72px minmax(220px, 280px) minmax(360px, 1fr);
+  }
+
+  .webqq-profile {
+    display: none;
+  }
 }
 
 @media (max-width: 768px) {
   .onebot-sandbox-page {
     margin-left: var(--activity-width, 3.5rem);
     width: calc(100% - var(--activity-width, 3.5rem));
+  }
+
+  .webqq-workspace {
+    grid-template-columns: 60px minmax(0, 1fr);
+  }
+
+  .webqq-rail {
+    grid-column: 1;
+    grid-row: 1;
+    padding: 16px 8px;
+  }
+
+  .webqq-brand {
+    width: 38px;
+    height: 38px;
+  }
+
+  .webqq-rail-button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .webqq-conversations,
+  .webqq-chat,
+  .webqq-profile {
+    display: none;
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .webqq-workspace[data-mobile-view="contacts"] .webqq-conversations,
+  .webqq-workspace[data-mobile-view="messages"] .webqq-chat,
+  .webqq-workspace[data-mobile-view="profile"] .webqq-profile {
+    display: flex;
+  }
+
+  .webqq-workspace[data-mobile-view="messages"] .webqq-chat {
+    display: grid;
+  }
+
+  .webqq-profile {
+    border-right: 0;
+  }
+
+  .webqq-message-bubble {
+    max-width: calc(100vw - 190px);
   }
 }
