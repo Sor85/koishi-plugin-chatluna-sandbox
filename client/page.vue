@@ -127,34 +127,92 @@
             </ol>
           </section>
 
-          <form class="webqq-composer" @submit.prevent="sendMessage">
-            <span v-if="errorMessage" class="webqq-composer-error" role="alert">{{ errorMessage }}</span>
-            <span class="webqq-composer-avatar" aria-hidden="true">
-              {{ getInitial(currentUser?.name) }}
-            </span>
-            <div class="webqq-composer-main">
-              <label class="sr-only" for="onebot-sandbox-input">消息内容</label>
-              <textarea
-                id="onebot-sandbox-input"
-                v-model="input"
-                rows="1"
-                placeholder="发送消息"
-                :disabled="sending || !currentConversation"
-                @keydown.enter.exact.prevent="sendMessage"
-              />
-            </div>
-            <button class="webqq-composer-action" type="button" aria-label="选择文件" disabled>
-              <IconPaperclip :size="19" stroke-width="2" aria-hidden="true" />
-            </button>
-            <button
-              class="webqq-composer-action is-primary"
-              type="submit"
-              aria-label="发送"
-              :disabled="sending || !input.trim() || !currentConversation"
-            >
-              <IconSend :size="19" stroke-width="2" aria-hidden="true" />
-            </button>
-          </form>
+          <div ref="composerLayoutRef" class="webqq-composer-layout-root">
+            <form class="webqq-composer" :style="composerStyle" @submit.prevent="sendMessage">
+              <span v-if="errorMessage" class="webqq-composer-error" role="alert">{{ errorMessage }}</span>
+              <div
+                :class="['webqq-composer-user-capsule', { 'has-user-stack': hasMultipleUsers, 'is-expanded': userStackVisualExpanded }]"
+                :style="userCapsuleStyle"
+                @pointerenter="expandUserStack"
+                @pointerleave="collapseUserStack"
+                @focusin="focusUserStack"
+                @focusout="blurUserStack"
+              >
+                <div
+                  v-if="hasMultipleUsers"
+                  ref="userStackRef"
+                  :class="['webqq-composer-user-stack', {
+                    'is-expanded': userStackVisualExpanded,
+                    'is-overflow-expanding': userStackOverflowMotion === 'expanding',
+                    'is-overflow-collapsing': userStackOverflowMotion === 'collapsing',
+                  }]"
+                  :style="userStackStyle"
+                >
+                  <button
+                    v-for="(user, index) in userStackUsers"
+                    :key="user.id"
+                    type="button"
+                    :class="['webqq-composer-user-switch', {
+                      'is-active': user.id === currentUserId,
+                      'is-collapsed-extra': isUserCollapsedExtra(index),
+                    }]"
+                    :aria-label="user.id === currentUserId ? `当前用户：${user.name}` : `切换到用户：${user.name}`"
+                    :aria-pressed="user.id === currentUserId"
+                    :aria-hidden="isUserCollapsedHidden(index) ? 'true' : undefined"
+                    :tabindex="isUserCollapsedHidden(index) ? -1 : undefined"
+                    :style="getUserSwitchStyle(index)"
+                    @click="selectComposerUser(user.id)"
+                  >
+                    <span class="webqq-composer-user-avatar">{{ getInitial(user.name) }}</span>
+                  </button>
+                  <span
+                    v-if="userStackMetrics.overflowCount"
+                    class="webqq-composer-user-overflow"
+                    :style="userOverflowStyle"
+                    aria-hidden="true"
+                  >
+                    <span v-if="userOverflowPreview" class="webqq-composer-user-overflow-avatar">
+                      {{ getInitial(userOverflowPreview.name) }}
+                    </span>
+                    <span class="webqq-composer-user-overflow-label">
+                      <span class="webqq-composer-user-overflow-plus">+</span>
+                      <span class="webqq-composer-user-overflow-count">{{ userStackMetrics.overflowCount }}</span>
+                    </span>
+                  </span>
+                </div>
+                <button
+                  v-else
+                  type="button"
+                  class="webqq-composer-user-button"
+                  :aria-label="`当前用户：${currentUser?.name ?? '未选择'}`"
+                >
+                  <span class="webqq-composer-user-avatar">{{ getInitial(currentUser?.name) }}</span>
+                </button>
+              </div>
+              <div class="webqq-composer-main">
+                <label class="sr-only" for="onebot-sandbox-input">消息内容</label>
+                <textarea
+                  id="onebot-sandbox-input"
+                  v-model="input"
+                  rows="1"
+                  placeholder="发送消息"
+                  :disabled="sending || !currentConversation"
+                  @keydown.enter.exact.prevent="sendMessage"
+                />
+              </div>
+              <button class="webqq-composer-action" type="button" aria-label="选择文件" disabled>
+                <IconPaperclip :size="19" stroke-width="2" aria-hidden="true" />
+              </button>
+              <button
+                class="webqq-composer-action is-primary"
+                type="submit"
+                aria-label="发送"
+                :disabled="sending || !input.trim() || !currentConversation"
+              >
+                <IconSend :size="19" stroke-width="2" aria-hidden="true" />
+              </button>
+            </form>
+          </div>
         </main>
 
         <aside class="webqq-profile" :aria-label="currentGroup ? '群信息' : '私聊信息'">
@@ -245,6 +303,7 @@
 
 <script setup lang="ts">
 import { send } from '@koishijs/client'
+import { createLayout, type AutoLayout } from 'animejs'
 import {
   IconAddressBook,
   IconBell,
@@ -260,7 +319,7 @@ import {
   IconUserCircle,
   IconUsers,
 } from '@tabler/icons-vue'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
   loadWorkspacePreferences,
   resolveWorkspaceSelection,
@@ -268,6 +327,13 @@ import {
   type SandboxWorkspaceView,
 } from './workspace-state'
 import { vWebqqScrollbar } from './webqq-scrollbar'
+import {
+  getUserStackMetrics,
+  orderUsersByActive,
+  USER_AVATAR_SIZE,
+  USER_STACK_COLLAPSED_STEP,
+  USER_STACK_EXPANDED_STEP,
+} from './user-stack'
 import type {
   SandboxAppearance,
   SandboxConversation,
@@ -310,6 +376,17 @@ const deletingAnnouncementId = ref('')
 const groupMemberSearch = ref('')
 const detailsOpen = ref(false)
 const hydrated = ref(false)
+const composerLayoutRef = ref<HTMLElement>()
+const userStackRef = ref<HTMLElement>()
+const userStackExpanded = ref(false)
+const userStackHovered = ref(false)
+const userStackFocused = ref(false)
+type UserStackOverflowMotion = 'idle' | 'expanding' | 'collapsing'
+const userStackOverflowMotion = ref<UserStackOverflowMotion>('idle')
+let suppressUserStackCollapse = false
+let suppressUserStackCollapseTimer: ReturnType<typeof setTimeout> | undefined
+let userStackOverflowMotionTimer: ReturnType<typeof setTimeout> | undefined
+let userStackLayout: AutoLayout | undefined
 type SidebarTab = 'recent' | 'friends' | 'groups'
 const sidebarTab = ref<SidebarTab>('recent')
 
@@ -325,6 +402,41 @@ const sidebarTabs = [
 ]
 const snapshot = computed(() => workspace.value.snapshot)
 const currentUser = computed(() => snapshot.value.users.find(({ id }) => id === currentUserId.value))
+const hasMultipleUsers = computed(() => snapshot.value.users.length > 1)
+const userStackUsers = computed(() => orderUsersByActive(snapshot.value.users, currentUserId.value))
+const userStackMetrics = computed(() => getUserStackMetrics(userStackUsers.value.length))
+const hasUserStackOverflow = computed(() => userStackMetrics.value.overflowCount > 0)
+const userStackVisualExpanded = computed(() => userStackExpanded.value || !hasUserStackOverflow.value)
+const userOverflowPreview = computed(() => userStackUsers.value[userStackMetrics.value.collapsedVisibleCount])
+const visibleUserStackWidth = computed(() => userStackVisualExpanded.value
+  ? userStackMetrics.value.expandedWidth
+  : userStackMetrics.value.collapsedWidth)
+const composerStyle = computed(() => {
+  const extraWidth = hasMultipleUsers.value ? Math.max(0, visibleUserStackWidth.value - USER_AVATAR_SIZE) : 0
+  return {
+    '--webqq-composer-extra-width': `${extraWidth}px`,
+  }
+})
+const userCapsuleStyle = computed(() => ({
+  '--webqq-user-capsule-collapsed-width': `${userStackMetrics.value.collapsedWidth}px`,
+  '--webqq-user-capsule-expanded-width': `${userStackMetrics.value.expandedWidth}px`,
+}))
+const userStackStyle = computed(() => ({
+  '--webqq-user-stack-collapsed-width': `${userStackMetrics.value.collapsedWidth}px`,
+  '--webqq-user-stack-expanded-width': `${userStackMetrics.value.expandedWidth}px`,
+}))
+const userOverflowStyle = computed(() => {
+  const collapsedRight = userStackMetrics.value.collapsedVisibleCount * USER_STACK_COLLAPSED_STEP
+  const expandedRight = userStackMetrics.value.collapsedVisibleCount * USER_STACK_EXPANDED_STEP
+  const coveredByExpandedAvatar = userStackExpanded.value || userStackOverflowMotion.value === 'expanding'
+  const overflowZIndex = userStackUsers.value.length - userStackMetrics.value.collapsedVisibleCount
+    - (coveredByExpandedAvatar ? 1 : 0)
+  return {
+    '--webqq-user-overflow-right': `${collapsedRight}px`,
+    '--webqq-user-overflow-expanded-right': `${expandedRight}px`,
+    '--webqq-user-overflow-z-index': `${overflowZIndex}`,
+  }
+})
 const visibleConversations = computed(() => snapshot.value.conversations.filter(({ userId }) => userId === currentUserId.value))
 const filteredConversations = computed(() => {
   const conversations = visibleConversations.value.filter((conversation) => {
@@ -387,6 +499,10 @@ watch(activeConversationId, () => {
   infoErrorMessage.value = ''
 })
 
+watch(hasUserStackOverflow, (hasOverflow) => {
+  if (!hasOverflow) userStackExpanded.value = false
+})
+
 function applySelection(selection: ReturnType<typeof resolveWorkspaceSelection>) {
   currentUserId.value = selection.currentUserId
   activeConversationId.value = selection.activeConversationId
@@ -410,6 +526,114 @@ function selectSidebarTab(tab: SidebarTab) {
   currentView.value = 'contacts'
 }
 
+function getUserSwitchStyle(index: number) {
+  const collapsedRight = isUserCollapsedExtra(index)
+    ? userStackMetrics.value.collapsedVisibleCount * USER_STACK_COLLAPSED_STEP
+    : index * USER_STACK_COLLAPSED_STEP
+  return {
+    '--webqq-user-collapsed-right': `${collapsedRight}px`,
+    '--webqq-user-expanded-right': `${index * USER_STACK_EXPANDED_STEP}px`,
+    zIndex: String(userStackUsers.value.length - index),
+  }
+}
+
+function isUserCollapsedExtra(index: number) {
+  return userStackMetrics.value.overflowCount > 0 && index >= userStackMetrics.value.collapsedVisibleCount
+}
+
+function isUserCollapsedHidden(index: number) {
+  return !userStackExpanded.value && isUserCollapsedExtra(index)
+}
+
+function ensureUserStackLayout() {
+  if (userStackLayout || !userStackRef.value) return userStackLayout
+  // FLIP 根节点必须收窄到头像组。若使用整个发送区域，Anime.js 会投影根节点的直接子元素，
+  // 即使 children 没有显式选择表单，也会让右锚定的发送控件产生临时 translate。
+  userStackLayout = createLayout(userStackRef.value, {
+    children: [
+      '.webqq-composer-user-switch',
+      '.webqq-composer-user-overflow',
+    ],
+  })
+  return userStackLayout
+}
+
+function recordUserStackLayout() {
+  const layout = ensureUserStackLayout()
+  layout?.record()
+  return layout
+}
+
+async function animateUserStackLayout(layout?: AutoLayout) {
+  if (!layout) return
+  await nextTick()
+  layout.animate({ duration: 260, ease: 'out(3)' })
+}
+
+function setUserStackExpanded(expanded: boolean) {
+  if (!hasMultipleUsers.value || !hasUserStackOverflow.value || userStackExpanded.value === expanded) return
+  const layout = recordUserStackLayout()
+  userStackOverflowMotion.value = expanded ? 'expanding' : 'collapsing'
+  if (userStackOverflowMotionTimer) clearTimeout(userStackOverflowMotionTimer)
+  userStackOverflowMotionTimer = setTimeout(() => {
+    userStackOverflowMotion.value = 'idle'
+    userStackOverflowMotionTimer = undefined
+  }, 280)
+  userStackExpanded.value = expanded
+  void animateUserStackLayout(layout)
+}
+
+// 与 WebQQ 胶囊保持一致：Chrome 在点击后会重新聚焦 keyed 按钮，重排期间的伪 focusout
+// 不能触发折叠，否则会中断 FLIP 并让头像停在错误位置。
+function syncUserStackExpanded() {
+  if (suppressUserStackCollapse) return
+  setUserStackExpanded(userStackHovered.value || userStackFocused.value)
+}
+
+function expandUserStack() {
+  userStackHovered.value = true
+  syncUserStackExpanded()
+}
+
+function collapseUserStack() {
+  userStackHovered.value = false
+  syncUserStackExpanded()
+}
+
+function focusUserStack() {
+  userStackFocused.value = true
+  syncUserStackExpanded()
+}
+
+function blurUserStack(event: FocusEvent) {
+  const nextTarget = event.relatedTarget
+  const currentTarget = event.currentTarget
+  userStackFocused.value = nextTarget instanceof Node
+    && currentTarget instanceof Node
+    && currentTarget.contains(nextTarget)
+  syncUserStackExpanded()
+}
+
+async function selectComposerUser(userId: string) {
+  if (userId === currentUserId.value) return
+  const layout = recordUserStackLayout()
+  suppressUserStackCollapse = true
+  if (suppressUserStackCollapseTimer) clearTimeout(suppressUserStackCollapseTimer)
+  applySelection(resolveWorkspaceSelection(snapshot.value, {
+    currentUserId: userId,
+    currentView: 'messages',
+  }))
+  input.value = ''
+  detailsOpen.value = false
+  await animateUserStackLayout(layout)
+  suppressUserStackCollapseTimer = setTimeout(() => {
+    suppressUserStackCollapse = false
+    suppressUserStackCollapseTimer = undefined
+    userStackFocused.value = !!composerLayoutRef.value?.contains(document.activeElement)
+    syncUserStackExpanded()
+  }, 280)
+}
+
 function getBot(botId?: string) {
   return snapshot.value.bots.find(({ id }) => id === botId)
 }
@@ -429,6 +653,13 @@ function getParticipantName(id: string) {
 function getInitial(name?: string) {
   return name?.trim().slice(0, 1).toUpperCase() || '?'
 }
+
+onBeforeUnmount(() => {
+  userStackLayout?.revert()
+  userStackLayout = undefined
+  if (suppressUserStackCollapseTimer) clearTimeout(suppressUserStackCollapseTimer)
+  if (userStackOverflowMotionTimer) clearTimeout(userStackOverflowMotionTimer)
+})
 
 function getGroupMemberName(member: SandboxGroupMember) {
   return member.card?.trim() || getParticipantName(member.participantId)

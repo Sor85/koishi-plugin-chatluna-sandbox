@@ -2878,6 +2878,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"animejs@npm:4.4.1":
+  version: 4.4.1
+  resolution: "animejs@npm:4.4.1"
+  checksum: 10c0/fed82adea748494d261378564eaeebfbe95987366671ddd4f06522174358bbf2c09d06facaa5ac9b3e7b004410b1ea69d5abf7a292be7bb448f4df03b0a0fae8
+  languageName: node
+  linkType: hard
+
 "any-promise@npm:^1.0.0":
   version: 1.3.0
   resolution: "any-promise@npm:1.3.0"
@@ -4501,6 +4508,7 @@ __metadata:
     "@types/node": "npm:^24.0.0"
     "@vitejs/plugin-vue": "npm:^6.0.2"
     "@vueuse/core": "npm:^14.3.0"
+    animejs: "npm:4.4.1"
     koishi: "npm:^4.18.10"
     reka-ui: "npm:^2.10.1"
     shx: "npm:^0.4.0"
