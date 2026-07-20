@@ -1,17 +1,22 @@
 import { Context, h, Random, Universal } from 'koishi'
 import { SandboxBot } from './bot'
 import type {
+  DeleteGroupAnnouncementInput,
   SandboxMessage,
   SandboxSnapshot,
   SendMessageInput,
   SendMessageResult,
+  SetGroupAnnouncementInput,
 } from './types'
 
 const DEFAULT_USER_ID = '10001'
 const SECONDARY_USER_ID = '10002'
 const DEFAULT_BOT_ID = '20001'
+const DEFAULT_GROUP_ID = '30001'
 const DEFAULT_CONVERSATION_ID = `private:${DEFAULT_USER_ID}:${DEFAULT_BOT_ID}`
 const SECONDARY_CONVERSATION_ID = `private:${SECONDARY_USER_ID}:${DEFAULT_BOT_ID}`
+const DEFAULT_GROUP_CONVERSATION_ID = `group:${DEFAULT_GROUP_ID}:${DEFAULT_USER_ID}:${DEFAULT_BOT_ID}`
+const SECONDARY_GROUP_CONVERSATION_ID = `group:${DEFAULT_GROUP_ID}:${SECONDARY_USER_ID}:${DEFAULT_BOT_ID}`
 
 export class SandboxControlService {
   readonly bot: SandboxBot
@@ -23,15 +28,46 @@ export class SandboxControlService {
       { id: SECONDARY_USER_ID, name: '协作用户' },
     ],
     bots: [{ id: DEFAULT_BOT_ID, name: 'OneBot Sandbox' }],
+    groups: [{
+      id: DEFAULT_GROUP_ID,
+      name: 'OneBot 测试群',
+      members: [
+        { participantId: DEFAULT_USER_ID, card: '测试群主', role: 'owner' },
+        { participantId: SECONDARY_USER_ID, card: '协作用户', role: 'member' },
+        { participantId: DEFAULT_BOT_ID, card: 'OneBot Sandbox', role: 'member' },
+      ],
+      announcements: [{
+        id: 'announcement:welcome',
+        authorId: DEFAULT_USER_ID,
+        content: '欢迎使用 OneBot Sandbox 验证群聊插件功能',
+        createdAt: new Date().toISOString(),
+      }],
+    }],
     conversations: [{
       id: DEFAULT_CONVERSATION_ID,
+      type: 'direct',
       userId: DEFAULT_USER_ID,
       botId: DEFAULT_BOT_ID,
       messageIds: [],
     }, {
       id: SECONDARY_CONVERSATION_ID,
+      type: 'direct',
       userId: SECONDARY_USER_ID,
       botId: DEFAULT_BOT_ID,
+      messageIds: [],
+    }, {
+      id: DEFAULT_GROUP_CONVERSATION_ID,
+      type: 'group',
+      userId: DEFAULT_USER_ID,
+      botId: DEFAULT_BOT_ID,
+      groupId: DEFAULT_GROUP_ID,
+      messageIds: [],
+    }, {
+      id: SECONDARY_GROUP_CONVERSATION_ID,
+      type: 'group',
+      userId: SECONDARY_USER_ID,
+      botId: DEFAULT_BOT_ID,
+      groupId: DEFAULT_GROUP_ID,
       messageIds: [],
     }],
     messages: [],
@@ -58,6 +94,14 @@ export class SandboxControlService {
     if (!conversation || conversation.userId !== user.id || conversation.botId !== bot.id) {
       throw new Error(`会话不存在：${input.conversationId}`)
     }
+    const group = conversation.groupId
+      ? this.scene.groups.find(({ id }) => id === conversation.groupId)
+      : undefined
+    if (conversation.type === 'group' && (!group
+      || !group.members.some(({ participantId }) => participantId === user.id)
+      || !group.members.some(({ participantId }) => participantId === bot.id))) {
+      throw new Error(`群聊关系不存在：${input.conversationId}`)
+    }
     if (!input.content.trim()) throw new Error('消息内容不能为空')
 
     const message = this.appendMessage(user.id, conversation.id, input.content.trim())
@@ -67,8 +111,9 @@ export class SandboxControlService {
       user: { id: user.id, name: user.name },
       channel: {
         id: conversation.id,
-        type: Universal.Channel.Type.DIRECT,
+        type: conversation.type === 'group' ? Universal.Channel.Type.TEXT : Universal.Channel.Type.DIRECT,
       },
+      guild: group ? { id: group.id, name: group.name } : undefined,
       message: {
         id: message.id,
         messageId: message.id,
@@ -94,6 +139,41 @@ export class SandboxControlService {
       messageId: message.id,
       revision: this.scene.revision,
     }
+  }
+
+  setGroupAnnouncement(input: SetGroupAnnouncementInput): void {
+    const user = this.scene.users.find(({ id }) => id === input.actorUserId)
+    const group = this.scene.groups.find(({ id }) => id === input.groupId)
+    if (!user) throw new Error(`用户不存在：${input.actorUserId}`)
+    if (!group) throw new Error(`群组不存在：${input.groupId}`)
+    if (!group.members.some(({ participantId }) => participantId === user.id)) {
+      throw new Error(`用户不在群组中：${input.actorUserId}`)
+    }
+    const content = input.content.trim()
+    if (!content) throw new Error('群公告不能为空')
+
+    group.announcements.unshift({
+      id: Random.id(),
+      authorId: user.id,
+      content,
+      createdAt: new Date().toISOString(),
+    })
+    this.scene.revision += 1
+  }
+
+  deleteGroupAnnouncement(input: DeleteGroupAnnouncementInput): void {
+    const user = this.scene.users.find(({ id }) => id === input.actorUserId)
+    const group = this.scene.groups.find(({ id }) => id === input.groupId)
+    if (!user) throw new Error(`用户不存在：${input.actorUserId}`)
+    if (!group) throw new Error(`群组不存在：${input.groupId}`)
+    if (!group.members.some(({ participantId }) => participantId === user.id)) {
+      throw new Error(`用户不在群组中：${input.actorUserId}`)
+    }
+
+    const index = group.announcements.findIndex(({ id }) => id === input.announcementId)
+    if (index < 0) throw new Error(`群公告不存在：${input.announcementId}`)
+    group.announcements.splice(index, 1)
+    this.scene.revision += 1
   }
 
   recordBotMessage(conversationId: string, content: string): SandboxMessage {

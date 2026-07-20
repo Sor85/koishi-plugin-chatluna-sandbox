@@ -51,7 +51,12 @@ describe('Koishi 控制台适配器', () => {
 
     const snapshotListener = listeners.get('onebot-sandbox/workspace')
     const sendMessageListener = listeners.get('onebot-sandbox/send-message')
-    if (typeof snapshotListener !== 'function' || typeof sendMessageListener !== 'function') {
+    const setGroupAnnouncementListener = listeners.get('onebot-sandbox/set-group-announcement')
+    const deleteGroupAnnouncementListener = listeners.get('onebot-sandbox/delete-group-announcement')
+    if (typeof snapshotListener !== 'function'
+      || typeof sendMessageListener !== 'function'
+      || typeof setGroupAnnouncementListener !== 'function'
+      || typeof deleteGroupAnnouncementListener !== 'function') {
       throw new Error('控制台监听器未注册')
     }
 
@@ -59,6 +64,7 @@ describe('Koishi 控制台适配器', () => {
       snapshot: {
         users: [{ id: '10001' }, { id: '10002' }],
         bots: [{ id: '20001' }],
+        groups: [{ id: '30001' }],
       },
       appearance,
     })
@@ -73,5 +79,18 @@ describe('Koishi 控制台适配器', () => {
       '控制台消息',
       '回复：控制台消息',
     ])
+
+    const updated = setGroupAnnouncementListener({
+      actorUserId: '10001',
+      groupId: '30001',
+      content: '控制台发布的公告',
+    })
+    expect(updated.snapshot.groups[0].announcements[0].content).toBe('控制台发布的公告')
+    const removed = deleteGroupAnnouncementListener({
+      actorUserId: '10001',
+      groupId: '30001',
+      announcementId: updated.snapshot.groups[0].announcements[0].id,
+    })
+    expect(removed.snapshot.groups[0].announcements.some(({ content }: { content: string }) => content === '控制台发布的公告')).toBe(false)
   })
 })

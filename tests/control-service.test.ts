@@ -1,4 +1,4 @@
-import { App } from '@koishijs/core'
+import { App, Universal } from '@koishijs/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SandboxControlService } from '../src/control-service'
 
@@ -46,9 +46,20 @@ describe('模拟 QQ 环境消息闭环', () => {
         { id: '10002', name: '协作用户' },
       ],
       bots: [{ id: '20001', name: 'OneBot Sandbox' }],
+      groups: [{
+        id: '30001',
+        name: 'OneBot 测试群',
+        members: [
+          { participantId: '10001', role: 'owner' },
+          { participantId: '10002', role: 'member' },
+          { participantId: '20001', role: 'member' },
+        ],
+      }],
       conversations: [
-        { id: 'private:10001:20001', messageIds: [] },
-        { id: 'private:10002:20001', messageIds: [] },
+        { id: 'private:10001:20001', type: 'direct', messageIds: [] },
+        { id: 'private:10002:20001', type: 'direct', messageIds: [] },
+        { id: 'group:30001:10001:20001', type: 'group', groupId: '30001', messageIds: [] },
+        { id: 'group:30001:10002:20001', type: 'group', groupId: '30001', messageIds: [] },
       ],
     })
 
@@ -78,5 +89,54 @@ describe('模拟 QQ 环境消息闭环', () => {
         content: '收到：你好',
       }),
     ])
+  })
+
+  it('群成员可以发布公告并以群聊 Session 向插件发送消息', async () => {
+    const app = new App()
+    let control: SandboxControlService | undefined
+    app.plugin((ctx) => {
+      control = new SandboxControlService(ctx)
+    })
+    runningApps.push(app)
+
+    let receivedSession: { channelId?: string, guildId?: string, channelType?: number } | undefined
+    app.middleware((session) => {
+      receivedSession = {
+        channelId: session.channelId,
+        guildId: session.guildId,
+        channelType: session.event.channel?.type,
+      }
+    })
+    await app.start()
+    if (!control) throw new Error('沙盒控制服务未注册')
+
+    control.setGroupAnnouncement({
+      actorUserId: '10001',
+      groupId: '30001',
+      content: '新的群公告',
+    })
+    await control.sendMessage({
+      actorUserId: '10001',
+      botId: '20001',
+      conversationId: 'group:30001:10001:20001',
+      content: '群聊消息',
+    })
+
+    expect(control.getSnapshot().groups[0].announcements[0]).toMatchObject({
+      authorId: '10001',
+      content: '新的群公告',
+    })
+    const announcementId = control.getSnapshot().groups[0].announcements[0].id
+    control.deleteGroupAnnouncement({
+      actorUserId: '10001',
+      groupId: '30001',
+      announcementId,
+    })
+    expect(control.getSnapshot().groups[0].announcements.some(({ id }) => id === announcementId)).toBe(false)
+    expect(receivedSession).toEqual({
+      channelId: 'group:30001:10001:20001',
+      guildId: '30001',
+      channelType: Universal.Channel.Type.TEXT,
+    })
   })
 })
