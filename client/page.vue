@@ -1,5 +1,5 @@
 <template>
-  <k-layout main="onebot-sandbox-page">
+  <k-layout container="onebot-sandbox-layout" main="onebot-sandbox-page">
     <k-content>
       <div
         class="webqq-workspace"
