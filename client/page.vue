@@ -14,7 +14,6 @@
         :style="{ '--webqq-accent': workspace.appearance.webQQAccentColor }"
       >
         <nav class="webqq-rail" aria-label="WebQQ 主导航">
-          <div class="webqq-brand" aria-label="OneBot Sandbox">Q</div>
           <button
             v-for="item in navigationItems"
             :key="item.id"
@@ -23,60 +22,41 @@
             :class="{ 'is-active': currentView === item.id }"
             :aria-label="item.label"
             :aria-current="currentView === item.id ? 'page' : undefined"
-            @click="currentView = item.id"
+            @click="selectNavigation(item.id)"
           >
             <component :is="item.icon" :size="22" stroke-width="1.8" aria-hidden="true" />
           </button>
-          <span class="webqq-rail-spacer" />
-          <ContextMenu>
-            <ContextMenuTrigger as-child>
-              <button
-                type="button"
-                class="webqq-current-user"
-                :aria-label="`当前用户：${currentUser?.name ?? '未选择'}，右键或按 Shift+F10 切换用户`"
-                @click="currentView = 'profile'"
-                @keydown="openUserMenuFromKeyboard"
-              >
-                {{ getInitial(currentUser?.name) }}
-              </button>
-            </ContextMenuTrigger>
-            <ContextMenuContent aria-label="切换当前用户">
-              <ContextMenuItem
-                v-for="user in snapshot.users"
-                :key="user.id"
-                :aria-current="user.id === currentUserId ? 'true' : undefined"
-                @select="selectUser(user.id)"
-              >
-                <span class="webqq-menu-avatar">{{ getInitial(user.name) }}</span>
-                <span class="min-w-0 flex-1">
-                  <strong class="block truncate font-medium">{{ user.name }}</strong>
-                  <small class="block text-xs text-slate-500">{{ user.id }}</small>
-                </span>
-                <IconCheck v-if="user.id === currentUserId" :size="16" aria-hidden="true" />
-              </ContextMenuItem>
-            </ContextMenuContent>
-          </ContextMenu>
         </nav>
 
         <aside class="webqq-conversations" aria-label="会话列表">
-          <header class="webqq-pane-header">
-            <div>
-              <p>当前用户</p>
-              <h1>{{ currentUser?.name ?? '未选择用户' }}</h1>
+          <header class="webqq-sidebar-tabs-row">
+            <div class="webqq-sidebar-tabs" aria-label="会话分类">
+              <button
+                v-for="tab in sidebarTabs"
+                :key="tab.id"
+                type="button"
+                :class="{ 'is-active': sidebarTab === tab.id }"
+                :aria-current="sidebarTab === tab.id ? 'page' : undefined"
+                @click="selectSidebarTab(tab.id)"
+              >
+                <component :is="tab.icon" :size="16" stroke-width="2" aria-hidden="true" />
+                {{ tab.label }}
+              </button>
             </div>
-            <button type="button" class="webqq-icon-button" aria-label="新建会话" disabled>
-              <IconEdit :size="20" aria-hidden="true" />
+            <button type="button" class="webqq-sidebar-notify" aria-label="通知（暂不可用）" disabled>
+              <IconBell :size="20" stroke-width="1.8" aria-hidden="true" />
             </button>
           </header>
-          <label class="webqq-search">
+          <label v-if="sidebarTab !== 'recent'" class="webqq-search">
             <IconSearch :size="18" aria-hidden="true" />
             <span class="sr-only">搜索会话</span>
-            <input v-model="searchQuery" type="search" placeholder="搜索" autocomplete="off">
+            <input
+              v-model="searchQuery"
+              type="search"
+              :placeholder="sidebarTab === 'friends' ? '搜索好友...' : '搜索群组...'"
+              autocomplete="off"
+            >
           </label>
-          <div class="webqq-list-tabs" aria-label="目录分类">
-            <button type="button" class="is-active">最近</button>
-            <button type="button" @click="currentView = 'contacts'">联系人</button>
-          </div>
           <div v-webqq-scrollbar class="webqq-session-list">
             <button
               v-for="conversation in filteredConversations"
@@ -267,24 +247,20 @@
 import { send } from '@koishijs/client'
 import {
   IconAddressBook,
-  IconCheck,
+  IconBell,
+  IconClock,
   IconDots,
-  IconEdit,
   IconMessageCircle,
   IconPaperclip,
   IconPlus,
   IconSearch,
   IconSend,
   IconTrash,
+  IconUser,
   IconUserCircle,
+  IconUsers,
 } from '@tabler/icons-vue'
 import { computed, onMounted, ref, watch } from 'vue'
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from './components/ui/context-menu'
 import {
   loadWorkspacePreferences,
   resolveWorkspaceSelection,
@@ -334,19 +310,31 @@ const deletingAnnouncementId = ref('')
 const groupMemberSearch = ref('')
 const detailsOpen = ref(false)
 const hydrated = ref(false)
+type SidebarTab = 'recent' | 'friends' | 'groups'
+const sidebarTab = ref<SidebarTab>('recent')
 
 const navigationItems = [
   { id: 'messages' as const, label: '消息', icon: IconMessageCircle },
   { id: 'contacts' as const, label: '联系人', icon: IconAddressBook },
   { id: 'profile' as const, label: '资料', icon: IconUserCircle },
 ]
+const sidebarTabs = [
+  { id: 'recent' as const, label: '最近', icon: IconClock },
+  { id: 'friends' as const, label: '好友', icon: IconUser },
+  { id: 'groups' as const, label: '群组', icon: IconUsers },
+]
 const snapshot = computed(() => workspace.value.snapshot)
 const currentUser = computed(() => snapshot.value.users.find(({ id }) => id === currentUserId.value))
 const visibleConversations = computed(() => snapshot.value.conversations.filter(({ userId }) => userId === currentUserId.value))
 const filteredConversations = computed(() => {
+  const conversations = visibleConversations.value.filter((conversation) => {
+    if (sidebarTab.value === 'friends') return conversation.type === 'direct'
+    if (sidebarTab.value === 'groups') return conversation.type === 'group'
+    return true
+  })
   const query = searchQuery.value.trim().toLowerCase()
-  if (!query) return visibleConversations.value
-  return visibleConversations.value.filter((conversation) => {
+  if (!query || sidebarTab.value === 'recent') return conversations
+  return conversations.filter((conversation) => {
     return getConversationTitle(conversation).toLowerCase().includes(query)
       || conversation.botId.includes(query)
       || conversation.groupId?.includes(query)
@@ -405,34 +393,21 @@ function applySelection(selection: ReturnType<typeof resolveWorkspaceSelection>)
   currentView.value = selection.currentView
 }
 
-function selectUser(userId: string) {
-  applySelection(resolveWorkspaceSelection(snapshot.value, {
-    currentUserId: userId,
-    currentView: 'messages',
-  }))
-  input.value = ''
-  detailsOpen.value = false
-}
-
 function selectConversation(conversationId: string) {
   activeConversationId.value = conversationId
   currentView.value = 'messages'
 }
 
-function openUserMenuFromKeyboard(event: KeyboardEvent) {
-  if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return
-  event.preventDefault()
-  const target = event.currentTarget as HTMLElement
-  const bounds = target.getBoundingClientRect()
+function selectNavigation(view: SandboxWorkspaceView) {
+  currentView.value = view
+  if (view === 'messages') sidebarTab.value = 'recent'
+  if (view === 'contacts') sidebarTab.value = 'friends'
+}
 
-  // Reka UI 的 Context Menu 在部分桌面浏览器不会自行处理菜单键；
-  // 转为标准 contextmenu 事件后仍由组件负责定位、焦点恢复和无障碍语义。
-  target.dispatchEvent(new MouseEvent('contextmenu', {
-    bubbles: true,
-    cancelable: true,
-    clientX: bounds.left + bounds.width / 2,
-    clientY: bounds.top + bounds.height / 2,
-  }))
+function selectSidebarTab(tab: SidebarTab) {
+  sidebarTab.value = tab
+  searchQuery.value = ''
+  currentView.value = 'contacts'
 }
 
 function getBot(botId?: string) {
