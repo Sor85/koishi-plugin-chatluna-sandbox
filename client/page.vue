@@ -76,7 +76,7 @@
             <button type="button" class="is-active">最近</button>
             <button type="button" @click="currentView = 'contacts'">联系人</button>
           </div>
-          <div class="webqq-session-list">
+          <div v-webqq-scrollbar class="webqq-session-list">
             <button
               v-for="conversation in filteredConversations"
               :key="conversation.id"
@@ -110,7 +110,7 @@
             </button>
           </header>
 
-          <section class="webqq-messages" aria-label="消息记录">
+          <section v-webqq-scrollbar class="webqq-messages" aria-label="消息记录">
             <div v-if="!messages.length" class="webqq-welcome">
               <span class="webqq-avatar webqq-avatar-large webqq-avatar-bot">{{ getInitial(currentBot?.name) }}</span>
               <strong>{{ currentBot?.name ?? 'OneBot Sandbox' }}</strong>
@@ -123,42 +123,54 @@
                 class="webqq-message-row"
                 :class="message.authorId === currentUser?.id ? 'is-outgoing' : 'is-incoming'"
               >
-                <span class="webqq-avatar">
-                  {{ getInitial(getParticipantName(message.authorId)) }}
+                <span class="webqq-message-avatar-wrap">
+                  <span class="webqq-message-avatar">
+                    {{ getInitial(getParticipantName(message.authorId)) }}
+                  </span>
                 </span>
-                <div>
-                  <span class="webqq-message-author">{{ getParticipantName(message.authorId) }}</span>
-                  <p class="webqq-message-bubble">{{ message.content }}</p>
+                <div class="webqq-message-content">
+                  <div class="webqq-sender-line">
+                    <span class="webqq-message-author">{{ getParticipantName(message.authorId) }}</span>
+                  </div>
+                  <div class="webqq-message-body">
+                    <p class="webqq-message-bubble">{{ message.content }}</p>
+                  </div>
                 </div>
               </li>
             </ol>
           </section>
 
           <form class="webqq-composer" @submit.prevent="sendMessage">
-            <div class="webqq-composer-tools" aria-label="消息工具">
-              <button type="button" aria-label="表情" disabled><IconMoodSmile :size="20" /></button>
-              <button type="button" aria-label="图片" disabled><IconPhoto :size="20" /></button>
-              <button type="button" aria-label="文件" disabled><IconPaperclip :size="20" /></button>
+            <span v-if="errorMessage" class="webqq-composer-error" role="alert">{{ errorMessage }}</span>
+            <span class="webqq-composer-avatar" aria-hidden="true">
+              {{ getInitial(currentUser?.name) }}
+            </span>
+            <div class="webqq-composer-main">
+              <label class="sr-only" for="onebot-sandbox-input">消息内容</label>
+              <textarea
+                id="onebot-sandbox-input"
+                v-model="input"
+                rows="1"
+                placeholder="发送消息"
+                :disabled="sending || !currentConversation"
+                @keydown.enter.exact.prevent="sendMessage"
+              />
             </div>
-            <label class="sr-only" for="onebot-sandbox-input">消息内容</label>
-            <textarea
-              id="onebot-sandbox-input"
-              v-model="input"
-              rows="3"
-              placeholder="输入消息，Enter 发送"
-              :disabled="sending || !currentConversation"
-              @keydown.enter.exact.prevent="sendMessage"
-            />
-            <div class="webqq-composer-footer">
-              <span>{{ errorMessage }}</span>
-              <button type="submit" :disabled="sending || !input.trim() || !currentConversation">
-                {{ sending ? '发送中' : '发送' }}
-              </button>
-            </div>
+            <button class="webqq-composer-action" type="button" aria-label="选择文件" disabled>
+              <IconPaperclip :size="19" stroke-width="2" aria-hidden="true" />
+            </button>
+            <button
+              class="webqq-composer-action is-primary"
+              type="submit"
+              aria-label="发送"
+              :disabled="sending || !input.trim() || !currentConversation"
+            >
+              <IconSend :size="19" stroke-width="2" aria-hidden="true" />
+            </button>
           </form>
         </main>
 
-        <aside class="webqq-profile" aria-label="资料区域">
+        <aside v-webqq-scrollbar class="webqq-profile" aria-label="资料区域">
           <div class="webqq-profile-hero">
             <span class="webqq-avatar webqq-avatar-profile webqq-avatar-bot">{{ getInitial(currentBot?.name) }}</span>
             <h2>{{ currentBot?.name ?? 'OneBot Sandbox' }}</h2>
@@ -201,10 +213,9 @@ import {
   IconDots,
   IconEdit,
   IconMessageCircle,
-  IconMoodSmile,
   IconPaperclip,
-  IconPhoto,
   IconSearch,
+  IconSend,
   IconUserCircle,
 } from '@tabler/icons-vue'
 import { computed, onMounted, ref, watch } from 'vue'
@@ -220,6 +231,7 @@ import {
   saveWorkspacePreferences,
   type SandboxWorkspaceView,
 } from './workspace-state'
+import { vWebqqScrollbar } from './webqq-scrollbar'
 import type {
   SandboxAppearance,
   SandboxConversation,
