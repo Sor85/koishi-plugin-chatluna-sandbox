@@ -3,12 +3,15 @@ import type {} from '@koishijs/console'
 import type { SandboxControlService } from './control-service'
 import type {
   DeleteGroupAnnouncementInput,
+  GetMediaContentInput,
   GetMessageHistoryInput,
   GetSandboxWorkspaceInput,
   ManageSandboxEnvironmentInput,
   SandboxAppearance,
+  SandboxMediaContent,
   SandboxMessageHistory,
   SandboxWorkspaceState,
+  SendMediaMessageInput,
   SendMessageInput,
   SetGroupAnnouncementInput,
 } from './types'
@@ -17,6 +20,8 @@ interface ConsoleEventMap {
   'onebot-sandbox/workspace': (input?: GetSandboxWorkspaceInput) => SandboxWorkspaceState
   'onebot-sandbox/message-history': (input: GetMessageHistoryInput) => SandboxMessageHistory
   'onebot-sandbox/send-message': (input: SendMessageInput) => Promise<SandboxWorkspaceState>
+  'onebot-sandbox/send-media-message': (input: SendMediaMessageInput) => Promise<SandboxWorkspaceState>
+  'onebot-sandbox/media-content': (input: GetMediaContentInput) => SandboxMediaContent
   'onebot-sandbox/set-group-announcement': (input: SetGroupAnnouncementInput) => SandboxWorkspaceState
   'onebot-sandbox/delete-group-announcement': (input: DeleteGroupAnnouncementInput) => SandboxWorkspaceState
   'onebot-sandbox/manage-environment': (input: ManageSandboxEnvironmentInput) => SandboxWorkspaceState
@@ -58,6 +63,11 @@ export function registerConsole(
     await control.sendMessage(input)
     return getWorkspace(input.actorUserId)
   }, { authority: 4 })
+  console.addListener('onebot-sandbox/send-media-message', async (input) => {
+    await control.sendMediaMessage(input)
+    return getWorkspace(input.actorUserId)
+  }, { authority: 4 })
+  console.addListener('onebot-sandbox/media-content', (input) => control.getMediaContent(input), { authority: 4 })
   console.addListener('onebot-sandbox/set-group-announcement', (input) => {
     control.setGroupAnnouncement(input)
     return getWorkspace(input.actorUserId)
@@ -105,6 +115,8 @@ declare module '@koishijs/console' {
     'onebot-sandbox/workspace'(input?: GetSandboxWorkspaceInput): SandboxWorkspaceState
     'onebot-sandbox/message-history'(input: GetMessageHistoryInput): SandboxMessageHistory
     'onebot-sandbox/send-message'(input: SendMessageInput): Promise<SandboxWorkspaceState>
+    'onebot-sandbox/send-media-message'(input: SendMediaMessageInput): Promise<SandboxWorkspaceState>
+    'onebot-sandbox/media-content'(input: GetMediaContentInput): SandboxMediaContent
     'onebot-sandbox/set-group-announcement'(input: SetGroupAnnouncementInput): SandboxWorkspaceState
     'onebot-sandbox/delete-group-announcement'(input: DeleteGroupAnnouncementInput): SandboxWorkspaceState
     'onebot-sandbox/manage-environment'(input: ManageSandboxEnvironmentInput): SandboxWorkspaceState

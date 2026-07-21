@@ -13,4 +13,5 @@ node_modules
 !.yarn/versions/**
 lib
 dist
+data
 *.tsbuildinfo

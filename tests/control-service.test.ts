@@ -1,14 +1,200 @@
 import { App, Universal } from '@koishijs/core'
+import { mkdtemp, readdir, rm, unlink } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SandboxControlService } from '../src/control-service'
 
 const runningApps: App[] = []
+const temporaryDirectories: string[] = []
 
 afterEach(async () => {
   await Promise.all(runningApps.splice(0).map((app) => app.stop()))
+  await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
 })
 
 describe('模拟 QQ 环境消息闭环', () => {
+  it('发送图片时只在场景保存安全引用，并生成 Koishi 与 OneBot 媒体消息', async () => {
+    const app = new App()
+    const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-media-'))
+    temporaryDirectories.push(mediaDirectory)
+    let control: SandboxControlService | undefined
+    app.plugin((ctx) => {
+      control = new SandboxControlService(ctx, { mediaDirectory })
+    })
+    runningApps.push(app)
+
+    let receivedSession: {
+      content?: string
+      elementType?: string
+      elementSource?: unknown
+      rawMessage?: Array<{ type: string, data: Record<string, string> }>
+    } | undefined
+    app.middleware((session) => {
+      const onebot = (session as typeof session & {
+        onebot?: { message?: Array<{ type: string, data: Record<string, string> }> }
+      }).onebot
+      receivedSession = {
+        content: session.content,
+        elementType: session.elements?.[0]?.type,
+        elementSource: session.elements?.[0]?.attrs.src,
+        rawMessage: onebot?.message,
+      }
+    })
+    await app.start()
+    if (!control) throw new Error('沙盒控制服务未注册')
+
+    const result = await control.sendMediaMessage({
+      actorUserId: '10001',
+      botId: '20001',
+      conversationId: 'private:10001:20001',
+      fileName: '测试图片.png',
+      mimeType: 'image/png',
+      dataBase64: Buffer.from('image-content').toString('base64'),
+    })
+
+    const message = control.getSnapshot().messages.find(({ id }) => id === result.messageId)
+    expect(message).toEqual(expect.objectContaining({
+      content: '[图片] 测试图片.png',
+      media: [expect.objectContaining({
+        type: 'image',
+        name: '测试图片.png',
+        mimeType: 'image/png',
+        size: 13,
+        reference: expect.stringMatching(/^sandbox-media:\/\//),
+      })],
+    }))
+    expect(JSON.stringify(control.getSnapshot())).not.toContain('aW1hZ2UtY29udGVudA==')
+    expect(receivedSession).toEqual(expect.objectContaining({
+      content: expect.stringContaining('<img'),
+      elementType: 'img',
+      elementSource: message?.media?.[0].reference,
+      rawMessage: [{ type: 'image', data: { file: message?.media?.[0].reference } }],
+    }))
+    expect(control.getMediaContent({
+      actorUserId: '10001',
+      mediaId: message?.media?.[0].id ?? '',
+    }).dataBase64).toBe('aW1hZ2UtY29udGVudA==')
+    await unlink(join(mediaDirectory, message?.media?.[0].id ?? ''))
+    expect(() => control!.getMediaContent({
+      actorUserId: '10001',
+      mediaId: message?.media?.[0].id ?? '',
+    })).toThrow('媒体文件不存在')
+  })
+
+  it('拒绝不支持或超限的媒体内容', async () => {
+    const app = new App()
+    const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-media-'))
+    temporaryDirectories.push(mediaDirectory)
+    let control: SandboxControlService | undefined
+    app.plugin((ctx) => {
+      control = new SandboxControlService(ctx, { mediaDirectory })
+    })
+    runningApps.push(app)
+    await app.start()
+    if (!control) throw new Error('沙盒控制服务未注册')
+
+    const baseInput = {
+      actorUserId: '10001',
+      botId: '20001',
+      conversationId: 'private:10001:20001',
+      fileName: '测试文件.exe',
+      dataBase64: Buffer.alloc(10 * 1024 * 1024 + 1).toString('base64'),
+    }
+    await expect(control.sendMediaMessage({ ...baseInput, mimeType: 'application/x-msdownload' }))
+      .rejects.toThrow('不支持的媒体类型')
+    await expect(control.sendMediaMessage({ ...baseInput, fileName: '测试文件.txt', mimeType: 'text/plain' }))
+      .rejects.toThrow('媒体大小不能超过')
+    expect(control.getSnapshot().messages).toEqual([])
+    expect(await readdir(mediaDirectory)).toEqual([])
+  })
+
+  it('将文件、语音和视频映射为对应的 Koishi 元素与 OneBot 消息段', async () => {
+    const app = new App()
+    const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-media-'))
+    temporaryDirectories.push(mediaDirectory)
+    let control: SandboxControlService | undefined
+    app.plugin((ctx) => {
+      control = new SandboxControlService(ctx, { mediaDirectory })
+    })
+    runningApps.push(app)
+
+    const received: Array<{ elementType?: string; onebotType?: string }> = []
+    app.middleware((session) => {
+      const onebot = (session as typeof session & {
+        onebot?: { message?: Array<{ type: string }> }
+      }).onebot
+      received.push({
+        elementType: session.elements?.[0]?.type,
+        onebotType: onebot?.message?.[0]?.type,
+      })
+    })
+    await app.start()
+    if (!control) throw new Error('沙盒控制服务未注册')
+
+    for (const media of [
+      { fileName: '说明.txt', mimeType: 'text/plain' },
+      { fileName: '语音.mp3', mimeType: 'audio/mpeg' },
+      { fileName: '视频.mp4', mimeType: 'video/mp4' },
+    ]) {
+      await control.sendMediaMessage({
+        actorUserId: '10001',
+        botId: '20001',
+        conversationId: 'private:10001:20001',
+        ...media,
+        dataBase64: Buffer.from(media.fileName).toString('base64'),
+      })
+    }
+
+    expect(received).toEqual([
+      { elementType: 'file', onebotType: 'file' },
+      { elementType: 'audio', onebotType: 'record' },
+      { elementType: 'video', onebotType: 'video' },
+    ])
+  })
+
+  it('删除媒体消息所属会话并重新启动内存场景时清理媒体文件', async () => {
+    const app = new App()
+    const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-media-'))
+    temporaryDirectories.push(mediaDirectory)
+    let control: SandboxControlService | undefined
+    app.plugin((ctx) => {
+      control = new SandboxControlService(ctx, { mediaDirectory })
+    })
+    runningApps.push(app)
+    await app.start()
+    if (!control) throw new Error('沙盒控制服务未注册')
+
+    await control.sendMediaMessage({
+      actorUserId: '10001',
+      botId: '20001',
+      conversationId: 'private:10001:20001',
+      fileName: '待清理图片.png',
+      mimeType: 'image/png',
+      dataBase64: Buffer.from('orphan-image').toString('base64'),
+    })
+    expect(await readdir(mediaDirectory)).toHaveLength(1)
+    control.deleteUser({ id: '10001' })
+    expect(await readdir(mediaDirectory)).toEqual([])
+
+    await control.sendMediaMessage({
+      actorUserId: '10002',
+      botId: '20001',
+      conversationId: 'private:10002:20001',
+      fileName: '重启前图片.png',
+      mimeType: 'image/png',
+      dataBase64: Buffer.from('restart-image').toString('base64'),
+    })
+    expect(await readdir(mediaDirectory)).toHaveLength(1)
+
+    const restartedApp = new App()
+    restartedApp.plugin((ctx) => {
+      new SandboxControlService(ctx, { mediaDirectory })
+    })
+    runningApps.push(restartedApp)
+    expect(await readdir(mediaDirectory)).toEqual([])
+  })
+
   it('只返回当前用户可见会话，并按会话有界读取历史', async () => {
     const app = new App()
     let control: SandboxControlService | undefined

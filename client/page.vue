@@ -194,7 +194,38 @@
                             <strong class="webqq-message-quote-title">{{ getParticipantName(getReplyMessage(message)!.authorId) }}</strong>
                             <span>{{ getReplyMessage(message)!.content }}</span>
                           </button>
-                          <span>{{ message.content }}</span>
+                          <div v-for="media in message.media" :key="media.id" class="webqq-message-media">
+                            <img
+                              v-if="media.type === 'image' && getMediaSource(media.id)"
+                              :src="getMediaSource(media.id)"
+                              :alt="media.name"
+                            >
+                            <audio
+                              v-else-if="media.type === 'audio' && getMediaSource(media.id)"
+                              :src="getMediaSource(media.id)"
+                              controls
+                              preload="metadata"
+                            />
+                            <video
+                              v-else-if="media.type === 'video' && getMediaSource(media.id)"
+                              :src="getMediaSource(media.id)"
+                              controls
+                              preload="metadata"
+                            />
+                            <a
+                              v-else-if="media.type === 'file' && getMediaSource(media.id)"
+                              :href="getMediaSource(media.id)"
+                              :download="media.name"
+                              class="webqq-message-file"
+                            >
+                              <IconPaperclip :size="18" aria-hidden="true" />
+                              <span><strong>{{ media.name }}</strong><small>{{ formatMediaSize(media.size) }}</small></span>
+                            </a>
+                            <span v-else class="webqq-message-media-loading">
+                              {{ mediaLoadFailures[media.id] ? '媒体不可用' : '媒体加载中...' }}
+                            </span>
+                          </div>
+                          <span v-if="getMessageText(message)">{{ getMessageText(message) }}</span>
                         </div>
                       </div>
                     </div>
@@ -215,6 +246,13 @@
               <div v-if="replyingToMessage" class="webqq-composer-reply">
                 <span>回复 {{ getParticipantName(replyingToMessage.authorId) }}：{{ replyingToMessage.content }}</span>
                 <button type="button" aria-label="取消回复" @click="replyingToMessageId = ''">
+                  <IconX :size="15" aria-hidden="true" />
+                </button>
+              </div>
+              <div v-if="selectedMediaFile" :class="['webqq-composer-media', { 'has-reply': replyingToMessage }]">
+                <IconPaperclip :size="16" aria-hidden="true" />
+                <span>{{ selectedMediaFile.name }} · {{ formatMediaSize(selectedMediaFile.size) }}</span>
+                <button type="button" aria-label="移除待发送媒体" @click="clearSelectedMedia">
                   <IconX :size="15" aria-hidden="true" />
                 </button>
               </div>
@@ -314,14 +352,27 @@
                   @keydown.enter.exact.prevent="sendMessage"
                 />
               </div>
-              <button class="webqq-composer-action" type="button" aria-label="选择文件" disabled>
+              <input
+                ref="mediaInputRef"
+                class="sr-only"
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp,audio/*,video/mp4,video/webm,video/quicktime,.txt,.csv,.json,.pdf,.zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                @change="selectMediaFile"
+              >
+              <button
+                class="webqq-composer-action"
+                type="button"
+                aria-label="选择文件"
+                :disabled="sending || !currentConversation"
+                @click="mediaInputRef?.click()"
+              >
                 <IconPaperclip :size="19" stroke-width="2" aria-hidden="true" />
               </button>
               <button
                 class="webqq-composer-action is-primary"
                 type="submit"
                 aria-label="发送"
-                :disabled="sending || !input.trim() || !currentConversation"
+                :disabled="sending || (!input.trim() && !selectedMediaFile) || !currentConversation"
               >
                 <IconSend :size="19" stroke-width="2" aria-hidden="true" />
               </button>
@@ -488,6 +539,7 @@ import type {
   SandboxAppearance,
   SandboxConversation,
   SandboxGroupMember,
+  SandboxMedia,
   SandboxMessage,
   SandboxSnapshot,
   SandboxWorkspaceState,
@@ -518,6 +570,10 @@ const activeConversationId = ref<string>()
 const currentView = ref<SandboxWorkspaceView>('messages')
 const searchQuery = ref('')
 const input = ref('')
+const mediaInputRef = ref<HTMLInputElement>()
+const selectedMediaFile = ref<File>()
+const mediaSources = ref<Record<string, string>>({})
+const mediaLoadFailures = ref<Record<string, true>>({})
 const sending = ref(false)
 const errorMessage = ref('')
 const infoErrorMessage = ref('')
@@ -676,6 +732,12 @@ watch(activeConversationId, () => {
   infoErrorMessage.value = ''
   replyingToMessageId.value = ''
 })
+
+watch(
+  () => [currentUserId.value, ...messages.value.flatMap(({ media }) => media?.map(({ id }) => id) ?? [])].join(':'),
+  () => void loadVisibleMedia(),
+  { immediate: true },
+)
 
 watch(hasUserStackOverflow, (hasOverflow) => {
   if (!hasOverflow) userStackExpanded.value = false
@@ -912,6 +974,75 @@ function getReplyMessage(message: SandboxMessage) {
     : undefined
 }
 
+function getMediaLabel(media: SandboxMedia) {
+  return media.type === 'image' ? '图片' : media.type === 'audio' ? '语音' : media.type === 'video' ? '视频' : '文件'
+}
+
+function getMessageText(message: SandboxMessage) {
+  if (message.media?.length === 1 && message.content === `[${getMediaLabel(message.media[0])}] ${message.media[0].name}`) return ''
+  return message.content
+}
+
+function getMediaSource(mediaId: string) {
+  return mediaSources.value[mediaId] ?? ''
+}
+
+async function loadVisibleMedia() {
+  const actorUserId = currentUserId.value
+  if (!actorUserId) return
+  const missingMedia = messages.value.flatMap(({ media }) => media ?? []).filter(({ id }) => !mediaSources.value[id])
+  await Promise.all(missingMedia.map(async (media) => {
+    try {
+      const content = await send('onebot-sandbox/media-content', { actorUserId, mediaId: media.id })
+      mediaSources.value = {
+        ...mediaSources.value,
+        [media.id]: `data:${content.mimeType};base64,${content.dataBase64}`,
+      }
+      const { [media.id]: _, ...remainingFailures } = mediaLoadFailures.value
+      mediaLoadFailures.value = remainingFailures
+    } catch {
+      mediaLoadFailures.value = { ...mediaLoadFailures.value, [media.id]: true }
+    }
+  }))
+}
+
+function formatMediaSize(size: number) {
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / 1024 / 1024).toFixed(1)} MB`
+}
+
+function selectMediaFile(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  if (file.size > 10 * 1024 * 1024) {
+    errorMessage.value = '媒体大小不能超过 10 MB'
+    clearSelectedMedia()
+    return
+  }
+  selectedMediaFile.value = file
+  errorMessage.value = ''
+}
+
+function clearSelectedMedia() {
+  selectedMediaFile.value = undefined
+  if (mediaInputRef.value) mediaInputRef.value.value = ''
+}
+
+function readFileBase64(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.addEventListener('load', () => {
+      const result = typeof reader.result === 'string' ? reader.result : ''
+      const separator = result.indexOf(',')
+      if (separator < 0) return reject(new Error('无法读取媒体内容'))
+      resolve(result.slice(separator + 1))
+    })
+    reader.addEventListener('error', () => reject(reader.error ?? new Error('无法读取媒体内容')))
+    reader.readAsDataURL(file)
+  })
+}
+
 function scrollToQuotedMessage(messageId: string) {
   const element = document.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`)
   if (!element) return
@@ -971,27 +1102,40 @@ function getConversationTime(conversationId: string) {
 
 async function sendMessage() {
   const content = input.value.trim()
+  const mediaFile = selectedMediaFile.value
   const user = currentUser.value
   const bot = currentBot.value
   const conversation = currentConversation.value
-  if (!content || !user || !bot || !conversation || sending.value) return
+  if ((!content && !mediaFile) || !user || !bot || !conversation || sending.value) return
 
   sending.value = true
   errorMessage.value = ''
   try {
-    workspace.value = await send('onebot-sandbox/send-message', {
-      actorUserId: user.id,
-      botId: bot.id,
-      conversationId: conversation.id,
-      content,
-      replyToMessageId: replyingToMessageId.value || undefined,
-    })
+    workspace.value = mediaFile
+      ? await send('onebot-sandbox/send-media-message', {
+          actorUserId: user.id,
+          botId: bot.id,
+          conversationId: conversation.id,
+          fileName: mediaFile.name,
+          mimeType: mediaFile.type,
+          dataBase64: await readFileBase64(mediaFile),
+          content: content || undefined,
+          replyToMessageId: replyingToMessageId.value || undefined,
+        })
+      : await send('onebot-sandbox/send-message', {
+          actorUserId: user.id,
+          botId: bot.id,
+          conversationId: conversation.id,
+          content,
+          replyToMessageId: replyingToMessageId.value || undefined,
+        })
     applySelection(resolveWorkspaceSelection(snapshot.value, {
       currentUserId: user.id,
       activeConversationId: conversation.id,
       currentView: currentView.value,
     }))
     input.value = ''
+    clearSelectedMedia()
     replyingToMessageId.value = ''
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '发送失败'

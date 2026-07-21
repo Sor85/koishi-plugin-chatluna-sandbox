@@ -92,6 +92,18 @@ export interface SandboxMessage {
   content: string
   createdAt: string
   replyToMessageId?: string
+  media?: SandboxMedia[]
+}
+
+export type SandboxMediaType = 'image' | 'file' | 'audio' | 'video'
+
+export interface SandboxMedia {
+  id: string
+  type: SandboxMediaType
+  name: string
+  mimeType: string
+  size: number
+  reference: string
 }
 
 export interface SandboxRelationshipRequest {
@@ -155,6 +167,26 @@ export interface SendMessageInput {
 export interface SendMessageResult {
   messageId: string
   revision: number
+}
+
+export interface SendMediaMessageInput {
+  actorUserId: string
+  botId: string
+  conversationId: string
+  fileName: string
+  mimeType: string
+  dataBase64: string
+  content?: string
+  replyToMessageId?: string
+}
+
+export interface GetMediaContentInput {
+  actorUserId: string
+  mediaId: string
+}
+
+export interface SandboxMediaContent extends SandboxMedia {
+  dataBase64: string
 }
 
 export interface SetGroupAnnouncementInput {

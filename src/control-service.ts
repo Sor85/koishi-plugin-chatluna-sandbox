@@ -1,5 +1,7 @@
 import { Context, h, Random, Universal } from 'koishi'
+import { resolve } from 'node:path'
 import { SandboxBot } from './bot'
+import { SandboxMediaStorage } from './media-storage'
 import type {
   CreateSandboxBotInput,
   CreateSandboxGroupInput,
@@ -8,11 +10,18 @@ import type {
   DeleteSandboxGroupInput,
   DeleteSandboxUserInput,
   DeleteGroupAnnouncementInput,
+  GetMediaContentInput,
   GetMessageHistoryInput,
+  SandboxBotProfile,
   SandboxConversation,
+  SandboxGroup,
+  SandboxMedia,
+  SandboxMediaContent,
   SandboxMessage,
   SandboxMessageHistory,
   SandboxSnapshot,
+  SandboxUser,
+  SendMediaMessageInput,
   SendMessageInput,
   SendMessageResult,
   SetGroupAnnouncementInput,
@@ -20,6 +29,19 @@ import type {
   UpdateSandboxGroupInput,
   UpdateSandboxUserInput,
 } from './types'
+
+export interface SandboxControlServiceOptions {
+  mediaDirectory?: string
+}
+
+interface SandboxMessageContext {
+  user: SandboxUser
+  bot: SandboxBotProfile
+  conversation: SandboxConversation
+  group?: SandboxGroup
+  reply?: SandboxMessage
+  runtimeBot: SandboxBot
+}
 
 const DEFAULT_USER_ID = '10001'
 const SECONDARY_USER_ID = '10002'
@@ -109,8 +131,10 @@ export class SandboxControlService {
 
   private scene: SandboxSnapshot = createDefaultScene()
   private runtimeBots = new Map<string, SandboxBot>()
+  private mediaStorage: SandboxMediaStorage
 
-  constructor(private ctx: Context) {
+  constructor(private ctx: Context, options: SandboxControlServiceOptions = {}) {
+    this.mediaStorage = new SandboxMediaStorage(options.mediaDirectory ?? resolve(ctx.baseDir, 'data/onebot-sandbox/media'))
     this.bot = this.createRuntimeBot({
       selfId: DEFAULT_BOT_ID,
       name: 'OneBot Sandbox',
@@ -292,71 +316,92 @@ export class SandboxControlService {
   }
 
   async sendMessage(input: SendMessageInput): Promise<SendMessageResult> {
-    const user = this.scene.users.find(({ id }) => id === input.actorUserId)
-    const bot = this.scene.bots.find(({ id }) => id === input.botId)
-    const conversation = this.scene.conversations.find(({ id }) => id === input.conversationId)
-
-    if (!user) throw new Error(`用户不存在：${input.actorUserId}`)
-    if (!bot) throw new Error(`机器人不存在：${input.botId}`)
-    if (!bot.enabled) throw new Error(`机器人已停用：${input.botId}`)
-    if (!conversation || conversation.userId !== user.id || conversation.botId !== bot.id) {
-      throw new Error(`会话不存在：${input.conversationId}`)
-    }
-    const group = conversation.groupId
-      ? this.scene.groups.find(({ id }) => id === conversation.groupId)
-      : undefined
-    if (conversation.type === 'group' && (!group
-      || !group.members.some(({ participantId }) => participantId === user.id)
-      || !group.members.some(({ participantId }) => participantId === bot.id))) {
-      throw new Error(`群聊关系不存在：${input.conversationId}`)
-    }
     if (!input.content.trim()) throw new Error('消息内容不能为空')
-    const reply = input.replyToMessageId
-      ? this.scene.messages.find(({ id, conversationId }) => id === input.replyToMessageId && conversationId === conversation.id)
-      : undefined
-    if (input.replyToMessageId && !reply) throw new Error(`回复消息不存在：${input.replyToMessageId}`)
+    const context = this.getMessageContext(input)
+    const message = this.appendMessage(context.user.id, context.conversation.id, input.content.trim(), input.replyToMessageId)
+    return this.dispatchUserMessage(context, message, h.parse(message.content), [
+      ...(context.reply ? [{ type: 'reply', data: { id: context.reply.id } }] : []),
+      { type: 'text', data: { text: message.content } },
+    ], `${context.reply ? `[CQ:reply,id=${context.reply.id}]` : ''}${message.content}`)
+  }
 
-    const runtimeBot = this.runtimeBots.get(bot.id)
-    if (!runtimeBot) throw new Error(`机器人运行时不存在：${bot.id}`)
-    const message = this.appendMessage(user.id, conversation.id, input.content.trim(), input.replyToMessageId)
-    const session = runtimeBot.session({
+  async sendMediaMessage(input: SendMediaMessageInput): Promise<SendMessageResult> {
+    const context = this.getMessageContext(input)
+    const media = this.mediaStorage.save(input)
+    const content = input.content?.trim() || `[${this.getMediaLabel(media)}] ${media.name}`
+    const message = this.appendMessage(context.user.id, context.conversation.id, content, input.replyToMessageId, [media])
+    const elementType = media.type === 'image' ? 'img' : media.type
+    const mediaElement = h(elementType, {
+      src: media.reference,
+      file: media.reference,
+      title: media.name,
+      mime: media.mimeType,
+      size: media.size,
+    })
+    const elements = [mediaElement, ...(input.content?.trim() ? [h.text(input.content.trim())] : [])]
+    const onebotType = media.type === 'audio' ? 'record' : media.type
+    return this.dispatchUserMessage(context, message, elements, [
+      ...(context.reply ? [{ type: 'reply', data: { id: context.reply.id } }] : []),
+      { type: onebotType, data: { file: media.reference } },
+      ...(input.content?.trim() ? [{ type: 'text', data: { text: input.content.trim() } }] : []),
+    ], `${context.reply ? `[CQ:reply,id=${context.reply.id}]` : ''}[CQ:${onebotType},file=${media.reference}]${input.content?.trim() ?? ''}`)
+  }
+
+  getMediaContent(input: GetMediaContentInput): SandboxMediaContent {
+    const visibleConversationIds = new Set(this.scene.conversations
+      .filter(({ userId }) => userId === input.actorUserId)
+      .map(({ id }) => id))
+    this.getUser(input.actorUserId)
+    const media = this.scene.messages
+      .filter(({ conversationId }) => visibleConversationIds.has(conversationId))
+      .flatMap(({ media }) => media ?? [])
+      .find(({ id }) => id === input.mediaId)
+    if (!media) throw new Error(`媒体不存在或不可见：${input.mediaId}`)
+    return this.mediaStorage.read(media)
+  }
+
+  private async dispatchUserMessage(
+    context: SandboxMessageContext,
+    message: SandboxMessage,
+    elements: ReturnType<typeof h>[],
+    onebotMessage: Array<{ type: string; data: Record<string, string> }>,
+    rawMessage: string,
+  ): Promise<SendMessageResult> {
+    const session = context.runtimeBot.session({
       type: 'message',
       timestamp: Date.now(),
-      user: { id: user.id, name: user.name },
+      user: { id: context.user.id, name: context.user.name },
       channel: {
-        id: conversation.id,
-        type: conversation.type === 'group' ? Universal.Channel.Type.TEXT : Universal.Channel.Type.DIRECT,
+        id: context.conversation.id,
+        type: context.conversation.type === 'group' ? Universal.Channel.Type.TEXT : Universal.Channel.Type.DIRECT,
       },
-      guild: group ? { id: group.id, name: group.name } : undefined,
+      guild: context.group ? { id: context.group.id, name: context.group.name } : undefined,
       message: {
         id: message.id,
         messageId: message.id,
-        content: message.content,
-        elements: h.parse(message.content),
-        quote: reply ? {
-          id: reply.id,
-          messageId: reply.id,
-          content: reply.content,
-          user: { id: reply.authorId },
+        content: elements.join(''),
+        elements,
+        quote: context.reply ? {
+          id: context.reply.id,
+          messageId: context.reply.id,
+          content: context.reply.content,
+          user: { id: context.reply.authorId },
         } : undefined,
       },
     })
     Object.assign(session, {
       onebot: {
         time: Math.floor(Date.now() / 1000),
-        self_id: Number(bot.id),
+        self_id: Number(context.bot.id),
         post_type: 'message',
-        message_type: conversation.type === 'group' ? 'group' : 'private',
-        sub_type: conversation.type === 'group' ? 'normal' : 'friend',
+        message_type: context.conversation.type === 'group' ? 'group' : 'private',
+        sub_type: context.conversation.type === 'group' ? 'normal' : 'friend',
         message_id: Number.parseInt(message.id, 16),
-        user_id: Number(user.id),
-        group_id: group ? Number(group.id) : undefined,
-        message: [
-          ...(reply ? [{ type: 'reply', data: { id: reply.id } }] : []),
-          { type: 'text', data: { text: message.content } },
-        ],
-        raw_message: `${reply ? `[CQ:reply,id=${reply.id}]` : ''}${message.content}`,
-        sender: { user_id: Number(user.id), nickname: user.name },
+        user_id: Number(context.user.id),
+        group_id: context.group ? Number(context.group.id) : undefined,
+        message: onebotMessage,
+        raw_message: rawMessage,
+        sender: { user_id: Number(context.user.id), nickname: context.user.name },
       },
     })
 
@@ -370,7 +415,7 @@ export class SandboxControlService {
       })
     })
 
-    runtimeBot.dispatch(session)
+    context.runtimeBot.dispatch(session)
     await middlewareFinished
 
     return {
@@ -420,7 +465,13 @@ export class SandboxControlService {
     return this.appendMessage(conversation.botId, conversation.id, content)
   }
 
-  private appendMessage(authorId: string, conversationId: string, content: string, replyToMessageId?: string): SandboxMessage {
+  private appendMessage(
+    authorId: string,
+    conversationId: string,
+    content: string,
+    replyToMessageId?: string,
+    media?: SandboxMedia[],
+  ): SandboxMessage {
     const conversation = this.scene.conversations.find(({ id }) => id === conversationId)
     if (!conversation) throw new Error(`会话不存在：${conversationId}`)
 
@@ -432,6 +483,7 @@ export class SandboxControlService {
       content,
       createdAt: new Date().toISOString(),
       replyToMessageId,
+      media,
     }
     this.scene.messages.push(message)
     conversation.messageIds.push(message.id)
@@ -470,6 +522,37 @@ export class SandboxControlService {
     return conversation
   }
 
+  private getMessageContext(input: Pick<SendMessageInput, 'actorUserId' | 'botId' | 'conversationId' | 'replyToMessageId'>): SandboxMessageContext {
+    const user = this.scene.users.find(({ id }) => id === input.actorUserId)
+    const bot = this.scene.bots.find(({ id }) => id === input.botId)
+    const conversation = this.scene.conversations.find(({ id }) => id === input.conversationId)
+    if (!user) throw new Error(`用户不存在：${input.actorUserId}`)
+    if (!bot) throw new Error(`机器人不存在：${input.botId}`)
+    if (!bot.enabled) throw new Error(`机器人已停用：${input.botId}`)
+    if (!conversation || conversation.userId !== user.id || conversation.botId !== bot.id) {
+      throw new Error(`会话不存在：${input.conversationId}`)
+    }
+    const group = conversation.groupId
+      ? this.scene.groups.find(({ id }) => id === conversation.groupId)
+      : undefined
+    if (conversation.type === 'group' && (!group
+      || !group.members.some(({ participantId }) => participantId === user.id)
+      || !group.members.some(({ participantId }) => participantId === bot.id))) {
+      throw new Error(`群聊关系不存在：${input.conversationId}`)
+    }
+    const reply = input.replyToMessageId
+      ? this.scene.messages.find(({ id, conversationId }) => id === input.replyToMessageId && conversationId === conversation.id)
+      : undefined
+    if (input.replyToMessageId && !reply) throw new Error(`回复消息不存在：${input.replyToMessageId}`)
+    const runtimeBot = this.runtimeBots.get(bot.id)
+    if (!runtimeBot) throw new Error(`机器人运行时不存在：${bot.id}`)
+    return { user, bot, conversation, group, reply, runtimeBot }
+  }
+
+  private getMediaLabel(media: SandboxMedia): string {
+    return media.type === 'image' ? '图片' : media.type === 'audio' ? '语音' : media.type === 'video' ? '视频' : '文件'
+  }
+
   private validateMessageLimit(value: number) {
     if (!Number.isInteger(value) || value < 1 || value > 100) throw new Error('消息分页大小必须在 1 到 100 之间')
     return value
@@ -483,6 +566,11 @@ export class SandboxControlService {
 
   private deleteConversations(predicate: (conversation: SandboxSnapshot['conversations'][number]) => boolean): void {
     const removedIds = new Set(this.scene.conversations.filter(predicate).map(({ id }) => id))
+    for (const media of this.scene.messages
+      .filter(({ conversationId }) => removedIds.has(conversationId))
+      .flatMap(({ media }) => media ?? [])) {
+      this.mediaStorage.remove(media)
+    }
     this.scene.conversations = this.scene.conversations.filter(({ id }) => !removedIds.has(id))
     this.scene.messages = this.scene.messages.filter(({ conversationId }) => !removedIds.has(conversationId))
   }

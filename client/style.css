@@ -732,6 +732,67 @@ body,
   color: #fff;
 }
 
+.webqq-message-media {
+  display: flex;
+  max-width: min(280px, 100%);
+  flex-direction: column;
+}
+
+.webqq-message-media img,
+.webqq-message-media video {
+  display: block;
+  max-width: 100%;
+  max-height: 280px;
+  border-radius: 7px;
+  object-fit: contain;
+}
+
+.webqq-message-media audio {
+  width: min(260px, 100%);
+  height: 36px;
+}
+
+.webqq-message-file {
+  display: flex;
+  min-width: 210px;
+  max-width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  color: inherit;
+  background: rgb(148 163 184 / 14%);
+  text-decoration: none;
+}
+
+.webqq-message-row.is-outgoing .webqq-message-file {
+  background: rgb(255 255 255 / 14%);
+}
+
+.webqq-message-file span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.webqq-message-file strong,
+.webqq-message-file small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webqq-message-file small,
+.webqq-message-media-loading {
+  color: var(--webqq-muted);
+  font-size: 11px;
+}
+
+.webqq-message-row.is-outgoing .webqq-message-file small,
+.webqq-message-row.is-outgoing .webqq-message-media-loading {
+  color: rgb(255 255 255 / 72%);
+}
+
 .webqq-message-row.is-quote-target .webqq-message-bubble::after {
   position: absolute;
   inset: 0;
@@ -826,7 +887,8 @@ body,
   pointer-events: auto;
 }
 
-.webqq-composer-reply {
+.webqq-composer-reply,
+.webqq-composer-media {
   position: absolute;
   right: 14px;
   bottom: calc(100% + 8px);
@@ -844,7 +906,8 @@ body,
   font-size: 12px;
 }
 
-.webqq-composer-reply span {
+.webqq-composer-reply span,
+.webqq-composer-media span {
   min-width: 0;
   flex: 1;
   overflow: hidden;
@@ -852,7 +915,8 @@ body,
   white-space: nowrap;
 }
 
-.webqq-composer-reply button {
+.webqq-composer-reply button,
+.webqq-composer-media button {
   display: inline-flex;
   width: 24px;
   height: 24px;
@@ -866,10 +930,20 @@ body,
 }
 
 .webqq-composer-reply button:hover,
-.webqq-composer-reply button:focus-visible {
+.webqq-composer-reply button:focus-visible,
+.webqq-composer-media button:hover,
+.webqq-composer-media button:focus-visible {
   color: var(--webqq-text);
   outline: none;
   background: var(--webqq-hover);
+}
+
+.webqq-composer-media {
+  bottom: calc(100% + 8px);
+}
+
+.webqq-composer-media.has-reply {
+  bottom: calc(100% + 54px);
 }
 
 .webqq-composer::before {

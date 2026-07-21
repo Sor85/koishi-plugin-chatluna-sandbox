@@ -52,12 +52,16 @@ describe('Koishi 控制台适配器', () => {
     const snapshotListener = listeners.get('onebot-sandbox/workspace')
     const historyListener = listeners.get('onebot-sandbox/message-history')
     const sendMessageListener = listeners.get('onebot-sandbox/send-message')
+    const sendMediaMessageListener = listeners.get('onebot-sandbox/send-media-message')
+    const getMediaContentListener = listeners.get('onebot-sandbox/media-content')
     const setGroupAnnouncementListener = listeners.get('onebot-sandbox/set-group-announcement')
     const deleteGroupAnnouncementListener = listeners.get('onebot-sandbox/delete-group-announcement')
     const manageEnvironmentListener = listeners.get('onebot-sandbox/manage-environment')
     if (typeof snapshotListener !== 'function'
       || typeof historyListener !== 'function'
       || typeof sendMessageListener !== 'function'
+      || typeof sendMediaMessageListener !== 'function'
+      || typeof getMediaContentListener !== 'function'
       || typeof setGroupAnnouncementListener !== 'function'
       || typeof deleteGroupAnnouncementListener !== 'function'
       || typeof manageEnvironmentListener !== 'function') {
@@ -86,6 +90,21 @@ describe('Koishi 控制台适配器', () => {
       '控制台消息',
       '回复：控制台消息',
     ])
+
+    const mediaWorkspace = await sendMediaMessageListener({
+      actorUserId: '10001',
+      botId: '20001',
+      conversationId: 'private:10001:20001',
+      fileName: '控制台图片.png',
+      mimeType: 'image/png',
+      dataBase64: Buffer.from('console-image').toString('base64'),
+    })
+    const media = mediaWorkspace.snapshot.messages.find(({ media }: { media?: unknown[] }) => media?.length)?.media?.[0]
+    expect(media).toEqual(expect.objectContaining({ name: '控制台图片.png', type: 'image' }))
+    expect(getMediaContentListener({ actorUserId: '10001', mediaId: media.id })).toEqual(expect.objectContaining({
+      id: media.id,
+      dataBase64: 'Y29uc29sZS1pbWFnZQ==',
+    }))
 
     const otherWorkspace = snapshotListener({ actorUserId: '10002' })
     expect(otherWorkspace.snapshot.conversations.every(({ userId }: { userId: string }) => userId === '10002')).toBe(true)
