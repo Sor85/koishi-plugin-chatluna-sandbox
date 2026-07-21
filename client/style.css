@@ -98,6 +98,26 @@ body,
     background: rgb(30 41 59 / 90%);
   }
 
+  .webqq-workspace[data-color-mode="auto"] .webqq-message-quote {
+    border-left-color: rgb(147 197 253 / 56%);
+    color: #cbd5e1;
+    background: rgb(15 23 42 / 42%);
+  }
+
+  .webqq-workspace[data-color-mode="auto"] .webqq-message-quote-title {
+    color: #dbeafe;
+  }
+
+  .webqq-workspace[data-color-mode="auto"] .webqq-message-row.is-outgoing .webqq-message-quote {
+    border-left-color: rgb(255 255 255 / 62%);
+    color: rgb(255 255 255 / 82%);
+    background: rgb(255 255 255 / 16%);
+  }
+
+  .webqq-workspace[data-color-mode="auto"] .webqq-message-row.is-outgoing .webqq-message-quote-title {
+    color: #fff;
+  }
+
 }
 
 [data-webqq-scrollbar="true"] {
@@ -668,23 +688,66 @@ body,
 }
 
 .webqq-message-quote {
-  display: grid;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
   gap: 2px;
-  max-width: 320px;
-  margin-bottom: 6px;
-  padding: 7px 10px;
-  border-left: 3px solid color-mix(in srgb, var(--webqq-accent) 65%, transparent);
+  margin-bottom: 4px;
+  padding: 6px 8px;
+  box-sizing: border-box;
+  border: 0;
+  border-left: 3px solid rgb(148 163 184 / 70%);
   border-radius: 6px;
-  color: var(--webqq-muted);
-  background: color-mix(in srgb, var(--webqq-panel) 78%, transparent);
+  color: rgb(40 40 44 / 62%);
+  background: rgb(148 163 184 / 16%);
+  font: inherit;
   font-size: 12px;
+  line-height: 17px;
+  text-align: left;
 }
 
-.webqq-message-quote strong,
+.webqq-message-quote-title {
+  color: rgb(30 30 34 / 78%);
+  font-weight: 600;
+}
+
+.webqq-message-quote-title,
 .webqq-message-quote span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.webqq-message-quote.is-clickable {
+  cursor: pointer;
+}
+
+.webqq-message-row.is-outgoing .webqq-message-bubble .webqq-message-quote {
+  border-left-color: rgb(255 255 255 / 62%);
+  color: rgb(255 255 255 / 82%);
+  background: rgb(255 255 255 / 16%);
+}
+
+.webqq-message-row.is-outgoing .webqq-message-bubble .webqq-message-quote-title {
+  color: #fff;
+}
+
+.webqq-message-row.is-quote-target .webqq-message-bubble {
+  animation: webqq-quote-target 1.4s ease-out;
+}
+
+@keyframes webqq-quote-target {
+  0% {
+    box-shadow: 0 0 0 0 rgb(59 130 246 / 36%), 0 2px 8px rgb(15 23 42 / 8%);
+  }
+
+  32% {
+    box-shadow: 0 0 0 5px rgb(59 130 246 / 22%), 0 8px 18px rgb(37 99 235 / 18%);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgb(59 130 246 / 0%), 0 2px 8px rgb(15 23 42 / 8%);
+  }
 }
 
 .webqq-message-row.is-outgoing .webqq-message-bubble {
@@ -1141,6 +1204,26 @@ body,
 .webqq-workspace[data-color-mode="dark"] .webqq-message-bubble,
 .webqq-workspace[data-color-mode="dark"] .webqq-composer {
   color: #e5edf7;
+}
+
+.webqq-workspace[data-color-mode="dark"] .webqq-message-quote {
+  border-left-color: rgb(147 197 253 / 56%);
+  color: #cbd5e1;
+  background: rgb(15 23 42 / 42%);
+}
+
+.webqq-workspace[data-color-mode="dark"] .webqq-message-quote-title {
+  color: #dbeafe;
+}
+
+.webqq-workspace[data-color-mode="dark"] .webqq-message-row.is-outgoing .webqq-message-quote {
+  border-left-color: rgb(255 255 255 / 62%);
+  color: rgb(255 255 255 / 82%);
+  background: rgb(255 255 255 / 16%);
+}
+
+.webqq-workspace[data-color-mode="dark"] .webqq-message-row.is-outgoing .webqq-message-quote-title {
+  color: #fff;
 }
 
 .webqq-workspace[data-color-mode="dark"] .webqq-message-bubble,

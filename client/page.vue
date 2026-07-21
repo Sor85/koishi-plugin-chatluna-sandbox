@@ -167,7 +167,11 @@
                 <ContextMenuTrigger as-child>
                   <li
                     class="webqq-message-row"
-                    :class="message.authorId === currentUser?.id ? 'is-outgoing' : 'is-incoming'"
+                    :class="[
+                      message.authorId === currentUser?.id ? 'is-outgoing' : 'is-incoming',
+                      { 'is-quote-target': highlightedMessageId === message.id },
+                    ]"
+                    :data-message-id="message.id"
                   >
                     <span class="webqq-message-avatar-wrap">
                       <span class="webqq-message-avatar">
@@ -179,11 +183,19 @@
                         <span class="webqq-message-author">{{ getParticipantName(message.authorId) }}</span>
                       </div>
                       <div class="webqq-message-body">
-                        <div v-if="getReplyMessage(message)" class="webqq-message-quote">
-                          <strong>{{ getParticipantName(getReplyMessage(message)!.authorId) }}</strong>
-                          <span>{{ getReplyMessage(message)!.content }}</span>
+                        <div class="webqq-message-bubble">
+                          <button
+                            v-if="getReplyMessage(message)"
+                            class="webqq-message-quote is-clickable"
+                            type="button"
+                            aria-label="跳转到引用消息"
+                            @click.stop="scrollToQuotedMessage(getReplyMessage(message)!.id)"
+                          >
+                            <strong class="webqq-message-quote-title">{{ getParticipantName(getReplyMessage(message)!.authorId) }}</strong>
+                            <span>{{ getReplyMessage(message)!.content }}</span>
+                          </button>
+                          <span>{{ message.content }}</span>
                         </div>
-                        <p class="webqq-message-bubble">{{ message.content }}</p>
                       </div>
                     </div>
                   </li>
@@ -632,6 +644,8 @@ const messages = computed(() => {
 const replyingToMessageId = ref('')
 const replyingToMessage = computed(() => snapshot.value.messages.find(({ id }) => id === replyingToMessageId.value))
 const historyLoading = ref(false)
+const highlightedMessageId = ref('')
+let quoteHighlightTimer: ReturnType<typeof setTimeout> | undefined
 
 onMounted(async () => {
   const preferences = loadWorkspacePreferences(window.localStorage)
@@ -864,6 +878,7 @@ onBeforeUnmount(() => {
   userStackLayout = undefined
   if (suppressUserStackCollapseTimer) clearTimeout(suppressUserStackCollapseTimer)
   if (userStackOverflowMotionTimer) clearTimeout(userStackOverflowMotionTimer)
+  if (quoteHighlightTimer) clearTimeout(quoteHighlightTimer)
 })
 
 function getGroupMemberName(member: SandboxGroupMember) {
@@ -895,6 +910,18 @@ function getReplyMessage(message: SandboxMessage) {
   return message.replyToMessageId
     ? snapshot.value.messages.find(({ id }) => id === message.replyToMessageId)
     : undefined
+}
+
+function scrollToQuotedMessage(messageId: string) {
+  const element = document.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`)
+  if (!element) return
+  element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  highlightedMessageId.value = messageId
+  if (quoteHighlightTimer) clearTimeout(quoteHighlightTimer)
+  quoteHighlightTimer = setTimeout(() => {
+    highlightedMessageId.value = ''
+    quoteHighlightTimer = undefined
+  }, 1400)
 }
 
 async function loadEarlierMessages() {
