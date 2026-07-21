@@ -114,6 +114,14 @@ export interface SandboxRelationshipRequest {
   groupId?: string
   status: 'pending'
   createdAt: string
+  comment?: string
+}
+
+export interface SandboxFriendship {
+  id: string
+  participantIds: [string, string]
+  remarks: Record<string, string>
+  createdAt: string
 }
 
 export interface SandboxSnapshot {
@@ -123,7 +131,24 @@ export interface SandboxSnapshot {
   groups: SandboxGroup[]
   conversations: SandboxConversation[]
   messages: SandboxMessage[]
+  friendships: SandboxFriendship[]
   requests: SandboxRelationshipRequest[]
+}
+
+export type SandboxFriendAction =
+  | { action: 'request'; targetId: string; comment?: string }
+  | { action: 'handle-request'; requestId: string; approve: boolean }
+  | { action: 'delete'; targetId: string }
+  | { action: 'set-remark'; targetId: string; remark: string }
+  | { action: 'poke'; targetId: string }
+
+export type PerformFriendActionInput = SandboxFriendAction extends infer Action
+  ? Action extends SandboxFriendAction ? Action & { actorUserId: string } : never
+  : never
+
+export interface PerformFriendActionResult {
+  revision: number
+  requestId?: string
 }
 
 export interface SandboxAppearance {

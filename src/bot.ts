@@ -6,13 +6,18 @@ export namespace SandboxBot {
     selfId: string
     name: string
   }
+
+  export interface Internal {
+    _request(action: string, params: Record<string, unknown>): Promise<unknown>
+    set_friend_add_request(input: { flag: string; approve: boolean; remark?: string }): Promise<unknown>
+  }
 }
 
 // Koishi Context 覆盖了 Cordis 的递归数据库泛型，在 strict 模式下无法满足
 // Satori Bot<C> 的基础约束；只在第三方基类边界放宽，领域服务仍使用具体 Context。
 export class SandboxBot extends Bot<any, SandboxBot.Config> {
   hidden = true
-  internal = {}
+  internal: SandboxBot.Internal
 
   constructor(ctx: Context, public control: SandboxControlService, config: SandboxBot.Config) {
     // 被测插件通常按 session.platform === 'onebot' 选择协议逻辑；
@@ -22,6 +27,17 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     this.selfId = config.selfId
     this.user = { id: config.selfId, name: config.name }
     this.status = Universal.Status.ONLINE
+    this.internal = {
+      _request: async (action, params) => {
+        if (action !== 'set_friend_add_request') throw new Error(`不支持的 OneBot action：${action}`)
+        return this.control.handleBotFriendRequest(this.selfId, {
+          flag: typeof params.flag === 'string' ? params.flag : '',
+          approve: params.approve === true,
+          remark: typeof params.remark === 'string' ? params.remark : undefined,
+        })
+      },
+      set_friend_add_request: (input) => this.control.handleBotFriendRequest(this.selfId, input),
+    }
   }
 
   async createDirectChannel(userId: string): Promise<Universal.Channel> {

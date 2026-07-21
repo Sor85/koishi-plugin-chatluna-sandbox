@@ -342,6 +342,7 @@ body,
 }
 
 .webqq-sidebar-notify {
+  position: relative;
   display: inline-flex;
   width: 36px;
   height: 36px;
@@ -353,10 +354,68 @@ body,
   border-radius: 9px;
   color: var(--webqq-muted);
   background: transparent;
+  cursor: pointer;
 }
 
-.webqq-sidebar-notify:disabled {
-  opacity: 0.45;
+.webqq-sidebar-notify:hover,
+.webqq-sidebar-notify:focus-visible {
+  color: var(--webqq-accent);
+  background: color-mix(in srgb, var(--webqq-accent) 12%, transparent);
+  outline: none;
+}
+
+.webqq-sidebar-notify.has-notification::after {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 7px;
+  height: 7px;
+  border: 2px solid var(--webqq-panel);
+  border-radius: 50%;
+  background: #ef4444;
+  content: '';
+}
+
+.webqq-notification-popover > strong {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.webqq-notification-empty {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.webqq-notification-item {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.webqq-notification-item + .webqq-notification-item {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.webqq-notification-item > span:nth-child(2) strong,
+.webqq-notification-item > span:nth-child(2) small {
+  display: block;
+}
+
+.webqq-notification-item > span:nth-child(2) small {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.webqq-notification-item > div {
+  grid-column: 2;
+  display: flex;
+  gap: 8px;
 }
 
 .webqq-search {
@@ -492,6 +551,12 @@ body,
   text-align: center;
   color: var(--webqq-muted);
   font-size: 13px;
+}
+
+.webqq-dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .webqq-chat {

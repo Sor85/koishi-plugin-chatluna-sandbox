@@ -57,6 +57,7 @@ describe('Koishi 控制台适配器', () => {
     const setGroupAnnouncementListener = listeners.get('onebot-sandbox/set-group-announcement')
     const deleteGroupAnnouncementListener = listeners.get('onebot-sandbox/delete-group-announcement')
     const manageEnvironmentListener = listeners.get('onebot-sandbox/manage-environment')
+    const friendActionListener = listeners.get('onebot-sandbox/friend-action')
     if (typeof snapshotListener !== 'function'
       || typeof historyListener !== 'function'
       || typeof sendMessageListener !== 'function'
@@ -64,7 +65,8 @@ describe('Koishi 控制台适配器', () => {
       || typeof getMediaContentListener !== 'function'
       || typeof setGroupAnnouncementListener !== 'function'
       || typeof deleteGroupAnnouncementListener !== 'function'
-      || typeof manageEnvironmentListener !== 'function') {
+      || typeof manageEnvironmentListener !== 'function'
+      || typeof friendActionListener !== 'function') {
       throw new Error('控制台监听器未注册')
     }
 
@@ -136,6 +138,13 @@ describe('Koishi 控制台适配器', () => {
       data: { id: '10099', name: '控制台用户' },
     })
     expect(managed.snapshot.users).toContainEqual({ id: '10099', name: '控制台用户' })
+
+    const friendWorkspace = await friendActionListener({
+      action: 'request',
+      actorUserId: '10001',
+      targetId: '10002',
+    })
+    expect(friendWorkspace.snapshot.requests.some(({ requesterId, targetId }: { requesterId: string; targetId?: string }) => requesterId === '10001' && targetId === '10002')).toBe(true)
 
     const afterCurrentUserDeleted = manageEnvironmentListener({
       actorUserId: '10001',

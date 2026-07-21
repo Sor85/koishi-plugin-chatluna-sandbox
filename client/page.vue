@@ -43,9 +43,33 @@
                 {{ tab.label }}
               </button>
             </div>
-            <button type="button" class="webqq-sidebar-notify" aria-label="通知（暂不可用）" disabled>
-              <IconBell :size="20" stroke-width="1.8" aria-hidden="true" />
-            </button>
+            <Popover>
+              <PopoverTrigger as-child>
+                <button
+                  type="button"
+                  class="webqq-sidebar-notify"
+                  :class="{ 'has-notification': incomingFriendRequests.length }"
+                  :aria-label="`通知${incomingFriendRequests.length ? `（${incomingFriendRequests.length}）` : ''}`"
+                >
+                  <IconBell :size="20" stroke-width="1.8" aria-hidden="true" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" class="webqq-notification-popover">
+                <strong>好友通知</strong>
+                <p v-if="!incomingFriendRequests.length" class="webqq-notification-empty">暂无待处理申请</p>
+                <article v-for="request in incomingFriendRequests" :key="request.id" class="webqq-notification-item">
+                  <span class="webqq-avatar">{{ getInitial(getParticipantName(request.requesterId)) }}</span>
+                  <span>
+                    <strong>{{ getParticipantName(request.requesterId) }}</strong>
+                    <small>{{ request.comment || '请求添加你为好友' }}</small>
+                  </span>
+                  <div>
+                    <Button size="sm" @click="handleFriendRequest(request.id, true)">同意</Button>
+                    <Button size="sm" variant="outline" @click="handleFriendRequest(request.id, false)">拒绝</Button>
+                  </div>
+                </article>
+              </PopoverContent>
+            </Popover>
           </header>
           <label v-if="sidebarTab !== 'recent'" class="webqq-search">
             <IconSearch :size="18" aria-hidden="true" />
@@ -95,7 +119,59 @@
               </template>
             </EnvironmentCreatePopover>
             <ContextMenu
-              v-for="conversation in filteredConversations"
+              v-for="entry in filteredFriendDirectory"
+              :key="entry.id"
+            >
+              <ContextMenuTrigger as-child>
+                <button
+                  type="button"
+                  class="webqq-session"
+                  :class="{ 'is-active': entry.conversationId === activeConversationId }"
+                  @click="entry.conversationId && selectConversation(entry.conversationId)"
+                >
+                  <span class="webqq-avatar webqq-avatar-bot">{{ getInitial(entry.displayName) }}</span>
+                  <span class="webqq-session-copy">
+                    <strong>{{ entry.displayName }}</strong>
+                    <small>{{ entry.status }}</small>
+                  </span>
+                </button>
+              </ContextMenuTrigger>
+              <ContextMenuContent style="z-index: 140">
+                <ContextMenuItem v-if="!entry.isFriend && !entry.pendingOutgoing" @select="requestFriend(entry.id)">
+                  <IconUserPlus :size="16" aria-hidden="true" /> 发送好友申请
+                </ContextMenuItem>
+                <ContextMenuItem v-else-if="entry.pendingOutgoing" disabled>
+                  <IconClock :size="16" aria-hidden="true" /> 等待对方处理
+                </ContextMenuItem>
+                <ContextMenuItem v-else-if="entry.pendingIncoming" disabled>
+                  <IconBell :size="16" aria-hidden="true" /> 请在通知中处理申请
+                </ContextMenuItem>
+                <ContextMenuSub v-if="entry.isFriend">
+                  <ContextMenuSubTrigger>
+                    <IconHandClick :size="16" aria-hidden="true" /> 好友互动
+                  </ContextMenuSubTrigger>
+                  <ContextMenuSubContent>
+                    <ContextMenuItem @select="pokeFriend(entry.id)">
+                      <IconHandClick :size="16" aria-hidden="true" /> 戳一戳
+                    </ContextMenuItem>
+                    <ContextMenuItem @select="openRemarkDialog(entry.id)">
+                      <IconTag :size="16" aria-hidden="true" /> 设置好友备注
+                    </ContextMenuItem>
+                    <ContextMenuItem class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="deleteFriend(entry.id)">
+                      <IconUserMinus :size="16" aria-hidden="true" /> 删除好友
+                    </ContextMenuItem>
+                  </ContextMenuSubContent>
+                </ContextMenuSub>
+                <ContextMenuItem @select="openEntityDialog('edit', { type: entry.isBot ? 'bot' : 'user', id: entry.id })">
+                  <IconEdit :size="16" aria-hidden="true" /> 编辑{{ entry.isBot ? '机器人' : '用户' }}
+                </ContextMenuItem>
+                <ContextMenuItem class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="openEntityDialog('delete', { type: entry.isBot ? 'bot' : 'user', id: entry.id })">
+                  <IconTrash :size="16" aria-hidden="true" /> 删除{{ entry.isBot ? '机器人' : '用户' }}
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
+            <ContextMenu
+              v-for="conversation in sidebarTab === 'friends' ? [] : filteredConversations"
               :key="conversation.id"
             >
               <ContextMenuTrigger as-child>
@@ -122,7 +198,7 @@
                 </ContextMenuItem>
               </ContextMenuContent>
             </ContextMenu>
-            <p v-if="!filteredConversations.length" class="webqq-empty">没有匹配的会话</p>
+            <p v-if="sidebarTab === 'friends' ? !filteredFriendDirectory.length : !filteredConversations.length" class="webqq-empty">没有匹配的会话</p>
           </div>
         </aside>
 
@@ -488,6 +564,17 @@
           :accent-color="workspace.appearance.webQQAccentColor"
           @updated="applyWorkspaceUpdate"
         />
+        <Dialog v-model:open="remarkDialogOpen">
+          <DialogContent>
+            <DialogTitle>设置好友备注</DialogTitle>
+            <DialogDescription>备注只对当前测试用户生效，不会修改对方资料昵称。</DialogDescription>
+            <Input v-model="remarkInput" placeholder="留空可删除备注" @keydown.enter="saveFriendRemark" />
+            <div class="webqq-dialog-actions">
+              <Button variant="outline" @click="remarkDialogOpen = false">取消</Button>
+              <Button @click="saveFriendRemark">保存</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </k-content>
   </k-layout>
@@ -503,6 +590,7 @@ import {
   IconDatabase,
   IconDots,
   IconEdit,
+  IconHandClick,
   IconMessageCircle,
   IconPaperclip,
   IconPlus,
@@ -510,13 +598,20 @@ import {
   IconSearch,
   IconSend,
   IconTrash,
+  IconTag,
   IconX,
   IconUser,
+  IconUserMinus,
+  IconUserPlus,
   IconUserCircle,
   IconUsers,
 } from '@tabler/icons-vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from './components/ui/context-menu'
+import { Button } from './components/ui/button'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from './components/ui/context-menu'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from './components/ui/dialog'
+import { Input } from './components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover'
 import EnvironmentCreatePopover from './environment-create-popover.vue'
 import EnvironmentEntityDialog from './environment-entity-dialog.vue'
 import EnvironmentManager from './environment-manager.vue'
@@ -543,6 +638,7 @@ import type {
   SandboxMessage,
   SandboxSnapshot,
   SandboxWorkspaceState,
+  SandboxFriendAction,
 } from '../src/types'
 
 const defaultAppearance: SandboxAppearance = {
@@ -559,6 +655,7 @@ const emptySnapshot: SandboxSnapshot = {
   groups: [],
   conversations: [],
   messages: [],
+  friendships: [],
   requests: [],
 }
 const workspace = ref<SandboxWorkspaceState>({
@@ -590,6 +687,9 @@ const userStackExpanded = ref(false)
 const userStackHovered = ref(false)
 const userStackFocused = ref(false)
 const createUserOpen = ref(false)
+const remarkDialogOpen = ref(false)
+const remarkTargetId = ref('')
+const remarkInput = ref('')
 type EnvironmentEntityType = 'user' | 'bot' | 'group'
 type EnvironmentDialogMode = 'edit' | 'delete'
 const entityDialogOpen = ref(false)
@@ -675,6 +775,48 @@ const filteredConversations = computed(() => {
       || conversation.groupId?.includes(query)
   })
 })
+const incomingFriendRequests = computed(() => snapshot.value.requests.filter(({ type, targetId }) => {
+  return type === 'friend'
+    && targetId === currentUserId.value
+    && snapshot.value.users.some(({ id }) => id === targetId)
+}))
+const friendDirectory = computed(() => {
+  const actorUserId = currentUserId.value
+  if (!actorUserId) return []
+  return [...snapshot.value.users, ...snapshot.value.bots]
+    .filter(({ id }) => id !== actorUserId)
+    .map((participant) => {
+      const friendship = snapshot.value.friendships.find(({ participantIds }) => participantIds.includes(actorUserId) && participantIds.includes(participant.id))
+      const pendingOutgoing = snapshot.value.requests.some(({ type, requesterId, targetId }) => type === 'friend' && requesterId === actorUserId && targetId === participant.id)
+      const pendingIncoming = snapshot.value.requests.some(({ type, requesterId, targetId }) => type === 'friend' && requesterId === participant.id && targetId === actorUserId)
+      const isBot = snapshot.value.bots.some(({ id }) => id === participant.id)
+      const conversationId = isBot
+        ? visibleConversations.value.find(({ type, botId }) => type === 'direct' && botId === participant.id)?.id
+        : undefined
+      return {
+        id: participant.id,
+        isBot,
+        isFriend: !!friendship,
+        pendingOutgoing,
+        pendingIncoming,
+        conversationId,
+        displayName: friendship?.remarks[actorUserId] || participant.name,
+        status: friendship
+          ? `${participant.name} · ${isBot ? '机器人好友' : '好友'}`
+          : pendingOutgoing
+            ? '好友申请待处理'
+            : pendingIncoming
+              ? '有新的好友申请'
+              : isBot ? '可申请机器人好友' : '可申请好友',
+      }
+    })
+})
+const filteredFriendDirectory = computed(() => {
+  if (sidebarTab.value !== 'friends') return []
+  const query = searchQuery.value.trim().toLowerCase()
+  if (!query) return friendDirectory.value
+  return friendDirectory.value.filter(({ id, displayName }) => id.includes(query) || displayName.toLowerCase().includes(query))
+})
 const currentConversation = computed(() => visibleConversations.value.find(({ id }) => id === activeConversationId.value))
 const currentBot = computed(() => getBot(currentConversation.value?.botId))
 const currentGroup = computed(() => snapshot.value.groups?.find(({ id }) => id === currentConversation.value?.groupId))
@@ -756,6 +898,47 @@ function applyWorkspaceUpdate(nextWorkspace: SandboxWorkspaceState) {
     activeConversationId: activeConversationId.value,
     currentView: currentView.value,
   }))
+}
+
+async function performFriendAction(input: SandboxFriendAction) {
+  const actorUserId = currentUserId.value
+  if (!actorUserId) return
+  errorMessage.value = ''
+  try {
+    const nextWorkspace = await send('onebot-sandbox/friend-action', { ...input, actorUserId })
+    applyWorkspaceUpdate(nextWorkspace)
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '好友操作失败'
+  }
+}
+
+function requestFriend(targetId: string) {
+  return performFriendAction({ action: 'request', targetId, comment: '来自 OneBot Sandbox 的好友申请' })
+}
+
+function handleFriendRequest(requestId: string, approve: boolean) {
+  return performFriendAction({ action: 'handle-request', requestId, approve })
+}
+
+function pokeFriend(targetId: string) {
+  return performFriendAction({ action: 'poke', targetId })
+}
+
+function deleteFriend(targetId: string) {
+  return performFriendAction({ action: 'delete', targetId })
+}
+
+function openRemarkDialog(targetId: string) {
+  const friendship = snapshot.value.friendships.find(({ participantIds }) => participantIds.includes(currentUserId.value ?? '') && participantIds.includes(targetId))
+  remarkTargetId.value = targetId
+  remarkInput.value = friendship?.remarks[currentUserId.value ?? ''] ?? ''
+  remarkDialogOpen.value = true
+}
+
+async function saveFriendRemark() {
+  if (!remarkTargetId.value) return
+  await performFriendAction({ action: 'set-remark', targetId: remarkTargetId.value, remark: remarkInput.value })
+  if (!errorMessage.value) remarkDialogOpen.value = false
 }
 
 function openEntityDialog(mode: EnvironmentDialogMode, target: { type: EnvironmentEntityType, id: string }) {

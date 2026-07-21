@@ -12,8 +12,11 @@ import type {
   DeleteGroupAnnouncementInput,
   GetMediaContentInput,
   GetMessageHistoryInput,
+  PerformFriendActionInput,
+  PerformFriendActionResult,
   SandboxBotProfile,
   SandboxConversation,
+  SandboxFriendship,
   SandboxGroup,
   SandboxMedia,
   SandboxMediaContent,
@@ -56,7 +59,6 @@ function createDefaultScene(): SandboxSnapshot {
     DEFAULT_USER_ID,
     SECONDARY_USER_ID,
     ADMIN_USER_ID,
-    APPLICANT_USER_ID,
   ].map((userId) => ({
     id: `private:${userId}:${DEFAULT_BOT_ID}`,
     type: 'direct',
@@ -108,6 +110,11 @@ function createDefaultScene(): SandboxSnapshot {
     }],
     conversations: [...directConversations, ...groupConversations],
     messages: [],
+    friendships: [
+      DEFAULT_USER_ID,
+      SECONDARY_USER_ID,
+      ADMIN_USER_ID,
+    ].map((userId) => createFriendship(userId, DEFAULT_BOT_ID, createdAt)),
     requests: [{
       id: `request:friend:${APPLICANT_USER_ID}:${DEFAULT_BOT_ID}`,
       type: 'friend',
@@ -123,6 +130,16 @@ function createDefaultScene(): SandboxSnapshot {
       status: 'pending',
       createdAt,
     }],
+  }
+}
+
+function createFriendship(firstId: string, secondId: string, createdAt = new Date().toISOString()): SandboxFriendship {
+  const participantIds = [firstId, secondId].sort() as [string, string]
+  return {
+    id: `friend:${participantIds[0]}:${participantIds[1]}`,
+    participantIds,
+    remarks: {},
+    createdAt,
   }
 }
 
@@ -191,15 +208,8 @@ export class SandboxControlService {
     }
 
     this.scene.users.push({ id, name })
-    for (const bot of this.scene.bots) {
-      this.scene.conversations.push({
-        id: `private:${id}:${bot.id}`,
-        type: 'direct',
-        userId: id,
-        botId: bot.id,
-        messageIds: [],
-      })
-    }
+    // 环境管理属于测试前置配置，可静默建立关系；WebQQ 用户操作仍必须走好友申请审批。
+    for (const bot of this.scene.bots) this.addFriendship(id, bot.id)
     this.scene.revision += 1
   }
 
@@ -223,6 +233,7 @@ export class SandboxControlService {
       group.announcements = group.announcements.filter(({ authorId }) => authorId !== input.id)
     }
     this.scene.requests = this.scene.requests.filter(({ requesterId, targetId }) => requesterId !== input.id && targetId !== input.id)
+    this.scene.friendships = this.scene.friendships.filter(({ participantIds }) => !participantIds.includes(input.id))
     this.deleteConversations((conversation) => conversation.userId === input.id
       || (!!conversation.groupId && ownedGroupIds.has(conversation.groupId)))
     this.scene.revision += 1
@@ -243,13 +254,7 @@ export class SandboxControlService {
     })
     this.createRuntimeBot({ selfId: id, name })
     for (const user of this.scene.users) {
-      this.scene.conversations.push({
-        id: `private:${user.id}:${id}`,
-        type: 'direct',
-        userId: user.id,
-        botId: id,
-        messageIds: [],
-      })
+      this.addFriendship(user.id, id)
     }
     this.scene.revision += 1
   }
@@ -279,6 +284,7 @@ export class SandboxControlService {
       group.members = group.members.filter(({ participantId }) => participantId !== input.id)
     }
     this.scene.requests = this.scene.requests.filter(({ targetId }) => targetId !== input.id)
+    this.scene.friendships = this.scene.friendships.filter(({ participantIds }) => !participantIds.includes(input.id))
     this.deleteConversations((conversation) => conversation.botId === input.id)
     this.scene.revision += 1
   }
@@ -313,6 +319,78 @@ export class SandboxControlService {
     this.scene.requests = this.scene.requests.filter(({ groupId }) => groupId !== input.id)
     this.deleteConversations((conversation) => conversation.groupId === input.id)
     this.scene.revision += 1
+  }
+
+  async performFriendAction(input: PerformFriendActionInput): Promise<PerformFriendActionResult> {
+    this.getUser(input.actorUserId)
+    if (input.action === 'handle-request') {
+      return this.handleUserFriendRequest(input)
+    }
+
+    const target = this.getParticipant(input.targetId)
+    if (target.id === input.actorUserId) throw new Error('不能对自己执行好友操作')
+    const friendship = this.getFriendship(input.actorUserId, target.id)
+
+    if (input.action === 'request') {
+      if (friendship) throw new Error('已经是好友关系')
+      if (this.scene.requests.some(({ type, requesterId, targetId }) => type === 'friend'
+        && ((requesterId === input.actorUserId && targetId === target.id)
+          || (requesterId === target.id && targetId === input.actorUserId)))) {
+        throw new Error('双方已有待处理的好友申请')
+      }
+      const request = {
+        id: `request:friend:${Random.id()}`,
+        type: 'friend' as const,
+        requesterId: input.actorUserId,
+        targetId: target.id,
+        status: 'pending' as const,
+        createdAt: new Date().toISOString(),
+        comment: input.comment?.trim() || undefined,
+      }
+      this.scene.requests.push(request)
+      this.scene.revision += 1
+      if (this.isBot(target.id)) await this.dispatchFriendRequest(target.id, input.actorUserId, request.id, request.comment)
+      return { revision: this.scene.revision, requestId: request.id }
+    }
+
+    if (!friendship) throw new Error('好友关系不存在')
+    if (input.action === 'set-remark') {
+      const remark = input.remark.trim()
+      if (remark) friendship.remarks[input.actorUserId] = remark
+      else delete friendship.remarks[input.actorUserId]
+      this.scene.revision += 1
+      return { revision: this.scene.revision }
+    }
+
+    if (input.action === 'poke') {
+      if (this.isBot(target.id)) await this.dispatchBotNotice(target.id, input.actorUserId, 'notify')
+      this.scene.revision += 1
+      return { revision: this.scene.revision }
+    }
+
+    if (input.action !== 'delete') throw new Error(`不支持的好友操作：${Reflect.get(input, 'action') ?? 'unknown'}`)
+
+    this.scene.friendships = this.scene.friendships.filter(({ id }) => id !== friendship.id)
+    if (this.isBot(target.id)) {
+      this.deleteConversations(({ type, userId, botId }) => type === 'direct' && userId === input.actorUserId && botId === target.id)
+      await this.dispatchBotNotice(target.id, input.actorUserId, 'friend_del')
+    }
+    this.scene.revision += 1
+    return { revision: this.scene.revision }
+  }
+
+  async handleBotFriendRequest(botId: string, input: { flag: string; approve: boolean; remark?: string }) {
+    if (!this.isBot(botId)) throw new Error(`机器人不存在：${botId}`)
+    const requestIndex = this.scene.requests.findIndex(({ id, type, targetId }) => id === input.flag && type === 'friend' && targetId === botId)
+    if (requestIndex < 0) throw new Error(`好友申请不存在：${input.flag}`)
+    const [request] = this.scene.requests.splice(requestIndex, 1)
+    if (input.approve) {
+      const friendship = this.addFriendship(request.requesterId, botId)
+      const remark = input.remark?.trim()
+      if (remark) friendship.remarks[botId] = remark
+    }
+    this.scene.revision += 1
+    return { status: 'ok', retcode: 0, data: null }
   }
 
   async sendMessage(input: SendMessageInput): Promise<SendMessageResult> {
@@ -562,6 +640,97 @@ export class SandboxControlService {
     const bot = new SandboxBot(this.ctx, this, config)
     this.runtimeBots.set(config.selfId, bot)
     return bot
+  }
+
+  private handleUserFriendRequest(input: Extract<PerformFriendActionInput, { action: 'handle-request' }>): PerformFriendActionResult {
+    const requestIndex = this.scene.requests.findIndex(({ id, type }) => id === input.requestId && type === 'friend')
+    if (requestIndex < 0) throw new Error(`好友申请不存在：${input.requestId}`)
+    const request = this.scene.requests[requestIndex]
+    if (this.isBot(request.targetId)) throw new Error('机器人申请必须由机器人处理')
+    if (request.targetId !== input.actorUserId) throw new Error('只能处理发给自己的好友申请')
+    this.scene.requests.splice(requestIndex, 1)
+    if (input.approve) this.addFriendship(request.requesterId, input.actorUserId)
+    this.scene.revision += 1
+    return { revision: this.scene.revision }
+  }
+
+  private addFriendship(firstId: string, secondId: string): SandboxFriendship {
+    const existing = this.getFriendship(firstId, secondId)
+    if (existing) return existing
+    const friendship = createFriendship(firstId, secondId)
+    this.scene.friendships.push(friendship)
+    const userId = this.isBot(firstId) ? secondId : firstId
+    const botId = this.isBot(firstId) ? firstId : this.isBot(secondId) ? secondId : undefined
+    if (botId && !this.scene.conversations.some(({ id }) => id === `private:${userId}:${botId}`)) {
+      this.scene.conversations.push({
+        id: `private:${userId}:${botId}`,
+        type: 'direct',
+        userId,
+        botId,
+        messageIds: [],
+      })
+    }
+    return friendship
+  }
+
+  private getFriendship(firstId: string, secondId: string) {
+    return this.scene.friendships.find(({ participantIds }) => participantIds.includes(firstId) && participantIds.includes(secondId))
+  }
+
+  private getParticipant(id: string): SandboxUser | SandboxBotProfile {
+    const user = this.scene.users.find((item) => item.id === id)
+    const bot = this.scene.bots.find((item) => item.id === id)
+    if (user) return user
+    if (bot) return bot
+    throw new Error(`参与者不存在：${id}`)
+  }
+
+  private isBot(id: string | undefined): boolean {
+    return !!id && this.scene.bots.some((bot) => bot.id === id)
+  }
+
+  private async dispatchFriendRequest(botId: string, userId: string, flag: string, comment?: string) {
+    const bot = this.runtimeBots.get(botId)
+    if (!bot) throw new Error(`机器人运行时不存在：${botId}`)
+    const session = bot.session({
+      type: 'friend-request',
+      timestamp: Date.now(),
+      user: { id: userId, name: this.getUser(userId).name },
+    })
+    Object.assign(session, {
+      onebot: {
+        time: Math.floor(Date.now() / 1000),
+        self_id: Number(botId),
+        post_type: 'request',
+        request_type: 'friend',
+        user_id: Number(userId),
+        comment,
+        flag,
+      },
+    })
+    await bot.dispatch(session)
+  }
+
+  private async dispatchBotNotice(botId: string, userId: string, noticeType: 'notify' | 'friend_del') {
+    const bot = this.runtimeBots.get(botId)
+    if (!bot) throw new Error(`机器人运行时不存在：${botId}`)
+    const session = bot.session({
+      type: 'notice',
+      timestamp: Date.now(),
+      user: { id: userId, name: this.getUser(userId).name },
+    })
+    Object.assign(session, {
+      onebot: {
+        time: Math.floor(Date.now() / 1000),
+        self_id: Number(botId),
+        post_type: 'notice',
+        notice_type: noticeType,
+        sub_type: noticeType === 'notify' ? 'poke' : undefined,
+        user_id: Number(userId),
+        target_id: Number(botId),
+      },
+    })
+    await bot.dispatch(session)
   }
 
   private deleteConversations(predicate: (conversation: SandboxSnapshot['conversations'][number]) => boolean): void {
