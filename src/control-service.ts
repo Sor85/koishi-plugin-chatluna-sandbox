@@ -324,7 +324,7 @@ export class SandboxControlService {
   async performFriendAction(input: PerformFriendActionInput): Promise<PerformFriendActionResult> {
     this.getUser(input.actorUserId)
     if (input.action === 'handle-request') {
-      return this.handleUserFriendRequest(input)
+      return this.handleUserRelationshipRequest(input)
     }
 
     const target = this.getParticipant(input.targetId)
@@ -642,14 +642,31 @@ export class SandboxControlService {
     return bot
   }
 
-  private handleUserFriendRequest(input: Extract<PerformFriendActionInput, { action: 'handle-request' }>): PerformFriendActionResult {
-    const requestIndex = this.scene.requests.findIndex(({ id, type }) => id === input.requestId && type === 'friend')
-    if (requestIndex < 0) throw new Error(`好友申请不存在：${input.requestId}`)
+  private handleUserRelationshipRequest(input: Extract<PerformFriendActionInput, { action: 'handle-request' }>): PerformFriendActionResult {
+    const requestIndex = this.scene.requests.findIndex(({ id }) => id === input.requestId)
+    if (requestIndex < 0) throw new Error(`关系申请不存在：${input.requestId}`)
     const request = this.scene.requests[requestIndex]
-    if (this.isBot(request.targetId)) throw new Error('机器人申请必须由机器人处理')
-    if (request.targetId !== input.actorUserId) throw new Error('只能处理发给自己的好友申请')
+    if (request.type === 'friend') {
+      if (this.isBot(request.targetId)) throw new Error('机器人申请必须由机器人处理')
+      if (request.targetId !== input.actorUserId) throw new Error('只能处理发给自己的好友申请')
+      this.scene.requests.splice(requestIndex, 1)
+      if (input.approve) this.addFriendship(request.requesterId, input.actorUserId)
+      this.scene.revision += 1
+      return { revision: this.scene.revision }
+    }
+
+    const group = this.scene.groups.find(({ id }) => id === request.groupId)
+    if (!group) throw new Error(`群组不存在：${request.groupId}`)
+    const operator = group.members.find(({ participantId }) => participantId === input.actorUserId)
+    if (!operator || (operator.role !== 'owner' && operator.role !== 'admin')) {
+      throw new Error('只有群主或管理员可以处理入群申请')
+    }
+    this.getUser(request.requesterId)
     this.scene.requests.splice(requestIndex, 1)
-    if (input.approve) this.addFriendship(request.requesterId, input.actorUserId)
+    if (input.approve && !group.members.some(({ participantId }) => participantId === request.requesterId)) {
+      group.members.push({ participantId: request.requesterId, role: 'member' })
+      this.syncGroupConversations(group.id)
+    }
     this.scene.revision += 1
     return { revision: this.scene.revision }
   }

@@ -93,4 +93,26 @@ describe('模拟 QQ 环境好友关系', () => {
 
     expect(control.getSnapshot()).toEqual(before)
   })
+
+  it('群主可以同意入群申请并为申请人建立群会话', async () => {
+    const { control } = await createControl()
+    const request = control.getSnapshot().requests.find(({ type }) => type === 'group')
+    if (!request) throw new Error('默认入群申请不存在')
+
+    await control.performFriendAction({ action: 'handle-request', actorUserId: '10001', requestId: request.id, approve: true })
+
+    const snapshot = control.getSnapshot()
+    expect(snapshot.requests.some(({ id }) => id === request.id)).toBe(false)
+    expect(snapshot.groups[0].members).toContainEqual({ participantId: '10004', role: 'member' })
+    expect(snapshot.conversations.some(({ id }) => id === 'group:30001:10004:20001')).toBe(true)
+  })
+
+  it('普通群成员不能处理入群申请', async () => {
+    const { control } = await createControl()
+    const request = control.getSnapshot().requests.find(({ type }) => type === 'group')
+    if (!request) throw new Error('默认入群申请不存在')
+
+    await expect(control.performFriendAction({ action: 'handle-request', actorUserId: '10002', requestId: request.id, approve: true }))
+      .rejects.toThrow('只有群主或管理员可以处理入群申请')
+  })
 })

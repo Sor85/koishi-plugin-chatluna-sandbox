@@ -43,31 +43,36 @@
                 {{ tab.label }}
               </button>
             </div>
-            <Popover>
+            <Popover v-slot="{ open }">
               <PopoverTrigger as-child>
                 <button
                   type="button"
                   class="webqq-sidebar-notify"
-                  :class="{ 'has-notification': incomingFriendRequests.length }"
-                  :aria-label="`通知${incomingFriendRequests.length ? `（${incomingFriendRequests.length}）` : ''}`"
+                  :class="{ 'is-active': open, 'has-notification': pendingNotificationCount }"
+                  :aria-label="`通知${pendingNotificationCount ? `（${pendingNotificationCount}）` : ''}`"
                 >
                   <IconBell :size="20" stroke-width="1.8" aria-hidden="true" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="end" class="webqq-notification-popover">
-                <strong>好友通知</strong>
-                <p v-if="!incomingFriendRequests.length" class="webqq-notification-empty">暂无待处理申请</p>
-                <article v-for="request in incomingFriendRequests" :key="request.id" class="webqq-notification-item">
-                  <span class="webqq-avatar">{{ getInitial(getParticipantName(request.requesterId)) }}</span>
-                  <span>
-                    <strong>{{ getParticipantName(request.requesterId) }}</strong>
-                    <small>{{ request.comment || '请求添加你为好友' }}</small>
-                  </span>
-                  <div>
-                    <Button size="sm" @click="handleFriendRequest(request.id, true)">同意</Button>
-                    <Button size="sm" variant="outline" @click="handleFriendRequest(request.id, false)">拒绝</Button>
-                  </div>
-                </article>
+              <PopoverContent
+                align="center"
+                :class="['webqq-notification-popover', {
+                  'is-frosted': workspace.appearance.enableWebQQFrostedGlass,
+                  'is-plain': !workspace.appearance.enableWebQQFrostedGlass,
+                  'is-color-dark': workspace.appearance.webQQColorMode === 'dark',
+                  'is-color-auto': workspace.appearance.webQQColorMode === 'auto',
+                }]"
+                :style="{ '--webqq-accent': workspace.appearance.webQQAccentColor, '--webqq-muted': '#64748b' }"
+              >
+                <NotificationMenu
+                  v-model:tab="notificationTab"
+                  :friends="notificationRequests.friends"
+                  :groups="notificationRequests.groups"
+                  :snapshot="snapshot"
+                  :handling-request-id="handlingRequestId"
+                  :error-text="notificationErrorMessage"
+                  @handle="handleNotificationRequest"
+                />
               </PopoverContent>
             </Popover>
           </header>
@@ -649,6 +654,8 @@ import EnvironmentCreatePopover from './environment-create-popover.vue'
 import EnvironmentEntityDialog from './environment-entity-dialog.vue'
 import EnvironmentManager from './environment-manager.vue'
 import { getFriendMenuActions, type FriendMenuState } from './friend-menu'
+import NotificationMenu from './notification-menu.vue'
+import { getIncomingNotificationRequests } from './notification-requests'
 import {
   loadWorkspacePreferences,
   resolveWorkspaceSelection,
@@ -725,6 +732,9 @@ const createUserOpen = ref(false)
 const remarkDialogOpen = ref(false)
 const remarkTargetId = ref('')
 const remarkInput = ref('')
+const notificationTab = ref<'friends' | 'groups'>('friends')
+const handlingRequestId = ref('')
+const notificationErrorMessage = ref('')
 type EnvironmentEntityType = 'user' | 'bot' | 'group'
 type EnvironmentDialogMode = 'edit' | 'delete'
 const entityDialogOpen = ref(false)
@@ -810,11 +820,8 @@ const filteredConversations = computed(() => {
       || conversation.groupId?.includes(query)
   })
 })
-const incomingFriendRequests = computed(() => snapshot.value.requests.filter(({ type, targetId }) => {
-  return type === 'friend'
-    && targetId === currentUserId.value
-    && snapshot.value.users.some(({ id }) => id === targetId)
-}))
+const notificationRequests = computed(() => getIncomingNotificationRequests(snapshot.value, currentUserId.value))
+const pendingNotificationCount = computed(() => notificationRequests.value.friends.length + notificationRequests.value.groups.length)
 const friendDirectory = computed(() => {
   const actorUserId = currentUserId.value
   if (!actorUserId) return []
@@ -974,8 +981,19 @@ function requestFriend(targetId: string) {
   return performFriendAction({ action: 'request', targetId, comment: '来自 OneBot Sandbox 的好友申请' })
 }
 
-function handleFriendRequest(requestId: string, approve: boolean) {
-  return performFriendAction({ action: 'handle-request', requestId, approve })
+async function handleNotificationRequest(requestId: string, approve: boolean) {
+  const actorUserId = currentUserId.value
+  if (!actorUserId) return
+  handlingRequestId.value = requestId
+  notificationErrorMessage.value = ''
+  try {
+    const nextWorkspace = await send('onebot-sandbox/friend-action', { action: 'handle-request', requestId, approve, actorUserId })
+    applyWorkspaceUpdate(nextWorkspace)
+  } catch (error) {
+    notificationErrorMessage.value = error instanceof Error ? error.message : '处理通知失败'
+  } finally {
+    handlingRequestId.value = ''
+  }
 }
 
 function pokeFriend(targetId: string) {
