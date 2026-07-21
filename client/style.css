@@ -732,21 +732,30 @@ body,
   color: #fff;
 }
 
-.webqq-message-row.is-quote-target .webqq-message-bubble {
+.webqq-message-row.is-quote-target .webqq-message-bubble::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 5px rgb(59 130 246 / 22%), 0 8px 18px rgb(37 99 235 / 18%);
+  content: "";
+  pointer-events: none;
+  opacity: 0;
+  /* Chrome 在平滑滚动期间直接重绘 box-shadow，偶发产生横向图层接缝；固定阴影后只合成透明度。 */
   animation: webqq-quote-target 1.4s ease-out;
+  will-change: opacity;
 }
 
 @keyframes webqq-quote-target {
   0% {
-    box-shadow: 0 0 0 0 rgb(59 130 246 / 36%), 0 2px 8px rgb(15 23 42 / 8%);
+    opacity: 0;
   }
 
   32% {
-    box-shadow: 0 0 0 5px rgb(59 130 246 / 22%), 0 8px 18px rgb(37 99 235 / 18%);
+    opacity: 1;
   }
 
   100% {
-    box-shadow: 0 0 0 0 rgb(59 130 246 / 0%), 0 2px 8px rgb(15 23 42 / 8%);
+    opacity: 0;
   }
 }
 
