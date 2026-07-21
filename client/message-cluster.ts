@@ -22,6 +22,8 @@ function isSameClusterSender(
 ) {
   return !!left
     && !!right
+    && !left.event
+    && !right.event
     && left.authorId === right.authorId
     && getDirection(left, currentUserId) === getDirection(right, currentUserId)
 }

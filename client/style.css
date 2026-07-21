@@ -760,6 +760,24 @@ body,
   list-style: none;
 }
 
+.webqq-message-event {
+  align-self: center;
+  width: fit-content;
+  max-width: 74%;
+  margin: 0 auto 16px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  color: color-mix(in srgb, var(--webqq-text) 58%, transparent);
+  background: rgb(148 163 184 / 14%);
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.webqq-message-event:last-child {
+  margin-bottom: 0;
+}
+
 .webqq-welcome {
   display: flex;
   min-height: 100%;

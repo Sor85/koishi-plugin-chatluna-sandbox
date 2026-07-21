@@ -234,9 +234,13 @@
                   {{ historyLoading ? '加载中...' : '查看更早消息' }}
                 </button>
               </li>
-              <ContextMenu v-for="(message, messageIndex) in messages" :key="message.id">
-                <ContextMenuTrigger as-child>
-                  <li
+              <template v-for="(message, messageIndex) in messages" :key="message.id">
+                <li v-if="message.event" class="webqq-message-event">
+                  {{ message.content }}
+                </li>
+                <ContextMenu v-else>
+                  <ContextMenuTrigger as-child>
+                    <li
                     class="webqq-message-row"
                     :class="[
                       message.authorId === currentUser?.id ? 'is-outgoing' : 'is-incoming',
@@ -343,14 +347,15 @@
                         </div>
                       </div>
                     </div>
-                  </li>
-                </ContextMenuTrigger>
-                <ContextMenuContent style="z-index: 140">
-                  <ContextMenuItem @select="replyingToMessageId = message.id">
-                    <IconMessageReply :size="16" aria-hidden="true" /> 回复
-                  </ContextMenuItem>
-                </ContextMenuContent>
-              </ContextMenu>
+                    </li>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent style="z-index: 140">
+                    <ContextMenuItem @select="replyingToMessageId = message.id">
+                      <IconMessageReply :size="16" aria-hidden="true" /> 回复
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
+              </template>
             </ol>
           </section>
 
@@ -997,7 +1002,9 @@ async function handleNotificationRequest(requestId: string, approve: boolean) {
 }
 
 function pokeFriend(targetId: string) {
-  return performFriendAction({ action: 'poke', targetId })
+  const conversationId = currentConversation.value?.id
+  if (!conversationId) return
+  return performFriendAction({ action: 'poke', targetId, conversationId })
 }
 
 function deleteFriend(targetId: string) {

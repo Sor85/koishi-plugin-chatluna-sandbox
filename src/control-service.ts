@@ -364,7 +364,27 @@ export class SandboxControlService {
 
     if (input.action === 'poke') {
       if (this.isBot(target.id)) await this.dispatchBotNotice(target.id, input.actorUserId, 'notify')
-      this.scene.revision += 1
+      const conversation = input.conversationId
+        ? this.getVisibleConversation(input.actorUserId, input.conversationId)
+        : this.scene.conversations.find(({ type, userId, botId }) => type === 'direct' && userId === input.actorUserId && botId === target.id)
+      if (!conversation) throw new Error('戳一戳必须在可见会话中发起')
+      const group = conversation.groupId
+        ? this.scene.groups.find(({ id }) => id === conversation.groupId)
+        : undefined
+      if (group && !group.members.some(({ participantId }) => participantId === target.id)) {
+        throw new Error('目标用户不在当前群组中')
+      }
+      if (!group && conversation.botId !== target.id) throw new Error('目标用户不在当前私聊中')
+      const getDisplayName = (participantId: string) => group?.members.find((member) => member.participantId === participantId)?.card
+        || this.getParticipant(participantId).name
+      this.appendMessage(
+        input.actorUserId,
+        conversation.id,
+        `${getDisplayName(input.actorUserId)} 戳了戳 ${getDisplayName(target.id)}`,
+        undefined,
+        undefined,
+        { type: 'poke', targetId: target.id },
+      )
       return { revision: this.scene.revision }
     }
 
@@ -549,6 +569,7 @@ export class SandboxControlService {
     content: string,
     replyToMessageId?: string,
     media?: SandboxMedia[],
+    event?: SandboxMessage['event'],
   ): SandboxMessage {
     const conversation = this.scene.conversations.find(({ id }) => id === conversationId)
     if (!conversation) throw new Error(`会话不存在：${conversationId}`)
@@ -562,6 +583,7 @@ export class SandboxControlService {
       createdAt: new Date().toISOString(),
       replyToMessageId,
       media,
+      event,
     }
     this.scene.messages.push(message)
     conversation.messageIds.push(message.id)

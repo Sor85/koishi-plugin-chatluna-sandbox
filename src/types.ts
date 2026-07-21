@@ -93,6 +93,10 @@ export interface SandboxMessage {
   createdAt: string
   replyToMessageId?: string
   media?: SandboxMedia[]
+  event?: {
+    type: 'poke'
+    targetId: string
+  }
 }
 
 export type SandboxMediaType = 'image' | 'file' | 'audio' | 'video'
@@ -140,7 +144,7 @@ export type SandboxFriendAction =
   | { action: 'handle-request'; requestId: string; approve: boolean }
   | { action: 'delete'; targetId: string }
   | { action: 'set-remark'; targetId: string; remark: string }
-  | { action: 'poke'; targetId: string }
+  | { action: 'poke'; targetId: string; conversationId?: string }
 
 export type PerformFriendActionInput = SandboxFriendAction extends infer Action
   ? Action extends SandboxFriendAction ? Action & { actorUserId: string } : never

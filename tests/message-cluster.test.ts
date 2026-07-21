@@ -53,4 +53,15 @@ describe('TIM 消息簇', () => {
     expect(getMessageClusterClass(messages, 0, 'tim', '10001')).toBe('is-cluster-first')
     expect(getMessageClusterClass(messages, 2, 'tim', '10001')).toBe('is-cluster-last')
   })
+
+  it('戳一戳事件会中断连续消息合并', () => {
+    const event: SandboxMessage = {
+      ...message('poke', '10001', '测试用户 戳了戳机器人'),
+      event: { type: 'poke', targetId: '20001' },
+    }
+    const messages = [message('1', '20001'), event, message('2', '20001')]
+
+    expect(messages.map((_, index) => getMessageClusterClass(messages, index, 'tim', '10001')))
+      .toEqual(['', '', ''])
+  })
 })
