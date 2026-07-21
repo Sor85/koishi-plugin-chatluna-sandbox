@@ -3,15 +3,19 @@ import type {} from '@koishijs/console'
 import type { SandboxControlService } from './control-service'
 import type {
   DeleteGroupAnnouncementInput,
+  GetMessageHistoryInput,
+  GetSandboxWorkspaceInput,
   ManageSandboxEnvironmentInput,
   SandboxAppearance,
+  SandboxMessageHistory,
   SandboxWorkspaceState,
   SendMessageInput,
   SetGroupAnnouncementInput,
 } from './types'
 
 interface ConsoleEventMap {
-  'onebot-sandbox/workspace': () => SandboxWorkspaceState
+  'onebot-sandbox/workspace': (input?: GetSandboxWorkspaceInput) => SandboxWorkspaceState
+  'onebot-sandbox/message-history': (input: GetMessageHistoryInput) => SandboxMessageHistory
   'onebot-sandbox/send-message': (input: SendMessageInput) => Promise<SandboxWorkspaceState>
   'onebot-sandbox/set-group-announcement': (input: SetGroupAnnouncementInput) => SandboxWorkspaceState
   'onebot-sandbox/delete-group-announcement': (input: DeleteGroupAnnouncementInput) => SandboxWorkspaceState
@@ -37,23 +41,30 @@ export function registerConsole(
     prod: resolve(__dirname, '../dist'),
   })
 
-  const getWorkspace = (): SandboxWorkspaceState => ({
-    snapshot: control.getSnapshot(),
-    appearance,
-  })
+  const getWorkspace = (actorUserId?: string, messageLimit?: number): SandboxWorkspaceState => {
+    const snapshot = control.getSnapshot()
+    const visibleUserId = snapshot.users.some(({ id }) => id === actorUserId)
+      ? actorUserId
+      : snapshot.users[0]?.id
+    return {
+      snapshot: visibleUserId ? control.getVisibleSnapshot(visibleUserId, messageLimit) : snapshot,
+      appearance,
+    }
+  }
 
-  console.addListener('onebot-sandbox/workspace', getWorkspace, { authority: 4 })
+  console.addListener('onebot-sandbox/workspace', (input) => getWorkspace(input?.actorUserId, input?.messageLimit), { authority: 4 })
+  console.addListener('onebot-sandbox/message-history', (input) => control.getMessageHistory(input), { authority: 4 })
   console.addListener('onebot-sandbox/send-message', async (input) => {
     await control.sendMessage(input)
-    return getWorkspace()
+    return getWorkspace(input.actorUserId)
   }, { authority: 4 })
   console.addListener('onebot-sandbox/set-group-announcement', (input) => {
     control.setGroupAnnouncement(input)
-    return getWorkspace()
+    return getWorkspace(input.actorUserId)
   }, { authority: 4 })
   console.addListener('onebot-sandbox/delete-group-announcement', (input) => {
     control.deleteGroupAnnouncement(input)
-    return getWorkspace()
+    return getWorkspace(input.actorUserId)
   }, { authority: 4 })
   console.addListener('onebot-sandbox/manage-environment', (input) => {
     switch (input.action) {
@@ -85,13 +96,14 @@ export function registerConsole(
         control.deleteGroup(input.data)
         break
     }
-    return getWorkspace()
+    return getWorkspace(input.actorUserId)
   }, { authority: 4 })
 }
 
 declare module '@koishijs/console' {
   interface Events {
-    'onebot-sandbox/workspace'(): SandboxWorkspaceState
+    'onebot-sandbox/workspace'(input?: GetSandboxWorkspaceInput): SandboxWorkspaceState
+    'onebot-sandbox/message-history'(input: GetMessageHistoryInput): SandboxMessageHistory
     'onebot-sandbox/send-message'(input: SendMessageInput): Promise<SandboxWorkspaceState>
     'onebot-sandbox/set-group-announcement'(input: SetGroupAnnouncementInput): SandboxWorkspaceState
     'onebot-sandbox/delete-group-announcement'(input: DeleteGroupAnnouncementInput): SandboxWorkspaceState

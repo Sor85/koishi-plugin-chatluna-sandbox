@@ -147,6 +147,7 @@ const props = defineProps<{
   mode: DialogMode
   target?: { type: EntityType, id: string }
   snapshot: SandboxSnapshot
+  currentUserId?: string
   accentColor: string
 }>()
 const emit = defineEmits<{
@@ -209,7 +210,7 @@ async function runAction(input: ManageSandboxEnvironmentInput) {
   busy.value = true
   errorMessage.value = ''
   try {
-    emit('updated', await send('onebot-sandbox/manage-environment', input))
+    emit('updated', await send('onebot-sandbox/manage-environment', { ...input, actorUserId: props.currentUserId }))
     emit('update:open', false)
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '环境管理失败'

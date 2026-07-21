@@ -50,11 +50,13 @@ describe('Koishi 控制台适配器', () => {
     }])
 
     const snapshotListener = listeners.get('onebot-sandbox/workspace')
+    const historyListener = listeners.get('onebot-sandbox/message-history')
     const sendMessageListener = listeners.get('onebot-sandbox/send-message')
     const setGroupAnnouncementListener = listeners.get('onebot-sandbox/set-group-announcement')
     const deleteGroupAnnouncementListener = listeners.get('onebot-sandbox/delete-group-announcement')
     const manageEnvironmentListener = listeners.get('onebot-sandbox/manage-environment')
     if (typeof snapshotListener !== 'function'
+      || typeof historyListener !== 'function'
       || typeof sendMessageListener !== 'function'
       || typeof setGroupAnnouncementListener !== 'function'
       || typeof deleteGroupAnnouncementListener !== 'function'
@@ -62,7 +64,7 @@ describe('Koishi 控制台适配器', () => {
       throw new Error('控制台监听器未注册')
     }
 
-    const initialWorkspace = snapshotListener()
+    const initialWorkspace = snapshotListener({ actorUserId: '10001' })
     expect(initialWorkspace.snapshot.users.map(({ id }: { id: string }) => id)).toEqual([
       '10001',
       '10002',
@@ -71,6 +73,7 @@ describe('Koishi 控制台适配器', () => {
     ])
     expect(initialWorkspace.snapshot.bots.map(({ id }: { id: string }) => id)).toEqual(['20001'])
     expect(initialWorkspace.snapshot.groups.map(({ id }: { id: string }) => id)).toEqual(['30001'])
+    expect(initialWorkspace.snapshot.conversations.every(({ userId }: { userId: string }) => userId === '10001')).toBe(true)
     expect(initialWorkspace.appearance).toEqual(appearance)
 
     const snapshot = await sendMessageListener({
@@ -83,6 +86,18 @@ describe('Koishi 控制台适配器', () => {
       '控制台消息',
       '回复：控制台消息',
     ])
+
+    const otherWorkspace = snapshotListener({ actorUserId: '10002' })
+    expect(otherWorkspace.snapshot.conversations.every(({ userId }: { userId: string }) => userId === '10002')).toBe(true)
+    expect(otherWorkspace.snapshot.messages).toEqual([])
+
+    const history = historyListener({
+      actorUserId: '10001',
+      conversationId: 'private:10001:20001',
+      limit: 1,
+    })
+    expect(history.messages).toHaveLength(1)
+    expect(history.nextBeforeMessageId).toBeDefined()
 
     const updated = setGroupAnnouncementListener({
       actorUserId: '10001',
@@ -102,5 +117,13 @@ describe('Koishi 控制台适配器', () => {
       data: { id: '10099', name: '控制台用户' },
     })
     expect(managed.snapshot.users).toContainEqual({ id: '10099', name: '控制台用户' })
+
+    const afterCurrentUserDeleted = manageEnvironmentListener({
+      actorUserId: '10001',
+      action: 'delete-user',
+      data: { id: '10001' },
+    })
+    expect(afterCurrentUserDeleted.snapshot.users.some(({ id }: { id: string }) => id === '10001')).toBe(false)
+    expect(afterCurrentUserDeleted.snapshot.conversations.every(({ userId }: { userId: string }) => userId === '10002')).toBe(true)
   })
 })

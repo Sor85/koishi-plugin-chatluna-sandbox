@@ -158,32 +158,54 @@
               <p>发送消息，验证插件在模拟 QQ 环境中的响应</p>
             </div>
             <ol v-else>
-              <li
-                v-for="message in messages"
-                :key="message.id"
-                class="webqq-message-row"
-                :class="message.authorId === currentUser?.id ? 'is-outgoing' : 'is-incoming'"
-              >
-                <span class="webqq-message-avatar-wrap">
-                  <span class="webqq-message-avatar">
-                    {{ getInitial(getParticipantName(message.authorId)) }}
-                  </span>
-                </span>
-                <div class="webqq-message-content">
-                  <div class="webqq-sender-line">
-                    <span class="webqq-message-author">{{ getParticipantName(message.authorId) }}</span>
-                  </div>
-                  <div class="webqq-message-body">
-                    <p class="webqq-message-bubble">{{ message.content }}</p>
-                  </div>
-                </div>
+              <li v-if="currentConversation?.hasMoreMessages" class="webqq-history-more-row">
+                <button type="button" class="webqq-history-more" :disabled="historyLoading" @click="loadEarlierMessages">
+                  {{ historyLoading ? '加载中...' : '查看更早消息' }}
+                </button>
               </li>
+              <ContextMenu v-for="message in messages" :key="message.id">
+                <ContextMenuTrigger as-child>
+                  <li
+                    class="webqq-message-row"
+                    :class="message.authorId === currentUser?.id ? 'is-outgoing' : 'is-incoming'"
+                  >
+                    <span class="webqq-message-avatar-wrap">
+                      <span class="webqq-message-avatar">
+                        {{ getInitial(getParticipantName(message.authorId)) }}
+                      </span>
+                    </span>
+                    <div class="webqq-message-content">
+                      <div class="webqq-sender-line">
+                        <span class="webqq-message-author">{{ getParticipantName(message.authorId) }}</span>
+                      </div>
+                      <div class="webqq-message-body">
+                        <div v-if="getReplyMessage(message)" class="webqq-message-quote">
+                          <strong>{{ getParticipantName(getReplyMessage(message)!.authorId) }}</strong>
+                          <span>{{ getReplyMessage(message)!.content }}</span>
+                        </div>
+                        <p class="webqq-message-bubble">{{ message.content }}</p>
+                      </div>
+                    </div>
+                  </li>
+                </ContextMenuTrigger>
+                <ContextMenuContent style="z-index: 140">
+                  <ContextMenuItem @select="replyingToMessageId = message.id">
+                    <IconMessageReply :size="16" aria-hidden="true" /> 回复
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
             </ol>
           </section>
 
           <div ref="composerLayoutRef" class="webqq-composer-layout-root">
             <form class="webqq-composer" :style="composerStyle" @submit.prevent="sendMessage">
               <span v-if="errorMessage" class="webqq-composer-error" role="alert">{{ errorMessage }}</span>
+              <div v-if="replyingToMessage" class="webqq-composer-reply">
+                <span>回复 {{ getParticipantName(replyingToMessage.authorId) }}：{{ replyingToMessage.content }}</span>
+                <button type="button" aria-label="取消回复" @click="replyingToMessageId = ''">
+                  <IconX :size="15" aria-hidden="true" />
+                </button>
+              </div>
               <div ref="userStackLayoutRef" class="webqq-composer-user-layout-root" :style="userLayoutStyle">
                 <div
                   :class="['webqq-composer-user-capsule', { 'is-expanded': userStackVisualExpanded }]"
@@ -399,6 +421,7 @@
           :mode="entityDialogMode"
           :target="entityDialogTarget"
           :snapshot="snapshot"
+          :current-user-id="currentUserId"
           :accent-color="workspace.appearance.webQQAccentColor"
           @updated="applyWorkspaceUpdate"
         />
@@ -420,9 +443,11 @@ import {
   IconMessageCircle,
   IconPaperclip,
   IconPlus,
+  IconMessageReply,
   IconSearch,
   IconSend,
   IconTrash,
+  IconX,
   IconUser,
   IconUserCircle,
   IconUsers,
@@ -451,6 +476,7 @@ import type {
   SandboxAppearance,
   SandboxConversation,
   SandboxGroupMember,
+  SandboxMessage,
   SandboxSnapshot,
   SandboxWorkspaceState,
 } from '../src/types'
@@ -603,10 +629,18 @@ const messages = computed(() => {
   const ids = new Set(currentConversation.value?.messageIds ?? [])
   return snapshot.value.messages.filter(({ id }) => ids.has(id))
 })
+const replyingToMessageId = ref('')
+const replyingToMessage = computed(() => snapshot.value.messages.find(({ id }) => id === replyingToMessageId.value))
+const historyLoading = ref(false)
 
 onMounted(async () => {
-  workspace.value = await send('onebot-sandbox/workspace')
-  applySelection(resolveWorkspaceSelection(snapshot.value, loadWorkspacePreferences(window.localStorage)))
+  const preferences = loadWorkspacePreferences(window.localStorage)
+  try {
+    workspace.value = await send('onebot-sandbox/workspace', { actorUserId: preferences.currentUserId })
+  } catch {
+    workspace.value = await send('onebot-sandbox/workspace')
+  }
+  applySelection(resolveWorkspaceSelection(snapshot.value, preferences))
   hydrated.value = true
 })
 
@@ -626,6 +660,7 @@ watch(activeConversationId, () => {
   announcementEditorOpen.value = false
   deletingAnnouncementId.value = ''
   infoErrorMessage.value = ''
+  replyingToMessageId.value = ''
 })
 
 watch(hasUserStackOverflow, (hasOverflow) => {
@@ -788,6 +823,7 @@ async function selectComposerUser(userId: string) {
   // 避免 Anime.js 在过渡中途读取坐标并吞掉点击切换动画。
   await waitForUserStackTransition()
   const layout = recordUserStackLayout()
+  workspace.value = await send('onebot-sandbox/workspace', { actorUserId: userId })
   applySelection(resolveWorkspaceSelection(snapshot.value, {
     currentUserId: userId,
     currentView: 'messages',
@@ -855,6 +891,47 @@ function getConversationMessages(conversationId: string) {
   return snapshot.value.messages.filter(({ id }) => ids.has(id))
 }
 
+function getReplyMessage(message: SandboxMessage) {
+  return message.replyToMessageId
+    ? snapshot.value.messages.find(({ id }) => id === message.replyToMessageId)
+    : undefined
+}
+
+async function loadEarlierMessages() {
+  const conversation = currentConversation.value
+  const user = currentUser.value
+  const beforeMessageId = conversation?.messageIds[0]
+  if (!conversation || !user || !beforeMessageId || historyLoading.value) return
+
+  historyLoading.value = true
+  errorMessage.value = ''
+  try {
+    const history = await send('onebot-sandbox/message-history', {
+      actorUserId: user.id,
+      conversationId: conversation.id,
+      beforeMessageId,
+      limit: 50,
+    })
+    const knownIds = new Set(snapshot.value.messages.map(({ id }) => id))
+    workspace.value = {
+      ...workspace.value,
+      snapshot: {
+        ...snapshot.value,
+        conversations: snapshot.value.conversations.map((item) => item.id === conversation.id ? {
+          ...item,
+          messageIds: [...history.messages.map((message: SandboxMessage) => message.id), ...item.messageIds],
+          hasMoreMessages: !!history.nextBeforeMessageId,
+        } : item),
+        messages: [...history.messages.filter((message: SandboxMessage) => !knownIds.has(message.id)), ...snapshot.value.messages],
+      },
+    }
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '读取历史消息失败'
+  } finally {
+    historyLoading.value = false
+  }
+}
+
 function getConversationPreview(conversationId: string) {
   return getConversationMessages(conversationId).at(-1)?.content ?? '开始一段新对话'
 }
@@ -880,6 +957,7 @@ async function sendMessage() {
       botId: bot.id,
       conversationId: conversation.id,
       content,
+      replyToMessageId: replyingToMessageId.value || undefined,
     })
     applySelection(resolveWorkspaceSelection(snapshot.value, {
       currentUserId: user.id,
@@ -887,6 +965,7 @@ async function sendMessage() {
       currentView: currentView.value,
     }))
     input.value = ''
+    replyingToMessageId.value = ''
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '发送失败'
   } finally {

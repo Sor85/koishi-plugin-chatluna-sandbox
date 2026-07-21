@@ -641,6 +641,52 @@ body,
   white-space: pre-wrap;
 }
 
+.webqq-history-more-row {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 12px;
+}
+
+.webqq-history-more {
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 12px;
+  color: var(--webqq-muted);
+  background: color-mix(in srgb, var(--webqq-panel) 82%, transparent);
+  font-size: 12px;
+}
+
+.webqq-history-more:hover:not(:disabled),
+.webqq-history-more:focus-visible {
+  color: var(--webqq-accent);
+  outline: none;
+  background: color-mix(in srgb, var(--webqq-accent) 10%, var(--webqq-panel));
+}
+
+.webqq-history-more:disabled {
+  opacity: 0.6;
+}
+
+.webqq-message-quote {
+  display: grid;
+  gap: 2px;
+  max-width: 320px;
+  margin-bottom: 6px;
+  padding: 7px 10px;
+  border-left: 3px solid color-mix(in srgb, var(--webqq-accent) 65%, transparent);
+  border-radius: 6px;
+  color: var(--webqq-muted);
+  background: color-mix(in srgb, var(--webqq-panel) 78%, transparent);
+  font-size: 12px;
+}
+
+.webqq-message-quote strong,
+.webqq-message-quote span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .webqq-message-row.is-outgoing .webqq-message-bubble {
   color: #fff;
   background: var(--webqq-accent);
@@ -706,6 +752,52 @@ body,
   color: var(--webqq-text);
   background: transparent;
   pointer-events: auto;
+}
+
+.webqq-composer-reply {
+  position: absolute;
+  right: 14px;
+  bottom: calc(100% + 8px);
+  left: 14px;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--webqq-border);
+  border-radius: 12px;
+  color: var(--webqq-muted);
+  background: var(--webqq-panel);
+  box-shadow: 0 8px 18px rgb(15 23 42 / 8%);
+  font-size: 12px;
+}
+
+.webqq-composer-reply span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webqq-composer-reply button {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  color: inherit;
+  background: transparent;
+}
+
+.webqq-composer-reply button:hover,
+.webqq-composer-reply button:focus-visible {
+  color: var(--webqq-text);
+  outline: none;
+  background: var(--webqq-hover);
 }
 
 .webqq-composer::before {

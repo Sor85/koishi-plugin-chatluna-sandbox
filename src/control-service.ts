@@ -8,8 +8,10 @@ import type {
   DeleteSandboxGroupInput,
   DeleteSandboxUserInput,
   DeleteGroupAnnouncementInput,
+  GetMessageHistoryInput,
   SandboxConversation,
   SandboxMessage,
+  SandboxMessageHistory,
   SandboxSnapshot,
   SendMessageInput,
   SendMessageResult,
@@ -106,9 +108,10 @@ export class SandboxControlService {
   readonly bot: SandboxBot
 
   private scene: SandboxSnapshot = createDefaultScene()
+  private runtimeBots = new Map<string, SandboxBot>()
 
   constructor(private ctx: Context) {
-    this.bot = new SandboxBot(ctx, this, {
+    this.bot = this.createRuntimeBot({
       selfId: DEFAULT_BOT_ID,
       name: 'OneBot Sandbox',
     })
@@ -116,6 +119,44 @@ export class SandboxControlService {
 
   getSnapshot(): SandboxSnapshot {
     return structuredClone(this.scene)
+  }
+
+  getVisibleSnapshot(actorUserId: string, messageLimit = 50): SandboxSnapshot {
+    this.getUser(actorUserId)
+    const limit = this.validateMessageLimit(messageLimit)
+    const conversations = this.scene.conversations
+      .filter(({ userId }) => userId === actorUserId)
+      .map((conversation) => ({
+        ...conversation,
+        messageIds: conversation.messageIds.slice(-limit),
+        hasMoreMessages: conversation.messageIds.length > limit,
+      }))
+    const visibleMessageIds = new Set(conversations.flatMap(({ messageIds }) => messageIds))
+    const visibleGroupIds = new Set(conversations.flatMap(({ groupId }) => groupId ? [groupId] : []))
+
+    return structuredClone({
+      ...this.scene,
+      groups: this.scene.groups.filter(({ id }) => visibleGroupIds.has(id)),
+      conversations,
+      messages: this.scene.messages.filter(({ id }) => visibleMessageIds.has(id)),
+    })
+  }
+
+  getMessageHistory(input: GetMessageHistoryInput): SandboxMessageHistory {
+    const conversation = this.getVisibleConversation(input.actorUserId, input.conversationId)
+    const limit = this.validateMessageLimit(input.limit ?? 50)
+    let end = conversation.messageIds.length
+    if (input.beforeMessageId) {
+      end = conversation.messageIds.indexOf(input.beforeMessageId)
+      if (end < 0) throw new Error(`消息不存在：${input.beforeMessageId}`)
+    }
+    const start = Math.max(0, end - limit)
+    const messageIds = conversation.messageIds.slice(start, end)
+    const messagesById = new Map(this.scene.messages.map((message) => [message.id, message]))
+    return {
+      messages: structuredClone(messageIds.flatMap((id) => messagesById.get(id) ?? [])),
+      nextBeforeMessageId: start > 0 ? messageIds[0] : undefined,
+    }
   }
 
   createUser(input: CreateSandboxUserInput): void {
@@ -176,6 +217,7 @@ export class SandboxControlService {
       implementation: input.implementation,
       enabled: input.enabled,
     })
+    this.createRuntimeBot({ selfId: id, name })
     for (const user of this.scene.users) {
       this.scene.conversations.push({
         id: `private:${user.id}:${id}`,
@@ -194,6 +236,11 @@ export class SandboxControlService {
     bot.name = this.validateName(input.name, '机器人昵称')
     bot.implementation = input.implementation
     bot.enabled = input.enabled
+    const runtime = this.runtimeBots.get(bot.id)
+    if (runtime) {
+      runtime.user = { id: bot.id, name: bot.name }
+      runtime.status = bot.enabled ? Universal.Status.ONLINE : Universal.Status.OFFLINE
+    }
     this.scene.revision += 1
   }
 
@@ -201,6 +248,9 @@ export class SandboxControlService {
     const index = this.scene.bots.findIndex(({ id }) => id === input.id)
     if (index < 0) throw new Error(`机器人不存在：${input.id}`)
     this.scene.bots.splice(index, 1)
+    const runtime = this.runtimeBots.get(input.id)
+    this.runtimeBots.delete(input.id)
+    void runtime?.dispose()
     for (const group of this.scene.groups) {
       group.members = group.members.filter(({ participantId }) => participantId !== input.id)
     }
@@ -261,9 +311,15 @@ export class SandboxControlService {
       throw new Error(`群聊关系不存在：${input.conversationId}`)
     }
     if (!input.content.trim()) throw new Error('消息内容不能为空')
+    const reply = input.replyToMessageId
+      ? this.scene.messages.find(({ id, conversationId }) => id === input.replyToMessageId && conversationId === conversation.id)
+      : undefined
+    if (input.replyToMessageId && !reply) throw new Error(`回复消息不存在：${input.replyToMessageId}`)
 
-    const message = this.appendMessage(user.id, conversation.id, input.content.trim())
-    const session = this.bot.session({
+    const runtimeBot = this.runtimeBots.get(bot.id)
+    if (!runtimeBot) throw new Error(`机器人运行时不存在：${bot.id}`)
+    const message = this.appendMessage(user.id, conversation.id, input.content.trim(), input.replyToMessageId)
+    const session = runtimeBot.session({
       type: 'message',
       timestamp: Date.now(),
       user: { id: user.id, name: user.name },
@@ -277,6 +333,30 @@ export class SandboxControlService {
         messageId: message.id,
         content: message.content,
         elements: h.parse(message.content),
+        quote: reply ? {
+          id: reply.id,
+          messageId: reply.id,
+          content: reply.content,
+          user: { id: reply.authorId },
+        } : undefined,
+      },
+    })
+    Object.assign(session, {
+      onebot: {
+        time: Math.floor(Date.now() / 1000),
+        self_id: Number(bot.id),
+        post_type: 'message',
+        message_type: conversation.type === 'group' ? 'group' : 'private',
+        sub_type: conversation.type === 'group' ? 'normal' : 'friend',
+        message_id: Number.parseInt(message.id, 16),
+        user_id: Number(user.id),
+        group_id: group ? Number(group.id) : undefined,
+        message: [
+          ...(reply ? [{ type: 'reply', data: { id: reply.id } }] : []),
+          { type: 'text', data: { text: message.content } },
+        ],
+        raw_message: `${reply ? `[CQ:reply,id=${reply.id}]` : ''}${message.content}`,
+        sender: { user_id: Number(user.id), nickname: user.name },
       },
     })
 
@@ -290,7 +370,7 @@ export class SandboxControlService {
       })
     })
 
-    this.bot.dispatch(session)
+    runtimeBot.dispatch(session)
     await middlewareFinished
 
     return {
@@ -340,16 +420,18 @@ export class SandboxControlService {
     return this.appendMessage(conversation.botId, conversation.id, content)
   }
 
-  private appendMessage(authorId: string, conversationId: string, content: string): SandboxMessage {
+  private appendMessage(authorId: string, conversationId: string, content: string, replyToMessageId?: string): SandboxMessage {
     const conversation = this.scene.conversations.find(({ id }) => id === conversationId)
     if (!conversation) throw new Error(`会话不存在：${conversationId}`)
 
     const message: SandboxMessage = {
       id: Random.id(),
       authorId,
+      botId: conversation.botId,
       conversationId,
       content,
       createdAt: new Date().toISOString(),
+      replyToMessageId,
     }
     this.scene.messages.push(message)
     conversation.messageIds.push(message.id)
@@ -373,6 +455,30 @@ export class SandboxControlService {
     const name = value.trim()
     if (!name) throw new Error(`${field}不能为空`)
     return name
+  }
+
+  private getUser(userId: string) {
+    const user = this.scene.users.find(({ id }) => id === userId)
+    if (!user) throw new Error(`用户不存在：${userId}`)
+    return user
+  }
+
+  private getVisibleConversation(actorUserId: string, conversationId: string) {
+    this.getUser(actorUserId)
+    const conversation = this.scene.conversations.find(({ id, userId }) => id === conversationId && userId === actorUserId)
+    if (!conversation) throw new Error(`会话不存在：${conversationId}`)
+    return conversation
+  }
+
+  private validateMessageLimit(value: number) {
+    if (!Number.isInteger(value) || value < 1 || value > 100) throw new Error('消息分页大小必须在 1 到 100 之间')
+    return value
+  }
+
+  private createRuntimeBot(config: SandboxBot.Config) {
+    const bot = new SandboxBot(this.ctx, this, config)
+    this.runtimeBots.set(config.selfId, bot)
+    return bot
   }
 
   private deleteConversations(predicate: (conversation: SandboxSnapshot['conversations'][number]) => boolean): void {

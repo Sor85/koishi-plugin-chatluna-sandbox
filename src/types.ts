@@ -62,7 +62,7 @@ export interface DeleteSandboxGroupInput {
   id: string
 }
 
-export type ManageSandboxEnvironmentInput =
+export type ManageSandboxEnvironmentInput = { actorUserId?: string } & (
   | { action: 'create-user', data: CreateSandboxUserInput }
   | { action: 'update-user', data: UpdateSandboxUserInput }
   | { action: 'delete-user', data: DeleteSandboxUserInput }
@@ -72,6 +72,7 @@ export type ManageSandboxEnvironmentInput =
   | { action: 'create-group', data: CreateSandboxGroupInput }
   | { action: 'update-group', data: UpdateSandboxGroupInput }
   | { action: 'delete-group', data: DeleteSandboxGroupInput }
+)
 
 export interface SandboxConversation {
   id: string
@@ -80,14 +81,17 @@ export interface SandboxConversation {
   botId: string
   groupId?: string
   messageIds: string[]
+  hasMoreMessages?: boolean
 }
 
 export interface SandboxMessage {
   id: string
   authorId: string
+  botId: string
   conversationId: string
   content: string
   createdAt: string
+  replyToMessageId?: string
 }
 
 export interface SandboxRelationshipRequest {
@@ -123,11 +127,29 @@ export interface SandboxWorkspaceState {
   appearance: SandboxAppearance
 }
 
+export interface GetSandboxWorkspaceInput {
+  actorUserId?: string
+  messageLimit?: number
+}
+
+export interface GetMessageHistoryInput {
+  actorUserId: string
+  conversationId: string
+  beforeMessageId?: string
+  limit?: number
+}
+
+export interface SandboxMessageHistory {
+  messages: SandboxMessage[]
+  nextBeforeMessageId?: string
+}
+
 export interface SendMessageInput {
   actorUserId: string
   botId: string
   conversationId: string
   content: string
+  replyToMessageId?: string
 }
 
 export interface SendMessageResult {

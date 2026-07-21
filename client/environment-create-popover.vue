@@ -155,7 +155,7 @@ async function submit() {
   busy.value = true
   errorMessage.value = ''
   try {
-    emit('updated', await send('onebot-sandbox/manage-environment', input))
+    emit('updated', await send('onebot-sandbox/manage-environment', { ...input, actorUserId: props.currentUserId }))
     open.value = false
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '创建失败'
