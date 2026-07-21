@@ -5,8 +5,9 @@ declare module '@koishijs/client' {
     GetMediaContentInput,
     GetMessageHistoryInput,
     GetSandboxWorkspaceInput,
-  ManageSandboxEnvironmentInput,
-  PerformFriendActionInput,
+    ManageSandboxEnvironmentInput,
+    PerformFriendActionInput,
+    PerformGroupActionInput,
     SandboxMediaContent,
     SandboxMessageHistory,
     SandboxWorkspaceState,
@@ -35,4 +36,5 @@ declare module '@koishijs/client' {
   export function send(event: 'onebot-sandbox/delete-group-announcement', input: DeleteGroupAnnouncementInput): Promise<SandboxWorkspaceState>
   export function send(event: 'onebot-sandbox/manage-environment', input: ManageSandboxEnvironmentInput): Promise<SandboxWorkspaceState>
   export function send(event: 'onebot-sandbox/friend-action', input: PerformFriendActionInput): Promise<SandboxWorkspaceState>
+  export function send(event: 'onebot-sandbox/group-action', input: PerformGroupActionInput): Promise<SandboxWorkspaceState>
 }

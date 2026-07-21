@@ -1,4 +1,7 @@
 import { App } from '@koishijs/core'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { registerConsole, type SandboxConsoleRegistrar } from '../src/console'
 import { SandboxControlService } from '../src/control-service'
@@ -13,17 +16,21 @@ const appearance: SandboxAppearance = {
 }
 
 const runningApps: App[] = []
+const temporaryDirectories: string[] = []
 
 afterEach(async () => {
   await Promise.all(runningApps.splice(0).map((app) => app.stop()))
+  await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
 })
 
 describe('Koishi 控制台适配器', () => {
   it('注册 Vue 页面入口并通过共享服务返回消息闭环结果', async () => {
     const app = new App()
+    const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-console-media-'))
+    temporaryDirectories.push(mediaDirectory)
     let control: SandboxControlService | undefined
     app.plugin((ctx) => {
-      control = new SandboxControlService(ctx)
+      control = new SandboxControlService(ctx, { mediaDirectory })
     })
     runningApps.push(app)
 
@@ -58,6 +65,7 @@ describe('Koishi 控制台适配器', () => {
     const deleteGroupAnnouncementListener = listeners.get('onebot-sandbox/delete-group-announcement')
     const manageEnvironmentListener = listeners.get('onebot-sandbox/manage-environment')
     const friendActionListener = listeners.get('onebot-sandbox/friend-action')
+    const groupActionListener = listeners.get('onebot-sandbox/group-action')
     if (typeof snapshotListener !== 'function'
       || typeof historyListener !== 'function'
       || typeof sendMessageListener !== 'function'
@@ -66,7 +74,8 @@ describe('Koishi 控制台适配器', () => {
       || typeof setGroupAnnouncementListener !== 'function'
       || typeof deleteGroupAnnouncementListener !== 'function'
       || typeof manageEnvironmentListener !== 'function'
-      || typeof friendActionListener !== 'function') {
+      || typeof friendActionListener !== 'function'
+      || typeof groupActionListener !== 'function') {
       throw new Error('控制台监听器未注册')
     }
 
@@ -145,6 +154,15 @@ describe('Koishi 控制台适配器', () => {
       targetId: '10002',
     })
     expect(friendWorkspace.snapshot.requests.some(({ requesterId, targetId }: { requesterId: string; targetId?: string }) => requesterId === '10001' && targetId === '10002')).toBe(true)
+
+    const groupWorkspace = await groupActionListener({
+      action: 'set-card',
+      actorUserId: '10002',
+      groupId: '30001',
+      targetId: '10002',
+      card: '控制台群名片',
+    })
+    expect(groupWorkspace.snapshot.groups[0].members.find(({ participantId }: { participantId: string }) => participantId === '10002')?.card).toBe('控制台群名片')
 
     const afterCurrentUserDeleted = manageEnvironmentListener({
       actorUserId: '10001',

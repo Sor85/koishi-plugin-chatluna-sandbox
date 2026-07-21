@@ -113,6 +113,7 @@ export interface SandboxMedia {
 export interface SandboxRelationshipRequest {
   id: string
   type: 'friend' | 'group'
+  subType?: 'add' | 'invite'
   requesterId: string
   targetId?: string
   groupId?: string
@@ -151,6 +152,26 @@ export type PerformFriendActionInput = SandboxFriendAction extends infer Action
   : never
 
 export interface PerformFriendActionResult {
+  revision: number
+  requestId?: string
+}
+
+export type SandboxGroupAction =
+  | { action: 'request-join'; groupId: string; comment?: string }
+  | { action: 'invite'; groupId: string; targetId: string; comment?: string }
+  | { action: 'handle-request'; requestId: string; approve: boolean }
+  | { action: 'leave'; groupId: string }
+  | { action: 'kick'; groupId: string; targetId: string }
+  | { action: 'set-admin'; groupId: string; targetId: string; enabled: boolean }
+  | { action: 'set-card'; groupId: string; targetId: string; card: string }
+  | { action: 'set-name'; groupId: string; name: string }
+  | { action: 'poke'; groupId: string; targetId: string; conversationId?: string }
+
+export type PerformGroupActionInput = SandboxGroupAction extends infer Action
+  ? Action extends SandboxGroupAction ? Action & { actorUserId: string } : never
+  : never
+
+export interface PerformGroupActionResult {
   revision: number
   requestId?: string
 }

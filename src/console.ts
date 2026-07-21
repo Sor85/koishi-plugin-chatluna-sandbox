@@ -8,6 +8,7 @@ import type {
   GetSandboxWorkspaceInput,
   ManageSandboxEnvironmentInput,
   PerformFriendActionInput,
+  PerformGroupActionInput,
   SandboxAppearance,
   SandboxMediaContent,
   SandboxMessageHistory,
@@ -27,6 +28,7 @@ interface ConsoleEventMap {
   'onebot-sandbox/delete-group-announcement': (input: DeleteGroupAnnouncementInput) => SandboxWorkspaceState
   'onebot-sandbox/manage-environment': (input: ManageSandboxEnvironmentInput) => SandboxWorkspaceState
   'onebot-sandbox/friend-action': (input: PerformFriendActionInput) => Promise<SandboxWorkspaceState>
+  'onebot-sandbox/group-action': (input: PerformGroupActionInput) => Promise<SandboxWorkspaceState>
 }
 
 export interface SandboxConsoleRegistrar {
@@ -114,6 +116,10 @@ export function registerConsole(
     await control.performFriendAction(input)
     return getWorkspace(input.actorUserId)
   }, { authority: 4 })
+  console.addListener('onebot-sandbox/group-action', async (input) => {
+    await control.performGroupAction(input)
+    return getWorkspace(input.actorUserId)
+  }, { authority: 4 })
 }
 
 declare module '@koishijs/console' {
@@ -127,5 +133,6 @@ declare module '@koishijs/console' {
     'onebot-sandbox/delete-group-announcement'(input: DeleteGroupAnnouncementInput): SandboxWorkspaceState
     'onebot-sandbox/manage-environment'(input: ManageSandboxEnvironmentInput): SandboxWorkspaceState
     'onebot-sandbox/friend-action'(input: PerformFriendActionInput): Promise<SandboxWorkspaceState>
+    'onebot-sandbox/group-action'(input: PerformGroupActionInput): Promise<SandboxWorkspaceState>
   }
 }

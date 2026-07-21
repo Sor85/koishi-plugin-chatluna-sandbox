@@ -10,6 +10,7 @@ export namespace SandboxBot {
   export interface Internal {
     _request(action: string, params: Record<string, unknown>): Promise<unknown>
     set_friend_add_request(input: { flag: string; approve: boolean; remark?: string }): Promise<unknown>
+    set_group_add_request(input: { flag: string; sub_type: 'add' | 'invite'; approve: boolean; reason?: string }): Promise<unknown>
   }
 }
 
@@ -29,14 +30,30 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     this.status = Universal.Status.ONLINE
     this.internal = {
       _request: async (action, params) => {
-        if (action !== 'set_friend_add_request') throw new Error(`不支持的 OneBot action：${action}`)
-        return this.control.handleBotFriendRequest(this.selfId, {
-          flag: typeof params.flag === 'string' ? params.flag : '',
-          approve: params.approve === true,
-          remark: typeof params.remark === 'string' ? params.remark : undefined,
-        })
+        if (action === 'set_friend_add_request') {
+          return this.control.handleBotFriendRequest(this.selfId, {
+            flag: typeof params.flag === 'string' ? params.flag : '',
+            approve: params.approve === true,
+            remark: typeof params.remark === 'string' ? params.remark : undefined,
+          })
+        }
+        if (action === 'set_group_add_request') {
+          return this.control.handleBotGroupRequest(this.selfId, {
+            flag: typeof params.flag === 'string' ? params.flag : '',
+            subType: params.sub_type === 'invite' ? 'invite' : 'add',
+            approve: params.approve === true,
+            reason: typeof params.reason === 'string' ? params.reason : undefined,
+          })
+        }
+        throw new Error(`不支持的 OneBot action：${action}`)
       },
       set_friend_add_request: (input) => this.control.handleBotFriendRequest(this.selfId, input),
+      set_group_add_request: (input) => this.control.handleBotGroupRequest(this.selfId, {
+        flag: input.flag,
+        subType: input.sub_type,
+        approve: input.approve,
+        reason: input.reason,
+      }),
     }
   }
 

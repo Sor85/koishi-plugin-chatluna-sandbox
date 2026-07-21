@@ -17,7 +17,8 @@ const snapshot = {
   friendships: [],
   requests: [
     { id: 'friend', type: 'friend', requesterId: 'applicant', targetId: 'owner', status: 'pending', createdAt: '' },
-    { id: 'group-request', type: 'group', requesterId: 'applicant', groupId: 'group', status: 'pending', createdAt: '' },
+    { id: 'group-request', type: 'group', subType: 'add', requesterId: 'applicant', groupId: 'group', status: 'pending', createdAt: '' },
+    { id: 'group-invite', type: 'group', subType: 'invite', requesterId: 'owner', targetId: 'member', groupId: 'group', status: 'pending', createdAt: '' },
   ],
 } satisfies SandboxSnapshot
 
@@ -29,7 +30,7 @@ describe('铃铛通知申请', () => {
     })
   })
 
-  it('普通群成员不能看到需要管理员审批的入群申请', () => {
-    expect(getIncomingNotificationRequests(snapshot, 'member')).toEqual({ friends: [], groups: [] })
+  it('普通群成员看不到入群申请，但能处理发给自己的群邀请', () => {
+    expect(getIncomingNotificationRequests(snapshot, 'member')).toEqual({ friends: [], groups: [snapshot.requests[2]] })
   })
 })

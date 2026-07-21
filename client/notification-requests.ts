@@ -14,6 +14,7 @@ export function getIncomingNotificationRequests(snapshot: SandboxSnapshot, actor
 
   return {
     friends: snapshot.requests.filter(({ type, targetId }) => type === 'friend' && targetId === actorUserId),
-    groups: snapshot.requests.filter(({ type, groupId }) => type === 'group' && !!groupId && manageableGroupIds.has(groupId)),
+    groups: snapshot.requests.filter(({ type, subType, groupId, targetId }) => type === 'group' && !!groupId
+      && ((subType === 'invite' && targetId === actorUserId) || ((subType ?? 'add') === 'add' && manageableGroupIds.has(groupId)))),
   }
 }

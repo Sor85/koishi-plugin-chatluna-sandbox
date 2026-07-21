@@ -123,6 +123,25 @@
                 </button>
               </template>
             </EnvironmentCreatePopover>
+            <ContextMenu v-for="group in filteredGroupDirectory" :key="`directory:${group.id}`">
+              <ContextMenuTrigger as-child>
+                <button type="button" class="webqq-session">
+                  <span class="webqq-avatar webqq-avatar-bot">{{ getInitial(group.name) }}</span>
+                  <span class="webqq-session-copy">
+                    <strong>{{ group.name }}</strong>
+                    <small>{{ group.pending ? '入群申请待处理' : `右键申请加入 · 群聊 ${group.id}` }}</small>
+                  </span>
+                </button>
+              </ContextMenuTrigger>
+              <ContextMenuContent style="z-index: 140">
+                <ContextMenuItem v-if="!group.pending" @select="requestJoinGroup(group.id)">
+                  <IconUserPlus :size="16" aria-hidden="true" /> 申请加入群组
+                </ContextMenuItem>
+                <ContextMenuItem v-else disabled>
+                  <IconClock :size="16" aria-hidden="true" /> 等待群管理员处理
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
             <ContextMenu
               v-for="entry in filteredFriendDirectory"
               :key="entry.id"
@@ -157,6 +176,12 @@
                 <ContextMenuItem v-if="entry.isFriend" class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="deleteFriend(entry.id)">
                   <IconUserMinus :size="16" aria-hidden="true" /> 删除好友
                 </ContextMenuItem>
+                <ContextMenuItem
+                  v-if="currentGroup && !currentGroup.members.some(({ participantId }) => participantId === entry.id)"
+                  @select="inviteToCurrentGroup(entry.id)"
+                >
+                  <IconUserPlus :size="16" aria-hidden="true" /> 邀请加入当前群组
+                </ContextMenuItem>
                 <ContextMenuItem @select="openEntityDialog('edit', { type: entry.isBot ? 'bot' : 'user', id: entry.id })">
                   <IconEdit :size="16" aria-hidden="true" /> 编辑{{ entry.isBot ? '机器人' : '用户' }}
                 </ContextMenuItem>
@@ -185,6 +210,23 @@
                 </button>
               </ContextMenuTrigger>
               <ContextMenuContent style="z-index: 140">
+                <ContextMenuItem
+                  v-if="conversation.groupId"
+                  :disabled="getGroupMember(conversation.groupId, currentUserId ?? '')?.role === 'member'"
+                  @select="openGroupActionDialog('name', '', conversation.groupId)"
+                >
+                  <IconEdit :size="16" aria-hidden="true" />
+                  {{ getGroupMember(conversation.groupId, currentUserId ?? '')?.role === 'member' ? '需要管理员权限修改群名称' : '修改群名称' }}
+                </ContextMenuItem>
+                <ContextMenuItem
+                  v-if="conversation.groupId"
+                  :disabled="getGroupMember(conversation.groupId, currentUserId ?? '')?.role === 'owner'"
+                  class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40"
+                  @select="leaveGroup(conversation.groupId!)"
+                >
+                  <IconUserMinus :size="16" aria-hidden="true" />
+                  {{ getGroupMember(conversation.groupId, currentUserId ?? '')?.role === 'owner' ? '群主不能直接退群' : '退出群组' }}
+                </ContextMenuItem>
                 <ContextMenuItem @select="openEntityDialog('edit', getConversationEntityTarget(conversation))">
                   <IconEdit :size="16" aria-hidden="true" /> 编辑{{ getConversationEntityLabel(conversation) }}
                 </ContextMenuItem>
@@ -193,7 +235,14 @@
                 </ContextMenuItem>
               </ContextMenuContent>
             </ContextMenu>
-            <p v-if="sidebarTab === 'friends' ? !filteredFriendDirectory.length : !filteredConversations.length" class="webqq-empty">没有匹配的会话</p>
+            <p
+              v-if="sidebarTab === 'friends'
+                ? !filteredFriendDirectory.length
+                : sidebarTab === 'groups'
+                  ? !filteredConversations.length && !filteredGroupDirectory.length
+                  : !filteredConversations.length"
+              class="webqq-empty"
+            >没有匹配的会话</p>
           </div>
         </aside>
 
@@ -264,6 +313,21 @@
                         </button>
                       </ContextMenuTrigger>
                       <ContextMenuContent style="z-index: 140">
+                        <ContextMenuSub v-if="currentGroup && getCurrentGroupMember(message.authorId)">
+                          <ContextMenuSubTrigger>
+                            <IconUsers :size="16" aria-hidden="true" /> 群成员操作
+                          </ContextMenuSubTrigger>
+                          <GroupMemberMenu
+                            sub
+                            :actor="getCurrentGroupMember(currentUserId ?? '')"
+                            :target="getCurrentGroupMember(message.authorId)!"
+                            :target-is-bot="snapshot.bots.some(({ id }) => id === message.authorId)"
+                            @poke="pokeGroupMember(message.authorId)"
+                            @set-card="openGroupActionDialog('card', message.authorId)"
+                            @set-admin="setGroupAdmin(message.authorId, $event)"
+                            @kick="kickGroupMember(message.authorId)"
+                          />
+                        </ContextMenuSub>
                         <ContextMenuItem v-if="getChatFriendActions(message.authorId).includes('request')" @select="requestFriend(message.authorId)">
                           <IconUserPlus :size="16" aria-hidden="true" /> 发送好友申请
                         </ContextMenuItem>
@@ -273,7 +337,7 @@
                         <ContextMenuItem v-else-if="getFriendMenuState(message.authorId).pendingIncoming" disabled>
                           <IconBell :size="16" aria-hidden="true" /> 请在通知中处理申请
                         </ContextMenuItem>
-                        <ContextMenuSub v-if="getChatFriendActions(message.authorId).includes('poke')">
+                        <ContextMenuSub v-if="!currentGroup && getChatFriendActions(message.authorId).includes('poke')">
                           <ContextMenuSubTrigger>
                             <IconHandClick :size="16" aria-hidden="true" /> 好友互动
                           </ContextMenuSubTrigger>
@@ -571,14 +635,27 @@
               <input v-model="groupMemberSearch" type="search" placeholder="搜索群昵称或 QQ 号">
               <div v-if="!visibleGroupMembers.length" class="webqq-group-empty">暂无群成员</div>
               <div v-else v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-group-member-list">
-                <article v-for="member in visibleGroupMembers" :key="member.participantId" class="webqq-group-member">
-                  <span class="webqq-menu-avatar">{{ getInitial(getGroupMemberName(member)) }}</span>
-                  <span>
-                    <strong>{{ getGroupMemberName(member) }}</strong>
-                    <small>{{ member.participantId }}</small>
-                  </span>
-                  <em>{{ getGroupRoleLabel(member.role) }}</em>
-                </article>
+                <ContextMenu v-for="member in visibleGroupMembers" :key="member.participantId">
+                  <ContextMenuTrigger as-child>
+                    <article class="webqq-group-member">
+                      <span class="webqq-menu-avatar">{{ getInitial(getGroupMemberName(member)) }}</span>
+                      <span>
+                        <strong>{{ getGroupMemberName(member) }}</strong>
+                        <small>{{ member.participantId }}</small>
+                      </span>
+                      <em>{{ getGroupRoleLabel(member.role) }}</em>
+                    </article>
+                  </ContextMenuTrigger>
+                  <GroupMemberMenu
+                    :actor="getCurrentGroupMember(currentUserId ?? '')"
+                    :target="member"
+                    :target-is-bot="snapshot.bots.some(({ id }) => id === member.participantId)"
+                    @poke="pokeGroupMember(member.participantId)"
+                    @set-card="openGroupActionDialog('card', member.participantId)"
+                    @set-admin="setGroupAdmin(member.participantId, $event)"
+                    @kick="kickGroupMember(member.participantId)"
+                  />
+                </ContextMenu>
               </div>
             </section>
           </div>
@@ -615,6 +692,23 @@
             <div class="webqq-dialog-actions">
               <Button variant="outline" @click="remarkDialogOpen = false">取消</Button>
               <Button @click="saveFriendRemark">保存</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+        <Dialog v-model:open="groupActionDialogOpen">
+          <DialogContent>
+            <DialogTitle>{{ groupActionDialogMode === 'name' ? '修改群名称' : '修改群名片' }}</DialogTitle>
+            <DialogDescription>
+              {{ groupActionDialogMode === 'name' ? '新的群名称会对所有群成员和机器人可见。' : '留空可以清除当前群名片。' }}
+            </DialogDescription>
+            <Input
+              v-model="groupActionInput"
+              :placeholder="groupActionDialogMode === 'name' ? '输入群名称' : '输入群名片'"
+              @keydown.enter="saveGroupAction"
+            />
+            <div class="webqq-dialog-actions">
+              <Button variant="outline" @click="groupActionDialogOpen = false">取消</Button>
+              <Button @click="saveGroupAction">保存</Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -659,6 +753,7 @@ import EnvironmentCreatePopover from './environment-create-popover.vue'
 import EnvironmentEntityDialog from './environment-entity-dialog.vue'
 import EnvironmentManager from './environment-manager.vue'
 import { getFriendMenuActions, type FriendMenuState } from './friend-menu'
+import GroupMemberMenu from './group-member-menu.vue'
 import NotificationMenu from './notification-menu.vue'
 import { getIncomingNotificationRequests } from './notification-requests'
 import {
@@ -686,6 +781,7 @@ import type {
   SandboxSnapshot,
   SandboxWorkspaceState,
   SandboxFriendAction,
+  SandboxGroupAction,
 } from '../src/types'
 
 const defaultAppearance: SandboxAppearance = {
@@ -737,6 +833,11 @@ const createUserOpen = ref(false)
 const remarkDialogOpen = ref(false)
 const remarkTargetId = ref('')
 const remarkInput = ref('')
+const groupActionDialogOpen = ref(false)
+const groupActionDialogMode = ref<'card' | 'name'>('card')
+const groupActionTargetId = ref('')
+const groupActionGroupId = ref('')
+const groupActionInput = ref('')
 const notificationTab = ref<'friends' | 'groups'>('friends')
 const handlingRequestId = ref('')
 const notificationErrorMessage = ref('')
@@ -864,6 +965,23 @@ const filteredFriendDirectory = computed(() => {
   if (!query) return friendDirectory.value
   return friendDirectory.value.filter(({ id, displayName }) => id.includes(query) || displayName.toLowerCase().includes(query))
 })
+const groupDirectory = computed(() => {
+  const actorUserId = currentUserId.value
+  if (!actorUserId) return []
+  return snapshot.value.groups
+    .filter(({ members }) => !members.some(({ participantId }) => participantId === actorUserId))
+    .map((group) => ({
+      ...group,
+      pending: snapshot.value.requests.some(({ type, subType, requesterId, groupId }) => type === 'group'
+        && (subType ?? 'add') === 'add' && requesterId === actorUserId && groupId === group.id),
+    }))
+})
+const filteredGroupDirectory = computed(() => {
+  if (sidebarTab.value !== 'groups') return []
+  const query = searchQuery.value.trim().toLowerCase()
+  if (!query) return groupDirectory.value
+  return groupDirectory.value.filter(({ id, name }) => id.includes(query) || name.toLowerCase().includes(query))
+})
 
 function getFriendMenuState(targetId: string): FriendMenuState {
   const actorUserId = currentUserId.value
@@ -982,6 +1100,18 @@ async function performFriendAction(input: SandboxFriendAction) {
   }
 }
 
+async function performGroupAction(input: SandboxGroupAction) {
+  const actorUserId = currentUserId.value
+  if (!actorUserId) return
+  errorMessage.value = ''
+  try {
+    const nextWorkspace = await send('onebot-sandbox/group-action', { ...input, actorUserId })
+    applyWorkspaceUpdate(nextWorkspace)
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '群组操作失败'
+  }
+}
+
 function requestFriend(targetId: string) {
   return performFriendAction({ action: 'request', targetId, comment: '来自 OneBot Sandbox 的好友申请' })
 }
@@ -992,13 +1122,79 @@ async function handleNotificationRequest(requestId: string, approve: boolean) {
   handlingRequestId.value = requestId
   notificationErrorMessage.value = ''
   try {
-    const nextWorkspace = await send('onebot-sandbox/friend-action', { action: 'handle-request', requestId, approve, actorUserId })
+    const request = snapshot.value.requests.find(({ id }) => id === requestId)
+    const nextWorkspace = request?.type === 'group'
+      ? await send('onebot-sandbox/group-action', { action: 'handle-request', requestId, approve, actorUserId })
+      : await send('onebot-sandbox/friend-action', { action: 'handle-request', requestId, approve, actorUserId })
     applyWorkspaceUpdate(nextWorkspace)
   } catch (error) {
     notificationErrorMessage.value = error instanceof Error ? error.message : '处理通知失败'
   } finally {
     handlingRequestId.value = ''
   }
+}
+
+function requestJoinGroup(groupId: string) {
+  return performGroupAction({ action: 'request-join', groupId, comment: '来自 OneBot Sandbox 的入群申请' })
+}
+
+function inviteToCurrentGroup(targetId: string) {
+  const groupId = currentGroup.value?.id
+  if (!groupId) return
+  return performGroupAction({ action: 'invite', groupId, targetId })
+}
+
+function getCurrentGroupMember(participantId: string) {
+  const groupId = currentGroup.value?.id
+  return groupId ? getGroupMember(groupId, participantId) : undefined
+}
+
+function getGroupMember(groupId: string, participantId: string) {
+  return snapshot.value.groups.find(({ id }) => id === groupId)?.members.find((member) => member.participantId === participantId)
+}
+
+function pokeGroupMember(targetId: string) {
+  const group = currentGroup.value
+  const conversation = currentConversation.value
+  if (!group || !conversation) return
+  return performGroupAction({ action: 'poke', groupId: group.id, targetId, conversationId: conversation.id })
+}
+
+function kickGroupMember(targetId: string) {
+  const groupId = currentGroup.value?.id
+  if (!groupId) return
+  return performGroupAction({ action: 'kick', groupId, targetId })
+}
+
+function setGroupAdmin(targetId: string, enabled: boolean) {
+  const groupId = currentGroup.value?.id
+  if (!groupId) return
+  return performGroupAction({ action: 'set-admin', groupId, targetId, enabled })
+}
+
+function leaveGroup(groupId: string) {
+  return performGroupAction({ action: 'leave', groupId })
+}
+
+function openGroupActionDialog(mode: 'card' | 'name', targetId = '', groupId = currentGroup.value?.id ?? '') {
+  groupActionDialogMode.value = mode
+  groupActionTargetId.value = targetId
+  groupActionGroupId.value = groupId
+  groupActionInput.value = mode === 'name'
+    ? snapshot.value.groups.find(({ id }) => id === groupId)?.name ?? ''
+    : getCurrentGroupMember(targetId)?.card ?? ''
+  groupActionDialogOpen.value = true
+}
+
+async function saveGroupAction() {
+  const groupId = groupActionGroupId.value
+  if (!groupId) return
+  if (groupActionDialogMode.value === 'name') {
+    await performGroupAction({ action: 'set-name', groupId, name: groupActionInput.value })
+  } else if (groupActionTargetId.value) {
+    await performGroupAction({ action: 'set-card', groupId, targetId: groupActionTargetId.value, card: groupActionInput.value })
+  }
+  if (!errorMessage.value) groupActionDialogOpen.value = false
 }
 
 function pokeFriend(targetId: string) {

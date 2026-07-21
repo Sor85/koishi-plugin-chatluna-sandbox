@@ -66,6 +66,7 @@ function getRequestTitle(request: SandboxRelationshipRequest) {
 
 function getRequestSubtitle(request: SandboxRelationshipRequest) {
   if (request.type === 'friend') return `来自 QQ ${request.requesterId}`
+  if (request.subType === 'invite') return `${getParticipantName(request.requesterId)} 邀请你加入群聊`
   return `${getParticipantName(request.requesterId)} 申请加入群聊`
 }
 
