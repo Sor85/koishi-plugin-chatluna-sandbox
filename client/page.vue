@@ -239,12 +239,14 @@
                   {{ historyLoading ? '加载中...' : '查看更早消息' }}
                 </button>
               </li>
-              <ContextMenu v-for="message in messages" :key="message.id">
+              <ContextMenu v-for="(message, messageIndex) in messages" :key="message.id">
                 <ContextMenuTrigger as-child>
                   <li
                     class="webqq-message-row"
                     :class="[
                       message.authorId === currentUser?.id ? 'is-outgoing' : 'is-incoming',
+                      getChatMessageClusterClass(messageIndex),
+                      { 'is-merged': isMergedChatMessage(messageIndex) },
                       { 'is-quote-target': highlightedMessageId === message.id },
                     ]"
                     :data-message-id="message.id"
@@ -255,7 +257,7 @@
                       </span>
                     </span>
                     <div class="webqq-message-content">
-                      <div class="webqq-sender-line">
+                      <div v-if="!isMergedChatMessage(messageIndex)" class="webqq-sender-line">
                         <span class="webqq-message-author">{{ getParticipantName(message.authorId) }}</span>
                       </div>
                       <div class="webqq-message-body">
@@ -622,6 +624,7 @@ import {
   type SandboxWorkspaceView,
 } from './workspace-state'
 import { vWebqqScrollbar } from './webqq-scrollbar'
+import { getMessageClusterClass, isMergedMessage } from './message-cluster'
 import {
   getUserStackMetrics,
   getUserStackLayoutMetrics,
@@ -839,6 +842,14 @@ const messages = computed(() => {
   const ids = new Set(currentConversation.value?.messageIds ?? [])
   return snapshot.value.messages.filter(({ id }) => ids.has(id))
 })
+
+function isMergedChatMessage(index: number) {
+  return isMergedMessage(messages.value, index, workspace.value.appearance.webQQChatStyle, currentUserId.value)
+}
+
+function getChatMessageClusterClass(index: number) {
+  return getMessageClusterClass(messages.value, index, workspace.value.appearance.webQQChatStyle, currentUserId.value)
+}
 const replyingToMessageId = ref('')
 const replyingToMessage = computed(() => snapshot.value.messages.find(({ id }) => id === replyingToMessageId.value))
 const historyLoading = ref(false)
