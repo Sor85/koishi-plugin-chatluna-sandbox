@@ -657,6 +657,14 @@ body,
   flex: 0 0 32px;
 }
 
+.webqq-message-avatar-trigger {
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  cursor: context-menu;
+}
+
 .webqq-message-avatar {
   display: flex;
   width: 32px;

@@ -146,22 +146,12 @@
                 <ContextMenuItem v-else-if="entry.pendingIncoming" disabled>
                   <IconBell :size="16" aria-hidden="true" /> 请在通知中处理申请
                 </ContextMenuItem>
-                <ContextMenuSub v-if="entry.isFriend">
-                  <ContextMenuSubTrigger>
-                    <IconHandClick :size="16" aria-hidden="true" /> 好友互动
-                  </ContextMenuSubTrigger>
-                  <ContextMenuSubContent>
-                    <ContextMenuItem @select="pokeFriend(entry.id)">
-                      <IconHandClick :size="16" aria-hidden="true" /> 戳一戳
-                    </ContextMenuItem>
-                    <ContextMenuItem @select="openRemarkDialog(entry.id)">
-                      <IconTag :size="16" aria-hidden="true" /> 设置好友备注
-                    </ContextMenuItem>
-                    <ContextMenuItem class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="deleteFriend(entry.id)">
-                      <IconUserMinus :size="16" aria-hidden="true" /> 删除好友
-                    </ContextMenuItem>
-                  </ContextMenuSubContent>
-                </ContextMenuSub>
+                <ContextMenuItem v-if="entry.isFriend" @select="openRemarkDialog(entry.id)">
+                  <IconTag :size="16" aria-hidden="true" /> 设置好友备注
+                </ContextMenuItem>
+                <ContextMenuItem v-if="entry.isFriend" class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="deleteFriend(entry.id)">
+                  <IconUserMinus :size="16" aria-hidden="true" /> 删除好友
+                </ContextMenuItem>
                 <ContextMenuItem @select="openEntityDialog('edit', { type: entry.isBot ? 'bot' : 'user', id: entry.id })">
                   <IconEdit :size="16" aria-hidden="true" /> 编辑{{ entry.isBot ? '机器人' : '用户' }}
                 </ContextMenuItem>
@@ -251,7 +241,48 @@
                     ]"
                     :data-message-id="message.id"
                   >
-                    <span class="webqq-message-avatar-wrap">
+                    <ContextMenu v-if="message.authorId !== currentUser?.id">
+                      <ContextMenuTrigger as-child>
+                        <button
+                          type="button"
+                          class="webqq-message-avatar-wrap webqq-message-avatar-trigger"
+                          :aria-label="`打开 ${getParticipantName(message.authorId)} 的操作菜单`"
+                          @contextmenu.stop
+                        >
+                          <span class="webqq-message-avatar">
+                            {{ getInitial(getParticipantName(message.authorId)) }}
+                          </span>
+                        </button>
+                      </ContextMenuTrigger>
+                      <ContextMenuContent style="z-index: 140">
+                        <ContextMenuItem v-if="getChatFriendActions(message.authorId).includes('request')" @select="requestFriend(message.authorId)">
+                          <IconUserPlus :size="16" aria-hidden="true" /> 发送好友申请
+                        </ContextMenuItem>
+                        <ContextMenuItem v-else-if="getFriendMenuState(message.authorId).pendingOutgoing" disabled>
+                          <IconClock :size="16" aria-hidden="true" /> 等待对方处理
+                        </ContextMenuItem>
+                        <ContextMenuItem v-else-if="getFriendMenuState(message.authorId).pendingIncoming" disabled>
+                          <IconBell :size="16" aria-hidden="true" /> 请在通知中处理申请
+                        </ContextMenuItem>
+                        <ContextMenuSub v-if="getChatFriendActions(message.authorId).includes('poke')">
+                          <ContextMenuSubTrigger>
+                            <IconHandClick :size="16" aria-hidden="true" /> 好友互动
+                          </ContextMenuSubTrigger>
+                          <ContextMenuSubContent>
+                            <ContextMenuItem @select="pokeFriend(message.authorId)">
+                              <IconHandClick :size="16" aria-hidden="true" /> 戳一戳
+                            </ContextMenuItem>
+                          </ContextMenuSubContent>
+                        </ContextMenuSub>
+                        <ContextMenuItem v-if="getChatFriendActions(message.authorId).includes('remark')" @select="openRemarkDialog(message.authorId)">
+                          <IconTag :size="16" aria-hidden="true" /> 设置好友备注
+                        </ContextMenuItem>
+                        <ContextMenuItem v-if="getChatFriendActions(message.authorId).includes('delete')" class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="deleteFriend(message.authorId)">
+                          <IconUserMinus :size="16" aria-hidden="true" /> 删除好友
+                        </ContextMenuItem>
+                      </ContextMenuContent>
+                    </ContextMenu>
+                    <span v-else class="webqq-message-avatar-wrap">
                       <span class="webqq-message-avatar">
                         {{ getInitial(getParticipantName(message.authorId)) }}
                       </span>
@@ -617,6 +648,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover
 import EnvironmentCreatePopover from './environment-create-popover.vue'
 import EnvironmentEntityDialog from './environment-entity-dialog.vue'
 import EnvironmentManager from './environment-manager.vue'
+import { getFriendMenuActions, type FriendMenuState } from './friend-menu'
 import {
   loadWorkspacePreferences,
   resolveWorkspaceSelection,
@@ -820,6 +852,21 @@ const filteredFriendDirectory = computed(() => {
   if (!query) return friendDirectory.value
   return friendDirectory.value.filter(({ id, displayName }) => id.includes(query) || displayName.toLowerCase().includes(query))
 })
+
+function getFriendMenuState(targetId: string): FriendMenuState {
+  const actorUserId = currentUserId.value
+  if (!actorUserId) return { isFriend: false, pendingOutgoing: false, pendingIncoming: false }
+
+  return {
+    isFriend: snapshot.value.friendships.some(({ participantIds }) => participantIds.includes(actorUserId) && participantIds.includes(targetId)),
+    pendingOutgoing: snapshot.value.requests.some(({ type, requesterId, targetId: requestTargetId }) => type === 'friend' && requesterId === actorUserId && requestTargetId === targetId),
+    pendingIncoming: snapshot.value.requests.some(({ type, requesterId, targetId: requestTargetId }) => type === 'friend' && requesterId === targetId && requestTargetId === actorUserId),
+  }
+}
+
+function getChatFriendActions(targetId: string) {
+  return getFriendMenuActions(getFriendMenuState(targetId), true)
+}
 const currentConversation = computed(() => visibleConversations.value.find(({ id }) => id === activeConversationId.value))
 const currentBot = computed(() => getBot(currentConversation.value?.botId))
 const currentGroup = computed(() => snapshot.value.groups?.find(({ id }) => id === currentConversation.value?.groupId))
