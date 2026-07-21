@@ -72,7 +72,6 @@ export type ManageSandboxEnvironmentInput =
   | { action: 'create-group', data: CreateSandboxGroupInput }
   | { action: 'update-group', data: UpdateSandboxGroupInput }
   | { action: 'delete-group', data: DeleteSandboxGroupInput }
-  | { action: 'reset-default' }
 
 export interface SandboxConversation {
   id: string

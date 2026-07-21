@@ -57,7 +57,7 @@
               autocomplete="off"
             >
           </label>
-          <div v-webqq-scrollbar class="webqq-session-list">
+          <div v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-session-list">
             <EnvironmentCreatePopover
               v-if="sidebarTab === 'friends'"
               type="bot"
@@ -94,21 +94,34 @@
                 </button>
               </template>
             </EnvironmentCreatePopover>
-            <button
+            <ContextMenu
               v-for="conversation in filteredConversations"
               :key="conversation.id"
-              type="button"
-              class="webqq-session"
-              :class="{ 'is-active': conversation.id === activeConversationId }"
-              @click="selectConversation(conversation.id)"
             >
-              <span class="webqq-avatar webqq-avatar-bot">{{ getInitial(getConversationTitle(conversation)) }}</span>
-              <span class="webqq-session-copy">
-                <strong>{{ getConversationTitle(conversation) }}</strong>
-                <small>{{ getConversationPreview(conversation.id) }}</small>
-              </span>
-              <time>{{ getConversationTime(conversation.id) }}</time>
-            </button>
+              <ContextMenuTrigger as-child>
+                <button
+                  type="button"
+                  class="webqq-session"
+                  :class="{ 'is-active': conversation.id === activeConversationId }"
+                  @click="selectConversation(conversation.id)"
+                >
+                  <span class="webqq-avatar webqq-avatar-bot">{{ getInitial(getConversationTitle(conversation)) }}</span>
+                  <span class="webqq-session-copy">
+                    <strong>{{ getConversationTitle(conversation) }}</strong>
+                    <small>{{ getConversationPreview(conversation.id) }}</small>
+                  </span>
+                  <time>{{ getConversationTime(conversation.id) }}</time>
+                </button>
+              </ContextMenuTrigger>
+              <ContextMenuContent style="z-index: 140">
+                <ContextMenuItem @select="openEntityDialog('edit', getConversationEntityTarget(conversation))">
+                  <IconEdit :size="16" aria-hidden="true" /> 编辑{{ getConversationEntityLabel(conversation) }}
+                </ContextMenuItem>
+                <ContextMenuItem class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="openEntityDialog('delete', getConversationEntityTarget(conversation))">
+                  <IconTrash :size="16" aria-hidden="true" /> 删除{{ getConversationEntityLabel(conversation) }}
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
             <p v-if="!filteredConversations.length" class="webqq-empty">没有匹配的会话</p>
           </div>
         </aside>
@@ -117,7 +130,6 @@
           <EnvironmentManager
             v-if="currentView === 'profile'"
             :snapshot="snapshot"
-            @updated="applyWorkspaceUpdate"
           />
           <template v-else>
           <header class="webqq-chat-header">
@@ -139,7 +151,7 @@
             </button>
           </header>
 
-          <section v-webqq-scrollbar class="webqq-messages" aria-label="消息记录">
+          <section v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-messages" aria-label="消息记录">
             <div v-if="!messages.length" class="webqq-welcome">
               <span class="webqq-avatar webqq-avatar-large webqq-avatar-bot">{{ getInitial(currentConversationTitle) }}</span>
               <strong>{{ currentConversationTitle }}</strong>
@@ -189,23 +201,36 @@
                     }]"
                     :style="userStackStyle"
                   >
-                    <button
+                    <ContextMenu
                       v-for="(user, index) in userStackUsers"
                       :key="user.id"
-                      type="button"
-                      :class="['webqq-composer-user-switch', {
-                        'is-active': user.id === currentUserId,
-                        'is-collapsed-extra': isUserCollapsedExtra(index),
-                      }]"
-                      :aria-label="user.id === currentUserId ? `当前用户：${user.name}` : `切换到用户：${user.name}`"
-                      :aria-pressed="user.id === currentUserId"
-                      :aria-hidden="isUserCollapsedHidden(index) ? 'true' : undefined"
-                      :tabindex="isUserCollapsedHidden(index) ? -1 : undefined"
-                      :style="getUserSwitchStyle(index)"
-                      @click="selectComposerUser(user.id)"
                     >
-                      <span class="webqq-composer-user-avatar">{{ getInitial(user.name) }}</span>
-                    </button>
+                      <ContextMenuTrigger as-child>
+                        <button
+                          type="button"
+                          :class="['webqq-composer-user-switch', {
+                            'is-active': user.id === currentUserId,
+                            'is-collapsed-extra': isUserCollapsedExtra(index),
+                          }]"
+                          :aria-label="user.id === currentUserId ? `当前用户：${user.name}` : `切换到用户：${user.name}`"
+                          :aria-pressed="user.id === currentUserId"
+                          :aria-hidden="isUserCollapsedHidden(index) ? 'true' : undefined"
+                          :tabindex="isUserCollapsedHidden(index) ? -1 : undefined"
+                          :style="getUserSwitchStyle(index)"
+                          @click="selectComposerUser(user.id)"
+                        >
+                          <span class="webqq-composer-user-avatar">{{ getInitial(user.name) }}</span>
+                        </button>
+                      </ContextMenuTrigger>
+                      <ContextMenuContent style="z-index: 140">
+                        <ContextMenuItem @select="openEntityDialog('edit', { type: 'user', id: user.id })">
+                          <IconEdit :size="16" aria-hidden="true" /> 编辑用户
+                        </ContextMenuItem>
+                        <ContextMenuItem class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="openEntityDialog('delete', { type: 'user', id: user.id })">
+                          <IconTrash :size="16" aria-hidden="true" /> 删除用户
+                        </ContextMenuItem>
+                      </ContextMenuContent>
+                    </ContextMenu>
                     <span
                       v-if="userStackMetrics.overflowCount"
                       class="webqq-composer-user-overflow"
@@ -247,6 +272,7 @@
                 <label class="sr-only" for="onebot-sandbox-input">消息内容</label>
                 <textarea
                   id="onebot-sandbox-input"
+                  v-webqq-scrollbar="{ tone: 'accent' }"
                   v-model="input"
                   rows="1"
                   placeholder="发送消息"
@@ -296,7 +322,7 @@
           </div>
 
           <div v-else-if="currentGroup" class="webqq-group-info-body">
-            <section v-webqq-scrollbar class="webqq-group-announcements">
+            <section v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-group-announcements">
               <div class="webqq-info-section-title">
                 <h3>群公告</h3>
                 <button
@@ -340,7 +366,7 @@
               <h3>群成员 {{ currentGroup.members.length }}</h3>
               <input v-model="groupMemberSearch" type="search" placeholder="搜索群昵称或 QQ 号">
               <div v-if="!visibleGroupMembers.length" class="webqq-group-empty">暂无群成员</div>
-              <div v-else v-webqq-scrollbar class="webqq-group-member-list">
+              <div v-else v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-group-member-list">
                 <article v-for="member in visibleGroupMembers" :key="member.participantId" class="webqq-group-member">
                   <span class="webqq-menu-avatar">{{ getInitial(getGroupMemberName(member)) }}</span>
                   <span>
@@ -353,7 +379,7 @@
             </section>
           </div>
 
-          <div v-else v-webqq-scrollbar class="webqq-private-info">
+          <div v-else v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-private-info">
             <div class="webqq-profile-hero">
               <span class="webqq-avatar webqq-avatar-profile webqq-avatar-bot">{{ getInitial(currentBot?.name) }}</span>
               <h2>{{ currentBot?.name ?? 'OneBot Sandbox' }}</h2>
@@ -368,6 +394,14 @@
             </dl>
           </div>
         </aside>
+        <EnvironmentEntityDialog
+          v-model:open="entityDialogOpen"
+          :mode="entityDialogMode"
+          :target="entityDialogTarget"
+          :snapshot="snapshot"
+          :accent-color="workspace.appearance.webQQAccentColor"
+          @updated="applyWorkspaceUpdate"
+        />
       </div>
     </k-content>
   </k-layout>
@@ -382,6 +416,7 @@ import {
   IconClock,
   IconDatabase,
   IconDots,
+  IconEdit,
   IconMessageCircle,
   IconPaperclip,
   IconPlus,
@@ -393,7 +428,9 @@ import {
   IconUsers,
 } from '@tabler/icons-vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from './components/ui/context-menu'
 import EnvironmentCreatePopover from './environment-create-popover.vue'
+import EnvironmentEntityDialog from './environment-entity-dialog.vue'
 import EnvironmentManager from './environment-manager.vue'
 import {
   loadWorkspacePreferences,
@@ -459,6 +496,11 @@ const userStackExpanded = ref(false)
 const userStackHovered = ref(false)
 const userStackFocused = ref(false)
 const createUserOpen = ref(false)
+type EnvironmentEntityType = 'user' | 'bot' | 'group'
+type EnvironmentDialogMode = 'edit' | 'delete'
+const entityDialogOpen = ref(false)
+const entityDialogMode = ref<EnvironmentDialogMode>('edit')
+const entityDialogTarget = ref<{ type: EnvironmentEntityType, id: string }>()
 type UserStackOverflowMotion = 'idle' | 'expanding' | 'collapsing'
 const userStackOverflowMotion = ref<UserStackOverflowMotion>('idle')
 let suppressUserStackCollapse = false
@@ -603,6 +645,22 @@ function applyWorkspaceUpdate(nextWorkspace: SandboxWorkspaceState) {
     activeConversationId: activeConversationId.value,
     currentView: currentView.value,
   }))
+}
+
+function openEntityDialog(mode: EnvironmentDialogMode, target: { type: EnvironmentEntityType, id: string }) {
+  entityDialogMode.value = mode
+  entityDialogTarget.value = target
+  entityDialogOpen.value = true
+}
+
+function getConversationEntityTarget(conversation: SandboxConversation): { type: 'bot' | 'group', id: string } {
+  return conversation.groupId
+    ? { type: 'group', id: conversation.groupId }
+    : { type: 'bot', id: conversation.botId }
+}
+
+function getConversationEntityLabel(conversation: SandboxConversation) {
+  return conversation.groupId ? '群组' : '机器人'
 }
 
 function selectConversation(conversationId: string) {

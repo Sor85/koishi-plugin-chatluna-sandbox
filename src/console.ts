@@ -84,9 +84,6 @@ export function registerConsole(
       case 'delete-group':
         control.deleteGroup(input.data)
         break
-      case 'reset-default':
-        control.resetDefaultScene()
-        break
     }
     return getWorkspace()
   }, { authority: 4 })

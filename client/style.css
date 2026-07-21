@@ -100,17 +100,17 @@ body,
 
 }
 
-.webqq-workspace [data-webqq-scrollbar="true"] {
+[data-webqq-scrollbar="true"] {
   scrollbar-width: none;
   scrollbar-color: transparent transparent;
 }
 
-.webqq-workspace [data-webqq-scrollbar="true"]::-webkit-scrollbar {
+[data-webqq-scrollbar="true"]::-webkit-scrollbar {
   width: 0;
   height: 0;
 }
 
-.webqq-workspace [data-webqq-scrollbar="true"]::-webkit-scrollbar-button {
+[data-webqq-scrollbar="true"]::-webkit-scrollbar-button {
   display: none;
   width: 0;
   height: 0;
@@ -137,10 +137,14 @@ body,
   min-height: 28px;
   height: var(--webqq-scrollbar-thumb-height);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--webqq-accent) 78%, #60a5fa 22%);
+  background: #94a3b8;
   cursor: default;
   pointer-events: auto;
   transition: width 0.14s ease, right 0.14s ease, background 0.14s ease;
+}
+
+.webqq-scrollbar-overlay.is-accent .webqq-scrollbar-thumb {
+  background: color-mix(in srgb, var(--webqq-accent) 78%, #60a5fa 22%);
 }
 
 .webqq-scrollbar-overlay.is-wide .webqq-scrollbar-thumb,
@@ -257,8 +261,8 @@ body,
   border-bottom: 1px solid var(--webqq-border);
 }
 
-.webqq-chat-title strong,
-.webqq-chat-title span {
+.webqq-chat-title > div > strong,
+.webqq-chat-title > div > span {
   margin: 0;
 }
 
@@ -489,12 +493,12 @@ body,
   gap: 12px;
 }
 
-.webqq-chat-title strong,
-.webqq-chat-title span {
+.webqq-chat-title > div > strong,
+.webqq-chat-title > div > span {
   display: block;
 }
 
-.webqq-chat-title span {
+.webqq-chat-title > div > span {
   margin-top: 2px;
   color: var(--webqq-muted);
   font-size: 12px;

@@ -142,28 +142,4 @@ describe('模拟 QQ 环境目录管理', () => {
     expect(getMiddlewareCalls()).toBe(0)
   })
 
-  it('恢复包含消息、申请和群权限测试条件的默认场景', async () => {
-    const { control, getMiddlewareCalls } = await createControl()
-    const initial = control.getSnapshot()
-    expect(initial.groups[0].members.map(({ participantId, role }) => ({ participantId, role }))).toEqual([
-      { participantId: '10001', role: 'owner' },
-      { participantId: '10003', role: 'admin' },
-      { participantId: '10002', role: 'member' },
-      { participantId: '20001', role: 'member' },
-    ])
-    expect(initial.requests).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'friend', requesterId: '10004', targetId: '20001', status: 'pending' }),
-      expect.objectContaining({ type: 'group', requesterId: '10004', groupId: '30001', status: 'pending' }),
-    ]))
-
-    control.createUser({ id: '10999', name: '待重置用户' })
-    const revisionBeforeReset = control.getSnapshot().revision
-    control.resetDefaultScene()
-    const reset = control.getSnapshot()
-    expect(reset.revision).toBe(revisionBeforeReset + 1)
-    expect(reset.users.some(({ id }) => id === '10999')).toBe(false)
-    expect(reset.users.map(({ id }) => id)).toEqual(['10001', '10002', '10003', '10004'])
-    expect(reset.messages).toEqual([])
-    expect(getMiddlewareCalls()).toBe(0)
-  })
 })

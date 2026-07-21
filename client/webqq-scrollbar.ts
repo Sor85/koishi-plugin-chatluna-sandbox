@@ -28,6 +28,7 @@ const states = new WeakMap<HTMLElement, WebQQScrollbarState>()
 
 interface WebQQScrollbarOptions {
   hideOnNarrow?: boolean
+  tone?: 'accent' | 'neutral'
 }
 
 function addListener(
@@ -64,7 +65,10 @@ function scheduleHide(state: WebQQScrollbarState) {
 }
 
 function readAccentColor(element: HTMLElement) {
-  const root = element.closest<HTMLElement>('.webqq-workspace') || element
+  // 显式使用主题色的 Portal 浮层不在工作台 DOM 子树内，需要回读当前工作台的强调色。
+  const root = element.closest<HTMLElement>('.webqq-workspace')
+    || document.querySelector<HTMLElement>('.webqq-workspace')
+    || element
   return getComputedStyle(root).getPropertyValue('--webqq-accent').trim()
 }
 
@@ -157,6 +161,7 @@ function applyScrollbarOptions(
 ) {
   const { overlay } = state
   overlay.classList.toggle('is-hidden-on-narrow', Boolean(binding.value?.hideOnNarrow))
+  overlay.classList.toggle('is-accent', binding.value?.tone === 'accent')
 }
 
 export const vWebqqScrollbar: Directive<HTMLElement, WebQQScrollbarOptions | undefined> = {

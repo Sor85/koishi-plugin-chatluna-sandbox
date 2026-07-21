@@ -9,6 +9,7 @@ import {
   useForwardPropsEmits,
 } from "reka-ui"
 import { cn } from "../../../lib/utils"
+import { vWebqqScrollbar } from "../../../webqq-scrollbar"
 import { SelectScrollDownButton, SelectScrollUpButton } from "."
 
 defineOptions({
@@ -42,8 +43,10 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
       "
     >
       <SelectScrollUpButton />
-      <SelectViewport :class="cn('p-1', position === 'popper' && 'h-(--reka-select-trigger-height) w-full min-w-(--reka-select-trigger-width) scroll-my-1')">
-        <slot />
+      <SelectViewport as-child>
+        <div v-webqq-scrollbar :class="cn('p-1', position === 'popper' && 'h-(--reka-select-trigger-height) w-full min-w-(--reka-select-trigger-width) scroll-my-1')">
+          <slot />
+        </div>
       </SelectViewport>
       <SelectScrollDownButton />
     </SelectContent>

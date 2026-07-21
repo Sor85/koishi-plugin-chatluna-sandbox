@@ -102,7 +102,5 @@ describe('Koishi 控制台适配器', () => {
       data: { id: '10099', name: '控制台用户' },
     })
     expect(managed.snapshot.users).toContainEqual({ id: '10099', name: '控制台用户' })
-    const reset = manageEnvironmentListener({ action: 'reset-default' })
-    expect(reset.snapshot.users.some(({ id }: { id: string }) => id === '10099')).toBe(false)
   })
 })

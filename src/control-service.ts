@@ -118,12 +118,6 @@ export class SandboxControlService {
     return structuredClone(this.scene)
   }
 
-  resetDefaultScene(): void {
-    const revision = this.scene.revision + 1
-    this.scene = createDefaultScene()
-    this.scene.revision = revision
-  }
-
   createUser(input: CreateSandboxUserInput): void {
     const id = this.validateParticipantId(input.id)
     const name = this.validateName(input.name, '用户昵称')
