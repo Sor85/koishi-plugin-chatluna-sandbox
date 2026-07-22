@@ -84,7 +84,6 @@ describe('Koishi 控制台适配器', () => {
       '10001',
       '10002',
       '10003',
-      '10004',
     ])
     expect(initialWorkspace.snapshot.bots.map(({ id }: { id: string }) => id)).toEqual(['20001'])
     expect(initialWorkspace.snapshot.groups.map(({ id }: { id: string }) => id)).toEqual(['30001'])

@@ -348,16 +348,17 @@ describe('模拟 QQ 环境消息闭环', () => {
     if (!control) throw new Error('沙盒控制服务未注册')
 
     const initial = control.getSnapshot()
-    expect(initial.users.map(({ id }) => id)).toEqual(['10001', '10002', '10003', '10004'])
-    expect(initial.bots).toContainEqual(expect.objectContaining({ id: '20001', name: 'OneBot Sandbox' }))
+    expect(initial.users.map(({ id }) => id)).toEqual(['10001', '10002', '10003'])
+    expect(initial.users.map(({ name }) => name)).toEqual(['群主', '管理员', '普通群员'])
+    expect(initial.bots).toContainEqual(expect.objectContaining({ id: '20001', name: 'Koishi' }))
     expect(initial.groups[0]).toMatchObject({
       id: '30001',
-      name: 'OneBot 测试群',
+      name: '测试群',
       members: [
         { participantId: '10001', role: 'owner' },
-        { participantId: '10003', role: 'admin' },
-        { participantId: '10002', role: 'member' },
-        { participantId: '20001', role: 'member' },
+        { participantId: '10002', role: 'admin' },
+        { participantId: '10003', role: 'member' },
+        { participantId: '20001', role: 'admin' },
       ],
     })
     expect(initial.conversations).toContainEqual(expect.objectContaining({
@@ -447,6 +448,7 @@ describe('模拟 QQ 环境消息闭环', () => {
       guildId: '30001',
       channelType: Universal.Channel.Type.TEXT,
     })
+    control.createUser({ id: '10004', name: '非成员' })
     await expect(control.sendMessage({
       actorUserId: '10004',
       botId: '20001',

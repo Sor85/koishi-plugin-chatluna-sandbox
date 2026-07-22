@@ -51,7 +51,6 @@ interface SandboxMessageContext {
 const DEFAULT_USER_ID = '10001'
 const SECONDARY_USER_ID = '10002'
 const ADMIN_USER_ID = '10003'
-const APPLICANT_USER_ID = '10004'
 const DEFAULT_BOT_ID = '20001'
 const DEFAULT_GROUP_ID = '30001'
 
@@ -70,8 +69,8 @@ function createDefaultScene(): SandboxSnapshot {
   }))
   const groupConversations: SandboxConversation[] = [
     DEFAULT_USER_ID,
-    ADMIN_USER_ID,
     SECONDARY_USER_ID,
+    ADMIN_USER_ID,
   ].map((userId) => ({
     id: `group:${DEFAULT_GROUP_ID}:${userId}:${DEFAULT_BOT_ID}`,
     type: 'group',
@@ -83,30 +82,29 @@ function createDefaultScene(): SandboxSnapshot {
   return {
     revision: 0,
     users: [
-      { id: DEFAULT_USER_ID, name: '测试用户' },
-      { id: SECONDARY_USER_ID, name: '协作用户' },
-      { id: ADMIN_USER_ID, name: '管理用户' },
-      { id: APPLICANT_USER_ID, name: '申请用户' },
+      { id: DEFAULT_USER_ID, name: '群主' },
+      { id: SECONDARY_USER_ID, name: '管理员' },
+      { id: ADMIN_USER_ID, name: '普通群员' },
     ],
     bots: [{
       id: DEFAULT_BOT_ID,
-      name: 'OneBot Sandbox',
+      name: 'Koishi',
       implementation: 'napcat',
       enabled: true,
     }],
     groups: [{
       id: DEFAULT_GROUP_ID,
-      name: 'OneBot 测试群',
+      name: '测试群',
       members: [
-        { participantId: DEFAULT_USER_ID, card: '测试群主', role: 'owner' },
-        { participantId: ADMIN_USER_ID, card: '管理用户', role: 'admin' },
-        { participantId: SECONDARY_USER_ID, card: '协作用户', role: 'member' },
-        { participantId: DEFAULT_BOT_ID, card: 'OneBot Sandbox', role: 'member' },
+        { participantId: DEFAULT_USER_ID, card: '群主', role: 'owner' },
+        { participantId: SECONDARY_USER_ID, card: '管理员', role: 'admin' },
+        { participantId: ADMIN_USER_ID, card: '普通群员', role: 'member' },
+        { participantId: DEFAULT_BOT_ID, card: 'Koishi', role: 'admin' },
       ],
       announcements: [{
         id: 'announcement:welcome',
         authorId: DEFAULT_USER_ID,
-        content: '欢迎使用 OneBot Sandbox 验证群聊插件功能',
+        content: '欢迎使用测试群验证群聊插件功能',
         createdAt,
       }],
     }],
@@ -117,22 +115,7 @@ function createDefaultScene(): SandboxSnapshot {
       SECONDARY_USER_ID,
       ADMIN_USER_ID,
     ].map((userId) => createFriendship(userId, DEFAULT_BOT_ID, createdAt)),
-    requests: [{
-      id: `request:friend:${APPLICANT_USER_ID}:${DEFAULT_BOT_ID}`,
-      type: 'friend',
-      requesterId: APPLICANT_USER_ID,
-      targetId: DEFAULT_BOT_ID,
-      status: 'pending',
-      createdAt,
-    }, {
-      id: `request:group:${APPLICANT_USER_ID}:${DEFAULT_GROUP_ID}`,
-      type: 'group',
-      subType: 'add',
-      requesterId: APPLICANT_USER_ID,
-      groupId: DEFAULT_GROUP_ID,
-      status: 'pending',
-      createdAt,
-    }],
+    requests: [],
   }
 }
 
@@ -157,7 +140,7 @@ export class SandboxControlService {
     this.mediaStorage = new SandboxMediaStorage(options.mediaDirectory ?? resolve(ctx.baseDir, 'data/onebot-sandbox/media'))
     this.bot = this.createRuntimeBot({
       selfId: DEFAULT_BOT_ID,
-      name: 'OneBot Sandbox',
+      name: 'Koishi',
     })
   }
 

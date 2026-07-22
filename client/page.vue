@@ -663,7 +663,7 @@
           <div v-else v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-private-info">
             <div class="webqq-profile-hero">
               <span class="webqq-avatar webqq-avatar-profile webqq-avatar-bot">{{ getInitial(currentBot?.name) }}</span>
-              <h2>{{ currentBot?.name ?? 'OneBot Sandbox' }}</h2>
+              <h2>{{ currentBot?.name ?? 'Koishi' }}</h2>
               <p>{{ currentBot?.id ?? '未选择机器人' }}</p>
               <span class="webqq-online"><i /> 在线</span>
             </div>

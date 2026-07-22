@@ -37,7 +37,7 @@ describe('模拟 QQ 环境好友关系', () => {
     await control.performFriendAction({ action: 'set-remark', actorUserId: '10001', targetId: '10002', remark: '测试搭档' })
     const friendship = control.getSnapshot().friendships.find(({ participantIds }) => participantIds.includes('10001') && participantIds.includes('10002'))
     expect(friendship?.remarks).toEqual({ '10001': '测试搭档' })
-    expect(control.getSnapshot().users.find(({ id }) => id === '10002')?.name).toBe('协作用户')
+    expect(control.getSnapshot().users.find(({ id }) => id === '10002')?.name).toBe('管理员')
 
     await control.performFriendAction({ action: 'delete', actorUserId: '10001', targetId: '10002' })
     expect(control.getSnapshot().friendships.some(({ participantIds }) => participantIds.includes('10001') && participantIds.includes('10002'))).toBe(false)
@@ -45,6 +45,10 @@ describe('模拟 QQ 环境好友关系', () => {
 
   it('发给机器人的申请只能由 OneBot action 审批，并向机器人派发戳一戳和删除事件', async () => {
     const { app, control } = await createControl()
+    control.createUser({ id: '10004', name: '申请用户' })
+    await control.performFriendAction({ action: 'delete', actorUserId: '10004', targetId: '20001' })
+    const request = await control.performFriendAction({ action: 'request', actorUserId: '10004', targetId: '20001' })
+    if (!request.requestId) throw new Error('机器人好友申请未创建')
     const notices: Array<{ type?: string; noticeType?: string; userId?: number; targetId?: number }> = []
     ;(app.on as unknown as (name: string, listener: (session: unknown) => void) => void)('notice', (session) => {
       const value = session as { type?: string; onebot?: { notice_type?: string; user_id?: number; target_id?: number } }
@@ -56,12 +60,10 @@ describe('模拟 QQ 环境好友关系', () => {
       })
     })
 
-    const request = control.getSnapshot().requests.find(({ type, targetId }) => type === 'friend' && targetId === '20001')
-    if (!request) throw new Error('默认机器人好友申请不存在')
-    await expect(control.performFriendAction({ action: 'handle-request', actorUserId: '10004', requestId: request.id, approve: true }))
+    await expect(control.performFriendAction({ action: 'handle-request', actorUserId: '10004', requestId: request.requestId, approve: true }))
       .rejects.toThrow('机器人申请必须由机器人处理')
 
-    await control.bot.internal.set_friend_add_request({ flag: request.id, approve: true, remark: '申请用户' })
+    await control.bot.internal.set_friend_add_request({ flag: request.requestId, approve: true, remark: '申请用户' })
     expect(control.getSnapshot().friendships.some(({ participantIds }) => participantIds.includes('10004') && participantIds.includes('20001'))).toBe(true)
     expect(control.getSnapshot().conversations.some(({ id }) => id === 'private:10004:20001')).toBe(true)
 
@@ -69,7 +71,7 @@ describe('模拟 QQ 环境好友关系', () => {
     expect(control.getSnapshot().messages).toContainEqual(expect.objectContaining({
       authorId: '10004',
       conversationId: 'private:10004:20001',
-      content: '申请用户 戳了戳 OneBot Sandbox',
+      content: '申请用户 戳了戳 Koishi',
       event: { type: 'poke', targetId: '20001' },
     }))
     await control.performFriendAction({ action: 'delete', actorUserId: '10004', targetId: '20001' })
@@ -102,23 +104,25 @@ describe('模拟 QQ 环境好友关系', () => {
 
   it('群主可以同意入群申请并为申请人建立群会话', async () => {
     const { control } = await createControl()
-    const request = control.getSnapshot().requests.find(({ type }) => type === 'group')
-    if (!request) throw new Error('默认入群申请不存在')
+    control.createUser({ id: '10004', name: '申请用户' })
+    const request = await control.performGroupAction({ action: 'request-join', actorUserId: '10004', groupId: '30001' })
+    if (!request.requestId) throw new Error('入群申请未创建')
 
-    await control.performFriendAction({ action: 'handle-request', actorUserId: '10001', requestId: request.id, approve: true })
+    await control.performFriendAction({ action: 'handle-request', actorUserId: '10001', requestId: request.requestId, approve: true })
 
     const snapshot = control.getSnapshot()
-    expect(snapshot.requests.some(({ id }) => id === request.id)).toBe(false)
+    expect(snapshot.requests.some(({ id }) => id === request.requestId)).toBe(false)
     expect(snapshot.groups[0].members).toContainEqual({ participantId: '10004', role: 'member' })
     expect(snapshot.conversations.some(({ id }) => id === 'group:30001:10004:20001')).toBe(true)
   })
 
   it('普通群成员不能处理入群申请', async () => {
     const { control } = await createControl()
-    const request = control.getSnapshot().requests.find(({ type }) => type === 'group')
-    if (!request) throw new Error('默认入群申请不存在')
+    control.createUser({ id: '10004', name: '申请用户' })
+    const request = await control.performGroupAction({ action: 'request-join', actorUserId: '10004', groupId: '30001' })
+    if (!request.requestId) throw new Error('入群申请未创建')
 
-    await expect(control.performFriendAction({ action: 'handle-request', actorUserId: '10002', requestId: request.id, approve: true }))
+    await expect(control.performFriendAction({ action: 'handle-request', actorUserId: '10003', requestId: request.requestId, approve: true }))
       .rejects.toThrow('只有群主或管理员可以处理入群申请')
   })
 })
