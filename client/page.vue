@@ -737,30 +737,36 @@
           @updated="applyWorkspaceUpdate"
         />
         <Dialog v-model:open="remarkDialogOpen">
-          <DialogContent>
+          <DialogContent :style="{ '--webqq-accent': workspace.appearance.webQQAccentColor }">
             <DialogTitle>设置好友备注</DialogTitle>
             <DialogDescription>备注只对当前测试用户生效，不会修改对方资料昵称。</DialogDescription>
-            <Input v-model="remarkInput" placeholder="留空可删除备注" @keydown.enter="saveFriendRemark" />
+            <Input
+              v-model="remarkInput"
+              class="border-slate-200 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700"
+              placeholder="留空可删除备注"
+              @keydown.enter="saveFriendRemark"
+            />
             <div class="webqq-dialog-actions">
-              <Button variant="outline" @click="remarkDialogOpen = false">取消</Button>
-              <Button @click="saveFriendRemark">保存</Button>
+              <Button variant="outline" class="border-slate-200 bg-white hover:bg-slate-100 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800" @click="remarkDialogOpen = false">取消</Button>
+              <Button class="bg-[var(--webqq-accent)] text-white hover:opacity-90" @click="saveFriendRemark">保存</Button>
             </div>
           </DialogContent>
         </Dialog>
         <Dialog v-model:open="groupActionDialogOpen">
-          <DialogContent>
+          <DialogContent :style="{ '--webqq-accent': workspace.appearance.webQQAccentColor }">
             <DialogTitle>{{ groupActionDialogMode === 'name' ? '修改群名称' : '修改群名片' }}</DialogTitle>
             <DialogDescription>
               {{ groupActionDialogMode === 'name' ? '新的群名称会对所有群成员和机器人可见。' : '留空可以清除当前群名片。' }}
             </DialogDescription>
             <Input
               v-model="groupActionInput"
+              class="border-slate-200 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700"
               :placeholder="groupActionDialogMode === 'name' ? '输入群名称' : '输入群名片'"
               @keydown.enter="saveGroupAction"
             />
             <div class="webqq-dialog-actions">
-              <Button variant="outline" @click="groupActionDialogOpen = false">取消</Button>
-              <Button @click="saveGroupAction">保存</Button>
+              <Button variant="outline" class="border-slate-200 bg-white hover:bg-slate-100 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800" @click="groupActionDialogOpen = false">取消</Button>
+              <Button class="bg-[var(--webqq-accent)] text-white hover:opacity-90" @click="saveGroupAction">保存</Button>
             </div>
           </DialogContent>
         </Dialog>
