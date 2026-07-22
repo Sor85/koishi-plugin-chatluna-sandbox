@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { getUserStackLayoutMetrics, getUserStackMetrics, orderUsersByActive } from '../client/user-stack'
 
@@ -46,5 +48,15 @@ describe('发送框用户头像组', () => {
       addCollapsedRight: 63,
       addExpandedRight: 135,
     })
+  })
+
+  it('在发送消息控件中统一创建普通用户和机器人', () => {
+    const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
+    const popoverSource = readFileSync(resolve('client/environment-create-popover.vue'), 'utf8')
+
+    expect(pageSource).toContain('type="participant"')
+    expect(pageSource).not.toContain('type="bot"')
+    expect(popoverSource).toContain('<SelectItem value="user"')
+    expect(popoverSource).toContain('<SelectItem value="bot"')
   })
 })

@@ -88,24 +88,6 @@
           </label>
           <div v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-session-list">
             <EnvironmentCreatePopover
-              v-if="sidebarTab === 'friends'"
-              type="bot"
-              :snapshot="snapshot"
-              :current-user-id="currentUserId"
-              :accent-color="workspace.appearance.webQQAccentColor"
-              @updated="applyWorkspaceUpdate"
-            >
-              <template #trigger>
-                <button type="button" class="webqq-session webqq-session-create">
-                  <span class="webqq-avatar webqq-avatar-create"><IconPlus :size="20" aria-hidden="true" /></span>
-                  <span class="webqq-session-copy">
-                    <strong>添加机器人</strong>
-                    <small>创建新的测试机器人</small>
-                  </span>
-                </button>
-              </template>
-            </EnvironmentCreatePopover>
-            <EnvironmentCreatePopover
               v-if="sidebarTab === 'groups'"
               type="group"
               :snapshot="snapshot"
@@ -587,20 +569,20 @@
                       </span>
                     </span>
                     <EnvironmentCreatePopover
-                      type="user"
+                      type="participant"
                       side="top"
                       :snapshot="snapshot"
                       :current-user-id="currentUserId"
                       :accent-color="workspace.appearance.webQQAccentColor"
                       @updated="applyWorkspaceUpdate"
-                      @open-change="handleCreateUserOpen"
+                      @open-change="handleCreateParticipantOpen"
                     >
                       <template #trigger>
                         <button
                           type="button"
                           :class="['webqq-composer-user-add', { 'is-collapsed-hidden': hasUserStackOverflow && !userStackVisualExpanded }]"
                           :style="userAddStyle"
-                          aria-label="添加测试用户"
+                          aria-label="添加测试账号"
                         >
                           <IconPlus :size="18" stroke-width="2" aria-hidden="true" />
                         </button>
@@ -937,7 +919,7 @@ const userStackLayoutRef = ref<HTMLElement>()
 const userStackExpanded = ref(false)
 const userStackHovered = ref(false)
 const userStackFocused = ref(false)
-const createUserOpen = ref(false)
+const createParticipantOpen = ref(false)
 const remarkDialogOpen = ref(false)
 const remarkTargetId = ref('')
 const remarkInput = ref('')
@@ -1416,11 +1398,11 @@ function setUserStackExpanded(expanded: boolean) {
 // 不能触发折叠，否则会中断 FLIP 并让头像停在错误位置。
 function syncUserStackExpanded() {
   if (suppressUserStackCollapse) return
-  setUserStackExpanded(userStackHovered.value || userStackFocused.value || createUserOpen.value)
+  setUserStackExpanded(userStackHovered.value || userStackFocused.value || createParticipantOpen.value)
 }
 
-function handleCreateUserOpen(open: boolean) {
-  createUserOpen.value = open
+function handleCreateParticipantOpen(open: boolean) {
+  createParticipantOpen.value = open
   syncUserStackExpanded()
 }
 

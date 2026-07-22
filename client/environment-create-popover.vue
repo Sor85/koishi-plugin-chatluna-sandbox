@@ -16,8 +16,24 @@
           <p class="m-0 text-xs leading-5 text-slate-500 dark:text-slate-400">{{ description }}</p>
         </header>
 
+        <div v-if="type === 'participant'" class="grid gap-1.5">
+          <Label for="environment-create-type">账号类型</Label>
+          <Select v-model="participantType">
+            <SelectTrigger
+              id="environment-create-type"
+              class="w-full border-slate-200 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent :portal-to="selectPortalTarget" class="z-[120] w-[var(--reka-select-trigger-width)] border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+              <SelectItem value="user" class="focus:bg-slate-100 dark:focus:bg-slate-800">普通用户</SelectItem>
+              <SelectItem value="bot" class="focus:bg-slate-100 dark:focus:bg-slate-800">机器人</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         <div class="grid gap-1.5">
-          <Label for="environment-create-id">{{ type === 'group' ? '群号' : 'QQ ID' }}</Label>
+          <Label for="environment-create-id">{{ effectiveType === 'group' ? '群号' : 'QQ ID' }}</Label>
           <Input
             id="environment-create-id"
             v-model="draft.id"
@@ -29,7 +45,7 @@
         </div>
 
         <div class="grid gap-1.5">
-          <Label for="environment-create-name">{{ type === 'user' ? '用户昵称' : type === 'bot' ? '机器人昵称' : '群名称' }}</Label>
+          <Label for="environment-create-name">{{ effectiveType === 'user' ? '用户昵称' : effectiveType === 'bot' ? '机器人昵称' : '群名称' }}</Label>
           <Input
             id="environment-create-name"
             v-model="draft.name"
@@ -38,7 +54,7 @@
           />
         </div>
 
-        <template v-if="type === 'bot'">
+        <template v-if="effectiveType === 'bot'">
           <div class="grid gap-1.5">
             <Label for="environment-create-implementation">实现配置</Label>
             <Select v-model="botImplementation">
@@ -71,9 +87,9 @@
         <Button
           type="submit"
           class="inline-flex h-9 items-center justify-center rounded-lg bg-[var(--webqq-accent)] px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-          :disabled="busy || (type === 'group' && !canCreateGroup)"
+          :disabled="busy || (effectiveType === 'group' && !canCreateGroup)"
         >
-          {{ busy ? '创建中...' : title }}
+          {{ busy ? '创建中...' : submitLabel }}
         </Button>
       </form>
       <!-- 下拉层挂在父 Popover 内的绝对定位宿主，避免外部点击误判，同时不参与表单高度计算。 -->
@@ -102,7 +118,8 @@ import type {
   SandboxWorkspaceState,
 } from '../src/types'
 
-type EnvironmentCreateType = 'user' | 'bot' | 'group'
+type EnvironmentCreateType = 'user' | 'bot' | 'group' | 'participant'
+type ParticipantCreateType = 'user' | 'bot'
 
 const props = withDefaults(defineProps<{
   type: EnvironmentCreateType
@@ -122,6 +139,7 @@ const open = ref(false)
 const busy = ref(false)
 const errorMessage = ref('')
 const draft = reactive({ id: '', name: '' })
+const participantType = ref<ParticipantCreateType>('user')
 const botImplementation = ref<SandboxImplementationProfile>('napcat')
 const botEnabled = ref(true)
 const selectPortalTarget = ref<HTMLElement | null>(null)
@@ -129,12 +147,16 @@ const isNarrow = useMediaQuery('(max-width: 768px)')
 const resolvedSide = computed(() => props.side === 'right' && isNarrow.value ? 'bottom' : props.side)
 const currentUser = computed(() => props.snapshot.users.find(({ id }) => id === props.currentUserId))
 const canCreateGroup = computed(() => !!currentUser.value && props.snapshot.bots.length > 0)
-const title = computed(() => props.type === 'user' ? '添加测试用户' : props.type === 'bot' ? '添加测试机器人' : '添加测试群组')
+const effectiveType = computed(() => props.type === 'participant' ? participantType.value : props.type)
+const title = computed(() => props.type === 'participant'
+  ? '添加测试账号'
+  : props.type === 'user' ? '添加测试用户' : props.type === 'bot' ? '添加测试机器人' : '添加测试群组')
+const submitLabel = computed(() => effectiveType.value === 'user' ? '添加测试用户' : effectiveType.value === 'bot' ? '添加测试机器人' : '添加测试群组')
 const description = computed(() => {
-  if (props.type === 'user') return '创建后可在发送框头像区域切换身份'
-  if (props.type === 'bot') return '创建后会为所有测试用户建立私聊会话'
+  if (effectiveType.value === 'user') return '创建后可在发送框头像区域切换身份'
+  if (effectiveType.value === 'bot') return '创建后会为所有测试用户建立私聊会话'
   if (!currentUser.value) return '请先创建并选择一位测试用户'
-  if (!props.snapshot.bots.length) return '请先在好友页添加测试机器人'
+  if (!props.snapshot.bots.length) return '请先在发送消息控件中添加测试机器人'
   return `当前用户“${currentUser.value.name}”为群主，现有机器人自动加入群组`
 })
 
@@ -144,6 +166,7 @@ watch(open, (value) => {
   errorMessage.value = ''
   draft.id = ''
   draft.name = ''
+  participantType.value = 'user'
   botImplementation.value = 'napcat'
   botEnabled.value = true
 })
@@ -165,10 +188,10 @@ async function submit() {
 }
 
 function createInput(): ManageSandboxEnvironmentInput | undefined {
-  if (props.type === 'user') {
+  if (effectiveType.value === 'user') {
     return { action: 'create-user', data: { id: draft.id, name: draft.name } }
   }
-  if (props.type === 'bot') {
+  if (effectiveType.value === 'bot') {
     return {
       action: 'create-bot',
       data: { id: draft.id, name: draft.name, implementation: botImplementation.value, enabled: botEnabled.value },
