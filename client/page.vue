@@ -457,32 +457,40 @@
                     :style="userStackStyle"
                   >
                     <ContextMenu
-                      v-for="(user, index) in userStackUsers"
-                      :key="user.id"
+                      v-for="(sender, index) in userStackUsers"
+                      :key="sender.id"
                     >
                       <ContextMenuTrigger as-child>
                         <button
                           type="button"
                           :class="['webqq-composer-user-switch', {
-                            'is-active': user.id === currentUserId,
+                            'is-active': sender.id === composerSenderId,
+                            'is-bot': sender.type === 'bot',
                             'is-collapsed-extra': isUserCollapsedExtra(index),
                           }]"
-                          :aria-label="user.id === currentUserId ? `当前用户：${user.name}` : `切换到用户：${user.name}`"
-                          :aria-pressed="user.id === currentUserId"
+                          :aria-label="sender.id === composerSenderId
+                            ? `当前发送者：${sender.name}${sender.type === 'bot' ? '（机器人）' : ''}`
+                            : `切换发送者：${sender.name}${sender.type === 'bot' ? '（机器人）' : ''}`"
+                          :aria-pressed="sender.id === composerSenderId"
                           :aria-hidden="isUserCollapsedHidden(index) ? 'true' : undefined"
                           :tabindex="isUserCollapsedHidden(index) ? -1 : undefined"
                           :style="getUserSwitchStyle(index)"
-                          @click="selectComposerUser(user.id)"
+                          @click="selectComposerUser(sender)"
                         >
-                          <span class="webqq-composer-user-avatar">{{ getInitial(user.name) }}</span>
+                          <span :class="['webqq-composer-user-avatar', { 'is-bot': sender.type === 'bot' }]">
+                            {{ getInitial(sender.name) }}
+                            <span v-if="sender.type === 'bot' && sender.id === composerSenderId" class="webqq-composer-user-bot-badge">
+                              <IconRobotFace :size="10" stroke-width="2.4" aria-hidden="true" />
+                            </span>
+                          </span>
                         </button>
                       </ContextMenuTrigger>
                       <ContextMenuContent style="z-index: 140">
-                        <ContextMenuItem @select="openEntityDialog('edit', { type: 'user', id: user.id })">
-                          <IconEdit :size="16" aria-hidden="true" /> 编辑用户
+                        <ContextMenuItem @select="openEntityDialog('edit', { type: sender.type, id: sender.id })">
+                          <IconEdit :size="16" aria-hidden="true" /> 编辑{{ sender.type === 'bot' ? '机器人' : '用户' }}
                         </ContextMenuItem>
-                        <ContextMenuItem class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="openEntityDialog('delete', { type: 'user', id: user.id })">
-                          <IconTrash :size="16" aria-hidden="true" /> 删除用户
+                        <ContextMenuItem class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="openEntityDialog('delete', { type: sender.type, id: sender.id })">
+                          <IconTrash :size="16" aria-hidden="true" /> 删除{{ sender.type === 'bot' ? '机器人' : '用户' }}
                         </ContextMenuItem>
                       </ContextMenuContent>
                     </ContextMenu>
@@ -494,6 +502,9 @@
                     >
                       <span v-if="userOverflowPreview" class="webqq-composer-user-overflow-avatar">
                         {{ getInitial(userOverflowPreview.name) }}
+                        <span v-if="userOverflowPreview.type === 'bot' && userOverflowPreview.id === composerSenderId" class="webqq-composer-user-bot-badge">
+                          <IconRobotFace :size="10" stroke-width="2.4" aria-hidden="true" />
+                        </span>
                       </span>
                       <span class="webqq-composer-user-overflow-label">
                         <span class="webqq-composer-user-overflow-plus">+</span>
@@ -731,6 +742,7 @@ import {
   IconMessageCircle,
   IconPaperclip,
   IconPlus,
+  IconRobotFace,
   IconMessageReply,
   IconSearch,
   IconSend,
@@ -806,6 +818,7 @@ const workspace = ref<SandboxWorkspaceState>({
   appearance: defaultAppearance,
 })
 const currentUserId = ref<string>()
+const composerSenderId = ref<string>()
 const activeConversationId = ref<string>()
 const currentView = ref<SandboxWorkspaceView>('messages')
 const searchQuery = ref('')
@@ -868,7 +881,20 @@ const sidebarTabs = [
 ]
 const snapshot = computed(() => workspace.value.snapshot)
 const currentUser = computed(() => snapshot.value.users.find(({ id }) => id === currentUserId.value))
-const userStackUsers = computed(() => orderUsersByActive(snapshot.value.users, currentUserId.value))
+type ComposerSender = { id: string, name: string, type: 'user' | 'bot' }
+const userStackUsers = computed<ComposerSender[]>(() => {
+  const users = snapshot.value.users.map((user) => ({ ...user, type: 'user' as const }))
+  const activeUserIndex = users.findIndex(({ id }) => id === currentUserId.value)
+  const orderedUsers = activeUserIndex > 0
+    ? [users[activeUserIndex], ...users.slice(0, activeUserIndex), ...users.slice(activeUserIndex + 1)]
+    : users
+  const conversation = snapshot.value.conversations.find(({ id }) => id === activeConversationId.value)
+  const bot = snapshot.value.bots.find(({ id }) => id === conversation?.botId)
+  const senders = bot
+    ? [orderedUsers[0], { ...bot, type: 'bot' as const }, ...orderedUsers.slice(1)].filter(Boolean) as ComposerSender[]
+    : orderedUsers
+  return orderUsersByActive(senders, composerSenderId.value)
+})
 const userStackMetrics = computed(() => getUserStackMetrics(userStackUsers.value.length))
 const userStackLayoutMetrics = computed(() => getUserStackLayoutMetrics(userStackUsers.value.length))
 const hasUserStackOverflow = computed(() => userStackMetrics.value.overflowCount > 0)
@@ -1033,6 +1059,10 @@ const historyLoading = ref(false)
 const highlightedMessageId = ref('')
 let quoteHighlightTimer: ReturnType<typeof setTimeout> | undefined
 
+watch([currentUserId, () => currentConversation.value?.botId], ([userId, botId]) => {
+  if (composerSenderId.value !== userId && composerSenderId.value !== botId) composerSenderId.value = userId
+})
+
 onMounted(async () => {
   const preferences = loadWorkspacePreferences(window.localStorage)
   try {
@@ -1075,6 +1105,7 @@ watch(hasUserStackOverflow, (hasOverflow) => {
 
 function applySelection(selection: ReturnType<typeof resolveWorkspaceSelection>) {
   currentUserId.value = selection.currentUserId
+  if (!composerSenderId.value) composerSenderId.value = selection.currentUserId
   activeConversationId.value = selection.activeConversationId
   currentView.value = selection.currentView
 }
@@ -1353,19 +1384,22 @@ function blurUserStack(event: FocusEvent) {
   syncUserStackExpanded()
 }
 
-async function selectComposerUser(userId: string) {
-  if (userId === currentUserId.value) return
+async function selectComposerUser(sender: ComposerSender) {
+  if (sender.id === composerSenderId.value) return
   suppressUserStackCollapse = true
   if (suppressUserStackCollapseTimer) clearTimeout(suppressUserStackCollapseTimer)
   // 展开和折叠由同步 CSS transition 完成；等头像停止移动后再记录用户重排，
   // 避免 Anime.js 在过渡中途读取坐标并吞掉点击切换动画。
   await waitForUserStackTransition()
   const layout = recordUserStackLayout()
-  workspace.value = await send('onebot-sandbox/workspace', { actorUserId: userId })
-  applySelection(resolveWorkspaceSelection(snapshot.value, {
-    currentUserId: userId,
-    currentView: 'messages',
-  }))
+  composerSenderId.value = sender.id
+  if (sender.type === 'user') {
+    workspace.value = await send('onebot-sandbox/workspace', { actorUserId: sender.id })
+    applySelection(resolveWorkspaceSelection(snapshot.value, {
+      currentUserId: sender.id,
+      currentView: 'messages',
+    }))
+  }
   input.value = ''
   detailsOpen.value = false
   await animateUserStackLayout(layout)
@@ -1568,7 +1602,8 @@ async function sendMessage() {
   const user = currentUser.value
   const bot = currentBot.value
   const conversation = currentConversation.value
-  if ((!content && !mediaFile) || !user || !bot || !conversation || sending.value) return
+  const senderId = composerSenderId.value ?? user?.id
+  if ((!content && !mediaFile) || !user || !bot || !conversation || !senderId || sending.value) return
 
   sending.value = true
   errorMessage.value = ''
@@ -1576,6 +1611,7 @@ async function sendMessage() {
     workspace.value = mediaFile
       ? await send('onebot-sandbox/send-media-message', {
           actorUserId: user.id,
+          senderId,
           botId: bot.id,
           conversationId: conversation.id,
           fileName: mediaFile.name,
@@ -1586,6 +1622,7 @@ async function sendMessage() {
         })
       : await send('onebot-sandbox/send-message', {
           actorUserId: user.id,
+          senderId,
           botId: bot.id,
           conversationId: conversation.id,
           content,

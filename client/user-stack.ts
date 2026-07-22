@@ -18,7 +18,7 @@ export interface UserStackLayoutMetrics {
   addExpandedRight: number
 }
 
-export function orderUsersByActive(users: SandboxUser[], activeUserId?: string): SandboxUser[] {
+export function orderUsersByActive<User extends SandboxUser>(users: User[], activeUserId?: string): User[] {
   const activeIndex = users.findIndex(({ id }) => id === activeUserId)
   return activeIndex > 0
     ? [users[activeIndex], ...users.slice(0, activeIndex), ...users.slice(activeIndex + 1)]

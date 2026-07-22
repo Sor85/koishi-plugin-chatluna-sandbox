@@ -208,6 +208,7 @@ export interface SandboxMessageHistory {
 
 export interface SendMessageInput {
   actorUserId: string
+  senderId?: string
   botId: string
   conversationId: string
   content: string
@@ -221,6 +222,7 @@ export interface SendMessageResult {
 
 export interface SendMediaMessageInput {
   actorUserId: string
+  senderId?: string
   botId: string
   conversationId: string
   fileName: string

@@ -456,4 +456,34 @@ describe('模拟 QQ 环境消息闭环', () => {
       content: '非成员消息',
     })).rejects.toThrow('会话不存在')
   })
+
+  it('机器人可以作为发送者写入当前会话且不触发自身中间件', async () => {
+    const app = new App()
+    let control: SandboxControlService | undefined
+    let receivedCount = 0
+    app.plugin((ctx) => {
+      control = new SandboxControlService(ctx)
+    })
+    app.middleware(() => {
+      receivedCount += 1
+    })
+    runningApps.push(app)
+    await app.start()
+    if (!control) throw new Error('沙盒控制服务未注册')
+
+    await control.sendMessage({
+      actorUserId: '10001',
+      senderId: '20001',
+      botId: '20001',
+      conversationId: 'private:10001:20001',
+      content: '机器人主动消息',
+    })
+
+    expect(receivedCount).toBe(0)
+    expect(control.getSnapshot().messages).toContainEqual(expect.objectContaining({
+      authorId: '20001',
+      conversationId: 'private:10001:20001',
+      content: '机器人主动消息',
+    }))
+  })
 })

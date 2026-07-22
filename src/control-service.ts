@@ -570,7 +570,10 @@ export class SandboxControlService {
   async sendMessage(input: SendMessageInput): Promise<SendMessageResult> {
     if (!input.content.trim()) throw new Error('消息内容不能为空')
     const context = this.getMessageContext(input)
-    const message = this.appendMessage(context.user.id, context.conversation.id, input.content.trim(), input.replyToMessageId)
+    const senderId = input.senderId ?? context.user.id
+    if (senderId !== context.user.id && senderId !== context.bot.id) throw new Error(`发送者不在当前会话中：${senderId}`)
+    const message = this.appendMessage(senderId, context.conversation.id, input.content.trim(), input.replyToMessageId)
+    if (senderId === context.bot.id) return { messageId: message.id, revision: this.scene.revision }
     return this.dispatchUserMessage(context, message, h.parse(message.content), [
       ...(context.reply ? [{ type: 'reply', data: { id: context.reply.id } }] : []),
       { type: 'text', data: { text: message.content } },
@@ -579,9 +582,12 @@ export class SandboxControlService {
 
   async sendMediaMessage(input: SendMediaMessageInput): Promise<SendMessageResult> {
     const context = this.getMessageContext(input)
+    const senderId = input.senderId ?? context.user.id
+    if (senderId !== context.user.id && senderId !== context.bot.id) throw new Error(`发送者不在当前会话中：${senderId}`)
     const media = this.mediaStorage.save(input)
     const content = input.content?.trim() || `[${this.getMediaLabel(media)}] ${media.name}`
-    const message = this.appendMessage(context.user.id, context.conversation.id, content, input.replyToMessageId, [media])
+    const message = this.appendMessage(senderId, context.conversation.id, content, input.replyToMessageId, [media])
+    if (senderId === context.bot.id) return { messageId: message.id, revision: this.scene.revision }
     const elementType = media.type === 'image' ? 'img' : media.type
     const mediaElement = h(elementType, {
       src: media.reference,
