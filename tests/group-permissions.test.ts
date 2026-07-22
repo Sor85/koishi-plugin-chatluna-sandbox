@@ -190,4 +190,25 @@ describe('模拟 QQ 环境群权限操作', () => {
       expect.objectContaining({ self_id: 20002, sub_type: 'kick_me', user_id: 20002 }),
     ]))
   })
+
+  it('群内仍有成员时保留历史群会话，仅当前成员可见', async () => {
+    const { control } = await createControl()
+    const group = control.getSnapshot().groups[0]
+    const conversationIds = control.getSnapshot().conversations
+      .filter(({ groupId }) => groupId === group.id)
+      .map(({ id }) => id)
+
+    control.updateGroup({
+      id: group.id,
+      name: group.name,
+      members: group.members.filter(({ participantId }) => participantId === '10001'),
+    })
+
+    expect(control.getSnapshot().conversations
+      .filter(({ groupId }) => groupId === group.id)
+      .map(({ id }) => id)).toEqual(conversationIds)
+    expect(control.getVisibleSnapshot('10001').conversations).toContainEqual(expect.objectContaining({ groupId: '30001' }))
+    expect(control.getVisibleSnapshot('10002').conversations).not.toContainEqual(expect.objectContaining({ groupId: '30001' }))
+    expect(control.getVisibleSnapshot('10003').conversations).not.toContainEqual(expect.objectContaining({ groupId: '30001' }))
+  })
 })

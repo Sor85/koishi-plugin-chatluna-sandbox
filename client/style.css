@@ -263,10 +263,15 @@ body,
 }
 
 .webqq-menu-avatar {
+  --webqq-avatar-size: 30px;
+  --webqq-bot-badge-size: 12.5px;
+  --webqq-bot-badge-offset: -1.667px;
+  --webqq-bot-badge-border: 1.667px;
+
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 700;
 }
 
@@ -653,15 +658,61 @@ body,
 }
 
 .webqq-avatar {
+  --webqq-avatar-size: 38px;
+  --webqq-bot-badge-size: 15.833px;
+  --webqq-bot-badge-offset: -2.111px;
+  --webqq-bot-badge-border: 2.111px;
+
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  font-size: 13px;
+  font-size: 12.667px;
   font-weight: 700;
 }
 
 .webqq-avatar-bot {
   background: #59657a;
+}
+
+.webqq-avatar.is-bot,
+.webqq-menu-avatar.is-bot {
+  position: relative;
+  color: #fff;
+  background: #475569;
+}
+
+.webqq-avatar-bot-badge,
+.webqq-composer-user-bot-badge {
+  position: absolute;
+  right: var(--webqq-bot-badge-offset);
+  bottom: var(--webqq-bot-badge-offset);
+  z-index: 1;
+  display: inline-flex;
+  width: var(--webqq-bot-badge-size);
+  height: var(--webqq-bot-badge-size);
+  align-items: center;
+  justify-content: center;
+  border: var(--webqq-bot-badge-border) solid #fff;
+  border-radius: 50%;
+  color: #fff;
+  background: #334155;
+}
+
+.webqq-avatar-bot-badge svg,
+.webqq-composer-user-bot-badge svg {
+  width: 66.667%;
+  height: 66.667%;
+}
+
+.webqq-workspace[data-color-mode="dark"] .webqq-avatar.is-bot,
+.webqq-workspace[data-color-mode="dark"] .webqq-menu-avatar.is-bot {
+  background: #64748b;
+}
+
+.webqq-workspace[data-color-mode="dark"] .webqq-avatar-bot-badge,
+.webqq-workspace[data-color-mode="dark"] .webqq-composer-user-bot-badge {
+  border-color: #0f172a;
+  background: #94a3b8;
 }
 
 .webqq-avatar-create {
@@ -1291,6 +1342,11 @@ body,
 }
 
 .webqq-composer-user-avatar {
+  --webqq-avatar-size: 36px;
+  --webqq-bot-badge-size: 15px;
+  --webqq-bot-badge-offset: -2px;
+  --webqq-bot-badge-border: 2px;
+
   position: relative;
   display: inline-flex;
   width: 36px;
@@ -1374,26 +1430,6 @@ body,
 
 .webqq-workspace[data-color-mode="dark"] .webqq-composer-user-avatar.is-bot {
   background: #64748b;
-}
-
-.webqq-composer-user-bot-badge {
-  position: absolute;
-  right: -2px;
-  bottom: -2px;
-  display: inline-flex;
-  width: 15px;
-  height: 15px;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid #fff;
-  border-radius: 50%;
-  color: #fff;
-  background: #334155;
-}
-
-.webqq-workspace[data-color-mode="dark"] .webqq-composer-user-bot-badge {
-  border-color: #0f172a;
-  background: #94a3b8;
 }
 
 .webqq-composer-user-add {
@@ -1963,10 +1999,15 @@ body,
 }
 
 .webqq-avatar-profile {
+  --webqq-avatar-size: 76px;
+  --webqq-bot-badge-size: 31.667px;
+  --webqq-bot-badge-offset: -4.222px;
+  --webqq-bot-badge-border: 4.222px;
+
   width: 76px;
   height: 76px;
   border-radius: 50%;
-  font-size: 26px;
+  font-size: 25.333px;
 }
 
 .webqq-profile-hero h2 {

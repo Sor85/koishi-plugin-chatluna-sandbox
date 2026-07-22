@@ -158,7 +158,7 @@ export class SandboxControlService {
     this.getUser(actorUserId)
     const limit = this.validateMessageLimit(messageLimit)
     const conversations = this.scene.conversations
-      .filter(({ userId }) => userId === actorUserId)
+      .filter((conversation) => this.isConversationVisible(actorUserId, conversation))
       .map((conversation) => ({
         ...conversation,
         messageIds: conversation.messageIds.slice(-limit),
@@ -883,9 +883,16 @@ export class SandboxControlService {
 
   private getVisibleConversation(actorUserId: string, conversationId: string) {
     this.getUser(actorUserId)
-    const conversation = this.scene.conversations.find(({ id, userId }) => id === conversationId && userId === actorUserId)
-    if (!conversation) throw new Error(`会话不存在：${conversationId}`)
+    const conversation = this.scene.conversations.find(({ id }) => id === conversationId)
+    if (!conversation || !this.isConversationVisible(actorUserId, conversation)) throw new Error(`会话不存在：${conversationId}`)
     return conversation
+  }
+
+  private isConversationVisible(actorUserId: string, conversation: SandboxConversation) {
+    if (conversation.userId !== actorUserId) return false
+    if (!conversation.groupId) return true
+    const group = this.scene.groups.find(({ id }) => id === conversation.groupId)
+    return !!group?.members.some(({ participantId }) => participantId === actorUserId)
   }
 
   private getMessageContext(input: Pick<SendMessageInput, 'actorUserId' | 'botId' | 'conversationId' | 'replyToMessageId'>): SandboxMessageContext {
@@ -1226,7 +1233,15 @@ export class SandboxControlService {
     const botIds = group.members
       .filter(({ participantId }) => this.scene.bots.some(({ id }) => id === participantId))
       .map(({ participantId }) => participantId)
-    const desiredIds = new Set(userIds.flatMap((userId) => botIds.map((botId) => `group:${groupId}:${userId}:${botId}`)))
+    const existingIds = group.members.length
+      ? this.scene.conversations.filter((conversation) => conversation.groupId === groupId).map(({ id }) => id)
+      : []
+    // 群会话是共享 QQ 历史，只要群内仍有参与者就不因成员或机器人离群主动删除；
+    // 已离群用户的访问由可见性检查拦截，群为空或显式删除群组时才清理数据。
+    const desiredIds = new Set([
+      ...existingIds,
+      ...userIds.flatMap((userId) => botIds.map((botId) => `group:${groupId}:${userId}:${botId}`)),
+    ])
     this.deleteConversations((conversation) => conversation.groupId === groupId && !desiredIds.has(conversation.id))
     for (const userId of userIds) {
       for (const botId of botIds) {
