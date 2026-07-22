@@ -59,4 +59,13 @@ describe('发送框用户头像组', () => {
     expect(popoverSource).toContain('<SelectItem value="user"')
     expect(popoverSource).toContain('<SelectItem value="bot"')
   })
+
+  it('头像菜单在 Tooltip 内部直接绑定按钮以保留右键坐标', () => {
+    const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
+
+    expect(pageSource).toContain('<Tooltip\n                        v-for="(sender, index) in userStackUsers"')
+    expect(pageSource).toContain('<ContextMenu>\n                              <ContextMenuTrigger as-child>\n                                <button')
+    expect(pageSource).not.toContain('<ContextMenu\n                        v-for="(sender, index) in userStackUsers"')
+    expect(pageSource).toContain('class="webqq-composer-user-menu" style="z-index: 160"')
+  })
 })

@@ -505,51 +505,57 @@
                     :style="userStackStyle"
                   >
                     <TooltipProvider :delay-duration="300">
-                      <ContextMenu
+                      <Tooltip
                         v-for="(sender, index) in userStackUsers"
                         :key="sender.id"
                       >
-                        <Tooltip>
-                          <ContextMenuTrigger as-child>
-                            <TooltipTrigger as-child>
-                              <button
-                                type="button"
-                                :class="['webqq-composer-user-switch', {
-                                  'is-active': sender.id === composerSenderId,
-                                  'is-bot': sender.type === 'bot',
-                                  'is-collapsed-extra': isUserCollapsedExtra(index),
-                                }]"
-                                :aria-label="sender.id === composerSenderId
-                                  ? `当前发送者：${sender.name}${sender.type === 'bot' ? '（机器人）' : ''}`
-                                  : `切换发送者：${sender.name}${sender.type === 'bot' ? '（机器人）' : ''}`"
-                                :aria-pressed="sender.id === composerSenderId"
-                                :aria-hidden="isUserCollapsedHidden(index) ? 'true' : undefined"
-                                :tabindex="isUserCollapsedHidden(index) ? -1 : undefined"
-                                :style="getUserSwitchStyle(index)"
-                                @click="selectComposerUser(sender)"
-                              >
-                                <span :class="['webqq-composer-user-avatar', { 'is-bot': sender.type === 'bot' }]">
-                                  {{ getInitial(sender.name) }}
-                                  <span v-if="sender.type === 'bot' && sender.id === composerSenderId" class="webqq-composer-user-bot-badge">
-                                    <IconRobotFace :size="10" stroke-width="2.4" aria-hidden="true" />
+                        <!-- Tooltip 使用外层定位节点，ContextMenu 直接绑定内部按钮；如果让
+                             ContextMenu 根包住 Tooltip 根，reka-ui 会把右键菜单定位到 (0, 0)。 -->
+                        <TooltipTrigger as-child>
+                          <span
+                            :class="['webqq-composer-user-switch', {
+                              'is-active': sender.id === composerSenderId,
+                              'is-bot': sender.type === 'bot',
+                              'is-collapsed-extra': isUserCollapsedExtra(index),
+                            }]"
+                            :aria-hidden="isUserCollapsedHidden(index) ? 'true' : undefined"
+                            :style="getUserSwitchStyle(index)"
+                          >
+                            <ContextMenu>
+                              <ContextMenuTrigger as-child>
+                                <button
+                                  type="button"
+                                  class="webqq-composer-user-button"
+                                  :aria-label="sender.id === composerSenderId
+                                    ? `当前发送者：${sender.name}${sender.type === 'bot' ? '（机器人）' : ''}`
+                                    : `切换发送者：${sender.name}${sender.type === 'bot' ? '（机器人）' : ''}`"
+                                  :aria-pressed="sender.id === composerSenderId"
+                                  :tabindex="isUserCollapsedHidden(index) ? -1 : undefined"
+                                  @click="selectComposerUser(sender)"
+                                >
+                                  <span :class="['webqq-composer-user-avatar', { 'is-bot': sender.type === 'bot' }]">
+                                    {{ getInitial(sender.name) }}
+                                    <span v-if="sender.type === 'bot' && sender.id === composerSenderId" class="webqq-composer-user-bot-badge">
+                                      <IconRobotFace :size="10" stroke-width="2.4" aria-hidden="true" />
+                                    </span>
                                   </span>
-                                </span>
-                              </button>
-                            </TooltipTrigger>
-                          </ContextMenuTrigger>
-                          <TooltipContent side="top">
-                            {{ sender.name }}
-                          </TooltipContent>
-                        </Tooltip>
-                        <ContextMenuContent style="z-index: 140">
-                          <ContextMenuItem @select="openEntityDialog('edit', { type: sender.type, id: sender.id })">
-                            <IconEdit :size="16" aria-hidden="true" /> 编辑{{ sender.type === 'bot' ? '机器人' : '用户' }}
-                          </ContextMenuItem>
-                          <ContextMenuItem class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="openEntityDialog('delete', { type: sender.type, id: sender.id })">
-                            <IconTrash :size="16" aria-hidden="true" /> 删除{{ sender.type === 'bot' ? '机器人' : '用户' }}
-                          </ContextMenuItem>
-                        </ContextMenuContent>
-                      </ContextMenu>
+                                </button>
+                              </ContextMenuTrigger>
+                              <ContextMenuContent class="webqq-composer-user-menu" style="z-index: 160">
+                                <ContextMenuItem @select="openEntityDialog('edit', { type: sender.type, id: sender.id })">
+                                  <IconEdit :size="16" aria-hidden="true" /> 编辑{{ sender.type === 'bot' ? '机器人' : '用户' }}
+                                </ContextMenuItem>
+                                <ContextMenuItem class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="openEntityDialog('delete', { type: sender.type, id: sender.id })">
+                                  <IconTrash :size="16" aria-hidden="true" /> 删除{{ sender.type === 'bot' ? '机器人' : '用户' }}
+                                </ContextMenuItem>
+                              </ContextMenuContent>
+                            </ContextMenu>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          {{ sender.name }}
+                        </TooltipContent>
+                      </Tooltip>
                     </TooltipProvider>
                     <span
                       v-if="userStackMetrics.overflowCount"

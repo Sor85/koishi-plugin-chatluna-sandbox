@@ -1446,6 +1446,22 @@ body,
   -webkit-tap-highlight-color: transparent;
 }
 
+.webqq-composer-user-button {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* 折叠时只能用透明度隐藏额外头像；display/visibility 会让 Anime.js FLIP
    把节点当作进入或离开元素，导致头像跟随胶囊位移并留下重影。 */
 .webqq-composer-user-switch.is-collapsed-extra {
@@ -1453,10 +1469,14 @@ body,
   pointer-events: none;
 }
 
-.webqq-composer-user-switch:focus-visible {
+.webqq-composer-user-button:focus-visible {
   z-index: 20 !important;
   outline: 2px solid var(--webqq-accent);
   outline-offset: 3px;
+}
+
+.webqq-composer-user-menu {
+  translate: 0 calc(-100% - 16px);
 }
 
 .webqq-composer-user-avatar.is-bot {
