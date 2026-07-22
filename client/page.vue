@@ -126,7 +126,7 @@
             <ContextMenu v-for="group in filteredGroupDirectory" :key="`directory:${group.id}`">
               <ContextMenuTrigger as-child>
                 <button type="button" class="webqq-session">
-                  <span class="webqq-avatar webqq-avatar-bot">{{ getInitial(group.name) }}</span>
+                  <span class="webqq-avatar webqq-avatar-bot is-group">{{ getInitial(group.name) }}</span>
                   <span class="webqq-session-copy">
                     <strong>{{ group.name }}</strong>
                     <small>{{ group.pending ? '入群申请待处理' : `右键申请加入 · 群聊 ${group.id}` }}</small>
@@ -207,7 +207,7 @@
                   :class="{ 'is-active': conversation.id === activeConversationId }"
                   @click="selectConversation(conversation.id)"
                 >
-                  <span :class="['webqq-avatar webqq-avatar-bot', { 'is-bot': !conversation.groupId }]">
+                  <span :class="['webqq-avatar webqq-avatar-bot', { 'is-bot': !conversation.groupId, 'is-group': !!conversation.groupId }]">
                     <img v-if="getConversationAvatar(conversation)" :src="getConversationAvatar(conversation)" :alt="getConversationTitle(conversation)">
                     <template v-else>{{ getInitial(getConversationTitle(conversation)) }}</template>
                     <span v-if="!conversation.groupId" class="webqq-avatar-bot-badge">
@@ -266,7 +266,7 @@
           <template v-else>
           <header class="webqq-chat-header">
             <div class="webqq-chat-title">
-              <span :class="['webqq-avatar webqq-avatar-bot', { 'is-bot': !currentGroup && !!currentBot }]">
+              <span :class="['webqq-avatar webqq-avatar-bot', { 'is-bot': !currentGroup && !!currentBot, 'is-group': !!currentGroup }]">
                 <img v-if="currentBot?.avatar && !currentGroup" :src="currentBot.avatar" :alt="currentConversationTitle">
                 <template v-else>{{ getInitial(currentConversationTitle) }}</template>
                 <span v-if="!currentGroup && currentBot" class="webqq-avatar-bot-badge">
@@ -291,7 +291,7 @@
 
           <section v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-messages" aria-label="消息记录">
             <div v-if="!messages.length" class="webqq-welcome">
-              <span class="webqq-avatar webqq-avatar-large webqq-avatar-bot">{{ getInitial(currentConversationTitle) }}</span>
+              <span :class="['webqq-avatar webqq-avatar-large webqq-avatar-bot', { 'is-group': !!currentGroup }]">{{ getInitial(currentConversationTitle) }}</span>
               <strong>{{ currentConversationTitle }}</strong>
               <p>发送消息，验证插件在模拟 QQ 环境中的响应</p>
             </div>

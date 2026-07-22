@@ -674,6 +674,10 @@ body,
   background: #59657a;
 }
 
+.webqq-avatar.is-group {
+  background: #0f766e;
+}
+
 .webqq-avatar.is-bot,
 .webqq-menu-avatar.is-bot {
   position: relative;
