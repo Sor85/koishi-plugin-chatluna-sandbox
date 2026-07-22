@@ -224,20 +224,20 @@
               <ContextMenuContent style="z-index: 140">
                 <ContextMenuItem
                   v-if="conversation.groupId"
-                  :disabled="getGroupMember(conversation.groupId, currentUserId ?? '')?.role === 'member'"
+                  :disabled="getGroupMember(conversation.groupId, currentOperatorId ?? '')?.role === 'member'"
                   @select="openGroupActionDialog('name', '', conversation.groupId)"
                 >
                   <IconEdit :size="16" aria-hidden="true" />
-                  {{ getGroupMember(conversation.groupId, currentUserId ?? '')?.role === 'member' ? '需要管理员权限修改群名称' : '修改群名称' }}
+                  {{ getGroupMember(conversation.groupId, currentOperatorId ?? '')?.role === 'member' ? '需要管理员权限修改群名称' : '修改群名称' }}
                 </ContextMenuItem>
                 <ContextMenuItem
                   v-if="conversation.groupId"
-                  :disabled="getGroupMember(conversation.groupId, currentUserId ?? '')?.role === 'owner'"
+                  :disabled="getGroupMember(conversation.groupId, currentOperatorId ?? '')?.role === 'owner'"
                   class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40"
                   @select="leaveGroup(conversation.groupId!)"
                 >
                   <IconUserMinus :size="16" aria-hidden="true" />
-                  {{ getGroupMember(conversation.groupId, currentUserId ?? '')?.role === 'owner' ? '群主不能直接退群' : '退出群组' }}
+                  {{ getGroupMember(conversation.groupId, currentOperatorId ?? '')?.role === 'owner' ? '群主不能直接退群' : '退出群组' }}
                 </ContextMenuItem>
                 <ContextMenuItem @select="openEntityDialog('edit', getConversationEntityTarget(conversation))">
                   <IconEdit :size="16" aria-hidden="true" /> 编辑{{ getConversationEntityLabel(conversation) }}
@@ -338,9 +338,8 @@
                           </ContextMenuSubTrigger>
                           <GroupMemberMenu
                             sub
-                            :actor="getCurrentGroupMember(currentUserId ?? '')"
+                            :actor="getCurrentGroupMember(currentOperatorId ?? '')"
                             :target="getCurrentGroupMember(message.authorId)!"
-                            :target-is-bot="snapshot.bots.some(({ id }) => id === message.authorId)"
                             @poke="pokeGroupMember(message.authorId)"
                             @set-card="openGroupActionDialog('card', message.authorId)"
                             @set-admin="setGroupAdmin(message.authorId, $event)"
@@ -694,9 +693,8 @@
                     </article>
                   </ContextMenuTrigger>
                   <GroupMemberMenu
-                    :actor="getCurrentGroupMember(currentUserId ?? '')"
+                    :actor="getCurrentGroupMember(currentOperatorId ?? '')"
                     :target="member"
-                    :target-is-bot="snapshot.bots.some(({ id }) => id === member.participantId)"
                     @poke="pokeGroupMember(member.participantId)"
                     @set-card="openGroupActionDialog('card', member.participantId)"
                     @set-admin="setGroupAdmin(member.participantId, $event)"
@@ -925,6 +923,7 @@ const sidebarTabs = [
 ]
 const snapshot = computed(() => workspace.value.snapshot)
 const currentUser = computed(() => snapshot.value.users.find(({ id }) => id === currentUserId.value))
+const currentOperatorId = computed(() => composerSenderId.value ?? currentUserId.value)
 type ComposerSender = { id: string, name: string, type: 'user' | 'bot' }
 const userStackUsers = computed<ComposerSender[]>(() => {
   const users = snapshot.value.users.map((user) => ({ ...user, type: 'user' as const }))
@@ -1177,7 +1176,7 @@ async function performFriendAction(input: SandboxFriendAction) {
 }
 
 async function performGroupAction(input: SandboxGroupAction) {
-  const actorUserId = currentUserId.value
+  const actorUserId = currentOperatorId.value
   if (!actorUserId) return
   errorMessage.value = ''
   try {

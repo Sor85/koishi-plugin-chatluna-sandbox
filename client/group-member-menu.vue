@@ -38,7 +38,6 @@ import type { SandboxGroupMember } from '../src/types'
 const props = defineProps<{
   actor?: SandboxGroupMember
   target: SandboxGroupMember
-  targetIsBot: boolean
   sub?: boolean
 }>()
 
@@ -50,7 +49,7 @@ const emit = defineEmits<{
   kick: []
 }>()
 
-const actions = computed(() => getGroupMemberMenuActions(props.actor, props.target, props.targetIsBot))
+const actions = computed(() => getGroupMemberMenuActions(props.actor, props.target))
 const kickDisabledReason = computed(() => {
   if (!props.actor || props.actor.participantId === props.target.participantId) return ''
   if (props.actor.role === 'member') return '需要管理员权限才能踢人'

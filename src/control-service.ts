@@ -403,6 +403,33 @@ export class SandboxControlService {
   }
 
   async performGroupAction(input: PerformGroupActionInput): Promise<PerformGroupActionResult> {
+    // 控制台 RPC 的 actorUserId 是历史字段名；WebQQ 选择机器人后这里承载的是参与者 ID。
+    // 机器人管理群组必须经过自身 OneBot action，不能直接复用普通用户的状态修改路径。
+    if (this.isBot(input.actorUserId)) {
+      const bot = this.scene.bots.find(({ id }) => id === input.actorUserId)!
+      if (!bot.enabled) throw new Error(`机器人已停用：${bot.id}`)
+      const runtime = this.getRuntimeBot(bot.id)
+      if (input.action === 'kick') {
+        await runtime.internal._request('set_group_kick', { group_id: input.groupId, user_id: input.targetId })
+        return { revision: this.scene.revision }
+      }
+      if (input.action === 'set-admin') {
+        await runtime.internal._request('set_group_admin', { group_id: input.groupId, user_id: input.targetId, enable: input.enabled })
+        return { revision: this.scene.revision }
+      }
+      if (input.action === 'transfer-owner') {
+        await runtime.internal._request('set_group_owner', { group_id: input.groupId, user_id: input.targetId })
+        return { revision: this.scene.revision }
+      }
+      if (input.action === 'set-card') {
+        await runtime.internal._request('set_group_card', { group_id: input.groupId, user_id: input.targetId, card: input.card })
+        return { revision: this.scene.revision }
+      }
+      if (input.action === 'set-name') {
+        await runtime.internal._request('set_group_name', { group_id: input.groupId, group_name: input.name })
+        return { revision: this.scene.revision }
+      }
+    }
     this.getUser(input.actorUserId)
     if (input.action === 'handle-request') return this.handleUserGroupRequest(input)
 
@@ -495,7 +522,6 @@ export class SandboxControlService {
     if (input.action === 'set-admin') {
       if (actor.role !== 'owner') throw new Error('只有群主可以设置管理员')
       if (target.role === 'owner') throw new Error('不能修改群主权限')
-      if (this.isBot(target.participantId)) throw new Error('机器人不能设置为管理员')
       target.role = input.enabled ? 'admin' : 'member'
       this.scene.revision += 1
       await this.dispatchGroupNotice(group, 'group_admin', {
@@ -1235,7 +1261,7 @@ export class SandboxControlService {
       const bot = this.scene.bots.find(({ id }) => id === member.participantId)
       if (!user && !bot) throw new Error(`群成员不存在：${member.participantId}`)
       if (member.role === 'owner') {
-        if (!user) throw new Error('群主必须是普通用户')
+        // 普通用户和虚拟 OneBot 机器人共享同一套群角色，群主只要求是有效参与者。
         if (ownerId) throw new Error('群组只能有一个群主')
         ownerId = member.participantId
       }

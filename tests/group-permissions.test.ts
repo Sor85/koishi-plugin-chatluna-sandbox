@@ -129,6 +129,17 @@ describe('模拟 QQ 环境群权限操作', () => {
     expect(control.getSnapshot().groups[0].members.some(({ participantId }) => participantId === '10003')).toBe(false)
   })
 
+  it('机器人接任群主后可以作为 WebQQ 当前操作者管理群成员', async () => {
+    const { control } = await createControl()
+
+    await control.performGroupAction({ action: 'transfer-owner', actorUserId: '10001', groupId: '30001', targetId: '20001' })
+    const group = control.getSnapshot().groups[0]
+    control.updateGroup({ id: group.id, name: group.name, members: group.members })
+    await control.performGroupAction({ action: 'kick', actorUserId: '20001', groupId: '30001', targetId: '10003' })
+
+    expect(control.getSnapshot().groups[0].members.some(({ participantId }) => participantId === '10003')).toBe(false)
+  })
+
   it('群内戳一戳写入事件消息并向群内机器人派发通知', async () => {
     const { app, control } = await createControl()
     const notices: Array<{ noticeType?: string; subType?: string; groupId?: number; userId?: number; targetId?: number }> = []

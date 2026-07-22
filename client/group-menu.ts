@@ -5,7 +5,6 @@ export type GroupMemberMenuAction = 'poke' | 'set-card' | 'kick' | 'set-admin' |
 export function getGroupMemberMenuActions(
   actor: SandboxGroupMember | undefined,
   target: SandboxGroupMember,
-  targetIsBot: boolean,
 ): GroupMemberMenuAction[] {
   if (!actor) return []
   const actions: GroupMemberMenuAction[] = []
@@ -13,7 +12,7 @@ export function getGroupMemberMenuActions(
   if (actor.participantId === target.participantId
     || actor.role === 'owner'
     || (actor.role === 'admin' && target.role === 'member')) actions.push('set-card')
-  if (actor.role === 'owner' && !targetIsBot && target.role !== 'owner') {
+  if (actor.role === 'owner' && target.role !== 'owner') {
     actions.push(target.role === 'admin' ? 'unset-admin' : 'set-admin')
   }
   if (actor.role === 'owner' && actor.participantId !== target.participantId) actions.push('transfer-owner')
