@@ -1,6 +1,6 @@
 import type { SandboxGroupMember } from '../src/types'
 
-export type GroupMemberMenuAction = 'poke' | 'set-card' | 'kick' | 'set-admin' | 'unset-admin'
+export type GroupMemberMenuAction = 'poke' | 'set-card' | 'kick' | 'set-admin' | 'unset-admin' | 'transfer-owner'
 
 export function getGroupMemberMenuActions(
   actor: SandboxGroupMember | undefined,
@@ -13,11 +13,12 @@ export function getGroupMemberMenuActions(
   if (actor.participantId === target.participantId
     || actor.role === 'owner'
     || (actor.role === 'admin' && target.role === 'member')) actions.push('set-card')
-  if (actor.participantId !== target.participantId
-    && target.role !== 'owner'
-    && (actor.role === 'owner' || (actor.role === 'admin' && target.role === 'member'))) actions.push('kick')
   if (actor.role === 'owner' && !targetIsBot && target.role !== 'owner') {
     actions.push(target.role === 'admin' ? 'unset-admin' : 'set-admin')
   }
+  if (actor.role === 'owner' && actor.participantId !== target.participantId) actions.push('transfer-owner')
+  if (actor.participantId !== target.participantId
+    && target.role !== 'owner'
+    && (actor.role === 'owner' || (actor.role === 'admin' && target.role === 'member'))) actions.push('kick')
   return actions
 }

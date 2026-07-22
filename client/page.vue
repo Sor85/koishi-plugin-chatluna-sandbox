@@ -344,6 +344,7 @@
                             @poke="pokeGroupMember(message.authorId)"
                             @set-card="openGroupActionDialog('card', message.authorId)"
                             @set-admin="setGroupAdmin(message.authorId, $event)"
+                            @transfer-owner="transferGroupOwner(message.authorId)"
                             @kick="kickGroupMember(message.authorId)"
                           />
                         </ContextMenuSub>
@@ -476,44 +477,53 @@
                     }]"
                     :style="userStackStyle"
                   >
-                    <ContextMenu
-                      v-for="(sender, index) in userStackUsers"
-                      :key="sender.id"
-                    >
-                      <ContextMenuTrigger as-child>
-                        <button
-                          type="button"
-                          :class="['webqq-composer-user-switch', {
-                            'is-active': sender.id === composerSenderId,
-                            'is-bot': sender.type === 'bot',
-                            'is-collapsed-extra': isUserCollapsedExtra(index),
-                          }]"
-                          :aria-label="sender.id === composerSenderId
-                            ? `当前发送者：${sender.name}${sender.type === 'bot' ? '（机器人）' : ''}`
-                            : `切换发送者：${sender.name}${sender.type === 'bot' ? '（机器人）' : ''}`"
-                          :aria-pressed="sender.id === composerSenderId"
-                          :aria-hidden="isUserCollapsedHidden(index) ? 'true' : undefined"
-                          :tabindex="isUserCollapsedHidden(index) ? -1 : undefined"
-                          :style="getUserSwitchStyle(index)"
-                          @click="selectComposerUser(sender)"
-                        >
-                          <span :class="['webqq-composer-user-avatar', { 'is-bot': sender.type === 'bot' }]">
-                            {{ getInitial(sender.name) }}
-                            <span v-if="sender.type === 'bot' && sender.id === composerSenderId" class="webqq-composer-user-bot-badge">
-                              <IconRobotFace :size="10" stroke-width="2.4" aria-hidden="true" />
-                            </span>
-                          </span>
-                        </button>
-                      </ContextMenuTrigger>
-                      <ContextMenuContent style="z-index: 140">
-                        <ContextMenuItem @select="openEntityDialog('edit', { type: sender.type, id: sender.id })">
-                          <IconEdit :size="16" aria-hidden="true" /> 编辑{{ sender.type === 'bot' ? '机器人' : '用户' }}
-                        </ContextMenuItem>
-                        <ContextMenuItem class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="openEntityDialog('delete', { type: sender.type, id: sender.id })">
-                          <IconTrash :size="16" aria-hidden="true" /> 删除{{ sender.type === 'bot' ? '机器人' : '用户' }}
-                        </ContextMenuItem>
-                      </ContextMenuContent>
-                    </ContextMenu>
+                    <TooltipProvider :delay-duration="300">
+                      <ContextMenu
+                        v-for="(sender, index) in userStackUsers"
+                        :key="sender.id"
+                      >
+                        <Tooltip>
+                          <ContextMenuTrigger as-child>
+                            <TooltipTrigger as-child>
+                              <button
+                                type="button"
+                                :class="['webqq-composer-user-switch', {
+                                  'is-active': sender.id === composerSenderId,
+                                  'is-bot': sender.type === 'bot',
+                                  'is-collapsed-extra': isUserCollapsedExtra(index),
+                                }]"
+                                :aria-label="sender.id === composerSenderId
+                                  ? `当前发送者：${sender.name}${sender.type === 'bot' ? '（机器人）' : ''}`
+                                  : `切换发送者：${sender.name}${sender.type === 'bot' ? '（机器人）' : ''}`"
+                                :aria-pressed="sender.id === composerSenderId"
+                                :aria-hidden="isUserCollapsedHidden(index) ? 'true' : undefined"
+                                :tabindex="isUserCollapsedHidden(index) ? -1 : undefined"
+                                :style="getUserSwitchStyle(index)"
+                                @click="selectComposerUser(sender)"
+                              >
+                                <span :class="['webqq-composer-user-avatar', { 'is-bot': sender.type === 'bot' }]">
+                                  {{ getInitial(sender.name) }}
+                                  <span v-if="sender.type === 'bot' && sender.id === composerSenderId" class="webqq-composer-user-bot-badge">
+                                    <IconRobotFace :size="10" stroke-width="2.4" aria-hidden="true" />
+                                  </span>
+                                </span>
+                              </button>
+                            </TooltipTrigger>
+                          </ContextMenuTrigger>
+                          <TooltipContent side="top">
+                            {{ sender.name }}
+                          </TooltipContent>
+                        </Tooltip>
+                        <ContextMenuContent style="z-index: 140">
+                          <ContextMenuItem @select="openEntityDialog('edit', { type: sender.type, id: sender.id })">
+                            <IconEdit :size="16" aria-hidden="true" /> 编辑{{ sender.type === 'bot' ? '机器人' : '用户' }}
+                          </ContextMenuItem>
+                          <ContextMenuItem class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="openEntityDialog('delete', { type: sender.type, id: sender.id })">
+                            <IconTrash :size="16" aria-hidden="true" /> 删除{{ sender.type === 'bot' ? '机器人' : '用户' }}
+                          </ContextMenuItem>
+                        </ContextMenuContent>
+                      </ContextMenu>
+                    </TooltipProvider>
                     <span
                       v-if="userStackMetrics.overflowCount"
                       class="webqq-composer-user-overflow"
@@ -690,6 +700,7 @@
                     @poke="pokeGroupMember(member.participantId)"
                     @set-card="openGroupActionDialog('card', member.participantId)"
                     @set-admin="setGroupAdmin(member.participantId, $event)"
+                    @transfer-owner="transferGroupOwner(member.participantId)"
                     @kick="kickGroupMember(member.participantId)"
                   />
                 </ContextMenu>
@@ -793,6 +804,7 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, Conte
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './components/ui/dialog'
 import { Input } from './components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip'
 import EnvironmentCreatePopover from './environment-create-popover.vue'
 import EnvironmentEntityDialog from './environment-entity-dialog.vue'
 import EnvironmentManager from './environment-manager.vue'
@@ -1234,6 +1246,12 @@ function setGroupAdmin(targetId: string, enabled: boolean) {
   const groupId = currentGroup.value?.id
   if (!groupId) return
   return performGroupAction({ action: 'set-admin', groupId, targetId, enabled })
+}
+
+function transferGroupOwner(targetId: string) {
+  const groupId = currentGroup.value?.id
+  if (!groupId) return
+  return performGroupAction({ action: 'transfer-owner', groupId, targetId })
 }
 
 function leaveGroup(groupId: string) {

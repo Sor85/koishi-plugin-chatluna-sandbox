@@ -138,6 +138,13 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
             enabled: params.enable === true,
           })
         }
+        if (action === 'set_group_owner') {
+          return this.control.performBotGroupAction(this.selfId, {
+            action: 'transfer-owner',
+            groupId: String(params.group_id ?? ''),
+            targetId: String(params.user_id ?? ''),
+          })
+        }
         if (action === 'set_group_card') {
           return this.control.performBotGroupAction(this.selfId, {
             action: 'set-card',
@@ -287,6 +294,10 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
   }
 
   async setGuildMemberRole(guildId: string, userId: string, roleId: string): Promise<void> {
+    if (roleId === 'owner') {
+      await this.control.performBotGroupAction(this.selfId, { action: 'transfer-owner', groupId: guildId, targetId: userId })
+      return
+    }
     if (roleId !== 'admin') throw new Error(`不支持的群角色：${roleId}`)
     await this.control.performBotGroupAction(this.selfId, { action: 'set-admin', groupId: guildId, targetId: userId, enabled: true })
   }

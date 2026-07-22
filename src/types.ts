@@ -166,6 +166,7 @@ export type SandboxGroupAction =
   | { action: 'leave'; groupId: string }
   | { action: 'kick'; groupId: string; targetId: string }
   | { action: 'set-admin'; groupId: string; targetId: string; enabled: boolean }
+  | { action: 'transfer-owner'; groupId: string; targetId: string }
   | { action: 'set-card'; groupId: string; targetId: string; card: string }
   | { action: 'set-name'; groupId: string; name: string }
   | { action: 'poke'; groupId: string; targetId: string; conversationId?: string }

@@ -349,7 +349,7 @@ describe('模拟 QQ 环境消息闭环', () => {
 
     const initial = control.getSnapshot()
     expect(initial.users.map(({ id }) => id)).toEqual(['10001', '10002', '10003'])
-    expect(initial.users.map(({ name }) => name)).toEqual(['群主', '管理员', '普通群员'])
+    expect(initial.users.map(({ name }) => name)).toEqual(['测试用户1', '测试用户2', '测试用户3'])
     expect(initial.bots).toContainEqual(expect.objectContaining({ id: '20001', name: 'Koishi' }))
     expect(initial.groups[0]).toMatchObject({
       id: '30001',

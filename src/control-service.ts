@@ -20,6 +20,7 @@ import type {
   SandboxConversation,
   SandboxFriendship,
   SandboxGroup,
+  SandboxGroupMember,
   SandboxMedia,
   SandboxMediaContent,
   SandboxMessage,
@@ -82,9 +83,9 @@ function createDefaultScene(): SandboxSnapshot {
   return {
     revision: 0,
     users: [
-      { id: DEFAULT_USER_ID, name: '群主' },
-      { id: SECONDARY_USER_ID, name: '管理员' },
-      { id: ADMIN_USER_ID, name: '普通群员' },
+      { id: DEFAULT_USER_ID, name: '测试用户1' },
+      { id: SECONDARY_USER_ID, name: '测试用户2' },
+      { id: ADMIN_USER_ID, name: '测试用户3' },
     ],
     bots: [{
       id: DEFAULT_BOT_ID,
@@ -96,9 +97,9 @@ function createDefaultScene(): SandboxSnapshot {
       id: DEFAULT_GROUP_ID,
       name: '测试群',
       members: [
-        { participantId: DEFAULT_USER_ID, card: '群主', role: 'owner' },
-        { participantId: SECONDARY_USER_ID, card: '管理员', role: 'admin' },
-        { participantId: ADMIN_USER_ID, card: '普通群员', role: 'member' },
+        { participantId: DEFAULT_USER_ID, card: '测试用户1', role: 'owner' },
+        { participantId: SECONDARY_USER_ID, card: '测试用户2', role: 'admin' },
+        { participantId: ADMIN_USER_ID, card: '测试用户3', role: 'member' },
         { participantId: DEFAULT_BOT_ID, card: 'Koishi', role: 'admin' },
       ],
       announcements: [{
@@ -504,6 +505,11 @@ export class SandboxControlService {
       return { revision: this.scene.revision }
     }
 
+    if (input.action === 'transfer-owner') {
+      await this.transferGroupOwner(group, actor, target)
+      return { revision: this.scene.revision }
+    }
+
     if (input.action === 'set-card') {
       if (target.participantId !== input.actorUserId) this.assertCanManageMember(actor, target, '修改群名片')
       const previousCard = target.card ?? ''
@@ -592,6 +598,7 @@ export class SandboxControlService {
   async performBotGroupAction(botId: string, input:
   | { action: 'kick'; groupId: string; targetId: string }
   | { action: 'set-admin'; groupId: string; targetId: string; enabled: boolean }
+  | { action: 'transfer-owner'; groupId: string; targetId: string }
   | { action: 'set-card'; groupId: string; targetId: string; card: string }
   | { action: 'set-name'; groupId: string; name: string }) {
     const group = this.scene.groups.find(({ id }) => id === input.groupId)
@@ -632,6 +639,11 @@ export class SandboxControlService {
         sub_type: input.enabled ? 'set' : 'unset',
         user_id: Number(target.participantId),
       })
+      return { status: 'ok', retcode: 0, data: null }
+    }
+
+    if (input.action === 'transfer-owner') {
+      await this.transferGroupOwner(group, actor, target)
       return { status: 'ok', retcode: 0, data: null }
     }
 
@@ -1003,6 +1015,20 @@ export class SandboxControlService {
     if (actor.participantId === target.participantId) throw new Error(`不能对自己执行${action}`)
   }
 
+  private async transferGroupOwner(group: SandboxGroup, actor: SandboxGroupMember, target: SandboxGroupMember) {
+    if (actor.role !== 'owner') throw new Error('只有群主可以转让群主身份')
+    if (actor.participantId === target.participantId) throw new Error('不能把群主身份转让给自己')
+    actor.role = 'member'
+    target.role = 'owner'
+    this.scene.revision += 1
+    await this.dispatchGroupNotice(group, 'group_owner', {
+      operator_id: Number(actor.participantId),
+      user_id: Number(target.participantId),
+      owner_id_old: Number(actor.participantId),
+      owner_id_new: Number(target.participantId),
+    })
+  }
+
   private async addApprovedGroupMember(group: SandboxGroup, participantId: string, operatorId: string, subType: 'add' | 'invite') {
     this.getParticipant(participantId)
     if (!group.members.some((member) => member.participantId === participantId)) {
@@ -1154,7 +1180,7 @@ export class SandboxControlService {
           ? (userId === botId ? 'guild-removed' : 'guild-member-removed')
           : noticeType === 'group_name'
             ? 'guild-updated'
-            : noticeType === 'group_admin' || noticeType === 'group_card'
+            : noticeType === 'group_admin' || noticeType === 'group_card' || noticeType === 'group_owner'
               ? 'guild-member-updated'
               : 'notice'
       const session = bot.session({

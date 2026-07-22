@@ -37,7 +37,7 @@ describe('模拟 QQ 环境好友关系', () => {
     await control.performFriendAction({ action: 'set-remark', actorUserId: '10001', targetId: '10002', remark: '测试搭档' })
     const friendship = control.getSnapshot().friendships.find(({ participantIds }) => participantIds.includes('10001') && participantIds.includes('10002'))
     expect(friendship?.remarks).toEqual({ '10001': '测试搭档' })
-    expect(control.getSnapshot().users.find(({ id }) => id === '10002')?.name).toBe('管理员')
+    expect(control.getSnapshot().users.find(({ id }) => id === '10002')?.name).toBe('测试用户2')
 
     await control.performFriendAction({ action: 'delete', actorUserId: '10001', targetId: '10002' })
     expect(control.getSnapshot().friendships.some(({ participantIds }) => participantIds.includes('10001') && participantIds.includes('10002'))).toBe(false)

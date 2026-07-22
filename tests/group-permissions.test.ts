@@ -108,6 +108,27 @@ describe('模拟 QQ 环境群权限操作', () => {
     expect(group.members.find(({ participantId }) => participantId === '10003')?.card).toBe('管理员设置')
   })
 
+  it('用户和机器人群主都可以把群主身份转让给其他成员', async () => {
+    const { control } = await createControl()
+
+    await control.performGroupAction({ action: 'transfer-owner', actorUserId: '10001', groupId: '30001', targetId: '20001' })
+    expect(control.getSnapshot().groups[0].members).toEqual(expect.arrayContaining([
+      expect.objectContaining({ participantId: '10001', role: 'member' }),
+      expect.objectContaining({ participantId: '20001', role: 'owner' }),
+    ]))
+    await expect(control.performGroupAction({ action: 'transfer-owner', actorUserId: '10002', groupId: '30001', targetId: '10003' }))
+      .rejects.toThrow('只有群主可以转让群主身份')
+
+    await control.bot.internal._request('set_group_owner', { group_id: 30001, user_id: 10002 })
+    expect(control.getSnapshot().groups[0].members).toEqual(expect.arrayContaining([
+      expect.objectContaining({ participantId: '20001', role: 'member' }),
+      expect.objectContaining({ participantId: '10002', role: 'owner' }),
+    ]))
+
+    await control.performGroupAction({ action: 'kick', actorUserId: '10002', groupId: '30001', targetId: '10003' })
+    expect(control.getSnapshot().groups[0].members.some(({ participantId }) => participantId === '10003')).toBe(false)
+  })
+
   it('群内戳一戳写入事件消息并向群内机器人派发通知', async () => {
     const { app, control } = await createControl()
     const notices: Array<{ noticeType?: string; subType?: string; groupId?: number; userId?: number; targetId?: number }> = []
@@ -133,7 +154,7 @@ describe('模拟 QQ 环境群权限操作', () => {
     expect(control.getSnapshot().messages).toContainEqual(expect.objectContaining({
       authorId: '10003',
       conversationId: 'group:30001:10003:20001',
-      content: '普通群员 戳了戳 群主',
+      content: '测试用户3 戳了戳 测试用户1',
       event: { type: 'poke', targetId: '10001' },
     }))
     expect(notices).toContainEqual({

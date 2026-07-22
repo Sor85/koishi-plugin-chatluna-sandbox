@@ -63,21 +63,21 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     const { control } = await createControl()
     const bot = control.bot
 
-    await expect(bot.getUser('10001')).resolves.toMatchObject({ id: '10001', name: '群主', isBot: false })
+    await expect(bot.getUser('10001')).resolves.toMatchObject({ id: '10001', name: '测试用户1', isBot: false })
     await expect(bot.getFriendList()).resolves.toMatchObject({
-      data: expect.arrayContaining([expect.objectContaining({ user: expect.objectContaining({ id: '10001', name: '群主' }) })]),
+      data: expect.arrayContaining([expect.objectContaining({ user: expect.objectContaining({ id: '10001', name: '测试用户1' }) })]),
     })
     await expect(bot.getGuildList()).resolves.toEqual({ data: [{ id: '30001', name: '测试群' }] })
     await expect(bot.getGuildMember('30001', '10002')).resolves.toMatchObject({
-      user: { id: '10002', name: '管理员', isBot: false },
-      nick: '管理员',
+      user: { id: '10002', name: '测试用户2', isBot: false },
+      nick: '测试用户2',
       roles: [{ id: 'admin', name: '管理员' }],
     })
 
     await expect(bot.internal._request('get_friend_list', {})).resolves.toMatchObject({
       status: 'ok',
       retcode: 0,
-      data: expect.arrayContaining([expect.objectContaining({ user_id: 10001, nickname: '群主' })]),
+      data: expect.arrayContaining([expect.objectContaining({ user_id: 10001, nickname: '测试用户1' })]),
     })
     await expect(bot.internal._request('get_group_list', {})).resolves.toEqual({
       status: 'ok',
@@ -87,7 +87,7 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     await expect(bot.internal._request('get_group_member_info', { group_id: 30001, user_id: 10002 })).resolves.toMatchObject({
       status: 'ok',
       retcode: 0,
-      data: { group_id: 30001, user_id: 10002, nickname: '管理员', card: '管理员', role: 'admin' },
+      data: { group_id: 30001, user_id: 10002, nickname: '测试用户2', card: '测试用户2', role: 'admin' },
     })
     await expect(bot.internal._request('get_version_info', {})).resolves.toEqual({
       status: 'ok',

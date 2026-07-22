@@ -12,6 +12,9 @@
     <ContextMenuItem v-if="actions.includes('unset-admin')" @select="emit('set-admin', false)">
       <IconUserMinus :size="16" aria-hidden="true" /> 取消管理员
     </ContextMenuItem>
+    <ContextMenuItem v-if="actions.includes('transfer-owner')" @select="emit('transfer-owner')">
+      <IconCrown :size="16" aria-hidden="true" /> 转让群主
+    </ContextMenuItem>
     <ContextMenuItem
       v-if="actions.includes('kick')"
       class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40"
@@ -27,7 +30,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { IconHandClick, IconTag, IconUserMinus, IconUserPlus } from '@tabler/icons-vue'
+import { IconCrown, IconHandClick, IconTag, IconUserMinus, IconUserPlus } from '@tabler/icons-vue'
 import { ContextMenuContent, ContextMenuItem, ContextMenuSubContent } from './components/ui/context-menu'
 import { getGroupMemberMenuActions } from './group-menu'
 import type { SandboxGroupMember } from '../src/types'
@@ -43,6 +46,7 @@ const emit = defineEmits<{
   poke: []
   'set-card': []
   'set-admin': [enabled: boolean]
+  'transfer-owner': []
   kick: []
 }>()
 
