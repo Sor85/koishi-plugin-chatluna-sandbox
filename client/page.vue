@@ -125,20 +125,60 @@
             </EnvironmentCreatePopover>
             <ContextMenu v-for="group in filteredGroupDirectory" :key="`directory:${group.id}`">
               <ContextMenuTrigger as-child>
-                <button type="button" class="webqq-session">
+                <button
+                  type="button"
+                  class="webqq-session"
+                  :class="{ 'is-active': group.conversationId === activeConversationId }"
+                  @click="group.conversationId && selectConversation(group.conversationId)"
+                >
                   <span class="webqq-avatar webqq-avatar-bot is-group">{{ getInitial(group.name) }}</span>
                   <span class="webqq-session-copy">
                     <strong>{{ group.name }}</strong>
-                    <small>{{ group.pending ? '入群申请待处理' : `右键申请加入 · 群聊 ${group.id}` }}</small>
+                    <small>
+                      {{ group.member
+                        ? `群聊 ${group.id} · ${getGroupRoleLabel(group.member.role)}`
+                        : group.pending
+                          ? `群聊 ${group.id} · 入群申请待处理`
+                          : `群聊 ${group.id} · 右键申请加入` }}
+                    </small>
+                  </span>
+                  <span :class="['webqq-relation-badge', `is-${group.relation}`]">
+                    {{ group.member ? '已加入' : group.pending ? '待处理' : '未加入' }}
                   </span>
                 </button>
               </ContextMenuTrigger>
               <ContextMenuContent style="z-index: 140">
-                <ContextMenuItem v-if="!group.pending" @select="requestJoinGroup(group.id)">
+                <ContextMenuItem v-if="!group.member && !group.pending && !currentOperatorIsBot" @select="requestJoinGroup(group.id)">
                   <IconUserPlus :size="16" aria-hidden="true" /> 申请加入群组
                 </ContextMenuItem>
-                <ContextMenuItem v-else disabled>
+                <ContextMenuItem v-else-if="!group.member && group.pending" disabled>
                   <IconClock :size="16" aria-hidden="true" /> 等待群管理员处理
+                </ContextMenuItem>
+                <ContextMenuItem v-else-if="!group.member" disabled>
+                  <IconRobotFace :size="16" aria-hidden="true" /> 当前机器人不支持主动申请加群
+                </ContextMenuItem>
+                <ContextMenuItem
+                  v-if="group.member"
+                  :disabled="group.member.role === 'member'"
+                  @select="openGroupActionDialog('name', '', group.id)"
+                >
+                  <IconEdit :size="16" aria-hidden="true" />
+                  {{ group.member.role === 'member' ? '需要管理员权限修改群名称' : '修改群名称' }}
+                </ContextMenuItem>
+                <ContextMenuItem
+                  v-if="group.member"
+                  :disabled="group.member.role === 'owner'"
+                  class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40"
+                  @select="leaveGroup(group.id)"
+                >
+                  <IconUserMinus :size="16" aria-hidden="true" />
+                  {{ group.member.role === 'owner' ? '群主不能直接退群' : '退出群组' }}
+                </ContextMenuItem>
+                <ContextMenuItem @select="openEntityDialog('edit', { type: 'group', id: group.id })">
+                  <IconEdit :size="16" aria-hidden="true" /> 编辑群组
+                </ContextMenuItem>
+                <ContextMenuItem class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="openEntityDialog('delete', { type: 'group', id: group.id })">
+                  <IconTrash :size="16" aria-hidden="true" /> 删除群组
                 </ContextMenuItem>
               </ContextMenuContent>
             </ContextMenu>
@@ -164,10 +204,13 @@
                     <strong>{{ entry.displayName }}</strong>
                     <small>{{ entry.status }}</small>
                   </span>
+                  <span :class="['webqq-relation-badge', `is-${entry.relation}`]">
+                    {{ entry.isFriend ? '已添加' : entry.pendingOutgoing || entry.pendingIncoming ? '待处理' : '未添加' }}
+                  </span>
                 </button>
               </ContextMenuTrigger>
               <ContextMenuContent style="z-index: 140">
-                <ContextMenuItem v-if="!entry.isFriend && !entry.pendingOutgoing" @select="requestFriend(entry.id)">
+                <ContextMenuItem v-if="!entry.isFriend && !entry.pendingOutgoing && !entry.pendingIncoming && !currentOperatorIsBot" @select="requestFriend(entry.id)">
                   <IconUserPlus :size="16" aria-hidden="true" /> 发送好友申请
                 </ContextMenuItem>
                 <ContextMenuItem v-else-if="entry.pendingOutgoing" disabled>
@@ -176,10 +219,13 @@
                 <ContextMenuItem v-else-if="entry.pendingIncoming" disabled>
                   <IconBell :size="16" aria-hidden="true" /> 请在通知中处理申请
                 </ContextMenuItem>
-                <ContextMenuItem v-if="entry.isFriend" @select="openRemarkDialog(entry.id)">
+                <ContextMenuItem v-else-if="!entry.isFriend" disabled>
+                  <IconRobotFace :size="16" aria-hidden="true" /> 当前机器人不支持主动发送好友申请
+                </ContextMenuItem>
+                <ContextMenuItem v-if="entry.isFriend && !currentOperatorIsBot" @select="openRemarkDialog(entry.id)">
                   <IconTag :size="16" aria-hidden="true" /> 设置好友备注
                 </ContextMenuItem>
-                <ContextMenuItem v-if="entry.isFriend" class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="deleteFriend(entry.id)">
+                <ContextMenuItem v-if="entry.isFriend && !currentOperatorIsBot" class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="deleteFriend(entry.id)">
                   <IconUserMinus :size="16" aria-hidden="true" /> 删除好友
                 </ContextMenuItem>
                 <ContextMenuItem
@@ -197,7 +243,7 @@
               </ContextMenuContent>
             </ContextMenu>
             <ContextMenu
-              v-for="conversation in sidebarTab === 'friends' ? [] : filteredConversations"
+              v-for="conversation in sidebarTab === 'recent' ? filteredConversations : []"
               :key="conversation.id"
             >
               <ContextMenuTrigger as-child>
@@ -251,7 +297,7 @@
               v-if="sidebarTab === 'friends'
                 ? !filteredFriendDirectory.length
                 : sidebarTab === 'groups'
-                  ? !filteredConversations.length && !filteredGroupDirectory.length
+                  ? !filteredGroupDirectory.length
                   : !filteredConversations.length"
               class="webqq-empty"
             >没有匹配的会话</p>
@@ -816,6 +862,7 @@ import { getFriendMenuActions, type FriendMenuState } from './friend-menu'
 import GroupMemberMenu from './group-member-menu.vue'
 import NotificationMenu from './notification-menu.vue'
 import { getIncomingNotificationRequests } from './notification-requests'
+import { getFriendDirectory, getGroupDirectory } from './relationship-directory'
 import {
   loadWorkspacePreferences,
   resolveWorkspaceSelection,
@@ -930,6 +977,7 @@ const sidebarTabs = [
 const snapshot = computed(() => workspace.value.snapshot)
 const currentUser = computed(() => snapshot.value.users.find(({ id }) => id === currentUserId.value))
 const currentOperatorId = computed(() => composerSenderId.value ?? currentUserId.value)
+const currentOperatorIsBot = computed(() => snapshot.value.bots.some(({ id }) => id === currentOperatorId.value))
 type ComposerSender = { id: string, name: string, type: 'user' | 'bot' }
 const userStackUsers = computed<ComposerSender[]>(() => {
   const users = snapshot.value.users.map((user) => ({ ...user, type: 'user' as const }))
@@ -1003,55 +1051,14 @@ const filteredConversations = computed(() => {
 })
 const notificationRequests = computed(() => getIncomingNotificationRequests(snapshot.value, currentUserId.value))
 const pendingNotificationCount = computed(() => notificationRequests.value.friends.length + notificationRequests.value.groups.length)
-const friendDirectory = computed(() => {
-  const actorUserId = currentUserId.value
-  if (!actorUserId) return []
-  return [...snapshot.value.users, ...snapshot.value.bots]
-    .filter(({ id }) => id !== actorUserId)
-    .map((participant) => {
-      const friendship = snapshot.value.friendships.find(({ participantIds }) => participantIds.includes(actorUserId) && participantIds.includes(participant.id))
-      const pendingOutgoing = snapshot.value.requests.some(({ type, requesterId, targetId }) => type === 'friend' && requesterId === actorUserId && targetId === participant.id)
-      const pendingIncoming = snapshot.value.requests.some(({ type, requesterId, targetId }) => type === 'friend' && requesterId === participant.id && targetId === actorUserId)
-      const isBot = snapshot.value.bots.some(({ id }) => id === participant.id)
-      const conversationId = isBot
-        ? visibleConversations.value.find(({ type, botId }) => type === 'direct' && botId === participant.id)?.id
-        : undefined
-      return {
-        id: participant.id,
-        isBot,
-        isFriend: !!friendship,
-        pendingOutgoing,
-        pendingIncoming,
-        conversationId,
-        avatar: participant.avatar,
-        displayName: friendship?.remarks[actorUserId] || participant.name,
-        status: friendship
-          ? `${participant.name} · ${isBot ? '机器人好友' : '好友'}`
-          : pendingOutgoing
-            ? '好友申请待处理'
-            : pendingIncoming
-              ? '有新的好友申请'
-              : isBot ? '可申请机器人好友' : '可申请好友',
-      }
-    })
-})
+const friendDirectory = computed(() => getFriendDirectory(snapshot.value, currentOperatorId.value))
 const filteredFriendDirectory = computed(() => {
   if (sidebarTab.value !== 'friends') return []
   const query = searchQuery.value.trim().toLowerCase()
   if (!query) return friendDirectory.value
   return friendDirectory.value.filter(({ id, displayName }) => id.includes(query) || displayName.toLowerCase().includes(query))
 })
-const groupDirectory = computed(() => {
-  const actorUserId = currentUserId.value
-  if (!actorUserId) return []
-  return snapshot.value.groups
-    .filter(({ members }) => !members.some(({ participantId }) => participantId === actorUserId))
-    .map((group) => ({
-      ...group,
-      pending: snapshot.value.requests.some(({ type, subType, requesterId, groupId }) => type === 'group'
-        && (subType ?? 'add') === 'add' && requesterId === actorUserId && groupId === group.id),
-    }))
-})
+const groupDirectory = computed(() => getGroupDirectory(snapshot.value, currentOperatorId.value))
 const filteredGroupDirectory = computed(() => {
   if (sidebarTab.value !== 'groups') return []
   const query = searchQuery.value.trim().toLowerCase()
@@ -1060,7 +1067,7 @@ const filteredGroupDirectory = computed(() => {
 })
 
 function getFriendMenuState(targetId: string): FriendMenuState {
-  const actorUserId = currentUserId.value
+  const actorUserId = currentOperatorId.value
   if (!actorUserId) return { isFriend: false, pendingOutgoing: false, pendingIncoming: false }
 
   return {
@@ -1170,7 +1177,7 @@ function applyWorkspaceUpdate(nextWorkspace: SandboxWorkspaceState) {
 }
 
 async function performFriendAction(input: SandboxFriendAction) {
-  const actorUserId = currentUserId.value
+  const actorUserId = currentOperatorId.value
   if (!actorUserId) return
   errorMessage.value = ''
   try {
@@ -1295,9 +1302,10 @@ function deleteFriend(targetId: string) {
 }
 
 function openRemarkDialog(targetId: string) {
-  const friendship = snapshot.value.friendships.find(({ participantIds }) => participantIds.includes(currentUserId.value ?? '') && participantIds.includes(targetId))
+  const operatorId = currentOperatorId.value ?? ''
+  const friendship = snapshot.value.friendships.find(({ participantIds }) => participantIds.includes(operatorId) && participantIds.includes(targetId))
   remarkTargetId.value = targetId
-  remarkInput.value = friendship?.remarks[currentUserId.value ?? ''] ?? ''
+  remarkInput.value = friendship?.remarks[operatorId] ?? ''
   remarkDialogOpen.value = true
 }
 
