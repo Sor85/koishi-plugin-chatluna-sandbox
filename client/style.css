@@ -64,6 +64,14 @@ body,
   background: var(--webqq-bg);
 }
 
+.webqq-workspace.is-details-closed {
+  grid-template-columns: 72px minmax(230px, 300px) minmax(360px, 1fr);
+}
+
+.webqq-workspace.is-details-closed .webqq-profile {
+  display: none;
+}
+
 .webqq-workspace[data-color-mode="dark"] {
   --webqq-bg: #0f172a;
   --webqq-rail: #0f172a;

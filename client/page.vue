@@ -6,7 +6,8 @@
         :class="{
           'is-frosted': workspace.appearance.enableWebQQFrostedGlass,
           'has-tim-tail': workspace.appearance.webQQTimBubbleTail,
-          'is-details-open': detailsOpen,
+          'is-details-open': detailsVisible,
+          'is-details-closed': !detailsVisible,
         }"
         :data-chat-style="workspace.appearance.webQQChatStyle"
         :data-color-mode="workspace.appearance.webQQColorMode"
@@ -309,9 +310,9 @@
             <button
               type="button"
               class="webqq-icon-button"
-              :class="{ 'is-active': detailsOpen }"
-              :aria-label="detailsOpen ? '关闭会话信息' : '打开会话信息'"
-              @click="detailsOpen = !detailsOpen"
+              :class="{ 'is-active': detailsVisible }"
+              :aria-label="detailsVisible ? '关闭会话信息' : '打开会话信息'"
+              @click="toggleDetails"
             >
               <IconDots :size="22" aria-hidden="true" />
             </button>
@@ -641,7 +642,7 @@
         <aside class="webqq-profile" :aria-label="currentView === 'profile' ? '环境摘要' : currentGroup ? '群信息' : '私聊信息'">
           <header class="webqq-info-header">
             <strong>{{ currentView === 'profile' ? '环境摘要' : currentGroup ? '群信息' : '私聊信息' }}</strong>
-            <button type="button" class="webqq-info-close" aria-label="关闭会话信息" @click="detailsOpen = false">
+            <button type="button" class="webqq-info-close" aria-label="关闭会话信息" @click="closeDetails">
               <IconDots :size="22" aria-hidden="true" />
             </button>
           </header>
@@ -836,6 +837,7 @@ import {
   IconUserCircle,
   IconUsers,
 } from '@tabler/icons-vue'
+import { useMediaQuery } from '@vueuse/core'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Button } from './components/ui/button'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from './components/ui/context-menu'
@@ -853,8 +855,12 @@ import { getIncomingNotificationRequests } from './notification-requests'
 import { getFriendDirectory, getGroupDirectory } from './relationship-directory'
 import {
   loadWorkspacePreferences,
+  resolveDetailsPreferenceAfterLayoutChange,
+  resolveDetailsVisibility,
   resolveWorkspaceSelection,
   saveWorkspacePreferences,
+  toggleDetailsPreference,
+  type SandboxDetailsPreference,
   type SandboxWorkspaceView,
 } from './workspace-state'
 import { vWebqqScrollbar } from './webqq-scrollbar'
@@ -918,7 +924,9 @@ const announcementSending = ref(false)
 const announcementEditorOpen = ref(false)
 const deletingAnnouncementId = ref('')
 const groupMemberSearch = ref('')
-const detailsOpen = ref(false)
+const detailsPreference = ref<SandboxDetailsPreference>('auto')
+const wideDetailsLayout = useMediaQuery('(min-width: 1181px)')
+const detailsVisible = computed(() => resolveDetailsVisibility(detailsPreference.value, wideDetailsLayout.value))
 const hydrated = ref(false)
 const composerLayoutRef = ref<HTMLElement>()
 const userStackLayoutRef = ref<HTMLElement>()
@@ -1129,13 +1137,18 @@ watch([currentUserId, activeConversationId, currentView], () => {
 })
 
 watch(activeConversationId, () => {
-  detailsOpen.value = false
+  detailsPreference.value = 'auto'
   groupMemberSearch.value = ''
   announcementInput.value = ''
   announcementEditorOpen.value = false
   deletingAnnouncementId.value = ''
   infoErrorMessage.value = ''
   replyingToMessageId.value = ''
+})
+
+watch(wideDetailsLayout, (wideLayout) => {
+  // 断点切换必须覆盖旧的显式状态：窄屏关闭避免遮挡聊天区，恢复宽屏时重新展示信息栏。
+  detailsPreference.value = resolveDetailsPreferenceAfterLayoutChange(wideLayout)
 })
 
 watch(
@@ -1330,6 +1343,14 @@ function selectNavigation(view: SandboxWorkspaceView) {
   if (view === 'contacts') sidebarTab.value = 'friends'
 }
 
+function toggleDetails() {
+  detailsPreference.value = toggleDetailsPreference(detailsVisible.value)
+}
+
+function closeDetails() {
+  detailsPreference.value = 'closed'
+}
+
 function selectSidebarTab(tab: SidebarTab) {
   sidebarTab.value = tab
   searchQuery.value = ''
@@ -1453,7 +1474,7 @@ async function selectComposerUser(sender: ComposerSender) {
     }))
   }
   input.value = ''
-  detailsOpen.value = false
+  detailsPreference.value = 'auto'
   await animateUserStackLayout(layout)
   suppressUserStackCollapseTimer = setTimeout(() => {
     suppressUserStackCollapse = false

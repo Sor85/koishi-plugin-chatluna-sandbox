@@ -1,6 +1,7 @@
 import type { SandboxSnapshot } from '../src/types'
 
 export type SandboxWorkspaceView = 'messages' | 'contacts' | 'profile'
+export type SandboxDetailsPreference = 'auto' | 'open' | 'closed'
 
 export interface SandboxWorkspacePreferences {
   currentUserId?: string
@@ -18,6 +19,20 @@ const DEFAULT_PREFERENCES: SandboxWorkspacePreferences = {
   currentView: 'messages',
 }
 const WORKSPACE_VIEWS = new Set<SandboxWorkspaceView>(['messages', 'contacts', 'profile'])
+
+export function resolveDetailsVisibility(preference: SandboxDetailsPreference, wideLayout: boolean) {
+  if (preference === 'open') return true
+  if (preference === 'closed') return false
+  return wideLayout
+}
+
+export function toggleDetailsPreference(visible: boolean): SandboxDetailsPreference {
+  return visible ? 'closed' : 'open'
+}
+
+export function resolveDetailsPreferenceAfterLayoutChange(wideLayout: boolean): SandboxDetailsPreference {
+  return wideLayout ? 'open' : 'closed'
+}
 
 export function loadWorkspacePreferences(storage: Pick<WorkspaceStorage, 'getItem'>): SandboxWorkspacePreferences {
   try {

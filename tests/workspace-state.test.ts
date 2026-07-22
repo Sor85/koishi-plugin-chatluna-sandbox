@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest'
 import type { SandboxSnapshot } from '../src/types'
 import {
   loadWorkspacePreferences,
+  resolveDetailsPreferenceAfterLayoutChange,
+  resolveDetailsVisibility,
   resolveWorkspaceSelection,
   saveWorkspacePreferences,
+  toggleDetailsPreference,
 } from '../client/workspace-state'
 
 const snapshot: SandboxSnapshot = {
@@ -29,6 +32,20 @@ const snapshot: SandboxSnapshot = {
 }
 
 describe('WebQQ 浏览器工作台状态', () => {
+  it('右侧栏默认跟随宽度并允许三点按钮显式切换', () => {
+    expect(resolveDetailsVisibility('auto', true)).toBe(true)
+    expect(resolveDetailsVisibility('auto', false)).toBe(false)
+    expect(resolveDetailsVisibility('closed', true)).toBe(false)
+    expect(resolveDetailsVisibility('open', false)).toBe(true)
+    expect(toggleDetailsPreference(true)).toBe('closed')
+    expect(toggleDetailsPreference(false)).toBe('open')
+  })
+
+  it('浏览器跨越响应式断点时同步右侧栏状态', () => {
+    expect(resolveDetailsPreferenceAfterLayoutChange(false)).toBe('closed')
+    expect(resolveDetailsPreferenceAfterLayoutChange(true)).toBe('open')
+  })
+
   it('只在浏览器存储中保存当前用户、活动会话和当前视图', () => {
     const values = new Map<string, string>()
     const storage = {
