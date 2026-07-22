@@ -238,10 +238,11 @@ export class SandboxControlService {
     this.scene.bots.push({
       id,
       name,
+      avatar: input.avatar?.trim() || undefined,
       implementation: input.implementation,
       enabled: input.enabled,
     })
-    this.createRuntimeBot({ selfId: id, name })
+    this.createRuntimeBot({ selfId: id, name, avatar: input.avatar?.trim() || undefined })
     for (const user of this.scene.users) {
       this.addFriendship(user.id, id)
     }
@@ -252,14 +253,26 @@ export class SandboxControlService {
     const bot = this.scene.bots.find(({ id }) => id === input.id)
     if (!bot) throw new Error(`机器人不存在：${input.id}`)
     bot.name = this.validateName(input.name, '机器人昵称')
+    if (input.avatar !== undefined) bot.avatar = input.avatar.trim() || undefined
     bot.implementation = input.implementation
     bot.enabled = input.enabled
     const runtime = this.runtimeBots.get(bot.id)
     if (runtime) {
-      runtime.user = { id: bot.id, name: bot.name }
+      runtime.user = { id: bot.id, name: bot.name, avatar: bot.avatar }
       runtime.status = bot.enabled ? Universal.Status.ONLINE : Universal.Status.OFFLINE
     }
     this.scene.revision += 1
+  }
+
+  updateBotSelfProfile(botId: string, input: { name?: string; avatar?: string }) {
+    const bot = this.scene.bots.find(({ id }) => id === botId)
+    if (!bot) throw new Error(`机器人不存在：${botId}`)
+    if (input.name !== undefined) bot.name = this.validateName(input.name, '机器人昵称')
+    if (input.avatar !== undefined) bot.avatar = input.avatar.trim() || undefined
+    const runtime = this.getRuntimeBot(botId)
+    runtime.user = { id: bot.id, name: bot.name, avatar: bot.avatar }
+    this.scene.revision += 1
+    return { status: 'ok', retcode: 0, data: null }
   }
 
   deleteBot(input: DeleteSandboxBotInput): void {
@@ -567,6 +580,73 @@ export class SandboxControlService {
     return { status: 'ok', retcode: 0, data: null }
   }
 
+  deleteBotFriend(botId: string, userId: string): void {
+    const friendship = this.getFriendship(botId, userId)
+    if (!friendship) throw new Error('好友关系不存在')
+    this.scene.friendships = this.scene.friendships.filter(({ id }) => id !== friendship.id)
+    this.deleteConversations(({ type, userId: conversationUserId, botId: conversationBotId }) => type === 'direct'
+      && conversationUserId === userId && conversationBotId === botId)
+    this.scene.revision += 1
+  }
+
+  async performBotGroupAction(botId: string, input:
+  | { action: 'kick'; groupId: string; targetId: string }
+  | { action: 'set-admin'; groupId: string; targetId: string; enabled: boolean }
+  | { action: 'set-card'; groupId: string; targetId: string; card: string }
+  | { action: 'set-name'; groupId: string; name: string }) {
+    const group = this.scene.groups.find(({ id }) => id === input.groupId)
+    if (!group) throw new Error(`群组不存在：${input.groupId}`)
+    const actor = this.requireGroupMember(group, botId)
+
+    if (input.action === 'set-name') {
+      if (actor.role === 'member') throw new Error('只有群主或管理员可以修改群名称')
+      const previousName = group.name
+      group.name = this.validateName(input.name, '群名称')
+      this.scene.revision += 1
+      await this.dispatchGroupNotice(group, 'group_name', {
+        user_id: Number(botId),
+        name_old: previousName,
+        name_new: group.name,
+      })
+      return { status: 'ok', retcode: 0, data: null }
+    }
+
+    const target = this.requireGroupMember(group, input.targetId)
+    if (input.action === 'kick') {
+      this.assertCanManageMember(actor, target, '踢出成员')
+      await this.dispatchGroupNotice(group, 'group_decrease', (receiverBotId) => ({
+        sub_type: receiverBotId === target.participantId ? 'kick_me' : 'kick',
+        operator_id: Number(botId),
+        user_id: Number(target.participantId),
+      }))
+      this.removeGroupMember(group, target.participantId)
+      return { status: 'ok', retcode: 0, data: null }
+    }
+
+    if (input.action === 'set-admin') {
+      if (actor.role !== 'owner') throw new Error('只有群主可以设置管理员')
+      if (target.role === 'owner') throw new Error('不能修改群主权限')
+      target.role = input.enabled ? 'admin' : 'member'
+      this.scene.revision += 1
+      await this.dispatchGroupNotice(group, 'group_admin', {
+        sub_type: input.enabled ? 'set' : 'unset',
+        user_id: Number(target.participantId),
+      })
+      return { status: 'ok', retcode: 0, data: null }
+    }
+
+    if (target.participantId !== botId) this.assertCanManageMember(actor, target, '修改群名片')
+    const previousCard = target.card ?? ''
+    target.card = input.card.trim() || undefined
+    this.scene.revision += 1
+    await this.dispatchGroupNotice(group, 'group_card', {
+      user_id: Number(target.participantId),
+      card_old: previousCard,
+      card_new: target.card ?? '',
+    })
+    return { status: 'ok', retcode: 0, data: null }
+  }
+
   async sendMessage(input: SendMessageInput): Promise<SendMessageResult> {
     if (!input.content.trim()) throw new Error('消息内容不能为空')
     const context = this.getMessageContext(input)
@@ -723,6 +803,30 @@ export class SandboxControlService {
     return this.appendMessage(conversation.botId, conversation.id, content)
   }
 
+  recordBotGroupMessage(botId: string, groupId: string, content: string): SandboxMessage[] {
+    const conversations = this.scene.conversations.filter(({ botId: conversationBotId, groupId: conversationGroupId }) => conversationBotId === botId
+      && conversationGroupId === groupId)
+    if (!conversations.length) throw new Error(`群聊会话不存在：${groupId}`)
+    const broadcastId = Random.id()
+    return conversations.map(({ id }) => this.appendMessage(botId, id, content, undefined, undefined, undefined, broadcastId))
+  }
+
+  deleteBotMessage(botId: string, messageId: string, conversationId?: string): void {
+    const index = this.scene.messages.findIndex(({ id, botId: messageBotId, conversationId: messageConversationId }) => id === messageId
+      && messageBotId === botId && (!conversationId || messageConversationId === conversationId))
+    if (index < 0) throw new Error(`消息不存在：${messageId}`)
+    const target = this.scene.messages[index]
+    const removed = this.scene.messages.filter(({ id, broadcastId }) => id === target.id
+      || (!!target.broadcastId && broadcastId === target.broadcastId))
+    const removedIds = new Set(removed.map(({ id }) => id))
+    this.scene.messages = this.scene.messages.filter(({ id }) => !removedIds.has(id))
+    for (const conversation of this.scene.conversations) {
+      conversation.messageIds = conversation.messageIds.filter((id) => !removedIds.has(id))
+    }
+    for (const media of removed.flatMap(({ media }) => media ?? [])) this.mediaStorage.remove(media)
+    this.scene.revision += 1
+  }
+
   private appendMessage(
     authorId: string,
     conversationId: string,
@@ -730,6 +834,7 @@ export class SandboxControlService {
     replyToMessageId?: string,
     media?: SandboxMedia[],
     event?: SandboxMessage['event'],
+    broadcastId?: string,
   ): SandboxMessage {
     const conversation = this.scene.conversations.find(({ id }) => id === conversationId)
     if (!conversation) throw new Error(`会话不存在：${conversationId}`)
@@ -742,6 +847,7 @@ export class SandboxControlService {
       content,
       createdAt: new Date().toISOString(),
       replyToMessageId,
+      broadcastId,
       media,
       event,
     }
@@ -1029,10 +1135,33 @@ export class SandboxControlService {
     const botIds = group.members.flatMap(({ participantId }) => this.isBot(participantId) ? [participantId] : [])
     await Promise.all(botIds.map(async (botId) => {
       const bot = this.getRuntimeBot(botId)
+      const noticeData = typeof data === 'function' ? data(botId) : data
+      const userId = noticeData.user_id === undefined ? undefined : String(noticeData.user_id)
+      const operatorId = noticeData.operator_id === undefined ? undefined : String(noticeData.operator_id)
+      const user = userId ? this.getParticipant(userId) : undefined
+      const operator = operatorId ? this.getParticipant(operatorId) : undefined
+      const member = userId ? group.members.find(({ participantId }) => participantId === userId) : undefined
+      const standardType = noticeType === 'group_increase'
+        ? (userId === botId ? 'guild-added' : 'guild-member-added')
+        : noticeType === 'group_decrease'
+          ? (userId === botId ? 'guild-removed' : 'guild-member-removed')
+          : noticeType === 'group_name'
+            ? 'guild-updated'
+            : noticeType === 'group_admin' || noticeType === 'group_card'
+              ? 'guild-member-updated'
+              : 'notice'
       const session = bot.session({
-        type: 'notice',
+        type: standardType,
         timestamp: Date.now(),
         guild: { id: group.id, name: group.name },
+        user: user ? { id: user.id, name: user.name, avatar: user.avatar, isBot: this.isBot(user.id) } : undefined,
+        operator: operator ? { id: operator.id, name: operator.name, avatar: operator.avatar, isBot: this.isBot(operator.id) } : undefined,
+        member: member && user ? {
+          user: { id: user.id, name: user.name, avatar: user.avatar, isBot: this.isBot(user.id) },
+          name: user.name,
+          nick: member.card ?? user.name,
+          roles: [{ id: member.role }],
+        } : undefined,
       })
       Object.assign(session, {
         onebot: {
@@ -1041,10 +1170,15 @@ export class SandboxControlService {
           post_type: 'notice',
           notice_type: noticeType,
           group_id: Number(group.id),
-          ...(typeof data === 'function' ? data(botId) : data),
+          ...noticeData,
         },
       })
       await bot.dispatch(session)
+      if (standardType !== 'notice') {
+        // OneBot 插件仍会监听原始 notice；标准事件和原始事件必须复用同一个 Session，
+        // 避免重复派发 internal/session 导致调试记录和等待器各收到两次。
+        ;(this.ctx.emit as unknown as (session: unknown, name: string, payload: unknown) => void)(session, 'notice', session)
+      }
     }))
   }
 

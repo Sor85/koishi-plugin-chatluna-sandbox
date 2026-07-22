@@ -153,7 +153,10 @@
                   :class="{ 'is-active': entry.conversationId === activeConversationId }"
                   @click="entry.conversationId && selectConversation(entry.conversationId)"
                 >
-                  <span class="webqq-avatar webqq-avatar-bot">{{ getInitial(entry.displayName) }}</span>
+                  <span class="webqq-avatar webqq-avatar-bot">
+                    <img v-if="entry.avatar" :src="entry.avatar" :alt="entry.displayName">
+                    <template v-else>{{ getInitial(entry.displayName) }}</template>
+                  </span>
                   <span class="webqq-session-copy">
                     <strong>{{ entry.displayName }}</strong>
                     <small>{{ entry.status }}</small>
@@ -201,7 +204,10 @@
                   :class="{ 'is-active': conversation.id === activeConversationId }"
                   @click="selectConversation(conversation.id)"
                 >
-                  <span class="webqq-avatar webqq-avatar-bot">{{ getInitial(getConversationTitle(conversation)) }}</span>
+                  <span class="webqq-avatar webqq-avatar-bot">
+                    <img v-if="getConversationAvatar(conversation)" :src="getConversationAvatar(conversation)" :alt="getConversationTitle(conversation)">
+                    <template v-else>{{ getInitial(getConversationTitle(conversation)) }}</template>
+                  </span>
                   <span class="webqq-session-copy">
                     <strong>{{ getConversationTitle(conversation) }}</strong>
                     <small>{{ getConversationPreview(conversation.id) }}</small>
@@ -254,7 +260,10 @@
           <template v-else>
           <header class="webqq-chat-header">
             <div class="webqq-chat-title">
-              <span class="webqq-avatar webqq-avatar-bot">{{ getInitial(currentConversationTitle) }}</span>
+              <span class="webqq-avatar webqq-avatar-bot">
+                <img v-if="currentBot?.avatar && !currentGroup" :src="currentBot.avatar" :alt="currentConversationTitle">
+                <template v-else>{{ getInitial(currentConversationTitle) }}</template>
+              </span>
               <div>
                 <strong>{{ currentConversationTitle }}</strong>
                 <span>{{ currentConversationSubtitle }}</span>
@@ -308,7 +317,8 @@
                           @contextmenu.stop
                         >
                           <span class="webqq-message-avatar">
-                            {{ getInitial(getParticipantName(message.authorId)) }}
+                            <img v-if="getParticipantAvatar(message.authorId)" :src="getParticipantAvatar(message.authorId)" :alt="getParticipantName(message.authorId)">
+                            <template v-else>{{ getInitial(getParticipantName(message.authorId)) }}</template>
                           </span>
                         </button>
                       </ContextMenuTrigger>
@@ -357,7 +367,8 @@
                     </ContextMenu>
                     <span v-else class="webqq-message-avatar-wrap">
                       <span class="webqq-message-avatar">
-                        {{ getInitial(getParticipantName(message.authorId)) }}
+                        <img v-if="getParticipantAvatar(message.authorId)" :src="getParticipantAvatar(message.authorId)" :alt="getParticipantName(message.authorId)">
+                        <template v-else>{{ getInitial(getParticipantName(message.authorId)) }}</template>
                       </span>
                     </span>
                     <div class="webqq-message-content">
@@ -649,7 +660,10 @@
                 <ContextMenu v-for="member in visibleGroupMembers" :key="member.participantId">
                   <ContextMenuTrigger as-child>
                     <article class="webqq-group-member">
-                      <span class="webqq-menu-avatar">{{ getInitial(getGroupMemberName(member)) }}</span>
+                      <span class="webqq-menu-avatar">
+                        <img v-if="getParticipantAvatar(member.participantId)" :src="getParticipantAvatar(member.participantId)" :alt="getGroupMemberName(member)">
+                        <template v-else>{{ getInitial(getGroupMemberName(member)) }}</template>
+                      </span>
                       <span>
                         <strong>{{ getGroupMemberName(member) }}</strong>
                         <small>{{ member.participantId }}</small>
@@ -673,7 +687,10 @@
 
           <div v-else v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-private-info">
             <div class="webqq-profile-hero">
-              <span class="webqq-avatar webqq-avatar-profile webqq-avatar-bot">{{ getInitial(currentBot?.name) }}</span>
+              <span class="webqq-avatar webqq-avatar-profile webqq-avatar-bot">
+                <img v-if="currentBot?.avatar" :src="currentBot.avatar" :alt="currentBot.name">
+                <template v-else>{{ getInitial(currentBot?.name) }}</template>
+              </span>
               <h2>{{ currentBot?.name ?? 'Koishi' }}</h2>
               <p>{{ currentBot?.id ?? '未选择机器人' }}</p>
               <span class="webqq-online"><i /> 在线</span>
@@ -974,6 +991,7 @@ const friendDirectory = computed(() => {
         pendingOutgoing,
         pendingIncoming,
         conversationId,
+        avatar: participant.avatar,
         displayName: friendship?.remarks[actorUserId] || participant.name,
         status: friendship
           ? `${participant.name} · ${isBot ? '机器人好友' : '好友'}`
@@ -1421,10 +1439,19 @@ function getConversationTitle(conversation: SandboxConversation) {
     ?? conversation.id
 }
 
+function getConversationAvatar(conversation: SandboxConversation) {
+  return conversation.groupId ? undefined : getBot(conversation.botId)?.avatar
+}
+
 function getParticipantName(id: string) {
   return snapshot.value.users.find((user) => user.id === id)?.name
     ?? snapshot.value.bots.find((bot) => bot.id === id)?.name
     ?? id
+}
+
+function getParticipantAvatar(id: string) {
+  return snapshot.value.users.find((user) => user.id === id)?.avatar
+    ?? snapshot.value.bots.find((bot) => bot.id === id)?.avatar
 }
 
 function getInitial(name?: string) {

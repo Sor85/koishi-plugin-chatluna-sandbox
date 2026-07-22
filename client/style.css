@@ -223,6 +223,15 @@ body,
   user-select: none;
 }
 
+.webqq-menu-avatar img,
+.webqq-avatar img,
+.webqq-message-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
 .webqq-rail-button,
 .webqq-icon-button {
   display: inline-flex;

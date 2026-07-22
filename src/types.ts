@@ -1,6 +1,7 @@
 export interface SandboxUser {
   id: string
   name: string
+  avatar?: string
 }
 
 export interface CreateSandboxUserInput extends SandboxUser {}
@@ -16,6 +17,7 @@ export type SandboxImplementationProfile = 'napcat' | 'llbot'
 export interface SandboxBotProfile {
   id: string
   name: string
+  avatar?: string
   implementation: SandboxImplementationProfile
   enabled: boolean
 }
@@ -92,6 +94,7 @@ export interface SandboxMessage {
   content: string
   createdAt: string
   replyToMessageId?: string
+  broadcastId?: string
   media?: SandboxMedia[]
   event?: {
     type: 'poke'
