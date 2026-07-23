@@ -15,4 +15,16 @@ describe('环境管理组件传输边界', () => {
       expect(source).toContain('submit: [')
     }
   })
+
+  it('跨区域 Dialog 由窄输入 OverlayHost 统一渲染', () => {
+    const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
+    const overlaySource = readFileSync(resolve('client/workspace-overlay-host.vue'), 'utf8')
+
+    expect(pageSource).toContain('<WorkspaceOverlayHost')
+    expect(pageSource).not.toContain('<Dialog')
+    expect(overlaySource).not.toContain('SandboxSnapshot')
+    expect(overlaySource).not.toContain('snapshot')
+    expect(overlaySource).toContain('<EnvironmentEntityDialog')
+    expect(overlaySource.match(/<Dialog /g)).toHaveLength(2)
+  })
 })

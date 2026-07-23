@@ -1,0 +1,22 @@
+{
+  "verifiedAt": "2026-07-23",
+  "route": "http://127.0.0.1:5140/onebot-sandbox",
+  "responsive": {
+    "700px": {
+      "workspaceClass": "is-details-closed",
+      "detailsDisplay": "none"
+    },
+    "1400px": {
+      "workspaceClass": "is-details-open",
+      "detailsDisplay": "flex"
+    }
+  },
+  "dialog": {
+    "title": "设置好友备注",
+    "openedFromOriginalContextMenu": true,
+    "inputBorderColor": "rgb(37, 99, 235)",
+    "inputTextColor": "rgb(15, 23, 42)",
+    "blackCurrentColorFallback": false
+  },
+  "consoleFailures": []
+}

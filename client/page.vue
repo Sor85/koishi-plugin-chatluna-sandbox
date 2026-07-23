@@ -762,48 +762,16 @@
             </dl>
           </div>
         </aside>
-        <EnvironmentEntityDialog
-          v-model:open="entityDialogOpen"
-          :mode="entityDialogMode"
-          :target="entityDialogTarget"
-          :snapshot="snapshot"
+        <WorkspaceOverlayHost
+          ref="overlayHostRef"
+          :users="snapshot.users"
+          :bots="snapshot.bots"
+          :groups="snapshot.groups"
           :accent-color="workspace.appearance.webQQAccentColor"
-          @submit="manageEnvironment"
+          @manage-environment="manageEnvironment"
+          @save-remark="saveFriendRemark"
+          @save-group-action="saveGroupAction"
         />
-        <Dialog v-model:open="remarkDialogOpen">
-          <DialogContent :style="{ '--webqq-accent': workspace.appearance.webQQAccentColor }">
-            <DialogTitle>设置好友备注</DialogTitle>
-            <DialogDescription>备注只对当前测试用户生效，不会修改对方资料昵称。</DialogDescription>
-            <Input
-              v-model="remarkInput"
-              class="border-slate-200 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700"
-              placeholder="留空可删除备注"
-              @keydown.enter="saveFriendRemark"
-            />
-            <div class="webqq-dialog-actions">
-              <Button variant="outline" class="border-slate-200 bg-white hover:bg-slate-100 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800" @click="remarkDialogOpen = false">取消</Button>
-              <Button class="bg-[var(--webqq-accent)] text-white hover:opacity-90" @click="saveFriendRemark">保存</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-        <Dialog v-model:open="groupActionDialogOpen">
-          <DialogContent :style="{ '--webqq-accent': workspace.appearance.webQQAccentColor }">
-            <DialogTitle>{{ groupActionDialogMode === 'name' ? '修改群名称' : '修改群名片' }}</DialogTitle>
-            <DialogDescription>
-              {{ groupActionDialogMode === 'name' ? '新的群名称会对所有群成员和机器人可见。' : '留空可以清除当前群名片。' }}
-            </DialogDescription>
-            <Input
-              v-model="groupActionInput"
-              class="border-slate-200 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700"
-              :placeholder="groupActionDialogMode === 'name' ? '输入群名称' : '输入群名片'"
-              @keydown.enter="saveGroupAction"
-            />
-            <div class="webqq-dialog-actions">
-              <Button variant="outline" class="border-slate-200 bg-white hover:bg-slate-100 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800" @click="groupActionDialogOpen = false">取消</Button>
-              <Button class="bg-[var(--webqq-accent)] text-white hover:opacity-90" @click="saveGroupAction">保存</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
     </k-content>
   </k-layout>
@@ -835,31 +803,22 @@ import {
   IconUserCircle,
   IconUsers,
 } from '@tabler/icons-vue'
-import { useMediaQuery } from '@vueuse/core'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Button } from './components/ui/button'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from './components/ui/context-menu'
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from './components/ui/dialog'
-import { Input } from './components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip'
 import EnvironmentCreatePopover from './environment-create-popover.vue'
-import EnvironmentEntityDialog from './environment-entity-dialog.vue'
 import EnvironmentManager from './environment-manager.vue'
 import { getFriendMenuActions, type FriendMenuState } from './friend-menu'
 import GroupMemberMenu from './group-member-menu.vue'
 import NotificationMenu from './notification-menu.vue'
+import WorkspaceOverlayHost from './workspace-overlay-host.vue'
 import { getIncomingNotificationRequests } from './notification-requests'
 import { getFriendDirectory, getGroupDirectory } from './relationship-directory'
-import {
-  resolveDetailsPreferenceAfterLayoutChange,
-  resolveDetailsVisibility,
-  toggleDetailsPreference,
-  type SandboxDetailsPreference,
-  type SandboxWorkspaceView,
-} from './workspace-state'
+import { type SandboxWorkspaceView } from './workspace-state'
 import { koishiWorkspacePort } from './webqq/koishi-workspace-port'
 import { createWorkspaceController } from './webqq/workspace-controller'
+import { createWorkspaceLayout } from './webqq/workspace-layout'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import { getMessageClusterClass, isMergedMessage } from './message-cluster'
 import {
@@ -900,31 +859,20 @@ const announcementSending = ref(false)
 const announcementEditorOpen = ref(false)
 const deletingAnnouncementId = ref('')
 const groupMemberSearch = ref('')
-const detailsPreference = ref<SandboxDetailsPreference>('auto')
-const wideDetailsLayout = useMediaQuery('(min-width: 1181px)')
-const detailsVisible = computed(() => resolveDetailsVisibility(detailsPreference.value, wideDetailsLayout.value))
+const workspaceLayout = createWorkspaceLayout()
+const detailsVisible = workspaceLayout.detailsVisible
 const composerLayoutRef = ref<HTMLElement>()
 const userStackLayoutRef = ref<HTMLElement>()
 const userStackExpanded = ref(false)
 const userStackHovered = ref(false)
 const userStackFocused = ref(false)
 const createParticipantOpen = ref(false)
-const remarkDialogOpen = ref(false)
-const remarkTargetId = ref('')
-const remarkInput = ref('')
-const groupActionDialogOpen = ref(false)
-const groupActionDialogMode = ref<'card' | 'name'>('card')
-const groupActionTargetId = ref('')
-const groupActionGroupId = ref('')
-const groupActionInput = ref('')
+const overlayHostRef = ref<InstanceType<typeof WorkspaceOverlayHost>>()
 const notificationTab = ref<'friends' | 'groups'>('friends')
 const handlingRequestId = ref('')
 const notificationErrorMessage = ref('')
 type EnvironmentEntityType = 'user' | 'bot' | 'group'
 type EnvironmentDialogMode = 'edit' | 'delete'
-const entityDialogOpen = ref(false)
-const entityDialogMode = ref<EnvironmentDialogMode>('edit')
-const entityDialogTarget = ref<{ type: EnvironmentEntityType, id: string }>()
 type UserStackOverflowMotion = 'idle' | 'expanding' | 'collapsing'
 const userStackOverflowMotion = ref<UserStackOverflowMotion>('idle')
 let suppressUserStackCollapse = false
@@ -1096,18 +1044,13 @@ onMounted(async () => {
 })
 
 watch(activeConversationId, () => {
-  detailsPreference.value = 'auto'
+  workspaceLayout.resetDetails()
   groupMemberSearch.value = ''
   announcementInput.value = ''
   announcementEditorOpen.value = false
   deletingAnnouncementId.value = ''
   infoErrorMessage.value = ''
   replyingToMessageId.value = ''
-})
-
-watch(wideDetailsLayout, (wideLayout) => {
-  // 断点切换必须覆盖旧的显式状态：窄屏关闭避免遮挡聊天区，恢复宽屏时重新展示信息栏。
-  detailsPreference.value = resolveDetailsPreferenceAfterLayoutChange(wideLayout)
 })
 
 watch(
@@ -1216,24 +1159,29 @@ function leaveGroup(groupId: string) {
 }
 
 function openGroupActionDialog(mode: 'card' | 'name', targetId = '', groupId = currentGroup.value?.id ?? '') {
-  groupActionDialogMode.value = mode
-  groupActionTargetId.value = targetId
-  groupActionGroupId.value = groupId
-  groupActionInput.value = mode === 'name'
+  const value = mode === 'name'
     ? snapshot.value.groups.find(({ id }) => id === groupId)?.name ?? ''
     : getCurrentGroupMember(targetId)?.card ?? ''
-  groupActionDialogOpen.value = true
+  overlayHostRef.value?.openGroupAction(mode, targetId, groupId, value)
 }
 
-async function saveGroupAction() {
-  const groupId = groupActionGroupId.value
-  if (!groupId) return
-  if (groupActionDialogMode.value === 'name') {
-    await performGroupAction({ action: 'set-name', groupId, name: groupActionInput.value })
-  } else if (groupActionTargetId.value) {
-    await performGroupAction({ action: 'set-card', groupId, targetId: groupActionTargetId.value, card: groupActionInput.value })
+async function saveGroupAction(
+  input: { mode: 'card' | 'name', targetId: string, groupId: string, value: string },
+  resolve: () => void,
+  reject: (error: unknown) => void,
+) {
+  errorMessage.value = ''
+  try {
+    if (input.mode === 'name') {
+      await workspaceController.performGroupAction({ action: 'set-name', groupId: input.groupId, name: input.value })
+    } else if (input.targetId) {
+      await workspaceController.performGroupAction({ action: 'set-card', groupId: input.groupId, targetId: input.targetId, card: input.value })
+    }
+    resolve()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '群组操作失败'
+    reject(error)
   }
-  if (!errorMessage.value) groupActionDialogOpen.value = false
 }
 
 function pokeFriend(targetId: string) {
@@ -1249,21 +1197,26 @@ function deleteFriend(targetId: string) {
 function openRemarkDialog(targetId: string) {
   const operatorId = currentOperatorId.value ?? ''
   const friendship = snapshot.value.friendships.find(({ participantIds }) => participantIds.includes(operatorId) && participantIds.includes(targetId))
-  remarkTargetId.value = targetId
-  remarkInput.value = friendship?.remarks[operatorId] ?? ''
-  remarkDialogOpen.value = true
+  overlayHostRef.value?.openRemark(targetId, friendship?.remarks[operatorId] ?? '')
 }
 
-async function saveFriendRemark() {
-  if (!remarkTargetId.value) return
-  await performFriendAction({ action: 'set-remark', targetId: remarkTargetId.value, remark: remarkInput.value })
-  if (!errorMessage.value) remarkDialogOpen.value = false
+async function saveFriendRemark(
+  input: { targetId: string, remark: string },
+  resolve: () => void,
+  reject: (error: unknown) => void,
+) {
+  errorMessage.value = ''
+  try {
+    await workspaceController.performFriendAction({ action: 'set-remark', ...input })
+    resolve()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '好友操作失败'
+    reject(error)
+  }
 }
 
 function openEntityDialog(mode: EnvironmentDialogMode, target: { type: EnvironmentEntityType, id: string }) {
-  entityDialogMode.value = mode
-  entityDialogTarget.value = target
-  entityDialogOpen.value = true
+  overlayHostRef.value?.openEntity(mode, target)
 }
 
 function getConversationEntityTarget(conversation: SandboxConversation): { type: 'bot' | 'group', id: string } {
@@ -1287,11 +1240,11 @@ function selectNavigation(view: SandboxWorkspaceView) {
 }
 
 function toggleDetails() {
-  detailsPreference.value = toggleDetailsPreference(detailsVisible.value)
+  workspaceLayout.toggleDetails()
 }
 
 function closeDetails() {
-  detailsPreference.value = 'closed'
+  workspaceLayout.closeDetails()
 }
 
 function selectSidebarTab(tab: SidebarTab) {
@@ -1410,7 +1363,7 @@ async function selectComposerUser(sender: ComposerSender) {
   const layout = recordUserStackLayout()
   await workspaceController.selectOperator(sender.id)
   input.value = ''
-  detailsPreference.value = 'auto'
+  workspaceLayout.resetDetails()
   await animateUserStackLayout(layout)
   suppressUserStackCollapseTimer = setTimeout(() => {
     suppressUserStackCollapse = false

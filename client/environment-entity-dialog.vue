@@ -132,9 +132,11 @@ import { Label } from './components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
 import type {
   ManageSandboxEnvironmentInput,
+  SandboxBotProfile,
+  SandboxGroup,
   SandboxGroupMember,
   SandboxImplementationProfile,
-  SandboxSnapshot,
+  SandboxUser,
 } from '../src/types'
 
 type EntityType = 'user' | 'bot' | 'group'
@@ -144,7 +146,9 @@ const props = defineProps<{
   open: boolean
   mode: DialogMode
   target?: { type: EntityType, id: string }
-  snapshot: SandboxSnapshot
+  users: SandboxUser[]
+  bots: SandboxBotProfile[]
+  groups: SandboxGroup[]
   accentColor: string
 }>()
 const emit = defineEmits<{
@@ -164,14 +168,14 @@ const draft = reactive<{
 }>({ id: '', name: '', implementation: 'napcat', enabled: true, members: [] })
 
 const entity = computed(() => {
-  if (props.target?.type === 'user') return props.snapshot.users.find(({ id }) => id === props.target?.id)
-  if (props.target?.type === 'bot') return props.snapshot.bots.find(({ id }) => id === props.target?.id)
-  if (props.target?.type === 'group') return props.snapshot.groups.find(({ id }) => id === props.target?.id)
+  if (props.target?.type === 'user') return props.users.find(({ id }) => id === props.target?.id)
+  if (props.target?.type === 'bot') return props.bots.find(({ id }) => id === props.target?.id)
+  if (props.target?.type === 'group') return props.groups.find(({ id }) => id === props.target?.id)
   return undefined
 })
 const participants = computed(() => [
-  ...props.snapshot.users.map((user) => ({ ...user, type: 'user' as const })),
-  ...props.snapshot.bots.map((bot) => ({ ...bot, type: 'bot' as const })),
+  ...props.users.map((user) => ({ ...user, type: 'user' as const })),
+  ...props.bots.map((bot) => ({ ...bot, type: 'bot' as const })),
 ])
 const entityLabel = computed(() => props.target?.type === 'user' ? '用户' : props.target?.type === 'bot' ? '机器人' : '群组')
 const dialogTitle = computed(() => `${props.mode === 'edit' ? '编辑' : '删除'}${entityLabel.value}`)
@@ -188,15 +192,15 @@ watch([() => props.open, () => props.target], ([open]) => {
   if (!open) return
   errorMessage.value = ''
   if (props.target?.type === 'user') {
-    const value = props.snapshot.users.find(({ id }) => id === props.target?.id)
+    const value = props.users.find(({ id }) => id === props.target?.id)
     if (!value) return
     Object.assign(draft, { id: value.id, name: value.name, implementation: 'napcat', enabled: true, members: [] })
   } else if (props.target?.type === 'bot') {
-    const value = props.snapshot.bots.find(({ id }) => id === props.target?.id)
+    const value = props.bots.find(({ id }) => id === props.target?.id)
     if (!value) return
     Object.assign(draft, { ...value, members: [] })
   } else if (props.target?.type === 'group') {
-    const value = props.snapshot.groups.find(({ id }) => id === props.target?.id)
+    const value = props.groups.find(({ id }) => id === props.target?.id)
     if (!value) return
     Object.assign(draft, { id: value.id, name: value.name, implementation: 'napcat', enabled: true, members: value.members.map((member) => ({ ...member })) })
   }
@@ -245,7 +249,7 @@ function removeGroupMember(index: number) {
 }
 
 function isBotParticipant(participantId: string) {
-  return props.snapshot.bots.some(({ id }) => id === participantId)
+  return props.bots.some(({ id }) => id === participantId)
 }
 
 function normalizeMemberRole(member: SandboxGroupMember) {
