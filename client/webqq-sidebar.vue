@@ -97,7 +97,7 @@
                 <button
                   type="button"
                   class="webqq-session"
-                  :class="{ 'is-active': group.conversationId === activeConversationId }"
+                  :class="{ 'is-active': group.conversationId && group.conversationId === activeConversationId }"
                   @click="group.conversationId && selectConversation(group.conversationId)"
                 >
                   <WebqqAvatar class="webqq-avatar webqq-avatar-bot" kind="group" :name="group.name" />
@@ -159,7 +159,7 @@
                 <button
                   type="button"
                   class="webqq-session"
-                  :class="{ 'is-active': entry.conversationId === activeConversationId }"
+                  :class="{ 'is-active': entry.conversationId && entry.conversationId === activeConversationId }"
                   @click="entry.conversationId && selectConversation(entry.conversationId)"
                 >
                   <WebqqAvatar
@@ -302,8 +302,8 @@ export interface WebqqSidebarConversation {
   preview: string
   time: string
   actorRole?: SandboxGroupMember['role']
-  entityTarget: { type: 'bot' | 'group', id: string }
-  entityLabel: '机器人' | '群组'
+  entityTarget: { type: 'user' | 'bot' | 'group', id: string }
+  entityLabel: '用户' | '机器人' | '群组'
 }
 
 export interface WebqqSidebarFriend {

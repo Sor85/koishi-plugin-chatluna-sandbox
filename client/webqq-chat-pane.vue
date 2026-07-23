@@ -53,7 +53,7 @@ export interface WebqqChatPaneModel {
   title: string
   subtitle: string
   avatar: string
-  avatarKind: 'bot' | 'group'
+  avatarKind: 'user' | 'bot' | 'group'
   detailsVisible: boolean
   participantNames: Record<string, string>
   messageList: WebqqMessageListModel

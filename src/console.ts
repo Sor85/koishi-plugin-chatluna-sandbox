@@ -52,11 +52,13 @@ export function registerConsole(
 
   const getWorkspace = (actorUserId?: string, messageLimit?: number): SandboxWorkspaceState => {
     const snapshot = control.getSnapshot()
-    const visibleUserId = snapshot.users.some(({ id }) => id === actorUserId)
+    // actorUserId 是历史 RPC 字段名，但统一当前操作者后也会承载机器人 ID；
+    // 只按用户校验会把机器人命令后的快照静默切到首个用户，继而清空当前会话选择。
+    const visibleParticipantId = [...snapshot.users, ...snapshot.bots].some(({ id }) => id === actorUserId)
       ? actorUserId
       : snapshot.users[0]?.id
     return {
-      snapshot: visibleUserId ? control.getVisibleSnapshot(visibleUserId, messageLimit) : snapshot,
+      snapshot: visibleParticipantId ? control.getVisibleSnapshot(visibleParticipantId, messageLimit) : snapshot,
       appearance,
     }
   }

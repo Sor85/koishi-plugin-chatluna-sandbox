@@ -73,9 +73,9 @@
 
     <div v-else v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-private-info">
       <div class="webqq-profile-hero">
-        <WebqqAvatar class="webqq-avatar webqq-avatar-profile webqq-avatar-bot" kind="bot" :name="model.bot?.name" :avatar="model.bot?.avatar" :show-bot-badge="!!model.bot" />
-        <h2>{{ model.bot?.name ?? 'Koishi' }}</h2>
-        <p>{{ model.bot?.id ?? '未选择机器人' }}</p>
+        <WebqqAvatar class="webqq-avatar webqq-avatar-profile" :kind="model.privateParticipant?.isBot ? 'bot' : 'user'" :name="model.privateParticipant?.name" :avatar="model.privateParticipant?.avatar" :show-bot-badge="model.privateParticipant?.isBot" />
+        <h2>{{ model.privateParticipant?.name ?? '未选择联系人' }}</h2>
+        <p>{{ model.privateParticipant?.id ?? '未选择会话' }}</p>
         <span class="webqq-online"><i /> 在线</span>
       </div>
       <dl class="webqq-profile-details">
@@ -110,6 +110,7 @@ export interface WebqqDetailsPanelModel {
   counts: { users: number, bots: number, groups: number, requests: number }
   group?: SandboxGroup
   bot?: SandboxBotProfile
+  privateParticipant?: { id: string, name: string, avatar?: string, isBot: boolean }
   currentUserName?: string
   currentOperatorId?: string
   participants: Record<string, WebqqDetailsParticipant>

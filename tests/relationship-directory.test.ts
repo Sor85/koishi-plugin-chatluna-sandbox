@@ -16,6 +16,7 @@ const snapshot: SandboxSnapshot = {
     { id: '30003', name: '可申请群', announcements: [], members: [{ participantId: '10003', role: 'owner' }] },
   ],
   conversations: [
+    { id: 'private:10001:10002', type: 'direct', userId: '10001', botId: '10002', messageIds: [] },
     { id: 'private:10001:20001', type: 'direct', userId: '10001', botId: '20001', messageIds: [] },
     { id: 'group:30001:10001:20001', type: 'group', userId: '10001', botId: '20001', groupId: '30001', messageIds: [] },
   ],
@@ -29,7 +30,11 @@ describe('当前操作者关系目录', () => {
     const directory = getFriendDirectory(snapshot, '10001')
 
     expect(directory.map(({ id }) => id)).toEqual(['10002', '10003', '20001'])
-    expect(directory.find(({ id }) => id === '10002')).toMatchObject({ displayName: '搭档', relation: 'added' })
+    expect(directory.find(({ id }) => id === '10002')).toMatchObject({
+      displayName: '搭档',
+      relation: 'added',
+      conversationId: 'private:10001:10002',
+    })
     expect(directory.find(({ id }) => id === '10003')).toMatchObject({ relation: 'missing' })
     expect(directory.find(({ id }) => id === '20001')).toMatchObject({ relation: 'missing', conversationId: 'private:10001:20001' })
   })

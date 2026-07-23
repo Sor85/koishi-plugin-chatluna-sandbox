@@ -63,13 +63,16 @@ export function createWebqqWorkspaceShell(
   const visibleConversations = computed(() => snapshot.value.conversations.filter(({ userId }) => userId === currentUserId.value))
   const currentConversation = computed(() => visibleConversations.value.find(({ id }) => id === activeConversationId.value))
   const currentBot = computed(() => getBot(currentConversation.value?.botId))
+  const currentPeer = computed(() => currentBot.value
+    ?? snapshot.value.users.find(({ id }) => id === currentConversation.value?.botId))
   const currentGroup = computed(() => snapshot.value.groups.find(({ id }) => id === currentConversation.value?.groupId))
   const currentConversationTitle = computed(() => currentConversation.value
     ? getConversationTitle(currentConversation.value)
     : '选择一个会话')
   const currentConversationSubtitle = computed(() => {
     if (currentGroup.value) return `群聊 ${currentGroup.value.id} · ${currentGroup.value.members.length} 人`
-    return currentBot.value ? '在线 · 虚拟 OneBot 机器人' : '暂无会话'
+    if (currentBot.value) return '在线 · 虚拟 OneBot 机器人'
+    return currentPeer.value ? '在线 · 好友' : '暂无会话'
   })
   const messages = computed(() => {
     const ids = new Set(currentConversation.value?.messageIds ?? [])
@@ -105,8 +108,8 @@ export function createWebqqWorkspaceShell(
     currentUserId: currentUserId.value,
     currentOperatorId: currentOperatorId.value,
     title: currentConversationTitle.value,
-    avatar: currentGroup.value ? '' : currentBot.value?.avatar ?? '',
-    avatarKind: currentGroup.value ? 'group' : 'bot',
+    avatar: currentGroup.value ? '' : currentPeer.value?.avatar ?? '',
+    avatarKind: currentGroup.value ? 'group' : currentBot.value ? 'bot' : 'user',
     chatStyle: appearance.value.webQQChatStyle,
     hasMoreMessages: !!currentConversation.value?.hasMoreMessages,
     mediaSources: mediaSources.value,
@@ -117,7 +120,7 @@ export function createWebqqWorkspaceShell(
     currentOperatorId: composerSenderId.value,
     currentUserId: currentUserId.value,
     conversationId: currentConversation.value?.id,
-    botId: currentBot.value?.id,
+    botId: currentPeer.value?.id,
     accentColor: appearance.value.webQQAccentColor,
     externalError: errorMessage.value,
   }))
@@ -129,8 +132,8 @@ export function createWebqqWorkspaceShell(
     conversationId: currentConversation.value?.id,
     title: currentConversationTitle.value,
     subtitle: currentConversationSubtitle.value,
-    avatar: currentGroup.value ? '' : currentBot.value?.avatar ?? '',
-    avatarKind: currentGroup.value ? 'group' : 'bot',
+    avatar: currentGroup.value ? '' : currentPeer.value?.avatar ?? '',
+    avatarKind: currentGroup.value ? 'group' : currentBot.value ? 'bot' : 'user',
     detailsVisible: detailsVisible.value,
     participantNames: participantNames.value,
     messageList: messageListModel.value,
@@ -148,6 +151,12 @@ export function createWebqqWorkspaceShell(
     },
     group: currentGroup.value,
     bot: currentBot.value,
+    privateParticipant: currentPeer.value ? {
+      id: currentPeer.value.id,
+      name: currentPeer.value.name,
+      avatar: currentPeer.value.avatar,
+      isBot: !!currentBot.value,
+    } : undefined,
     currentUserName: currentUser.value?.name,
     currentOperatorId: currentOperatorId.value,
     participants: participants.value,
@@ -155,6 +164,7 @@ export function createWebqqWorkspaceShell(
   const sidebarConversations = computed(() => visibleConversations.value.map((conversation) => {
     const group = snapshot.value.groups.find(({ id }) => id === conversation.groupId)
     const bot = getBot(conversation.botId)
+    const peer = bot ?? snapshot.value.users.find(({ id }) => id === conversation.botId)
     const messageIds = new Set(conversation.messageIds)
     const latestMessage = snapshot.value.messages.filter(({ id }) => messageIds.has(id)).at(-1)
     const actorRole = group?.members.find(({ participantId }) => participantId === currentOperatorId.value)?.role
@@ -162,8 +172,8 @@ export function createWebqqWorkspaceShell(
       id: conversation.id,
       botId: conversation.botId,
       groupId: conversation.groupId,
-      title: group?.name ?? bot?.name ?? conversation.id,
-      avatar: conversation.groupId ? undefined : bot?.avatar,
+      title: group?.name ?? peer?.name ?? conversation.id,
+      avatar: conversation.groupId ? undefined : peer?.avatar,
       preview: latestMessage?.content ?? '开始一段新对话',
       time: latestMessage?.createdAt
         ? new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(new Date(latestMessage.createdAt))
@@ -171,8 +181,8 @@ export function createWebqqWorkspaceShell(
       actorRole,
       entityTarget: conversation.groupId
         ? { type: 'group' as const, id: conversation.groupId }
-        : { type: 'bot' as const, id: conversation.botId },
-      entityLabel: conversation.groupId ? '群组' as const : '机器人' as const,
+        : { type: bot ? 'bot' as const : 'user' as const, id: conversation.botId },
+      entityLabel: conversation.groupId ? '群组' as const : bot ? '机器人' as const : '用户' as const,
     }
   }))
   const sidebarModel = computed<WebqqSidebarModel>(() => ({
@@ -364,6 +374,7 @@ export function createWebqqWorkspaceShell(
   function getConversationTitle(conversation: SandboxConversation) {
     return snapshot.value.groups.find(({ id }) => id === conversation.groupId)?.name
       ?? getBot(conversation.botId)?.name
+      ?? snapshot.value.users.find(({ id }) => id === conversation.botId)?.name
       ?? conversation.id
   }
 

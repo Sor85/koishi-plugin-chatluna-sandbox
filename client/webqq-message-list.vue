@@ -127,7 +127,7 @@ export interface WebqqMessageListModel {
   currentOperatorId?: string
   title: string
   avatar: string
-  avatarKind: 'bot' | 'group'
+  avatarKind: 'user' | 'bot' | 'group'
   chatStyle: 'tim' | 'qq'
   hasMoreMessages: boolean
   mediaSources: Record<string, string>

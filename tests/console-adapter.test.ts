@@ -163,6 +163,12 @@ describe('Koishi 控制台适配器', () => {
     })
     expect(groupWorkspace.snapshot.groups[0].members.find(({ participantId }: { participantId: string }) => participantId === '10002')?.card).toBe('控制台群名片')
 
+    const botWorkspace = snapshotListener({ actorUserId: '20001' })
+    expect(botWorkspace.snapshot.conversations.length).toBeGreaterThan(0)
+    expect(botWorkspace.snapshot.conversations.every(({ botId }: { botId: string }) => botId === '20001')).toBe(true)
+    const botConversationUserIds = new Set(botWorkspace.snapshot.conversations.map(({ userId }: { userId: string }) => userId))
+    expect(['10001', '10002', '10003'].every((userId) => botConversationUserIds.has(userId))).toBe(true)
+
     const afterCurrentUserDeleted = manageEnvironmentListener({
       actorUserId: '10001',
       action: 'delete-user',

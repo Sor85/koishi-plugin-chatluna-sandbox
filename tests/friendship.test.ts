@@ -34,6 +34,21 @@ describe('模拟 QQ 环境好友关系', () => {
     expect(control.getSnapshot().friendships.some(({ participantIds }) => participantIds.includes('10001') && participantIds.includes('10002'))).toBe(false)
 
     await control.performFriendAction({ action: 'handle-request', actorUserId: '10002', requestId: request.requestId, approve: true })
+    expect(control.getSnapshot().conversations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'private:10001:10002', userId: '10001', botId: '10002' }),
+      expect.objectContaining({ id: 'private:10002:10001', userId: '10002', botId: '10001' }),
+    ]))
+    await control.sendMessage({
+      actorUserId: '10001',
+      botId: '10002',
+      conversationId: 'private:10001:10002',
+      content: '普通好友私聊',
+    })
+    const directMessages = control.getSnapshot().messages.filter(({ content }) => content === '普通好友私聊')
+    expect(directMessages.map(({ conversationId }) => conversationId).sort()).toEqual([
+      'private:10001:10002',
+      'private:10002:10001',
+    ])
     await control.performFriendAction({ action: 'set-remark', actorUserId: '10001', targetId: '10002', remark: '测试搭档' })
     const friendship = control.getSnapshot().friendships.find(({ participantIds }) => participantIds.includes('10001') && participantIds.includes('10002'))
     expect(friendship?.remarks).toEqual({ '10001': '测试搭档' })

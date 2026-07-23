@@ -42,11 +42,12 @@ export interface SandboxControlServiceOptions {
 
 interface SandboxMessageContext {
   user: SandboxUser
-  bot: SandboxBotProfile
+  peer: SandboxUser | SandboxBotProfile
+  bot?: SandboxBotProfile
   conversation: SandboxConversation
   group?: SandboxGroup
   reply?: SandboxMessage
-  runtimeBot: SandboxBot
+  runtimeBot?: SandboxBot
 }
 
 const DEFAULT_USER_ID = '10001'
@@ -156,7 +157,7 @@ export class SandboxControlService {
   }
 
   getVisibleSnapshot(actorUserId: string, messageLimit = 50): SandboxSnapshot {
-    this.getUser(actorUserId)
+    this.getParticipant(actorUserId)
     const limit = this.validateMessageLimit(messageLimit)
     const conversations = this.scene.conversations
       .filter((conversation) => this.isConversationVisible(actorUserId, conversation))
@@ -394,8 +395,9 @@ export class SandboxControlService {
     if (input.action !== 'delete') throw new Error(`不支持的好友操作：${Reflect.get(input, 'action') ?? 'unknown'}`)
 
     this.scene.friendships = this.scene.friendships.filter(({ id }) => id !== friendship.id)
+    this.deleteConversations(({ type, userId, botId }) => type === 'direct'
+      && ((userId === input.actorUserId && botId === target.id) || (userId === target.id && botId === input.actorUserId)))
     if (this.isBot(target.id)) {
-      this.deleteConversations(({ type, userId, botId }) => type === 'direct' && userId === input.actorUserId && botId === target.id)
       await this.dispatchBotNotice(target.id, input.actorUserId, 'friend_del')
     }
     this.scene.revision += 1
@@ -689,8 +691,12 @@ export class SandboxControlService {
     if (!input.content.trim()) throw new Error('消息内容不能为空')
     const context = this.getMessageContext(input)
     const senderId = input.senderId ?? context.user.id
-    if (senderId !== context.user.id && senderId !== context.bot.id) throw new Error(`发送者不在当前会话中：${senderId}`)
+    if (senderId !== context.user.id && senderId !== context.peer.id) throw new Error(`发送者不在当前会话中：${senderId}`)
     const message = this.appendMessage(senderId, context.conversation.id, input.content.trim(), input.replyToMessageId)
+    if (!context.bot) {
+      this.appendMirroredDirectMessage(context, senderId, message.content, input.replyToMessageId)
+      return { messageId: message.id, revision: this.scene.revision }
+    }
     if (senderId === context.bot.id) return { messageId: message.id, revision: this.scene.revision }
     return this.dispatchUserMessage(context, message, h.parse(message.content), [
       ...(context.reply ? [{ type: 'reply', data: { id: context.reply.id } }] : []),
@@ -701,10 +707,14 @@ export class SandboxControlService {
   async sendMediaMessage(input: SendMediaMessageInput): Promise<SendMessageResult> {
     const context = this.getMessageContext(input)
     const senderId = input.senderId ?? context.user.id
-    if (senderId !== context.user.id && senderId !== context.bot.id) throw new Error(`发送者不在当前会话中：${senderId}`)
+    if (senderId !== context.user.id && senderId !== context.peer.id) throw new Error(`发送者不在当前会话中：${senderId}`)
     const media = this.mediaStorage.save(input)
     const content = input.content?.trim() || `[${this.getMediaLabel(media)}] ${media.name}`
     const message = this.appendMessage(senderId, context.conversation.id, content, input.replyToMessageId, [media])
+    if (!context.bot) {
+      this.appendMirroredDirectMessage(context, senderId, message.content, input.replyToMessageId, [media])
+      return { messageId: message.id, revision: this.scene.revision }
+    }
     if (senderId === context.bot.id) return { messageId: message.id, revision: this.scene.revision }
     const elementType = media.type === 'image' ? 'img' : media.type
     const mediaElement = h(elementType, {
@@ -743,6 +753,7 @@ export class SandboxControlService {
     onebotMessage: Array<{ type: string; data: Record<string, string> }>,
     rawMessage: string,
   ): Promise<SendMessageResult> {
+    if (!context.runtimeBot || !context.bot) throw new Error('虚拟 OneBot 机器人运行时不可用')
     const session = context.runtimeBot.session({
       type: 'message',
       timestamp: Date.now(),
@@ -927,6 +938,7 @@ export class SandboxControlService {
   }
 
   private isConversationVisible(actorUserId: string, conversation: SandboxConversation) {
+    if (this.isBot(actorUserId)) return conversation.botId === actorUserId
     if (conversation.userId !== actorUserId) return false
     if (!conversation.groupId) return true
     const group = this.scene.groups.find(({ id }) => id === conversation.groupId)
@@ -936,11 +948,11 @@ export class SandboxControlService {
   private getMessageContext(input: Pick<SendMessageInput, 'actorUserId' | 'botId' | 'conversationId' | 'replyToMessageId'>): SandboxMessageContext {
     const user = this.scene.users.find(({ id }) => id === input.actorUserId)
     const bot = this.scene.bots.find(({ id }) => id === input.botId)
+    const peer = this.getParticipant(input.botId)
     const conversation = this.scene.conversations.find(({ id }) => id === input.conversationId)
     if (!user) throw new Error(`用户不存在：${input.actorUserId}`)
-    if (!bot) throw new Error(`机器人不存在：${input.botId}`)
-    if (!bot.enabled) throw new Error(`机器人已停用：${input.botId}`)
-    if (!conversation || conversation.userId !== user.id || conversation.botId !== bot.id) {
+    if (bot && !bot.enabled) throw new Error(`机器人已停用：${input.botId}`)
+    if (!conversation || conversation.userId !== user.id || conversation.botId !== peer.id) {
       throw new Error(`会话不存在：${input.conversationId}`)
     }
     const group = conversation.groupId
@@ -948,6 +960,7 @@ export class SandboxControlService {
       : undefined
     if (conversation.type === 'group' && (!group
       || !group.members.some(({ participantId }) => participantId === user.id)
+      || !bot
       || !group.members.some(({ participantId }) => participantId === bot.id))) {
       throw new Error(`群聊关系不存在：${input.conversationId}`)
     }
@@ -955,9 +968,22 @@ export class SandboxControlService {
       ? this.scene.messages.find(({ id, conversationId }) => id === input.replyToMessageId && conversationId === conversation.id)
       : undefined
     if (input.replyToMessageId && !reply) throw new Error(`回复消息不存在：${input.replyToMessageId}`)
-    const runtimeBot = this.runtimeBots.get(bot.id)
-    if (!runtimeBot) throw new Error(`机器人运行时不存在：${bot.id}`)
-    return { user, bot, conversation, group, reply, runtimeBot }
+    const runtimeBot = bot ? this.runtimeBots.get(bot.id) : undefined
+    if (bot && !runtimeBot) throw new Error(`机器人运行时不存在：${bot.id}`)
+    return { user, peer, bot, conversation, group, reply, runtimeBot }
+  }
+
+  private appendMirroredDirectMessage(
+    context: SandboxMessageContext,
+    senderId: string,
+    content: string,
+    replyToMessageId?: string,
+    media?: SandboxMedia[],
+  ) {
+    const mirroredConversation = this.scene.conversations.find(({ type, userId, botId }) => type === 'direct'
+      && userId === context.peer.id && botId === context.user.id)
+    if (!mirroredConversation) return
+    this.appendMessage(senderId, mirroredConversation.id, content, replyToMessageId, media)
   }
 
   private getMediaLabel(media: SandboxMedia): string {
@@ -1082,16 +1108,15 @@ export class SandboxControlService {
     if (existing) return existing
     const friendship = createFriendship(firstId, secondId)
     this.scene.friendships.push(friendship)
-    const userId = this.isBot(firstId) ? secondId : firstId
-    const botId = this.isBot(firstId) ? firstId : this.isBot(secondId) ? secondId : undefined
-    if (botId && !this.scene.conversations.some(({ id }) => id === `private:${userId}:${botId}`)) {
-      this.scene.conversations.push({
-        id: `private:${userId}:${botId}`,
-        type: 'direct',
-        userId,
-        botId,
-        messageIds: [],
-      })
+    const participantPairs = this.isBot(firstId) || this.isBot(secondId)
+      ? [[this.isBot(firstId) ? secondId : firstId, this.isBot(firstId) ? firstId : secondId]]
+      : [[firstId, secondId], [secondId, firstId]]
+    // botId 是早期会话结构遗留的“对端 ID”字段；普通用户好友需要为双方各建一条定向视图，
+    // 否则好友目录没有 conversationId，点击条目时无法进入私聊。
+    for (const [userId, peerId] of participantPairs) {
+      const id = `private:${userId}:${peerId}`
+      if (this.scene.conversations.some((conversation) => conversation.id === id)) continue
+      this.scene.conversations.push({ id, type: 'direct', userId, botId: peerId, messageIds: [] })
     }
     return friendship
   }
