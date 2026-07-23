@@ -285,62 +285,29 @@
           </div>
         </aside>
 
-        <main :class="['webqq-chat', { 'is-environment': currentView === 'profile' }]">
-          <EnvironmentManager
-            v-if="currentView === 'profile'"
-            :snapshot="snapshot"
-          />
-          <template v-else>
-          <header class="webqq-chat-header">
-            <div class="webqq-chat-title">
-              <WebqqAvatar
-                class="webqq-avatar webqq-avatar-bot"
-                :kind="currentGroup ? 'group' : 'bot'"
-                :name="currentConversationTitle"
-                :avatar="currentGroup ? '' : currentBot?.avatar"
-              />
-              <div>
-                <strong>{{ currentConversationTitle }}</strong>
-                <span>{{ currentConversationSubtitle }}</span>
-              </div>
-            </div>
-            <button
-              type="button"
-              class="webqq-icon-button"
-              :class="{ 'is-active': detailsVisible }"
-              :aria-label="detailsVisible ? '关闭会话信息' : '打开会话信息'"
-              @click="toggleDetails"
-            >
-              <IconDots :size="22" aria-hidden="true" />
-            </button>
-          </header>
-
-          <WebqqMessageList
-            :model="messageListModel"
-            @reply="replyingToMessageId = $event"
-            @load-history="loadEarlierMessages"
-            @request-friend="requestFriend"
-            @poke-friend="pokeFriend"
-            @set-remark="openRemarkDialog"
-            @delete-friend="deleteFriend"
-            @poke-group-member="pokeGroupMember"
-            @set-group-card="openGroupActionDialog('card', $event)"
-            @set-group-admin="setGroupAdmin"
-            @transfer-group-owner="transferGroupOwner"
-            @kick-group-member="kickGroupMember"
-          />
-
-          <WebqqComposer
-            :model="composerModel"
-            @send="sendComposerMessage"
-            @select-operator="selectComposerOperator"
-            @manage-environment="manageEnvironment"
-            @edit-participant="openComposerParticipantDialog('edit', $event)"
-            @delete-participant="openComposerParticipantDialog('delete', $event)"
-            @clear-reply="replyingToMessageId = ''"
-          />
-          </template>
+        <main v-if="currentView === 'profile'" class="webqq-chat is-environment">
+          <EnvironmentManager :snapshot="snapshot" />
         </main>
+        <WebqqChatPane
+          v-else
+          :model="chatPaneModel"
+          @toggle-details="toggleDetails"
+          @send="sendComposerMessage"
+          @select-operator="selectComposerOperator"
+          @manage-environment="manageEnvironment"
+          @edit-participant="openComposerParticipantDialog('edit', $event)"
+          @delete-participant="openComposerParticipantDialog('delete', $event)"
+          @load-history="loadEarlierMessages"
+          @request-friend="requestFriend"
+          @poke-friend="pokeFriend"
+          @set-remark="openRemarkDialog"
+          @delete-friend="deleteFriend"
+          @poke-group-member="pokeGroupMember"
+          @set-group-card="openGroupActionDialog('card', $event)"
+          @set-group-admin="setGroupAdmin"
+          @transfer-group-owner="transferGroupOwner"
+          @kick-group-member="kickGroupMember"
+        />
 
         <aside class="webqq-profile" :aria-label="currentView === 'profile' ? '环境摘要' : currentGroup ? '群信息' : '私聊信息'">
           <header class="webqq-info-header">
@@ -509,8 +476,9 @@ import { getFriendMenuActions, type FriendMenuState } from './friend-menu'
 import GroupMemberMenu from './group-member-menu.vue'
 import NotificationMenu from './notification-menu.vue'
 import WebqqAvatar from './webqq-avatar.vue'
-import WebqqComposer, { type WebqqComposerModel, type WebqqComposerSendIntent, type WebqqComposerSender } from './webqq-composer.vue'
-import WebqqMessageList, { type WebqqMessageListModel } from './webqq-message-list.vue'
+import WebqqChatPane, { type WebqqChatPaneModel } from './webqq-chat-pane.vue'
+import type { WebqqComposerModel, WebqqComposerSendIntent, WebqqComposerSender } from './webqq-composer.vue'
+import type { WebqqMessageListModel } from './webqq-message-list.vue'
 import WorkspaceOverlayHost from './workspace-overlay-host.vue'
 import { getIncomingNotificationRequests } from './notification-requests'
 import { getFriendDirectory, getGroupDirectory } from './relationship-directory'
@@ -649,8 +617,6 @@ const messages = computed(() => {
   const ids = new Set(currentConversation.value?.messageIds ?? [])
   return snapshot.value.messages.filter(({ id }) => ids.has(id))
 })
-const replyingToMessageId = ref('')
-const replyingToMessage = computed(() => snapshot.value.messages.find(({ id }) => id === replyingToMessageId.value))
 const messageListModel = computed<WebqqMessageListModel>(() => ({
   messages: messages.value,
   snapshot: snapshot.value,
@@ -672,16 +638,24 @@ const composerModel = computed<WebqqComposerModel>(() => ({
   currentUserId: currentUserId.value,
   conversationId: currentConversation.value?.id,
   botId: currentBot.value?.id,
-  replyingTo: replyingToMessage.value
-    ? {
-        id: replyingToMessage.value.id,
-        authorName: getParticipantName(replyingToMessage.value.authorId),
-        content: replyingToMessage.value.content,
-      }
-    : undefined,
   snapshot: snapshot.value,
   accentColor: workspace.value.appearance.webQQAccentColor,
   externalError: errorMessage.value,
+}))
+const participantNames = computed(() => Object.fromEntries([
+  ...snapshot.value.users.map(({ id, name }) => [id, name]),
+  ...snapshot.value.bots.map(({ id, name }) => [id, name]),
+]))
+const chatPaneModel = computed<WebqqChatPaneModel>(() => ({
+  conversationId: currentConversation.value?.id,
+  title: currentConversationTitle.value,
+  subtitle: currentConversationSubtitle.value,
+  avatar: currentGroup.value ? '' : currentBot.value?.avatar ?? '',
+  avatarKind: currentGroup.value ? 'group' : 'bot',
+  detailsVisible: detailsVisible.value,
+  participantNames: participantNames.value,
+  messageList: messageListModel.value,
+  composer: composerModel.value,
 }))
 
 watch([currentUserId, () => currentConversation.value?.botId], ([userId, botId]) => {
@@ -699,7 +673,6 @@ watch(activeConversationId, () => {
   announcementEditorOpen.value = false
   deletingAnnouncementId.value = ''
   infoErrorMessage.value = ''
-  replyingToMessageId.value = ''
 })
 
 watch(
