@@ -122,7 +122,6 @@
 </template>
 
 <script setup lang="ts">
-import { send } from '@koishijs/client'
 import { IconPlus, IconTrash } from '@tabler/icons-vue'
 import { computed, reactive, ref, watch } from 'vue'
 import { Button } from './components/ui/button'
@@ -136,7 +135,6 @@ import type {
   SandboxGroupMember,
   SandboxImplementationProfile,
   SandboxSnapshot,
-  SandboxWorkspaceState,
 } from '../src/types'
 
 type EntityType = 'user' | 'bot' | 'group'
@@ -147,12 +145,11 @@ const props = defineProps<{
   mode: DialogMode
   target?: { type: EntityType, id: string }
   snapshot: SandboxSnapshot
-  currentUserId?: string
   accentColor: string
 }>()
 const emit = defineEmits<{
   'update:open': [open: boolean]
-  updated: [workspace: SandboxWorkspaceState]
+  submit: [input: ManageSandboxEnvironmentInput, resolve: () => void, reject: (error: unknown) => void]
 }>()
 
 const busy = ref(false)
@@ -210,7 +207,7 @@ async function runAction(input: ManageSandboxEnvironmentInput) {
   busy.value = true
   errorMessage.value = ''
   try {
-    emit('updated', await send('onebot-sandbox/manage-environment', { ...input, actorUserId: props.currentUserId }))
+    await new Promise<void>((resolve, reject) => emit('submit', input, resolve, reject))
     emit('update:open', false)
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '环境管理失败'

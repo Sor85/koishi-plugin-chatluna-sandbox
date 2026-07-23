@@ -560,4 +560,58 @@ describe('WebQQ 工作区控制模块', () => {
     })
     expect(controller.details.value.revision).toBe(9)
   })
+
+  it('环境管理删除当前用户后应用现有选择 fallback', async () => {
+    const port = createFakeWorkspacePort(workspace)
+    const controller = createWorkspaceController(port, createStorage())
+    await controller.load()
+    port.workspaceResult = {
+      ...workspace,
+      snapshot: {
+        ...workspace.snapshot,
+        revision: 8,
+        users: workspace.snapshot.users.filter(({ id }) => id !== '10001'),
+        conversations: workspace.snapshot.conversations.filter(({ userId }) => userId !== '10001'),
+      },
+    }
+
+    await controller.manageEnvironment({ action: 'delete-user', data: { id: '10001' } })
+
+    expect(port.calls.at(-1)).toEqual({
+      operation: 'manageEnvironment',
+      input: {
+        action: 'delete-user',
+        actorUserId: '10001',
+        data: { id: '10001' },
+      },
+    })
+    expect(controller.currentUserId.value).toBe('10002')
+    expect(controller.currentOperatorId.value).toBe('10002')
+    expect(controller.activeConversationId.value).toBe('private:10002:20001')
+    expect([
+      controller.sidebar.value.revision,
+      controller.chat.value.revision,
+      controller.composer.value.revision,
+      controller.details.value.revision,
+    ]).toEqual([8, 8, 8, 8])
+  })
+
+  it('环境管理失败时保留工作区和当前选择', async () => {
+    const port = createFakeWorkspacePort(workspace)
+    const controller = createWorkspaceController(port, createStorage())
+    await controller.load()
+    port.rejectNext('manageEnvironment', new Error('环境操作被拒绝'))
+
+    await expect(controller.manageEnvironment({
+      action: 'create-user',
+      data: { id: '10099', name: '失败用户' },
+    })).rejects.toMatchObject({
+      name: 'WorkspaceControllerError',
+      message: '环境操作被拒绝',
+    })
+
+    expect(controller.currentUserId.value).toBe('10001')
+    expect(controller.activeConversationId.value).toBe('private:10001:20001')
+    expect(controller.sidebar.value.revision).toBe(7)
+  })
 })

@@ -2,6 +2,7 @@ import { computed, readonly, ref, type DeepReadonly } from 'vue'
 import type {
   DeleteGroupAnnouncementInput,
   GetMessageHistoryInput,
+  ManageSandboxEnvironmentInput,
   SandboxAppearance,
   SandboxBotProfile,
   SandboxConversation,
@@ -313,6 +314,14 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     }
   }
 
+  async function manageEnvironment(input: ManageSandboxEnvironmentInput) {
+    try {
+      replaceWorkspace(await port.manageEnvironment({ ...input, actorUserId: currentUserIdState.value }))
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '环境管理失败')
+    }
+  }
+
   async function performGroupAction(input: SandboxGroupAction) {
     const actorUserId = currentOperatorIdState.value
     if (!actorUserId) throw new WorkspaceControllerError('当前操作者不可用')
@@ -353,6 +362,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     handleRelationshipRequest,
     load,
     loadMessageHistory,
+    manageEnvironment,
     performFriendAction,
     performGroupAction,
     replaceWorkspace,

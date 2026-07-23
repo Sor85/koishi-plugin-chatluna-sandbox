@@ -102,7 +102,6 @@
 </template>
 
 <script setup lang="ts">
-import { send } from '@koishijs/client'
 import { useMediaQuery } from '@vueuse/core'
 import { computed, reactive, ref, watch } from 'vue'
 import { Button } from './components/ui/button'
@@ -115,7 +114,6 @@ import type {
   ManageSandboxEnvironmentInput,
   SandboxImplementationProfile,
   SandboxSnapshot,
-  SandboxWorkspaceState,
 } from '../src/types'
 
 type EnvironmentCreateType = 'user' | 'bot' | 'group' | 'participant'
@@ -131,7 +129,7 @@ const props = withDefaults(defineProps<{
   side: 'right',
 })
 const emit = defineEmits<{
-  updated: [workspace: SandboxWorkspaceState]
+  submit: [input: ManageSandboxEnvironmentInput, resolve: () => void, reject: (error: unknown) => void]
   openChange: [open: boolean]
 }>()
 
@@ -178,7 +176,7 @@ async function submit() {
   busy.value = true
   errorMessage.value = ''
   try {
-    emit('updated', await send('onebot-sandbox/manage-environment', { ...input, actorUserId: props.currentUserId }))
+    await new Promise<void>((resolve, reject) => emit('submit', input, resolve, reject))
     open.value = false
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '创建失败'

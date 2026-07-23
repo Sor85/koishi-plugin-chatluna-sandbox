@@ -94,7 +94,7 @@
               :snapshot="snapshot"
               :current-user-id="currentUserId"
               :accent-color="workspace.appearance.webQQAccentColor"
-              @updated="applyWorkspaceUpdate"
+              @submit="manageEnvironment"
             >
               <template #trigger>
                 <button type="button" class="webqq-session webqq-session-create">
@@ -581,7 +581,7 @@
                       :snapshot="snapshot"
                       :current-user-id="currentUserId"
                       :accent-color="workspace.appearance.webQQAccentColor"
-                      @updated="applyWorkspaceUpdate"
+                      @submit="manageEnvironment"
                       @open-change="handleCreateParticipantOpen"
                     >
                       <template #trigger>
@@ -767,9 +767,8 @@
           :mode="entityDialogMode"
           :target="entityDialogTarget"
           :snapshot="snapshot"
-          :current-user-id="currentUserId"
           :accent-color="workspace.appearance.webQQAccentColor"
-          @updated="applyWorkspaceUpdate"
+          @submit="manageEnvironment"
         />
         <Dialog v-model:open="remarkDialogOpen">
           <DialogContent :style="{ '--webqq-accent': workspace.appearance.webQQAccentColor }">
@@ -811,7 +810,6 @@
 </template>
 
 <script setup lang="ts">
-import { send } from '@koishijs/client'
 import { createLayout, type AutoLayout } from 'animejs'
 import {
   IconAddressBook,
@@ -877,9 +875,9 @@ import type {
   SandboxGroupMember,
   SandboxMedia,
   SandboxMessage,
-  SandboxWorkspaceState,
   SandboxFriendAction,
   SandboxGroupAction,
+  ManageSandboxEnvironmentInput,
 } from '../src/types'
 
 const workspaceController = createWorkspaceController(koishiWorkspacePort, window.localStorage)
@@ -1122,8 +1120,17 @@ watch(hasUserStackOverflow, (hasOverflow) => {
   if (!hasOverflow) userStackExpanded.value = false
 })
 
-function applyWorkspaceUpdate(nextWorkspace: SandboxWorkspaceState) {
-  workspaceController.replaceWorkspace(nextWorkspace)
+async function manageEnvironment(
+  input: ManageSandboxEnvironmentInput,
+  resolve: () => void,
+  reject: (error: unknown) => void,
+) {
+  try {
+    await workspaceController.manageEnvironment(input)
+    resolve()
+  } catch (error) {
+    reject(error)
+  }
 }
 
 async function performFriendAction(input: SandboxFriendAction) {
