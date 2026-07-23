@@ -231,9 +231,7 @@ body,
   user-select: none;
 }
 
-.webqq-menu-avatar img,
-.webqq-avatar img,
-.webqq-message-avatar img {
+.webqq-identity-avatar > img {
   width: 100%;
   height: 100%;
   border-radius: inherit;
@@ -471,6 +469,11 @@ body,
 }
 
 .webqq-notification-avatar {
+  --webqq-avatar-size: 38px;
+  --webqq-bot-badge-size: 15.833px;
+  --webqq-bot-badge-offset: -2.111px;
+  --webqq-bot-badge-border: 2.111px;
+
   display: flex;
   width: 38px;
   height: 38px;
@@ -682,12 +685,11 @@ body,
   background: #59657a;
 }
 
-.webqq-avatar.is-group {
+.webqq-identity-avatar.is-group {
   background: #0f766e;
 }
 
-.webqq-avatar.is-bot,
-.webqq-menu-avatar.is-bot {
+.webqq-identity-avatar.is-bot {
   position: relative;
   color: #fff;
   background: #475569;
@@ -716,8 +718,7 @@ body,
   height: 66.667%;
 }
 
-.webqq-workspace[data-color-mode="dark"] .webqq-avatar.is-bot,
-.webqq-workspace[data-color-mode="dark"] .webqq-menu-avatar.is-bot {
+.webqq-workspace[data-color-mode="dark"] .webqq-identity-avatar.is-bot {
   background: #64748b;
 }
 
@@ -944,6 +945,11 @@ body,
 }
 
 .webqq-message-avatar {
+  --webqq-avatar-size: 32px;
+  --webqq-bot-badge-size: 13.333px;
+  --webqq-bot-badge-offset: -1.778px;
+  --webqq-bot-badge-border: 1.778px;
+
   display: flex;
   width: 32px;
   height: 32px;
@@ -960,7 +966,7 @@ body,
   visibility: hidden;
 }
 
-.webqq-message-row.is-incoming .webqq-message-avatar {
+.webqq-message-row.is-incoming .webqq-message-avatar:not(.is-bot) {
   background: #59657a;
 }
 

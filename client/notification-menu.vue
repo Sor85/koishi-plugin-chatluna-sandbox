@@ -9,7 +9,12 @@
       <div v-else-if="!visibleRequests.length" class="webqq-notification-empty">暂无通知</div>
       <div v-else class="webqq-notifications">
         <article v-for="request in visibleRequests" :key="request.id" class="webqq-notification-card">
-          <span class="webqq-notification-avatar">{{ getInitial(getParticipantName(request.requesterId)) }}</span>
+          <WebqqAvatar
+            class="webqq-notification-avatar"
+            :kind="isBotParticipant(request.requesterId) ? 'bot' : 'user'"
+            :name="getParticipantName(request.requesterId)"
+            :avatar="getParticipantAvatar(request.requesterId)"
+          />
           <div class="webqq-notification-main">
             <strong class="webqq-notification-title">{{ getRequestTitle(request) }}</strong>
             <span>{{ getRequestSubtitle(request) }}</span>
@@ -31,6 +36,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Button } from './components/ui/button'
+import WebqqAvatar from './webqq-avatar.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type { SandboxRelationshipRequest, SandboxSnapshot } from '../src/types'
 
@@ -55,8 +61,14 @@ function getParticipantName(id: string) {
     ?? id
 }
 
-function getInitial(value: string) {
-  return value.trim().slice(0, 1).toUpperCase() || '?'
+function isBotParticipant(id: string) {
+  return props.snapshot.bots.some((bot) => bot.id === id)
+}
+
+function getParticipantAvatar(id: string) {
+  return props.snapshot.users.find((user) => user.id === id)?.avatar
+    ?? props.snapshot.bots.find((bot) => bot.id === id)?.avatar
+    ?? ''
 }
 
 function getRequestTitle(request: SandboxRelationshipRequest) {

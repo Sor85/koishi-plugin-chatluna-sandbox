@@ -114,7 +114,7 @@
                   :class="{ 'is-active': group.conversationId === activeConversationId }"
                   @click="group.conversationId && selectConversation(group.conversationId)"
                 >
-                  <span class="webqq-avatar webqq-avatar-bot is-group">{{ getInitial(group.name) }}</span>
+                  <WebqqAvatar class="webqq-avatar webqq-avatar-bot" kind="group" :name="group.name" />
                   <span class="webqq-session-copy">
                     <strong>{{ group.name }}</strong>
                     <small>
@@ -176,13 +176,12 @@
                   :class="{ 'is-active': entry.conversationId === activeConversationId }"
                   @click="entry.conversationId && selectConversation(entry.conversationId)"
                 >
-                  <span :class="['webqq-avatar', { 'is-bot': entry.isBot }]">
-                    <img v-if="entry.avatar" :src="entry.avatar" :alt="entry.displayName">
-                    <template v-else>{{ getInitial(entry.displayName) }}</template>
-                    <span v-if="entry.isBot" class="webqq-avatar-bot-badge">
-                      <IconRobotFace :size="10" stroke-width="2.4" aria-hidden="true" />
-                    </span>
-                  </span>
+                  <WebqqAvatar
+                    class="webqq-avatar"
+                    :kind="entry.isBot ? 'bot' : 'user'"
+                    :name="entry.displayName"
+                    :avatar="entry.avatar"
+                  />
                   <span class="webqq-session-copy">
                     <strong>{{ entry.displayName }}</strong>
                     <small>{{ entry.status }}</small>
@@ -236,13 +235,12 @@
                   :class="{ 'is-active': conversation.id === activeConversationId }"
                   @click="selectConversation(conversation.id)"
                 >
-                  <span :class="['webqq-avatar webqq-avatar-bot', { 'is-bot': !conversation.groupId, 'is-group': !!conversation.groupId }]">
-                    <img v-if="getConversationAvatar(conversation)" :src="getConversationAvatar(conversation)" :alt="getConversationTitle(conversation)">
-                    <template v-else>{{ getInitial(getConversationTitle(conversation)) }}</template>
-                    <span v-if="!conversation.groupId" class="webqq-avatar-bot-badge">
-                      <IconRobotFace :size="10" stroke-width="2.4" aria-hidden="true" />
-                    </span>
-                  </span>
+                  <WebqqAvatar
+                    class="webqq-avatar webqq-avatar-bot"
+                    :kind="conversation.groupId ? 'group' : 'bot'"
+                    :name="getConversationTitle(conversation)"
+                    :avatar="getConversationAvatar(conversation)"
+                  />
                   <span class="webqq-session-copy">
                     <strong>{{ getConversationTitle(conversation) }}</strong>
                     <small>{{ getConversationPreview(conversation.id) }}</small>
@@ -295,13 +293,12 @@
           <template v-else>
           <header class="webqq-chat-header">
             <div class="webqq-chat-title">
-              <span :class="['webqq-avatar webqq-avatar-bot', { 'is-bot': !currentGroup && !!currentBot, 'is-group': !!currentGroup }]">
-                <img v-if="currentBot?.avatar && !currentGroup" :src="currentBot.avatar" :alt="currentConversationTitle">
-                <template v-else>{{ getInitial(currentConversationTitle) }}</template>
-                <span v-if="!currentGroup && currentBot" class="webqq-avatar-bot-badge">
-                  <IconRobotFace :size="10" stroke-width="2.4" aria-hidden="true" />
-                </span>
-              </span>
+              <WebqqAvatar
+                class="webqq-avatar webqq-avatar-bot"
+                :kind="currentGroup ? 'group' : 'bot'"
+                :name="currentConversationTitle"
+                :avatar="currentGroup ? '' : currentBot?.avatar"
+              />
               <div>
                 <strong>{{ currentConversationTitle }}</strong>
                 <span>{{ currentConversationSubtitle }}</span>
@@ -320,7 +317,12 @@
 
           <section v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-messages" aria-label="消息记录">
             <div v-if="!messages.length" class="webqq-welcome">
-              <span :class="['webqq-avatar webqq-avatar-large webqq-avatar-bot', { 'is-group': !!currentGroup }]">{{ getInitial(currentConversationTitle) }}</span>
+              <WebqqAvatar
+                class="webqq-avatar webqq-avatar-large webqq-avatar-bot"
+                :kind="currentGroup ? 'group' : 'bot'"
+                :name="currentConversationTitle"
+                :avatar="currentGroup ? '' : currentBot?.avatar"
+              />
               <strong>{{ currentConversationTitle }}</strong>
               <p>发送消息，验证插件在模拟 QQ 环境中的响应</p>
             </div>
@@ -354,10 +356,12 @@
                           :aria-label="`打开 ${getParticipantName(message.authorId)} 的操作菜单`"
                           @contextmenu.stop
                         >
-                          <span class="webqq-message-avatar">
-                            <img v-if="getParticipantAvatar(message.authorId)" :src="getParticipantAvatar(message.authorId)" :alt="getParticipantName(message.authorId)">
-                            <template v-else>{{ getInitial(getParticipantName(message.authorId)) }}</template>
-                          </span>
+                          <WebqqAvatar
+                            class="webqq-message-avatar"
+                            :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'"
+                            :name="getParticipantName(message.authorId)"
+                            :avatar="getParticipantAvatar(message.authorId)"
+                          />
                         </button>
                       </ContextMenuTrigger>
                       <ContextMenuContent style="z-index: 140">
@@ -404,10 +408,12 @@
                       </ContextMenuContent>
                     </ContextMenu>
                     <span v-else class="webqq-message-avatar-wrap">
-                      <span class="webqq-message-avatar">
-                        <img v-if="getParticipantAvatar(message.authorId)" :src="getParticipantAvatar(message.authorId)" :alt="getParticipantName(message.authorId)">
-                        <template v-else>{{ getInitial(getParticipantName(message.authorId)) }}</template>
-                      </span>
+                      <WebqqAvatar
+                        class="webqq-message-avatar"
+                        :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'"
+                        :name="getParticipantName(message.authorId)"
+                        :avatar="getParticipantAvatar(message.authorId)"
+                      />
                     </span>
                     <div class="webqq-message-content">
                       <div v-if="!isMergedChatMessage(messageIndex)" class="webqq-sender-line">
@@ -534,12 +540,13 @@
                                   :tabindex="isUserCollapsedHidden(index) ? -1 : undefined"
                                   @click="selectComposerUser(sender)"
                                 >
-                                  <span :class="['webqq-composer-user-avatar', { 'is-bot': sender.type === 'bot' }]">
-                                    {{ getInitial(sender.name) }}
-                                    <span v-if="sender.type === 'bot' && sender.id === composerSenderId" class="webqq-composer-user-bot-badge">
-                                      <IconRobotFace :size="10" stroke-width="2.4" aria-hidden="true" />
-                                    </span>
-                                  </span>
+                                  <WebqqAvatar
+                                    class="webqq-composer-user-avatar"
+                                    :kind="sender.type"
+                                    :name="sender.name"
+                                    :avatar="sender.avatar"
+                                    :show-bot-badge="sender.id === composerSenderId"
+                                  />
                                 </button>
                               </ContextMenuTrigger>
                               <ContextMenuContent class="webqq-composer-user-menu" style="z-index: 160">
@@ -564,12 +571,14 @@
                       :style="userOverflowStyle"
                       aria-hidden="true"
                     >
-                      <span v-if="userOverflowPreview" class="webqq-composer-user-overflow-avatar">
-                        {{ getInitial(userOverflowPreview.name) }}
-                        <span v-if="userOverflowPreview.type === 'bot' && userOverflowPreview.id === composerSenderId" class="webqq-composer-user-bot-badge">
-                          <IconRobotFace :size="10" stroke-width="2.4" aria-hidden="true" />
-                        </span>
-                      </span>
+                      <WebqqAvatar
+                        v-if="userOverflowPreview"
+                        class="webqq-composer-user-overflow-avatar"
+                        :kind="userOverflowPreview.type"
+                        :name="userOverflowPreview.name"
+                        :avatar="userOverflowPreview.avatar"
+                        :show-bot-badge="userOverflowPreview.id === composerSenderId"
+                      />
                       <span class="webqq-composer-user-overflow-label">
                         <span class="webqq-composer-user-overflow-plus">+</span>
                         <span class="webqq-composer-user-overflow-count">{{ userStackMetrics.overflowCount }}</span>
@@ -713,13 +722,12 @@
                 <ContextMenu v-for="member in visibleGroupMembers" :key="member.participantId">
                   <ContextMenuTrigger as-child>
                     <article class="webqq-group-member">
-                      <span :class="['webqq-menu-avatar', { 'is-bot': isBotParticipant(member.participantId) }]">
-                        <img v-if="getParticipantAvatar(member.participantId)" :src="getParticipantAvatar(member.participantId)" :alt="getGroupMemberName(member)">
-                        <template v-else>{{ getInitial(getGroupMemberName(member)) }}</template>
-                        <span v-if="isBotParticipant(member.participantId)" class="webqq-avatar-bot-badge">
-                          <IconRobotFace :size="10" stroke-width="2.4" aria-hidden="true" />
-                        </span>
-                      </span>
+                      <WebqqAvatar
+                        class="webqq-menu-avatar"
+                        :kind="isBotParticipant(member.participantId) ? 'bot' : 'user'"
+                        :name="getGroupMemberName(member)"
+                        :avatar="getParticipantAvatar(member.participantId)"
+                      />
                       <span>
                         <strong>{{ getGroupMemberName(member) }}</strong>
                         <small>{{ member.participantId }}</small>
@@ -743,13 +751,13 @@
 
           <div v-else v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-private-info">
             <div class="webqq-profile-hero">
-              <span class="webqq-avatar webqq-avatar-profile webqq-avatar-bot is-bot">
-                <img v-if="currentBot?.avatar" :src="currentBot.avatar" :alt="currentBot.name">
-                <template v-else>{{ getInitial(currentBot?.name) }}</template>
-                <span v-if="currentBot" class="webqq-avatar-bot-badge">
-                  <IconRobotFace :size="14" stroke-width="2.4" aria-hidden="true" />
-                </span>
-              </span>
+              <WebqqAvatar
+                class="webqq-avatar webqq-avatar-profile webqq-avatar-bot"
+                kind="bot"
+                :name="currentBot?.name"
+                :avatar="currentBot?.avatar"
+                :show-bot-badge="!!currentBot"
+              />
               <h2>{{ currentBot?.name ?? 'Koishi' }}</h2>
               <p>{{ currentBot?.id ?? '未选择机器人' }}</p>
               <span class="webqq-online"><i /> 在线</span>
@@ -812,6 +820,7 @@ import EnvironmentManager from './environment-manager.vue'
 import { getFriendMenuActions, type FriendMenuState } from './friend-menu'
 import GroupMemberMenu from './group-member-menu.vue'
 import NotificationMenu from './notification-menu.vue'
+import WebqqAvatar from './webqq-avatar.vue'
 import WorkspaceOverlayHost from './workspace-overlay-host.vue'
 import { getIncomingNotificationRequests } from './notification-requests'
 import { getFriendDirectory, getGroupDirectory } from './relationship-directory'
@@ -897,7 +906,7 @@ const snapshot = computed(() => workspace.value.snapshot)
 const currentUser = computed(() => snapshot.value.users.find(({ id }) => id === currentUserId.value))
 const currentOperatorId = computed(() => composerSenderId.value ?? currentUserId.value)
 const currentOperatorIsBot = computed(() => snapshot.value.bots.some(({ id }) => id === currentOperatorId.value))
-type ComposerSender = { id: string, name: string, type: 'user' | 'bot' }
+type ComposerSender = { id: string, name: string, avatar?: string, type: 'user' | 'bot' }
 const userStackUsers = computed<ComposerSender[]>(() => {
   const users = snapshot.value.users.map((user) => ({ ...user, type: 'user' as const }))
   const activeUserIndex = users.findIndex(({ id }) => id === currentUserId.value)
