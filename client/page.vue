@@ -309,128 +309,17 @@
           @kick-group-member="kickGroupMember"
         />
 
-        <aside class="webqq-profile" :aria-label="currentView === 'profile' ? '环境摘要' : currentGroup ? '群信息' : '私聊信息'">
-          <header class="webqq-info-header">
-            <strong>{{ currentView === 'profile' ? '环境摘要' : currentGroup ? '群信息' : '私聊信息' }}</strong>
-            <button type="button" class="webqq-info-close" aria-label="关闭会话信息" @click="closeDetails">
-              <IconDots :size="22" aria-hidden="true" />
-            </button>
-          </header>
-
-          <div v-if="currentView === 'profile'" v-webqq-scrollbar class="webqq-private-info">
-            <div class="webqq-profile-hero">
-              <span class="webqq-avatar webqq-avatar-profile webqq-avatar-bot">
-                <IconDatabase :size="32" aria-hidden="true" />
-              </span>
-              <h2>默认内存场景</h2>
-              <p>修订 {{ snapshot.revision }}</p>
-            </div>
-            <dl class="webqq-profile-details">
-              <div><dt>普通用户</dt><dd>{{ snapshot.users.length }}</dd></div>
-              <div><dt>虚拟机器人</dt><dd>{{ snapshot.bots.length }}</dd></div>
-              <div><dt>群组</dt><dd>{{ snapshot.groups.length }}</dd></div>
-              <div><dt>待处理申请</dt><dd>{{ snapshot.requests.length }}</dd></div>
-              <div><dt>状态来源</dt><dd>服务端内存</dd></div>
-            </dl>
-          </div>
-
-          <div v-else-if="currentGroup" class="webqq-group-info-body">
-            <section v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-group-announcements">
-              <div class="webqq-info-section-title">
-                <h3>群公告</h3>
-                <button
-                  type="button"
-                  :aria-label="announcementEditorOpen ? '取消添加群公告' : '添加群公告'"
-                  :class="{ 'is-active': announcementEditorOpen }"
-                  @click="toggleAnnouncementEditor"
-                >
-                  <IconPlus :size="17" aria-hidden="true" />
-                </button>
-              </div>
-              <span v-if="infoErrorMessage" class="webqq-info-error" role="alert">{{ infoErrorMessage }}</span>
-              <form v-if="announcementEditorOpen" class="webqq-announcement-editor" @submit.prevent="publishAnnouncement">
-                <textarea v-model="announcementInput" rows="3" placeholder="发布一条群公告" />
-                <div>
-                  <button type="submit" :disabled="announcementSending || !announcementInput.trim()">
-                    {{ announcementSending ? '发布中' : '发布' }}
-                  </button>
-                </div>
-              </form>
-              <p v-if="!currentGroup.announcements.length" class="webqq-group-empty">暂无群公告</p>
-              <article
-                v-for="announcement in currentGroup.announcements"
-                :key="announcement.id"
-                class="webqq-group-announcement"
-              >
-                <button
-                  type="button"
-                  class="webqq-announcement-delete"
-                  :aria-label="`删除群公告：${announcement.content}`"
-                  :disabled="deletingAnnouncementId === announcement.id"
-                  @click="deleteAnnouncement(announcement.id)"
-                >
-                  <IconTrash :size="15" aria-hidden="true" />
-                </button>
-                <p>{{ announcement.content }}</p>
-                <time>{{ getParticipantName(announcement.authorId) }} · {{ formatDateTime(announcement.createdAt) }}</time>
-              </article>
-            </section>
-            <section class="webqq-group-members">
-              <h3>群成员 {{ currentGroup.members.length }}</h3>
-              <input v-model="groupMemberSearch" type="search" placeholder="搜索群昵称或 QQ 号">
-              <div v-if="!visibleGroupMembers.length" class="webqq-group-empty">暂无群成员</div>
-              <div v-else v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-group-member-list">
-                <ContextMenu v-for="member in visibleGroupMembers" :key="member.participantId">
-                  <ContextMenuTrigger as-child>
-                    <article class="webqq-group-member">
-                      <WebqqAvatar
-                        class="webqq-menu-avatar"
-                        :kind="isBotParticipant(member.participantId) ? 'bot' : 'user'"
-                        :name="getGroupMemberName(member)"
-                        :avatar="getParticipantAvatar(member.participantId)"
-                      />
-                      <span>
-                        <strong>{{ getGroupMemberName(member) }}</strong>
-                        <small>{{ member.participantId }}</small>
-                      </span>
-                      <em>{{ getGroupRoleLabel(member.role) }}</em>
-                    </article>
-                  </ContextMenuTrigger>
-                  <GroupMemberMenu
-                    :actor="getCurrentGroupMember(currentOperatorId ?? '')"
-                    :target="member"
-                    @poke="pokeGroupMember(member.participantId)"
-                    @set-card="openGroupActionDialog('card', member.participantId)"
-                    @set-admin="setGroupAdmin(member.participantId, $event)"
-                    @transfer-owner="transferGroupOwner(member.participantId)"
-                    @kick="kickGroupMember(member.participantId)"
-                  />
-                </ContextMenu>
-              </div>
-            </section>
-          </div>
-
-          <div v-else v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-private-info">
-            <div class="webqq-profile-hero">
-              <WebqqAvatar
-                class="webqq-avatar webqq-avatar-profile webqq-avatar-bot"
-                kind="bot"
-                :name="currentBot?.name"
-                :avatar="currentBot?.avatar"
-                :show-bot-badge="!!currentBot"
-              />
-              <h2>{{ currentBot?.name ?? 'Koishi' }}</h2>
-              <p>{{ currentBot?.id ?? '未选择机器人' }}</p>
-              <span class="webqq-online"><i /> 在线</span>
-            </div>
-            <dl class="webqq-profile-details">
-              <div><dt>平台</dt><dd>OneBot</dd></div>
-              <div><dt>会话类型</dt><dd>私聊</dd></div>
-              <div><dt>当前用户</dt><dd>{{ currentUser?.name ?? '未选择' }}</dd></div>
-              <div><dt>模拟环境</dt><dd>服务端内存</dd></div>
-            </dl>
-          </div>
-        </aside>
+        <WebqqDetailsPanel
+          :model="detailsPanelModel"
+          @close="closeDetails"
+          @publish-announcement="publishAnnouncement"
+          @delete-announcement="deleteAnnouncement"
+          @poke-group-member="pokeGroupMember"
+          @set-group-card="openGroupActionDialog('card', $event)"
+          @set-group-admin="setGroupAdmin"
+          @transfer-group-owner="transferGroupOwner"
+          @kick-group-member="kickGroupMember"
+        />
         <WorkspaceOverlayHost
           ref="overlayHostRef"
           :users="snapshot.users"
@@ -451,7 +340,6 @@ import {
   IconAddressBook,
   IconBell,
   IconClock,
-  IconDatabase,
   IconDots,
   IconEdit,
   IconHandClick,
@@ -473,11 +361,11 @@ import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover
 import EnvironmentCreatePopover from './environment-create-popover.vue'
 import EnvironmentManager from './environment-manager.vue'
 import { getFriendMenuActions, type FriendMenuState } from './friend-menu'
-import GroupMemberMenu from './group-member-menu.vue'
 import NotificationMenu from './notification-menu.vue'
 import WebqqAvatar from './webqq-avatar.vue'
 import WebqqChatPane, { type WebqqChatPaneModel } from './webqq-chat-pane.vue'
 import type { WebqqComposerModel, WebqqComposerSendIntent, WebqqComposerSender } from './webqq-composer.vue'
+import WebqqDetailsPanel, { type WebqqDetailsPanelModel } from './webqq-details-panel.vue'
 import type { WebqqMessageListModel } from './webqq-message-list.vue'
 import WorkspaceOverlayHost from './workspace-overlay-host.vue'
 import { getIncomingNotificationRequests } from './notification-requests'
@@ -505,12 +393,6 @@ const searchQuery = ref('')
 const mediaSources = ref<Record<string, string>>({})
 const mediaLoadFailures = ref<Record<string, true>>({})
 const errorMessage = ref('')
-const infoErrorMessage = ref('')
-const announcementInput = ref('')
-const announcementSending = ref(false)
-const announcementEditorOpen = ref(false)
-const deletingAnnouncementId = ref('')
-const groupMemberSearch = ref('')
 const workspaceLayout = createWorkspaceLayout()
 const detailsVisible = workspaceLayout.detailsVisible
 const overlayHostRef = ref<InstanceType<typeof WorkspaceOverlayHost>>()
@@ -605,14 +487,6 @@ const currentConversationSubtitle = computed(() => {
   if (currentGroup.value) return `群聊 ${currentGroup.value.id} · ${currentGroup.value.members.length} 人`
   return currentBot.value ? '在线 · 虚拟 OneBot 机器人' : '暂无会话'
 })
-const visibleGroupMembers = computed(() => {
-  const group = currentGroup.value
-  const query = groupMemberSearch.value.trim().toLowerCase()
-  if (!group) return []
-  if (!query) return group.members
-  return group.members.filter((member) => getGroupMemberName(member).toLowerCase().includes(query)
-    || member.participantId.includes(query))
-})
 const messages = computed(() => {
   const ids = new Set(currentConversation.value?.messageIds ?? [])
   return snapshot.value.messages.filter(({ id }) => ids.has(id))
@@ -657,6 +531,26 @@ const chatPaneModel = computed<WebqqChatPaneModel>(() => ({
   messageList: messageListModel.value,
   composer: composerModel.value,
 }))
+const detailsParticipants = computed(() => Object.fromEntries([
+  ...snapshot.value.users.map(({ id, name, avatar }) => [id, { name, avatar, isBot: false }]),
+  ...snapshot.value.bots.map(({ id, name, avatar }) => [id, { name, avatar, isBot: true }]),
+]))
+const detailsPanelModel = computed<WebqqDetailsPanelModel>(() => ({
+  view: currentView.value === 'profile' ? 'profile' : currentGroup.value ? 'group' : 'private',
+  conversationId: currentConversation.value?.id,
+  revision: snapshot.value.revision,
+  counts: {
+    users: snapshot.value.users.length,
+    bots: snapshot.value.bots.length,
+    groups: snapshot.value.groups.length,
+    requests: snapshot.value.requests.length,
+  },
+  group: currentGroup.value,
+  bot: currentBot.value,
+  currentUserName: currentUser.value?.name,
+  currentOperatorId: currentOperatorId.value,
+  participants: detailsParticipants.value,
+}))
 
 watch([currentUserId, () => currentConversation.value?.botId], ([userId, botId]) => {
   workspaceController.ensureOperator(userId, botId)
@@ -668,11 +562,6 @@ onMounted(async () => {
 
 watch(activeConversationId, () => {
   workspaceLayout.resetDetails()
-  groupMemberSearch.value = ''
-  announcementInput.value = ''
-  announcementEditorOpen.value = false
-  deletingAnnouncementId.value = ''
-  infoErrorMessage.value = ''
 })
 
 watch(
@@ -891,36 +780,14 @@ function getParticipantName(id: string) {
     ?? id
 }
 
-function getParticipantAvatar(id: string) {
-  return snapshot.value.users.find((user) => user.id === id)?.avatar
-    ?? snapshot.value.bots.find((bot) => bot.id === id)?.avatar
-}
-
-function isBotParticipant(id: string) {
-  return snapshot.value.bots.some((bot) => bot.id === id)
-}
-
 function getInitial(name?: string) {
   return name?.trim().slice(0, 1).toUpperCase() || '?'
-}
-
-function getGroupMemberName(member: SandboxGroupMember) {
-  return member.card?.trim() || getParticipantName(member.participantId)
 }
 
 function getGroupRoleLabel(role: SandboxGroupMember['role']) {
   if (role === 'owner') return '群主'
   if (role === 'admin') return '管理员'
   return '成员'
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value))
 }
 
 function getConversationMessages(conversationId: string) {
@@ -1020,50 +887,31 @@ function openComposerParticipantDialog(mode: EnvironmentDialogMode, entity: { ty
   openEntityDialog(mode, entity)
 }
 
-async function publishAnnouncement() {
-  const content = announcementInput.value.trim()
-  const user = currentUser.value
+async function publishAnnouncement(content: string, resolve: () => void, reject: (error: unknown) => void) {
   const group = currentGroup.value
-  if (!content || !user || !group || announcementSending.value) return
-
-  announcementSending.value = true
-  infoErrorMessage.value = ''
+  if (!group) return resolve()
   try {
     await workspaceController.setGroupAnnouncement({
       groupId: group.id,
       content,
     })
-    announcementInput.value = ''
-    announcementEditorOpen.value = false
+    resolve()
   } catch (error) {
-    infoErrorMessage.value = error instanceof Error ? error.message : '发布群公告失败'
-  } finally {
-    announcementSending.value = false
+    reject(error)
   }
 }
 
-function toggleAnnouncementEditor() {
-  announcementEditorOpen.value = !announcementEditorOpen.value
-  announcementInput.value = ''
-  infoErrorMessage.value = ''
-}
-
-async function deleteAnnouncement(announcementId: string) {
-  const user = currentUser.value
+async function deleteAnnouncement(announcementId: string, resolve: () => void, reject: (error: unknown) => void) {
   const group = currentGroup.value
-  if (!user || !group || deletingAnnouncementId.value) return
-
-  deletingAnnouncementId.value = announcementId
-  infoErrorMessage.value = ''
+  if (!group) return resolve()
   try {
     await workspaceController.deleteGroupAnnouncement({
       groupId: group.id,
       announcementId,
     })
+    resolve()
   } catch (error) {
-    infoErrorMessage.value = error instanceof Error ? error.message : '删除群公告失败'
-  } finally {
-    deletingAnnouncementId.value = ''
+    reject(error)
   }
 }
 </script>

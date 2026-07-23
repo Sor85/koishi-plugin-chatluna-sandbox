@@ -1,0 +1,208 @@
+<template>
+  <aside class="webqq-profile" :aria-label="panelLabel">
+    <header class="webqq-info-header">
+      <strong>{{ panelLabel }}</strong>
+      <button type="button" class="webqq-info-close" aria-label="关闭会话信息" @click="emit('close')">
+        <IconDots :size="22" aria-hidden="true" />
+      </button>
+    </header>
+
+    <div v-if="model.view === 'profile'" v-webqq-scrollbar class="webqq-private-info">
+      <div class="webqq-profile-hero">
+        <span class="webqq-avatar webqq-avatar-profile webqq-avatar-bot"><IconDatabase :size="32" aria-hidden="true" /></span>
+        <h2>默认内存场景</h2>
+        <p>修订 {{ model.revision }}</p>
+      </div>
+      <dl class="webqq-profile-details">
+        <div><dt>普通用户</dt><dd>{{ model.counts.users }}</dd></div>
+        <div><dt>虚拟机器人</dt><dd>{{ model.counts.bots }}</dd></div>
+        <div><dt>群组</dt><dd>{{ model.counts.groups }}</dd></div>
+        <div><dt>待处理申请</dt><dd>{{ model.counts.requests }}</dd></div>
+        <div><dt>状态来源</dt><dd>服务端内存</dd></div>
+      </dl>
+    </div>
+
+    <div v-else-if="model.group" class="webqq-group-info-body">
+      <section v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-group-announcements">
+        <div class="webqq-info-section-title">
+          <h3>群公告</h3>
+          <button type="button" :aria-label="announcementEditorOpen ? '取消添加群公告' : '添加群公告'" :class="{ 'is-active': announcementEditorOpen }" @click="toggleAnnouncementEditor">
+            <IconPlus :size="17" aria-hidden="true" />
+          </button>
+        </div>
+        <span v-if="errorMessage" class="webqq-info-error" role="alert">{{ errorMessage }}</span>
+        <form v-if="announcementEditorOpen" class="webqq-announcement-editor" @submit.prevent="publishAnnouncement">
+          <textarea v-model="announcementInput" rows="3" placeholder="发布一条群公告" />
+          <div><button type="submit" :disabled="announcementSending || !announcementInput.trim()">{{ announcementSending ? '发布中' : '发布' }}</button></div>
+        </form>
+        <p v-if="!model.group.announcements.length" class="webqq-group-empty">暂无群公告</p>
+        <article v-for="announcement in model.group.announcements" :key="announcement.id" class="webqq-group-announcement">
+          <button type="button" class="webqq-announcement-delete" :aria-label="`删除群公告：${announcement.content}`" :disabled="deletingAnnouncementId === announcement.id" @click="deleteAnnouncement(announcement.id)">
+            <IconTrash :size="15" aria-hidden="true" />
+          </button>
+          <p>{{ announcement.content }}</p>
+          <time>{{ getParticipant(announcement.authorId).name }} · {{ formatDateTime(announcement.createdAt) }}</time>
+        </article>
+      </section>
+      <section class="webqq-group-members">
+        <h3>群成员 {{ model.group.members.length }}</h3>
+        <input v-model="groupMemberSearch" type="search" placeholder="搜索群昵称或 QQ 号">
+        <div v-if="!visibleGroupMembers.length" class="webqq-group-empty">暂无群成员</div>
+        <div v-else v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-group-member-list">
+          <ContextMenu v-for="member in visibleGroupMembers" :key="member.participantId">
+            <ContextMenuTrigger as-child>
+              <article class="webqq-group-member">
+                <WebqqAvatar class="webqq-menu-avatar" :kind="getParticipant(member.participantId).isBot ? 'bot' : 'user'" :name="getGroupMemberName(member)" :avatar="getParticipant(member.participantId).avatar" />
+                <span><strong>{{ getGroupMemberName(member) }}</strong><small>{{ member.participantId }}</small></span>
+                <em>{{ getGroupRoleLabel(member.role) }}</em>
+              </article>
+            </ContextMenuTrigger>
+            <GroupMemberMenu
+              :actor="getCurrentGroupMember(model.currentOperatorId ?? '')"
+              :target="member"
+              @poke="emit('pokeGroupMember', member.participantId)"
+              @set-card="emit('setGroupCard', member.participantId)"
+              @set-admin="emit('setGroupAdmin', member.participantId, $event)"
+              @transfer-owner="emit('transferGroupOwner', member.participantId)"
+              @kick="emit('kickGroupMember', member.participantId)"
+            />
+          </ContextMenu>
+        </div>
+      </section>
+    </div>
+
+    <div v-else v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-private-info">
+      <div class="webqq-profile-hero">
+        <WebqqAvatar class="webqq-avatar webqq-avatar-profile webqq-avatar-bot" kind="bot" :name="model.bot?.name" :avatar="model.bot?.avatar" :show-bot-badge="!!model.bot" />
+        <h2>{{ model.bot?.name ?? 'Koishi' }}</h2>
+        <p>{{ model.bot?.id ?? '未选择机器人' }}</p>
+        <span class="webqq-online"><i /> 在线</span>
+      </div>
+      <dl class="webqq-profile-details">
+        <div><dt>平台</dt><dd>OneBot</dd></div>
+        <div><dt>会话类型</dt><dd>私聊</dd></div>
+        <div><dt>当前用户</dt><dd>{{ model.currentUserName || '未选择' }}</dd></div>
+        <div><dt>模拟环境</dt><dd>服务端内存</dd></div>
+      </dl>
+    </div>
+  </aside>
+</template>
+
+<script setup lang="ts">
+import { IconDatabase, IconDots, IconPlus, IconTrash } from '@tabler/icons-vue'
+import { computed, ref, watch } from 'vue'
+import { ContextMenu, ContextMenuTrigger } from './components/ui/context-menu'
+import GroupMemberMenu from './group-member-menu.vue'
+import WebqqAvatar from './webqq-avatar.vue'
+import { vWebqqScrollbar } from './webqq-scrollbar'
+import type { SandboxBotProfile, SandboxGroup, SandboxGroupMember } from '../src/types'
+
+export interface WebqqDetailsParticipant {
+  name: string
+  avatar?: string
+  isBot: boolean
+}
+
+export interface WebqqDetailsPanelModel {
+  view: 'profile' | 'group' | 'private'
+  conversationId?: string
+  revision: number
+  counts: { users: number, bots: number, groups: number, requests: number }
+  group?: SandboxGroup
+  bot?: SandboxBotProfile
+  currentUserName?: string
+  currentOperatorId?: string
+  participants: Record<string, WebqqDetailsParticipant>
+}
+
+const props = defineProps<{ model: WebqqDetailsPanelModel }>()
+const emit = defineEmits<{
+  close: []
+  publishAnnouncement: [content: string, resolve: () => void, reject: (error: unknown) => void]
+  deleteAnnouncement: [announcementId: string, resolve: () => void, reject: (error: unknown) => void]
+  pokeGroupMember: [targetId: string]
+  setGroupCard: [targetId: string]
+  setGroupAdmin: [targetId: string, enabled: boolean]
+  transferGroupOwner: [targetId: string]
+  kickGroupMember: [targetId: string]
+}>()
+
+const announcementInput = ref('')
+const announcementSending = ref(false)
+const announcementEditorOpen = ref(false)
+const deletingAnnouncementId = ref('')
+const groupMemberSearch = ref('')
+const errorMessage = ref('')
+const panelLabel = computed(() => props.model.view === 'profile' ? '环境摘要' : props.model.group ? '群信息' : '私聊信息')
+const visibleGroupMembers = computed(() => {
+  const group = props.model.group
+  const query = groupMemberSearch.value.trim().toLowerCase()
+  if (!group || !query) return group?.members ?? []
+  return group.members.filter((member) => getGroupMemberName(member).toLowerCase().includes(query) || member.participantId.includes(query))
+})
+
+watch(() => props.model.conversationId, () => {
+  groupMemberSearch.value = ''
+  announcementInput.value = ''
+  announcementEditorOpen.value = false
+  deletingAnnouncementId.value = ''
+  errorMessage.value = ''
+})
+
+function getParticipant(id: string): WebqqDetailsParticipant {
+  return props.model.participants[id] ?? { name: id, isBot: false }
+}
+
+function getGroupMemberName(member: SandboxGroupMember) {
+  return member.card?.trim() || getParticipant(member.participantId).name
+}
+
+function getGroupRoleLabel(role: SandboxGroupMember['role']) {
+  if (role === 'owner') return '群主'
+  if (role === 'admin') return '管理员'
+  return '成员'
+}
+
+function getCurrentGroupMember(participantId: string) {
+  return props.model.group?.members.find((member) => member.participantId === participantId)
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
+}
+
+function toggleAnnouncementEditor() {
+  announcementEditorOpen.value = !announcementEditorOpen.value
+  announcementInput.value = ''
+  errorMessage.value = ''
+}
+
+async function publishAnnouncement() {
+  const content = announcementInput.value.trim()
+  if (!content || announcementSending.value) return
+  announcementSending.value = true
+  errorMessage.value = ''
+  try {
+    await new Promise<void>((resolve, reject) => emit('publishAnnouncement', content, resolve, reject))
+    announcementInput.value = ''
+    announcementEditorOpen.value = false
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '发布群公告失败'
+  } finally {
+    announcementSending.value = false
+  }
+}
+
+async function deleteAnnouncement(announcementId: string) {
+  if (deletingAnnouncementId.value) return
+  deletingAnnouncementId.value = announcementId
+  errorMessage.value = ''
+  try {
+    await new Promise<void>((resolve, reject) => emit('deleteAnnouncement', announcementId, resolve, reject))
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '删除群公告失败'
+  } finally {
+    deletingAnnouncementId.value = ''
+  }
+}
+</script>

@@ -1,0 +1,15 @@
+{
+  "verifiedAt": "2026-07-23",
+  "route": "http://127.0.0.1:5140/onebot-sandbox",
+  "group": {
+    "announcementAdded": true,
+    "announcementDeleted": true,
+    "memberContextMenuOpened": true
+  },
+  "private": { "label": "私聊信息", "name": "Koishi" },
+  "responsive": {
+    "700px": "none",
+    "wideRestore": "pending-user-release-of-ego-task-space"
+  },
+  "consoleFailures": []
+}
