@@ -21,10 +21,10 @@ const snapshot: SandboxSnapshot = {
     ],
   }],
   conversations: [
-    { id: 'private:10001:20001', type: 'direct', userId: '10001', botId: '20001', messageIds: ['message-1'] },
-    { id: 'private:10001:10002', type: 'direct', userId: '10001', botId: '10002', messageIds: [] },
+    { id: 'private:10001:20001', type: 'direct', participantIds: ['10001', '20001'], messageIds: ['message-1'] },
+    { id: 'private:10001:10002', type: 'direct', participantIds: ['10001', '10002'], messageIds: [] },
     { id: 'group:30001:10001:20001', type: 'group', userId: '10001', botId: '20001', groupId: '30001', messageIds: [] },
-    { id: 'private:10002:20001', type: 'direct', userId: '10002', botId: '20001', messageIds: [] },
+    { id: 'private:10002:20001', type: 'direct', participantIds: ['10002', '20001'], messageIds: [] },
   ],
   messages: [{
     id: 'message-1',
@@ -139,7 +139,7 @@ describe('WebQQ 工作区控制模块', () => {
       input: { operatorId: '10002' },
     })
     expect(controller.currentOperatorId.value).toBe('10002')
-    expect(controller.activeConversationId.value).toBe('private:10002:20001')
+    expect(controller.activeConversationId.value).toBe('private:10001:10002')
 
     await controller.selectOperator('20001')
 
@@ -150,8 +150,9 @@ describe('WebQQ 工作区控制模块', () => {
     expect(controller.currentOperatorId.value).toBe('20001')
     expect(controller.composer.value.currentOperator).toMatchObject({ id: '20001', type: 'bot' })
     expect(controller.sidebar.value.conversations
-      .filter(({ type }) => type === 'direct')
-      .map(({ userId }) => userId)).toEqual(['10001', '10002'])
+      .flatMap((conversation) => conversation.type === 'direct'
+        ? conversation.participantIds.find((id) => id !== '20001') ?? []
+        : [])).toEqual(['10001', '10002'])
     for (const conversationId of ['private:10001:20001', 'private:10002:20001']) {
       controller.selectConversation(conversationId)
       expect(controller.chat.value.conversation?.id).toBe(conversationId)
@@ -593,7 +594,9 @@ describe('WebQQ 工作区控制模块', () => {
         ...workspace.snapshot,
         revision: 8,
         participants: workspace.snapshot.participants.filter(({ id }) => id !== '10001'),
-        conversations: workspace.snapshot.conversations.filter(({ userId }) => userId !== '10001'),
+        conversations: workspace.snapshot.conversations.filter((conversation) => conversation.type === 'direct'
+          ? !conversation.participantIds.includes('10001')
+          : conversation.userId !== '10001'),
       },
     }
 

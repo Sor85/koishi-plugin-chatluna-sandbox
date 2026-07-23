@@ -36,8 +36,7 @@ describe('模拟 QQ 环境目录管理', () => {
     expect(created.conversations).toContainEqual({
       id: 'private:10099:20001',
       type: 'direct',
-      userId: '10099',
-      botId: '20001',
+      participantIds: ['10099', '20001'],
       messageIds: [],
     })
 
@@ -52,7 +51,7 @@ describe('模拟 QQ 环境目录管理', () => {
     const snapshot = control.getSnapshot()
     expect(snapshot.revision).toBe(initialRevision + 3)
     expect(snapshot.participants.some(({ id }) => id === '10099')).toBe(false)
-    expect(snapshot.conversations.some(({ userId }) => userId === '10099')).toBe(false)
+    expect(snapshot.conversations.some((conversation) => conversation.type === 'direct' && conversation.participantIds.includes('10099'))).toBe(false)
     expect(snapshot.messages).toEqual([])
     expect(getMiddlewareCalls()).toBe(0)
   })
@@ -74,7 +73,8 @@ describe('模拟 QQ 环境目录管理', () => {
       implementation: 'llbot',
       enabled: false,
     })
-    expect(created.conversations.filter(({ botId }) => botId === '20099')).toHaveLength(created.participants.filter(({ kind }) => kind === 'user').length)
+    expect(created.conversations.filter((conversation) => conversation.type === 'direct' && conversation.participantIds.includes('20099')))
+      .toHaveLength(created.participants.length - 1)
 
     control.updateBot({
       id: '20099',
@@ -93,7 +93,7 @@ describe('模拟 QQ 环境目录管理', () => {
     control.deleteBot({ id: '20099' })
     const removed = control.getSnapshot()
     expect(removed.participants.some(({ id }) => id === '20099')).toBe(false)
-    expect(removed.conversations.some(({ botId }) => botId === '20099')).toBe(false)
+    expect(removed.conversations.some((conversation) => conversation.type === 'direct' && conversation.participantIds.includes('20099'))).toBe(false)
     expect(removed.groups.some(({ members }) => members.some(({ participantId }) => participantId === '20099'))).toBe(false)
     expect(getMiddlewareCalls()).toBe(0)
   })

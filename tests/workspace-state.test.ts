@@ -18,8 +18,8 @@ const snapshot: SandboxSnapshot = {
   ],
   groups: [],
   conversations: [
-    { id: 'private:10001:20001', type: 'direct', userId: '10001', botId: '20001', messageIds: [] },
-    { id: 'private:10002:20001', type: 'direct', userId: '10002', botId: '20001', messageIds: [] },
+    { id: 'private:10001:20001', type: 'direct', participantIds: ['10001', '20001'], messageIds: [] },
+    { id: 'private:10002:20001', type: 'direct', participantIds: ['10002', '20001'], messageIds: [] },
   ],
   messages: [],
   friendships: [],

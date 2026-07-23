@@ -1,6 +1,7 @@
 import type { SandboxConversation, SandboxSnapshot } from '../../src/types'
 
 export function getConversationPeerId(conversation: SandboxConversation, operatorId: string | undefined, operatorIsBot: boolean) {
+  if (conversation.type === 'direct') return conversation.participantIds.find((id) => id !== operatorId) ?? conversation.participantIds[0]
   return operatorIsBot && conversation.botId === operatorId ? conversation.userId : conversation.botId
 }
 
@@ -85,8 +86,8 @@ export function getGroupDirectory(snapshot: SandboxSnapshot, operatorId?: string
 
 function isDirectConversationBetween(conversation: SandboxConversation, firstId: string, secondId: string) {
   return conversation.type === 'direct'
-    && ((conversation.userId === firstId && conversation.botId === secondId)
-      || (conversation.userId === secondId && conversation.botId === firstId))
+    && conversation.participantIds.includes(firstId)
+    && conversation.participantIds.includes(secondId)
 }
 
 function isGroupConversationFor(conversation: SandboxConversation, groupId: string, operatorId: string) {

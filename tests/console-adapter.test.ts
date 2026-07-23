@@ -87,7 +87,9 @@ describe('Koishi 控制台适配器', () => {
     ])
     expect(initialWorkspace.snapshot.participants.filter(({ kind }: { kind: string }) => kind === 'bot').map(({ id }: { id: string }) => id)).toEqual(['20001'])
     expect(initialWorkspace.snapshot.groups.map(({ id }: { id: string }) => id)).toEqual(['30001'])
-    expect(initialWorkspace.snapshot.conversations.every(({ userId }: { userId: string }) => userId === '10001')).toBe(true)
+    expect(initialWorkspace.snapshot.conversations.every((conversation: { type: string; participantIds?: readonly string[]; userId?: string }) => conversation.type === 'direct'
+      ? conversation.participantIds?.includes('10001')
+      : conversation.userId === '10001')).toBe(true)
     expect(initialWorkspace.appearance).toEqual(appearance)
 
     const snapshot = await sendMessageListener({
@@ -115,7 +117,9 @@ describe('Koishi 控制台适配器', () => {
     }))
 
     const otherWorkspace = snapshotListener({ operatorId: '10002' })
-    expect(otherWorkspace.snapshot.conversations.every(({ userId }: { userId: string }) => userId === '10002')).toBe(true)
+    expect(otherWorkspace.snapshot.conversations.every((conversation: { type: string; participantIds?: readonly string[]; userId?: string }) => conversation.type === 'direct'
+      ? conversation.participantIds?.includes('10002')
+      : conversation.userId === '10002')).toBe(true)
     expect(otherWorkspace.snapshot.messages).toEqual([])
 
     const history = historyListener({
@@ -163,8 +167,12 @@ describe('Koishi 控制台适配器', () => {
 
     const botWorkspace = snapshotListener({ operatorId: '20001' })
     expect(botWorkspace.snapshot.conversations.length).toBeGreaterThan(0)
-    expect(botWorkspace.snapshot.conversations.every(({ botId }: { botId: string }) => botId === '20001')).toBe(true)
-    const botConversationUserIds = new Set(botWorkspace.snapshot.conversations.map(({ userId }: { userId: string }) => userId))
+    expect(botWorkspace.snapshot.conversations.every((conversation: { type: string; participantIds?: readonly string[]; botId?: string }) => conversation.type === 'direct'
+      ? conversation.participantIds?.includes('20001')
+      : conversation.botId === '20001')).toBe(true)
+    const botConversationUserIds = new Set(botWorkspace.snapshot.conversations.flatMap((conversation: { type: string; participantIds?: readonly string[]; userId?: string }) => conversation.type === 'direct'
+      ? conversation.participantIds?.filter((id) => id !== '20001') ?? []
+      : conversation.userId ? [conversation.userId] : []))
     expect(['10001', '10002', '10003'].every((userId) => botConversationUserIds.has(userId))).toBe(true)
 
     const afterCurrentUserDeleted = manageEnvironmentListener({
@@ -173,6 +181,8 @@ describe('Koishi 控制台适配器', () => {
       data: { id: '10001' },
     })
     expect(afterCurrentUserDeleted.snapshot.participants.some(({ id }: { id: string }) => id === '10001')).toBe(false)
-    expect(afterCurrentUserDeleted.snapshot.conversations.every(({ userId }: { userId: string }) => userId === '10002')).toBe(true)
+    expect(afterCurrentUserDeleted.snapshot.conversations.every((conversation: { type: string; participantIds?: readonly string[]; userId?: string }) => conversation.type === 'direct'
+      ? conversation.participantIds?.includes('10002')
+      : conversation.userId === '10002')).toBe(true)
   })
 })

@@ -33,13 +33,14 @@ describe('模拟 QQ 环境好友关系', () => {
 
     await control.performFriendAction({ action: 'handle-request', operatorId: '10003', requestId: request.requestId, approve: true })
 
-    for (const [operatorId, conversationId] of [
-      ['10001', 'private:10001:10003'],
-      ['10003', 'private:10003:10001'],
-    ]) {
+    for (const operatorId of ['10001', '10003']) {
       const snapshot = control.getVisibleSnapshot(operatorId)
       expect(snapshot.friendships.some(({ participantIds }) => participantIds.includes('10001') && participantIds.includes('10003'))).toBe(true)
-      expect(snapshot.conversations.some(({ id }) => id === conversationId)).toBe(true)
+      expect(snapshot.conversations).toContainEqual(expect.objectContaining({
+        id: 'private:10001:10003',
+        type: 'direct',
+        participantIds: ['10001', '10003'],
+      }))
     }
   })
 
@@ -56,20 +57,15 @@ describe('模拟 QQ 环境好友关系', () => {
     expect(control.getSnapshot().friendships.some(({ participantIds }) => participantIds.includes('10001') && participantIds.includes('10002'))).toBe(false)
 
     await control.performFriendAction({ action: 'handle-request', operatorId: '10002', requestId: request.requestId, approve: true })
-    expect(control.getSnapshot().conversations).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: 'private:10001:10002', userId: '10001', botId: '10002' }),
-      expect.objectContaining({ id: 'private:10002:10001', userId: '10002', botId: '10001' }),
-    ]))
+    expect(control.getSnapshot().conversations.filter(({ type, id }) => type === 'direct' && id === 'private:10001:10002'))
+      .toEqual([expect.objectContaining({ participantIds: ['10001', '10002'] })])
     await control.sendMessage({
       operatorId: '10001',
       conversationId: 'private:10001:10002',
       content: '普通好友私聊',
     })
     const directMessages = control.getSnapshot().messages.filter(({ content }) => content === '普通好友私聊')
-    expect(directMessages.map(({ conversationId }) => conversationId).sort()).toEqual([
-      'private:10001:10002',
-      'private:10002:10001',
-    ])
+    expect(directMessages.map(({ conversationId }) => conversationId)).toEqual(['private:10001:10002'])
     await control.performFriendAction({ action: 'set-remark', operatorId: '10001', targetId: '10002', remark: '测试搭档' })
     const friendship = control.getSnapshot().friendships.find(({ participantIds }) => participantIds.includes('10001') && participantIds.includes('10002'))
     expect(friendship?.remarks).toEqual({ '10001': '测试搭档' })
@@ -77,6 +73,23 @@ describe('模拟 QQ 环境好友关系', () => {
 
     await control.performFriendAction({ action: 'delete', operatorId: '10001', targetId: '10002' })
     expect(control.getSnapshot().friendships.some(({ participantIds }) => participantIds.includes('10001') && participantIds.includes('10002'))).toBe(false)
+    expect(control.getSnapshot().conversations.find(({ id }) => id === 'private:10001:10002')?.messageIds).toEqual([directMessages[0].id])
+    expect(control.getVisibleSnapshot('10001').conversations.some(({ id }) => id === 'private:10001:10002')).toBe(false)
+    expect(() => control.getMessageHistory({ operatorId: '10001', conversationId: 'private:10001:10002' })).toThrow('会话不存在')
+    await expect(control.sendMessage({
+      operatorId: '10002',
+      conversationId: 'private:10001:10002',
+      content: '关系删除后不可发送',
+    })).rejects.toThrow('会话不存在')
+
+    const restoreRequest = await control.performFriendAction({ action: 'request', operatorId: '10002', targetId: '10001' })
+    if (!restoreRequest.requestId) throw new Error('恢复好友申请未创建')
+    await control.performFriendAction({ action: 'handle-request', operatorId: '10001', requestId: restoreRequest.requestId, approve: true })
+    expect(control.getMessageHistory({
+      operatorId: '10002',
+      conversationId: 'private:10001:10002',
+    }).messages.map(({ content }) => content)).toEqual(['普通好友私聊'])
+    expect(control.getSnapshot().conversations.filter(({ id }) => id === 'private:10001:10002')).toHaveLength(1)
   })
 
   it('发给机器人的申请只能由 OneBot action 审批，并向机器人派发戳一戳和删除事件', async () => {
@@ -136,6 +149,20 @@ describe('模拟 QQ 环境好友关系', () => {
       .rejects.toThrow('双方已有待处理的好友申请')
 
     expect(control.getSnapshot()).toEqual(before)
+  })
+
+  it('用户、机器人之间的私聊使用同一个稳定会话，机器人之间也可以互通', async () => {
+    const { control } = await createControl()
+    control.createBot({ id: '20002', name: '第二个机器人', implementation: 'llbot', enabled: true })
+
+    const conversation = control.getSnapshot().conversations.filter(({ id }) => id === 'private:20001:20002')
+    expect(conversation).toHaveLength(1)
+    expect(control.getVisibleSnapshot('20001').conversations).toContainEqual(expect.objectContaining({ id: 'private:20001:20002' }))
+    expect(control.getVisibleSnapshot('20002').conversations).toContainEqual(expect.objectContaining({ id: 'private:20001:20002' }))
+
+    await control.sendMessage({ operatorId: '20001', conversationId: 'private:20001:20002', content: '机器人之间的测试消息' })
+    expect(control.getMessageHistory({ operatorId: '20002', conversationId: 'private:20001:20002' }).messages)
+      .toEqual([expect.objectContaining({ authorId: '20001', content: '机器人之间的测试消息' })])
   })
 
   it('群主可以同意入群申请并为申请人建立群会话', async () => {

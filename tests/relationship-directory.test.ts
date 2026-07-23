@@ -16,8 +16,8 @@ const snapshot: SandboxSnapshot = {
     { id: '30003', name: '可申请群', announcements: [], members: [{ participantId: '10003', role: 'owner' }] },
   ],
   conversations: [
-    { id: 'private:10001:10002', type: 'direct', userId: '10001', botId: '10002', messageIds: [] },
-    { id: 'private:10001:20001', type: 'direct', userId: '10001', botId: '20001', messageIds: [] },
+    { id: 'private:10001:10002', type: 'direct', participantIds: ['10001', '10002'], messageIds: [] },
+    { id: 'private:10001:20001', type: 'direct', participantIds: ['10001', '20001'], messageIds: [] },
     { id: 'group:30001:10001:20001', type: 'group', userId: '10001', botId: '20001', groupId: '30001', messageIds: [] },
   ],
   messages: [],
@@ -36,7 +36,7 @@ describe('当前操作者关系目录', () => {
   it('机器人视角把同一群组的多条底层会话合并为一个最近入口', () => {
     const conversations: SandboxConversation[] = [
       { id: 'group:30001:10001:20001', type: 'group', userId: '10001', botId: '20001', groupId: '30001', messageIds: [] },
-      { id: 'private:10001:20001', type: 'direct', userId: '10001', botId: '20001', messageIds: [] },
+      { id: 'private:10001:20001', type: 'direct', participantIds: ['10001', '20001'], messageIds: [] },
       { id: 'group:30001:10002:20001', type: 'group', userId: '10002', botId: '20001', groupId: '30001', messageIds: [] },
       { id: 'group:30001:10003:20001', type: 'group', userId: '10003', botId: '20001', groupId: '30001', messageIds: [] },
     ]

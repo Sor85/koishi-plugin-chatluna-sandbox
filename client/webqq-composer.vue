@@ -179,7 +179,6 @@ export interface WebqqComposerModel {
   senders: WebqqComposerSender[]
   currentOperatorId?: string
   conversationId?: string
-  botId?: string
   replyingTo?: { id: string, authorName: string, content: string }
   accentColor: string
   externalError?: string

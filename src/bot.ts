@@ -1,5 +1,6 @@
 import { Bot, Context, Fragment, h, Universal } from 'koishi'
 import type { SandboxControlService } from './control-service'
+import { createDirectConversationId, getDirectConversationPeerId } from './types'
 
 export namespace SandboxBot {
   export interface Config {
@@ -209,7 +210,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
 
   async createDirectChannel(userId: string): Promise<Universal.Channel> {
     return {
-      id: `private:${userId}:${this.selfId}`,
+      id: createDirectConversationId(userId, this.selfId),
       type: Universal.Channel.Type.DIRECT,
     }
   }
@@ -328,7 +329,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     if (this.status !== Universal.Status.ONLINE) throw new Error(`机器人已离线：${this.selfId}`)
     const content = h.normalize(fragment).join('').trim()
     if (!content) return []
-    const message = this.control.recordBotMessage(channelId, content)
+    const message = this.control.recordBotMessage(this.selfId, channelId, content)
     return [message.id]
   }
 
@@ -351,14 +352,14 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
   }
 
   private getVisibleConversation(channelId: string) {
-    const conversation = this.control.getSnapshot().conversations.find(({ id, botId }) => id === channelId && botId === this.selfId)
+    const conversation = this.control.getVisibleSnapshot(this.selfId).conversations.find(({ id }) => id === channelId)
     if (!conversation) throw new Error(`会话不存在：${channelId}`)
     return conversation
   }
 
   private findVisibleMessage(messageId: string, channelId?: string) {
-    const snapshot = this.control.getSnapshot()
-    const message = snapshot.messages.find(({ id, botId, conversationId }) => id === messageId && botId === this.selfId
+    const snapshot = this.control.getVisibleSnapshot(this.selfId)
+    const message = snapshot.messages.find(({ id, conversationId }) => id === messageId
       && (!channelId || conversationId === channelId))
     if (!message) throw new Error(`消息不存在：${messageId}`)
     return message
@@ -397,13 +398,16 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
 
   private toOneBotMessage(message: ReturnType<SandboxControlService['getSnapshot']>['messages'][number]) {
     const conversation = this.control.getSnapshot().conversations.find(({ id }) => id === message.conversationId)
+    const directPeerId = conversation?.type === 'direct'
+      ? getDirectConversationPeerId(conversation, this.selfId)
+      : undefined
     return {
       time: Math.floor(new Date(message.createdAt).getTime() / 1000),
       message_type: conversation?.type === 'group' ? 'group' : 'private',
       message_id: message.id,
       real_id: message.id,
       sender: { user_id: Number(message.authorId), nickname: this.control.getSnapshot().participants.find(({ id }) => id === message.authorId)?.name ?? this.user?.name ?? message.authorId },
-      user_id: Number(conversation?.userId ?? message.authorId),
+      user_id: Number(conversation?.type === 'group' ? conversation.userId : directPeerId ?? message.authorId),
       group_id: conversation?.groupId ? Number(conversation.groupId) : undefined,
       message: [{ type: 'text', data: { text: message.content } }],
       raw_message: message.content,

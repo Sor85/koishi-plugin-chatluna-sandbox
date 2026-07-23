@@ -98,20 +98,44 @@ export type ManageSandboxEnvironmentInput =
   | { action: 'update-group', data: UpdateSandboxGroupInput }
   | { action: 'delete-group', data: DeleteSandboxGroupInput }
 
-export interface SandboxConversation {
+export interface SandboxDirectConversation {
   id: string
-  type: 'direct' | 'group'
-  userId: string
-  botId: string
-  groupId?: string
+  type: 'direct'
+  participantIds: readonly [string, string]
+  groupId?: never
   messageIds: string[]
   hasMoreMessages?: boolean
+}
+
+export interface SandboxGroupConversation {
+  id: string
+  type: 'group'
+  userId: string
+  botId: string
+  groupId: string
+  participantIds?: never
+  messageIds: string[]
+  hasMoreMessages?: boolean
+}
+
+export type SandboxConversation = SandboxDirectConversation | SandboxGroupConversation
+
+export function createDirectConversationId(firstId: string, secondId: string): string {
+  const [left, right] = [firstId, secondId].sort()
+  return `private:${left}:${right}`
+}
+
+export function getDirectConversationPeerId(conversation: SandboxDirectConversation, participantId: string): string {
+  const peerId = conversation.participantIds.find((id) => id !== participantId)
+  if (!peerId) throw new Error(`参与者不在当前私聊中：${participantId}`)
+  return peerId
 }
 
 export interface SandboxMessage {
   id: string
   authorId: string
-  botId: string
+  /** 群消息或机器人私聊消息的接收机器人；普通用户私聊没有该字段。 */
+  botId?: string
   conversationId: string
   content: string
   createdAt: string

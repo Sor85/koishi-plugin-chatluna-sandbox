@@ -108,17 +108,24 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   const conversations = computed(() => {
     const operatorId = currentOperatorIdState.value
     const operatorIsBot = snapshot.value.participants.some(({ id, kind }) => id === operatorId && kind === 'bot')
-    return snapshot.value.conversations.filter((conversation) => operatorIsBot
-      ? conversation.botId === operatorId
-      : conversation.userId === operatorId)
+    return snapshot.value.conversations.filter((conversation) => conversation.type === 'direct'
+      ? conversation.participantIds.includes(operatorId ?? '')
+      : operatorIsBot
+        ? conversation.botId === operatorId
+        : conversation.userId === operatorId)
   })
   const activeConversation = computed(() => conversations.value.find(({ id }) => id === activeConversationIdState.value))
   const activeMessages = computed(() => {
     const ids = new Set(activeConversation.value?.messageIds ?? [])
     return snapshot.value.messages.filter(({ id }) => ids.has(id))
   })
-  const activeBot = computed(() => snapshot.value.participants.find((participant): participant is SandboxBotProfile => participant.kind === 'bot'
-    && participant.id === activeConversation.value?.botId))
+  const activeBot = computed(() => {
+    const conversation = activeConversation.value
+    const botId = conversation?.type === 'direct'
+      ? conversation.participantIds.find((id) => snapshot.value.participants.some((participant) => participant.kind === 'bot' && participant.id === id))
+      : conversation?.botId
+    return snapshot.value.participants.find((participant): participant is SandboxBotProfile => participant.kind === 'bot' && participant.id === botId)
+  })
   const activeGroup = computed(() => snapshot.value.groups.find(({ id }) => id === activeConversation.value?.groupId))
   const participants = computed<WorkspaceParticipant[]>(() => snapshot.value.participants
     .map((participant) => ({ ...participant, type: participant.kind })))

@@ -50,8 +50,6 @@ export function createWebqqWorkspaceShell(
   const appearance = computed(() => workspace.value.appearance)
   const currentOperator = computed(() => snapshot.value.participants.find(({ id }) => id === currentOperatorId.value))
   const currentOperatorIsBot = computed(() => currentOperator.value?.kind === 'bot')
-  // 会话的 botId 是历史遗留的“对端 ID”，普通用户私聊中也会指向用户；
-  // 发送者候选必须使用完整参与者目录，不能据此筛掉机器人。
   const composerSenders = computed<WebqqComposerSender[]>(() => workspaceController.composer.value.participants
     .map((participant) => ({ ...participant })))
   const visibleConversations = computed<SandboxConversation[]>(() => workspaceController.sidebar.value.conversations
@@ -113,7 +111,6 @@ export function createWebqqWorkspaceShell(
     senders: composerSenders.value,
     currentOperatorId: currentOperatorId.value,
     conversationId: currentConversation.value?.id,
-    botId: currentConversation.value?.botId,
     accentColor: appearance.value.webQQAccentColor,
     externalError: errorMessage.value,
   }))
@@ -167,7 +164,7 @@ export function createWebqqWorkspaceShell(
     const actorRole = group?.members.find(({ participantId }) => participantId === currentOperatorId.value)?.role
     return {
       id: conversation.id,
-      botId: conversation.botId,
+      botId: bot?.id ?? '',
       groupId: conversation.groupId,
       title: group?.name ?? peer?.name ?? conversation.id,
       avatar: conversation.groupId ? undefined : peer?.avatar,

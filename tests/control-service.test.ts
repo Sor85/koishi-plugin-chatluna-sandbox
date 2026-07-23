@@ -200,12 +200,14 @@ describe('模拟 QQ 环境消息闭环', () => {
     await app.start()
     if (!control) throw new Error('沙盒控制服务未注册')
 
-    control.recordBotMessage('private:10001:20001', '第一条')
-    control.recordBotMessage('private:10001:20001', '第二条')
-    control.recordBotMessage('private:10002:20001', '其他用户消息')
+    control.recordBotMessage('20001', 'private:10001:20001', '第一条')
+    control.recordBotMessage('20001', 'private:10001:20001', '第二条')
+    control.recordBotMessage('20001', 'private:10002:20001', '其他用户消息')
 
     const visible = control.getVisibleSnapshot('10001', 1)
-    expect(visible.conversations.every(({ userId }) => userId === '10001')).toBe(true)
+    expect(visible.conversations.every((conversation) => conversation.type === 'direct'
+      ? conversation.participantIds.includes('10001')
+      : conversation.userId === '10001')).toBe(true)
     expect(visible.messages.map(({ content }) => content)).toEqual(['第二条'])
     expect(visible.conversations.find(({ id }) => id === 'private:10001:20001')?.messageIds).toEqual([
       visible.messages[0].id,
