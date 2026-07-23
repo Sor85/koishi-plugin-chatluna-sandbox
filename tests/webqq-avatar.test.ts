@@ -20,10 +20,11 @@ describe('WebQQ 共享头像', () => {
     const composerSource = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
     const messageListSource = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
     const detailsPanelSource = readFileSync(resolve('client/webqq-details-panel.vue'), 'utf8')
+    const sidebarSource = readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
     const notificationSource = readFileSync(resolve('client/notification-menu.vue'), 'utf8')
     const environmentSource = readFileSync(resolve('client/environment-manager.vue'), 'utf8')
 
-    const avatarCount = [pageSource, composerSource, messageListSource, detailsPanelSource]
+    const avatarCount = [pageSource, composerSource, messageListSource, detailsPanelSource, sidebarSource]
       .reduce((count, source) => count + (source.match(/<WebqqAvatar/g)?.length ?? 0), 0)
     expect(avatarCount).toBeGreaterThanOrEqual(10)
     expect(pageSource).not.toContain('<span v-if="entry.isBot" class="webqq-avatar-bot-badge">')
