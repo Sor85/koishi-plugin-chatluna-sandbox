@@ -1,0 +1,52 @@
+{
+  "verifiedAt": "2026-07-23",
+  "route": "http://127.0.0.1:5140/onebot-sandbox",
+  "helperMigration": {
+    "directory": "client/webqq",
+    "files": [
+      "workspace-state.ts",
+      "message-cluster.ts",
+      "user-stack.ts",
+      "relationship-directory.ts",
+      "notification-requests.ts",
+      "friend-menu.ts",
+      "group-menu.ts"
+    ],
+    "oldPathsRemoved": true,
+    "behaviorChanges": false
+  },
+  "architecture": {
+    "pageLines": 131,
+    "uiFullSnapshotAccess": false,
+    "uiDirectKoishiRpc": false,
+    "uiWorkspaceControllerAccess": false,
+    "regionModels": "field-level readonly data derived by workspace-shell"
+  },
+  "chromium": {
+    "matrix": {
+      "1400px": "details-open, 72px 300px 684px 280px, no overflow",
+      "1000px": "details-closed, 72px 300px 564px, no overflow",
+      "700px": "details-closed, 72px 230px 360px, no overflow",
+      "restored1400px": "details-open automatically"
+    },
+    "interactions": ["notification popover", "participant create popover", "bot context menu"],
+    "consoleFailures": []
+  },
+  "firefox": {
+    "matrix": "matches Chromium and baseline at 1400px, 1000px, 700px and restored 1400px",
+    "participantCreateSelect": ["普通用户", "机器人"],
+    "senderAnimation": "expanded stack width 144px",
+    "contextMenu": "bot edit and delete items visible",
+    "consoleErrors": 0,
+    "componentWarnings": 0,
+    "existingRouterWarnings": 10
+  },
+  "commands": {
+    "targetedTests": "12 files, 48 tests plus 6 architecture files, 9 tests passed",
+    "fullTests": "28 files, 96 tests passed",
+    "typecheck": "passed",
+    "build": "passed with existing @vueuse PURE annotation warnings",
+    "diffCheck": "passed"
+  },
+  "mergeReadiness": "ready-for-human"
+}

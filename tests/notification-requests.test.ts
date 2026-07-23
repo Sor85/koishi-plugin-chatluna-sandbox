@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getIncomingNotificationRequests } from '../client/notification-requests'
+import { getIncomingNotificationRequests } from '../client/webqq/notification-requests'
 import type { SandboxSnapshot } from '../src/types'
 
 const snapshot = {

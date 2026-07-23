@@ -9,6 +9,8 @@ describe('WebQQ 消息列表', () => {
 
     expect(source).toContain('model: WebqqMessageListModel')
     expect(source).toContain('getMessageClusterClass')
+    expect(source).toContain('replyMessages: Record<string, SandboxMessage>')
+    expect(source).toContain('props.model.replyMessages[message.replyToMessageId]')
     expect(source).toContain('isMergedMessage')
     expect(source).toContain('class="webqq-message-quote is-clickable"')
     expect(source).toContain('class="webqq-message-event"')

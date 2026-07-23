@@ -1,4 +1,4 @@
-import type { SandboxRelationshipRequest, SandboxSnapshot } from '../src/types'
+import type { SandboxRelationshipRequest, SandboxSnapshot } from '../../src/types'
 
 export interface IncomingNotificationRequests {
   friends: SandboxRelationshipRequest[]

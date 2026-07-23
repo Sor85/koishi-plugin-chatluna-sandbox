@@ -1,4 +1,4 @@
-import type { SandboxMessage } from '../src/types'
+import type { SandboxMessage } from '../../src/types'
 
 type ChatStyle = 'tim' | 'qq'
 

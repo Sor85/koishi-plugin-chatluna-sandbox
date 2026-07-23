@@ -22,7 +22,7 @@ import {
   resolveWorkspaceSelection,
   saveWorkspacePreferences,
   type SandboxWorkspaceView,
-} from '../workspace-state'
+} from './workspace-state'
 import type { WorkspacePort } from './workspace-port'
 
 type WorkspaceStorage = {

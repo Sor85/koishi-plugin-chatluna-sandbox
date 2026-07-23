@@ -1,4 +1,4 @@
-import type { SandboxUser } from '../src/types'
+import type { SandboxUser } from '../../src/types'
 
 export const USER_AVATAR_SIZE = 36
 export const USER_STACK_COLLAPSED_STEP = 21

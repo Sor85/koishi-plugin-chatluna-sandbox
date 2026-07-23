@@ -32,7 +32,7 @@
 import { computed } from 'vue'
 import { IconCrown, IconHandClick, IconTag, IconUserMinus, IconUserPlus } from '@tabler/icons-vue'
 import { ContextMenuContent, ContextMenuItem, ContextMenuSubContent } from './components/ui/context-menu'
-import { getGroupMemberMenuActions } from './group-menu'
+import { getGroupMemberMenuActions } from './webqq/group-menu'
 import type { SandboxGroupMember } from '../src/types'
 
 const props = defineProps<{

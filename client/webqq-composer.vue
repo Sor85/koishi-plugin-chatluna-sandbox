@@ -102,8 +102,6 @@
             <EnvironmentCreatePopover
               type="participant"
               side="top"
-              :snapshot="model.snapshot"
-              :current-user-id="model.currentUserId"
               :accent-color="model.accentColor"
               @submit="forwardManageEnvironment"
               @open-change="handleCreateParticipantOpen"
@@ -167,8 +165,8 @@ import {
   USER_AVATAR_SIZE,
   USER_STACK_COLLAPSED_STEP,
   USER_STACK_EXPANDED_STEP,
-} from './user-stack'
-import type { ManageSandboxEnvironmentInput, SandboxSnapshot } from '../src/types'
+} from './webqq/user-stack'
+import type { ManageSandboxEnvironmentInput } from '../src/types'
 
 export interface WebqqComposerSender {
   id: string
@@ -184,7 +182,6 @@ export interface WebqqComposerModel {
   conversationId?: string
   botId?: string
   replyingTo?: { id: string, authorName: string, content: string }
-  snapshot: SandboxSnapshot
   accentColor: string
   externalError?: string
 }

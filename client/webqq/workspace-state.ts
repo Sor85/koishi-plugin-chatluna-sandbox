@@ -1,4 +1,4 @@
-import type { SandboxSnapshot } from '../src/types'
+import type { SandboxSnapshot } from '../../src/types'
 
 export type SandboxWorkspaceView = 'messages' | 'contacts' | 'profile'
 export type SandboxDetailsPreference = 'auto' | 'open' | 'closed'

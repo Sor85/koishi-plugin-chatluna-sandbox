@@ -38,12 +38,19 @@ import { computed } from 'vue'
 import { Button } from './components/ui/button'
 import WebqqAvatar from './webqq-avatar.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
-import type { SandboxRelationshipRequest, SandboxSnapshot } from '../src/types'
+import type { SandboxRelationshipRequest } from '../src/types'
+
+interface NotificationParticipant {
+  name: string
+  avatar?: string
+  isBot: boolean
+}
 
 const props = defineProps<{
   friends: SandboxRelationshipRequest[]
   groups: SandboxRelationshipRequest[]
-  snapshot: SandboxSnapshot
+  participants: Record<string, NotificationParticipant>
+  groupNames: Record<string, string>
   handlingRequestId: string
   errorText: string
 }>()
@@ -56,24 +63,20 @@ const tab = defineModel<'friends' | 'groups'>('tab', { required: true })
 const visibleRequests = computed(() => tab.value === 'friends' ? props.friends : props.groups)
 
 function getParticipantName(id: string) {
-  return props.snapshot.users.find((user) => user.id === id)?.name
-    ?? props.snapshot.bots.find((bot) => bot.id === id)?.name
-    ?? id
+  return props.participants[id]?.name ?? id
 }
 
 function isBotParticipant(id: string) {
-  return props.snapshot.bots.some((bot) => bot.id === id)
+  return props.participants[id]?.isBot ?? false
 }
 
 function getParticipantAvatar(id: string) {
-  return props.snapshot.users.find((user) => user.id === id)?.avatar
-    ?? props.snapshot.bots.find((bot) => bot.id === id)?.avatar
-    ?? ''
+  return props.participants[id]?.avatar ?? ''
 }
 
 function getRequestTitle(request: SandboxRelationshipRequest) {
   if (request.type === 'friend') return getParticipantName(request.requesterId)
-  return props.snapshot.groups.find(({ id }) => id === request.groupId)?.name ?? '群通知'
+  return props.groupNames[request.groupId ?? ''] ?? '群通知'
 }
 
 function getRequestSubtitle(request: SandboxRelationshipRequest) {

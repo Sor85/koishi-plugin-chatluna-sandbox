@@ -5,7 +5,7 @@ import {
   resolveDetailsVisibility,
   toggleDetailsPreference,
   type SandboxDetailsPreference,
-} from '../workspace-state'
+} from './workspace-state'
 
 export function createWorkspaceLayout(wideLayout: Ref<boolean> = useMediaQuery('(min-width: 1181px)')) {
   const detailsPreference = ref<SandboxDetailsPreference>('auto')

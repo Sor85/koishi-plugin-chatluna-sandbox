@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getGroupMemberMenuActions } from '../client/group-menu'
+import { getGroupMemberMenuActions } from '../client/webqq/group-menu'
 
 const owner = { participantId: 'owner', role: 'owner' as const }
 const admin = { participantId: 'admin', role: 'admin' as const }

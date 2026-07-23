@@ -43,18 +43,19 @@
               <PopoverContent
                 align="center"
                 :class="['webqq-notification-popover', {
-                  'is-frosted': workspace.appearance.enableWebQQFrostedGlass,
-                  'is-plain': !workspace.appearance.enableWebQQFrostedGlass,
-                  'is-color-dark': workspace.appearance.webQQColorMode === 'dark',
-                  'is-color-auto': workspace.appearance.webQQColorMode === 'auto',
+                  'is-frosted': appearance.enableWebQQFrostedGlass,
+                  'is-plain': !appearance.enableWebQQFrostedGlass,
+                  'is-color-dark': appearance.webQQColorMode === 'dark',
+                  'is-color-auto': appearance.webQQColorMode === 'auto',
                 }]"
-                :style="{ '--webqq-accent': workspace.appearance.webQQAccentColor, '--webqq-muted': '#64748b' }"
+                :style="{ '--webqq-accent': appearance.webQQAccentColor, '--webqq-muted': '#64748b' }"
               >
                 <NotificationMenu
                   v-model:tab="notificationTab"
                   :friends="notificationRequests.friends"
                   :groups="notificationRequests.groups"
-                  :snapshot="snapshot"
+                  :participants="model.participants"
+                  :group-names="model.groupNames"
                   :handling-request-id="handlingRequestId"
                   :error-text="notificationErrorMessage"
                   @handle="handleNotificationRequest"
@@ -76,9 +77,9 @@
             <EnvironmentCreatePopover
               v-if="sidebarTab === 'groups'"
               type="group"
-              :snapshot="snapshot"
-              :current-user-id="currentUserId"
-              :accent-color="workspace.appearance.webQQAccentColor"
+              :current-user="model.currentUser"
+              :bots="model.bots"
+              :accent-color="appearance.webQQAccentColor"
               @submit="manageEnvironment"
             >
               <template #trigger>
@@ -196,7 +197,7 @@
                   <IconUserMinus :size="16" aria-hidden="true" /> 删除好友
                 </ContextMenuItem>
                 <ContextMenuItem
-                  v-if="currentGroup && !currentGroup.members.some(({ participantId }) => participantId === entry.id)"
+                  v-if="currentGroupId && !model.currentGroupMemberIds.includes(entry.id)"
                   @select="inviteToCurrentGroup(entry.id)"
                 >
                   <IconUserPlus :size="16" aria-hidden="true" /> 邀请加入当前群组
@@ -223,39 +224,39 @@
                   <WebqqAvatar
                     class="webqq-avatar webqq-avatar-bot"
                     :kind="conversation.groupId ? 'group' : 'bot'"
-                    :name="getConversationTitle(conversation)"
-                    :avatar="getConversationAvatar(conversation)"
+                    :name="conversation.title"
+                    :avatar="conversation.avatar"
                   />
                   <span class="webqq-session-copy">
-                    <strong>{{ getConversationTitle(conversation) }}</strong>
-                    <small>{{ getConversationPreview(conversation.id) }}</small>
+                    <strong>{{ conversation.title }}</strong>
+                    <small>{{ conversation.preview }}</small>
                   </span>
-                  <time>{{ getConversationTime(conversation.id) }}</time>
+                  <time>{{ conversation.time }}</time>
                 </button>
               </ContextMenuTrigger>
               <ContextMenuContent style="z-index: 140">
                 <ContextMenuItem
                   v-if="conversation.groupId"
-                  :disabled="getGroupMember(conversation.groupId, currentOperatorId ?? '')?.role === 'member'"
+                  :disabled="conversation.actorRole === 'member'"
                   @select="openGroupActionDialog('name', '', conversation.groupId)"
                 >
                   <IconEdit :size="16" aria-hidden="true" />
-                  {{ getGroupMember(conversation.groupId, currentOperatorId ?? '')?.role === 'member' ? '需要管理员权限修改群名称' : '修改群名称' }}
+                  {{ conversation.actorRole === 'member' ? '需要管理员权限修改群名称' : '修改群名称' }}
                 </ContextMenuItem>
                 <ContextMenuItem
                   v-if="conversation.groupId"
-                  :disabled="getGroupMember(conversation.groupId, currentOperatorId ?? '')?.role === 'owner'"
+                  :disabled="conversation.actorRole === 'owner'"
                   class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40"
                   @select="leaveGroup(conversation.groupId!)"
                 >
                   <IconUserMinus :size="16" aria-hidden="true" />
-                  {{ getGroupMember(conversation.groupId, currentOperatorId ?? '')?.role === 'owner' ? '群主不能直接退群' : '退出群组' }}
+                  {{ conversation.actorRole === 'owner' ? '群主不能直接退群' : '退出群组' }}
                 </ContextMenuItem>
-                <ContextMenuItem @select="openEntityDialog('edit', getConversationEntityTarget(conversation))">
-                  <IconEdit :size="16" aria-hidden="true" /> 编辑{{ getConversationEntityLabel(conversation) }}
+                <ContextMenuItem @select="openEntityDialog('edit', conversation.entityTarget)">
+                  <IconEdit :size="16" aria-hidden="true" /> 编辑{{ conversation.entityLabel }}
                 </ContextMenuItem>
-                <ContextMenuItem class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="openEntityDialog('delete', getConversationEntityTarget(conversation))">
-                  <IconTrash :size="16" aria-hidden="true" /> 删除{{ getConversationEntityLabel(conversation) }}
+                <ContextMenuItem class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="openEntityDialog('delete', conversation.entityTarget)">
+                  <IconTrash :size="16" aria-hidden="true" /> 删除{{ conversation.entityLabel }}
                 </ContextMenuItem>
               </ContextMenuContent>
             </ContextMenu>
@@ -282,25 +283,70 @@ import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover
 import EnvironmentCreatePopover from './environment-create-popover.vue'
 import NotificationMenu from './notification-menu.vue'
 import WebqqAvatar from './webqq-avatar.vue'
-import { getIncomingNotificationRequests } from './notification-requests'
-import { getFriendDirectory, getGroupDirectory } from './relationship-directory'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type {
-  ManageSandboxEnvironmentInput, SandboxAppearance, SandboxConversation, SandboxFriendAction,
-  SandboxGroupAction, SandboxGroupMember, SandboxSnapshot, SandboxWorkspaceState,
+  ManageSandboxEnvironmentInput, SandboxAppearance, SandboxBotProfile, SandboxFriendAction,
+  SandboxGroup, SandboxGroupAction, SandboxGroupMember, SandboxRelationshipRequest, SandboxUser,
 } from '../src/types'
 
 type SidebarTab = 'recent' | 'friends' | 'groups'
 type EnvironmentEntityType = 'user' | 'bot' | 'group'
 type EnvironmentDialogMode = 'edit' | 'delete'
 
+export interface WebqqSidebarConversation {
+  id: string
+  botId: string
+  groupId?: string
+  title: string
+  avatar?: string
+  preview: string
+  time: string
+  actorRole?: SandboxGroupMember['role']
+  entityTarget: { type: 'bot' | 'group', id: string }
+  entityLabel: '机器人' | '群组'
+}
+
+export interface WebqqSidebarFriend {
+  id: string
+  isBot: boolean
+  isFriend: boolean
+  pendingOutgoing: boolean
+  pendingIncoming: boolean
+  conversationId?: string
+  avatar?: string
+  displayName: string
+  status: string
+  relation: 'added' | 'pending' | 'missing'
+}
+
+export interface WebqqSidebarGroup extends SandboxGroup {
+  member?: SandboxGroupMember
+  pending: boolean
+  conversationId?: string
+  relation: 'joined' | 'pending' | 'missing'
+}
+
+interface SidebarParticipant {
+  name: string
+  avatar?: string
+  isBot: boolean
+}
+
 export interface WebqqSidebarModel {
-  snapshot: SandboxSnapshot
   appearance: SandboxAppearance
   currentView: 'messages' | 'contacts' | 'profile'
-  currentUserId?: string
-  currentOperatorId?: string
   activeConversationId?: string
+  currentOperatorIsBot: boolean
+  currentGroupId?: string
+  currentGroupMemberIds: string[]
+  currentUser?: Pick<SandboxUser, 'id' | 'name'>
+  bots: Pick<SandboxBotProfile, 'id' | 'name'>[]
+  conversations: WebqqSidebarConversation[]
+  friends: WebqqSidebarFriend[]
+  groups: WebqqSidebarGroup[]
+  notificationRequests: { friends: SandboxRelationshipRequest[], groups: SandboxRelationshipRequest[] }
+  participants: Record<string, SidebarParticipant>
+  groupNames: Record<string, string>
 }
 
 const props = defineProps<{ model: WebqqSidebarModel }>()
@@ -316,13 +362,11 @@ const emit = defineEmits<{
   openRemarkDialog: [targetId: string]
 }>()
 
-const workspace = computed<SandboxWorkspaceState>(() => ({ snapshot: props.model.snapshot, appearance: props.model.appearance }))
-const snapshot = computed(() => props.model.snapshot)
+const appearance = computed(() => props.model.appearance)
 const currentView = computed(() => props.model.currentView)
-const currentUserId = computed(() => props.model.currentUserId)
-const currentOperatorId = computed(() => props.model.currentOperatorId)
 const activeConversationId = computed(() => props.model.activeConversationId)
-const currentOperatorIsBot = computed(() => snapshot.value.bots.some(({ id }) => id === currentOperatorId.value))
+const currentOperatorIsBot = computed(() => props.model.currentOperatorIsBot)
+const currentGroupId = computed(() => props.model.currentGroupId)
 const searchQuery = ref('')
 const sidebarTab = ref<SidebarTab>('recent')
 const notificationTab = ref<'friends' | 'groups'>('friends')
@@ -338,24 +382,19 @@ const sidebarTabs = [
   { id: 'friends' as const, label: '好友', icon: IconUser },
   { id: 'groups' as const, label: '群组', icon: IconUsers },
 ]
-const visibleConversations = computed(() => snapshot.value.conversations.filter(({ userId }) => userId === currentUserId.value))
-const filteredConversations = computed(() => sidebarTab.value === 'recent' ? visibleConversations.value : [])
-const notificationRequests = computed(() => getIncomingNotificationRequests(snapshot.value, currentUserId.value))
+const filteredConversations = computed(() => sidebarTab.value === 'recent' ? props.model.conversations : [])
+const notificationRequests = computed(() => props.model.notificationRequests)
 const pendingNotificationCount = computed(() => notificationRequests.value.friends.length + notificationRequests.value.groups.length)
-const friendDirectory = computed(() => getFriendDirectory(snapshot.value, currentOperatorId.value))
-const groupDirectory = computed(() => getGroupDirectory(snapshot.value, currentOperatorId.value))
 const filteredFriendDirectory = computed(() => {
   if (sidebarTab.value !== 'friends') return []
   const query = searchQuery.value.trim().toLowerCase()
-  return query ? friendDirectory.value.filter(({ id, displayName }) => id.includes(query) || displayName.toLowerCase().includes(query)) : friendDirectory.value
+  return query ? props.model.friends.filter(({ id, displayName }) => id.includes(query) || displayName.toLowerCase().includes(query)) : props.model.friends
 })
 const filteredGroupDirectory = computed(() => {
   if (sidebarTab.value !== 'groups') return []
   const query = searchQuery.value.trim().toLowerCase()
-  return query ? groupDirectory.value.filter(({ id, name }) => id.includes(query) || name.toLowerCase().includes(query)) : groupDirectory.value
+  return query ? props.model.groups.filter(({ id, name }) => id.includes(query) || name.toLowerCase().includes(query)) : props.model.groups
 })
-const currentConversation = computed(() => visibleConversations.value.find(({ id }) => id === activeConversationId.value))
-const currentGroup = computed(() => snapshot.value.groups.find(({ id }) => id === currentConversation.value?.groupId))
 
 function selectNavigation(view: WebqqSidebarModel['currentView']) {
   if (view === 'messages') sidebarTab.value = 'recent'
@@ -394,7 +433,7 @@ function leaveGroup(groupId: string) {
 }
 
 function inviteToCurrentGroup(targetId: string) {
-  if (currentGroup.value) emit('groupAction', { action: 'invite', groupId: currentGroup.value.id, targetId })
+  if (currentGroupId.value) emit('groupAction', { action: 'invite', groupId: currentGroupId.value, targetId })
 }
 
 async function handleNotificationRequest(requestId: string, approve: boolean) {
@@ -421,45 +460,7 @@ function openRemarkDialog(targetId: string) {
   emit('openRemarkDialog', targetId)
 }
 
-function getBot(botId?: string) {
-  return snapshot.value.bots.find(({ id }) => id === botId)
-}
-
-function getConversationTitle(conversation: SandboxConversation) {
-  return snapshot.value.groups.find(({ id }) => id === conversation.groupId)?.name ?? getBot(conversation.botId)?.name ?? conversation.id
-}
-
-function getConversationAvatar(conversation: SandboxConversation) {
-  return conversation.groupId ? undefined : getBot(conversation.botId)?.avatar
-}
-
-function getConversationMessages(conversationId: string) {
-  const ids = new Set(snapshot.value.conversations.find(({ id }) => id === conversationId)?.messageIds ?? [])
-  return snapshot.value.messages.filter(({ id }) => ids.has(id))
-}
-
-function getConversationPreview(conversationId: string) {
-  return getConversationMessages(conversationId).at(-1)?.content ?? '开始一段新对话'
-}
-
-function getConversationTime(conversationId: string) {
-  const value = getConversationMessages(conversationId).at(-1)?.createdAt
-  return value ? new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(new Date(value)) : ''
-}
-
-function getGroupMember(groupId: string, participantId: string) {
-  return snapshot.value.groups.find(({ id }) => id === groupId)?.members.find((member) => member.participantId === participantId)
-}
-
 function getGroupRoleLabel(role: SandboxGroupMember['role']) {
   return role === 'owner' ? '群主' : role === 'admin' ? '管理员' : '成员'
-}
-
-function getConversationEntityTarget(conversation: SandboxConversation) {
-  return conversation.groupId ? { type: 'group' as const, id: conversation.groupId } : { type: 'bot' as const, id: conversation.botId }
-}
-
-function getConversationEntityLabel(conversation: SandboxConversation) {
-  return conversation.groupId ? '群组' : '机器人'
 }
 </script>

@@ -4,7 +4,7 @@ import {
   getMessageClusterClass,
   isImageOnlyMessage,
   isMergedMessage,
-} from '../client/message-cluster'
+} from '../client/webqq/message-cluster'
 
 function message(id: string, authorId: string, content = id): SandboxMessage {
   return {

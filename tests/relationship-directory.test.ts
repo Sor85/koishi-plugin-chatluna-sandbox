@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getFriendDirectory, getGroupDirectory } from '../client/relationship-directory'
+import { getFriendDirectory, getGroupDirectory } from '../client/webqq/relationship-directory'
 import type { SandboxSnapshot } from '../src/types'
 
 const snapshot: SandboxSnapshot = {

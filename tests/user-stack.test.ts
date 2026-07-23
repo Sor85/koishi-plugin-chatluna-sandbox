@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { getUserStackLayoutMetrics, getUserStackMetrics, orderUsersByActive } from '../client/user-stack'
+import { getUserStackLayoutMetrics, getUserStackMetrics, orderUsersByActive } from '../client/webqq/user-stack'
 
 describe('发送框用户头像组', () => {
   const users = [

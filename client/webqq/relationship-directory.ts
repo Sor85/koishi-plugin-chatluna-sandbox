@@ -1,4 +1,4 @@
-import type { SandboxConversation, SandboxSnapshot } from '../src/types'
+import type { SandboxConversation, SandboxSnapshot } from '../../src/types'
 
 export function getFriendDirectory(snapshot: SandboxSnapshot, operatorId?: string) {
   if (!operatorId) return []

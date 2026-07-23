@@ -102,16 +102,25 @@
 import { IconBell, IconClock, IconHandClick, IconMessageReply, IconPaperclip, IconTag, IconUserMinus, IconUserPlus, IconUsers } from '@tabler/icons-vue'
 import { onBeforeUnmount, ref } from 'vue'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from './components/ui/context-menu'
-import { getFriendMenuActions, type FriendMenuState } from './friend-menu'
+import { getFriendMenuActions, type FriendMenuState } from './webqq/friend-menu'
 import GroupMemberMenu from './group-member-menu.vue'
-import { getMessageClusterClass, isMergedMessage } from './message-cluster'
+import { getMessageClusterClass, isMergedMessage } from './webqq/message-cluster'
 import WebqqAvatar from './webqq-avatar.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
-import type { SandboxConversation, SandboxGroup, SandboxMedia, SandboxMessage, SandboxSnapshot } from '../src/types'
+import type { SandboxConversation, SandboxGroup, SandboxMedia, SandboxMessage } from '../src/types'
+
+interface MessageParticipant {
+  name: string
+  avatar?: string
+  isBot: boolean
+}
 
 export interface WebqqMessageListModel {
   messages: SandboxMessage[]
-  snapshot: SandboxSnapshot
+  replyMessages: Record<string, SandboxMessage>
+  participants: Record<string, MessageParticipant>
+  friendMenuStates: Record<string, FriendMenuState>
+  currentOperatorIsBot: boolean
   currentConversation?: SandboxConversation
   currentGroup?: SandboxGroup
   currentUserId?: string
@@ -145,18 +154,15 @@ const highlightedMessageId = ref('')
 let quoteHighlightTimer: ReturnType<typeof setTimeout> | undefined
 
 function getParticipantName(id: string) {
-  return props.model.snapshot.users.find((user) => user.id === id)?.name
-    ?? props.model.snapshot.bots.find((bot) => bot.id === id)?.name
-    ?? id
+  return props.model.participants[id]?.name ?? id
 }
 
 function getParticipantAvatar(id: string) {
-  return props.model.snapshot.users.find((user) => user.id === id)?.avatar
-    ?? props.model.snapshot.bots.find((bot) => bot.id === id)?.avatar
+  return props.model.participants[id]?.avatar
 }
 
 function isBotParticipant(id: string) {
-  return props.model.snapshot.bots.some((bot) => bot.id === id)
+  return props.model.participants[id]?.isBot ?? false
 }
 
 function getCurrentGroupMember(participantId: string) {
@@ -164,21 +170,16 @@ function getCurrentGroupMember(participantId: string) {
 }
 
 function getFriendMenuState(targetId: string): FriendMenuState {
-  const actorId = props.model.currentOperatorId
-  if (!actorId) return { isFriend: false, pendingOutgoing: false, pendingIncoming: false }
-  return {
-    isFriend: props.model.snapshot.friendships.some(({ participantIds }) => participantIds.includes(actorId) && participantIds.includes(targetId)),
-    pendingOutgoing: props.model.snapshot.requests.some(({ type, requesterId, targetId: requestedId }) => type === 'friend' && requesterId === actorId && requestedId === targetId),
-    pendingIncoming: props.model.snapshot.requests.some(({ type, requesterId, targetId: requestedId }) => type === 'friend' && requesterId === targetId && requestedId === actorId),
-  }
+  return props.model.friendMenuStates[targetId]
+    ?? { isFriend: false, pendingOutgoing: false, pendingIncoming: false }
 }
 
 function getChatFriendActions(targetId: string) {
-  return getFriendMenuActions(getFriendMenuState(targetId), isBotParticipant(props.model.currentOperatorId ?? ''))
+  return getFriendMenuActions(getFriendMenuState(targetId), props.model.currentOperatorIsBot)
 }
 
 function getReplyMessage(message: SandboxMessage) {
-  return message.replyToMessageId ? props.model.snapshot.messages.find(({ id }) => id === message.replyToMessageId) : undefined
+  return message.replyToMessageId ? props.model.replyMessages[message.replyToMessageId] : undefined
 }
 
 function getMediaLabel(media: SandboxMedia) {

@@ -10,7 +10,10 @@ import type {
   SandboxFriendAction,
   SandboxGroupAction,
 } from '../../src/types'
-import type { SandboxWorkspaceView } from '../workspace-state'
+import type { SandboxWorkspaceView } from './workspace-state'
+import type { FriendMenuState } from './friend-menu'
+import { getIncomingNotificationRequests } from './notification-requests'
+import { getFriendDirectory, getGroupDirectory } from './relationship-directory'
 import type { createWorkspaceController } from './workspace-controller'
 import type { createWorkspaceLayout } from './workspace-layout'
 
@@ -72,9 +75,31 @@ export function createWebqqWorkspaceShell(
     const ids = new Set(currentConversation.value?.messageIds ?? [])
     return snapshot.value.messages.filter(({ id }) => ids.has(id))
   })
+  const participants = computed(() => Object.fromEntries([
+    ...snapshot.value.users.map(({ id, name, avatar }) => [id, { name, avatar, isBot: false }]),
+    ...snapshot.value.bots.map(({ id, name, avatar }) => [id, { name, avatar, isBot: true }]),
+  ]))
+  const currentOperatorIsBot = computed(() => snapshot.value.bots.some(({ id }) => id === currentOperatorId.value))
+  const friendMenuStates = computed<Record<string, FriendMenuState>>(() => {
+    const actorId = currentOperatorId.value
+    if (!actorId) return {}
+    return Object.fromEntries(Object.keys(participants.value).map((targetId) => [targetId, {
+      isFriend: snapshot.value.friendships.some(({ participantIds }) => participantIds.includes(actorId) && participantIds.includes(targetId)),
+      pendingOutgoing: snapshot.value.requests.some(({ type, requesterId, targetId: requestedId }) => type === 'friend' && requesterId === actorId && requestedId === targetId),
+      pendingIncoming: snapshot.value.requests.some(({ type, requesterId, targetId: requestedId }) => type === 'friend' && requesterId === targetId && requestedId === actorId),
+    }]))
+  })
+  const replyMessages = computed(() => Object.fromEntries(messages.value.flatMap(({ replyToMessageId }) => {
+    if (!replyToMessageId) return []
+    const reply = snapshot.value.messages.find(({ id }) => id === replyToMessageId)
+    return reply ? [[reply.id, reply]] : []
+  })))
   const messageListModel = computed<WebqqMessageListModel>(() => ({
     messages: messages.value,
-    snapshot: snapshot.value,
+    replyMessages: replyMessages.value,
+    participants: participants.value,
+    friendMenuStates: friendMenuStates.value,
+    currentOperatorIsBot: currentOperatorIsBot.value,
     currentConversation: currentConversation.value,
     currentGroup: currentGroup.value,
     currentUserId: currentUserId.value,
@@ -93,7 +118,6 @@ export function createWebqqWorkspaceShell(
     currentUserId: currentUserId.value,
     conversationId: currentConversation.value?.id,
     botId: currentBot.value?.id,
-    snapshot: snapshot.value,
     accentColor: appearance.value.webQQAccentColor,
     externalError: errorMessage.value,
   }))
@@ -112,10 +136,6 @@ export function createWebqqWorkspaceShell(
     messageList: messageListModel.value,
     composer: composerModel.value,
   }))
-  const detailsParticipants = computed(() => Object.fromEntries([
-    ...snapshot.value.users.map(({ id, name, avatar }) => [id, { name, avatar, isBot: false }]),
-    ...snapshot.value.bots.map(({ id, name, avatar }) => [id, { name, avatar, isBot: true }]),
-  ]))
   const detailsPanelModel = computed<WebqqDetailsPanelModel>(() => ({
     view: currentView.value === 'profile' ? 'profile' : currentGroup.value ? 'group' : 'private',
     conversationId: currentConversation.value?.id,
@@ -130,15 +150,46 @@ export function createWebqqWorkspaceShell(
     bot: currentBot.value,
     currentUserName: currentUser.value?.name,
     currentOperatorId: currentOperatorId.value,
-    participants: detailsParticipants.value,
+    participants: participants.value,
+  }))
+  const sidebarConversations = computed(() => visibleConversations.value.map((conversation) => {
+    const group = snapshot.value.groups.find(({ id }) => id === conversation.groupId)
+    const bot = getBot(conversation.botId)
+    const messageIds = new Set(conversation.messageIds)
+    const latestMessage = snapshot.value.messages.filter(({ id }) => messageIds.has(id)).at(-1)
+    const actorRole = group?.members.find(({ participantId }) => participantId === currentOperatorId.value)?.role
+    return {
+      id: conversation.id,
+      botId: conversation.botId,
+      groupId: conversation.groupId,
+      title: group?.name ?? bot?.name ?? conversation.id,
+      avatar: conversation.groupId ? undefined : bot?.avatar,
+      preview: latestMessage?.content ?? '开始一段新对话',
+      time: latestMessage?.createdAt
+        ? new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(new Date(latestMessage.createdAt))
+        : '',
+      actorRole,
+      entityTarget: conversation.groupId
+        ? { type: 'group' as const, id: conversation.groupId }
+        : { type: 'bot' as const, id: conversation.botId },
+      entityLabel: conversation.groupId ? '群组' as const : '机器人' as const,
+    }
   }))
   const sidebarModel = computed<WebqqSidebarModel>(() => ({
-    snapshot: snapshot.value,
     appearance: appearance.value,
     currentView: currentView.value,
-    currentUserId: currentUserId.value,
-    currentOperatorId: currentOperatorId.value,
     activeConversationId: activeConversationId.value,
+    currentOperatorIsBot: currentOperatorIsBot.value,
+    currentGroupId: currentGroup.value?.id,
+    currentGroupMemberIds: currentGroup.value?.members.map(({ participantId }) => participantId) ?? [],
+    currentUser: currentUser.value,
+    bots: snapshot.value.bots,
+    conversations: sidebarConversations.value,
+    friends: getFriendDirectory(snapshot.value, currentOperatorId.value),
+    groups: getGroupDirectory(snapshot.value, currentOperatorId.value),
+    notificationRequests: getIncomingNotificationRequests(snapshot.value, currentUserId.value),
+    participants: participants.value,
+    groupNames: Object.fromEntries(snapshot.value.groups.map(({ id, name }) => [id, name])),
   }))
   const overlayModel = computed(() => ({
     users: snapshot.value.users,

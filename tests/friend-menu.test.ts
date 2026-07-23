@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { getFriendMenuActions } from '../client/friend-menu'
+import { getFriendMenuActions } from '../client/webqq/friend-menu'
 
 describe('好友操作菜单', () => {
   it('侧栏保留关系管理但不显示聊天互动', () => {
