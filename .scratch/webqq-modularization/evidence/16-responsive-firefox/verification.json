@@ -1,0 +1,37 @@
+{
+  "verifiedAt": "2026-07-23",
+  "route": "http://127.0.0.1:5140/onebot-sandbox",
+  "css": {
+    "responsiveOwner": "client/styles/webqq-responsive.css",
+    "loadedLast": true,
+    "declarations": 1245
+  },
+  "chromium": {
+    "matrix": {
+      "1400px": "details-open, 72px 300px 684px 280px, no overflow",
+      "1000px": "details-closed, 72px 300px 564px, no overflow",
+      "700px": "details-closed, 72px 230px 360px, no overflow",
+      "restored1400px": "details-open automatically"
+    },
+    "themes": ["light", "dark"],
+    "interactions": ["notification popover", "sender stack animation", "composer context menu"],
+    "consoleFailures": []
+  },
+  "firefox": {
+    "matrix": "matches Chromium and baseline at 1400px, 1000px, 700px and restored 1400px",
+    "select": "NapCat and LLBot options open at trigger width without changing dialog height",
+    "dialog": "input, trigger and cancel borders use theme gray, not black currentColor",
+    "senderAnimation": "expanded stack and capsule width 144px",
+    "contextMenu": "bot edit and delete items visible",
+    "consoleErrors": 0,
+    "componentWarnings": 0,
+    "existingRouterWarnings": 10
+  },
+  "commands": {
+    "targetedTests": "4 files, 4 tests passed",
+    "fullTests": "26 files, 92 tests passed",
+    "typecheck": "passed",
+    "build": "passed with existing @vueuse PURE annotation warnings",
+    "diffCheck": "passed"
+  }
+}

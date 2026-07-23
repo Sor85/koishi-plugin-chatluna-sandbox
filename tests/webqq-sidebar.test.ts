@@ -13,6 +13,7 @@ describe('WebQQ 左侧栏', () => {
     expect(source).toContain("const searchQuery = ref('')")
     expect(source).toContain("const sidebarTab = ref<SidebarTab>('recent')")
     expect(source).toContain("const notificationTab = ref<'friends' | 'groups'>('friends')")
+    expect(source).toMatch(/import \{[^}]*IconPlus[^}]*\} from '@tabler\/icons-vue'/s)
     expect(pageSource).toContain('<WebqqSidebar')
     expect(pageSource).not.toContain('class="webqq-conversations"')
   })

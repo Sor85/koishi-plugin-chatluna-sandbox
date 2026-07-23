@@ -9,7 +9,7 @@
   "private": { "label": "私聊信息", "name": "Koishi" },
   "responsive": {
     "700px": "none",
-    "wideRestore": "pending-user-release-of-ego-task-space"
+    "wideRestore": "flex"
   },
   "consoleFailures": []
 }

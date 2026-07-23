@@ -4,7 +4,7 @@
 
 **Blocked by:** 10 — 提取聊天区域
 
-**Status:** needs-browser-verification
+**Status:** ready-for-human
 
 - [x] 右侧信息栏只接收 details 只读模型并通过事件表达公告和成员操作
 - [x] 群信息、私聊信息和环境摘要使用现有根元素与视觉结构
@@ -13,10 +13,10 @@
 - [x] 当前会话变化只重置现有要求清理的搜索、公告和错误状态
 - [x] 右侧信息栏不自行监听浏览器宽度，其可见性由工作区布局模块决定
 - [x] 主页面不再包含右侧信息、公告和成员列表实现
-- [ ] Ego Browser 验证群聊、私聊、宽窄屏和成员操作，完整验证命令通过
+- [x] Ego Browser 验证群聊、私聊、宽窄屏和成员操作，完整验证命令通过
 
 ## Answer
 
 新增 `WebqqDetailsPanel`，以只读模型渲染环境摘要、群信息和私聊信息。群公告输入、发布/删除 loading、错误提示、群成员搜索及会话切换清理由组件本地管理；公告和成员操作通过明确事件交由页面控制器执行。组件不监听浏览器宽度，继续由工作区布局类控制可见性。
 
-完整测试、类型检查和构建通过。Ego Browser 已验证群公告临时新增与删除、群成员右键菜单、私聊信息及 700px 隐藏；验证宽屏恢复时任务空间被用户接管，因此该单项保留待复核。当前记录位于 `.scratch/webqq-modularization/evidence/11-details-panel/verification.json`，PNG 仅保存在本地。
+完整测试、类型检查和构建通过。Ego Browser 已验证群公告临时新增与删除、群成员右键菜单、私聊信息、700px 隐藏及恢复到 1400px 后自动显示；当前记录位于 `.scratch/webqq-modularization/evidence/11-details-panel/verification.json`，PNG 仅保存在本地。

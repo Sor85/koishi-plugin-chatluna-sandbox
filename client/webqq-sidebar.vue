@@ -273,7 +273,7 @@
 
 <script setup lang="ts">
 import {
-  IconAddressBook, IconBell, IconClock, IconEdit, IconMessageCircle, IconRobotFace,
+  IconAddressBook, IconBell, IconClock, IconEdit, IconMessageCircle, IconPlus, IconRobotFace,
   IconSearch, IconTag, IconTrash, IconUser, IconUserCircle, IconUserMinus, IconUserPlus, IconUsers,
 } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'

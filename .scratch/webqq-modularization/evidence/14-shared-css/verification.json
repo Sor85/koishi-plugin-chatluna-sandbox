@@ -8,9 +8,9 @@
   },
   "commands": {
     "targetedTests": "passed",
-    "fullTests": "24 files, 90 tests passed",
+    "fullTests": "26 files, 92 tests passed",
     "typecheck": "passed",
     "build": "passed with existing @vueuse PURE annotation warnings"
   },
-  "browser": "pending-user-release-of-ego-task-space"
+  "browser": "passed against Chromium baseline matrix"
 }
