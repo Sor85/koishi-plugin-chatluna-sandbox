@@ -854,15 +854,14 @@ import NotificationMenu from './notification-menu.vue'
 import { getIncomingNotificationRequests } from './notification-requests'
 import { getFriendDirectory, getGroupDirectory } from './relationship-directory'
 import {
-  loadWorkspacePreferences,
   resolveDetailsPreferenceAfterLayoutChange,
   resolveDetailsVisibility,
-  resolveWorkspaceSelection,
-  saveWorkspacePreferences,
   toggleDetailsPreference,
   type SandboxDetailsPreference,
   type SandboxWorkspaceView,
 } from './workspace-state'
+import { koishiWorkspacePort } from './webqq/koishi-workspace-port'
+import { createWorkspaceController } from './webqq/workspace-controller'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import { getMessageClusterClass, isMergedMessage } from './message-cluster'
 import {
@@ -874,42 +873,21 @@ import {
   USER_STACK_EXPANDED_STEP,
 } from './user-stack'
 import type {
-  SandboxAppearance,
   SandboxConversation,
   SandboxGroupMember,
   SandboxMedia,
   SandboxMessage,
-  SandboxSnapshot,
   SandboxWorkspaceState,
   SandboxFriendAction,
   SandboxGroupAction,
 } from '../src/types'
 
-const defaultAppearance: SandboxAppearance = {
-  enableWebQQFrostedGlass: true,
-  webQQChatStyle: 'tim',
-  webQQTimBubbleTail: true,
-  webQQColorMode: 'auto',
-  webQQAccentColor: '#2563eb',
-}
-const emptySnapshot: SandboxSnapshot = {
-  revision: 0,
-  users: [],
-  bots: [],
-  groups: [],
-  conversations: [],
-  messages: [],
-  friendships: [],
-  requests: [],
-}
-const workspace = ref<SandboxWorkspaceState>({
-  snapshot: emptySnapshot,
-  appearance: defaultAppearance,
-})
-const currentUserId = ref<string>()
-const composerSenderId = ref<string>()
-const activeConversationId = ref<string>()
-const currentView = ref<SandboxWorkspaceView>('messages')
+const workspaceController = createWorkspaceController(koishiWorkspacePort, window.localStorage)
+const workspace = workspaceController.workspace
+const currentUserId = workspaceController.currentUserId
+const composerSenderId = workspaceController.currentOperatorId
+const activeConversationId = workspaceController.activeConversationId
+const currentView = workspaceController.currentView
 const searchQuery = ref('')
 const input = ref('')
 const mediaInputRef = ref<HTMLInputElement>()
@@ -927,7 +905,6 @@ const groupMemberSearch = ref('')
 const detailsPreference = ref<SandboxDetailsPreference>('auto')
 const wideDetailsLayout = useMediaQuery('(min-width: 1181px)')
 const detailsVisible = computed(() => resolveDetailsVisibility(detailsPreference.value, wideDetailsLayout.value))
-const hydrated = ref(false)
 const composerLayoutRef = ref<HTMLElement>()
 const userStackLayoutRef = ref<HTMLElement>()
 const userStackExpanded = ref(false)
@@ -1113,27 +1090,11 @@ const highlightedMessageId = ref('')
 let quoteHighlightTimer: ReturnType<typeof setTimeout> | undefined
 
 watch([currentUserId, () => currentConversation.value?.botId], ([userId, botId]) => {
-  if (composerSenderId.value !== userId && composerSenderId.value !== botId) composerSenderId.value = userId
+  workspaceController.ensureOperator(userId, botId)
 })
 
 onMounted(async () => {
-  const preferences = loadWorkspacePreferences(window.localStorage)
-  try {
-    workspace.value = await send('onebot-sandbox/workspace', { actorUserId: preferences.currentUserId })
-  } catch {
-    workspace.value = await send('onebot-sandbox/workspace')
-  }
-  applySelection(resolveWorkspaceSelection(snapshot.value, preferences))
-  hydrated.value = true
-})
-
-watch([currentUserId, activeConversationId, currentView], () => {
-  if (!hydrated.value) return
-  saveWorkspacePreferences(window.localStorage, {
-    currentUserId: currentUserId.value,
-    activeConversationId: activeConversationId.value,
-    currentView: currentView.value,
-  })
+  await workspaceController.load()
 })
 
 watch(activeConversationId, () => {
@@ -1161,20 +1122,8 @@ watch(hasUserStackOverflow, (hasOverflow) => {
   if (!hasOverflow) userStackExpanded.value = false
 })
 
-function applySelection(selection: ReturnType<typeof resolveWorkspaceSelection>) {
-  currentUserId.value = selection.currentUserId
-  if (!composerSenderId.value) composerSenderId.value = selection.currentUserId
-  activeConversationId.value = selection.activeConversationId
-  currentView.value = selection.currentView
-}
-
 function applyWorkspaceUpdate(nextWorkspace: SandboxWorkspaceState) {
-  workspace.value = nextWorkspace
-  applySelection(resolveWorkspaceSelection(snapshot.value, {
-    currentUserId: currentUserId.value,
-    activeConversationId: activeConversationId.value,
-    currentView: currentView.value,
-  }))
+  workspaceController.replaceWorkspace(nextWorkspace)
 }
 
 async function performFriendAction(input: SandboxFriendAction) {
@@ -1333,12 +1282,11 @@ function getConversationEntityLabel(conversation: SandboxConversation) {
 }
 
 function selectConversation(conversationId: string) {
-  activeConversationId.value = conversationId
-  currentView.value = 'messages'
+  workspaceController.selectConversation(conversationId)
 }
 
 function selectNavigation(view: SandboxWorkspaceView) {
-  currentView.value = view
+  workspaceController.selectView(view)
   if (view === 'messages') sidebarTab.value = 'recent'
   if (view === 'contacts') sidebarTab.value = 'friends'
 }
@@ -1354,7 +1302,7 @@ function closeDetails() {
 function selectSidebarTab(tab: SidebarTab) {
   sidebarTab.value = tab
   searchQuery.value = ''
-  currentView.value = 'contacts'
+  workspaceController.selectView('contacts')
 }
 
 function getUserSwitchStyle(index: number) {
@@ -1465,14 +1413,7 @@ async function selectComposerUser(sender: ComposerSender) {
   // 避免 Anime.js 在过渡中途读取坐标并吞掉点击切换动画。
   await waitForUserStackTransition()
   const layout = recordUserStackLayout()
-  composerSenderId.value = sender.id
-  if (sender.type === 'user') {
-    workspace.value = await send('onebot-sandbox/workspace', { actorUserId: sender.id })
-    applySelection(resolveWorkspaceSelection(snapshot.value, {
-      currentUserId: sender.id,
-      currentView: 'messages',
-    }))
-  }
+  await workspaceController.selectOperator(sender.id)
   input.value = ''
   detailsPreference.value = 'auto'
   await animateUserStackLayout(layout)
@@ -1653,7 +1594,7 @@ async function loadEarlierMessages() {
       limit: 50,
     })
     const knownIds = new Set(snapshot.value.messages.map(({ id }) => id))
-    workspace.value = {
+    workspaceController.replaceWorkspace({
       ...workspace.value,
       snapshot: {
         ...snapshot.value,
@@ -1664,7 +1605,7 @@ async function loadEarlierMessages() {
         } : item),
         messages: [...history.messages.filter((message: SandboxMessage) => !knownIds.has(message.id)), ...snapshot.value.messages],
       },
-    }
+    })
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '读取历史消息失败'
   } finally {
@@ -1694,7 +1635,7 @@ async function sendMessage() {
   sending.value = true
   errorMessage.value = ''
   try {
-    workspace.value = mediaFile
+    const nextWorkspace = mediaFile
       ? await send('onebot-sandbox/send-media-message', {
           actorUserId: user.id,
           senderId,
@@ -1714,11 +1655,7 @@ async function sendMessage() {
           content,
           replyToMessageId: replyingToMessageId.value || undefined,
         })
-    applySelection(resolveWorkspaceSelection(snapshot.value, {
-      currentUserId: user.id,
-      activeConversationId: conversation.id,
-      currentView: currentView.value,
-    }))
+    workspaceController.replaceWorkspace(nextWorkspace)
     input.value = ''
     clearSelectedMedia()
     replyingToMessageId.value = ''
@@ -1738,11 +1675,11 @@ async function publishAnnouncement() {
   announcementSending.value = true
   infoErrorMessage.value = ''
   try {
-    workspace.value = await send('onebot-sandbox/set-group-announcement', {
+    workspaceController.replaceWorkspace(await send('onebot-sandbox/set-group-announcement', {
       actorUserId: user.id,
       groupId: group.id,
       content,
-    })
+    }))
     announcementInput.value = ''
     announcementEditorOpen.value = false
   } catch (error) {
@@ -1766,11 +1703,11 @@ async function deleteAnnouncement(announcementId: string) {
   deletingAnnouncementId.value = announcementId
   infoErrorMessage.value = ''
   try {
-    workspace.value = await send('onebot-sandbox/delete-group-announcement', {
+    workspaceController.replaceWorkspace(await send('onebot-sandbox/delete-group-announcement', {
       actorUserId: user.id,
       groupId: group.id,
       announcementId,
-    })
+    }))
   } catch (error) {
     infoErrorMessage.value = error instanceof Error ? error.message : '删除群公告失败'
   } finally {

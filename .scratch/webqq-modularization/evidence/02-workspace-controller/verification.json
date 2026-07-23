@@ -1,0 +1,35 @@
+{
+  "verifiedAt": "2026-07-23",
+  "route": "http://127.0.0.1:5140/onebot-sandbox",
+  "viewport": {
+    "width": 1400,
+    "height": 900
+  },
+  "theme": "light",
+  "initial": {
+    "title": "Koishi",
+    "currentOperator": "测试用户3",
+    "workspaceClass": "webqq-workspace is-frosted has-tim-tail is-details-open",
+    "gridColumns": "72px 300px 684px 280px",
+    "detailsDisplay": "flex"
+  },
+  "interactions": {
+    "contactsNavigation": {
+      "activeView": "联系人",
+      "searchPlaceholder": "搜索好友..."
+    },
+    "switchToUser1": {
+      "currentOperator": "测试用户1",
+      "title": "Koishi",
+      "storedCurrentUserId": "10001",
+      "storedConversationId": "private:10001:20001"
+    },
+    "restoreUser3": {
+      "currentOperator": "测试用户3",
+      "title": "Koishi",
+      "storedCurrentUserId": "10003",
+      "storedConversationId": "private:10003:20001"
+    }
+  },
+  "consoleFailures": []
+}
