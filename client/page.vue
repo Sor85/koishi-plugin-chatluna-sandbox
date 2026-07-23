@@ -478,173 +478,15 @@
             </ol>
           </section>
 
-          <div ref="composerLayoutRef" class="webqq-composer-layout-root">
-            <form class="webqq-composer" :style="composerStyle" @submit.prevent="sendMessage">
-              <span v-if="errorMessage" class="webqq-composer-error" role="alert">{{ errorMessage }}</span>
-              <div v-if="replyingToMessage" class="webqq-composer-reply">
-                <span>回复 {{ getParticipantName(replyingToMessage.authorId) }}：{{ replyingToMessage.content }}</span>
-                <button type="button" aria-label="取消回复" @click="replyingToMessageId = ''">
-                  <IconX :size="15" aria-hidden="true" />
-                </button>
-              </div>
-              <div v-if="selectedMediaFile" :class="['webqq-composer-media', { 'has-reply': replyingToMessage }]">
-                <IconPaperclip :size="16" aria-hidden="true" />
-                <span>{{ selectedMediaFile.name }} · {{ formatMediaSize(selectedMediaFile.size) }}</span>
-                <button type="button" aria-label="移除待发送媒体" @click="clearSelectedMedia">
-                  <IconX :size="15" aria-hidden="true" />
-                </button>
-              </div>
-              <div ref="userStackLayoutRef" class="webqq-composer-user-layout-root" :style="userLayoutStyle">
-                <div
-                  :class="['webqq-composer-user-capsule', { 'is-expanded': userStackVisualExpanded }]"
-                  :style="userCapsuleStyle"
-                  @pointerenter="expandUserStack"
-                  @pointerleave="collapseUserStack"
-                  @focusin="focusUserStack"
-                  @focusout="blurUserStack"
-                >
-                  <div
-                    :class="['webqq-composer-user-stack', {
-                      'is-expanded': userStackVisualExpanded,
-                      'is-overflow-expanding': userStackOverflowMotion === 'expanding',
-                      'is-overflow-collapsing': userStackOverflowMotion === 'collapsing',
-                    }]"
-                    :style="userStackStyle"
-                  >
-                    <TooltipProvider :delay-duration="300">
-                      <Tooltip
-                        v-for="(sender, index) in userStackUsers"
-                        :key="sender.id"
-                      >
-                        <!-- Tooltip 使用外层定位节点，ContextMenu 直接绑定内部按钮；如果让
-                             ContextMenu 根包住 Tooltip 根，reka-ui 会把右键菜单定位到 (0, 0)。 -->
-                        <TooltipTrigger as-child>
-                          <span
-                            :class="['webqq-composer-user-switch', {
-                              'is-active': sender.id === composerSenderId,
-                              'is-bot': sender.type === 'bot',
-                              'is-collapsed-extra': isUserCollapsedExtra(index),
-                            }]"
-                            :aria-hidden="isUserCollapsedHidden(index) ? 'true' : undefined"
-                            :style="getUserSwitchStyle(index)"
-                          >
-                            <ContextMenu>
-                              <ContextMenuTrigger as-child>
-                                <button
-                                  type="button"
-                                  class="webqq-composer-user-button"
-                                  :aria-label="sender.id === composerSenderId
-                                    ? `当前发送者：${sender.name}${sender.type === 'bot' ? '（机器人）' : ''}`
-                                    : `切换发送者：${sender.name}${sender.type === 'bot' ? '（机器人）' : ''}`"
-                                  :aria-pressed="sender.id === composerSenderId"
-                                  :tabindex="isUserCollapsedHidden(index) ? -1 : undefined"
-                                  @click="selectComposerUser(sender)"
-                                >
-                                  <WebqqAvatar
-                                    class="webqq-composer-user-avatar"
-                                    :kind="sender.type"
-                                    :name="sender.name"
-                                    :avatar="sender.avatar"
-                                    :show-bot-badge="sender.id === composerSenderId"
-                                  />
-                                </button>
-                              </ContextMenuTrigger>
-                              <ContextMenuContent class="webqq-composer-user-menu" style="z-index: 160">
-                                <ContextMenuItem @select="openEntityDialog('edit', { type: sender.type, id: sender.id })">
-                                  <IconEdit :size="16" aria-hidden="true" /> 编辑{{ sender.type === 'bot' ? '机器人' : '用户' }}
-                                </ContextMenuItem>
-                                <ContextMenuItem class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="openEntityDialog('delete', { type: sender.type, id: sender.id })">
-                                  <IconTrash :size="16" aria-hidden="true" /> 删除{{ sender.type === 'bot' ? '机器人' : '用户' }}
-                                </ContextMenuItem>
-                              </ContextMenuContent>
-                            </ContextMenu>
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          {{ sender.name }}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    <span
-                      v-if="userStackMetrics.overflowCount"
-                      class="webqq-composer-user-overflow"
-                      :style="userOverflowStyle"
-                      aria-hidden="true"
-                    >
-                      <WebqqAvatar
-                        v-if="userOverflowPreview"
-                        class="webqq-composer-user-overflow-avatar"
-                        :kind="userOverflowPreview.type"
-                        :name="userOverflowPreview.name"
-                        :avatar="userOverflowPreview.avatar"
-                        :show-bot-badge="userOverflowPreview.id === composerSenderId"
-                      />
-                      <span class="webqq-composer-user-overflow-label">
-                        <span class="webqq-composer-user-overflow-plus">+</span>
-                        <span class="webqq-composer-user-overflow-count">{{ userStackMetrics.overflowCount }}</span>
-                      </span>
-                    </span>
-                    <EnvironmentCreatePopover
-                      type="participant"
-                      side="top"
-                      :snapshot="snapshot"
-                      :current-user-id="currentUserId"
-                      :accent-color="workspace.appearance.webQQAccentColor"
-                      @submit="manageEnvironment"
-                      @open-change="handleCreateParticipantOpen"
-                    >
-                      <template #trigger>
-                        <button
-                          type="button"
-                          :class="['webqq-composer-user-add', { 'is-collapsed-hidden': hasUserStackOverflow && !userStackVisualExpanded }]"
-                          :style="userAddStyle"
-                          aria-label="添加测试账号"
-                        >
-                          <IconPlus :size="18" stroke-width="2" aria-hidden="true" />
-                        </button>
-                      </template>
-                    </EnvironmentCreatePopover>
-                  </div>
-                </div>
-              </div>
-              <div class="webqq-composer-main">
-                <label class="sr-only" for="onebot-sandbox-input">消息内容</label>
-                <textarea
-                  id="onebot-sandbox-input"
-                  v-webqq-scrollbar="{ tone: 'accent' }"
-                  v-model="input"
-                  rows="1"
-                  placeholder="发送消息"
-                  :disabled="sending || !currentConversation"
-                  @keydown.enter.exact.prevent="sendMessage"
-                />
-              </div>
-              <input
-                ref="mediaInputRef"
-                class="sr-only"
-                type="file"
-                accept="image/png,image/jpeg,image/gif,image/webp,audio/*,video/mp4,video/webm,video/quicktime,.txt,.csv,.json,.pdf,.zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
-                @change="selectMediaFile"
-              >
-              <button
-                class="webqq-composer-action"
-                type="button"
-                aria-label="选择文件"
-                :disabled="sending || !currentConversation"
-                @click="mediaInputRef?.click()"
-              >
-                <IconPaperclip :size="19" stroke-width="2" aria-hidden="true" />
-              </button>
-              <button
-                class="webqq-composer-action is-primary"
-                type="submit"
-                aria-label="发送"
-                :disabled="sending || (!input.trim() && !selectedMediaFile) || !currentConversation"
-              >
-                <IconSend :size="19" stroke-width="2" aria-hidden="true" />
-              </button>
-            </form>
-          </div>
+          <WebqqComposer
+            :model="composerModel"
+            @send="sendComposerMessage"
+            @select-operator="selectComposerOperator"
+            @manage-environment="manageEnvironment"
+            @edit-participant="openComposerParticipantDialog('edit', $event)"
+            @delete-participant="openComposerParticipantDialog('delete', $event)"
+            @clear-reply="replyingToMessageId = ''"
+          />
           </template>
         </main>
 
@@ -786,7 +628,6 @@
 </template>
 
 <script setup lang="ts">
-import { createLayout, type AutoLayout } from 'animejs'
 import {
   IconAddressBook,
   IconBell,
@@ -801,26 +642,24 @@ import {
   IconRobotFace,
   IconMessageReply,
   IconSearch,
-  IconSend,
   IconTrash,
   IconTag,
-  IconX,
   IconUser,
   IconUserMinus,
   IconUserPlus,
   IconUserCircle,
   IconUsers,
 } from '@tabler/icons-vue'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from './components/ui/context-menu'
 import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip'
 import EnvironmentCreatePopover from './environment-create-popover.vue'
 import EnvironmentManager from './environment-manager.vue'
 import { getFriendMenuActions, type FriendMenuState } from './friend-menu'
 import GroupMemberMenu from './group-member-menu.vue'
 import NotificationMenu from './notification-menu.vue'
 import WebqqAvatar from './webqq-avatar.vue'
+import WebqqComposer, { type WebqqComposerModel, type WebqqComposerSendIntent, type WebqqComposerSender } from './webqq-composer.vue'
 import WorkspaceOverlayHost from './workspace-overlay-host.vue'
 import { getIncomingNotificationRequests } from './notification-requests'
 import { getFriendDirectory, getGroupDirectory } from './relationship-directory'
@@ -830,14 +669,6 @@ import { createWorkspaceController } from './webqq/workspace-controller'
 import { createWorkspaceLayout } from './webqq/workspace-layout'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import { getMessageClusterClass, isMergedMessage } from './message-cluster'
-import {
-  getUserStackMetrics,
-  getUserStackLayoutMetrics,
-  orderUsersByActive,
-  USER_AVATAR_SIZE,
-  USER_STACK_COLLAPSED_STEP,
-  USER_STACK_EXPANDED_STEP,
-} from './user-stack'
 import type {
   SandboxConversation,
   SandboxGroupMember,
@@ -855,12 +686,8 @@ const composerSenderId = workspaceController.currentOperatorId
 const activeConversationId = workspaceController.activeConversationId
 const currentView = workspaceController.currentView
 const searchQuery = ref('')
-const input = ref('')
-const mediaInputRef = ref<HTMLInputElement>()
-const selectedMediaFile = ref<File>()
 const mediaSources = ref<Record<string, string>>({})
 const mediaLoadFailures = ref<Record<string, true>>({})
-const sending = ref(false)
 const errorMessage = ref('')
 const infoErrorMessage = ref('')
 const announcementInput = ref('')
@@ -870,25 +697,12 @@ const deletingAnnouncementId = ref('')
 const groupMemberSearch = ref('')
 const workspaceLayout = createWorkspaceLayout()
 const detailsVisible = workspaceLayout.detailsVisible
-const composerLayoutRef = ref<HTMLElement>()
-const userStackLayoutRef = ref<HTMLElement>()
-const userStackExpanded = ref(false)
-const userStackHovered = ref(false)
-const userStackFocused = ref(false)
-const createParticipantOpen = ref(false)
 const overlayHostRef = ref<InstanceType<typeof WorkspaceOverlayHost>>()
 const notificationTab = ref<'friends' | 'groups'>('friends')
 const handlingRequestId = ref('')
 const notificationErrorMessage = ref('')
 type EnvironmentEntityType = 'user' | 'bot' | 'group'
 type EnvironmentDialogMode = 'edit' | 'delete'
-type UserStackOverflowMotion = 'idle' | 'expanding' | 'collapsing'
-const userStackOverflowMotion = ref<UserStackOverflowMotion>('idle')
-let suppressUserStackCollapse = false
-let suppressUserStackCollapseTimer: ReturnType<typeof setTimeout> | undefined
-let userStackOverflowMotionTimer: ReturnType<typeof setTimeout> | undefined
-let userStackLayout: AutoLayout | undefined
-let userStackTransitionUntil = 0
 type SidebarTab = 'recent' | 'friends' | 'groups'
 const sidebarTab = ref<SidebarTab>('recent')
 
@@ -906,8 +720,7 @@ const snapshot = computed(() => workspace.value.snapshot)
 const currentUser = computed(() => snapshot.value.users.find(({ id }) => id === currentUserId.value))
 const currentOperatorId = computed(() => composerSenderId.value ?? currentUserId.value)
 const currentOperatorIsBot = computed(() => snapshot.value.bots.some(({ id }) => id === currentOperatorId.value))
-type ComposerSender = { id: string, name: string, avatar?: string, type: 'user' | 'bot' }
-const userStackUsers = computed<ComposerSender[]>(() => {
+const composerSenders = computed<WebqqComposerSender[]>(() => {
   const users = snapshot.value.users.map((user) => ({ ...user, type: 'user' as const }))
   const activeUserIndex = users.findIndex(({ id }) => id === currentUserId.value)
   const orderedUsers = activeUserIndex > 0
@@ -916,51 +729,9 @@ const userStackUsers = computed<ComposerSender[]>(() => {
   const conversation = snapshot.value.conversations.find(({ id }) => id === activeConversationId.value)
   const bot = snapshot.value.bots.find(({ id }) => id === conversation?.botId)
   const senders = bot
-    ? [orderedUsers[0], { ...bot, type: 'bot' as const }, ...orderedUsers.slice(1)].filter(Boolean) as ComposerSender[]
+    ? [orderedUsers[0], { ...bot, type: 'bot' as const }, ...orderedUsers.slice(1)].filter(Boolean) as WebqqComposerSender[]
     : orderedUsers
-  return orderUsersByActive(senders, composerSenderId.value)
-})
-const userStackMetrics = computed(() => getUserStackMetrics(userStackUsers.value.length))
-const userStackLayoutMetrics = computed(() => getUserStackLayoutMetrics(userStackUsers.value.length))
-const hasUserStackOverflow = computed(() => userStackMetrics.value.overflowCount > 0)
-const userStackVisualExpanded = computed(() => userStackExpanded.value || !hasUserStackOverflow.value)
-const userOverflowPreview = computed(() => userStackUsers.value[userStackMetrics.value.collapsedVisibleCount])
-const composerStyle = computed(() => {
-  const extraWidth = Math.max(0, userStackLayoutMetrics.value.collapsedWidth - USER_AVATAR_SIZE)
-  const visualExtension = userStackVisualExpanded.value
-    ? Math.max(0, userStackLayoutMetrics.value.expandedWidth - userStackLayoutMetrics.value.collapsedWidth)
-    : 0
-  return {
-    width: `${460 + extraWidth}px`,
-    '--webqq-composer-visual-extension': `${visualExtension}px`,
-  }
-})
-const userLayoutStyle = computed(() => ({
-  '--webqq-user-layout-width': `${userStackLayoutMetrics.value.collapsedWidth}px`,
-}))
-const userCapsuleStyle = computed(() => ({
-  '--webqq-user-capsule-collapsed-width': `${userStackLayoutMetrics.value.collapsedWidth}px`,
-  '--webqq-user-capsule-expanded-width': `${userStackLayoutMetrics.value.expandedWidth}px`,
-}))
-const userStackStyle = computed(() => ({
-  '--webqq-user-stack-collapsed-width': `${userStackLayoutMetrics.value.collapsedWidth}px`,
-  '--webqq-user-stack-expanded-width': `${userStackLayoutMetrics.value.expandedWidth}px`,
-}))
-const userAddStyle = computed(() => ({
-  '--webqq-user-add-collapsed-right': `${userStackLayoutMetrics.value.addCollapsedRight}px`,
-  '--webqq-user-add-expanded-right': `${userStackLayoutMetrics.value.addExpandedRight}px`,
-}))
-const userOverflowStyle = computed(() => {
-  const collapsedRight = userStackMetrics.value.collapsedVisibleCount * USER_STACK_COLLAPSED_STEP
-  const expandedRight = userStackMetrics.value.collapsedVisibleCount * USER_STACK_EXPANDED_STEP
-  const coveredByExpandedAvatar = userStackExpanded.value || userStackOverflowMotion.value === 'expanding'
-  const overflowZIndex = userStackUsers.value.length - userStackMetrics.value.collapsedVisibleCount
-    - (coveredByExpandedAvatar ? 1 : 0)
-  return {
-    '--webqq-user-overflow-right': `${collapsedRight}px`,
-    '--webqq-user-overflow-expanded-right': `${expandedRight}px`,
-    '--webqq-user-overflow-z-index': `${overflowZIndex}`,
-  }
+  return senders
 })
 const visibleConversations = computed(() => snapshot.value.conversations.filter(({ userId }) => userId === currentUserId.value))
 const filteredConversations = computed(() => {
@@ -1040,6 +811,23 @@ function getChatMessageClusterClass(index: number) {
 }
 const replyingToMessageId = ref('')
 const replyingToMessage = computed(() => snapshot.value.messages.find(({ id }) => id === replyingToMessageId.value))
+const composerModel = computed<WebqqComposerModel>(() => ({
+  senders: composerSenders.value,
+  currentOperatorId: composerSenderId.value,
+  currentUserId: currentUserId.value,
+  conversationId: currentConversation.value?.id,
+  botId: currentBot.value?.id,
+  replyingTo: replyingToMessage.value
+    ? {
+        id: replyingToMessage.value.id,
+        authorName: getParticipantName(replyingToMessage.value.authorId),
+        content: replyingToMessage.value.content,
+      }
+    : undefined,
+  snapshot: snapshot.value,
+  accentColor: workspace.value.appearance.webQQAccentColor,
+  externalError: errorMessage.value,
+}))
 const historyLoading = ref(false)
 const highlightedMessageId = ref('')
 let quoteHighlightTimer: ReturnType<typeof setTimeout> | undefined
@@ -1067,10 +855,6 @@ watch(
   () => void loadVisibleMedia(),
   { immediate: true },
 )
-
-watch(hasUserStackOverflow, (hasOverflow) => {
-  if (!hasOverflow) userStackExpanded.value = false
-})
 
 async function manageEnvironment(
   input: ManageSandboxEnvironmentInput,
@@ -1262,126 +1046,6 @@ function selectSidebarTab(tab: SidebarTab) {
   workspaceController.selectView('contacts')
 }
 
-function getUserSwitchStyle(index: number) {
-  const collapsedRight = isUserCollapsedExtra(index)
-    ? userStackMetrics.value.collapsedVisibleCount * USER_STACK_COLLAPSED_STEP
-    : index * USER_STACK_COLLAPSED_STEP
-  return {
-    '--webqq-user-collapsed-right': `${collapsedRight}px`,
-    '--webqq-user-expanded-right': `${index * USER_STACK_EXPANDED_STEP}px`,
-    zIndex: String(userStackUsers.value.length - index),
-  }
-}
-
-function isUserCollapsedExtra(index: number) {
-  return userStackMetrics.value.overflowCount > 0 && index >= userStackMetrics.value.collapsedVisibleCount
-}
-
-function isUserCollapsedHidden(index: number) {
-  return !userStackExpanded.value && isUserCollapsedExtra(index)
-}
-
-function ensureUserStackLayout() {
-  if (userStackLayout || !userStackLayoutRef.value) return userStackLayout
-  // 用户重排只记录头像区；发送框正文位于同一外壳内，不能像 WebQQ 胶囊那样把外壳
-  // 加入 FLIP，否则 Anime.js 会连正文一起投影，重现整个发送控件横向移动的问题。
-  userStackLayout = createLayout(userStackLayoutRef.value, {
-    children: [
-      '.webqq-composer-user-capsule',
-      '.webqq-composer-user-stack',
-      '.webqq-composer-user-switch',
-      '.webqq-composer-user-overflow',
-      '.webqq-composer-user-add',
-    ],
-  })
-  return userStackLayout
-}
-
-function recordUserStackLayout() {
-  const layout = ensureUserStackLayout()
-  layout?.record()
-  return layout
-}
-
-async function animateUserStackLayout(layout?: AutoLayout) {
-  if (!layout) return
-  await nextTick()
-  await layout.animate({ duration: 260, ease: 'out(3)' })
-}
-
-async function waitForUserStackTransition() {
-  const remaining = userStackTransitionUntil - performance.now()
-  if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining))
-}
-
-function setUserStackExpanded(expanded: boolean) {
-  if (!hasUserStackOverflow.value || userStackExpanded.value === expanded) return
-  userStackOverflowMotion.value = expanded ? 'expanding' : 'collapsing'
-  if (userStackOverflowMotionTimer) clearTimeout(userStackOverflowMotionTimer)
-  userStackOverflowMotionTimer = setTimeout(() => {
-    userStackOverflowMotion.value = 'idle'
-    userStackOverflowMotionTimer = undefined
-  }, 280)
-  userStackExpanded.value = expanded
-  userStackTransitionUntil = performance.now() + 180
-}
-
-// 与 WebQQ 胶囊保持一致：Chrome 在点击后会重新聚焦 keyed 按钮，重排期间的伪 focusout
-// 不能触发折叠，否则会中断 FLIP 并让头像停在错误位置。
-function syncUserStackExpanded() {
-  if (suppressUserStackCollapse) return
-  setUserStackExpanded(userStackHovered.value || userStackFocused.value || createParticipantOpen.value)
-}
-
-function handleCreateParticipantOpen(open: boolean) {
-  createParticipantOpen.value = open
-  syncUserStackExpanded()
-}
-
-function expandUserStack() {
-  userStackHovered.value = true
-  syncUserStackExpanded()
-}
-
-function collapseUserStack() {
-  userStackHovered.value = false
-  syncUserStackExpanded()
-}
-
-function focusUserStack() {
-  userStackFocused.value = true
-  syncUserStackExpanded()
-}
-
-function blurUserStack(event: FocusEvent) {
-  const nextTarget = event.relatedTarget
-  const currentTarget = event.currentTarget
-  userStackFocused.value = nextTarget instanceof Node
-    && currentTarget instanceof Node
-    && currentTarget.contains(nextTarget)
-  syncUserStackExpanded()
-}
-
-async function selectComposerUser(sender: ComposerSender) {
-  if (sender.id === composerSenderId.value) return
-  suppressUserStackCollapse = true
-  if (suppressUserStackCollapseTimer) clearTimeout(suppressUserStackCollapseTimer)
-  // 展开和折叠由同步 CSS transition 完成；等头像停止移动后再记录用户重排，
-  // 避免 Anime.js 在过渡中途读取坐标并吞掉点击切换动画。
-  await waitForUserStackTransition()
-  const layout = recordUserStackLayout()
-  await workspaceController.selectOperator(sender.id)
-  input.value = ''
-  workspaceLayout.resetDetails()
-  await animateUserStackLayout(layout)
-  suppressUserStackCollapseTimer = setTimeout(() => {
-    suppressUserStackCollapse = false
-    suppressUserStackCollapseTimer = undefined
-    userStackFocused.value = !!composerLayoutRef.value?.contains(document.activeElement)
-    syncUserStackExpanded()
-  }, 280)
-}
-
 function getBot(botId?: string) {
   return snapshot.value.bots.find(({ id }) => id === botId)
 }
@@ -1416,10 +1080,6 @@ function getInitial(name?: string) {
 }
 
 onBeforeUnmount(() => {
-  userStackLayout?.revert()
-  userStackLayout = undefined
-  if (suppressUserStackCollapseTimer) clearTimeout(suppressUserStackCollapseTimer)
-  if (userStackOverflowMotionTimer) clearTimeout(userStackOverflowMotionTimer)
   if (quoteHighlightTimer) clearTimeout(quoteHighlightTimer)
 })
 
@@ -1492,37 +1152,6 @@ function formatMediaSize(size: number) {
   return `${(size / 1024 / 1024).toFixed(1)} MB`
 }
 
-function selectMediaFile(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
-  if (!file) return
-  if (file.size > 10 * 1024 * 1024) {
-    errorMessage.value = '媒体大小不能超过 10 MB'
-    clearSelectedMedia()
-    return
-  }
-  selectedMediaFile.value = file
-  errorMessage.value = ''
-}
-
-function clearSelectedMedia() {
-  selectedMediaFile.value = undefined
-  if (mediaInputRef.value) mediaInputRef.value.value = ''
-}
-
-function readFileBase64(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.addEventListener('load', () => {
-      const result = typeof reader.result === 'string' ? reader.result : ''
-      const separator = result.indexOf(',')
-      if (separator < 0) return reject(new Error('无法读取媒体内容'))
-      resolve(result.slice(separator + 1))
-    })
-    reader.addEventListener('error', () => reject(reader.error ?? new Error('无法读取媒体内容')))
-    reader.readAsDataURL(file)
-  })
-}
-
 function scrollToQuotedMessage(messageId: string) {
   const element = document.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`)
   if (!element) return
@@ -1566,46 +1195,46 @@ function getConversationTime(conversationId: string) {
   return new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(new Date(value))
 }
 
-async function sendMessage() {
-  const content = input.value.trim()
-  const mediaFile = selectedMediaFile.value
-  const user = currentUser.value
-  const bot = currentBot.value
-  const conversation = currentConversation.value
-  const senderId = composerSenderId.value ?? user?.id
-  if ((!content && !mediaFile) || !user || !bot || !conversation || !senderId || sending.value) return
-
-  sending.value = true
-  errorMessage.value = ''
+async function sendComposerMessage(input: WebqqComposerSendIntent, resolve: () => void, reject: (error: unknown) => void) {
   try {
-    if (mediaFile) {
+    if (input.media) {
       await workspaceController.sendMediaMessage({
-          senderId,
-          botId: bot.id,
-          conversationId: conversation.id,
-          fileName: mediaFile.name,
-          mimeType: mediaFile.type,
-          dataBase64: await readFileBase64(mediaFile),
-          content: content || undefined,
-          replyToMessageId: replyingToMessageId.value || undefined,
-        })
+        senderId: input.senderId,
+        botId: input.botId,
+        conversationId: input.conversationId,
+        fileName: input.media.fileName,
+        mimeType: input.media.mimeType,
+        dataBase64: input.media.dataBase64,
+        content: input.content || undefined,
+        replyToMessageId: input.replyToMessageId,
+      })
     } else {
       await workspaceController.sendMessage({
-          senderId,
-          botId: bot.id,
-          conversationId: conversation.id,
-          content,
-          replyToMessageId: replyingToMessageId.value || undefined,
-        })
+        senderId: input.senderId,
+        botId: input.botId,
+        conversationId: input.conversationId,
+        content: input.content,
+        replyToMessageId: input.replyToMessageId,
+      })
     }
-    input.value = ''
-    clearSelectedMedia()
-    replyingToMessageId.value = ''
+    resolve()
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '发送失败'
-  } finally {
-    sending.value = false
+    reject(error)
   }
+}
+
+async function selectComposerOperator(participantId: string, resolve: () => void, reject: (error: unknown) => void) {
+  try {
+    await workspaceController.selectOperator(participantId)
+    workspaceLayout.resetDetails()
+    resolve()
+  } catch (error) {
+    reject(error)
+  }
+}
+
+function openComposerParticipantDialog(mode: EnvironmentDialogMode, entity: { type: 'user' | 'bot', id: string }) {
+  openEntityDialog(mode, entity)
 }
 
 async function publishAnnouncement() {
