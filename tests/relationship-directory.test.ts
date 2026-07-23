@@ -4,12 +4,12 @@ import type { SandboxConversation, SandboxSnapshot } from '../src/types'
 
 const snapshot: SandboxSnapshot = {
   revision: 1,
-  users: [
-    { id: '10001', name: '当前用户' },
-    { id: '10002', name: '好友用户' },
-    { id: '10003', name: '陌生用户' },
+  participants: [
+    { kind: 'user', id: '10001', name: '当前用户' },
+    { kind: 'user', id: '10002', name: '好友用户' },
+    { kind: 'user', id: '10003', name: '陌生用户' },
+    { kind: 'bot', id: '20001', name: 'Koishi', implementation: 'napcat', enabled: true },
   ],
-  bots: [{ id: '20001', name: 'Koishi', implementation: 'napcat', enabled: true }],
   groups: [
     { id: '30001', name: '已加入群', announcements: [], members: [{ participantId: '10001', role: 'member' }] },
     { id: '30002', name: '未加入群', announcements: [], members: [{ participantId: '10002', role: 'owner' }] },

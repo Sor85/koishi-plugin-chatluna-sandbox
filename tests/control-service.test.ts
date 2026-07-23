@@ -45,8 +45,7 @@ describe('模拟 QQ 环境消息闭环', () => {
     if (!control) throw new Error('沙盒控制服务未注册')
 
     const result = await control.sendMediaMessage({
-      actorUserId: '10001',
-      botId: '20001',
+      operatorId: '10001',
       conversationId: 'private:10001:20001',
       fileName: '测试图片.png',
       mimeType: 'image/png',
@@ -72,12 +71,12 @@ describe('模拟 QQ 环境消息闭环', () => {
       rawMessage: [{ type: 'image', data: { file: message?.media?.[0].reference } }],
     }))
     expect(control.getMediaContent({
-      actorUserId: '10001',
+      operatorId: '10001',
       mediaId: message?.media?.[0].id ?? '',
     }).dataBase64).toBe('aW1hZ2UtY29udGVudA==')
     await unlink(join(mediaDirectory, message?.media?.[0].id ?? ''))
     expect(() => control!.getMediaContent({
-      actorUserId: '10001',
+      operatorId: '10001',
       mediaId: message?.media?.[0].id ?? '',
     })).toThrow('媒体文件不存在')
   })
@@ -95,8 +94,7 @@ describe('模拟 QQ 环境消息闭环', () => {
     if (!control) throw new Error('沙盒控制服务未注册')
 
     const baseInput = {
-      actorUserId: '10001',
-      botId: '20001',
+      operatorId: '10001',
       conversationId: 'private:10001:20001',
       fileName: '测试文件.exe',
       dataBase64: Buffer.alloc(10 * 1024 * 1024 + 1).toString('base64'),
@@ -138,8 +136,7 @@ describe('模拟 QQ 环境消息闭环', () => {
       { fileName: '视频.mp4', mimeType: 'video/mp4' },
     ]) {
       await control.sendMediaMessage({
-        actorUserId: '10001',
-        botId: '20001',
+        operatorId: '10001',
         conversationId: 'private:10001:20001',
         ...media,
         dataBase64: Buffer.from(media.fileName).toString('base64'),
@@ -166,8 +163,7 @@ describe('模拟 QQ 环境消息闭环', () => {
     if (!control) throw new Error('沙盒控制服务未注册')
 
     await control.sendMediaMessage({
-      actorUserId: '10001',
-      botId: '20001',
+      operatorId: '10001',
       conversationId: 'private:10001:20001',
       fileName: '待清理图片.png',
       mimeType: 'image/png',
@@ -178,8 +174,7 @@ describe('模拟 QQ 环境消息闭环', () => {
     expect(await readdir(mediaDirectory)).toEqual([])
 
     await control.sendMediaMessage({
-      actorUserId: '10002',
-      botId: '20001',
+      operatorId: '10002',
       conversationId: 'private:10002:20001',
       fileName: '重启前图片.png',
       mimeType: 'image/png',
@@ -217,7 +212,7 @@ describe('模拟 QQ 环境消息闭环', () => {
     ])
 
     const latest = control.getMessageHistory({
-      actorUserId: '10001',
+      operatorId: '10001',
       conversationId: 'private:10001:20001',
       limit: 1,
     })
@@ -225,7 +220,7 @@ describe('模拟 QQ 环境消息闭环', () => {
     expect(latest.nextBeforeMessageId).toBe(latest.messages[0].id)
 
     const previous = control.getMessageHistory({
-      actorUserId: '10001',
+      operatorId: '10001',
       conversationId: 'private:10001:20001',
       beforeMessageId: latest.nextBeforeMessageId,
       limit: 1,
@@ -234,12 +229,12 @@ describe('模拟 QQ 环境消息闭环', () => {
     expect(previous.nextBeforeMessageId).toBeUndefined()
     expect(control.getVisibleSnapshot('20001').conversations).toHaveLength(6)
     expect(control.getMessageHistory({
-      actorUserId: '20001',
+      operatorId: '20001',
       conversationId: 'private:10001:20001',
       limit: 1,
     }).messages.map(({ content }) => content)).toEqual(['第二条'])
     expect(() => control!.getMessageHistory({
-      actorUserId: '10002',
+      operatorId: '10002',
       conversationId: 'private:10001:20001',
       limit: 20,
     })).toThrow('会话不存在')
@@ -287,14 +282,12 @@ describe('模拟 QQ 环境消息闭环', () => {
 
     control.createBot({ id: '20002', name: 'LLBot 测试机器人', implementation: 'llbot', enabled: true })
     const first = await control.sendMessage({
-      actorUserId: '10001',
-      botId: '20002',
+      operatorId: '10001',
       conversationId: 'private:10001:20002',
       content: '第一条',
     })
     const second = await control.sendMessage({
-      actorUserId: '10001',
-      botId: '20002',
+      operatorId: '10001',
       conversationId: 'private:10001:20002',
       content: '引用回复',
       replyToMessageId: first.messageId,
@@ -354,9 +347,9 @@ describe('模拟 QQ 环境消息闭环', () => {
     if (!control) throw new Error('沙盒控制服务未注册')
 
     const initial = control.getSnapshot()
-    expect(initial.users.map(({ id }) => id)).toEqual(['10001', '10002', '10003'])
-    expect(initial.users.map(({ name }) => name)).toEqual(['测试用户1', '测试用户2', '测试用户3'])
-    expect(initial.bots).toContainEqual(expect.objectContaining({ id: '20001', name: 'Koishi' }))
+    expect(initial.participants.filter(({ kind }) => kind === 'user').map(({ id }) => id)).toEqual(['10001', '10002', '10003'])
+    expect(initial.participants.filter(({ kind }) => kind === 'user').map(({ name }) => name)).toEqual(['测试用户1', '测试用户2', '测试用户3'])
+    expect(initial.participants).toContainEqual(expect.objectContaining({ kind: 'bot', id: '20001', name: 'Koishi' }))
     expect(initial.groups[0]).toMatchObject({
       id: '30001',
       name: '测试群',
@@ -380,8 +373,7 @@ describe('模拟 QQ 环境消息闭环', () => {
     }))
 
     await control.sendMessage({
-      actorUserId: '10001',
-      botId: '20001',
+      operatorId: '10001',
       conversationId: 'private:10001:20001',
       content: '你好',
     })
@@ -427,13 +419,12 @@ describe('模拟 QQ 环境消息闭环', () => {
     if (!control) throw new Error('沙盒控制服务未注册')
 
     control.setGroupAnnouncement({
-      actorUserId: '20001',
+      operatorId: '20001',
       groupId: '30001',
       content: '新的群公告',
     })
     await control.sendMessage({
-      actorUserId: '10001',
-      botId: '20001',
+      operatorId: '10001',
       conversationId: 'group:30001:10001:20001',
       content: '群聊消息',
     })
@@ -444,7 +435,7 @@ describe('模拟 QQ 环境消息闭环', () => {
     })
     const announcementId = control.getSnapshot().groups[0].announcements[0].id
     control.deleteGroupAnnouncement({
-      actorUserId: '20001',
+      operatorId: '20001',
       groupId: '30001',
       announcementId,
     })
@@ -456,8 +447,7 @@ describe('模拟 QQ 环境消息闭环', () => {
     })
     control.createUser({ id: '10004', name: '非成员' })
     await expect(control.sendMessage({
-      actorUserId: '10004',
-      botId: '20001',
+      operatorId: '10004',
       conversationId: 'group:30001:10001:20001',
       content: '非成员消息',
     })).rejects.toThrow('会话不存在')
@@ -478,8 +468,7 @@ describe('模拟 QQ 环境消息闭环', () => {
     if (!control) throw new Error('沙盒控制服务未注册')
 
     await control.sendMessage({
-      actorUserId: '20001',
-      botId: '20001',
+      operatorId: '20001',
       conversationId: 'private:10001:20001',
       content: '机器人主动消息',
     })

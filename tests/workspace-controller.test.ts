@@ -5,16 +5,11 @@ import { createWorkspaceController } from '../client/webqq/workspace-controller'
 
 const snapshot: SandboxSnapshot = {
   revision: 7,
-  users: [
-    { id: '10001', name: '测试用户1' },
-    { id: '10002', name: '测试用户2' },
+  participants: [
+    { kind: 'user', id: '10001', name: '测试用户1' },
+    { kind: 'user', id: '10002', name: '测试用户2' },
+    { kind: 'bot', id: '20001', name: 'Koishi', implementation: 'napcat', enabled: true },
   ],
-  bots: [{
-    id: '20001',
-    name: 'Koishi',
-    implementation: 'napcat',
-    enabled: true,
-  }],
   groups: [{
     id: '30001',
     name: '测试群',
@@ -82,7 +77,7 @@ describe('WebQQ 工作区控制模块', () => {
   it('加载保存的选择并让四个区域模型观察同一修订', async () => {
     const port = createFakeWorkspacePort(workspace)
     const storage = createStorage(JSON.stringify({
-      currentUserId: '10001',
+      currentOperatorId: '10001',
       activeConversationId: 'private:10001:20001',
       currentView: 'messages',
     }))
@@ -92,7 +87,7 @@ describe('WebQQ 工作区控制模块', () => {
 
     expect(port.calls).toEqual([{
       operation: 'getWorkspace',
-      input: { actorUserId: '10001' },
+      input: { operatorId: '10001' },
     }])
     expect(controller.currentOperatorId.value).toBe('10001')
     expect(controller.activeConversationId.value).toBe('private:10001:20001')
@@ -141,7 +136,7 @@ describe('WebQQ 工作区控制模块', () => {
 
     expect(port.calls.at(-1)).toEqual({
       operation: 'getWorkspace',
-      input: { actorUserId: '10002' },
+      input: { operatorId: '10002' },
     })
     expect(controller.currentOperatorId.value).toBe('10002')
     expect(controller.activeConversationId.value).toBe('private:10002:20001')
@@ -150,7 +145,7 @@ describe('WebQQ 工作区控制模块', () => {
 
     expect(port.calls.at(-1)).toEqual({
       operation: 'getWorkspace',
-      input: { actorUserId: '20001' },
+      input: { operatorId: '20001' },
     })
     expect(controller.currentOperatorId.value).toBe('20001')
     expect(controller.composer.value.currentOperator).toMatchObject({ id: '20001', type: 'bot' })
@@ -169,8 +164,8 @@ describe('WebQQ 工作区控制模块', () => {
     await controller.load()
     await controller.selectOperator('20001')
 
-    await controller.sendMessage({ senderId: '20001', botId: '20001', conversationId: 'private:10001:20001', content: '机器人消息' })
-    await controller.sendMediaMessage({ senderId: '20001', botId: '20001', conversationId: 'private:10001:20001', fileName: 'bot.txt', mimeType: 'text/plain', dataBase64: '' })
+    await controller.sendMessage({ conversationId: 'private:10001:20001', content: '机器人消息' })
+    await controller.sendMediaMessage({ conversationId: 'private:10001:20001', fileName: 'bot.txt', mimeType: 'text/plain', dataBase64: '' })
     await controller.getMediaContent('media-1')
     await controller.loadMessageHistory({ conversationId: 'private:10001:20001', limit: 10 })
     await controller.setGroupAnnouncement({ groupId: '30001', content: '机器人公告' })
@@ -178,7 +173,7 @@ describe('WebQQ 工作区控制模块', () => {
     await controller.manageEnvironment({ action: 'create-user', data: { id: '10099', name: '新用户' } })
     await controller.handleRelationshipRequest('friend-request-1', true)
 
-    expect(port.calls.slice(-8).map(({ input }) => Reflect.get(input as object, 'actorUserId'))).toEqual(Array(8).fill('20001'))
+    expect(port.calls.slice(-8).map(({ input }) => Reflect.get(input as object, 'operatorId')).filter(Boolean)).toEqual(Array(7).fill('20001'))
   })
 
   it('端口拒绝操作者切换时保留全部区域模型并返回规范化错误', async () => {
@@ -209,7 +204,7 @@ describe('WebQQ 工作区控制模块', () => {
 
   it('无效浏览器选择回退到首个用户及其首个会话', async () => {
     const storage = createStorage(JSON.stringify({
-      currentUserId: 'deleted-user',
+      currentOperatorId: 'deleted-user',
       activeConversationId: 'deleted-conversation',
       currentView: 'contacts',
     }))
@@ -231,14 +226,14 @@ describe('WebQQ 工作区控制模块', () => {
     const port = createFakeWorkspacePort(workspace)
     port.rejectNext('getWorkspace', new Error('参与者不存在'))
     const controller = createWorkspaceController(port, createStorage(JSON.stringify({
-      currentUserId: '10001',
+      currentOperatorId: '10001',
       currentView: 'messages',
     })))
 
     await controller.load()
 
     expect(port.calls).toEqual([
-      { operation: 'getWorkspace', input: { actorUserId: '10001' } },
+      { operation: 'getWorkspace', input: { operatorId: '10001' } },
       { operation: 'getWorkspace', input: undefined },
     ])
     expect(controller.sidebar.value.revision).toBe(7)
@@ -301,7 +296,7 @@ describe('WebQQ 工作区控制模块', () => {
       operation: 'performFriendAction',
       input: {
         action: 'request',
-        actorUserId: '10001',
+        operatorId: '10001',
         targetId: '10002',
       },
     })
@@ -338,7 +333,7 @@ describe('WebQQ 工作区控制模块', () => {
       operation: 'performGroupAction',
       input: {
         action: 'set-name',
-        actorUserId: '10001',
+        operatorId: '10001',
         groupId: '30001',
         name: '新群名称',
       },
@@ -363,7 +358,7 @@ describe('WebQQ 工作区控制模块', () => {
       operation: 'performFriendAction',
       input: {
         action: 'handle-request',
-        actorUserId: '10001',
+        operatorId: '10001',
         requestId: 'friend-request-1',
         approve: true,
       },
@@ -371,7 +366,7 @@ describe('WebQQ 工作区控制模块', () => {
       operation: 'performGroupAction',
       input: {
         action: 'handle-request',
-        actorUserId: '10001',
+        operatorId: '10001',
         requestId: 'group-request-1',
         approve: false,
       },
@@ -441,8 +436,6 @@ describe('WebQQ 工作区控制模块', () => {
     }
 
     await controller.sendMessage({
-      senderId: '20001',
-      botId: '20001',
       conversationId: 'private:10001:20001',
       content: '控制模块发送',
     })
@@ -450,9 +443,7 @@ describe('WebQQ 工作区控制模块', () => {
     expect(port.calls.at(-1)).toEqual({
       operation: 'sendMessage',
       input: {
-        actorUserId: '10001',
-        senderId: '20001',
-        botId: '20001',
+        operatorId: '10001',
         conversationId: 'private:10001:20001',
         content: '控制模块发送',
       },
@@ -473,8 +464,6 @@ describe('WebQQ 工作区控制模块', () => {
     port.rejectNext('sendMediaMessage', new Error('媒体发送被拒绝'))
 
     await expect(controller.sendMediaMessage({
-      senderId: '10001',
-      botId: '20001',
       conversationId: 'private:10001:20001',
       fileName: 'fixture.png',
       mimeType: 'image/png',
@@ -487,9 +476,7 @@ describe('WebQQ 工作区控制模块', () => {
     expect(port.calls.at(-1)).toEqual({
       operation: 'sendMediaMessage',
       input: {
-        actorUserId: '10001',
-        senderId: '10001',
-        botId: '20001',
+        operatorId: '10001',
         conversationId: 'private:10001:20001',
         fileName: 'fixture.png',
         mimeType: 'image/png',
@@ -509,7 +496,7 @@ describe('WebQQ 工作区控制模块', () => {
     expect(port.calls.at(-1)).toEqual({
       operation: 'getMediaContent',
       input: {
-        actorUserId: '10001',
+        operatorId: '10001',
         mediaId: 'media-1',
       },
     })
@@ -541,7 +528,7 @@ describe('WebQQ 工作区控制模块', () => {
     expect(port.calls.at(-1)).toEqual({
       operation: 'getMessageHistory',
       input: {
-        actorUserId: '10001',
+        operatorId: '10001',
         conversationId: 'private:10001:20001',
         beforeMessageId: 'message-1',
         limit: 50,
@@ -569,7 +556,7 @@ describe('WebQQ 工作区控制模块', () => {
     expect(port.calls.at(-1)).toEqual({
       operation: 'setGroupAnnouncement',
       input: {
-        actorUserId: '10001',
+        operatorId: '10001',
         groupId: '30001',
         content: '控制模块公告',
       },
@@ -588,7 +575,7 @@ describe('WebQQ 工作区控制模块', () => {
     expect(port.calls.at(-1)).toEqual({
       operation: 'deleteGroupAnnouncement',
       input: {
-        actorUserId: '10001',
+        operatorId: '10001',
         groupId: '30001',
         announcementId: 'announcement-1',
       },
@@ -605,20 +592,16 @@ describe('WebQQ 工作区控制模块', () => {
       snapshot: {
         ...workspace.snapshot,
         revision: 8,
-        users: workspace.snapshot.users.filter(({ id }) => id !== '10001'),
+        participants: workspace.snapshot.participants.filter(({ id }) => id !== '10001'),
         conversations: workspace.snapshot.conversations.filter(({ userId }) => userId !== '10001'),
       },
     }
 
     await controller.manageEnvironment({ action: 'delete-user', data: { id: '10001' } })
 
-    expect(port.calls.at(-1)).toEqual({
+    expect(port.calls.at(-2)).toEqual({
       operation: 'manageEnvironment',
-      input: {
-        action: 'delete-user',
-        actorUserId: '10001',
-        data: { id: '10001' },
-      },
+      input: { action: 'delete-user', data: { id: '10001' } },
     })
     expect(controller.currentOperatorId.value).toBe('10002')
     expect(controller.currentOperatorId.value).toBe('10002')

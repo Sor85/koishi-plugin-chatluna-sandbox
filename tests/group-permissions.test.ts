@@ -27,7 +27,7 @@ describe('模拟 QQ 环境群权限操作', () => {
 
     const result = await control.performGroupAction({
       action: 'request-join',
-      actorUserId: '10005',
+      operatorId: '10005',
       groupId: '30001',
       comment: '申请加入测试群',
     })
@@ -35,7 +35,7 @@ describe('模拟 QQ 环境群权限操作', () => {
 
     await control.performGroupAction({
       action: 'handle-request',
-      actorUserId: '10001',
+      operatorId: '10001',
       requestId: result.requestId,
       approve: true,
     })
@@ -51,7 +51,7 @@ describe('模拟 QQ 环境群权限操作', () => {
 
     const result = await control.performGroupAction({
       action: 'invite',
-      actorUserId: '10002',
+      operatorId: '10002',
       groupId: '30001',
       targetId: '20002',
     })
@@ -59,7 +59,7 @@ describe('模拟 QQ 环境群权限操作', () => {
 
     await expect(control.performGroupAction({
       action: 'handle-request',
-      actorUserId: '10002',
+      operatorId: '10002',
       requestId: result.requestId,
       approve: true,
     })).rejects.toThrow('机器人邀请必须由机器人处理')
@@ -72,7 +72,7 @@ describe('模拟 QQ 环境群权限操作', () => {
   it('群管理员机器人可以通过 OneBot action 审批用户入群申请', async () => {
     const { control } = await createControl()
     control.createUser({ id: '10006', name: '机器人审批用户' })
-    const request = await control.performGroupAction({ action: 'request-join', actorUserId: '10006', groupId: '30001' })
+    const request = await control.performGroupAction({ action: 'request-join', operatorId: '10006', groupId: '30001' })
     if (!request.requestId) throw new Error('入群申请未创建')
 
     await control.bot.internal.set_group_add_request({ flag: request.requestId, sub_type: 'add', approve: true })
@@ -83,25 +83,25 @@ describe('模拟 QQ 环境群权限操作', () => {
   it('成员可以退群，管理员只能踢普通成员，群主可以设置管理员', async () => {
     const { control } = await createControl()
 
-    await expect(control.performGroupAction({ action: 'kick', actorUserId: '10003', groupId: '30001', targetId: '10002' }))
+    await expect(control.performGroupAction({ action: 'kick', operatorId: '10003', groupId: '30001', targetId: '10002' }))
       .rejects.toThrow('只有群主或管理员可以踢出成员')
-    await expect(control.performGroupAction({ action: 'kick', actorUserId: '10002', groupId: '30001', targetId: '10001' }))
+    await expect(control.performGroupAction({ action: 'kick', operatorId: '10002', groupId: '30001', targetId: '10001' }))
       .rejects.toThrow('管理员不能管理群主或其他管理员')
 
-    await control.performGroupAction({ action: 'set-admin', actorUserId: '10001', groupId: '30001', targetId: '10003', enabled: true })
+    await control.performGroupAction({ action: 'set-admin', operatorId: '10001', groupId: '30001', targetId: '10003', enabled: true })
     expect(control.getSnapshot().groups[0].members.find(({ participantId }) => participantId === '10003')?.role).toBe('admin')
 
-    await control.performGroupAction({ action: 'set-admin', actorUserId: '10001', groupId: '30001', targetId: '10003', enabled: false })
-    await control.performGroupAction({ action: 'leave', actorUserId: '10003', groupId: '30001' })
+    await control.performGroupAction({ action: 'set-admin', operatorId: '10001', groupId: '30001', targetId: '10003', enabled: false })
+    await control.performGroupAction({ action: 'leave', operatorId: '10003', groupId: '30001' })
     expect(control.getSnapshot().groups[0].members.some(({ participantId }) => participantId === '10003')).toBe(false)
   })
 
   it('成员修改自己的群名片，管理员修改成员名片和群名称', async () => {
     const { control } = await createControl()
 
-    await control.performGroupAction({ action: 'set-card', actorUserId: '10003', groupId: '30001', targetId: '10003', card: '新群名片' })
-    await control.performGroupAction({ action: 'set-card', actorUserId: '10002', groupId: '30001', targetId: '10003', card: '管理员设置' })
-    await control.performGroupAction({ action: 'set-name', actorUserId: '10002', groupId: '30001', name: '新的测试群' })
+    await control.performGroupAction({ action: 'set-card', operatorId: '10003', groupId: '30001', targetId: '10003', card: '新群名片' })
+    await control.performGroupAction({ action: 'set-card', operatorId: '10002', groupId: '30001', targetId: '10003', card: '管理员设置' })
+    await control.performGroupAction({ action: 'set-name', operatorId: '10002', groupId: '30001', name: '新的测试群' })
 
     const group = control.getSnapshot().groups[0]
     expect(group.name).toBe('新的测试群')
@@ -111,12 +111,12 @@ describe('模拟 QQ 环境群权限操作', () => {
   it('用户和机器人群主都可以把群主身份转让给其他成员', async () => {
     const { control } = await createControl()
 
-    await control.performGroupAction({ action: 'transfer-owner', actorUserId: '10001', groupId: '30001', targetId: '20001' })
+    await control.performGroupAction({ action: 'transfer-owner', operatorId: '10001', groupId: '30001', targetId: '20001' })
     expect(control.getSnapshot().groups[0].members).toEqual(expect.arrayContaining([
       expect.objectContaining({ participantId: '10001', role: 'member' }),
       expect.objectContaining({ participantId: '20001', role: 'owner' }),
     ]))
-    await expect(control.performGroupAction({ action: 'transfer-owner', actorUserId: '10002', groupId: '30001', targetId: '10003' }))
+    await expect(control.performGroupAction({ action: 'transfer-owner', operatorId: '10002', groupId: '30001', targetId: '10003' }))
       .rejects.toThrow('只有群主可以转让群主身份')
 
     await control.bot.internal._request('set_group_owner', { group_id: 30001, user_id: 10002 })
@@ -125,17 +125,17 @@ describe('模拟 QQ 环境群权限操作', () => {
       expect.objectContaining({ participantId: '10002', role: 'owner' }),
     ]))
 
-    await control.performGroupAction({ action: 'kick', actorUserId: '10002', groupId: '30001', targetId: '10003' })
+    await control.performGroupAction({ action: 'kick', operatorId: '10002', groupId: '30001', targetId: '10003' })
     expect(control.getSnapshot().groups[0].members.some(({ participantId }) => participantId === '10003')).toBe(false)
   })
 
   it('机器人接任群主后可以作为 WebQQ 当前操作者管理群成员', async () => {
     const { control } = await createControl()
 
-    await control.performGroupAction({ action: 'transfer-owner', actorUserId: '10001', groupId: '30001', targetId: '20001' })
+    await control.performGroupAction({ action: 'transfer-owner', operatorId: '10001', groupId: '30001', targetId: '20001' })
     const group = control.getSnapshot().groups[0]
     control.updateGroup({ id: group.id, name: group.name, members: group.members })
-    await control.performGroupAction({ action: 'kick', actorUserId: '20001', groupId: '30001', targetId: '10003' })
+    await control.performGroupAction({ action: 'kick', operatorId: '20001', groupId: '30001', targetId: '10003' })
 
     expect(control.getSnapshot().groups[0].members.some(({ participantId }) => participantId === '10003')).toBe(false)
   })
@@ -156,7 +156,7 @@ describe('模拟 QQ 环境群权限操作', () => {
 
     await control.performGroupAction({
       action: 'poke',
-      actorUserId: '10003',
+      operatorId: '10003',
       groupId: '30001',
       targetId: '10001',
       conversationId: 'group:30001:10003:20001',
@@ -185,11 +185,11 @@ describe('模拟 QQ 环境群权限操作', () => {
       notices.push(value.onebot ?? {})
     })
 
-    await control.performGroupAction({ action: 'set-admin', actorUserId: '10001', groupId: '30001', targetId: '10003', enabled: true })
-    await control.performGroupAction({ action: 'set-admin', actorUserId: '10001', groupId: '30001', targetId: '10003', enabled: false })
-    await control.performGroupAction({ action: 'set-card', actorUserId: '10002', groupId: '30001', targetId: '10003', card: '新名片' })
-    await control.performGroupAction({ action: 'set-name', actorUserId: '10002', groupId: '30001', name: '新群名称' })
-    await control.performGroupAction({ action: 'kick', actorUserId: '10002', groupId: '30001', targetId: '10003' })
+    await control.performGroupAction({ action: 'set-admin', operatorId: '10001', groupId: '30001', targetId: '10003', enabled: true })
+    await control.performGroupAction({ action: 'set-admin', operatorId: '10001', groupId: '30001', targetId: '10003', enabled: false })
+    await control.performGroupAction({ action: 'set-card', operatorId: '10002', groupId: '30001', targetId: '10003', card: '新名片' })
+    await control.performGroupAction({ action: 'set-name', operatorId: '10002', groupId: '30001', name: '新群名称' })
+    await control.performGroupAction({ action: 'kick', operatorId: '10002', groupId: '30001', targetId: '10003' })
 
     expect(notices).toEqual(expect.arrayContaining([
       expect.objectContaining({ notice_type: 'group_admin', sub_type: 'set', group_id: 30001, user_id: 10003 }),
@@ -215,7 +215,7 @@ describe('模拟 QQ 环境群权限操作', () => {
       if (value.onebot?.notice_type === 'group_decrease') notices.push(value.onebot)
     })
 
-    await control.performGroupAction({ action: 'kick', actorUserId: '10001', groupId: '30001', targetId: '20002' })
+    await control.performGroupAction({ action: 'kick', operatorId: '10001', groupId: '30001', targetId: '20002' })
 
     expect(notices).toEqual(expect.arrayContaining([
       expect.objectContaining({ self_id: 20001, sub_type: 'kick', user_id: 20002 }),

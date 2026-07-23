@@ -32,7 +32,7 @@ describe('模拟 QQ 环境目录管理', () => {
     control.createUser({ id: '10099', name: '新用户' })
     const created = control.getSnapshot()
     expect(created.revision).toBe(initialRevision + 1)
-    expect(created.users).toContainEqual({ id: '10099', name: '新用户' })
+    expect(created.participants).toContainEqual({ kind: 'user', id: '10099', name: '新用户' })
     expect(created.conversations).toContainEqual({
       id: 'private:10099:20001',
       type: 'direct',
@@ -42,7 +42,8 @@ describe('模拟 QQ 环境目录管理', () => {
     })
 
     control.updateUser({ id: '10099', name: '更新用户' })
-    expect(control.getSnapshot().users.find(({ id }) => id === '10099')).toEqual({
+    expect(control.getSnapshot().participants.find(({ id }) => id === '10099')).toEqual({
+      kind: 'user',
       id: '10099',
       name: '更新用户',
     })
@@ -50,7 +51,7 @@ describe('模拟 QQ 环境目录管理', () => {
     control.deleteUser({ id: '10099' })
     const snapshot = control.getSnapshot()
     expect(snapshot.revision).toBe(initialRevision + 3)
-    expect(snapshot.users.some(({ id }) => id === '10099')).toBe(false)
+    expect(snapshot.participants.some(({ id }) => id === '10099')).toBe(false)
     expect(snapshot.conversations.some(({ userId }) => userId === '10099')).toBe(false)
     expect(snapshot.messages).toEqual([])
     expect(getMiddlewareCalls()).toBe(0)
@@ -66,13 +67,14 @@ describe('模拟 QQ 环境目录管理', () => {
       enabled: false,
     })
     const created = control.getSnapshot()
-    expect(created.bots).toContainEqual({
+    expect(created.participants).toContainEqual({
+      kind: 'bot',
       id: '20099',
       name: 'LLBot 测试机器人',
       implementation: 'llbot',
       enabled: false,
     })
-    expect(created.conversations.filter(({ botId }) => botId === '20099')).toHaveLength(created.users.length)
+    expect(created.conversations.filter(({ botId }) => botId === '20099')).toHaveLength(created.participants.filter(({ kind }) => kind === 'user').length)
 
     control.updateBot({
       id: '20099',
@@ -80,7 +82,8 @@ describe('模拟 QQ 环境目录管理', () => {
       implementation: 'napcat',
       enabled: true,
     })
-    expect(control.getSnapshot().bots.find(({ id }) => id === '20099')).toEqual({
+    expect(control.getSnapshot().participants.find(({ id }) => id === '20099')).toEqual({
+      kind: 'bot',
       id: '20099',
       name: 'NapCat 测试机器人',
       implementation: 'napcat',
@@ -89,7 +92,7 @@ describe('模拟 QQ 环境目录管理', () => {
 
     control.deleteBot({ id: '20099' })
     const removed = control.getSnapshot()
-    expect(removed.bots.some(({ id }) => id === '20099')).toBe(false)
+    expect(removed.participants.some(({ id }) => id === '20099')).toBe(false)
     expect(removed.conversations.some(({ botId }) => botId === '20099')).toBe(false)
     expect(removed.groups.some(({ members }) => members.some(({ participantId }) => participantId === '20099'))).toBe(false)
     expect(getMiddlewareCalls()).toBe(0)

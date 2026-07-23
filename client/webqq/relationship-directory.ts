@@ -34,13 +34,13 @@ export function getVisibleRecentConversations(
 export function getFriendDirectory(snapshot: SandboxSnapshot, operatorId?: string) {
   if (!operatorId) return []
 
-  return [...snapshot.users, ...snapshot.bots]
+  return snapshot.participants
     .filter(({ id }) => id !== operatorId)
     .map((participant) => {
       const friendship = snapshot.friendships.find(({ participantIds }) => participantIds.includes(operatorId) && participantIds.includes(participant.id))
       const pendingOutgoing = snapshot.requests.some(({ type, requesterId, targetId }) => type === 'friend' && requesterId === operatorId && targetId === participant.id)
       const pendingIncoming = snapshot.requests.some(({ type, requesterId, targetId }) => type === 'friend' && requesterId === participant.id && targetId === operatorId)
-      const isBot = snapshot.bots.some(({ id }) => id === participant.id)
+      const isBot = participant.kind === 'bot'
       const conversationId = snapshot.conversations.find((conversation) => isDirectConversationBetween(conversation, operatorId, participant.id))?.id
 
       return {

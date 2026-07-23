@@ -11,16 +11,11 @@ import {
 
 const snapshot: SandboxSnapshot = {
   revision: 0,
-  users: [
-    { id: '10001', name: '测试用户' },
-    { id: '10002', name: '协作用户' },
+  participants: [
+    { kind: 'user', id: '10001', name: '测试用户' },
+    { kind: 'user', id: '10002', name: '协作用户' },
+    { kind: 'bot', id: '20001', name: 'OneBot Sandbox', implementation: 'napcat', enabled: true },
   ],
-  bots: [{
-    id: '20001',
-    name: 'OneBot Sandbox',
-    implementation: 'napcat',
-    enabled: true,
-  }],
   groups: [],
   conversations: [
     { id: 'private:10001:20001', type: 'direct', userId: '10001', botId: '20001', messageIds: [] },
@@ -64,7 +59,7 @@ describe('WebQQ 浏览器工作台状态', () => {
       activeConversationId: 'private:10002:20001',
       currentView: 'profile',
     })
-    expect(snapshot.users[0].id).toBe('10001')
+    expect(snapshot.participants[0].id).toBe('10001')
   })
 
   it('恢复机器人选择并在无效选择时回退到首个参与者', () => {

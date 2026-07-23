@@ -23,14 +23,14 @@
       </button>
     </nav>
     <div v-if="section === 'users'" v-webqq-scrollbar class="directory-list">
-      <article v-for="user in snapshot.users" :key="user.id" class="directory-card">
+      <article v-for="user in users" :key="user.id" class="directory-card">
         <WebqqAvatar class="directory-avatar" kind="user" :name="user.name" :avatar="user.avatar" />
         <span class="directory-copy"><strong>{{ user.name }}</strong><small>{{ user.id }}</small></span>
       </article>
     </div>
 
     <div v-else-if="section === 'bots'" v-webqq-scrollbar class="directory-list">
-      <article v-for="bot in snapshot.bots" :key="bot.id" class="directory-card">
+      <article v-for="bot in bots" :key="bot.id" class="directory-card">
         <WebqqAvatar class="directory-avatar" kind="bot" :name="bot.name" :avatar="bot.avatar" />
         <span class="directory-copy">
           <strong>{{ bot.name }}</strong>
@@ -56,16 +56,18 @@ import { IconRobot, IconUser, IconUsers } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
 import WebqqAvatar from './webqq-avatar.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
-import type { SandboxSnapshot } from '../src/types'
+import { getSandboxBots, getSandboxUsers, type SandboxSnapshot } from '../src/types'
 
 const props = defineProps<{ snapshot: SandboxSnapshot }>()
+const users = computed(() => getSandboxUsers(props.snapshot))
+const bots = computed(() => getSandboxBots(props.snapshot))
 
 type EnvironmentSection = 'users' | 'bots' | 'groups'
 const section = ref<EnvironmentSection>('users')
 
 const sections = computed(() => [
-  { id: 'users' as const, label: '普通用户', icon: IconUser, count: props.snapshot.users.length },
-  { id: 'bots' as const, label: '机器人', icon: IconRobot, count: props.snapshot.bots.length },
+  { id: 'users' as const, label: '普通用户', icon: IconUser, count: users.value.length },
+  { id: 'bots' as const, label: '机器人', icon: IconRobot, count: bots.value.length },
   { id: 'groups' as const, label: '群组', icon: IconUsers, count: props.snapshot.groups.length },
 ])
 

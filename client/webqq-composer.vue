@@ -186,8 +186,6 @@ export interface WebqqComposerModel {
 }
 
 export interface WebqqComposerSendIntent {
-  senderId: string
-  botId: string
   conversationId: string
   content: string
   replyToMessageId?: string
@@ -422,9 +420,8 @@ function formatMediaSize(size: number) {
 async function sendMessage() {
   const content = input.value.trim()
   const mediaFile = selectedMediaFile.value
-  const senderId = props.model.currentOperatorId
-  const { botId, conversationId } = props.model
-  if ((!content && !mediaFile) || !senderId || !botId || !conversationId || sending.value) return
+  const { currentOperatorId, conversationId } = props.model
+  if ((!content && !mediaFile) || !currentOperatorId || !conversationId || sending.value) return
 
   sending.value = true
   localError.value = ''
@@ -433,8 +430,6 @@ async function sendMessage() {
       ? { fileName: mediaFile.name, mimeType: mediaFile.type, dataBase64: await readFileBase64(mediaFile) }
       : undefined
     await new Promise<void>((resolve, reject) => emit('send', {
-      senderId,
-      botId,
       conversationId,
       content,
       replyToMessageId: props.model.replyingTo?.id,

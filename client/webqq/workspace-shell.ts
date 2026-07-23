@@ -10,6 +10,7 @@ import type {
   SandboxFriendAction,
   SandboxGroupAction,
 } from '../../src/types'
+import { getSandboxBots, getSandboxUsers } from '../../src/types'
 import type { SandboxWorkspaceView } from './workspace-state'
 import type { FriendMenuState } from './friend-menu'
 import { getIncomingNotificationRequests } from './notification-requests'
@@ -44,10 +45,11 @@ export function createWebqqWorkspaceShell(
   const mediaLoadFailures = ref<Record<string, true>>({})
   const errorMessage = ref('')
   const snapshot = computed(() => workspace.value.snapshot)
+  const users = computed(() => getSandboxUsers(snapshot.value))
+  const bots = computed(() => getSandboxBots(snapshot.value))
   const appearance = computed(() => workspace.value.appearance)
-  const currentOperator = computed(() => [...snapshot.value.users, ...snapshot.value.bots]
-    .find(({ id }) => id === currentOperatorId.value))
-  const currentOperatorIsBot = computed(() => snapshot.value.bots.some(({ id }) => id === currentOperatorId.value))
+  const currentOperator = computed(() => snapshot.value.participants.find(({ id }) => id === currentOperatorId.value))
+  const currentOperatorIsBot = computed(() => currentOperator.value?.kind === 'bot')
   // 会话的 botId 是历史遗留的“对端 ID”，普通用户私聊中也会指向用户；
   // 发送者候选必须使用完整参与者目录，不能据此筛掉机器人。
   const composerSenders = computed<WebqqComposerSender[]>(() => workspaceController.composer.value.participants
@@ -60,7 +62,7 @@ export function createWebqqWorkspaceShell(
     : undefined)
   const currentBot = computed(() => getBot(currentPeerId.value))
   const currentPeer = computed(() => currentBot.value
-    ?? snapshot.value.users.find(({ id }) => id === currentPeerId.value))
+    ?? users.value.find(({ id }) => id === currentPeerId.value))
   const currentGroup = computed(() => snapshot.value.groups.find(({ id }) => id === currentConversation.value?.groupId))
   const currentConversationTitle = computed(() => currentGroup.value?.name
     ?? currentPeer.value?.name
@@ -74,10 +76,8 @@ export function createWebqqWorkspaceShell(
     const ids = new Set(currentConversation.value?.messageIds ?? [])
     return snapshot.value.messages.filter(({ id }) => ids.has(id))
   })
-  const participants = computed(() => Object.fromEntries([
-    ...snapshot.value.users.map(({ id, name, avatar }) => [id, { name, avatar, isBot: false }]),
-    ...snapshot.value.bots.map(({ id, name, avatar }) => [id, { name, avatar, isBot: true }]),
-  ]))
+  const participants = computed(() => Object.fromEntries(snapshot.value.participants
+    .map(({ id, name, avatar, kind }) => [id, { name, avatar, isBot: kind === 'bot' }])))
   const friendMenuStates = computed<Record<string, FriendMenuState>>(() => {
     const actorId = currentOperatorId.value
     if (!actorId) return {}
@@ -118,8 +118,7 @@ export function createWebqqWorkspaceShell(
     externalError: errorMessage.value,
   }))
   const participantNames = computed(() => Object.fromEntries([
-    ...snapshot.value.users.map(({ id, name }) => [id, name]),
-    ...snapshot.value.bots.map(({ id, name }) => [id, name]),
+    ...snapshot.value.participants.map(({ id, name }) => [id, name]),
   ]))
   const chatPaneModel = computed<WebqqChatPaneModel>(() => ({
     conversationId: currentConversation.value?.id,
@@ -137,8 +136,8 @@ export function createWebqqWorkspaceShell(
     conversationId: currentConversation.value?.id,
     revision: snapshot.value.revision,
     counts: {
-      users: snapshot.value.users.length,
-      bots: snapshot.value.bots.length,
+      users: users.value.length,
+      bots: bots.value.length,
       groups: snapshot.value.groups.length,
       requests: snapshot.value.requests.length,
     },
@@ -162,7 +161,7 @@ export function createWebqqWorkspaceShell(
     const group = snapshot.value.groups.find(({ id }) => id === conversation.groupId)
     const peerId = getConversationPeerId(conversation, currentOperatorId.value, currentOperatorIsBot.value)
     const bot = getBot(peerId)
-    const peer = bot ?? snapshot.value.users.find(({ id }) => id === peerId)
+    const peer = bot ?? users.value.find(({ id }) => id === peerId)
     const messageIds = new Set(conversation.messageIds)
     const latestMessage = snapshot.value.messages.filter(({ id }) => messageIds.has(id)).at(-1)
     const actorRole = group?.members.find(({ participantId }) => participantId === currentOperatorId.value)?.role
@@ -192,7 +191,7 @@ export function createWebqqWorkspaceShell(
     currentGroupId: currentGroup.value?.id,
     currentGroupMemberIds: currentGroup.value?.members.map(({ participantId }) => participantId) ?? [],
     currentOperator: currentOperator.value,
-    bots: snapshot.value.bots,
+    bots: bots.value,
     conversations: sidebarConversations.value,
     friends: getFriendDirectory(snapshot.value, currentOperatorId.value),
     groups: getGroupDirectory(snapshot.value, currentOperatorId.value),
@@ -201,8 +200,8 @@ export function createWebqqWorkspaceShell(
     groupNames: Object.fromEntries(snapshot.value.groups.map(({ id, name }) => [id, name])),
   }))
   const overlayModel = computed(() => ({
-    users: snapshot.value.users,
-    bots: snapshot.value.bots,
+    users: users.value,
+    bots: bots.value,
     groups: snapshot.value.groups,
     accentColor: appearance.value.webQQAccentColor,
   }))
@@ -363,7 +362,7 @@ export function createWebqqWorkspaceShell(
   }
 
   function getBot(botId?: string) {
-    return snapshot.value.bots.find(({ id }) => id === botId)
+    return bots.value.find(({ id }) => id === botId)
   }
 
   async function loadVisibleMedia() {
@@ -399,8 +398,6 @@ export function createWebqqWorkspaceShell(
     try {
       if (input.media) {
         await workspaceController.sendMediaMessage({
-          senderId: input.senderId,
-          botId: input.botId,
           conversationId: input.conversationId,
           fileName: input.media.fileName,
           mimeType: input.media.mimeType,
@@ -410,8 +407,6 @@ export function createWebqqWorkspaceShell(
         })
       } else {
         await workspaceController.sendMessage({
-          senderId: input.senderId,
-          botId: input.botId,
           conversationId: input.conversationId,
           content: input.content,
           replyToMessageId: input.replyToMessageId,

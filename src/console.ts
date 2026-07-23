@@ -17,6 +17,7 @@ import type {
   SendMessageInput,
   SetGroupAnnouncementInput,
 } from './types'
+import { getSandboxUsers } from './types'
 
 interface ConsoleEventMap {
   'onebot-sandbox/workspace': (input?: GetSandboxWorkspaceInput) => SandboxWorkspaceState
@@ -50,37 +51,37 @@ export function registerConsole(
     prod: resolve(__dirname, '../dist'),
   })
 
-  const getWorkspace = (actorUserId?: string, messageLimit?: number): SandboxWorkspaceState => {
+  const getWorkspace = (operatorId?: string, messageLimit?: number): SandboxWorkspaceState => {
     const snapshot = control.getSnapshot()
-    // actorUserId 是历史 RPC 字段名，但统一当前操作者后也会承载机器人 ID；
+    // operatorId 是历史 RPC 字段名，但统一当前操作者后也会承载机器人 ID；
     // 只按用户校验会把机器人命令后的快照静默切到首个用户，继而清空当前会话选择。
-    const visibleParticipantId = [...snapshot.users, ...snapshot.bots].some(({ id }) => id === actorUserId)
-      ? actorUserId
-      : snapshot.users[0]?.id
+    const visibleParticipantId = snapshot.participants.some(({ id }) => id === operatorId)
+      ? operatorId
+      : getSandboxUsers(snapshot)[0]?.id ?? snapshot.participants[0]?.id
     return {
       snapshot: visibleParticipantId ? control.getVisibleSnapshot(visibleParticipantId, messageLimit) : snapshot,
       appearance,
     }
   }
 
-  console.addListener('onebot-sandbox/workspace', (input) => getWorkspace(input?.actorUserId, input?.messageLimit), { authority: 4 })
+  console.addListener('onebot-sandbox/workspace', (input) => getWorkspace(input?.operatorId, input?.messageLimit), { authority: 4 })
   console.addListener('onebot-sandbox/message-history', (input) => control.getMessageHistory(input), { authority: 4 })
   console.addListener('onebot-sandbox/send-message', async (input) => {
     await control.sendMessage(input)
-    return getWorkspace(input.actorUserId)
+    return getWorkspace(input.operatorId)
   }, { authority: 4 })
   console.addListener('onebot-sandbox/send-media-message', async (input) => {
     await control.sendMediaMessage(input)
-    return getWorkspace(input.actorUserId)
+    return getWorkspace(input.operatorId)
   }, { authority: 4 })
   console.addListener('onebot-sandbox/media-content', (input) => control.getMediaContent(input), { authority: 4 })
   console.addListener('onebot-sandbox/set-group-announcement', (input) => {
     control.setGroupAnnouncement(input)
-    return getWorkspace(input.actorUserId)
+    return getWorkspace(input.operatorId)
   }, { authority: 4 })
   console.addListener('onebot-sandbox/delete-group-announcement', (input) => {
     control.deleteGroupAnnouncement(input)
-    return getWorkspace(input.actorUserId)
+    return getWorkspace(input.operatorId)
   }, { authority: 4 })
   console.addListener('onebot-sandbox/manage-environment', (input) => {
     switch (input.action) {
@@ -112,15 +113,15 @@ export function registerConsole(
         control.deleteGroup(input.data)
         break
     }
-    return getWorkspace(input.actorUserId)
+    return getWorkspace()
   }, { authority: 4 })
   console.addListener('onebot-sandbox/friend-action', async (input) => {
     await control.performFriendAction(input)
-    return getWorkspace(input.actorUserId)
+    return getWorkspace(input.operatorId)
   }, { authority: 4 })
   console.addListener('onebot-sandbox/group-action', async (input) => {
     await control.performGroupAction(input)
-    return getWorkspace(input.actorUserId)
+    return getWorkspace(input.operatorId)
   }, { authority: 4 })
 }
 

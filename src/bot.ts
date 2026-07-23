@@ -216,11 +216,9 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
 
   async getUser(userId: string): Promise<Universal.User> {
     const snapshot = this.control.getSnapshot()
-    const user = snapshot.users.find(({ id }) => id === userId)
-    const bot = snapshot.bots.find(({ id }) => id === userId)
-    const participant = user ?? bot
+    const participant = snapshot.participants.find(({ id }) => id === userId)
     if (!participant) throw new Error(`参与者不存在：${userId}`)
-    return { id: participant.id, name: participant.name, avatar: participant.avatar, isBot: !!bot }
+    return { id: participant.id, name: participant.name, avatar: participant.avatar, isBot: participant.kind === 'bot' }
   }
 
   async getFriendList(): Promise<Universal.List<Universal.Friend>> {
@@ -404,7 +402,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
       message_type: conversation?.type === 'group' ? 'group' : 'private',
       message_id: message.id,
       real_id: message.id,
-      sender: { user_id: Number(message.authorId), nickname: this.control.getSnapshot().users.find(({ id }) => id === message.authorId)?.name ?? this.user?.name ?? message.authorId },
+      sender: { user_id: Number(message.authorId), nickname: this.control.getSnapshot().participants.find(({ id }) => id === message.authorId)?.name ?? this.user?.name ?? message.authorId },
       user_id: Number(conversation?.userId ?? message.authorId),
       group_id: conversation?.groupId ? Number(conversation.groupId) : undefined,
       message: [{ type: 'text', data: { text: message.content } }],

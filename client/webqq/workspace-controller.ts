@@ -10,8 +10,8 @@ import type {
   SandboxGroup,
   SandboxGroupAction,
   SandboxMessage,
+  SandboxParticipant,
   SandboxSnapshot,
-  SandboxUser,
   SandboxWorkspaceState,
   SendMediaMessageInput,
   SendMessageInput,
@@ -41,7 +41,7 @@ function normalizeWorkspaceError(error: unknown, fallback: string) {
   return new WorkspaceControllerError(error instanceof Error ? error.message : fallback)
 }
 
-export type WorkspaceParticipant = (SandboxUser & { type: 'user' }) | (SandboxBotProfile & { type: 'bot' })
+export type WorkspaceParticipant = SandboxParticipant & { type: SandboxParticipant['kind'] }
 
 export interface SidebarWorkspaceModel {
   readonly revision: number
@@ -83,8 +83,7 @@ const defaultAppearance: SandboxAppearance = {
 
 const emptySnapshot: SandboxSnapshot = {
   revision: 0,
-  users: [],
-  bots: [],
+  participants: [],
   groups: [],
   conversations: [],
   messages: [],
@@ -103,14 +102,12 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
 
   const snapshot = computed(() => workspaceState.value.snapshot)
   const currentOperator = computed<WorkspaceParticipant | undefined>(() => {
-    const user = snapshot.value.users.find(({ id }) => id === currentOperatorIdState.value)
-    if (user) return { ...user, type: 'user' }
-    const bot = snapshot.value.bots.find(({ id }) => id === currentOperatorIdState.value)
-    return bot ? { ...bot, type: 'bot' } : undefined
+    const participant = snapshot.value.participants.find(({ id }) => id === currentOperatorIdState.value)
+    return participant ? { ...participant, type: participant.kind } : undefined
   })
   const conversations = computed(() => {
     const operatorId = currentOperatorIdState.value
-    const operatorIsBot = snapshot.value.bots.some(({ id }) => id === operatorId)
+    const operatorIsBot = snapshot.value.participants.some(({ id, kind }) => id === operatorId && kind === 'bot')
     return snapshot.value.conversations.filter((conversation) => operatorIsBot
       ? conversation.botId === operatorId
       : conversation.userId === operatorId)
@@ -120,12 +117,11 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     const ids = new Set(activeConversation.value?.messageIds ?? [])
     return snapshot.value.messages.filter(({ id }) => ids.has(id))
   })
-  const activeBot = computed(() => snapshot.value.bots.find(({ id }) => id === activeConversation.value?.botId))
+  const activeBot = computed(() => snapshot.value.participants.find((participant): participant is SandboxBotProfile => participant.kind === 'bot'
+    && participant.id === activeConversation.value?.botId))
   const activeGroup = computed(() => snapshot.value.groups.find(({ id }) => id === activeConversation.value?.groupId))
-  const participants = computed<WorkspaceParticipant[]>(() => [
-    ...snapshot.value.users.map((user) => ({ ...user, type: 'user' as const })),
-    ...snapshot.value.bots.map((bot) => ({ ...bot, type: 'bot' as const })),
-  ])
+  const participants = computed<WorkspaceParticipant[]>(() => snapshot.value.participants
+    .map((participant) => ({ ...participant, type: participant.kind })))
 
   const sidebar = computed<SidebarWorkspaceModel>(() => ({
     revision: snapshot.value.revision,
@@ -185,9 +181,10 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     const preferences = loadWorkspacePreferences(storage)
     let nextWorkspace: SandboxWorkspaceState
     try {
-      nextWorkspace = await port.getWorkspace({ actorUserId: preferences.currentOperatorId })
+      nextWorkspace = preferences.currentOperatorId
+        ? await port.getWorkspace({ operatorId: preferences.currentOperatorId })
+        : await port.getWorkspace()
     } catch {
-      // 已保存的参与者可能已被删除；保留旧页面的无参数 RPC fallback。
       nextWorkspace = await port.getWorkspace()
     }
     workspaceState.value = nextWorkspace
@@ -207,10 +204,10 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   }
 
   async function selectOperator(participantId: string) {
-    if (![...snapshot.value.users, ...snapshot.value.bots].some(({ id }) => id === participantId)) return
+    if (!snapshot.value.participants.some(({ id }) => id === participantId)) return
     let nextWorkspace: SandboxWorkspaceState
     try {
-      nextWorkspace = await port.getWorkspace({ actorUserId: participantId })
+      nextWorkspace = await port.getWorkspace({ operatorId: participantId })
     } catch (error) {
       throw normalizeWorkspaceError(error, '切换当前操作者失败')
     }
@@ -225,52 +222,52 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   }
 
   function getCurrentOperatorId() {
-    const actorUserId = currentOperatorIdState.value
-    if (!actorUserId) throw new WorkspaceControllerError('当前操作者不可用')
-    return actorUserId
+    const operatorId = currentOperatorIdState.value
+    if (!operatorId) throw new WorkspaceControllerError('当前操作者不可用')
+    return operatorId
   }
 
   async function performFriendAction(input: SandboxFriendAction) {
-    const actorUserId = currentOperatorIdState.value
-    if (!actorUserId) throw new WorkspaceControllerError('当前操作者不可用')
+    const operatorId = currentOperatorIdState.value
+    if (!operatorId) throw new WorkspaceControllerError('当前操作者不可用')
     try {
-      replaceWorkspace(await port.performFriendAction({ ...input, actorUserId }))
+      replaceWorkspace(await port.performFriendAction({ ...input, operatorId }))
     } catch (error) {
       throw normalizeWorkspaceError(error, '好友操作失败')
     }
   }
 
-  async function sendMessage(input: Omit<SendMessageInput, 'actorUserId'>) {
-    const actorUserId = getCurrentOperatorId()
+  async function sendMessage(input: Omit<SendMessageInput, 'operatorId'>) {
+    const operatorId = getCurrentOperatorId()
     try {
-      replaceWorkspace(await port.sendMessage({ ...input, actorUserId }))
+      replaceWorkspace(await port.sendMessage({ ...input, operatorId }))
     } catch (error) {
       throw normalizeWorkspaceError(error, '发送失败')
     }
   }
 
-  async function sendMediaMessage(input: Omit<SendMediaMessageInput, 'actorUserId'>) {
-    const actorUserId = getCurrentOperatorId()
+  async function sendMediaMessage(input: Omit<SendMediaMessageInput, 'operatorId'>) {
+    const operatorId = getCurrentOperatorId()
     try {
-      replaceWorkspace(await port.sendMediaMessage({ ...input, actorUserId }))
+      replaceWorkspace(await port.sendMediaMessage({ ...input, operatorId }))
     } catch (error) {
       throw normalizeWorkspaceError(error, '发送失败')
     }
   }
 
   async function getMediaContent(mediaId: string) {
-    const actorUserId = getCurrentOperatorId()
+    const operatorId = getCurrentOperatorId()
     try {
-      return await port.getMediaContent({ actorUserId, mediaId })
+      return await port.getMediaContent({ operatorId, mediaId })
     } catch (error) {
       throw normalizeWorkspaceError(error, '加载媒体失败')
     }
   }
 
-  async function loadMessageHistory(input: Omit<GetMessageHistoryInput, 'actorUserId'>) {
-    const actorUserId = getCurrentOperatorId()
+  async function loadMessageHistory(input: Omit<GetMessageHistoryInput, 'operatorId'>) {
+    const operatorId = getCurrentOperatorId()
     try {
-      const history = await port.getMessageHistory({ ...input, actorUserId })
+      const history = await port.getMessageHistory({ ...input, operatorId })
       const knownIds = new Set(snapshot.value.messages.map(({ id }) => id))
       replaceWorkspace({
         ...workspaceState.value,
@@ -289,19 +286,19 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     }
   }
 
-  async function setGroupAnnouncement(input: Omit<SetGroupAnnouncementInput, 'actorUserId'>) {
-    const actorUserId = getCurrentOperatorId()
+  async function setGroupAnnouncement(input: Omit<SetGroupAnnouncementInput, 'operatorId'>) {
+    const operatorId = getCurrentOperatorId()
     try {
-      replaceWorkspace(await port.setGroupAnnouncement({ ...input, actorUserId }))
+      replaceWorkspace(await port.setGroupAnnouncement({ ...input, operatorId }))
     } catch (error) {
       throw normalizeWorkspaceError(error, '发布群公告失败')
     }
   }
 
-  async function deleteGroupAnnouncement(input: Omit<DeleteGroupAnnouncementInput, 'actorUserId'>) {
-    const actorUserId = getCurrentOperatorId()
+  async function deleteGroupAnnouncement(input: Omit<DeleteGroupAnnouncementInput, 'operatorId'>) {
+    const operatorId = getCurrentOperatorId()
     try {
-      replaceWorkspace(await port.deleteGroupAnnouncement({ ...input, actorUserId }))
+      replaceWorkspace(await port.deleteGroupAnnouncement({ ...input, operatorId }))
     } catch (error) {
       throw normalizeWorkspaceError(error, '删除群公告失败')
     }
@@ -309,30 +306,32 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
 
   async function manageEnvironment(input: ManageSandboxEnvironmentInput) {
     try {
-      replaceWorkspace(await port.manageEnvironment({ ...input, actorUserId: getCurrentOperatorId() }))
+      const operatorId = getCurrentOperatorId()
+      await port.manageEnvironment(input)
+      replaceWorkspace(await port.getWorkspace({ operatorId }))
     } catch (error) {
       throw normalizeWorkspaceError(error, '环境管理失败')
     }
   }
 
   async function performGroupAction(input: SandboxGroupAction) {
-    const actorUserId = currentOperatorIdState.value
-    if (!actorUserId) throw new WorkspaceControllerError('当前操作者不可用')
+    const operatorId = currentOperatorIdState.value
+    if (!operatorId) throw new WorkspaceControllerError('当前操作者不可用')
     try {
-      replaceWorkspace(await port.performGroupAction({ ...input, actorUserId }))
+      replaceWorkspace(await port.performGroupAction({ ...input, operatorId }))
     } catch (error) {
       throw normalizeWorkspaceError(error, '群组操作失败')
     }
   }
 
   async function handleRelationshipRequest(requestId: string, approve: boolean) {
-    const actorUserId = getCurrentOperatorId()
+    const operatorId = getCurrentOperatorId()
     const request = snapshot.value.requests.find(({ id }) => id === requestId)
     if (!request) throw new WorkspaceControllerError('关系申请不存在')
     try {
       const nextWorkspace = request.type === 'group'
-        ? await port.performGroupAction({ action: 'handle-request', requestId, approve, actorUserId })
-        : await port.performFriendAction({ action: 'handle-request', requestId, approve, actorUserId })
+        ? await port.performGroupAction({ action: 'handle-request', requestId, approve, operatorId })
+        : await port.performFriendAction({ action: 'handle-request', requestId, approve, operatorId })
       replaceWorkspace(nextWorkspace)
     } catch (error) {
       throw normalizeWorkspaceError(error, '处理关系申请失败')

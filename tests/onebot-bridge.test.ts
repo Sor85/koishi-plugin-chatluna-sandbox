@@ -43,7 +43,8 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     await bot.internal._request('set_qq_profile', { nickname: '新 Koishi' })
     await bot.internal._request('set_qq_avatar', { file: 'https://example.com/koishi.png' })
 
-    expect(control.getSnapshot().bots[0]).toMatchObject({
+    expect(control.getSnapshot().participants.find(({ id }) => id === '20001')).toMatchObject({
+      kind: 'bot',
       id: '20001',
       name: '新 Koishi',
       avatar: 'https://example.com/koishi.png',
@@ -131,14 +132,14 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     const { control } = await createControl()
     const bot = control.bot
     control.createUser({ id: '10004', name: '申请用户' })
-    await control.performFriendAction({ action: 'delete', actorUserId: '10004', targetId: '20001' })
-    const friendRequest = await control.performFriendAction({ action: 'request', actorUserId: '10004', targetId: '20001' })
+    await control.performFriendAction({ action: 'delete', operatorId: '10004', targetId: '20001' })
+    const friendRequest = await control.performFriendAction({ action: 'request', operatorId: '10004', targetId: '20001' })
     if (!friendRequest.requestId) throw new Error('好友申请未创建')
 
     await bot.handleFriendRequest(friendRequest.requestId, true, '申请用户')
     expect(control.getSnapshot().friendships.some(({ participantIds }) => participantIds.includes('10004') && participantIds.includes('20001'))).toBe(true)
 
-    const groupRequest = await control.performGroupAction({ action: 'request-join', actorUserId: '10004', groupId: '30001' })
+    const groupRequest = await control.performGroupAction({ action: 'request-join', operatorId: '10004', groupId: '30001' })
     if (!groupRequest.requestId) throw new Error('入群申请未创建')
     await bot.handleGuildMemberRequest(groupRequest.requestId, true)
     expect(control.getSnapshot().groups[0].members).toContainEqual({ participantId: '10004', role: 'member' })
@@ -176,9 +177,9 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     })
 
     control.createUser({ id: '10004', name: '申请用户' })
-    await control.performFriendAction({ action: 'delete', actorUserId: '10004', targetId: '20001' })
-    await control.performFriendAction({ action: 'request', actorUserId: '10004', targetId: '20001' })
-    const groupRequest = await control.performGroupAction({ action: 'request-join', actorUserId: '10004', groupId: '30001' })
+    await control.performFriendAction({ action: 'delete', operatorId: '10004', targetId: '20001' })
+    await control.performFriendAction({ action: 'request', operatorId: '10004', targetId: '20001' })
+    const groupRequest = await control.performGroupAction({ action: 'request-join', operatorId: '10004', groupId: '30001' })
     if (!groupRequest.requestId) throw new Error('入群申请未创建')
     await control.bot.handleGuildMemberRequest(groupRequest.requestId, true)
     await control.bot.internal._request('set_group_card', { group_id: 30001, user_id: 10003, card: '新名片' })

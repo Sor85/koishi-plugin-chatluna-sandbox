@@ -4,8 +4,12 @@ import type { SandboxSnapshot } from '../src/types'
 
 const snapshot = {
   revision: 0,
-  users: [{ id: 'owner', name: '群主' }, { id: 'member', name: '成员' }, { id: 'applicant', name: '申请人' }],
-  bots: [{ id: 'bot', name: '机器人', implementation: 'napcat', enabled: true }],
+  participants: [
+    { kind: 'user', id: 'owner', name: '群主' },
+    { kind: 'user', id: 'member', name: '成员' },
+    { kind: 'user', id: 'applicant', name: '申请人' },
+    { kind: 'bot', id: 'bot', name: '机器人', implementation: 'napcat', enabled: true },
+  ],
   groups: [{
     id: 'group',
     name: '测试群',

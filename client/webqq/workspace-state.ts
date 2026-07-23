@@ -37,12 +37,8 @@ export function resolveDetailsPreferenceAfterLayoutChange(wideLayout: boolean): 
 export function loadWorkspacePreferences(storage: Pick<WorkspaceStorage, 'getItem'>): SandboxWorkspacePreferences {
   try {
     const value = JSON.parse(storage.getItem(STORAGE_KEY) ?? '{}') as Partial<SandboxWorkspacePreferences>
-      & { currentUserId?: unknown }
     return {
-      // 旧版本只允许普通用户操作，保留一次性迁移以免升级后丢失当前选择。
-      currentOperatorId: typeof value.currentOperatorId === 'string'
-        ? value.currentOperatorId
-        : typeof value.currentUserId === 'string' ? value.currentUserId : undefined,
+      currentOperatorId: typeof value.currentOperatorId === 'string' ? value.currentOperatorId : undefined,
       activeConversationId: typeof value.activeConversationId === 'string' ? value.activeConversationId : undefined,
       currentView: WORKSPACE_VIEWS.has(value.currentView as SandboxWorkspaceView)
         ? value.currentView as SandboxWorkspaceView
@@ -64,11 +60,10 @@ export function resolveWorkspaceSelection(
   snapshot: SandboxSnapshot,
   preferences: SandboxWorkspacePreferences,
 ): SandboxWorkspacePreferences {
-  const currentOperator = [...snapshot.users, ...snapshot.bots]
-    .find(({ id }) => id === preferences.currentOperatorId)
-    ?? snapshot.users[0]
-    ?? snapshot.bots[0]
-  const operatorIsBot = snapshot.bots.some(({ id }) => id === currentOperator?.id)
+  const currentOperator = snapshot.participants.find(({ id }) => id === preferences.currentOperatorId)
+    ?? snapshot.participants.find(({ kind }) => kind === 'user')
+    ?? snapshot.participants[0]
+  const operatorIsBot = currentOperator?.kind === 'bot'
   const conversations = currentOperator
     ? snapshot.conversations.filter((conversation) => operatorIsBot
       ? conversation.botId === currentOperator.id
