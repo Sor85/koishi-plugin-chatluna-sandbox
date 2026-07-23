@@ -18,10 +18,13 @@ describe('WebQQ 共享头像', () => {
   it('主要身份区域统一使用共享头像', () => {
     const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
     const composerSource = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
+    const messageListSource = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
     const notificationSource = readFileSync(resolve('client/notification-menu.vue'), 'utf8')
     const environmentSource = readFileSync(resolve('client/environment-manager.vue'), 'utf8')
 
-    expect((pageSource.match(/<WebqqAvatar/g)?.length ?? 0) + (composerSource.match(/<WebqqAvatar/g)?.length ?? 0)).toBeGreaterThanOrEqual(10)
+    const avatarCount = [pageSource, composerSource, messageListSource]
+      .reduce((count, source) => count + (source.match(/<WebqqAvatar/g)?.length ?? 0), 0)
+    expect(avatarCount).toBeGreaterThanOrEqual(10)
     expect(pageSource).not.toContain('<span v-if="entry.isBot" class="webqq-avatar-bot-badge">')
     expect(notificationSource).toContain('<WebqqAvatar')
     expect(environmentSource.match(/<WebqqAvatar/g)).toHaveLength(3)

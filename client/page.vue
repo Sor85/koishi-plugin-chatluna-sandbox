@@ -315,168 +315,20 @@
             </button>
           </header>
 
-          <section v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-messages" aria-label="消息记录">
-            <div v-if="!messages.length" class="webqq-welcome">
-              <WebqqAvatar
-                class="webqq-avatar webqq-avatar-large webqq-avatar-bot"
-                :kind="currentGroup ? 'group' : 'bot'"
-                :name="currentConversationTitle"
-                :avatar="currentGroup ? '' : currentBot?.avatar"
-              />
-              <strong>{{ currentConversationTitle }}</strong>
-              <p>发送消息，验证插件在模拟 QQ 环境中的响应</p>
-            </div>
-            <ol v-else>
-              <li v-if="currentConversation?.hasMoreMessages" class="webqq-history-more-row">
-                <button type="button" class="webqq-history-more" :disabled="historyLoading" @click="loadEarlierMessages">
-                  {{ historyLoading ? '加载中...' : '查看更早消息' }}
-                </button>
-              </li>
-              <template v-for="(message, messageIndex) in messages" :key="message.id">
-                <li v-if="message.event" class="webqq-message-event">
-                  {{ message.content }}
-                </li>
-                <ContextMenu v-else>
-                  <ContextMenuTrigger as-child>
-                    <li
-                    class="webqq-message-row"
-                    :class="[
-                      message.authorId === currentUser?.id ? 'is-outgoing' : 'is-incoming',
-                      getChatMessageClusterClass(messageIndex),
-                      { 'is-merged': isMergedChatMessage(messageIndex) },
-                      { 'is-quote-target': highlightedMessageId === message.id },
-                    ]"
-                    :data-message-id="message.id"
-                  >
-                    <ContextMenu v-if="message.authorId !== currentUser?.id">
-                      <ContextMenuTrigger as-child>
-                        <button
-                          type="button"
-                          class="webqq-message-avatar-wrap webqq-message-avatar-trigger"
-                          :aria-label="`打开 ${getParticipantName(message.authorId)} 的操作菜单`"
-                          @contextmenu.stop
-                        >
-                          <WebqqAvatar
-                            class="webqq-message-avatar"
-                            :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'"
-                            :name="getParticipantName(message.authorId)"
-                            :avatar="getParticipantAvatar(message.authorId)"
-                          />
-                        </button>
-                      </ContextMenuTrigger>
-                      <ContextMenuContent style="z-index: 140">
-                        <ContextMenuSub v-if="currentGroup && getCurrentGroupMember(message.authorId)">
-                          <ContextMenuSubTrigger>
-                            <IconUsers :size="16" aria-hidden="true" /> 群成员操作
-                          </ContextMenuSubTrigger>
-                          <GroupMemberMenu
-                            sub
-                            :actor="getCurrentGroupMember(currentOperatorId ?? '')"
-                            :target="getCurrentGroupMember(message.authorId)!"
-                            @poke="pokeGroupMember(message.authorId)"
-                            @set-card="openGroupActionDialog('card', message.authorId)"
-                            @set-admin="setGroupAdmin(message.authorId, $event)"
-                            @transfer-owner="transferGroupOwner(message.authorId)"
-                            @kick="kickGroupMember(message.authorId)"
-                          />
-                        </ContextMenuSub>
-                        <ContextMenuItem v-if="getChatFriendActions(message.authorId).includes('request')" @select="requestFriend(message.authorId)">
-                          <IconUserPlus :size="16" aria-hidden="true" /> 发送好友申请
-                        </ContextMenuItem>
-                        <ContextMenuItem v-else-if="getFriendMenuState(message.authorId).pendingOutgoing" disabled>
-                          <IconClock :size="16" aria-hidden="true" /> 等待对方处理
-                        </ContextMenuItem>
-                        <ContextMenuItem v-else-if="getFriendMenuState(message.authorId).pendingIncoming" disabled>
-                          <IconBell :size="16" aria-hidden="true" /> 请在通知中处理申请
-                        </ContextMenuItem>
-                        <ContextMenuSub v-if="!currentGroup && getChatFriendActions(message.authorId).includes('poke')">
-                          <ContextMenuSubTrigger>
-                            <IconHandClick :size="16" aria-hidden="true" /> 好友互动
-                          </ContextMenuSubTrigger>
-                          <ContextMenuSubContent>
-                            <ContextMenuItem @select="pokeFriend(message.authorId)">
-                              <IconHandClick :size="16" aria-hidden="true" /> 戳一戳
-                            </ContextMenuItem>
-                          </ContextMenuSubContent>
-                        </ContextMenuSub>
-                        <ContextMenuItem v-if="getChatFriendActions(message.authorId).includes('remark')" @select="openRemarkDialog(message.authorId)">
-                          <IconTag :size="16" aria-hidden="true" /> 设置好友备注
-                        </ContextMenuItem>
-                        <ContextMenuItem v-if="getChatFriendActions(message.authorId).includes('delete')" class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="deleteFriend(message.authorId)">
-                          <IconUserMinus :size="16" aria-hidden="true" /> 删除好友
-                        </ContextMenuItem>
-                      </ContextMenuContent>
-                    </ContextMenu>
-                    <span v-else class="webqq-message-avatar-wrap">
-                      <WebqqAvatar
-                        class="webqq-message-avatar"
-                        :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'"
-                        :name="getParticipantName(message.authorId)"
-                        :avatar="getParticipantAvatar(message.authorId)"
-                      />
-                    </span>
-                    <div class="webqq-message-content">
-                      <div v-if="!isMergedChatMessage(messageIndex)" class="webqq-sender-line">
-                        <span class="webqq-message-author">{{ getParticipantName(message.authorId) }}</span>
-                      </div>
-                      <div class="webqq-message-body">
-                        <div class="webqq-message-bubble">
-                          <button
-                            v-if="getReplyMessage(message)"
-                            class="webqq-message-quote is-clickable"
-                            type="button"
-                            aria-label="跳转到引用消息"
-                            @click.stop="scrollToQuotedMessage(getReplyMessage(message)!.id)"
-                          >
-                            <strong class="webqq-message-quote-title">{{ getParticipantName(getReplyMessage(message)!.authorId) }}</strong>
-                            <span>{{ getReplyMessage(message)!.content }}</span>
-                          </button>
-                          <div v-for="media in message.media" :key="media.id" class="webqq-message-media">
-                            <img
-                              v-if="media.type === 'image' && getMediaSource(media.id)"
-                              :src="getMediaSource(media.id)"
-                              :alt="media.name"
-                            >
-                            <audio
-                              v-else-if="media.type === 'audio' && getMediaSource(media.id)"
-                              :src="getMediaSource(media.id)"
-                              controls
-                              preload="metadata"
-                            />
-                            <video
-                              v-else-if="media.type === 'video' && getMediaSource(media.id)"
-                              :src="getMediaSource(media.id)"
-                              controls
-                              preload="metadata"
-                            />
-                            <a
-                              v-else-if="media.type === 'file' && getMediaSource(media.id)"
-                              :href="getMediaSource(media.id)"
-                              :download="media.name"
-                              class="webqq-message-file"
-                            >
-                              <IconPaperclip :size="18" aria-hidden="true" />
-                              <span><strong>{{ media.name }}</strong><small>{{ formatMediaSize(media.size) }}</small></span>
-                            </a>
-                            <span v-else class="webqq-message-media-loading">
-                              {{ mediaLoadFailures[media.id] ? '媒体不可用' : '媒体加载中...' }}
-                            </span>
-                          </div>
-                          <span v-if="getMessageText(message)">{{ getMessageText(message) }}</span>
-                        </div>
-                      </div>
-                    </div>
-                    </li>
-                  </ContextMenuTrigger>
-                  <ContextMenuContent style="z-index: 140">
-                    <ContextMenuItem @select="replyingToMessageId = message.id">
-                      <IconMessageReply :size="16" aria-hidden="true" /> 回复
-                    </ContextMenuItem>
-                  </ContextMenuContent>
-                </ContextMenu>
-              </template>
-            </ol>
-          </section>
+          <WebqqMessageList
+            :model="messageListModel"
+            @reply="replyingToMessageId = $event"
+            @load-history="loadEarlierMessages"
+            @request-friend="requestFriend"
+            @poke-friend="pokeFriend"
+            @set-remark="openRemarkDialog"
+            @delete-friend="deleteFriend"
+            @poke-group-member="pokeGroupMember"
+            @set-group-card="openGroupActionDialog('card', $event)"
+            @set-group-admin="setGroupAdmin"
+            @transfer-group-owner="transferGroupOwner"
+            @kick-group-member="kickGroupMember"
+          />
 
           <WebqqComposer
             :model="composerModel"
@@ -637,10 +489,8 @@ import {
   IconEdit,
   IconHandClick,
   IconMessageCircle,
-  IconPaperclip,
   IconPlus,
   IconRobotFace,
-  IconMessageReply,
   IconSearch,
   IconTrash,
   IconTag,
@@ -650,7 +500,7 @@ import {
   IconUserCircle,
   IconUsers,
 } from '@tabler/icons-vue'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from './components/ui/context-menu'
 import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover'
 import EnvironmentCreatePopover from './environment-create-popover.vue'
@@ -660,6 +510,7 @@ import GroupMemberMenu from './group-member-menu.vue'
 import NotificationMenu from './notification-menu.vue'
 import WebqqAvatar from './webqq-avatar.vue'
 import WebqqComposer, { type WebqqComposerModel, type WebqqComposerSendIntent, type WebqqComposerSender } from './webqq-composer.vue'
+import WebqqMessageList, { type WebqqMessageListModel } from './webqq-message-list.vue'
 import WorkspaceOverlayHost from './workspace-overlay-host.vue'
 import { getIncomingNotificationRequests } from './notification-requests'
 import { getFriendDirectory, getGroupDirectory } from './relationship-directory'
@@ -668,12 +519,9 @@ import { koishiWorkspacePort } from './webqq/koishi-workspace-port'
 import { createWorkspaceController } from './webqq/workspace-controller'
 import { createWorkspaceLayout } from './webqq/workspace-layout'
 import { vWebqqScrollbar } from './webqq-scrollbar'
-import { getMessageClusterClass, isMergedMessage } from './message-cluster'
 import type {
   SandboxConversation,
   SandboxGroupMember,
-  SandboxMedia,
-  SandboxMessage,
   SandboxFriendAction,
   SandboxGroupAction,
   ManageSandboxEnvironmentInput,
@@ -801,16 +649,23 @@ const messages = computed(() => {
   const ids = new Set(currentConversation.value?.messageIds ?? [])
   return snapshot.value.messages.filter(({ id }) => ids.has(id))
 })
-
-function isMergedChatMessage(index: number) {
-  return isMergedMessage(messages.value, index, workspace.value.appearance.webQQChatStyle, currentUserId.value)
-}
-
-function getChatMessageClusterClass(index: number) {
-  return getMessageClusterClass(messages.value, index, workspace.value.appearance.webQQChatStyle, currentUserId.value)
-}
 const replyingToMessageId = ref('')
 const replyingToMessage = computed(() => snapshot.value.messages.find(({ id }) => id === replyingToMessageId.value))
+const messageListModel = computed<WebqqMessageListModel>(() => ({
+  messages: messages.value,
+  snapshot: snapshot.value,
+  currentConversation: currentConversation.value,
+  currentGroup: currentGroup.value,
+  currentUserId: currentUserId.value,
+  currentOperatorId: currentOperatorId.value,
+  title: currentConversationTitle.value,
+  avatar: currentGroup.value ? '' : currentBot.value?.avatar ?? '',
+  avatarKind: currentGroup.value ? 'group' : 'bot',
+  chatStyle: workspace.value.appearance.webQQChatStyle,
+  hasMoreMessages: !!currentConversation.value?.hasMoreMessages,
+  mediaSources: mediaSources.value,
+  mediaLoadFailures: mediaLoadFailures.value,
+}))
 const composerModel = computed<WebqqComposerModel>(() => ({
   senders: composerSenders.value,
   currentOperatorId: composerSenderId.value,
@@ -828,9 +683,6 @@ const composerModel = computed<WebqqComposerModel>(() => ({
   accentColor: workspace.value.appearance.webQQAccentColor,
   externalError: errorMessage.value,
 }))
-const historyLoading = ref(false)
-const highlightedMessageId = ref('')
-let quoteHighlightTimer: ReturnType<typeof setTimeout> | undefined
 
 watch([currentUserId, () => currentConversation.value?.botId], ([userId, botId]) => {
   workspaceController.ensureOperator(userId, botId)
@@ -1079,10 +931,6 @@ function getInitial(name?: string) {
   return name?.trim().slice(0, 1).toUpperCase() || '?'
 }
 
-onBeforeUnmount(() => {
-  if (quoteHighlightTimer) clearTimeout(quoteHighlightTimer)
-})
-
 function getGroupMemberName(member: SandboxGroupMember) {
   return member.card?.trim() || getParticipantName(member.participantId)
 }
@@ -1108,25 +956,6 @@ function getConversationMessages(conversationId: string) {
   return snapshot.value.messages.filter(({ id }) => ids.has(id))
 }
 
-function getReplyMessage(message: SandboxMessage) {
-  return message.replyToMessageId
-    ? snapshot.value.messages.find(({ id }) => id === message.replyToMessageId)
-    : undefined
-}
-
-function getMediaLabel(media: SandboxMedia) {
-  return media.type === 'image' ? '图片' : media.type === 'audio' ? '语音' : media.type === 'video' ? '视频' : '文件'
-}
-
-function getMessageText(message: SandboxMessage) {
-  if (message.media?.length === 1 && message.content === `[${getMediaLabel(message.media[0])}] ${message.media[0].name}`) return ''
-  return message.content
-}
-
-function getMediaSource(mediaId: string) {
-  return mediaSources.value[mediaId] ?? ''
-}
-
 async function loadVisibleMedia() {
   const actorUserId = currentUserId.value
   if (!actorUserId) return
@@ -1146,31 +975,12 @@ async function loadVisibleMedia() {
   }))
 }
 
-function formatMediaSize(size: number) {
-  if (size < 1024) return `${size} B`
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
-  return `${(size / 1024 / 1024).toFixed(1)} MB`
-}
-
-function scrollToQuotedMessage(messageId: string) {
-  const element = document.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`)
-  if (!element) return
-  element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  highlightedMessageId.value = messageId
-  if (quoteHighlightTimer) clearTimeout(quoteHighlightTimer)
-  quoteHighlightTimer = setTimeout(() => {
-    highlightedMessageId.value = ''
-    quoteHighlightTimer = undefined
-  }, 1400)
-}
-
-async function loadEarlierMessages() {
+async function loadEarlierMessages(resolve: () => void, reject: (error: unknown) => void) {
   const conversation = currentConversation.value
   const user = currentUser.value
   const beforeMessageId = conversation?.messageIds[0]
-  if (!conversation || !user || !beforeMessageId || historyLoading.value) return
+  if (!conversation || !user || !beforeMessageId) return resolve()
 
-  historyLoading.value = true
   errorMessage.value = ''
   try {
     await workspaceController.loadMessageHistory({
@@ -1178,10 +988,10 @@ async function loadEarlierMessages() {
       beforeMessageId,
       limit: 50,
     })
+    resolve()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '读取历史消息失败'
-  } finally {
-    historyLoading.value = false
+    reject(error)
   }
 }
 
