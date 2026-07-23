@@ -1504,7 +1504,7 @@ async function loadVisibleMedia() {
   const missingMedia = messages.value.flatMap(({ media }) => media ?? []).filter(({ id }) => !mediaSources.value[id])
   await Promise.all(missingMedia.map(async (media) => {
     try {
-      const content = await send('onebot-sandbox/media-content', { actorUserId, mediaId: media.id })
+      const content = await workspaceController.getMediaContent(media.id)
       mediaSources.value = {
         ...mediaSources.value,
         [media.id]: `data:${content.mimeType};base64,${content.dataBase64}`,
@@ -1575,24 +1575,10 @@ async function loadEarlierMessages() {
   historyLoading.value = true
   errorMessage.value = ''
   try {
-    const history = await send('onebot-sandbox/message-history', {
-      actorUserId: user.id,
+    await workspaceController.loadMessageHistory({
       conversationId: conversation.id,
       beforeMessageId,
       limit: 50,
-    })
-    const knownIds = new Set(snapshot.value.messages.map(({ id }) => id))
-    workspaceController.replaceWorkspace({
-      ...workspace.value,
-      snapshot: {
-        ...snapshot.value,
-        conversations: snapshot.value.conversations.map((item) => item.id === conversation.id ? {
-          ...item,
-          messageIds: [...history.messages.map((message: SandboxMessage) => message.id), ...item.messageIds],
-          hasMoreMessages: !!history.nextBeforeMessageId,
-        } : item),
-        messages: [...history.messages.filter((message: SandboxMessage) => !knownIds.has(message.id)), ...snapshot.value.messages],
-      },
     })
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '读取历史消息失败'
@@ -1623,9 +1609,8 @@ async function sendMessage() {
   sending.value = true
   errorMessage.value = ''
   try {
-    const nextWorkspace = mediaFile
-      ? await send('onebot-sandbox/send-media-message', {
-          actorUserId: user.id,
+    if (mediaFile) {
+      await workspaceController.sendMediaMessage({
           senderId,
           botId: bot.id,
           conversationId: conversation.id,
@@ -1635,15 +1620,15 @@ async function sendMessage() {
           content: content || undefined,
           replyToMessageId: replyingToMessageId.value || undefined,
         })
-      : await send('onebot-sandbox/send-message', {
-          actorUserId: user.id,
+    } else {
+      await workspaceController.sendMessage({
           senderId,
           botId: bot.id,
           conversationId: conversation.id,
           content,
           replyToMessageId: replyingToMessageId.value || undefined,
         })
-    workspaceController.replaceWorkspace(nextWorkspace)
+    }
     input.value = ''
     clearSelectedMedia()
     replyingToMessageId.value = ''
@@ -1663,11 +1648,10 @@ async function publishAnnouncement() {
   announcementSending.value = true
   infoErrorMessage.value = ''
   try {
-    workspaceController.replaceWorkspace(await send('onebot-sandbox/set-group-announcement', {
-      actorUserId: user.id,
+    await workspaceController.setGroupAnnouncement({
       groupId: group.id,
       content,
-    }))
+    })
     announcementInput.value = ''
     announcementEditorOpen.value = false
   } catch (error) {
@@ -1691,11 +1675,10 @@ async function deleteAnnouncement(announcementId: string) {
   deletingAnnouncementId.value = announcementId
   infoErrorMessage.value = ''
   try {
-    workspaceController.replaceWorkspace(await send('onebot-sandbox/delete-group-announcement', {
-      actorUserId: user.id,
+    await workspaceController.deleteGroupAnnouncement({
       groupId: group.id,
       announcementId,
-    }))
+    })
   } catch (error) {
     infoErrorMessage.value = error instanceof Error ? error.message : '删除群公告失败'
   } finally {

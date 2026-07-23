@@ -1,5 +1,7 @@
 import { computed, readonly, ref, type DeepReadonly } from 'vue'
 import type {
+  DeleteGroupAnnouncementInput,
+  GetMessageHistoryInput,
   SandboxAppearance,
   SandboxBotProfile,
   SandboxConversation,
@@ -10,6 +12,9 @@ import type {
   SandboxSnapshot,
   SandboxUser,
   SandboxWorkspaceState,
+  SendMediaMessageInput,
+  SendMessageInput,
+  SetGroupAnnouncementInput,
 } from '../../src/types'
 import {
   loadWorkspacePreferences,
@@ -225,6 +230,12 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     currentOperatorIdState.value = userId
   }
 
+  function getCurrentUserId() {
+    const actorUserId = currentUserIdState.value
+    if (!actorUserId) throw new WorkspaceControllerError('当前用户不可用')
+    return actorUserId
+  }
+
   async function performFriendAction(input: SandboxFriendAction) {
     const actorUserId = currentOperatorIdState.value
     if (!actorUserId) throw new WorkspaceControllerError('当前操作者不可用')
@@ -232,6 +243,73 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
       replaceWorkspace(await port.performFriendAction({ ...input, actorUserId }))
     } catch (error) {
       throw normalizeWorkspaceError(error, '好友操作失败')
+    }
+  }
+
+  async function sendMessage(input: Omit<SendMessageInput, 'actorUserId'>) {
+    const actorUserId = getCurrentUserId()
+    try {
+      replaceWorkspace(await port.sendMessage({ ...input, actorUserId }))
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '发送失败')
+    }
+  }
+
+  async function sendMediaMessage(input: Omit<SendMediaMessageInput, 'actorUserId'>) {
+    const actorUserId = getCurrentUserId()
+    try {
+      replaceWorkspace(await port.sendMediaMessage({ ...input, actorUserId }))
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '发送失败')
+    }
+  }
+
+  async function getMediaContent(mediaId: string) {
+    const actorUserId = getCurrentUserId()
+    try {
+      return await port.getMediaContent({ actorUserId, mediaId })
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '加载媒体失败')
+    }
+  }
+
+  async function loadMessageHistory(input: Omit<GetMessageHistoryInput, 'actorUserId'>) {
+    const actorUserId = getCurrentUserId()
+    try {
+      const history = await port.getMessageHistory({ ...input, actorUserId })
+      const knownIds = new Set(snapshot.value.messages.map(({ id }) => id))
+      replaceWorkspace({
+        ...workspaceState.value,
+        snapshot: {
+          ...snapshot.value,
+          conversations: snapshot.value.conversations.map((conversation) => conversation.id === input.conversationId ? {
+            ...conversation,
+            messageIds: [...history.messages.map(({ id }) => id), ...conversation.messageIds],
+            hasMoreMessages: !!history.nextBeforeMessageId,
+          } : conversation),
+          messages: [...history.messages.filter(({ id }) => !knownIds.has(id)), ...snapshot.value.messages],
+        },
+      })
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '读取历史消息失败')
+    }
+  }
+
+  async function setGroupAnnouncement(input: Omit<SetGroupAnnouncementInput, 'actorUserId'>) {
+    const actorUserId = getCurrentUserId()
+    try {
+      replaceWorkspace(await port.setGroupAnnouncement({ ...input, actorUserId }))
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '发布群公告失败')
+    }
+  }
+
+  async function deleteGroupAnnouncement(input: Omit<DeleteGroupAnnouncementInput, 'actorUserId'>) {
+    const actorUserId = getCurrentUserId()
+    try {
+      replaceWorkspace(await port.deleteGroupAnnouncement({ ...input, actorUserId }))
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '删除群公告失败')
     }
   }
 
@@ -246,8 +324,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   }
 
   async function handleRelationshipRequest(requestId: string, approve: boolean) {
-    const actorUserId = currentUserIdState.value
-    if (!actorUserId) throw new WorkspaceControllerError('当前用户不可用')
+    const actorUserId = getCurrentUserId()
     const request = snapshot.value.requests.find(({ id }) => id === requestId)
     if (!request) throw new WorkspaceControllerError('关系申请不存在')
     try {
@@ -269,15 +346,21 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     sidebar,
     chat,
     composer,
+    deleteGroupAnnouncement,
     details,
     ensureOperator,
+    getMediaContent,
     handleRelationshipRequest,
     load,
+    loadMessageHistory,
     performFriendAction,
     performGroupAction,
     replaceWorkspace,
     selectConversation,
     selectOperator,
     selectView,
+    sendMediaMessage,
+    sendMessage,
+    setGroupAnnouncement,
   }
 }

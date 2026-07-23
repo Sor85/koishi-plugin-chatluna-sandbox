@@ -392,4 +392,172 @@ describe('WebQQ 工作区控制模块', () => {
     ]).toEqual([9, 9, 9, 9])
     expect(controller.details.value.group?.name).toBe('新群名称')
   })
+
+  it('发送文本消息时注入当前用户并同步四个区域模型', async () => {
+    const port = createFakeWorkspacePort(workspace)
+    const controller = createWorkspaceController(port, createStorage())
+    await controller.load()
+    port.workspaceResult = {
+      ...workspace,
+      snapshot: {
+        ...workspace.snapshot,
+        revision: 8,
+      },
+    }
+
+    await controller.sendMessage({
+      senderId: '20001',
+      botId: '20001',
+      conversationId: 'private:10001:20001',
+      content: '控制模块发送',
+    })
+
+    expect(port.calls.at(-1)).toEqual({
+      operation: 'sendMessage',
+      input: {
+        actorUserId: '10001',
+        senderId: '20001',
+        botId: '20001',
+        conversationId: 'private:10001:20001',
+        content: '控制模块发送',
+      },
+    })
+    expect([
+      controller.sidebar.value.revision,
+      controller.chat.value.revision,
+      controller.composer.value.revision,
+      controller.details.value.revision,
+    ]).toEqual([8, 8, 8, 8])
+  })
+
+  it('媒体消息失败时保留工作区并返回规范化错误', async () => {
+    const port = createFakeWorkspacePort(workspace)
+    const controller = createWorkspaceController(port, createStorage())
+    await controller.load()
+    const revisionBeforeFailure = controller.chat.value.revision
+    port.rejectNext('sendMediaMessage', new Error('媒体发送被拒绝'))
+
+    await expect(controller.sendMediaMessage({
+      senderId: '10001',
+      botId: '20001',
+      conversationId: 'private:10001:20001',
+      fileName: 'fixture.png',
+      mimeType: 'image/png',
+      dataBase64: 'ZmFrZQ==',
+    })).rejects.toMatchObject({
+      name: 'WorkspaceControllerError',
+      message: '媒体发送被拒绝',
+    })
+
+    expect(port.calls.at(-1)).toEqual({
+      operation: 'sendMediaMessage',
+      input: {
+        actorUserId: '10001',
+        senderId: '10001',
+        botId: '20001',
+        conversationId: 'private:10001:20001',
+        fileName: 'fixture.png',
+        mimeType: 'image/png',
+        dataBase64: 'ZmFrZQ==',
+      },
+    })
+    expect(controller.chat.value.revision).toBe(revisionBeforeFailure)
+  })
+
+  it('媒体内容通过端口加载并注入当前用户', async () => {
+    const port = createFakeWorkspacePort(workspace)
+    const controller = createWorkspaceController(port, createStorage())
+    await controller.load()
+
+    const content = await controller.getMediaContent('media-1')
+
+    expect(port.calls.at(-1)).toEqual({
+      operation: 'getMediaContent',
+      input: {
+        actorUserId: '10001',
+        mediaId: 'media-1',
+      },
+    })
+    expect(content).toEqual(port.mediaContentResult)
+  })
+
+  it('加载历史消息时保持旧消息前置和分页状态', async () => {
+    const port = createFakeWorkspacePort(workspace)
+    const controller = createWorkspaceController(port, createStorage())
+    await controller.load()
+    port.historyResult = {
+      messages: [{
+        id: 'message-0',
+        authorId: '20001',
+        botId: '20001',
+        conversationId: 'private:10001:20001',
+        content: '更早的消息',
+        createdAt: '2026-07-22T23:59:59.000Z',
+      }],
+      nextBeforeMessageId: 'message-before-0',
+    }
+
+    await controller.loadMessageHistory({
+      conversationId: 'private:10001:20001',
+      beforeMessageId: 'message-1',
+      limit: 50,
+    })
+
+    expect(port.calls.at(-1)).toEqual({
+      operation: 'getMessageHistory',
+      input: {
+        actorUserId: '10001',
+        conversationId: 'private:10001:20001',
+        beforeMessageId: 'message-1',
+        limit: 50,
+      },
+    })
+    expect(controller.chat.value.messages.map(({ id }) => id)).toEqual(['message-0', 'message-1'])
+    expect(controller.chat.value.conversation?.messageIds).toEqual(['message-0', 'message-1'])
+    expect(controller.chat.value.conversation?.hasMoreMessages).toBe(true)
+  })
+
+  it('群公告新增和删除通过端口更新工作区', async () => {
+    const port = createFakeWorkspacePort(workspace)
+    const controller = createWorkspaceController(port, createStorage())
+    await controller.load()
+    port.workspaceResult = {
+      ...workspace,
+      snapshot: {
+        ...workspace.snapshot,
+        revision: 8,
+      },
+    }
+
+    await controller.setGroupAnnouncement({ groupId: '30001', content: '控制模块公告' })
+
+    expect(port.calls.at(-1)).toEqual({
+      operation: 'setGroupAnnouncement',
+      input: {
+        actorUserId: '10001',
+        groupId: '30001',
+        content: '控制模块公告',
+      },
+    })
+    expect(controller.details.value.revision).toBe(8)
+
+    port.workspaceResult = {
+      ...port.workspaceResult,
+      snapshot: {
+        ...port.workspaceResult.snapshot,
+        revision: 9,
+      },
+    }
+    await controller.deleteGroupAnnouncement({ groupId: '30001', announcementId: 'announcement-1' })
+
+    expect(port.calls.at(-1)).toEqual({
+      operation: 'deleteGroupAnnouncement',
+      input: {
+        actorUserId: '10001',
+        groupId: '30001',
+        announcementId: 'announcement-1',
+      },
+    })
+    expect(controller.details.value.revision).toBe(9)
+  })
 })
