@@ -72,3 +72,24 @@ body,
   backdrop-filter: saturate(180%) blur(20px);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
 }
+.webqq-conversations,
+.webqq-profile {
+  display: flex;
+  flex-direction: column;
+}
+
+.webqq-workspace[data-color-mode="dark"] .webqq-rail,
+.webqq-workspace[data-color-mode="dark"] .webqq-conversations,
+.webqq-workspace[data-color-mode="dark"] .webqq-chat,
+.webqq-workspace[data-color-mode="dark"] .webqq-profile {
+  background: rgb(15 23 42 / 88%);
+}
+
+@media (prefers-color-scheme: dark) {
+  .webqq-workspace[data-color-mode="auto"] .webqq-rail,
+  .webqq-workspace[data-color-mode="auto"] .webqq-conversations,
+  .webqq-workspace[data-color-mode="auto"] .webqq-chat,
+  .webqq-workspace[data-color-mode="auto"] .webqq-profile {
+    background: rgb(15 23 42 / 88%);
+  }
+}

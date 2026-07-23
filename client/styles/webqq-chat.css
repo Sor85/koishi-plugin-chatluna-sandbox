@@ -1,0 +1,71 @@
+.webqq-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 76px;
+  padding: 16px;
+  border-bottom: 1px solid var(--webqq-border);
+}
+
+.webqq-chat-title > div > strong,
+.webqq-chat-title > div > span {
+  margin: 0;
+}
+
+.webqq-chat {
+  position: relative;
+  grid-column: 3;
+  grid-row: 1;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: var(--webqq-bg);
+}
+
+.webqq-chat.is-environment {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.webqq-chat-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.webqq-chat-title > div > strong,
+.webqq-chat-title > div > span {
+  display: block;
+}
+
+.webqq-chat-title > div > span {
+  margin-top: 2px;
+  color: var(--webqq-muted);
+  font-size: 12px;
+}
+
+.webqq-welcome {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.webqq-avatar-large {
+  width: 68px;
+  height: 68px;
+  margin-bottom: 12px;
+  border-radius: 22px;
+  font-size: 24px;
+}
+
+.webqq-welcome strong {
+  font-size: 17px;
+}
+
+.webqq-welcome p {
+  max-width: 300px;
+  margin: 6px 0 0;
+  color: var(--webqq-muted);
+  font-size: 13px;
+}

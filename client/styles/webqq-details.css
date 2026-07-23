@@ -1,0 +1,419 @@
+.webqq-profile {
+  grid-column: 4;
+  grid-row: 1;
+  border-right: 0;
+  overflow: hidden;
+  background: var(--webqq-bg);
+}
+
+.webqq-info-header {
+  display: flex;
+  min-height: 64px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--webqq-border);
+}
+
+.webqq-info-header strong {
+  font-size: 15px;
+  line-height: 21px;
+}
+
+.webqq-info-close {
+  display: none;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  color: var(--webqq-accent);
+  background: transparent;
+}
+
+.webqq-group-info-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.webqq-group-announcements {
+  display: flex;
+  min-height: 0;
+  flex: 0 0 32%;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding: 12px;
+  border-bottom: 1px solid var(--webqq-border);
+}
+
+.webqq-group-announcements h3,
+.webqq-group-members h3 {
+  margin: 0;
+  color: var(--webqq-text);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.webqq-info-section-title {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.webqq-info-section-title button,
+.webqq-announcement-delete {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  color: var(--webqq-muted);
+  background: transparent;
+}
+
+.webqq-info-section-title button:hover,
+.webqq-info-section-title button:focus-visible,
+.webqq-info-section-title button.is-active {
+  color: var(--webqq-accent);
+  background: rgb(37 99 235 / 10%);
+}
+
+.webqq-info-error {
+  color: #dc2626;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.webqq-announcement-editor {
+  padding: 10px;
+  border: 1px solid rgb(255 255 255 / 48%);
+  border-radius: 9px;
+  background: rgb(255 255 255 / 50%);
+}
+
+.webqq-announcement-editor textarea {
+  display: block;
+  width: 100%;
+  resize: vertical;
+  border: 0;
+  padding: 0;
+  outline: 0;
+  color: var(--webqq-text);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.webqq-announcement-editor div {
+  display: flex;
+  min-height: 26px;
+  align-items: end;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.webqq-announcement-editor button {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 7px;
+  color: #fff;
+  background: var(--webqq-accent);
+  font-size: 12px;
+}
+
+.webqq-announcement-editor button:disabled {
+  opacity: 0.45;
+}
+
+.webqq-group-announcement {
+  position: relative;
+  padding: 10px;
+  padding-right: 36px;
+  border-radius: 9px;
+  background: rgb(255 255 255 / 50%);
+}
+
+.webqq-announcement-delete {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  color: var(--webqq-muted);
+  opacity: 0;
+}
+
+.webqq-group-announcement:hover .webqq-announcement-delete,
+.webqq-announcement-delete:focus-visible {
+  opacity: 1;
+}
+
+.webqq-announcement-delete:hover,
+.webqq-announcement-delete:focus-visible {
+  color: #dc2626;
+  background: rgb(220 38 38 / 9%);
+}
+
+.webqq-announcement-delete:disabled {
+  opacity: 0.35;
+}
+
+@media (hover: none) {
+  .webqq-announcement-delete {
+    opacity: 1;
+  }
+}
+
+.webqq-group-announcement p,
+.webqq-group-announcement time {
+  display: block;
+  margin: 0;
+}
+
+.webqq-group-announcement p {
+  color: var(--webqq-text);
+  font-size: 12px;
+  line-height: 17px;
+  overflow-wrap: anywhere;
+}
+
+.webqq-group-announcement time {
+  margin-top: 6px;
+  color: var(--webqq-muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.webqq-group-members {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  padding: 12px;
+}
+
+.webqq-group-members > input {
+  flex: 0 0 auto;
+  min-height: 32px;
+  margin: 10px 0;
+  padding: 0 10px;
+  border: 1px solid rgb(255 255 255 / 48%);
+  border-radius: 8px;
+  outline: 0;
+  color: var(--webqq-text);
+  background: rgb(255 255 255 / 48%);
+  font-size: 12px;
+}
+
+.webqq-group-member-list {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.webqq-group-member {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.webqq-group-member > span:nth-child(2),
+.webqq-group-member strong,
+.webqq-group-member small {
+  min-width: 0;
+}
+
+.webqq-group-member strong,
+.webqq-group-member small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webqq-group-member strong {
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.webqq-group-member small {
+  color: var(--webqq-muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.webqq-group-member em {
+  padding: 1px 5px;
+  border-radius: 5px;
+  color: #9a5b00;
+  background: #fff3cf;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 16px;
+}
+
+.webqq-group-empty {
+  padding: 18px 8px;
+  color: var(--webqq-muted);
+  text-align: center;
+  font-size: 12px;
+}
+
+.webqq-private-info {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.webqq-workspace[data-color-mode="dark"] .webqq-announcement-editor,
+.webqq-workspace[data-color-mode="dark"] .webqq-group-announcement,
+.webqq-workspace[data-color-mode="dark"] .webqq-group-members > input {
+  border-color: rgb(148 163 184 / 24%);
+  background: rgb(15 23 42 / 62%);
+}
+
+@media (prefers-color-scheme: dark) {
+  .webqq-workspace[data-color-mode="auto"] .webqq-announcement-editor,
+  .webqq-workspace[data-color-mode="auto"] .webqq-group-announcement,
+  .webqq-workspace[data-color-mode="auto"] .webqq-group-members > input {
+    border-color: rgb(148 163 184 / 24%);
+    background: rgb(15 23 42 / 62%);
+  }
+}
+
+.webqq-profile-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 24px 24px;
+  border-bottom: 1px solid var(--webqq-border);
+  text-align: center;
+}
+
+.webqq-avatar-profile {
+  --webqq-avatar-size: 76px;
+  --webqq-bot-badge-size: 31.667px;
+  --webqq-bot-badge-offset: -4.222px;
+  --webqq-bot-badge-border: 4.222px;
+
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  font-size: 25.333px;
+}
+
+.webqq-profile-hero h2 {
+  margin: 16px 0 4px;
+  font-size: 17px;
+}
+
+.webqq-profile-hero p {
+  margin: 0;
+  color: var(--webqq-muted);
+  font-size: 12px;
+}
+
+.webqq-online {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  color: #16a34a;
+  font-size: 12px;
+}
+
+.webqq-online i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.webqq-profile-details {
+  margin: 0;
+  padding: 16px;
+  border-bottom: 1px solid var(--webqq-border);
+}
+
+.webqq-profile-details div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  font-size: 13px;
+}
+
+.webqq-profile-details dt {
+  color: var(--webqq-muted);
+}
+
+.webqq-profile-details dd {
+  margin: 0;
+}
+
+.webqq-user-directory {
+  padding: 16px;
+}
+
+.webqq-section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.webqq-section-title h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.webqq-section-title span {
+  color: var(--webqq-muted);
+  font-size: 11px;
+}
+
+.webqq-user-directory button {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 10px;
+  text-align: left;
+  color: var(--webqq-text);
+  background: transparent;
+}
+
+.webqq-user-directory button:hover,
+.webqq-user-directory button:focus-visible,
+.webqq-user-directory button.is-active {
+  background: var(--webqq-hover);
+  outline: none;
+}
+
+.webqq-user-directory strong,
+.webqq-user-directory small {
+  display: block;
+}
+
+.webqq-user-directory strong {
+  font-size: 13px;
+}
+
+.webqq-user-directory small {
+  color: var(--webqq-muted);
+  font-size: 11px;
+}
