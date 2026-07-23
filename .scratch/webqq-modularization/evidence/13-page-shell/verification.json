@@ -1,0 +1,12 @@
+{
+  "verifiedAt": "2026-07-23",
+  "pageLines": 131,
+  "commands": {
+    "targetedTests": "passed",
+    "fullTests": "23 files, 89 tests passed",
+    "typecheck": "passed",
+    "build": "passed with existing @vueuse PURE annotation warnings"
+  },
+  "chromiumMatrix": "pending-user-release-of-ego-task-space",
+  "firefox": "pending"
+}
