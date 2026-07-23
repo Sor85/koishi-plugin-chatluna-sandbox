@@ -56,7 +56,7 @@ export function createWebqqWorkspaceShell(
     .map((conversation) => ({ ...conversation, messageIds: [...conversation.messageIds] })))
   const currentConversation = computed(() => visibleConversations.value.find(({ id }) => id === activeConversationId.value))
   const currentPeerId = computed(() => currentConversation.value
-    ? getConversationPeerId(currentConversation.value, currentOperatorId.value, currentOperatorIsBot.value)
+    ? getConversationPeerId(currentConversation.value, currentOperatorId.value)
     : undefined)
   const currentBot = computed(() => getBot(currentPeerId.value))
   const currentPeer = computed(() => currentBot.value
@@ -152,11 +152,11 @@ export function createWebqqWorkspaceShell(
   }))
   const sidebarConversations = computed(() => getVisibleRecentConversations(
     visibleConversations.value,
-    currentOperatorIsBot.value,
-    activeConversationId.value,
   ).map((conversation) => {
-    const group = snapshot.value.groups.find(({ id }) => id === conversation.groupId)
-    const peerId = getConversationPeerId(conversation, currentOperatorId.value, currentOperatorIsBot.value)
+    const group = conversation.type === 'group'
+      ? snapshot.value.groups.find(({ id }) => id === conversation.groupId)
+      : undefined
+    const peerId = getConversationPeerId(conversation, currentOperatorId.value)
     const bot = getBot(peerId)
     const peer = bot ?? users.value.find(({ id }) => id === peerId)
     const messageIds = new Set(conversation.messageIds)
@@ -164,20 +164,19 @@ export function createWebqqWorkspaceShell(
     const actorRole = group?.members.find(({ participantId }) => participantId === currentOperatorId.value)?.role
     return {
       id: conversation.id,
-      botId: bot?.id ?? '',
-      groupId: conversation.groupId,
+      groupId: group?.id,
       title: group?.name ?? peer?.name ?? conversation.id,
-      avatar: conversation.groupId ? undefined : peer?.avatar,
-      avatarKind: conversation.groupId ? 'group' as const : bot ? 'bot' as const : 'user' as const,
+      avatar: group ? undefined : peer?.avatar,
+      avatarKind: group ? 'group' as const : bot ? 'bot' as const : 'user' as const,
       preview: latestMessage?.content ?? '开始一段新对话',
       time: latestMessage?.createdAt
         ? new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(new Date(latestMessage.createdAt))
         : '',
       actorRole,
-      entityTarget: conversation.groupId
-        ? { type: 'group' as const, id: conversation.groupId }
-        : { type: bot ? 'bot' as const : 'user' as const, id: peerId },
-      entityLabel: conversation.groupId ? '群组' as const : bot ? '机器人' as const : '用户' as const,
+      entityTarget: group
+        ? { type: 'group' as const, id: group.id }
+        : { type: bot ? 'bot' as const : 'user' as const, id: peerId ?? '' },
+      entityLabel: group ? '群组' as const : bot ? '机器人' as const : '用户' as const,
     }
   }))
   const sidebarModel = computed<WebqqSidebarModel>(() => ({

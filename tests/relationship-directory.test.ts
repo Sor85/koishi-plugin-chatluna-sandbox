@@ -18,7 +18,7 @@ const snapshot: SandboxSnapshot = {
   conversations: [
     { id: 'private:10001:10002', type: 'direct', participantIds: ['10001', '10002'], messageIds: [] },
     { id: 'private:10001:20001', type: 'direct', participantIds: ['10001', '20001'], messageIds: [] },
-    { id: 'group:30001:10001:20001', type: 'group', userId: '10001', botId: '20001', groupId: '30001', messageIds: [] },
+    { id: 'group:30001', type: 'group', groupId: '30001', messageIds: [] },
   ],
   messages: [],
   friendships: [{ id: 'friend:10001:10002', participantIds: ['10001', '10002'], remarks: { 10001: '搭档' }, createdAt: '' }],
@@ -29,24 +29,18 @@ describe('当前操作者关系目录', () => {
   it('机器人视角把会话中的普通用户识别为对端', () => {
     const conversation = snapshot.conversations.find(({ id }) => id === 'private:10001:20001')!
 
-    expect(getConversationPeerId(conversation, '10001', false)).toBe('20001')
-    expect(getConversationPeerId(conversation, '20001', true)).toBe('10001')
+    expect(getConversationPeerId(conversation, '10001')).toBe('20001')
+    expect(getConversationPeerId(conversation, '20001')).toBe('10001')
   })
 
-  it('机器人视角把同一群组的多条底层会话合并为一个最近入口', () => {
+  it('机器人视角直接使用群组唯一的最近入口', () => {
     const conversations: SandboxConversation[] = [
-      { id: 'group:30001:10001:20001', type: 'group', userId: '10001', botId: '20001', groupId: '30001', messageIds: [] },
+      { id: 'group:30001', type: 'group', groupId: '30001', messageIds: [] },
       { id: 'private:10001:20001', type: 'direct', participantIds: ['10001', '20001'], messageIds: [] },
-      { id: 'group:30001:10002:20001', type: 'group', userId: '10002', botId: '20001', groupId: '30001', messageIds: [] },
-      { id: 'group:30001:10003:20001', type: 'group', userId: '10003', botId: '20001', groupId: '30001', messageIds: [] },
     ]
 
-    expect(getVisibleRecentConversations(conversations, true).map(({ id }) => id)).toEqual([
-      'group:30001:10001:20001',
-      'private:10001:20001',
-    ])
-    expect(getVisibleRecentConversations(conversations, true, 'group:30001:10003:20001').map(({ id }) => id)).toEqual([
-      'group:30001:10003:20001',
+    expect(getVisibleRecentConversations(conversations).map(({ id }) => id)).toEqual([
+      'group:30001',
       'private:10001:20001',
     ])
   })
@@ -68,7 +62,7 @@ describe('当前操作者关系目录', () => {
     const directory = getGroupDirectory(snapshot, '10001')
 
     expect(directory).toHaveLength(3)
-    expect(directory.find(({ id }) => id === '30001')).toMatchObject({ relation: 'joined', conversationId: 'group:30001:10001:20001' })
+    expect(directory.find(({ id }) => id === '30001')).toMatchObject({ relation: 'joined', conversationId: 'group:30001' })
     expect(directory.find(({ id }) => id === '30002')).toMatchObject({ relation: 'pending' })
     expect(directory.find(({ id }) => id === '30003')).toMatchObject({ relation: 'missing' })
   })

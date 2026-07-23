@@ -110,10 +110,8 @@ describe('模拟 QQ 环境目录管理', () => {
       ],
     })
     expect(control.getSnapshot().conversations).toContainEqual({
-      id: 'group:30099:10001:20001',
+      id: 'group:30099',
       type: 'group',
-      userId: '10001',
-      botId: '20001',
       groupId: '30099',
       messageIds: [],
     })
@@ -136,7 +134,7 @@ describe('模拟 QQ 环境目录管理', () => {
         { participantId: '20001', role: 'member' },
       ],
     })
-    expect(updated.conversations.some(({ id }) => id === 'group:30099:10002:20001')).toBe(true)
+    expect(updated.conversations.filter(({ id }) => id === 'group:30099')).toHaveLength(1)
 
     control.deleteGroup({ id: '30099' })
     const removed = control.getSnapshot()

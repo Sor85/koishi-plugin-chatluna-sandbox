@@ -110,8 +110,6 @@ export interface SandboxDirectConversation {
 export interface SandboxGroupConversation {
   id: string
   type: 'group'
-  userId: string
-  botId: string
   groupId: string
   participantIds?: never
   messageIds: string[]
@@ -123,6 +121,10 @@ export type SandboxConversation = SandboxDirectConversation | SandboxGroupConver
 export function createDirectConversationId(firstId: string, secondId: string): string {
   const [left, right] = [firstId, secondId].sort()
   return `private:${left}:${right}`
+}
+
+export function createGroupConversationId(groupId: string): string {
+  return `group:${groupId}`
 }
 
 export function getDirectConversationPeerId(conversation: SandboxDirectConversation, participantId: string): string {

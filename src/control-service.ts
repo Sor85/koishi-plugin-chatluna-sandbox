@@ -4,6 +4,7 @@ import { SandboxBot } from './bot'
 import { SandboxMediaStorage } from './media-storage'
 import {
   createDirectConversationId,
+  createGroupConversationId,
   getDirectConversationPeerId,
   type CreateSandboxBotInput,
   type CreateSandboxGroupInput,
@@ -45,7 +46,7 @@ export interface SandboxControlServiceOptions {
 
 interface SandboxMessageContext {
   operator: SandboxParticipant
-  peer: SandboxParticipant
+  peer?: SandboxParticipant
   bot?: SandboxBotProfile
   conversation: SandboxConversation
   group?: SandboxGroup
@@ -71,18 +72,12 @@ function createDefaultScene(): SandboxSnapshot {
     participantIds: [userId, DEFAULT_BOT_ID].sort() as [string, string],
     messageIds: [],
   }))
-  const groupConversations: SandboxConversation[] = [
-    DEFAULT_USER_ID,
-    SECONDARY_USER_ID,
-    ADMIN_USER_ID,
-  ].map((userId) => ({
-    id: `group:${DEFAULT_GROUP_ID}:${userId}:${DEFAULT_BOT_ID}`,
+  const groupConversation: SandboxConversation = {
+    id: createGroupConversationId(DEFAULT_GROUP_ID),
     type: 'group',
-    userId,
-    botId: DEFAULT_BOT_ID,
     groupId: DEFAULT_GROUP_ID,
     messageIds: [],
-  }))
+  }
   return {
     revision: 0,
     participants: [
@@ -107,7 +102,7 @@ function createDefaultScene(): SandboxSnapshot {
         createdAt,
       }],
     }],
-    conversations: [...directConversations, ...groupConversations],
+    conversations: [...directConversations, groupConversation],
     messages: [],
     friendships: [
       DEFAULT_USER_ID,
@@ -226,7 +221,7 @@ export class SandboxControlService {
     this.scene.friendships = this.scene.friendships.filter(({ participantIds }) => !participantIds.includes(input.id))
     this.deleteConversations((conversation) => conversation.type === 'direct'
       ? conversation.participantIds.includes(input.id)
-      : conversation.userId === input.id || ownedGroupIds.has(conversation.groupId))
+      : ownedGroupIds.has(conversation.groupId))
     this.scene.revision += 1
   }
 
@@ -299,7 +294,7 @@ export class SandboxControlService {
     this.scene.friendships = this.scene.friendships.filter(({ participantIds }) => !participantIds.includes(input.id))
     this.deleteConversations((conversation) => conversation.type === 'direct'
       ? conversation.participantIds.includes(input.id)
-      : conversation.botId === input.id || ownedGroupIds.has(conversation.groupId))
+      : ownedGroupIds.has(conversation.groupId))
     this.scene.revision += 1
   }
 
@@ -586,7 +581,7 @@ export class SandboxControlService {
     if (input.action !== 'poke') throw new Error(`不支持的群组操作：${Reflect.get(input, 'action') ?? 'unknown'}`)
     const conversation = input.conversationId
       ? this.getVisibleConversation(input.operatorId, input.conversationId)
-      : this.scene.conversations.find((item) => item.type === 'group' && item.userId === input.operatorId && item.groupId === group.id)
+      : this.scene.conversations.find((item) => item.type === 'group' && item.groupId === group.id)
     if (!conversation || conversation.groupId !== group.id) throw new Error('群内戳一戳必须在当前群会话中发起')
     await this.dispatchGroupNotice(group, 'notify', {
       sub_type: 'poke',
@@ -721,7 +716,11 @@ export class SandboxControlService {
     if (!input.content.trim()) throw new Error('消息内容不能为空')
     const context = this.getMessageContext(input)
     const messageAuthorId = input.operatorId
-    if (messageAuthorId !== context.operator.id && messageAuthorId !== context.peer.id) throw new Error(`操作者不在当前会话中：${messageAuthorId}`)
+    if (context.conversation.type === 'direct'
+      && messageAuthorId !== context.operator.id
+      && messageAuthorId !== context.peer?.id) {
+      throw new Error(`操作者不在当前会话中：${messageAuthorId}`)
+    }
     const message = this.appendMessage(messageAuthorId, context.conversation.id, input.content.trim(), input.replyToMessageId)
     if (!context.bot || messageAuthorId === context.bot.id) return { messageId: message.id, revision: this.scene.revision }
     return this.dispatchUserMessage(context, message, h.parse(message.content), [
@@ -733,7 +732,11 @@ export class SandboxControlService {
   async sendMediaMessage(input: SendMediaMessageInput): Promise<SendMessageResult> {
     const context = this.getMessageContext(input)
     const messageAuthorId = input.operatorId
-    if (messageAuthorId !== context.operator.id && messageAuthorId !== context.peer.id) throw new Error(`操作者不在当前会话中：${messageAuthorId}`)
+    if (context.conversation.type === 'direct'
+      && messageAuthorId !== context.operator.id
+      && messageAuthorId !== context.peer?.id) {
+      throw new Error(`操作者不在当前会话中：${messageAuthorId}`)
+    }
     const media = this.mediaStorage.save(input)
     const content = input.content?.trim() || `[${this.getMediaLabel(media)}] ${media.name}`
     const message = this.appendMessage(messageAuthorId, context.conversation.id, content, input.replyToMessageId, [media])
@@ -871,17 +874,17 @@ export class SandboxControlService {
     if (!conversation) throw new Error(`会话不存在：${conversationId}`)
     const botVisible = conversation.type === 'direct'
       ? conversation.participantIds.includes(botId)
-      : conversation.botId === botId
+      : !!this.scene.groups.find(({ id }) => id === conversation.groupId)?.members.some(({ participantId }) => participantId === botId)
     if (!botVisible) throw new Error(`机器人不在当前会话中：${botId}`)
     return this.appendMessage(botId, conversation.id, content)
   }
 
   recordBotGroupMessage(botId: string, groupId: string, content: string): SandboxMessage[] {
-    const conversations = this.scene.conversations.filter((conversation) => conversation.type === 'group'
-      && conversation.botId === botId && conversation.groupId === groupId)
-    if (!conversations.length) throw new Error(`群聊会话不存在：${groupId}`)
-    const broadcastId = Random.id()
-    return conversations.map(({ id }) => this.appendMessage(botId, id, content, undefined, undefined, undefined, broadcastId))
+    const group = this.scene.groups.find(({ id }) => id === groupId)
+    if (!group?.members.some(({ participantId }) => participantId === botId)) throw new Error(`机器人不在群组中：${botId}`)
+    const conversation = this.scene.conversations.find((item) => item.type === 'group' && item.groupId === groupId)
+    if (!conversation) throw new Error(`群聊会话不存在：${groupId}`)
+    return [this.appendMessage(botId, conversation.id, content)]
   }
 
   deleteBotMessage(botId: string, messageId: string, conversationId?: string): void {
@@ -916,7 +919,8 @@ export class SandboxControlService {
     if (!conversation) throw new Error(`会话不存在：${conversationId}`)
 
     const botId = conversation.type === 'group'
-      ? conversation.botId
+      ? this.scene.groups.find(({ id }) => id === conversation.groupId)?.members
+        .find(({ participantId }) => this.isBot(participantId))?.participantId
       : conversation.participantIds.find((participantId) => this.isBot(participantId))
     const message: SandboxMessage = {
       id: Random.id(),
@@ -980,8 +984,6 @@ export class SandboxControlService {
       if (!conversation.participantIds.includes(operatorId)) return false
       return !!this.getFriendship(...conversation.participantIds)
     }
-    if (this.isBot(operatorId)) return conversation.botId === operatorId
-    if (conversation.userId !== operatorId) return false
     const group = this.scene.groups.find(({ id }) => id === conversation.groupId)
     return !!group?.members.some(({ participantId }) => participantId === operatorId)
   }
@@ -989,21 +991,23 @@ export class SandboxControlService {
   private getMessageContext(input: Pick<SendMessageInput, 'operatorId' | 'conversationId' | 'replyToMessageId'>): SandboxMessageContext {
     const operator = this.getParticipant(input.operatorId)
     const conversation = this.getVisibleConversation(input.operatorId, input.conversationId)
-    const peerId = conversation.type === 'direct'
-      ? getDirectConversationPeerId(conversation, input.operatorId)
-      : conversation.botId
-    const peer = this.getParticipant(peerId)
-    const bot = peer.kind === 'bot' ? peer : undefined
-    if (bot && !bot.enabled) throw new Error(`机器人已停用：${bot.id}`)
     const group = conversation.groupId
       ? this.scene.groups.find(({ id }) => id === conversation.groupId)
       : undefined
-    if (conversation.type === 'group' && (!group
-      || !group.members.some(({ participantId }) => participantId === operator.id)
-      || !bot
-      || !group.members.some(({ participantId }) => participantId === bot.id))) {
+    if (conversation.type === 'group' && (!group || !group.members.some(({ participantId }) => participantId === operator.id))) {
       throw new Error(`群聊关系不存在：${input.conversationId}`)
     }
+    const peer = conversation.type === 'direct'
+      ? this.getParticipant(getDirectConversationPeerId(conversation, input.operatorId))
+      : undefined
+    const bot = conversation.type === 'direct'
+      ? peer?.kind === 'bot' ? peer : undefined
+      : group?.members
+        .map(({ participantId }) => this.scene.participants.find(({ id }) => id === participantId))
+        .find((participant): participant is SandboxBotProfile => participant?.kind === 'bot'
+          && participant.enabled && participant.id !== operator.id)
+        ?? (operator.kind === 'bot' ? operator : undefined)
+    if (bot && !bot.enabled) throw new Error(`机器人已停用：${bot.id}`)
     const reply = input.replyToMessageId
       ? this.scene.messages.find(({ id, conversationId }) => id === input.replyToMessageId && conversationId === conversation.id)
       : undefined
@@ -1330,35 +1334,8 @@ export class SandboxControlService {
   private syncGroupConversations(groupId: string): void {
     const group = this.scene.groups.find(({ id }) => id === groupId)
     if (!group) return
-    const userIds = group.members
-      .filter(({ participantId }) => this.getUsers().some(({ id }) => id === participantId))
-      .map(({ participantId }) => participantId)
-    const botIds = group.members
-      .filter(({ participantId }) => this.getBots().some(({ id }) => id === participantId))
-      .map(({ participantId }) => participantId)
-    const existingIds = group.members.length
-      ? this.scene.conversations.filter((conversation) => conversation.groupId === groupId).map(({ id }) => id)
-      : []
-    // 群会话是共享 QQ 历史，只要群内仍有参与者就不因成员或机器人离群主动删除；
-    // 已离群用户的访问由可见性检查拦截，群为空或显式删除群组时才清理数据。
-    const desiredIds = new Set([
-      ...existingIds,
-      ...userIds.flatMap((userId) => botIds.map((botId) => `group:${groupId}:${userId}:${botId}`)),
-    ])
-    this.deleteConversations((conversation) => conversation.groupId === groupId && !desiredIds.has(conversation.id))
-    for (const userId of userIds) {
-      for (const botId of botIds) {
-        const id = `group:${groupId}:${userId}:${botId}`
-        if (this.scene.conversations.some((conversation) => conversation.id === id)) continue
-        this.scene.conversations.push({
-          id,
-          type: 'group',
-          userId,
-          botId,
-          groupId,
-          messageIds: [],
-        })
-      }
-    }
+    const id = createGroupConversationId(groupId)
+    if (this.scene.conversations.some((conversation) => conversation.id === id)) return
+    this.scene.conversations.push({ id, type: 'group', groupId, messageIds: [] })
   }
 }

@@ -295,7 +295,6 @@ type EnvironmentDialogMode = 'edit' | 'delete'
 
 export interface WebqqSidebarConversation {
   id: string
-  botId: string
   groupId?: string
   title: string
   avatar?: string

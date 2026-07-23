@@ -207,7 +207,7 @@ describe('模拟 QQ 环境消息闭环', () => {
     const visible = control.getVisibleSnapshot('10001', 1)
     expect(visible.conversations.every((conversation) => conversation.type === 'direct'
       ? conversation.participantIds.includes('10001')
-      : conversation.userId === '10001')).toBe(true)
+      : conversation.groupId === '30001')).toBe(true)
     expect(visible.messages.map(({ content }) => content)).toEqual(['第二条'])
     expect(visible.conversations.find(({ id }) => id === 'private:10001:20001')?.messageIds).toEqual([
       visible.messages[0].id,
@@ -229,7 +229,7 @@ describe('模拟 QQ 环境消息闭环', () => {
     })
     expect(previous.messages.map(({ content }) => content)).toEqual(['第一条'])
     expect(previous.nextBeforeMessageId).toBeUndefined()
-    expect(control.getVisibleSnapshot('20001').conversations).toHaveLength(6)
+    expect(control.getVisibleSnapshot('20001').conversations).toHaveLength(4)
     expect(control.getMessageHistory({
       operatorId: '20001',
       conversationId: 'private:10001:20001',
@@ -368,7 +368,7 @@ describe('模拟 QQ 环境消息闭环', () => {
       messageIds: [],
     }))
     expect(initial.conversations).toContainEqual(expect.objectContaining({
-      id: 'group:30001:10001:20001',
+      id: 'group:30001',
       type: 'group',
       groupId: '30001',
       messageIds: [],
@@ -427,7 +427,7 @@ describe('模拟 QQ 环境消息闭环', () => {
     })
     await control.sendMessage({
       operatorId: '10001',
-      conversationId: 'group:30001:10001:20001',
+      conversationId: 'group:30001',
       content: '群聊消息',
     })
 
@@ -443,14 +443,14 @@ describe('模拟 QQ 环境消息闭环', () => {
     })
     expect(control.getSnapshot().groups[0].announcements.some(({ id }) => id === announcementId)).toBe(false)
     expect(receivedSession).toEqual({
-      channelId: 'group:30001:10001:20001',
+      channelId: 'group:30001',
       guildId: '30001',
       channelType: Universal.Channel.Type.TEXT,
     })
     control.createUser({ id: '10004', name: '非成员' })
     await expect(control.sendMessage({
       operatorId: '10004',
-      conversationId: 'group:30001:10001:20001',
+      conversationId: 'group:30001',
       content: '非成员消息',
     })).rejects.toThrow('会话不存在')
   })

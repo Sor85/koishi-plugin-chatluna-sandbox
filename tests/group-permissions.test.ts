@@ -42,7 +42,7 @@ describe('模拟 QQ 环境群权限操作', () => {
 
     const snapshot = control.getSnapshot()
     expect(snapshot.groups[0].members).toContainEqual({ participantId: '10005', role: 'member' })
-    expect(snapshot.conversations).toContainEqual(expect.objectContaining({ id: 'group:30001:10005:20001' }))
+    expect(snapshot.conversations).toContainEqual(expect.objectContaining({ id: 'group:30001' }))
   })
 
   it('邀请机器人入群必须由机器人通过 OneBot action 处理', async () => {
@@ -159,12 +159,12 @@ describe('模拟 QQ 环境群权限操作', () => {
       operatorId: '10003',
       groupId: '30001',
       targetId: '10001',
-      conversationId: 'group:30001:10003:20001',
+      conversationId: 'group:30001',
     })
 
     expect(control.getSnapshot().messages).toContainEqual(expect.objectContaining({
       authorId: '10003',
-      conversationId: 'group:30001:10003:20001',
+      conversationId: 'group:30001',
       content: '测试用户3 戳了戳 测试用户1',
       event: { type: 'poke', targetId: '10001' },
     }))
@@ -223,24 +223,30 @@ describe('模拟 QQ 环境群权限操作', () => {
     ]))
   })
 
-  it('群内仍有成员时保留历史群会话，仅当前成员可见', async () => {
+  it('成员被踢后失去群聊访问，重新入群恢复同一会话历史', async () => {
     const { control } = await createControl()
     const group = control.getSnapshot().groups[0]
-    const conversationIds = control.getSnapshot().conversations
-      .filter(({ groupId }) => groupId === group.id)
-      .map(({ id }) => id)
+    const [message] = control.recordBotGroupMessage('20001', group.id, '保留的群聊历史')
 
-    control.updateGroup({
-      id: group.id,
-      name: group.name,
-      members: group.members.filter(({ participantId }) => participantId === '10001'),
-    })
+    await control.performGroupAction({ action: 'kick', operatorId: '10001', groupId: group.id, targetId: '10003' })
 
     expect(control.getSnapshot().conversations
       .filter(({ groupId }) => groupId === group.id)
-      .map(({ id }) => id)).toEqual(conversationIds)
+      .map(({ id }) => id)).toEqual(['group:30001'])
+    expect(control.getSnapshot().conversations.find(({ id }) => id === 'group:30001')?.messageIds).toEqual([message.id])
     expect(control.getVisibleSnapshot('10001').conversations).toContainEqual(expect.objectContaining({ groupId: '30001' }))
-    expect(control.getVisibleSnapshot('10002').conversations).not.toContainEqual(expect.objectContaining({ groupId: '30001' }))
     expect(control.getVisibleSnapshot('10003').conversations).not.toContainEqual(expect.objectContaining({ groupId: '30001' }))
+    expect(() => control.getMessageHistory({ operatorId: '10003', conversationId: 'group:30001' })).toThrow('会话不存在')
+    await expect(control.sendMessage({ operatorId: '10003', conversationId: 'group:30001', content: '被踢后发送' }))
+      .rejects.toThrow('会话不存在')
+
+    const request = await control.performGroupAction({ action: 'request-join', operatorId: '10003', groupId: group.id })
+    if (!request.requestId) throw new Error('重新入群申请未创建')
+    await control.performGroupAction({ action: 'handle-request', operatorId: '10001', requestId: request.requestId, approve: true })
+
+    expect(control.getVisibleSnapshot('10003').conversations).toContainEqual(expect.objectContaining({ id: 'group:30001' }))
+    expect(control.getMessageHistory({ operatorId: '10003', conversationId: 'group:30001' }).messages)
+      .toEqual([expect.objectContaining({ id: message.id, content: '保留的群聊历史' })])
+    expect(control.getSnapshot().conversations.filter(({ id }) => id === 'group:30001')).toHaveLength(1)
   })
 })

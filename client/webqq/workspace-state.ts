@@ -63,13 +63,11 @@ export function resolveWorkspaceSelection(
   const currentOperator = snapshot.participants.find(({ id }) => id === preferences.currentOperatorId)
     ?? snapshot.participants.find(({ kind }) => kind === 'user')
     ?? snapshot.participants[0]
-  const operatorIsBot = currentOperator?.kind === 'bot'
   const conversations = currentOperator
     ? snapshot.conversations.filter((conversation) => conversation.type === 'direct'
       ? conversation.participantIds.includes(currentOperator.id)
-      : operatorIsBot
-        ? conversation.botId === currentOperator.id
-        : conversation.userId === currentOperator.id)
+      : snapshot.groups.find(({ id }) => id === conversation.groupId)?.members
+        .some(({ participantId }) => participantId === currentOperator.id))
     : []
   const activeConversation = conversations.find(({ id }) => id === preferences.activeConversationId)
     ?? conversations[0]

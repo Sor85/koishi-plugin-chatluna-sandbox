@@ -107,12 +107,10 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   })
   const conversations = computed(() => {
     const operatorId = currentOperatorIdState.value
-    const operatorIsBot = snapshot.value.participants.some(({ id, kind }) => id === operatorId && kind === 'bot')
     return snapshot.value.conversations.filter((conversation) => conversation.type === 'direct'
       ? conversation.participantIds.includes(operatorId ?? '')
-      : operatorIsBot
-        ? conversation.botId === operatorId
-        : conversation.userId === operatorId)
+      : snapshot.value.groups.find(({ id }) => id === conversation.groupId)?.members
+        .some(({ participantId }) => participantId === operatorId))
   })
   const activeConversation = computed(() => conversations.value.find(({ id }) => id === activeConversationIdState.value))
   const activeMessages = computed(() => {
@@ -123,7 +121,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     const conversation = activeConversation.value
     const botId = conversation?.type === 'direct'
       ? conversation.participantIds.find((id) => snapshot.value.participants.some((participant) => participant.kind === 'bot' && participant.id === id))
-      : conversation?.botId
+      : undefined
     return snapshot.value.participants.find((participant): participant is SandboxBotProfile => participant.kind === 'bot' && participant.id === botId)
   })
   const activeGroup = computed(() => snapshot.value.groups.find(({ id }) => id === activeConversation.value?.groupId))

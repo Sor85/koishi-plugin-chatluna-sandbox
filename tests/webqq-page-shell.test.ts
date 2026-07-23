@@ -19,7 +19,7 @@ describe('WebQQ 主页面装配', () => {
     expect(shellSource).toContain('export function createWebqqWorkspaceShell')
     expect(shellSource).not.toContain('currentUserId')
     expect(shellSource).toContain('currentOperatorName: currentOperator.value?.name')
-    expect(shellSource).toMatch(/avatarKind: conversation\.groupId \? 'group'.*bot \? 'bot'.*'user'/)
+    expect(shellSource).toMatch(/avatarKind: group \? 'group'.*bot \? 'bot'.*'user'/)
     expect(shellSource).not.toContain("from '@koishijs/client'")
   })
 

@@ -407,7 +407,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
       message_id: message.id,
       real_id: message.id,
       sender: { user_id: Number(message.authorId), nickname: this.control.getSnapshot().participants.find(({ id }) => id === message.authorId)?.name ?? this.user?.name ?? message.authorId },
-      user_id: Number(conversation?.type === 'group' ? conversation.userId : directPeerId ?? message.authorId),
+      user_id: Number(conversation?.type === 'group' ? message.authorId : directPeerId ?? message.authorId),
       group_id: conversation?.groupId ? Number(conversation.groupId) : undefined,
       message: [{ type: 'text', data: { text: message.content } }],
       raw_message: message.content,

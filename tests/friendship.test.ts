@@ -176,7 +176,7 @@ describe('模拟 QQ 环境好友关系', () => {
     const snapshot = control.getSnapshot()
     expect(snapshot.requests.some(({ id }) => id === request.requestId)).toBe(false)
     expect(snapshot.groups[0].members).toContainEqual({ participantId: '10004', role: 'member' })
-    expect(snapshot.conversations.some(({ id }) => id === 'group:30001:10004:20001')).toBe(true)
+    expect(snapshot.conversations.some(({ id }) => id === 'group:30001')).toBe(true)
   })
 
   it('普通群成员不能处理入群申请', async () => {

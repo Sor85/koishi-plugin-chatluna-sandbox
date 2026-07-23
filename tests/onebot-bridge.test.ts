@@ -120,7 +120,7 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     const groupResult = await bot.internal._request('send_group_msg', { group_id: 30001, message: [{ type: 'text', data: { text: '群广播' } }] }) as {
       data: { message_id: string }
     }
-    expect(control.getSnapshot().messages.filter(({ content }) => content === '群广播')).toHaveLength(3)
+    expect(control.getSnapshot().messages.filter(({ content }) => content === '群广播')).toHaveLength(1)
 
     await bot.internal._request('delete_msg', { message_id: groupResult.data.message_id })
     expect(control.getSnapshot().messages.some(({ content }) => content === '群广播')).toBe(false)

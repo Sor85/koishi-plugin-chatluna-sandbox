@@ -23,7 +23,7 @@ const snapshot: SandboxSnapshot = {
   conversations: [
     { id: 'private:10001:20001', type: 'direct', participantIds: ['10001', '20001'], messageIds: ['message-1'] },
     { id: 'private:10001:10002', type: 'direct', participantIds: ['10001', '10002'], messageIds: [] },
-    { id: 'group:30001:10001:20001', type: 'group', userId: '10001', botId: '20001', groupId: '30001', messageIds: [] },
+    { id: 'group:30001', type: 'group', groupId: '30001', messageIds: [] },
     { id: 'private:10002:20001', type: 'direct', participantIds: ['10002', '20001'], messageIds: [] },
   ],
   messages: [{
@@ -103,17 +103,17 @@ describe('WebQQ 工作区控制模块', () => {
     const controller = createWorkspaceController(port, storage)
     await controller.load()
 
-    controller.selectConversation('group:30001:10001:20001')
+    controller.selectConversation('group:30001')
 
-    expect(controller.activeConversationId.value).toBe('group:30001:10001:20001')
+    expect(controller.activeConversationId.value).toBe('group:30001')
     expect(controller.chat.value).toMatchObject({
       revision: 7,
-      conversation: { id: 'group:30001:10001:20001' },
+      conversation: { id: 'group:30001' },
       messages: [],
     })
     expect(JSON.parse(storage.read('onebot-sandbox.workspace') ?? '{}')).toEqual({
       currentOperatorId: '10001',
-      activeConversationId: 'group:30001:10001:20001',
+      activeConversationId: 'group:30001',
       currentView: 'messages',
     })
   })
@@ -401,7 +401,7 @@ describe('WebQQ 工作区控制模块', () => {
       controller.details.value.revision,
     ]).toEqual([8, 8, 8, 8])
 
-    controller.selectConversation('group:30001:10001:20001')
+    controller.selectConversation('group:30001')
     port.workspaceResult = {
       ...port.workspaceResult,
       snapshot: {
@@ -594,9 +594,8 @@ describe('WebQQ 工作区控制模块', () => {
         ...workspace.snapshot,
         revision: 8,
         participants: workspace.snapshot.participants.filter(({ id }) => id !== '10001'),
-        conversations: workspace.snapshot.conversations.filter((conversation) => conversation.type === 'direct'
-          ? !conversation.participantIds.includes('10001')
-          : conversation.userId !== '10001'),
+        conversations: workspace.snapshot.conversations.filter((conversation) => conversation.type !== 'direct'
+          || !conversation.participantIds.includes('10001')),
       },
     }
 
@@ -608,7 +607,7 @@ describe('WebQQ 工作区控制模块', () => {
     })
     expect(controller.currentOperatorId.value).toBe('10002')
     expect(controller.currentOperatorId.value).toBe('10002')
-    expect(controller.activeConversationId.value).toBe('private:10002:20001')
+    expect(controller.activeConversationId.value).toBe('group:30001')
     expect([
       controller.sidebar.value.revision,
       controller.chat.value.revision,

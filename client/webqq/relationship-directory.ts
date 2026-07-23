@@ -1,35 +1,14 @@
 import type { SandboxConversation, SandboxSnapshot } from '../../src/types'
 
-export function getConversationPeerId(conversation: SandboxConversation, operatorId: string | undefined, operatorIsBot: boolean) {
+export function getConversationPeerId(conversation: SandboxConversation, operatorId: string | undefined) {
   if (conversation.type === 'direct') return conversation.participantIds.find((id) => id !== operatorId) ?? conversation.participantIds[0]
-  return operatorIsBot && conversation.botId === operatorId ? conversation.userId : conversation.botId
+  return undefined
 }
 
 export function getVisibleRecentConversations(
   conversations: SandboxConversation[],
-  operatorIsBot: boolean,
-  activeConversationId?: string,
 ) {
-  if (!operatorIsBot) return conversations
-
-  // 机器人视角会同时收到同一群对每个参与者的底层会话；最近列表只合并展示入口，
-  // 并优先保留当前激活会话作为代表，避免切换后丢失选中态。
-  const groupRepresentatives = new Map<string, SandboxConversation>()
-  for (const conversation of conversations) {
-    if (!conversation.groupId) continue
-    const representative = groupRepresentatives.get(conversation.groupId)
-    if (!representative || conversation.id === activeConversationId) {
-      groupRepresentatives.set(conversation.groupId, conversation)
-    }
-  }
-
-  const addedGroups = new Set<string>()
-  return conversations.flatMap((conversation) => {
-    if (!conversation.groupId) return [conversation]
-    if (addedGroups.has(conversation.groupId)) return []
-    addedGroups.add(conversation.groupId)
-    return [groupRepresentatives.get(conversation.groupId) ?? conversation]
-  })
+  return conversations
 }
 
 export function getFriendDirectory(snapshot: SandboxSnapshot, operatorId?: string) {
@@ -72,7 +51,9 @@ export function getGroupDirectory(snapshot: SandboxSnapshot, operatorId?: string
     const member = group.members.find(({ participantId }) => participantId === operatorId)
     const pending = snapshot.requests.some(({ type, subType, requesterId, groupId }) => type === 'group'
       && (subType ?? 'add') === 'add' && requesterId === operatorId && groupId === group.id)
-    const conversationId = snapshot.conversations.find((conversation) => isGroupConversationFor(conversation, group.id, operatorId))?.id
+    const conversationId = member
+      ? snapshot.conversations.find((conversation) => isGroupConversationFor(conversation, group.id))?.id
+      : undefined
 
     return {
       ...group,
@@ -90,8 +71,7 @@ function isDirectConversationBetween(conversation: SandboxConversation, firstId:
     && conversation.participantIds.includes(secondId)
 }
 
-function isGroupConversationFor(conversation: SandboxConversation, groupId: string, operatorId: string) {
+function isGroupConversationFor(conversation: SandboxConversation, groupId: string) {
   return conversation.type === 'group'
     && conversation.groupId === groupId
-    && (conversation.userId === operatorId || conversation.botId === operatorId)
 }
