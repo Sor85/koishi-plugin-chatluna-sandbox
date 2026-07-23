@@ -119,10 +119,6 @@
   visibility: hidden;
 }
 
-.webqq-message-row.is-incoming .webqq-message-avatar:not(.is-bot) {
-  background: #59657a;
-}
-
 .webqq-message-content,
 .webqq-message-body {
   display: flex;
@@ -434,4 +430,10 @@
 .webqq-workspace[data-color-mode="dark"] .webqq-composer::before {
   border-color: rgb(148 163 184 / 24%);
   background: rgb(30 41 59 / 90%);
+}
+
+.webqq-workspace[data-color-mode="dark"] .webqq-message-row.is-outgoing .webqq-message-bubble {
+  color: #fff;
+  background: var(--webqq-accent);
+  box-shadow: 0 8px 18px var(--webqq-accent-shadow);
 }

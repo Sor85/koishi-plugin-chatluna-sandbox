@@ -46,7 +46,7 @@ describe('WebQQ 浏览器工作台状态', () => {
     expect(resolveDetailsPreferenceAfterLayoutChange(true)).toBe('open')
   })
 
-  it('只在浏览器存储中保存当前用户、活动会话和当前视图', () => {
+  it('只在浏览器存储中保存当前操作者、活动会话和当前视图', () => {
     const values = new Map<string, string>()
     const storage = {
       getItem: (key: string) => values.get(key) ?? null,
@@ -54,26 +54,36 @@ describe('WebQQ 浏览器工作台状态', () => {
     }
 
     saveWorkspacePreferences(storage, {
-      currentUserId: '10002',
+      currentOperatorId: '20001',
       activeConversationId: 'private:10002:20001',
       currentView: 'profile',
     })
 
     expect(loadWorkspacePreferences(storage)).toEqual({
-      currentUserId: '10002',
+      currentOperatorId: '20001',
       activeConversationId: 'private:10002:20001',
       currentView: 'profile',
     })
     expect(snapshot.users[0].id).toBe('10001')
   })
 
-  it('恢复无效选择时回退到存在的用户和该用户会话', () => {
+  it('恢复机器人选择并在无效选择时回退到首个参与者', () => {
     expect(resolveWorkspaceSelection(snapshot, {
-      currentUserId: 'deleted-user',
+      currentOperatorId: '20001',
+      activeConversationId: 'private:10002:20001',
+      currentView: 'messages',
+    })).toEqual({
+      currentOperatorId: '20001',
+      activeConversationId: 'private:10002:20001',
+      currentView: 'messages',
+    })
+
+    expect(resolveWorkspaceSelection(snapshot, {
+      currentOperatorId: 'deleted-user',
       activeConversationId: 'deleted-conversation',
       currentView: 'messages',
     })).toEqual({
-      currentUserId: '10001',
+      currentOperatorId: '10001',
       activeConversationId: 'private:10001:20001',
       currentView: 'messages',
     })

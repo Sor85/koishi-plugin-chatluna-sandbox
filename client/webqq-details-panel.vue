@@ -81,7 +81,7 @@
       <dl class="webqq-profile-details">
         <div><dt>平台</dt><dd>OneBot</dd></div>
         <div><dt>会话类型</dt><dd>私聊</dd></div>
-        <div><dt>当前用户</dt><dd>{{ model.currentUserName || '未选择' }}</dd></div>
+        <div><dt>当前操作者</dt><dd>{{ model.currentOperatorName || '未选择' }}</dd></div>
         <div><dt>模拟环境</dt><dd>服务端内存</dd></div>
       </dl>
     </div>
@@ -111,7 +111,7 @@ export interface WebqqDetailsPanelModel {
   group?: SandboxGroup
   bot?: SandboxBotProfile
   privateParticipant?: { id: string, name: string, avatar?: string, isBot: boolean }
-  currentUserName?: string
+  currentOperatorName?: string
   currentOperatorId?: string
   participants: Record<string, WebqqDetailsParticipant>
 }

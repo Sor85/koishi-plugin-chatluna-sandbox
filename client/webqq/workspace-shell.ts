@@ -13,7 +13,7 @@ import type {
 import type { SandboxWorkspaceView } from './workspace-state'
 import type { FriendMenuState } from './friend-menu'
 import { getIncomingNotificationRequests } from './notification-requests'
-import { getFriendDirectory, getGroupDirectory } from './relationship-directory'
+import { getConversationPeerId, getFriendDirectory, getGroupDirectory, getVisibleRecentConversations } from './relationship-directory'
 import type { createWorkspaceController } from './workspace-controller'
 import type { createWorkspaceLayout } from './workspace-layout'
 
@@ -36,8 +36,7 @@ export function createWebqqWorkspaceShell(
   getOverlayHost: () => WebqqWorkspaceOverlayHost | undefined,
 ) {
   const workspace = workspaceController.workspace
-  const currentUserId = workspaceController.currentUserId
-  const composerSenderId = workspaceController.currentOperatorId
+  const currentOperatorId = workspaceController.currentOperatorId
   const activeConversationId = workspaceController.activeConversationId
   const currentView = workspaceController.currentView
   const detailsVisible = workspaceLayout.detailsVisible
@@ -46,29 +45,26 @@ export function createWebqqWorkspaceShell(
   const errorMessage = ref('')
   const snapshot = computed(() => workspace.value.snapshot)
   const appearance = computed(() => workspace.value.appearance)
-  const currentUser = computed(() => snapshot.value.users.find(({ id }) => id === currentUserId.value))
-  const currentOperatorId = computed(() => composerSenderId.value ?? currentUserId.value)
-  const composerSenders = computed<WebqqComposerSender[]>(() => {
-    const users = snapshot.value.users.map((user) => ({ ...user, type: 'user' as const }))
-    const activeUserIndex = users.findIndex(({ id }) => id === currentUserId.value)
-    const orderedUsers = activeUserIndex > 0
-      ? [users[activeUserIndex], ...users.slice(0, activeUserIndex), ...users.slice(activeUserIndex + 1)]
-      : users
-    const conversation = snapshot.value.conversations.find(({ id }) => id === activeConversationId.value)
-    const bot = snapshot.value.bots.find(({ id }) => id === conversation?.botId)
-    return bot
-      ? [orderedUsers[0], { ...bot, type: 'bot' as const }, ...orderedUsers.slice(1)].filter(Boolean) as WebqqComposerSender[]
-      : orderedUsers
-  })
-  const visibleConversations = computed(() => snapshot.value.conversations.filter(({ userId }) => userId === currentUserId.value))
+  const currentOperator = computed(() => [...snapshot.value.users, ...snapshot.value.bots]
+    .find(({ id }) => id === currentOperatorId.value))
+  const currentOperatorIsBot = computed(() => snapshot.value.bots.some(({ id }) => id === currentOperatorId.value))
+  // 会话的 botId 是历史遗留的“对端 ID”，普通用户私聊中也会指向用户；
+  // 发送者候选必须使用完整参与者目录，不能据此筛掉机器人。
+  const composerSenders = computed<WebqqComposerSender[]>(() => workspaceController.composer.value.participants
+    .map((participant) => ({ ...participant })))
+  const visibleConversations = computed<SandboxConversation[]>(() => workspaceController.sidebar.value.conversations
+    .map((conversation) => ({ ...conversation, messageIds: [...conversation.messageIds] })))
   const currentConversation = computed(() => visibleConversations.value.find(({ id }) => id === activeConversationId.value))
-  const currentBot = computed(() => getBot(currentConversation.value?.botId))
+  const currentPeerId = computed(() => currentConversation.value
+    ? getConversationPeerId(currentConversation.value, currentOperatorId.value, currentOperatorIsBot.value)
+    : undefined)
+  const currentBot = computed(() => getBot(currentPeerId.value))
   const currentPeer = computed(() => currentBot.value
-    ?? snapshot.value.users.find(({ id }) => id === currentConversation.value?.botId))
+    ?? snapshot.value.users.find(({ id }) => id === currentPeerId.value))
   const currentGroup = computed(() => snapshot.value.groups.find(({ id }) => id === currentConversation.value?.groupId))
-  const currentConversationTitle = computed(() => currentConversation.value
-    ? getConversationTitle(currentConversation.value)
-    : '选择一个会话')
+  const currentConversationTitle = computed(() => currentGroup.value?.name
+    ?? currentPeer.value?.name
+    ?? (currentConversation.value ? currentConversation.value.id : '选择一个会话'))
   const currentConversationSubtitle = computed(() => {
     if (currentGroup.value) return `群聊 ${currentGroup.value.id} · ${currentGroup.value.members.length} 人`
     if (currentBot.value) return '在线 · 虚拟 OneBot 机器人'
@@ -82,7 +78,6 @@ export function createWebqqWorkspaceShell(
     ...snapshot.value.users.map(({ id, name, avatar }) => [id, { name, avatar, isBot: false }]),
     ...snapshot.value.bots.map(({ id, name, avatar }) => [id, { name, avatar, isBot: true }]),
   ]))
-  const currentOperatorIsBot = computed(() => snapshot.value.bots.some(({ id }) => id === currentOperatorId.value))
   const friendMenuStates = computed<Record<string, FriendMenuState>>(() => {
     const actorId = currentOperatorId.value
     if (!actorId) return {}
@@ -105,7 +100,6 @@ export function createWebqqWorkspaceShell(
     currentOperatorIsBot: currentOperatorIsBot.value,
     currentConversation: currentConversation.value,
     currentGroup: currentGroup.value,
-    currentUserId: currentUserId.value,
     currentOperatorId: currentOperatorId.value,
     title: currentConversationTitle.value,
     avatar: currentGroup.value ? '' : currentPeer.value?.avatar ?? '',
@@ -117,10 +111,9 @@ export function createWebqqWorkspaceShell(
   }))
   const composerModel = computed<WebqqComposerModel>(() => ({
     senders: composerSenders.value,
-    currentOperatorId: composerSenderId.value,
-    currentUserId: currentUserId.value,
+    currentOperatorId: currentOperatorId.value,
     conversationId: currentConversation.value?.id,
-    botId: currentPeer.value?.id,
+    botId: currentConversation.value?.botId,
     accentColor: appearance.value.webQQAccentColor,
     externalError: errorMessage.value,
   }))
@@ -157,14 +150,19 @@ export function createWebqqWorkspaceShell(
       avatar: currentPeer.value.avatar,
       isBot: !!currentBot.value,
     } : undefined,
-    currentUserName: currentUser.value?.name,
+    currentOperatorName: currentOperator.value?.name,
     currentOperatorId: currentOperatorId.value,
     participants: participants.value,
   }))
-  const sidebarConversations = computed(() => visibleConversations.value.map((conversation) => {
+  const sidebarConversations = computed(() => getVisibleRecentConversations(
+    visibleConversations.value,
+    currentOperatorIsBot.value,
+    activeConversationId.value,
+  ).map((conversation) => {
     const group = snapshot.value.groups.find(({ id }) => id === conversation.groupId)
-    const bot = getBot(conversation.botId)
-    const peer = bot ?? snapshot.value.users.find(({ id }) => id === conversation.botId)
+    const peerId = getConversationPeerId(conversation, currentOperatorId.value, currentOperatorIsBot.value)
+    const bot = getBot(peerId)
+    const peer = bot ?? snapshot.value.users.find(({ id }) => id === peerId)
     const messageIds = new Set(conversation.messageIds)
     const latestMessage = snapshot.value.messages.filter(({ id }) => messageIds.has(id)).at(-1)
     const actorRole = group?.members.find(({ participantId }) => participantId === currentOperatorId.value)?.role
@@ -174,6 +172,7 @@ export function createWebqqWorkspaceShell(
       groupId: conversation.groupId,
       title: group?.name ?? peer?.name ?? conversation.id,
       avatar: conversation.groupId ? undefined : peer?.avatar,
+      avatarKind: conversation.groupId ? 'group' as const : bot ? 'bot' as const : 'user' as const,
       preview: latestMessage?.content ?? '开始一段新对话',
       time: latestMessage?.createdAt
         ? new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(new Date(latestMessage.createdAt))
@@ -181,7 +180,7 @@ export function createWebqqWorkspaceShell(
       actorRole,
       entityTarget: conversation.groupId
         ? { type: 'group' as const, id: conversation.groupId }
-        : { type: bot ? 'bot' as const : 'user' as const, id: conversation.botId },
+        : { type: bot ? 'bot' as const : 'user' as const, id: peerId },
       entityLabel: conversation.groupId ? '群组' as const : bot ? '机器人' as const : '用户' as const,
     }
   }))
@@ -192,12 +191,12 @@ export function createWebqqWorkspaceShell(
     currentOperatorIsBot: currentOperatorIsBot.value,
     currentGroupId: currentGroup.value?.id,
     currentGroupMemberIds: currentGroup.value?.members.map(({ participantId }) => participantId) ?? [],
-    currentUser: currentUser.value,
+    currentOperator: currentOperator.value,
     bots: snapshot.value.bots,
     conversations: sidebarConversations.value,
     friends: getFriendDirectory(snapshot.value, currentOperatorId.value),
     groups: getGroupDirectory(snapshot.value, currentOperatorId.value),
-    notificationRequests: getIncomingNotificationRequests(snapshot.value, currentUserId.value),
+    notificationRequests: getIncomingNotificationRequests(snapshot.value, currentOperatorId.value),
     participants: participants.value,
     groupNames: Object.fromEntries(snapshot.value.groups.map(({ id, name }) => [id, name])),
   }))
@@ -209,10 +208,6 @@ export function createWebqqWorkspaceShell(
   }))
   const environmentModel = computed(() => snapshot.value)
 
-  watch([currentUserId, () => currentConversation.value?.botId], ([userId, botId]) => {
-    workspaceController.ensureOperator(userId, botId)
-  })
-
   onMounted(() => workspaceController.load())
 
   watch(activeConversationId, () => {
@@ -220,7 +215,7 @@ export function createWebqqWorkspaceShell(
   })
 
   watch(
-    () => [currentUserId.value, ...messages.value.flatMap(({ media }) => media?.map(({ id }) => id) ?? [])].join(':'),
+    () => [currentOperatorId.value, ...messages.value.flatMap(({ media }) => media?.map(({ id }) => id) ?? [])].join(':'),
     () => void loadVisibleMedia(),
     { immediate: true },
   )
@@ -371,15 +366,8 @@ export function createWebqqWorkspaceShell(
     return snapshot.value.bots.find(({ id }) => id === botId)
   }
 
-  function getConversationTitle(conversation: SandboxConversation) {
-    return snapshot.value.groups.find(({ id }) => id === conversation.groupId)?.name
-      ?? getBot(conversation.botId)?.name
-      ?? snapshot.value.users.find(({ id }) => id === conversation.botId)?.name
-      ?? conversation.id
-  }
-
   async function loadVisibleMedia() {
-    if (!currentUserId.value) return
+    if (!currentOperatorId.value) return
     const missingMedia = messages.value.flatMap(({ media }) => media ?? []).filter(({ id }) => !mediaSources.value[id])
     await Promise.all(missingMedia.map(async (media) => {
       try {
@@ -396,7 +384,7 @@ export function createWebqqWorkspaceShell(
   async function loadEarlierMessages(resolve: Resolve, reject: Reject) {
     const conversation = currentConversation.value
     const beforeMessageId = conversation?.messageIds[0]
-    if (!conversation || !currentUser.value || !beforeMessageId) return resolve()
+    if (!conversation || !currentOperator.value || !beforeMessageId) return resolve()
     errorMessage.value = ''
     try {
       await workspaceController.loadMessageHistory({ conversationId: conversation.id, beforeMessageId, limit: 50 })

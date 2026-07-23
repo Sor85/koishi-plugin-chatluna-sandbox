@@ -9,7 +9,7 @@ const snapshot = {
   groups: [{
     id: 'group',
     name: '测试群',
-    members: [{ participantId: 'owner', role: 'owner' }, { participantId: 'member', role: 'member' }, { participantId: 'bot', role: 'member' }],
+    members: [{ participantId: 'owner', role: 'owner' }, { participantId: 'member', role: 'member' }, { participantId: 'bot', role: 'admin' }],
     announcements: [],
   }],
   conversations: [],
@@ -19,6 +19,7 @@ const snapshot = {
     { id: 'friend', type: 'friend', requesterId: 'applicant', targetId: 'owner', status: 'pending', createdAt: '' },
     { id: 'group-request', type: 'group', subType: 'add', requesterId: 'applicant', groupId: 'group', status: 'pending', createdAt: '' },
     { id: 'group-invite', type: 'group', subType: 'invite', requesterId: 'owner', targetId: 'member', groupId: 'group', status: 'pending', createdAt: '' },
+    { id: 'friend-bot', type: 'friend', requesterId: 'applicant', targetId: 'bot', status: 'pending', createdAt: '' },
   ],
 } satisfies SandboxSnapshot
 
@@ -32,5 +33,12 @@ describe('铃铛通知申请', () => {
 
   it('普通群成员看不到入群申请，但能处理发给自己的群邀请', () => {
     expect(getIncomingNotificationRequests(snapshot, 'member')).toEqual({ friends: [], groups: [snapshot.requests[2]] })
+  })
+
+  it('机器人操作者按自身好友和群管理身份接收申请', () => {
+    expect(getIncomingNotificationRequests(snapshot, 'bot')).toEqual({
+      friends: [snapshot.requests[3]],
+      groups: [snapshot.requests[1]],
+    })
   })
 })

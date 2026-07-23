@@ -4,7 +4,7 @@ export type SandboxWorkspaceView = 'messages' | 'contacts' | 'profile'
 export type SandboxDetailsPreference = 'auto' | 'open' | 'closed'
 
 export interface SandboxWorkspacePreferences {
-  currentUserId?: string
+  currentOperatorId?: string
   activeConversationId?: string
   currentView: SandboxWorkspaceView
 }
@@ -37,8 +37,12 @@ export function resolveDetailsPreferenceAfterLayoutChange(wideLayout: boolean): 
 export function loadWorkspacePreferences(storage: Pick<WorkspaceStorage, 'getItem'>): SandboxWorkspacePreferences {
   try {
     const value = JSON.parse(storage.getItem(STORAGE_KEY) ?? '{}') as Partial<SandboxWorkspacePreferences>
+      & { currentUserId?: unknown }
     return {
-      currentUserId: typeof value.currentUserId === 'string' ? value.currentUserId : undefined,
+      // 旧版本只允许普通用户操作，保留一次性迁移以免升级后丢失当前选择。
+      currentOperatorId: typeof value.currentOperatorId === 'string'
+        ? value.currentOperatorId
+        : typeof value.currentUserId === 'string' ? value.currentUserId : undefined,
       activeConversationId: typeof value.activeConversationId === 'string' ? value.activeConversationId : undefined,
       currentView: WORKSPACE_VIEWS.has(value.currentView as SandboxWorkspaceView)
         ? value.currentView as SandboxWorkspaceView
@@ -60,15 +64,21 @@ export function resolveWorkspaceSelection(
   snapshot: SandboxSnapshot,
   preferences: SandboxWorkspacePreferences,
 ): SandboxWorkspacePreferences {
-  const currentUser = snapshot.users.find(({ id }) => id === preferences.currentUserId) ?? snapshot.users[0]
-  const conversations = currentUser
-    ? snapshot.conversations.filter(({ userId }) => userId === currentUser.id)
+  const currentOperator = [...snapshot.users, ...snapshot.bots]
+    .find(({ id }) => id === preferences.currentOperatorId)
+    ?? snapshot.users[0]
+    ?? snapshot.bots[0]
+  const operatorIsBot = snapshot.bots.some(({ id }) => id === currentOperator?.id)
+  const conversations = currentOperator
+    ? snapshot.conversations.filter((conversation) => operatorIsBot
+      ? conversation.botId === currentOperator.id
+      : conversation.userId === currentOperator.id)
     : []
   const activeConversation = conversations.find(({ id }) => id === preferences.activeConversationId)
     ?? conversations[0]
 
   return {
-    currentUserId: currentUser?.id,
+    currentOperatorId: currentOperator?.id,
     activeConversationId: activeConversation?.id,
     currentView: preferences.currentView,
   }

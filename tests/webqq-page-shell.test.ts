@@ -17,6 +17,28 @@ describe('WebQQ 主页面装配', () => {
     expect(pageSource).not.toContain('async function sendComposerMessage')
     expect(pageSource).not.toContain('async function manageEnvironment')
     expect(shellSource).toContain('export function createWebqqWorkspaceShell')
+    expect(shellSource).not.toContain('currentUserId')
+    expect(shellSource).toContain('currentOperatorName: currentOperator.value?.name')
+    expect(shellSource).toMatch(/avatarKind: conversation\.groupId \? 'group'.*bot \? 'bot'.*'user'/)
     expect(shellSource).not.toContain("from '@koishijs/client'")
+  })
+
+  it('用户头像不继承机器人灰色样式', () => {
+    const chatPaneSource = readFileSync(resolve('client/webqq-chat-pane.vue'), 'utf8')
+    const messageListSource = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
+    const messageStyles = readFileSync(resolve('client/styles/webqq-messages.css'), 'utf8')
+
+    expect(chatPaneSource).not.toContain('class="webqq-avatar webqq-avatar-bot"')
+    expect(messageListSource).not.toContain('class="webqq-avatar webqq-avatar-large webqq-avatar-bot"')
+    expect(messageStyles).not.toContain('.webqq-message-row.is-incoming .webqq-message-avatar:not(.is-bot)')
+  })
+
+  it('群环境编辑允许机器人承担群主角色', () => {
+    const dialogSource = readFileSync(resolve('client/environment-entity-dialog.vue'), 'utf8')
+    const createSource = readFileSync(resolve('client/environment-create-popover.vue'), 'utf8')
+
+    expect(dialogSource).toContain('<SelectItem value="owner">群主</SelectItem>')
+    expect(dialogSource).not.toContain('isBotParticipant')
+    expect(createSource).toContain('.filter(({ id }) => id !== owner.id)')
   })
 })

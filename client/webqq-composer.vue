@@ -178,7 +178,6 @@ export interface WebqqComposerSender {
 export interface WebqqComposerModel {
   senders: WebqqComposerSender[]
   currentOperatorId?: string
-  currentUserId?: string
   conversationId?: string
   botId?: string
   replyingTo?: { id: string, authorName: string, content: string }
@@ -423,7 +422,7 @@ function formatMediaSize(size: number) {
 async function sendMessage() {
   const content = input.value.trim()
   const mediaFile = selectedMediaFile.value
-  const senderId = props.model.currentOperatorId ?? props.model.currentUserId
+  const senderId = props.model.currentOperatorId
   const { botId, conversationId } = props.model
   if ((!content && !mediaFile) || !senderId || !botId || !conversationId || sending.value) return
 

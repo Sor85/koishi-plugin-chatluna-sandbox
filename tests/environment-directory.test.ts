@@ -142,4 +142,26 @@ describe('模拟 QQ 环境目录管理', () => {
     expect(getMiddlewareCalls()).toBe(0)
   })
 
+  it('允许机器人作为群主并在删除机器人时清理其群组', async () => {
+    const { control } = await createControl()
+
+    control.createGroup({
+      id: '30099',
+      name: '机器人群主测试群',
+      members: [
+        { participantId: '20001', card: 'Koishi', role: 'owner' },
+        { participantId: '10001', card: '测试用户1', role: 'member' },
+      ],
+    })
+    expect(control.getSnapshot().groups.find(({ id }) => id === '30099')?.members[0]).toMatchObject({
+      participantId: '20001',
+      role: 'owner',
+    })
+
+    control.deleteBot({ id: '20001' })
+
+    expect(control.getSnapshot().groups.some(({ id }) => id === '30099')).toBe(false)
+    expect(control.getSnapshot().conversations.some(({ groupId }) => groupId === '30099')).toBe(false)
+  })
+
 })

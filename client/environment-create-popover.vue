@@ -122,7 +122,7 @@ type ParticipantCreateType = 'user' | 'bot'
 
 const props = withDefaults(defineProps<{
   type: EnvironmentCreateType
-  currentUser?: Pick<SandboxUser, 'id' | 'name'>
+  currentOperator?: Pick<SandboxUser, 'id' | 'name'>
   bots?: Pick<SandboxBotProfile, 'id' | 'name'>[]
   accentColor: string
   side?: 'top' | 'right' | 'bottom' | 'left'
@@ -145,7 +145,7 @@ const botEnabled = ref(true)
 const selectPortalTarget = ref<HTMLElement | null>(null)
 const isNarrow = useMediaQuery('(max-width: 768px)')
 const resolvedSide = computed(() => props.side === 'right' && isNarrow.value ? 'bottom' : props.side)
-const canCreateGroup = computed(() => !!props.currentUser && props.bots.length > 0)
+const canCreateGroup = computed(() => !!props.currentOperator && props.bots.length > 0)
 const effectiveType = computed(() => props.type === 'participant' ? participantType.value : props.type)
 const title = computed(() => props.type === 'participant'
   ? '添加测试账号'
@@ -154,9 +154,9 @@ const submitLabel = computed(() => effectiveType.value === 'user' ? '添加测�
 const description = computed(() => {
   if (effectiveType.value === 'user') return '创建后可在发送框头像区域切换身份'
   if (effectiveType.value === 'bot') return '创建后会为所有测试用户建立私聊会话'
-  if (!props.currentUser) return '请先创建并选择一位测试用户'
+  if (!props.currentOperator) return '请先创建并选择一位测试参与者'
   if (!props.bots.length) return '请先在发送消息控件中添加测试机器人'
-  return `当前用户“${props.currentUser.name}”为群主，现有机器人自动加入群组`
+  return `当前操作者“${props.currentOperator.name}”为群主，现有机器人自动加入群组`
 })
 
 watch(open, (value) => {
@@ -196,7 +196,7 @@ function createInput(): ManageSandboxEnvironmentInput | undefined {
       data: { id: draft.id, name: draft.name, implementation: botImplementation.value, enabled: botEnabled.value },
     }
   }
-  const owner = props.currentUser
+  const owner = props.currentOperator
   if (!owner || !props.bots.length) return undefined
   return {
     action: 'create-group',
@@ -205,7 +205,9 @@ function createInput(): ManageSandboxEnvironmentInput | undefined {
       name: draft.name,
       members: [
         { participantId: owner.id, card: owner.name, role: 'owner' },
-        ...props.bots.map((bot) => ({ participantId: bot.id, card: bot.name, role: 'member' as const })),
+        ...props.bots
+          .filter(({ id }) => id !== owner.id)
+          .map((bot) => ({ participantId: bot.id, card: bot.name, role: 'member' as const })),
       ],
     },
   }

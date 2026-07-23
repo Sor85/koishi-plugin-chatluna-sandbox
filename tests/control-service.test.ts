@@ -232,6 +232,12 @@ describe('模拟 QQ 环境消息闭环', () => {
     })
     expect(previous.messages.map(({ content }) => content)).toEqual(['第一条'])
     expect(previous.nextBeforeMessageId).toBeUndefined()
+    expect(control.getVisibleSnapshot('20001').conversations).toHaveLength(6)
+    expect(control.getMessageHistory({
+      actorUserId: '20001',
+      conversationId: 'private:10001:20001',
+      limit: 1,
+    }).messages.map(({ content }) => content)).toEqual(['第二条'])
     expect(() => control!.getMessageHistory({
       actorUserId: '10002',
       conversationId: 'private:10001:20001',
@@ -421,7 +427,7 @@ describe('模拟 QQ 环境消息闭环', () => {
     if (!control) throw new Error('沙盒控制服务未注册')
 
     control.setGroupAnnouncement({
-      actorUserId: '10001',
+      actorUserId: '20001',
       groupId: '30001',
       content: '新的群公告',
     })
@@ -433,12 +439,12 @@ describe('模拟 QQ 环境消息闭环', () => {
     })
 
     expect(control.getSnapshot().groups[0].announcements[0]).toMatchObject({
-      authorId: '10001',
+      authorId: '20001',
       content: '新的群公告',
     })
     const announcementId = control.getSnapshot().groups[0].announcements[0].id
     control.deleteGroupAnnouncement({
-      actorUserId: '10001',
+      actorUserId: '20001',
       groupId: '30001',
       announcementId,
     })
@@ -472,8 +478,7 @@ describe('模拟 QQ 环境消息闭环', () => {
     if (!control) throw new Error('沙盒控制服务未注册')
 
     await control.sendMessage({
-      actorUserId: '10001',
-      senderId: '20001',
+      actorUserId: '20001',
       botId: '20001',
       conversationId: 'private:10001:20001',
       content: '机器人主动消息',

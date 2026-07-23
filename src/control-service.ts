@@ -284,12 +284,20 @@ export class SandboxControlService {
     const runtime = this.runtimeBots.get(input.id)
     this.runtimeBots.delete(input.id)
     void runtime?.dispose()
+    const ownedGroupIds = new Set(this.scene.groups
+      .filter(({ members }) => members.some(({ participantId, role }) => participantId === input.id && role === 'owner'))
+      .map(({ id }) => id))
+    this.scene.groups = this.scene.groups.filter(({ id }) => !ownedGroupIds.has(id))
     for (const group of this.scene.groups) {
       group.members = group.members.filter(({ participantId }) => participantId !== input.id)
+      group.announcements = group.announcements.filter(({ authorId }) => authorId !== input.id)
     }
-    this.scene.requests = this.scene.requests.filter(({ targetId }) => targetId !== input.id)
+    this.scene.requests = this.scene.requests.filter(({ requesterId, targetId, groupId }) => requesterId !== input.id
+      && targetId !== input.id
+      && !ownedGroupIds.has(groupId ?? ''))
     this.scene.friendships = this.scene.friendships.filter(({ participantIds }) => !participantIds.includes(input.id))
-    this.deleteConversations((conversation) => conversation.botId === input.id)
+    this.deleteConversations((conversation) => conversation.botId === input.id
+      || (!!conversation.groupId && ownedGroupIds.has(conversation.groupId)))
     this.scene.revision += 1
   }
 
@@ -326,7 +334,17 @@ export class SandboxControlService {
   }
 
   async performFriendAction(input: PerformFriendActionInput): Promise<PerformFriendActionResult> {
-    this.getUser(input.actorUserId)
+    if (this.isBot(input.actorUserId)) {
+      if (input.action !== 'handle-request') throw new Error('当前机器人不支持此好友操作')
+      const request = this.scene.requests.find(({ id, type }) => id === input.requestId && type === 'friend')
+      if (!request || request.targetId !== input.actorUserId) throw new Error(`好友申请不存在：${input.requestId}`)
+      await this.getRuntimeBot(input.actorUserId).internal.set_friend_add_request({
+        flag: input.requestId,
+        approve: input.approve,
+      })
+      return { revision: this.scene.revision }
+    }
+    this.getParticipant(input.actorUserId)
     if (input.action === 'handle-request') {
       return this.handleUserRelationshipRequest(input)
     }
@@ -411,6 +429,16 @@ export class SandboxControlService {
       const bot = this.scene.bots.find(({ id }) => id === input.actorUserId)!
       if (!bot.enabled) throw new Error(`机器人已停用：${bot.id}`)
       const runtime = this.getRuntimeBot(bot.id)
+      if (input.action === 'handle-request') {
+        const request = this.scene.requests.find(({ id, type }) => id === input.requestId && type === 'group')
+        if (!request) throw new Error(`群申请不存在：${input.requestId}`)
+        await runtime.internal.set_group_add_request({
+          flag: input.requestId,
+          sub_type: request.subType ?? 'add',
+          approve: input.approve,
+        })
+        return { revision: this.scene.revision }
+      }
       if (input.action === 'kick') {
         await runtime.internal._request('set_group_kick', { group_id: input.groupId, user_id: input.targetId })
         return { revision: this.scene.revision }
@@ -432,7 +460,7 @@ export class SandboxControlService {
         return { revision: this.scene.revision }
       }
     }
-    this.getUser(input.actorUserId)
+    this.getParticipant(input.actorUserId)
     if (input.action === 'handle-request') return this.handleUserGroupRequest(input)
 
     const group = this.scene.groups.find(({ id }) => id === input.groupId)
@@ -690,7 +718,7 @@ export class SandboxControlService {
   async sendMessage(input: SendMessageInput): Promise<SendMessageResult> {
     if (!input.content.trim()) throw new Error('消息内容不能为空')
     const context = this.getMessageContext(input)
-    const senderId = input.senderId ?? context.user.id
+    const senderId = input.senderId ?? input.actorUserId
     if (senderId !== context.user.id && senderId !== context.peer.id) throw new Error(`发送者不在当前会话中：${senderId}`)
     const message = this.appendMessage(senderId, context.conversation.id, input.content.trim(), input.replyToMessageId)
     if (!context.bot) {
@@ -706,7 +734,7 @@ export class SandboxControlService {
 
   async sendMediaMessage(input: SendMediaMessageInput): Promise<SendMessageResult> {
     const context = this.getMessageContext(input)
-    const senderId = input.senderId ?? context.user.id
+    const senderId = input.senderId ?? input.actorUserId
     if (senderId !== context.user.id && senderId !== context.peer.id) throw new Error(`发送者不在当前会话中：${senderId}`)
     const media = this.mediaStorage.save(input)
     const content = input.content?.trim() || `[${this.getMediaLabel(media)}] ${media.name}`
@@ -735,9 +763,9 @@ export class SandboxControlService {
 
   getMediaContent(input: GetMediaContentInput): SandboxMediaContent {
     const visibleConversationIds = new Set(this.scene.conversations
-      .filter(({ userId }) => userId === input.actorUserId)
+      .filter((conversation) => this.isConversationVisible(input.actorUserId, conversation))
       .map(({ id }) => id))
-    this.getUser(input.actorUserId)
+    this.getParticipant(input.actorUserId)
     const media = this.scene.messages
       .filter(({ conversationId }) => visibleConversationIds.has(conversationId))
       .flatMap(({ media }) => media ?? [])
@@ -812,19 +840,18 @@ export class SandboxControlService {
   }
 
   setGroupAnnouncement(input: SetGroupAnnouncementInput): void {
-    const user = this.scene.users.find(({ id }) => id === input.actorUserId)
+    const participant = this.getParticipant(input.actorUserId)
     const group = this.scene.groups.find(({ id }) => id === input.groupId)
-    if (!user) throw new Error(`用户不存在：${input.actorUserId}`)
     if (!group) throw new Error(`群组不存在：${input.groupId}`)
-    if (!group.members.some(({ participantId }) => participantId === user.id)) {
-      throw new Error(`用户不在群组中：${input.actorUserId}`)
+    if (!group.members.some(({ participantId }) => participantId === participant.id)) {
+      throw new Error(`参与者不在群组中：${input.actorUserId}`)
     }
     const content = input.content.trim()
     if (!content) throw new Error('群公告不能为空')
 
     group.announcements.unshift({
       id: Random.id(),
-      authorId: user.id,
+      authorId: participant.id,
       content,
       createdAt: new Date().toISOString(),
     })
@@ -832,12 +859,11 @@ export class SandboxControlService {
   }
 
   deleteGroupAnnouncement(input: DeleteGroupAnnouncementInput): void {
-    const user = this.scene.users.find(({ id }) => id === input.actorUserId)
+    const participant = this.getParticipant(input.actorUserId)
     const group = this.scene.groups.find(({ id }) => id === input.groupId)
-    if (!user) throw new Error(`用户不存在：${input.actorUserId}`)
     if (!group) throw new Error(`群组不存在：${input.groupId}`)
-    if (!group.members.some(({ participantId }) => participantId === user.id)) {
-      throw new Error(`用户不在群组中：${input.actorUserId}`)
+    if (!group.members.some(({ participantId }) => participantId === participant.id)) {
+      throw new Error(`参与者不在群组中：${input.actorUserId}`)
     }
 
     const index = group.announcements.findIndex(({ id }) => id === input.announcementId)
@@ -931,7 +957,7 @@ export class SandboxControlService {
   }
 
   private getVisibleConversation(actorUserId: string, conversationId: string) {
-    this.getUser(actorUserId)
+    this.getParticipant(actorUserId)
     const conversation = this.scene.conversations.find(({ id }) => id === conversationId)
     if (!conversation || !this.isConversationVisible(actorUserId, conversation)) throw new Error(`会话不存在：${conversationId}`)
     return conversation
@@ -946,13 +972,13 @@ export class SandboxControlService {
   }
 
   private getMessageContext(input: Pick<SendMessageInput, 'actorUserId' | 'botId' | 'conversationId' | 'replyToMessageId'>): SandboxMessageContext {
-    const user = this.scene.users.find(({ id }) => id === input.actorUserId)
-    const bot = this.scene.bots.find(({ id }) => id === input.botId)
-    const peer = this.getParticipant(input.botId)
-    const conversation = this.scene.conversations.find(({ id }) => id === input.conversationId)
-    if (!user) throw new Error(`用户不存在：${input.actorUserId}`)
+    this.getParticipant(input.actorUserId)
+    const conversation = this.getVisibleConversation(input.actorUserId, input.conversationId)
+    const user = this.getUser(conversation.userId)
+    const bot = this.scene.bots.find(({ id }) => id === conversation.botId)
+    const peer = this.getParticipant(conversation.botId)
     if (bot && !bot.enabled) throw new Error(`机器人已停用：${input.botId}`)
-    if (!conversation || conversation.userId !== user.id || conversation.botId !== peer.id) {
+    if (conversation.botId !== input.botId) {
       throw new Error(`会话不存在：${input.conversationId}`)
     }
     const group = conversation.groupId

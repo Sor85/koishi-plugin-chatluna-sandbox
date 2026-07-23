@@ -77,7 +77,7 @@
             <EnvironmentCreatePopover
               v-if="sidebarTab === 'groups'"
               type="group"
-              :current-user="model.currentUser"
+              :current-operator="model.currentOperator"
               :bots="model.bots"
               :accent-color="appearance.webQQAccentColor"
               @submit="manageEnvironment"
@@ -222,8 +222,8 @@
                   @click="selectConversation(conversation.id)"
                 >
                   <WebqqAvatar
-                    class="webqq-avatar webqq-avatar-bot"
-                    :kind="conversation.groupId ? 'group' : 'bot'"
+                    class="webqq-avatar"
+                    :kind="conversation.avatarKind"
                     :name="conversation.title"
                     :avatar="conversation.avatar"
                   />
@@ -299,6 +299,7 @@ export interface WebqqSidebarConversation {
   groupId?: string
   title: string
   avatar?: string
+  avatarKind: 'user' | 'bot' | 'group'
   preview: string
   time: string
   actorRole?: SandboxGroupMember['role']
@@ -339,7 +340,7 @@ export interface WebqqSidebarModel {
   currentOperatorIsBot: boolean
   currentGroupId?: string
   currentGroupMemberIds: string[]
-  currentUser?: Pick<SandboxUser, 'id' | 'name'>
+  currentOperator?: Pick<SandboxUser, 'id' | 'name'>
   bots: Pick<SandboxBotProfile, 'id' | 'name'>[]
   conversations: WebqqSidebarConversation[]
   friends: WebqqSidebarFriend[]

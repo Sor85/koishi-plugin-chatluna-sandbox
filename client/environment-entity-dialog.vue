@@ -60,7 +60,7 @@
             </Button>
           </div>
           <div v-for="(member, index) in draft.members" :key="`${member.participantId}:${index}`" class="grid grid-cols-[minmax(0,1fr)_110px_32px] gap-2">
-            <Select v-model="member.participantId" @update:model-value="normalizeMemberRole(member)">
+            <Select v-model="member.participantId">
               <SelectTrigger :aria-label="`第 ${index + 1} 位群成员`" class="w-full border-slate-200 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700">
                 <SelectValue placeholder="选择参与者" />
               </SelectTrigger>
@@ -75,7 +75,7 @@
                 <SelectValue />
               </SelectTrigger>
               <SelectContent :portal-to="selectPortalTarget" class="w-[var(--reka-select-trigger-width)] border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
-                <SelectItem value="owner" :disabled="isBotParticipant(member.participantId)">群主</SelectItem>
+                <SelectItem value="owner">群主</SelectItem>
                 <SelectItem value="admin">管理员</SelectItem>
                 <SelectItem value="member">成员</SelectItem>
               </SelectContent>
@@ -241,18 +241,11 @@ function addGroupMember() {
   const participant = participants.value.find(({ id }) => !draft.members.some(({ participantId }) => participantId === id))
   if (!participant) return
   const hasOwner = draft.members.some(({ role }) => role === 'owner')
-  draft.members.push({ participantId: participant.id, card: participant.name, role: !hasOwner && participant.type === 'user' ? 'owner' : 'member' })
+  draft.members.push({ participantId: participant.id, card: participant.name, role: hasOwner ? 'member' : 'owner' })
 }
 
 function removeGroupMember(index: number) {
   draft.members.splice(index, 1)
 }
 
-function isBotParticipant(participantId: string) {
-  return props.bots.some(({ id }) => id === participantId)
-}
-
-function normalizeMemberRole(member: SandboxGroupMember) {
-  if (member.role === 'owner' && isBotParticipant(member.participantId)) member.role = 'member'
-}
 </script>

@@ -2,7 +2,7 @@
   <main class="webqq-chat">
     <header class="webqq-chat-header">
       <div class="webqq-chat-title">
-        <WebqqAvatar class="webqq-avatar webqq-avatar-bot" :kind="model.avatarKind" :name="model.title" :avatar="model.avatar" />
+        <WebqqAvatar class="webqq-avatar" :kind="model.avatarKind" :name="model.title" :avatar="model.avatar" />
         <div>
           <strong>{{ model.title }}</strong>
           <span>{{ model.subtitle }}</span>

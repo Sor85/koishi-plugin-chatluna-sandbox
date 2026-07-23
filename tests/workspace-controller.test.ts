@@ -27,6 +27,7 @@ const snapshot: SandboxSnapshot = {
   }],
   conversations: [
     { id: 'private:10001:20001', type: 'direct', userId: '10001', botId: '20001', messageIds: ['message-1'] },
+    { id: 'private:10001:10002', type: 'direct', userId: '10001', botId: '10002', messageIds: [] },
     { id: 'group:30001:10001:20001', type: 'group', userId: '10001', botId: '20001', groupId: '30001', messageIds: [] },
     { id: 'private:10002:20001', type: 'direct', userId: '10002', botId: '20001', messageIds: [] },
   ],
@@ -116,13 +117,22 @@ describe('WebQQ 工作区控制模块', () => {
       messages: [],
     })
     expect(JSON.parse(storage.read('onebot-sandbox.workspace') ?? '{}')).toEqual({
-      currentUserId: '10001',
+      currentOperatorId: '10001',
       activeConversationId: 'group:30001:10001:20001',
       currentView: 'messages',
     })
   })
 
-  it('切换当前操作者时保持用户与机器人现有加载语义', async () => {
+  it('进入普通用户私聊时发送控件仍保留机器人参与者', async () => {
+    const controller = createWorkspaceController(createFakeWorkspacePort(workspace), createStorage())
+    await controller.load()
+
+    controller.selectConversation('private:10001:10002')
+
+    expect(controller.composer.value.participants.map(({ id }) => id)).toEqual(['10001', '10002', '20001'])
+  })
+
+  it('切换当前操作者时加载对应参与者的可见会话', async () => {
     const port = createFakeWorkspacePort(workspace)
     const controller = createWorkspaceController(port, createStorage())
     await controller.load()
@@ -133,17 +143,42 @@ describe('WebQQ 工作区控制模块', () => {
       operation: 'getWorkspace',
       input: { actorUserId: '10002' },
     })
-    expect(controller.currentUserId.value).toBe('10002')
     expect(controller.currentOperatorId.value).toBe('10002')
     expect(controller.activeConversationId.value).toBe('private:10002:20001')
 
-    const callCount = port.calls.length
     await controller.selectOperator('20001')
 
-    expect(port.calls).toHaveLength(callCount)
-    expect(controller.currentUserId.value).toBe('10002')
+    expect(port.calls.at(-1)).toEqual({
+      operation: 'getWorkspace',
+      input: { actorUserId: '20001' },
+    })
     expect(controller.currentOperatorId.value).toBe('20001')
     expect(controller.composer.value.currentOperator).toMatchObject({ id: '20001', type: 'bot' })
+    expect(controller.sidebar.value.conversations
+      .filter(({ type }) => type === 'direct')
+      .map(({ userId }) => userId)).toEqual(['10001', '10002'])
+    for (const conversationId of ['private:10001:20001', 'private:10002:20001']) {
+      controller.selectConversation(conversationId)
+      expect(controller.chat.value.conversation?.id).toBe(conversationId)
+    }
+  })
+
+  it('机器人作为当前操作者时所有工作区命令都使用机器人参与者 ID', async () => {
+    const port = createFakeWorkspacePort(workspace)
+    const controller = createWorkspaceController(port, createStorage())
+    await controller.load()
+    await controller.selectOperator('20001')
+
+    await controller.sendMessage({ senderId: '20001', botId: '20001', conversationId: 'private:10001:20001', content: '机器人消息' })
+    await controller.sendMediaMessage({ senderId: '20001', botId: '20001', conversationId: 'private:10001:20001', fileName: 'bot.txt', mimeType: 'text/plain', dataBase64: '' })
+    await controller.getMediaContent('media-1')
+    await controller.loadMessageHistory({ conversationId: 'private:10001:20001', limit: 10 })
+    await controller.setGroupAnnouncement({ groupId: '30001', content: '机器人公告' })
+    await controller.deleteGroupAnnouncement({ groupId: '30001', announcementId: 'announcement-1' })
+    await controller.manageEnvironment({ action: 'create-user', data: { id: '10099', name: '新用户' } })
+    await controller.handleRelationshipRequest('friend-request-1', true)
+
+    expect(port.calls.slice(-8).map(({ input }) => Reflect.get(input as object, 'actorUserId'))).toEqual(Array(8).fill('20001'))
   })
 
   it('端口拒绝操作者切换时保留全部区域模型并返回规范化错误', async () => {
@@ -186,7 +221,7 @@ describe('WebQQ 工作区控制模块', () => {
     expect(controller.activeConversationId.value).toBe('private:10001:20001')
     expect(controller.currentView.value).toBe('contacts')
     expect(JSON.parse(storage.read('onebot-sandbox.workspace') ?? '{}')).toEqual({
-      currentUserId: '10001',
+      currentOperatorId: '10001',
       activeConversationId: 'private:10001:20001',
       currentView: 'contacts',
     })
@@ -585,7 +620,7 @@ describe('WebQQ 工作区控制模块', () => {
         data: { id: '10001' },
       },
     })
-    expect(controller.currentUserId.value).toBe('10002')
+    expect(controller.currentOperatorId.value).toBe('10002')
     expect(controller.currentOperatorId.value).toBe('10002')
     expect(controller.activeConversationId.value).toBe('private:10002:20001')
     expect([
@@ -610,7 +645,7 @@ describe('WebQQ 工作区控制模块', () => {
       message: '环境操作被拒绝',
     })
 
-    expect(controller.currentUserId.value).toBe('10001')
+    expect(controller.currentOperatorId.value).toBe('10001')
     expect(controller.activeConversationId.value).toBe('private:10001:20001')
     expect(controller.sidebar.value.revision).toBe(7)
   })

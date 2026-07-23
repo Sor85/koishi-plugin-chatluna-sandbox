@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { getFriendDirectory, getGroupDirectory } from '../client/webqq/relationship-directory'
-import type { SandboxSnapshot } from '../src/types'
+import { getConversationPeerId, getFriendDirectory, getGroupDirectory, getVisibleRecentConversations } from '../client/webqq/relationship-directory'
+import type { SandboxConversation, SandboxSnapshot } from '../src/types'
 
 const snapshot: SandboxSnapshot = {
   revision: 1,
@@ -26,6 +26,31 @@ const snapshot: SandboxSnapshot = {
 }
 
 describe('当前操作者关系目录', () => {
+  it('机器人视角把会话中的普通用户识别为对端', () => {
+    const conversation = snapshot.conversations.find(({ id }) => id === 'private:10001:20001')!
+
+    expect(getConversationPeerId(conversation, '10001', false)).toBe('20001')
+    expect(getConversationPeerId(conversation, '20001', true)).toBe('10001')
+  })
+
+  it('机器人视角把同一群组的多条底层会话合并为一个最近入口', () => {
+    const conversations: SandboxConversation[] = [
+      { id: 'group:30001:10001:20001', type: 'group', userId: '10001', botId: '20001', groupId: '30001', messageIds: [] },
+      { id: 'private:10001:20001', type: 'direct', userId: '10001', botId: '20001', messageIds: [] },
+      { id: 'group:30001:10002:20001', type: 'group', userId: '10002', botId: '20001', groupId: '30001', messageIds: [] },
+      { id: 'group:30001:10003:20001', type: 'group', userId: '10003', botId: '20001', groupId: '30001', messageIds: [] },
+    ]
+
+    expect(getVisibleRecentConversations(conversations, true).map(({ id }) => id)).toEqual([
+      'group:30001:10001:20001',
+      'private:10001:20001',
+    ])
+    expect(getVisibleRecentConversations(conversations, true, 'group:30001:10003:20001').map(({ id }) => id)).toEqual([
+      'group:30001:10003:20001',
+      'private:10001:20001',
+    ])
+  })
+
   it('展示除当前操作者外的全部用户和机器人并标记好友关系', () => {
     const directory = getFriendDirectory(snapshot, '10001')
 

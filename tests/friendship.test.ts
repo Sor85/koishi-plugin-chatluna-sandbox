@@ -21,6 +21,28 @@ async function createControl() {
 }
 
 describe('模拟 QQ 环境好友关系', () => {
+  it('接收方切换身份审批后双方都能看到好友关系和私聊', async () => {
+    const { control } = await createControl()
+
+    const request = await control.performFriendAction({
+      action: 'request',
+      actorUserId: '10001',
+      targetId: '10003',
+    })
+    if (!request.requestId) throw new Error('好友申请未创建')
+
+    await control.performFriendAction({ action: 'handle-request', actorUserId: '10003', requestId: request.requestId, approve: true })
+
+    for (const [actorUserId, conversationId] of [
+      ['10001', 'private:10001:10003'],
+      ['10003', 'private:10003:10001'],
+    ]) {
+      const snapshot = control.getVisibleSnapshot(actorUserId)
+      expect(snapshot.friendships.some(({ participantIds }) => participantIds.includes('10001') && participantIds.includes('10003'))).toBe(true)
+      expect(snapshot.conversations.some(({ id }) => id === conversationId)).toBe(true)
+    }
+  })
+
   it('普通用户审批好友申请后可以设置本地备注并删除关系', async () => {
     const { control } = await createControl()
 

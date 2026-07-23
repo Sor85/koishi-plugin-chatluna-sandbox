@@ -97,7 +97,6 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     snapshot: emptySnapshot,
     appearance: defaultAppearance,
   })
-  const currentUserIdState = ref<string>()
   const currentOperatorIdState = ref<string>()
   const activeConversationIdState = ref<string>()
   const currentViewState = ref<SandboxWorkspaceView>('messages')
@@ -109,7 +108,13 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     const bot = snapshot.value.bots.find(({ id }) => id === currentOperatorIdState.value)
     return bot ? { ...bot, type: 'bot' } : undefined
   })
-  const conversations = computed(() => snapshot.value.conversations.filter(({ userId }) => userId === currentUserIdState.value))
+  const conversations = computed(() => {
+    const operatorId = currentOperatorIdState.value
+    const operatorIsBot = snapshot.value.bots.some(({ id }) => id === operatorId)
+    return snapshot.value.conversations.filter((conversation) => operatorIsBot
+      ? conversation.botId === operatorId
+      : conversation.userId === operatorId)
+  })
   const activeConversation = computed(() => conversations.value.find(({ id }) => id === activeConversationIdState.value))
   const activeMessages = computed(() => {
     const ids = new Set(activeConversation.value?.messageIds ?? [])
@@ -119,9 +124,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   const activeGroup = computed(() => snapshot.value.groups.find(({ id }) => id === activeConversation.value?.groupId))
   const participants = computed<WorkspaceParticipant[]>(() => [
     ...snapshot.value.users.map((user) => ({ ...user, type: 'user' as const })),
-    ...snapshot.value.bots
-      .filter(({ id }) => id === activeConversation.value?.botId)
-      .map((bot) => ({ ...bot, type: 'bot' as const })),
+    ...snapshot.value.bots.map((bot) => ({ ...bot, type: 'bot' as const })),
   ])
 
   const sidebar = computed<SidebarWorkspaceModel>(() => ({
@@ -153,29 +156,28 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
 
   function saveSelection() {
     saveWorkspacePreferences(storage, {
-      currentUserId: currentUserIdState.value,
+      currentOperatorId: currentOperatorIdState.value,
       activeConversationId: activeConversationIdState.value,
       currentView: currentViewState.value,
     })
   }
 
   function applySelection(preferences: ReturnType<typeof resolveWorkspaceSelection>) {
-    currentUserIdState.value = preferences.currentUserId
-    currentOperatorIdState.value = preferences.currentUserId
+    currentOperatorIdState.value = preferences.currentOperatorId
     activeConversationIdState.value = preferences.activeConversationId
     currentViewState.value = preferences.currentView
   }
 
   function replaceWorkspace(nextWorkspace: SandboxWorkspaceState) {
     const previousOperatorId = currentOperatorIdState.value
+    const previousConversationId = activeConversationIdState.value
     workspaceState.value = nextWorkspace
     const selection = resolveWorkspaceSelection(snapshot.value, {
-      currentUserId: currentUserIdState.value,
-      activeConversationId: activeConversationIdState.value,
+      currentOperatorId: previousOperatorId,
+      activeConversationId: previousConversationId,
       currentView: currentViewState.value,
     })
     applySelection(selection)
-    if (snapshot.value.bots.some(({ id }) => id === previousOperatorId)) currentOperatorIdState.value = previousOperatorId
     saveSelection()
   }
 
@@ -183,7 +185,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     const preferences = loadWorkspacePreferences(storage)
     let nextWorkspace: SandboxWorkspaceState
     try {
-      nextWorkspace = await port.getWorkspace({ actorUserId: preferences.currentUserId })
+      nextWorkspace = await port.getWorkspace({ actorUserId: preferences.currentOperatorId })
     } catch {
       // 已保存的参与者可能已被删除；保留旧页面的无参数 RPC fallback。
       nextWorkspace = await port.getWorkspace()
@@ -205,11 +207,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   }
 
   async function selectOperator(participantId: string) {
-    if (snapshot.value.bots.some(({ id }) => id === participantId)) {
-      currentOperatorIdState.value = participantId
-      return
-    }
-    if (!snapshot.value.users.some(({ id }) => id === participantId)) return
+    if (![...snapshot.value.users, ...snapshot.value.bots].some(({ id }) => id === participantId)) return
     let nextWorkspace: SandboxWorkspaceState
     try {
       nextWorkspace = await port.getWorkspace({ actorUserId: participantId })
@@ -218,7 +216,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     }
     workspaceState.value = nextWorkspace
     const selection = resolveWorkspaceSelection(snapshot.value, {
-      currentUserId: participantId,
+      currentOperatorId: participantId,
       currentView: 'messages',
     })
     applySelection(selection)
@@ -226,14 +224,9 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     saveSelection()
   }
 
-  function ensureOperator(userId?: string, botId?: string) {
-    if (currentOperatorIdState.value === userId || currentOperatorIdState.value === botId) return
-    currentOperatorIdState.value = userId
-  }
-
-  function getCurrentUserId() {
-    const actorUserId = currentUserIdState.value
-    if (!actorUserId) throw new WorkspaceControllerError('当前用户不可用')
+  function getCurrentOperatorId() {
+    const actorUserId = currentOperatorIdState.value
+    if (!actorUserId) throw new WorkspaceControllerError('当前操作者不可用')
     return actorUserId
   }
 
@@ -248,7 +241,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   }
 
   async function sendMessage(input: Omit<SendMessageInput, 'actorUserId'>) {
-    const actorUserId = getCurrentUserId()
+    const actorUserId = getCurrentOperatorId()
     try {
       replaceWorkspace(await port.sendMessage({ ...input, actorUserId }))
     } catch (error) {
@@ -257,7 +250,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   }
 
   async function sendMediaMessage(input: Omit<SendMediaMessageInput, 'actorUserId'>) {
-    const actorUserId = getCurrentUserId()
+    const actorUserId = getCurrentOperatorId()
     try {
       replaceWorkspace(await port.sendMediaMessage({ ...input, actorUserId }))
     } catch (error) {
@@ -266,7 +259,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   }
 
   async function getMediaContent(mediaId: string) {
-    const actorUserId = getCurrentUserId()
+    const actorUserId = getCurrentOperatorId()
     try {
       return await port.getMediaContent({ actorUserId, mediaId })
     } catch (error) {
@@ -275,7 +268,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   }
 
   async function loadMessageHistory(input: Omit<GetMessageHistoryInput, 'actorUserId'>) {
-    const actorUserId = getCurrentUserId()
+    const actorUserId = getCurrentOperatorId()
     try {
       const history = await port.getMessageHistory({ ...input, actorUserId })
       const knownIds = new Set(snapshot.value.messages.map(({ id }) => id))
@@ -297,7 +290,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   }
 
   async function setGroupAnnouncement(input: Omit<SetGroupAnnouncementInput, 'actorUserId'>) {
-    const actorUserId = getCurrentUserId()
+    const actorUserId = getCurrentOperatorId()
     try {
       replaceWorkspace(await port.setGroupAnnouncement({ ...input, actorUserId }))
     } catch (error) {
@@ -306,7 +299,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   }
 
   async function deleteGroupAnnouncement(input: Omit<DeleteGroupAnnouncementInput, 'actorUserId'>) {
-    const actorUserId = getCurrentUserId()
+    const actorUserId = getCurrentOperatorId()
     try {
       replaceWorkspace(await port.deleteGroupAnnouncement({ ...input, actorUserId }))
     } catch (error) {
@@ -316,7 +309,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
 
   async function manageEnvironment(input: ManageSandboxEnvironmentInput) {
     try {
-      replaceWorkspace(await port.manageEnvironment({ ...input, actorUserId: currentUserIdState.value }))
+      replaceWorkspace(await port.manageEnvironment({ ...input, actorUserId: getCurrentOperatorId() }))
     } catch (error) {
       throw normalizeWorkspaceError(error, '环境管理失败')
     }
@@ -333,7 +326,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   }
 
   async function handleRelationshipRequest(requestId: string, approve: boolean) {
-    const actorUserId = getCurrentUserId()
+    const actorUserId = getCurrentOperatorId()
     const request = snapshot.value.requests.find(({ id }) => id === requestId)
     if (!request) throw new WorkspaceControllerError('关系申请不存在')
     try {
@@ -348,7 +341,6 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
 
   return {
     workspace: computed<SandboxWorkspaceState>(() => workspaceState.value),
-    currentUserId: readonly(currentUserIdState),
     currentOperatorId: readonly(currentOperatorIdState),
     activeConversationId: readonly(activeConversationIdState),
     currentView: readonly(currentViewState),
@@ -357,7 +349,6 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     composer,
     deleteGroupAnnouncement,
     details,
-    ensureOperator,
     getMediaContent,
     handleRelationshipRequest,
     load,

@@ -1,7 +1,7 @@
 <template>
   <section v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-messages" aria-label="消息记录">
     <div v-if="!model.messages.length" class="webqq-welcome">
-      <WebqqAvatar class="webqq-avatar webqq-avatar-large webqq-avatar-bot" :kind="model.avatarKind" :name="model.title" :avatar="model.avatar" />
+      <WebqqAvatar class="webqq-avatar webqq-avatar-large" :kind="model.avatarKind" :name="model.title" :avatar="model.avatar" />
       <strong>{{ model.title }}</strong>
       <p>发送消息，验证插件在模拟 QQ 环境中的响应</p>
     </div>
@@ -18,14 +18,14 @@
             <li
               class="webqq-message-row"
               :class="[
-                message.authorId === model.currentUserId ? 'is-outgoing' : 'is-incoming',
-                getMessageClusterClass(model.messages, messageIndex, model.chatStyle, model.currentUserId),
-                { 'is-merged': isMergedMessage(model.messages, messageIndex, model.chatStyle, model.currentUserId) },
+                message.authorId === model.currentOperatorId ? 'is-outgoing' : 'is-incoming',
+                getMessageClusterClass(model.messages, messageIndex, model.chatStyle, model.currentOperatorId),
+                { 'is-merged': isMergedMessage(model.messages, messageIndex, model.chatStyle, model.currentOperatorId) },
                 { 'is-quote-target': highlightedMessageId === message.id },
               ]"
               :data-message-id="message.id"
             >
-              <ContextMenu v-if="message.authorId !== model.currentUserId">
+              <ContextMenu v-if="message.authorId !== model.currentOperatorId">
                 <ContextMenuTrigger as-child>
                   <button type="button" class="webqq-message-avatar-wrap webqq-message-avatar-trigger" :aria-label="`打开 ${getParticipantName(message.authorId)} 的操作菜单`" @contextmenu.stop>
                     <WebqqAvatar class="webqq-message-avatar" :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'" :name="getParticipantName(message.authorId)" :avatar="getParticipantAvatar(message.authorId)" />
@@ -64,7 +64,7 @@
                 <WebqqAvatar class="webqq-message-avatar" :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'" :name="getParticipantName(message.authorId)" :avatar="getParticipantAvatar(message.authorId)" />
               </span>
               <div class="webqq-message-content">
-                <div v-if="!isMergedMessage(model.messages, messageIndex, model.chatStyle, model.currentUserId)" class="webqq-sender-line">
+                <div v-if="!isMergedMessage(model.messages, messageIndex, model.chatStyle, model.currentOperatorId)" class="webqq-sender-line">
                   <span class="webqq-message-author">{{ getParticipantName(message.authorId) }}</span>
                 </div>
                 <div class="webqq-message-body">
@@ -123,7 +123,6 @@ export interface WebqqMessageListModel {
   currentOperatorIsBot: boolean
   currentConversation?: SandboxConversation
   currentGroup?: SandboxGroup
-  currentUserId?: string
   currentOperatorId?: string
   title: string
   avatar: string
@@ -175,7 +174,7 @@ function getFriendMenuState(targetId: string): FriendMenuState {
 }
 
 function getChatFriendActions(targetId: string) {
-  return getFriendMenuActions(getFriendMenuState(targetId), props.model.currentOperatorIsBot)
+  return props.model.currentOperatorIsBot ? [] : getFriendMenuActions(getFriendMenuState(targetId), true)
 }
 
 function getReplyMessage(message: SandboxMessage) {
