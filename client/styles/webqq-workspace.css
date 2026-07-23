@@ -1,0 +1,74 @@
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+.onebot-sandbox-page {
+  height: calc(100vh - var(--footer-height, 1.75rem));
+  min-height: 0;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.onebot-sandbox-layout .layout-header {
+  display: none;
+}
+
+.onebot-sandbox-page .el-scrollbar,
+.onebot-sandbox-page .el-scrollbar__wrap,
+.onebot-sandbox-page .el-scrollbar__view,
+.onebot-sandbox-page .k-content {
+  height: 100%;
+  min-height: 0;
+}
+
+.onebot-sandbox-page .k-content {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+.webqq-workspace {
+  display: grid;
+  grid-template-columns: 72px minmax(230px, 300px) minmax(360px, 1fr) 280px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  color: var(--webqq-text);
+  background: var(--webqq-bg);
+}
+
+.webqq-workspace.is-details-closed {
+  grid-template-columns: 72px minmax(230px, 300px) minmax(360px, 1fr);
+}
+
+.webqq-workspace.is-details-closed .webqq-profile {
+  display: none;
+}
+
+.webqq-rail,
+.webqq-conversations,
+.webqq-chat,
+.webqq-profile {
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid var(--webqq-border);
+}
+
+.webqq-workspace.is-frosted .webqq-rail,
+.webqq-workspace.is-frosted .webqq-conversations,
+.webqq-workspace.is-frosted .webqq-chat,
+.webqq-workspace.is-frosted .webqq-profile {
+  background: rgb(248 250 252 / 34%);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+}
+
+.webqq-workspace.is-frosted {
+  background: rgb(244 246 248 / 78%);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+}

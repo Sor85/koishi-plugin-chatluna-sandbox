@@ -1,100 +1,10 @@
 @import "tailwindcss";
-
-html,
-body,
-#app {
-  min-height: 100%;
-}
-
-.onebot-sandbox-page .sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-.onebot-sandbox-page {
-  height: calc(100vh - var(--footer-height, 1.75rem));
-  min-height: 0;
-  overflow: hidden;
-  background: #f8fafc;
-}
-
-.onebot-sandbox-layout .layout-header {
-  display: none;
-}
-
-.onebot-sandbox-page .el-scrollbar,
-.onebot-sandbox-page .el-scrollbar__wrap,
-.onebot-sandbox-page .el-scrollbar__view,
-.onebot-sandbox-page .k-content {
-  height: 100%;
-  min-height: 0;
-}
-
-.onebot-sandbox-page .k-content {
-  width: 100%;
-  max-width: none;
-  margin: 0;
-  padding: 0;
-}
-
-.webqq-workspace {
-  --webqq-bg: #f8fafc;
-  --webqq-rail: #f8fafc;
-  --webqq-surface: #f8fafc;
-  --webqq-surface-muted: #f5f7fb;
-  --webqq-border: #dfe5ee;
-  --webqq-text: #202938;
-  --webqq-muted: #7a8494;
-  --webqq-hover: #edf2f8;
-  --webqq-accent-shadow: color-mix(in srgb, var(--webqq-accent) 28%, transparent);
-  display: grid;
-  grid-template-columns: 72px minmax(230px, 300px) minmax(360px, 1fr) 280px;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-  color: var(--webqq-text);
-  background: var(--webqq-bg);
-}
-
-.webqq-workspace.is-details-closed {
-  grid-template-columns: 72px minmax(230px, 300px) minmax(360px, 1fr);
-}
-
-.webqq-workspace.is-details-closed .webqq-profile {
-  display: none;
-}
-
-.webqq-workspace[data-color-mode="dark"] {
-  --webqq-bg: #0f172a;
-  --webqq-rail: #0f172a;
-  --webqq-surface: #0f172a;
-  --webqq-surface-muted: #162032;
-  --webqq-border: #2f3a4d;
-  --webqq-text: #edf2f7;
-  --webqq-muted: #9ba7b8;
-  --webqq-hover: #273247;
-}
+@import "./styles/webqq-tokens.css";
+@import "./styles/webqq-workspace.css";
+@import "./styles/webqq-primitives.css";
+@import "./styles/webqq-overlays.css";
 
 @media (prefers-color-scheme: dark) {
-  .webqq-workspace[data-color-mode="auto"] {
-    --webqq-bg: #0f172a;
-    --webqq-rail: #0f172a;
-    --webqq-surface: #0f172a;
-    --webqq-surface-muted: #162032;
-    --webqq-border: #2f3a4d;
-    --webqq-text: #edf2f7;
-    --webqq-muted: #9ba7b8;
-    --webqq-hover: #273247;
-  }
-
   .webqq-workspace[data-color-mode="auto"] .webqq-message-bubble,
   .webqq-workspace[data-color-mode="auto"] .webqq-composer {
     color: #e5edf7;
@@ -128,87 +38,6 @@ body,
 
 }
 
-[data-webqq-scrollbar="true"] {
-  scrollbar-width: none;
-  scrollbar-color: transparent transparent;
-}
-
-[data-webqq-scrollbar="true"]::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-}
-
-[data-webqq-scrollbar="true"]::-webkit-scrollbar-button {
-  display: none;
-  width: 0;
-  height: 0;
-}
-
-.webqq-scrollbar-overlay {
-  position: fixed;
-  z-index: 10001;
-  width: 10px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.14s ease;
-}
-
-.webqq-scrollbar-overlay.is-visible {
-  opacity: 1;
-}
-
-.webqq-scrollbar-thumb {
-  position: absolute;
-  top: var(--webqq-scrollbar-thumb-top);
-  right: 2px;
-  width: 4px;
-  min-height: 28px;
-  height: var(--webqq-scrollbar-thumb-height);
-  border-radius: 999px;
-  background: #94a3b8;
-  cursor: default;
-  pointer-events: auto;
-  transition: width 0.14s ease, right 0.14s ease, background 0.14s ease;
-}
-
-.webqq-scrollbar-overlay.is-accent .webqq-scrollbar-thumb {
-  background: color-mix(in srgb, var(--webqq-accent) 78%, #60a5fa 22%);
-}
-
-.webqq-scrollbar-overlay.is-wide .webqq-scrollbar-thumb,
-.webqq-scrollbar-thumb:hover {
-  right: 2px;
-  width: 6px;
-}
-
-.webqq-scrollbar-thumb.is-dragging {
-  cursor: default;
-}
-
-.webqq-rail,
-.webqq-conversations,
-.webqq-chat,
-.webqq-profile {
-  min-width: 0;
-  min-height: 0;
-  border-right: 1px solid var(--webqq-border);
-}
-
-.webqq-workspace.is-frosted .webqq-rail,
-.webqq-workspace.is-frosted .webqq-conversations,
-.webqq-workspace.is-frosted .webqq-chat,
-.webqq-workspace.is-frosted .webqq-profile {
-  background: rgb(248 250 252 / 34%);
-  backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-}
-
-.webqq-workspace.is-frosted {
-  background: rgb(244 246 248 / 78%);
-  backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-}
-
 .webqq-rail {
   grid-column: 1;
   grid-row: 1;
@@ -220,65 +49,15 @@ body,
   background: var(--webqq-rail);
 }
 
-.webqq-menu-avatar,
-.webqq-avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  color: #fff;
-  background: var(--webqq-accent);
-  user-select: none;
-}
-
-.webqq-identity-avatar > img {
-  width: 100%;
-  height: 100%;
-  border-radius: inherit;
-  object-fit: cover;
-}
-
-.webqq-rail-button,
-.webqq-icon-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  color: var(--webqq-muted);
-  background: transparent;
-}
-
 .webqq-rail-button {
   width: 44px;
   height: 44px;
   border-radius: 13px;
 }
 
-.webqq-rail-button:hover,
-.webqq-rail-button:focus-visible,
-.webqq-icon-button:hover,
-.webqq-icon-button:focus-visible {
-  color: var(--webqq-text);
-  background: var(--webqq-hover);
-  outline: none;
-}
-
 .webqq-rail-button.is-active {
   color: #fff;
   background: var(--webqq-accent);
-}
-
-.webqq-menu-avatar {
-  --webqq-avatar-size: 30px;
-  --webqq-bot-badge-size: 12.5px;
-  --webqq-bot-badge-offset: -1.667px;
-  --webqq-bot-badge-border: 1.667px;
-
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  font-size: 10px;
-  font-weight: 700;
 }
 
 .webqq-conversations,
@@ -304,17 +83,6 @@ body,
 .webqq-chat-title > div > strong,
 .webqq-chat-title > div > span {
   margin: 0;
-}
-
-.webqq-icon-button {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-}
-
-.webqq-icon-button.is-active {
-  color: var(--webqq-accent);
-  background: color-mix(in srgb, var(--webqq-accent) 14%, transparent);
 }
 
 .webqq-sidebar-tabs-row {
@@ -668,75 +436,6 @@ body,
   cursor: pointer;
 }
 
-.webqq-avatar {
-  --webqq-avatar-size: 38px;
-  --webqq-bot-badge-size: 15.833px;
-  --webqq-bot-badge-offset: -2.111px;
-  --webqq-bot-badge-border: 2.111px;
-
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  font-size: 12.667px;
-  font-weight: 700;
-}
-
-.webqq-avatar-bot {
-  background: #59657a;
-}
-
-.webqq-identity-avatar.is-group {
-  background: #0f766e;
-}
-
-.webqq-identity-avatar.is-bot {
-  position: relative;
-  color: #fff;
-  background: #475569;
-}
-
-.webqq-avatar-bot-badge,
-.webqq-composer-user-bot-badge {
-  position: absolute;
-  right: var(--webqq-bot-badge-offset);
-  bottom: var(--webqq-bot-badge-offset);
-  z-index: 1;
-  display: inline-flex;
-  width: var(--webqq-bot-badge-size);
-  height: var(--webqq-bot-badge-size);
-  align-items: center;
-  justify-content: center;
-  border: var(--webqq-bot-badge-border) solid #fff;
-  border-radius: 50%;
-  color: #fff;
-  background: #334155;
-}
-
-.webqq-avatar-bot-badge svg,
-.webqq-composer-user-bot-badge svg {
-  width: 66.667%;
-  height: 66.667%;
-}
-
-.webqq-workspace[data-color-mode="dark"] .webqq-identity-avatar.is-bot {
-  background: #64748b;
-}
-
-.webqq-workspace[data-color-mode="dark"] .webqq-avatar-bot-badge,
-.webqq-workspace[data-color-mode="dark"] .webqq-composer-user-bot-badge {
-  border-color: #0f172a;
-  background: #94a3b8;
-}
-
-.webqq-avatar-create {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px dashed color-mix(in srgb, var(--webqq-accent) 46%, transparent);
-  color: var(--webqq-accent);
-  background: color-mix(in srgb, var(--webqq-accent) 9%, var(--webqq-bg));
-}
-
 .webqq-session-copy,
 .webqq-session-copy strong,
 .webqq-session-copy small {
@@ -812,12 +511,6 @@ body,
   text-align: center;
   color: var(--webqq-muted);
   font-size: 13px;
-}
-
-.webqq-dialog-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
 }
 
 .webqq-chat {
