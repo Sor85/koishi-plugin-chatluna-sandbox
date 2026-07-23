@@ -39,7 +39,21 @@ const snapshot: SandboxSnapshot = {
     createdAt: '2026-07-23T00:00:00.000Z',
   }],
   friendships: [],
-  requests: [],
+  requests: [{
+    id: 'friend-request-1',
+    type: 'friend',
+    requesterId: '10002',
+    targetId: '10001',
+    status: 'pending',
+    createdAt: '2026-07-23T00:00:00.000Z',
+  }, {
+    id: 'group-request-1',
+    type: 'group',
+    requesterId: '10002',
+    groupId: '30001',
+    status: 'pending',
+    createdAt: '2026-07-23T00:00:00.000Z',
+  }],
 }
 
 const workspace: SandboxWorkspaceState = {
@@ -226,5 +240,156 @@ describe('WebQQ 工作区控制模块', () => {
       controller.details.value.revision,
     ]).toEqual([8, 8, 8, 8])
     expect(controller.chat.value.messages.map(({ id }) => id)).toEqual(['message-1', 'message-2'])
+  })
+
+  it('好友命令失败时保留区域模型并返回规范化错误', async () => {
+    const port = createFakeWorkspacePort(workspace)
+    const controller = createWorkspaceController(port, createStorage())
+    await controller.load()
+    const regionsBeforeFailure = [
+      controller.sidebar.value,
+      controller.chat.value,
+      controller.composer.value,
+      controller.details.value,
+    ]
+    port.rejectNext('performFriendAction', new Error('好友操作被拒绝'))
+
+    await expect(controller.performFriendAction({
+      action: 'request',
+      targetId: '10002',
+    })).rejects.toMatchObject({
+      name: 'WorkspaceControllerError',
+      message: '好友操作被拒绝',
+    })
+
+    expect(port.calls.at(-1)).toEqual({
+      operation: 'performFriendAction',
+      input: {
+        action: 'request',
+        actorUserId: '10001',
+        targetId: '10002',
+      },
+    })
+    expect([
+      controller.sidebar.value,
+      controller.chat.value,
+      controller.composer.value,
+      controller.details.value,
+    ]).toEqual(regionsBeforeFailure)
+  })
+
+  it('群组命令失败时保留区域模型并返回规范化错误', async () => {
+    const port = createFakeWorkspacePort(workspace)
+    const controller = createWorkspaceController(port, createStorage())
+    await controller.load()
+    const regionsBeforeFailure = [
+      controller.sidebar.value,
+      controller.chat.value,
+      controller.composer.value,
+      controller.details.value,
+    ]
+    port.rejectNext('performGroupAction', new Error('群组操作被拒绝'))
+
+    await expect(controller.performGroupAction({
+      action: 'set-name',
+      groupId: '30001',
+      name: '新群名称',
+    })).rejects.toMatchObject({
+      name: 'WorkspaceControllerError',
+      message: '群组操作被拒绝',
+    })
+
+    expect(port.calls.at(-1)).toEqual({
+      operation: 'performGroupAction',
+      input: {
+        action: 'set-name',
+        actorUserId: '10001',
+        groupId: '30001',
+        name: '新群名称',
+      },
+    })
+    expect([
+      controller.sidebar.value,
+      controller.chat.value,
+      controller.composer.value,
+      controller.details.value,
+    ]).toEqual(regionsBeforeFailure)
+  })
+
+  it('处理关系申请时按申请类型调用对应端口', async () => {
+    const port = createFakeWorkspacePort(workspace)
+    const controller = createWorkspaceController(port, createStorage())
+    await controller.load()
+
+    await controller.handleRelationshipRequest('friend-request-1', true)
+    await controller.handleRelationshipRequest('group-request-1', false)
+
+    expect(port.calls.slice(-2)).toEqual([{
+      operation: 'performFriendAction',
+      input: {
+        action: 'handle-request',
+        actorUserId: '10001',
+        requestId: 'friend-request-1',
+        approve: true,
+      },
+    }, {
+      operation: 'performGroupAction',
+      input: {
+        action: 'handle-request',
+        actorUserId: '10001',
+        requestId: 'group-request-1',
+        approve: false,
+      },
+    }])
+  })
+
+  it('好友与群组命令成功后原子同步四个区域模型', async () => {
+    const port = createFakeWorkspacePort(workspace)
+    const controller = createWorkspaceController(port, createStorage())
+    await controller.load()
+    port.workspaceResult = {
+      ...workspace,
+      snapshot: {
+        ...workspace.snapshot,
+        revision: 8,
+        friendships: [{
+          id: 'friendship-1',
+          participantIds: ['10001', '10002'],
+          remarks: {},
+          createdAt: '2026-07-23T00:00:01.000Z',
+        }],
+      },
+    }
+
+    await controller.performFriendAction({ action: 'request', targetId: '10002' })
+
+    expect([
+      controller.sidebar.value.revision,
+      controller.chat.value.revision,
+      controller.composer.value.revision,
+      controller.details.value.revision,
+    ]).toEqual([8, 8, 8, 8])
+
+    controller.selectConversation('group:30001:10001:20001')
+    port.workspaceResult = {
+      ...port.workspaceResult,
+      snapshot: {
+        ...port.workspaceResult.snapshot,
+        revision: 9,
+        groups: port.workspaceResult.snapshot.groups.map((group) => group.id === '30001'
+          ? { ...group, name: '新群名称' }
+          : group),
+      },
+    }
+
+    await controller.performGroupAction({ action: 'set-name', groupId: '30001', name: '新群名称' })
+
+    expect([
+      controller.sidebar.value.revision,
+      controller.chat.value.revision,
+      controller.composer.value.revision,
+      controller.details.value.revision,
+    ]).toEqual([9, 9, 9, 9])
+    expect(controller.details.value.group?.name).toBe('新群名称')
   })
 })

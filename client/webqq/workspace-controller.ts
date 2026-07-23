@@ -3,7 +3,9 @@ import type {
   SandboxAppearance,
   SandboxBotProfile,
   SandboxConversation,
+  SandboxFriendAction,
   SandboxGroup,
+  SandboxGroupAction,
   SandboxMessage,
   SandboxSnapshot,
   SandboxUser,
@@ -223,6 +225,41 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     currentOperatorIdState.value = userId
   }
 
+  async function performFriendAction(input: SandboxFriendAction) {
+    const actorUserId = currentOperatorIdState.value
+    if (!actorUserId) throw new WorkspaceControllerError('当前操作者不可用')
+    try {
+      replaceWorkspace(await port.performFriendAction({ ...input, actorUserId }))
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '好友操作失败')
+    }
+  }
+
+  async function performGroupAction(input: SandboxGroupAction) {
+    const actorUserId = currentOperatorIdState.value
+    if (!actorUserId) throw new WorkspaceControllerError('当前操作者不可用')
+    try {
+      replaceWorkspace(await port.performGroupAction({ ...input, actorUserId }))
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '群组操作失败')
+    }
+  }
+
+  async function handleRelationshipRequest(requestId: string, approve: boolean) {
+    const actorUserId = currentUserIdState.value
+    if (!actorUserId) throw new WorkspaceControllerError('当前用户不可用')
+    const request = snapshot.value.requests.find(({ id }) => id === requestId)
+    if (!request) throw new WorkspaceControllerError('关系申请不存在')
+    try {
+      const nextWorkspace = request.type === 'group'
+        ? await port.performGroupAction({ action: 'handle-request', requestId, approve, actorUserId })
+        : await port.performFriendAction({ action: 'handle-request', requestId, approve, actorUserId })
+      replaceWorkspace(nextWorkspace)
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '处理关系申请失败')
+    }
+  }
+
   return {
     workspace: computed<SandboxWorkspaceState>(() => workspaceState.value),
     currentUserId: readonly(currentUserIdState),
@@ -234,7 +271,10 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     composer,
     details,
     ensureOperator,
+    handleRelationshipRequest,
     load,
+    performFriendAction,
+    performGroupAction,
     replaceWorkspace,
     selectConversation,
     selectOperator,

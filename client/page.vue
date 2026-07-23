@@ -1127,24 +1127,18 @@ function applyWorkspaceUpdate(nextWorkspace: SandboxWorkspaceState) {
 }
 
 async function performFriendAction(input: SandboxFriendAction) {
-  const actorUserId = currentOperatorId.value
-  if (!actorUserId) return
   errorMessage.value = ''
   try {
-    const nextWorkspace = await send('onebot-sandbox/friend-action', { ...input, actorUserId })
-    applyWorkspaceUpdate(nextWorkspace)
+    await workspaceController.performFriendAction(input)
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '好友操作失败'
   }
 }
 
 async function performGroupAction(input: SandboxGroupAction) {
-  const actorUserId = currentOperatorId.value
-  if (!actorUserId) return
   errorMessage.value = ''
   try {
-    const nextWorkspace = await send('onebot-sandbox/group-action', { ...input, actorUserId })
-    applyWorkspaceUpdate(nextWorkspace)
+    await workspaceController.performGroupAction(input)
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '群组操作失败'
   }
@@ -1155,16 +1149,10 @@ function requestFriend(targetId: string) {
 }
 
 async function handleNotificationRequest(requestId: string, approve: boolean) {
-  const actorUserId = currentUserId.value
-  if (!actorUserId) return
   handlingRequestId.value = requestId
   notificationErrorMessage.value = ''
   try {
-    const request = snapshot.value.requests.find(({ id }) => id === requestId)
-    const nextWorkspace = request?.type === 'group'
-      ? await send('onebot-sandbox/group-action', { action: 'handle-request', requestId, approve, actorUserId })
-      : await send('onebot-sandbox/friend-action', { action: 'handle-request', requestId, approve, actorUserId })
-    applyWorkspaceUpdate(nextWorkspace)
+    await workspaceController.handleRelationshipRequest(requestId, approve)
   } catch (error) {
     notificationErrorMessage.value = error instanceof Error ? error.message : '处理通知失败'
   } finally {
