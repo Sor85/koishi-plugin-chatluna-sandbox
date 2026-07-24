@@ -257,12 +257,18 @@ export interface SandboxAppearance {
 
 export interface SandboxWorkspaceState {
   snapshot: SandboxSnapshot
+  chatLunaStates: SandboxChatLunaState[]
   appearance: SandboxAppearance
 }
 
 export interface GetSandboxWorkspaceInput {
   operatorId?: string
   messageLimit?: number
+}
+
+export interface GetSandboxBotDeliveriesInput {
+  recipientBotId?: string
+  messageId?: string
 }
 
 export interface GetMessageHistoryInput {

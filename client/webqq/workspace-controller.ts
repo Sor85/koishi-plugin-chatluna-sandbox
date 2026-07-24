@@ -94,6 +94,7 @@ const emptySnapshot: SandboxSnapshot = {
 export function createWorkspaceController(port: WorkspacePort, storage: WorkspaceStorage) {
   const workspaceState = ref<SandboxWorkspaceState>({
     snapshot: emptySnapshot,
+    chatLunaStates: [],
     appearance: defaultAppearance,
   })
   const currentOperatorIdState = ref<string>()

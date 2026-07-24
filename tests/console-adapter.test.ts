@@ -1,4 +1,4 @@
-import { App } from '@koishijs/core'
+import { App, Universal } from '@koishijs/core'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -34,7 +34,11 @@ describe('Koishi 控制台适配器', () => {
     })
     runningApps.push(app)
 
-    app.middleware((session) => `回复：${session.content}`)
+    let middlewareCalls = 0
+    app.middleware((session) => {
+      middlewareCalls += 1
+      return `回复：${session.content}`
+    })
     await app.start()
     if (!control) throw new Error('沙盒控制服务未注册')
 
@@ -51,6 +55,20 @@ describe('Koishi 控制台适配器', () => {
 
     registerConsole(consoleRegistrar, control, appearance)
 
+    const chatLunaSession = control.bot.session({
+      type: 'message',
+      user: { id: '10001', name: '测试用户1' },
+      channel: { id: 'private:10001:20001', type: Universal.Channel.Type.DIRECT },
+    })
+    await (app.parallel as unknown as (event: string, ...args: unknown[]) => Promise<void>)(
+      'chatluna/before-chat',
+      'console:chatluna',
+      {},
+      {},
+      {},
+      chatLunaSession,
+    )
+
     expect(entries).toEqual([{
       dev: expect.stringContaining('client/index.ts'),
       prod: expect.stringContaining('dist'),
@@ -66,6 +84,7 @@ describe('Koishi 控制台适配器', () => {
     const manageEnvironmentListener = listeners.get('onebot-sandbox/manage-environment')
     const friendActionListener = listeners.get('onebot-sandbox/friend-action')
     const groupActionListener = listeners.get('onebot-sandbox/group-action')
+    const botDeliveriesListener = listeners.get('onebot-sandbox/bot-deliveries')
     if (typeof snapshotListener !== 'function'
       || typeof historyListener !== 'function'
       || typeof sendMessageListener !== 'function'
@@ -75,7 +94,8 @@ describe('Koishi 控制台适配器', () => {
       || typeof deleteGroupAnnouncementListener !== 'function'
       || typeof manageEnvironmentListener !== 'function'
       || typeof friendActionListener !== 'function'
-      || typeof groupActionListener !== 'function') {
+      || typeof groupActionListener !== 'function'
+      || typeof botDeliveriesListener !== 'function') {
       throw new Error('控制台监听器未注册')
     }
 
@@ -92,6 +112,13 @@ describe('Koishi 控制台适配器', () => {
       : initialWorkspace.snapshot.groups.find(({ id }: { id: string }) => id === conversation.groupId)?.members
         .some(({ participantId }: { participantId: string }) => participantId === '10001'))).toBe(true)
     expect(initialWorkspace.appearance).toEqual(appearance)
+    expect(initialWorkspace.chatLunaStates).toEqual([
+      expect.objectContaining({
+        botParticipantId: '20001',
+        conversationId: 'private:10001:20001',
+        thinking: true,
+      }),
+    ])
 
     const snapshot = await sendMessageListener({
       operatorId: '10001',
@@ -102,6 +129,13 @@ describe('Koishi 控制台适配器', () => {
       '控制台消息',
       '回复：控制台消息',
     ])
+    expect(snapshot.snapshot.messages.every((message: Record<string, unknown>) => !('botId' in message))).toBe(true)
+    expect(snapshot.snapshot.conversations.every((conversation: Record<string, unknown>) => !('userId' in conversation) && !('botId' in conversation))).toBe(true)
+    const messageId = snapshot.snapshot.messages.find(({ content }: { content: string }) => content === '控制台消息')?.id
+    expect(botDeliveriesListener({ recipientBotId: '20001', messageId })).toEqual([
+      expect.objectContaining({ recipientBotId: '20001', messageId }),
+    ])
+    expect(() => botDeliveriesListener({ botId: '20001' })).toThrow('不支持旧 RPC 字段：botId')
 
     const mediaWorkspace = await sendMediaMessageListener({
       operatorId: '10001',
@@ -123,6 +157,7 @@ describe('Koishi 控制台适配器', () => {
       : otherWorkspace.snapshot.groups.find(({ id }: { id: string }) => id === conversation.groupId)?.members
         .some(({ participantId }: { participantId: string }) => participantId === '10002'))).toBe(true)
     expect(otherWorkspace.snapshot.messages).toEqual([])
+    expect(otherWorkspace.chatLunaStates).toEqual([])
 
     const history = historyListener({
       operatorId: '10001',
@@ -145,11 +180,13 @@ describe('Koishi 控制台适配器', () => {
     })
     expect(removed.snapshot.groups[0].announcements.some(({ content }: { content: string }) => content === '控制台发布的公告')).toBe(false)
 
+    const middlewareCallsBeforeManage = middlewareCalls
     const managed = manageEnvironmentListener({
       action: 'create-user',
       data: { id: '10099', name: '控制台用户' },
     })
     expect(managed.snapshot.participants).toContainEqual({ kind: 'user', id: '10099', name: '控制台用户' })
+    expect(middlewareCalls).toBe(middlewareCallsBeforeManage)
 
     const friendWorkspace = await friendActionListener({
       action: 'request',
@@ -179,7 +216,6 @@ describe('Koishi 控制台适配器', () => {
     expect(['10001', '10002', '10003'].every((userId) => botConversationUserIds.has(userId))).toBe(true)
 
     const afterCurrentUserDeleted = manageEnvironmentListener({
-      operatorId: '10001',
       action: 'delete-user',
       data: { id: '10001' },
     })
@@ -188,5 +224,21 @@ describe('Koishi 控制台适配器', () => {
       ? conversation.participantIds?.includes('10002')
       : afterCurrentUserDeleted.snapshot.groups.find(({ id }: { id: string }) => id === conversation.groupId)?.members
         .some(({ participantId }: { participantId: string }) => participantId === '10002'))).toBe(true)
+
+    expect(() => snapshotListener({ operatorId: '99999' })).toThrow('参与者不存在：99999')
+    expect(() => snapshotListener({ userId: '10001' })).toThrow('不支持旧 RPC 字段：userId')
+    await expect(sendMessageListener({
+      operatorId: '10002',
+      senderId: '10003',
+      botId: '20001',
+      conversationId: 'private:10002:20001',
+      content: '伪造发送者',
+    })).rejects.toThrow('不支持旧 RPC 字段：senderId')
+    expect(() => manageEnvironmentListener({
+      operatorId: '10002',
+      action: 'create-user',
+      data: { id: '10100', name: '不应创建' },
+    })).toThrow('环境管理不接受操作者字段：operatorId')
+    expect(control.getSnapshot().participants.some(({ id }) => id === '10100')).toBe(false)
   })
 })

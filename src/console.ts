@@ -5,11 +5,13 @@ import type {
   DeleteGroupAnnouncementInput,
   GetMediaContentInput,
   GetMessageHistoryInput,
+  GetSandboxBotDeliveriesInput,
   GetSandboxWorkspaceInput,
   ManageSandboxEnvironmentInput,
   PerformFriendActionInput,
   PerformGroupActionInput,
   SandboxAppearance,
+  SandboxBotDelivery,
   SandboxMediaContent,
   SandboxMessageHistory,
   SandboxWorkspaceState,
@@ -30,6 +32,29 @@ interface ConsoleEventMap {
   'onebot-sandbox/manage-environment': (input: ManageSandboxEnvironmentInput) => SandboxWorkspaceState
   'onebot-sandbox/friend-action': (input: PerformFriendActionInput) => Promise<SandboxWorkspaceState>
   'onebot-sandbox/group-action': (input: PerformGroupActionInput) => Promise<SandboxWorkspaceState>
+  'onebot-sandbox/bot-deliveries': (input?: GetSandboxBotDeliveriesInput) => SandboxBotDelivery[]
+}
+
+const legacyRpcFields = ['senderId', 'botId', 'actorUserId', 'userId', 'currentUserId'] as const
+
+function hasOwnField(input: unknown, field: string): boolean {
+  return input !== null && typeof input === 'object' && Object.prototype.hasOwnProperty.call(input, field)
+}
+
+function assertNoLegacyRpcFields(input: unknown): void {
+  const field = legacyRpcFields.find((candidate) => hasOwnField(input, candidate))
+  if (field) throw new Error(`不支持旧 RPC 字段：${field}`)
+}
+
+function assertInteractionInput<Input>(input: Input): Input {
+  assertNoLegacyRpcFields(input)
+  return input
+}
+
+function assertEnvironmentInput(input: ManageSandboxEnvironmentInput): ManageSandboxEnvironmentInput {
+  if (hasOwnField(input, 'operatorId')) throw new Error('环境管理不接受操作者字段：operatorId')
+  assertNoLegacyRpcFields(input)
+  return input
 }
 
 export interface SandboxConsoleRegistrar {
@@ -51,39 +76,43 @@ export function registerConsole(
     prod: resolve(__dirname, '../dist'),
   })
 
-  const getWorkspace = (operatorId?: string, messageLimit?: number): SandboxWorkspaceState => {
+  const getWorkspace = (input: GetSandboxWorkspaceInput = {}): SandboxWorkspaceState => {
+    assertNoLegacyRpcFields(input)
     const snapshot = control.getSnapshot()
-    // operatorId 是历史 RPC 字段名，但统一当前操作者后也会承载机器人 ID；
-    // 只按用户校验会把机器人命令后的快照静默切到首个用户，继而清空当前会话选择。
-    const visibleParticipantId = snapshot.participants.some(({ id }) => id === operatorId)
-      ? operatorId
-      : getSandboxUsers(snapshot)[0]?.id ?? snapshot.participants[0]?.id
+    if (input.operatorId && !snapshot.participants.some(({ id }) => id === input.operatorId)) {
+      throw new Error(`参与者不存在：${input.operatorId}`)
+    }
+    const visibleParticipantId = input.operatorId ?? getSandboxUsers(snapshot)[0]?.id ?? snapshot.participants[0]?.id
+    const visibleSnapshot = visibleParticipantId ? control.getVisibleSnapshot(visibleParticipantId, input.messageLimit) : snapshot
+    const visibleConversationIds = new Set(visibleSnapshot.conversations.map(({ id }) => id))
     return {
-      snapshot: visibleParticipantId ? control.getVisibleSnapshot(visibleParticipantId, messageLimit) : snapshot,
+      snapshot: visibleSnapshot,
+      chatLunaStates: control.getChatLunaStates().filter(({ conversationId }) => visibleConversationIds.has(conversationId)),
       appearance,
     }
   }
 
-  console.addListener('onebot-sandbox/workspace', (input) => getWorkspace(input?.operatorId, input?.messageLimit), { authority: 4 })
-  console.addListener('onebot-sandbox/message-history', (input) => control.getMessageHistory(input), { authority: 4 })
+  console.addListener('onebot-sandbox/workspace', (input) => getWorkspace(input), { authority: 4 })
+  console.addListener('onebot-sandbox/message-history', (input) => control.getMessageHistory(assertInteractionInput(input)), { authority: 4 })
   console.addListener('onebot-sandbox/send-message', async (input) => {
-    await control.sendMessage(input)
-    return getWorkspace(input.operatorId)
+    await control.sendMessage(assertInteractionInput(input))
+    return getWorkspace({ operatorId: input.operatorId })
   }, { authority: 4 })
   console.addListener('onebot-sandbox/send-media-message', async (input) => {
-    await control.sendMediaMessage(input)
-    return getWorkspace(input.operatorId)
+    await control.sendMediaMessage(assertInteractionInput(input))
+    return getWorkspace({ operatorId: input.operatorId })
   }, { authority: 4 })
-  console.addListener('onebot-sandbox/media-content', (input) => control.getMediaContent(input), { authority: 4 })
+  console.addListener('onebot-sandbox/media-content', (input) => control.getMediaContent(assertInteractionInput(input)), { authority: 4 })
   console.addListener('onebot-sandbox/set-group-announcement', (input) => {
-    control.setGroupAnnouncement(input)
-    return getWorkspace(input.operatorId)
+    control.setGroupAnnouncement(assertInteractionInput(input))
+    return getWorkspace({ operatorId: input.operatorId })
   }, { authority: 4 })
   console.addListener('onebot-sandbox/delete-group-announcement', (input) => {
-    control.deleteGroupAnnouncement(input)
-    return getWorkspace(input.operatorId)
+    control.deleteGroupAnnouncement(assertInteractionInput(input))
+    return getWorkspace({ operatorId: input.operatorId })
   }, { authority: 4 })
   console.addListener('onebot-sandbox/manage-environment', (input) => {
+    assertEnvironmentInput(input)
     switch (input.action) {
       case 'create-user':
         control.createUser(input.data)
@@ -116,13 +145,14 @@ export function registerConsole(
     return getWorkspace()
   }, { authority: 4 })
   console.addListener('onebot-sandbox/friend-action', async (input) => {
-    await control.performFriendAction(input)
-    return getWorkspace(input.operatorId)
+    await control.performFriendAction(assertInteractionInput(input))
+    return getWorkspace({ operatorId: input.operatorId })
   }, { authority: 4 })
   console.addListener('onebot-sandbox/group-action', async (input) => {
-    await control.performGroupAction(input)
-    return getWorkspace(input.operatorId)
+    await control.performGroupAction(assertInteractionInput(input))
+    return getWorkspace({ operatorId: input.operatorId })
   }, { authority: 4 })
+  console.addListener('onebot-sandbox/bot-deliveries', (input) => control.getBotDeliveries(assertInteractionInput(input ?? {})), { authority: 4 })
 }
 
 declare module '@koishijs/console' {
@@ -137,5 +167,6 @@ declare module '@koishijs/console' {
     'onebot-sandbox/manage-environment'(input: ManageSandboxEnvironmentInput): SandboxWorkspaceState
     'onebot-sandbox/friend-action'(input: PerformFriendActionInput): Promise<SandboxWorkspaceState>
     'onebot-sandbox/group-action'(input: PerformGroupActionInput): Promise<SandboxWorkspaceState>
+    'onebot-sandbox/bot-deliveries'(input?: GetSandboxBotDeliveriesInput): SandboxBotDelivery[]
   }
 }

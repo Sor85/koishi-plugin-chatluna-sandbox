@@ -15,6 +15,7 @@ import {
   type DeleteSandboxUserInput,
   type DeleteGroupAnnouncementInput,
   type GetMediaContentInput,
+  type GetSandboxBotDeliveriesInput,
   type GetMessageHistoryInput,
   type PerformFriendActionInput,
   type PerformFriendActionResult,
@@ -150,8 +151,11 @@ export class SandboxControlService {
     return structuredClone(this.scene)
   }
 
-  getBotDeliveries(): SandboxBotDelivery[] {
-    return structuredClone(this.botDeliveries)
+  getBotDeliveries(input: GetSandboxBotDeliveriesInput = {}): SandboxBotDelivery[] {
+    return structuredClone(this.botDeliveries.filter(({ recipientBotId, messageId }) => (
+      (!input.recipientBotId || recipientBotId === input.recipientBotId)
+      && (!input.messageId || messageId === input.messageId)
+    )))
   }
 
   getChatLunaStates(): SandboxChatLunaState[] {

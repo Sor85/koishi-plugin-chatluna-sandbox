@@ -53,6 +53,7 @@ const snapshot: SandboxSnapshot = {
 
 const workspace: SandboxWorkspaceState = {
   snapshot,
+  chatLunaStates: [],
   appearance: {
     enableWebQQFrostedGlass: true,
     webQQChatStyle: 'tim',
