@@ -114,7 +114,7 @@ import type {
   ManageSandboxEnvironmentInput,
   SandboxBotProfile,
   SandboxImplementationProfile,
-  SandboxUser,
+  SandboxParticipant,
 } from '../src/types'
 
 type EnvironmentCreateType = 'user' | 'bot' | 'group' | 'participant'
@@ -122,7 +122,7 @@ type ParticipantCreateType = 'user' | 'bot'
 
 const props = withDefaults(defineProps<{
   type: EnvironmentCreateType
-  currentOperator?: Pick<SandboxUser, 'id' | 'name'>
+  currentOperator?: Pick<SandboxParticipant, 'id' | 'name'>
   bots?: Pick<SandboxBotProfile, 'id' | 'name'>[]
   accentColor: string
   side?: 'top' | 'right' | 'bottom' | 'left'

@@ -5,6 +5,7 @@ import type {
   ManageSandboxEnvironmentInput,
   SandboxAppearance,
   SandboxBotProfile,
+  SandboxChatLunaState,
   SandboxConversation,
   SandboxFriendAction,
   SandboxGroup,
@@ -56,6 +57,7 @@ export interface ChatWorkspaceModel {
   readonly currentOperator?: DeepReadonly<WorkspaceParticipant>
   readonly conversation?: DeepReadonly<SandboxConversation>
   readonly messages: readonly DeepReadonly<SandboxMessage>[]
+  readonly chatLunaStates: readonly DeepReadonly<SandboxChatLunaState>[]
 }
 
 export interface ComposerWorkspaceModel {
@@ -118,6 +120,8 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     const ids = new Set(activeConversation.value?.messageIds ?? [])
     return snapshot.value.messages.filter(({ id }) => ids.has(id))
   })
+  const activeChatLunaStates = computed(() => workspaceState.value.chatLunaStates
+    .filter(({ conversationId }) => conversationId === activeConversation.value?.id))
   const activeBot = computed(() => {
     const conversation = activeConversation.value
     const botId = conversation?.type === 'direct'
@@ -141,6 +145,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     currentOperator: currentOperator.value,
     conversation: activeConversation.value,
     messages: activeMessages.value,
+    chatLunaStates: activeChatLunaStates.value,
   }))
   const composer = computed<ComposerWorkspaceModel>(() => ({
     revision: snapshot.value.revision,

@@ -133,6 +133,66 @@
   align-items: flex-end;
 }
 
+.webqq-chatluna-state {
+  margin-top: 0;
+}
+
+.webqq-chatluna-thinking-dots {
+  display: flex;
+  width: 44px;
+  min-height: 18px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.webqq-chatluna-thinking-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.72;
+  animation: webqq-chatluna-thinking-dot 1s ease-in-out infinite;
+}
+
+.webqq-chatluna-thinking-dot:nth-child(2) {
+  animation-delay: 0.14s;
+}
+
+.webqq-chatluna-thinking-dot:nth-child(3) {
+  animation-delay: 0.28s;
+}
+
+.webqq-chatluna-usage {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  color: var(--webqq-muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.webqq-chatluna-usage span {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+@keyframes webqq-chatluna-thinking-dot {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.48;
+  }
+
+  40% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
 .webqq-sender-line {
   display: flex;
   max-width: 100%;

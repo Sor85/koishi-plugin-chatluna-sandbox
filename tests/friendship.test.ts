@@ -92,6 +92,38 @@ describe('模拟 QQ 环境好友关系', () => {
     expect(control.getSnapshot().conversations.filter(({ id }) => id === 'private:10001:10002')).toHaveLength(1)
   })
 
+  it('机器人操作者可以主动申请好友、设置备注并删除关系', async () => {
+    const { control } = await createControl()
+    control.createUser({ id: '10004', name: '机器人目标用户' })
+    await control.performFriendAction({ action: 'delete', operatorId: '20001', targetId: '10004' })
+
+    const request = await control.performFriendAction({
+      action: 'request',
+      operatorId: '20001',
+      targetId: '10004',
+      comment: '机器人主动申请',
+    })
+    if (!request.requestId) throw new Error('机器人好友申请未创建')
+
+    await control.performFriendAction({ action: 'handle-request', operatorId: '10004', requestId: request.requestId, approve: true })
+    await control.performFriendAction({ action: 'set-remark', operatorId: '20001', targetId: '10004', remark: '机器人好友' })
+
+    const friendship = control.getSnapshot().friendships.find(({ participantIds }) => participantIds.includes('20001') && participantIds.includes('10004'))
+    expect(friendship?.remarks).toEqual({ '20001': '机器人好友' })
+    expect(control.getVisibleSnapshot('20001').conversations).toContainEqual(expect.objectContaining({ id: 'private:10004:20001' }))
+
+    await control.performFriendAction({ action: 'delete', operatorId: '20001', targetId: '10004' })
+    expect(control.getSnapshot().friendships.some(({ id }) => id === friendship?.id)).toBe(false)
+  })
+
+  it('停用机器人保持可观察但不能执行好友操作', async () => {
+    const { control } = await createControl()
+    control.updateBot({ id: '20001', name: 'Koishi', implementation: 'napcat', enabled: false })
+
+    await expect(control.performFriendAction({ action: 'delete', operatorId: '20001', targetId: '10001' }))
+      .rejects.toThrow('机器人已停用：20001')
+  })
+
   it('发给机器人的申请只能由 OneBot action 审批，并向机器人派发戳一戳和删除事件', async () => {
     const { app, control } = await createControl()
     control.createUser({ id: '10004', name: '申请用户' })

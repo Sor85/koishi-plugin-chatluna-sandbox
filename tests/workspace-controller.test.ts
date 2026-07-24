@@ -53,7 +53,19 @@ const snapshot: SandboxSnapshot = {
 
 const workspace: SandboxWorkspaceState = {
   snapshot,
-  chatLunaStates: [],
+  chatLunaStates: [{
+    botParticipantId: '20001',
+    conversationId: 'private:10001:20001',
+    thinking: true,
+    usage: { inputTokens: 12, outputTokens: 5, totalTokens: 17 },
+    updatedAt: '2026-07-23T00:00:01.000Z',
+  }, {
+    botParticipantId: '20001',
+    conversationId: 'group:30001',
+    thinking: false,
+    usage: { inputTokens: 20, outputTokens: 8, totalTokens: 28 },
+    updatedAt: '2026-07-23T00:00:02.000Z',
+  }],
   appearance: {
     enableWebQQFrostedGlass: true,
     webQQChatStyle: 'tim',
@@ -93,6 +105,9 @@ describe('WebQQ 工作区控制模块', () => {
     expect(controller.activeConversationId.value).toBe('private:10001:20001')
     expect(controller.sidebar.value).toMatchObject({ revision: 7, currentView: 'messages' })
     expect(controller.chat.value).toMatchObject({ revision: 7, messages: [{ id: 'message-1' }] })
+    expect(controller.chat.value.chatLunaStates).toEqual([
+      expect.objectContaining({ botParticipantId: '20001', conversationId: 'private:10001:20001' }),
+    ])
     expect(controller.composer.value).toMatchObject({ revision: 7, currentOperator: { id: '10001' } })
     expect(controller.details.value).toMatchObject({ revision: 7, bot: { id: '20001' } })
   })
@@ -149,6 +164,9 @@ describe('WebQQ 工作区控制模块', () => {
     })
     expect(controller.currentOperatorId.value).toBe('20001')
     expect(controller.composer.value.currentOperator).toMatchObject({ id: '20001', type: 'bot' })
+    expect(controller.chat.value.chatLunaStates).toEqual([
+      expect.objectContaining({ botParticipantId: '20001', conversationId: 'private:10001:20001' }),
+    ])
     expect(controller.sidebar.value.conversations
       .flatMap((conversation) => conversation.type === 'direct'
         ? conversation.participantIds.find((id) => id !== '20001') ?? []
@@ -157,6 +175,10 @@ describe('WebQQ 工作区控制模块', () => {
       controller.selectConversation(conversationId)
       expect(controller.chat.value.conversation?.id).toBe(conversationId)
     }
+    controller.selectConversation('group:30001')
+    expect(controller.chat.value.chatLunaStates).toEqual([
+      expect.objectContaining({ botParticipantId: '20001', conversationId: 'group:30001' }),
+    ])
   })
 
   it('机器人作为当前操作者时所有工作区命令都使用机器人参与者 ID', async () => {

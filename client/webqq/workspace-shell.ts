@@ -49,7 +49,6 @@ export function createWebqqWorkspaceShell(
   const bots = computed(() => getSandboxBots(snapshot.value))
   const appearance = computed(() => workspace.value.appearance)
   const currentOperator = computed(() => snapshot.value.participants.find(({ id }) => id === currentOperatorId.value))
-  const currentOperatorIsBot = computed(() => currentOperator.value?.kind === 'bot')
   const composerSenders = computed<WebqqComposerSender[]>(() => workspaceController.composer.value.participants
     .map((participant) => ({ ...participant })))
   const visibleConversations = computed<SandboxConversation[]>(() => workspaceController.sidebar.value.conversations
@@ -92,10 +91,10 @@ export function createWebqqWorkspaceShell(
   })))
   const messageListModel = computed<WebqqMessageListModel>(() => ({
     messages: messages.value,
+    chatLunaStates: workspaceController.chat.value.chatLunaStates.map((state) => ({ ...state })),
     replyMessages: replyMessages.value,
     participants: participants.value,
     friendMenuStates: friendMenuStates.value,
-    currentOperatorIsBot: currentOperatorIsBot.value,
     currentConversation: currentConversation.value,
     currentGroup: currentGroup.value,
     currentOperatorId: currentOperatorId.value,
@@ -183,7 +182,6 @@ export function createWebqqWorkspaceShell(
     appearance: appearance.value,
     currentView: currentView.value,
     activeConversationId: activeConversationId.value,
-    currentOperatorIsBot: currentOperatorIsBot.value,
     currentGroupId: currentGroup.value?.id,
     currentGroupMemberIds: currentGroup.value?.members.map(({ participantId }) => participantId) ?? [],
     currentOperator: currentOperator.value,

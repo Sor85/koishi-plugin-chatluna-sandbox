@@ -1,6 +1,6 @@
 <template>
   <section v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-messages" aria-label="消息记录">
-    <div v-if="!model.messages.length" class="webqq-welcome">
+    <div v-if="!model.messages.length && !model.chatLunaStates.some((state) => state.thinking || state.usage)" class="webqq-welcome">
       <WebqqAvatar class="webqq-avatar webqq-avatar-large" :kind="model.avatarKind" :name="model.title" :avatar="model.avatar" />
       <strong>{{ model.title }}</strong>
       <p>发送消息，验证插件在模拟 QQ 环境中的响应</p>
@@ -94,12 +94,40 @@
           </ContextMenuContent>
         </ContextMenu>
       </template>
+      <li
+        v-for="state in model.chatLunaStates"
+        v-show="state.thinking || state.usage"
+        :key="`${state.botParticipantId}:${state.conversationId}`"
+        class="webqq-message-row webqq-chatluna-state"
+        :class="state.botParticipantId === model.currentOperatorId ? 'is-outgoing' : 'is-incoming'"
+      >
+        <span class="webqq-message-avatar-wrap">
+          <WebqqAvatar
+            class="webqq-message-avatar"
+            kind="bot"
+            :name="getParticipantName(state.botParticipantId)"
+            :avatar="getParticipantAvatar(state.botParticipantId)"
+          />
+        </span>
+        <div class="webqq-message-content">
+          <span class="webqq-message-author">{{ getParticipantName(state.botParticipantId) }}</span>
+          <div v-if="state.thinking" class="webqq-message-bubble" aria-label="机器人正在思考">
+            <span class="webqq-chatluna-thinking-dots">
+              <span v-for="dot in 3" :key="dot" class="webqq-chatluna-thinking-dot" />
+            </span>
+          </div>
+          <div v-if="state.usage" class="webqq-chatluna-usage" :aria-label="`Token：输入 ${state.usage.inputTokens}，输出 ${state.usage.outputTokens}，总计 ${state.usage.totalTokens}`">
+            <span><IconArrowUp :size="13" aria-hidden="true" /> {{ state.usage.inputTokens }}</span>
+            <span><IconArrowDown :size="13" aria-hidden="true" /> {{ state.usage.outputTokens }}</span>
+          </div>
+        </div>
+      </li>
     </ol>
   </section>
 </template>
 
 <script setup lang="ts">
-import { IconBell, IconClock, IconHandClick, IconMessageReply, IconPaperclip, IconTag, IconUserMinus, IconUserPlus, IconUsers } from '@tabler/icons-vue'
+import { IconArrowDown, IconArrowUp, IconBell, IconClock, IconHandClick, IconMessageReply, IconPaperclip, IconTag, IconUserMinus, IconUserPlus, IconUsers } from '@tabler/icons-vue'
 import { onBeforeUnmount, ref } from 'vue'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from './components/ui/context-menu'
 import { getFriendMenuActions, type FriendMenuState } from './webqq/friend-menu'
@@ -107,7 +135,7 @@ import GroupMemberMenu from './group-member-menu.vue'
 import { getMessageClusterClass, isMergedMessage } from './webqq/message-cluster'
 import WebqqAvatar from './webqq-avatar.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
-import type { SandboxConversation, SandboxGroup, SandboxMedia, SandboxMessage } from '../src/types'
+import type { SandboxChatLunaState, SandboxConversation, SandboxGroup, SandboxMedia, SandboxMessage } from '../src/types'
 
 interface MessageParticipant {
   name: string
@@ -117,10 +145,10 @@ interface MessageParticipant {
 
 export interface WebqqMessageListModel {
   messages: SandboxMessage[]
+  chatLunaStates: SandboxChatLunaState[]
   replyMessages: Record<string, SandboxMessage>
   participants: Record<string, MessageParticipant>
   friendMenuStates: Record<string, FriendMenuState>
-  currentOperatorIsBot: boolean
   currentConversation?: SandboxConversation
   currentGroup?: SandboxGroup
   currentOperatorId?: string
@@ -174,7 +202,7 @@ function getFriendMenuState(targetId: string): FriendMenuState {
 }
 
 function getChatFriendActions(targetId: string) {
-  return props.model.currentOperatorIsBot ? [] : getFriendMenuActions(getFriendMenuState(targetId), true)
+  return getFriendMenuActions(getFriendMenuState(targetId), true)
 }
 
 function getReplyMessage(message: SandboxMessage) {

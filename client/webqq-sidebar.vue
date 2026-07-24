@@ -117,14 +117,11 @@
                 </button>
               </ContextMenuTrigger>
               <ContextMenuContent style="z-index: 140">
-                <ContextMenuItem v-if="!group.member && !group.pending && !currentOperatorIsBot" @select="requestJoinGroup(group.id)">
+                <ContextMenuItem v-if="!group.member && !group.pending" @select="requestJoinGroup(group.id)">
                   <IconUserPlus :size="16" aria-hidden="true" /> 申请加入群组
                 </ContextMenuItem>
                 <ContextMenuItem v-else-if="!group.member && group.pending" disabled>
                   <IconClock :size="16" aria-hidden="true" /> 等待群管理员处理
-                </ContextMenuItem>
-                <ContextMenuItem v-else-if="!group.member" disabled>
-                  <IconRobotFace :size="16" aria-hidden="true" /> 当前机器人不支持主动申请加群
                 </ContextMenuItem>
                 <ContextMenuItem
                   v-if="group.member"
@@ -178,7 +175,7 @@
                 </button>
               </ContextMenuTrigger>
               <ContextMenuContent style="z-index: 140">
-                <ContextMenuItem v-if="!entry.isFriend && !entry.pendingOutgoing && !entry.pendingIncoming && !currentOperatorIsBot" @select="requestFriend(entry.id)">
+                <ContextMenuItem v-if="!entry.isFriend && !entry.pendingOutgoing && !entry.pendingIncoming" @select="requestFriend(entry.id)">
                   <IconUserPlus :size="16" aria-hidden="true" /> 发送好友申请
                 </ContextMenuItem>
                 <ContextMenuItem v-else-if="entry.pendingOutgoing" disabled>
@@ -187,13 +184,10 @@
                 <ContextMenuItem v-else-if="entry.pendingIncoming" disabled>
                   <IconBell :size="16" aria-hidden="true" /> 请在通知中处理申请
                 </ContextMenuItem>
-                <ContextMenuItem v-else-if="!entry.isFriend" disabled>
-                  <IconRobotFace :size="16" aria-hidden="true" /> 当前机器人不支持主动发送好友申请
-                </ContextMenuItem>
-                <ContextMenuItem v-if="entry.isFriend && !currentOperatorIsBot" @select="openRemarkDialog(entry.id)">
+                <ContextMenuItem v-if="entry.isFriend" @select="openRemarkDialog(entry.id)">
                   <IconTag :size="16" aria-hidden="true" /> 设置好友备注
                 </ContextMenuItem>
-                <ContextMenuItem v-if="entry.isFriend && !currentOperatorIsBot" class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="deleteFriend(entry.id)">
+                <ContextMenuItem v-if="entry.isFriend" class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="deleteFriend(entry.id)">
                   <IconUserMinus :size="16" aria-hidden="true" /> 删除好友
                 </ContextMenuItem>
                 <ContextMenuItem
@@ -274,7 +268,7 @@
 
 <script setup lang="ts">
 import {
-  IconAddressBook, IconBell, IconClock, IconEdit, IconMessageCircle, IconPlus, IconRobotFace,
+  IconAddressBook, IconBell, IconClock, IconEdit, IconMessageCircle, IconPlus,
   IconSearch, IconTag, IconTrash, IconUser, IconUserCircle, IconUserMinus, IconUserPlus, IconUsers,
 } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
@@ -286,7 +280,7 @@ import WebqqAvatar from './webqq-avatar.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type {
   ManageSandboxEnvironmentInput, SandboxAppearance, SandboxBotProfile, SandboxFriendAction,
-  SandboxGroup, SandboxGroupAction, SandboxGroupMember, SandboxRelationshipRequest, SandboxUser,
+  SandboxGroup, SandboxGroupAction, SandboxGroupMember, SandboxParticipant, SandboxRelationshipRequest,
 } from '../src/types'
 
 type SidebarTab = 'recent' | 'friends' | 'groups'
@@ -336,10 +330,9 @@ export interface WebqqSidebarModel {
   appearance: SandboxAppearance
   currentView: 'messages' | 'contacts' | 'profile'
   activeConversationId?: string
-  currentOperatorIsBot: boolean
   currentGroupId?: string
   currentGroupMemberIds: string[]
-  currentOperator?: Pick<SandboxUser, 'id' | 'name'>
+  currentOperator?: Pick<SandboxParticipant, 'id' | 'name'>
   bots: Pick<SandboxBotProfile, 'id' | 'name'>[]
   conversations: WebqqSidebarConversation[]
   friends: WebqqSidebarFriend[]
@@ -365,7 +358,6 @@ const emit = defineEmits<{
 const appearance = computed(() => props.model.appearance)
 const currentView = computed(() => props.model.currentView)
 const activeConversationId = computed(() => props.model.activeConversationId)
-const currentOperatorIsBot = computed(() => props.model.currentOperatorIsBot)
 const currentGroupId = computed(() => props.model.currentGroupId)
 const searchQuery = ref('')
 const sidebarTab = ref<SidebarTab>('recent')

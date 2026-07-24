@@ -28,4 +28,16 @@ describe('WebQQ 消息列表', () => {
     expect(darkOutgoingRule).toBeGreaterThan(darkIncomingRule)
     expect(styles.slice(darkOutgoingRule, darkOutgoingRule + 260)).toContain('background: var(--webqq-accent)')
   })
+
+  it('按机器人参与者和逻辑会话渲染 ChatLuna 思考状态与 Token', () => {
+    const source = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
+    const styles = readFileSync(resolve('client/styles/webqq-messages.css'), 'utf8')
+
+    expect(source).toContain('chatLunaStates: SandboxChatLunaState[]')
+    expect(source).toContain("state.botParticipantId === model.currentOperatorId ? 'is-outgoing' : 'is-incoming'")
+    expect(source).toContain('state.usage.inputTokens')
+    expect(source).toContain('state.usage.outputTokens')
+    expect(styles).toContain('.webqq-chatluna-thinking-dots')
+    expect(styles).toContain('@keyframes webqq-chatluna-thinking-dot')
+  })
 })

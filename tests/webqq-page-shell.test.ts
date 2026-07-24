@@ -39,6 +39,19 @@ describe('WebQQ 主页面装配', () => {
 
     expect(dialogSource).toContain('<SelectItem value="owner">群主</SelectItem>')
     expect(dialogSource).not.toContain('isBotParticipant')
+    expect(createSource).toContain("currentOperator?: Pick<SandboxParticipant, 'id' | 'name'>")
     expect(createSource).toContain('.filter(({ id }) => id !== owner.id)')
+  })
+
+  it('机器人操作者与普通用户共用好友和群组操作入口', () => {
+    const shellSource = readFileSync(resolve('client/webqq/workspace-shell.ts'), 'utf8')
+    const sidebarSource = readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
+    const messageListSource = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
+
+    for (const source of [shellSource, sidebarSource, messageListSource]) {
+      expect(source).not.toContain('currentOperatorIsBot')
+    }
+    expect(sidebarSource).not.toContain('当前机器人不支持主动申请加群')
+    expect(sidebarSource).not.toContain('当前机器人不支持主动发送好友申请')
   })
 })

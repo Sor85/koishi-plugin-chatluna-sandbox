@@ -353,7 +353,10 @@ export class SandboxControlService {
 
   async performFriendAction(input: PerformFriendActionInput): Promise<PerformFriendActionResult> {
     if (this.isBot(input.operatorId)) {
-      if (input.action !== 'handle-request') throw new Error('当前机器人不支持此好友操作')
+      const bot = this.getBots().find(({ id }) => id === input.operatorId)!
+      if (!bot.enabled) throw new Error(`机器人已停用：${bot.id}`)
+    }
+    if (this.isBot(input.operatorId) && input.action === 'handle-request') {
       const request = this.scene.requests.find(({ id, type }) => id === input.requestId && type === 'friend')
       if (!request || request.targetId !== input.operatorId) throw new Error(`好友申请不存在：${input.requestId}`)
       await this.getRuntimeBot(input.operatorId).internal.set_friend_add_request({
@@ -443,8 +446,8 @@ export class SandboxControlService {
   }
 
   async performGroupAction(input: PerformGroupActionInput): Promise<PerformGroupActionResult> {
-    // 控制台 RPC 的 operatorId 是历史字段名；WebQQ 选择机器人后这里承载的是参与者 ID。
-    // 机器人管理群组必须经过自身 OneBot action，不能直接复用普通用户的状态修改路径。
+    // 机器人处理协议能力覆盖的群操作时必须经过自身 OneBot action，确保事件中的 self_id 与实际机器人一致。
+    // 主动申请入群等沙盒参与者操作则继续落到下方统一路径，避免 WebQQ 因操作者种类出现行为差异。
     if (this.isBot(input.operatorId)) {
       const bot = this.getBots().find(({ id }) => id === input.operatorId)!
       if (!bot.enabled) throw new Error(`机器人已停用：${bot.id}`)
