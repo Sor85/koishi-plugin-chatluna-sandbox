@@ -29,7 +29,6 @@ const snapshot: SandboxSnapshot = {
   messages: [{
     id: 'message-1',
     authorId: '10001',
-    botId: '20001',
     conversationId: 'private:10001:20001',
     content: '基准消息',
     createdAt: '2026-07-23T00:00:00.000Z',
@@ -251,7 +250,6 @@ describe('WebQQ 工作区控制模块', () => {
         messages: [...workspace.snapshot.messages, {
           id: 'message-2',
           authorId: '20001',
-          botId: '20001',
           conversationId: 'private:10001:20001',
           content: '同步回复',
           createdAt: '2026-07-23T00:00:01.000Z',
@@ -512,7 +510,6 @@ describe('WebQQ 工作区控制模块', () => {
       messages: [{
         id: 'message-0',
         authorId: '20001',
-        botId: '20001',
         conversationId: 'private:10001:20001',
         content: '更早的消息',
         createdAt: '2026-07-22T23:59:59.000Z',

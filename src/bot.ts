@@ -1,6 +1,6 @@
 import { Bot, Context, Fragment, h, Universal } from 'koishi'
 import type { SandboxControlService } from './control-service'
-import { createDirectConversationId, getDirectConversationPeerId } from './types'
+import { createDirectConversationId, createGroupConversationId, getDirectConversationPeerId } from './types'
 
 export namespace SandboxBot {
   export interface Config {
@@ -103,8 +103,12 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           const groupId = String(params.group_id ?? '')
           await this.getGuild(groupId)
           const content = this.normalizeOneBotMessage(params.message)
-          const messageIds = this.control.recordBotGroupMessage(this.selfId, groupId, content).map(({ id }) => id)
-          return { status: 'ok', retcode: 0, data: { message_id: messageIds[0] } }
+          const result = await this.control.sendMessage({
+            operatorId: this.selfId,
+            conversationId: createGroupConversationId(groupId),
+            content,
+          })
+          return { status: 'ok', retcode: 0, data: { message_id: result.messageId } }
         }
         if (action === 'send_msg') {
           if (params.message_type === 'group' || params.group_id !== undefined) {
@@ -329,8 +333,8 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     if (this.status !== Universal.Status.ONLINE) throw new Error(`机器人已离线：${this.selfId}`)
     const content = h.normalize(fragment).join('').trim()
     if (!content) return []
-    const message = this.control.recordBotMessage(this.selfId, channelId, content)
-    return [message.id]
+    const result = await this.control.sendMessage({ operatorId: this.selfId, conversationId: channelId, content })
+    return [result.messageId]
   }
 
   private toOneBotUser(user?: Universal.User) {

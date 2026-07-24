@@ -19,6 +19,7 @@ import {
   type PerformFriendActionResult,
   type PerformGroupActionInput,
   type PerformGroupActionResult,
+  type SandboxBotDelivery,
   type SandboxBotProfile,
   type SandboxConversation,
   type SandboxFriendship,
@@ -47,11 +48,9 @@ export interface SandboxControlServiceOptions {
 interface SandboxMessageContext {
   operator: SandboxParticipant
   peer?: SandboxParticipant
-  bot?: SandboxBotProfile
   conversation: SandboxConversation
   group?: SandboxGroup
   reply?: SandboxMessage
-  runtimeBot?: SandboxBot
 }
 
 const DEFAULT_USER_ID = '10001'
@@ -128,6 +127,7 @@ export class SandboxControlService {
 
   private scene: SandboxSnapshot = createDefaultScene()
   private runtimeBots = new Map<string, SandboxBot>()
+  private botDeliveries: SandboxBotDelivery[] = []
   private mediaStorage: SandboxMediaStorage
 
   constructor(private ctx: Context, options: SandboxControlServiceOptions = {}) {
@@ -140,6 +140,10 @@ export class SandboxControlService {
 
   getSnapshot(): SandboxSnapshot {
     return structuredClone(this.scene)
+  }
+
+  getBotDeliveries(): SandboxBotDelivery[] {
+    return structuredClone(this.botDeliveries)
   }
 
   getRuntimeBot(botId: string): SandboxBot {
@@ -715,32 +719,19 @@ export class SandboxControlService {
   async sendMessage(input: SendMessageInput): Promise<SendMessageResult> {
     if (!input.content.trim()) throw new Error('消息内容不能为空')
     const context = this.getMessageContext(input)
-    const messageAuthorId = input.operatorId
-    if (context.conversation.type === 'direct'
-      && messageAuthorId !== context.operator.id
-      && messageAuthorId !== context.peer?.id) {
-      throw new Error(`操作者不在当前会话中：${messageAuthorId}`)
-    }
-    const message = this.appendMessage(messageAuthorId, context.conversation.id, input.content.trim(), input.replyToMessageId)
-    if (!context.bot || messageAuthorId === context.bot.id) return { messageId: message.id, revision: this.scene.revision }
-    return this.dispatchUserMessage(context, message, h.parse(message.content), [
+    const message = this.appendMessage(input.operatorId, context.conversation.id, input.content.trim(), input.replyToMessageId)
+    await this.dispatchMessageToBots(context, message, h.parse(message.content), [
       ...(context.reply ? [{ type: 'reply', data: { id: context.reply.id } }] : []),
       { type: 'text', data: { text: message.content } },
     ], `${context.reply ? `[CQ:reply,id=${context.reply.id}]` : ''}${message.content}`)
+    return { messageId: message.id, revision: this.scene.revision }
   }
 
   async sendMediaMessage(input: SendMediaMessageInput): Promise<SendMessageResult> {
     const context = this.getMessageContext(input)
-    const messageAuthorId = input.operatorId
-    if (context.conversation.type === 'direct'
-      && messageAuthorId !== context.operator.id
-      && messageAuthorId !== context.peer?.id) {
-      throw new Error(`操作者不在当前会话中：${messageAuthorId}`)
-    }
     const media = this.mediaStorage.save(input)
     const content = input.content?.trim() || `[${this.getMediaLabel(media)}] ${media.name}`
-    const message = this.appendMessage(messageAuthorId, context.conversation.id, content, input.replyToMessageId, [media])
-    if (!context.bot || messageAuthorId === context.bot.id) return { messageId: message.id, revision: this.scene.revision }
+    const message = this.appendMessage(input.operatorId, context.conversation.id, content, input.replyToMessageId, [media])
     const elementType = media.type === 'image' ? 'img' : media.type
     const mediaElement = h(elementType, {
       src: media.reference,
@@ -751,11 +742,12 @@ export class SandboxControlService {
     })
     const elements = [mediaElement, ...(input.content?.trim() ? [h.text(input.content.trim())] : [])]
     const onebotType = media.type === 'audio' ? 'record' : media.type
-    return this.dispatchUserMessage(context, message, elements, [
+    await this.dispatchMessageToBots(context, message, elements, [
       ...(context.reply ? [{ type: 'reply', data: { id: context.reply.id } }] : []),
       { type: onebotType, data: { file: media.reference } },
       ...(input.content?.trim() ? [{ type: 'text', data: { text: input.content.trim() } }] : []),
     ], `${context.reply ? `[CQ:reply,id=${context.reply.id}]` : ''}[CQ:${onebotType},file=${media.reference}]${input.content?.trim() ?? ''}`)
+    return { messageId: message.id, revision: this.scene.revision }
   }
 
   getMediaContent(input: GetMediaContentInput): SandboxMediaContent {
@@ -771,15 +763,34 @@ export class SandboxControlService {
     return this.mediaStorage.read(media)
   }
 
-  private async dispatchUserMessage(
+  private async dispatchMessageToBots(
     context: SandboxMessageContext,
     message: SandboxMessage,
     elements: ReturnType<typeof h>[],
     onebotMessage: Array<{ type: string; data: Record<string, string> }>,
     rawMessage: string,
-  ): Promise<SendMessageResult> {
-    if (!context.runtimeBot || !context.bot) throw new Error('虚拟 OneBot 机器人运行时不可用')
-    const session = context.runtimeBot.session({
+  ): Promise<void> {
+    await Promise.all(this.getMessageRecipientBots(context).map((recipientBot) => this.dispatchMessageToBot(
+      recipientBot,
+      context,
+      message,
+      elements,
+      onebotMessage,
+      rawMessage,
+    )))
+  }
+
+  private async dispatchMessageToBot(
+    recipientBot: SandboxBotProfile,
+    context: SandboxMessageContext,
+    message: SandboxMessage,
+    elements: ReturnType<typeof h>[],
+    onebotMessage: Array<{ type: string; data: Record<string, string> }>,
+    rawMessage: string,
+  ): Promise<void> {
+    const runtimeBot = this.runtimeBots.get(recipientBot.id)
+    if (!runtimeBot) throw new Error(`机器人运行时不存在：${recipientBot.id}`)
+    const session = runtimeBot.session({
       type: 'message',
       timestamp: Date.now(),
       user: { id: context.operator.id, name: context.operator.name },
@@ -804,7 +815,7 @@ export class SandboxControlService {
     Object.assign(session, {
       onebot: {
         time: Math.floor(Date.now() / 1000),
-        self_id: Number(context.bot.id),
+        self_id: Number(recipientBot.id),
         post_type: 'message',
         message_type: context.conversation.type === 'group' ? 'group' : 'private',
         sub_type: context.conversation.type === 'group' ? 'normal' : 'friend',
@@ -827,13 +838,15 @@ export class SandboxControlService {
       })
     })
 
-    context.runtimeBot.dispatch(session)
+    runtimeBot.dispatch(session)
     await middlewareFinished
-
-    return {
+    this.botDeliveries.push({
+      id: Random.id(),
+      recipientBotId: recipientBot.id,
       messageId: message.id,
-      revision: this.scene.revision,
-    }
+      conversationId: context.conversation.id,
+      createdAt: new Date().toISOString(),
+    })
   }
 
   setGroupAnnouncement(input: SetGroupAnnouncementInput): void {
@@ -869,24 +882,6 @@ export class SandboxControlService {
     this.scene.revision += 1
   }
 
-  recordBotMessage(botId: string, conversationId: string, content: string): SandboxMessage {
-    const conversation = this.scene.conversations.find(({ id }) => id === conversationId)
-    if (!conversation) throw new Error(`会话不存在：${conversationId}`)
-    const botVisible = conversation.type === 'direct'
-      ? conversation.participantIds.includes(botId)
-      : !!this.scene.groups.find(({ id }) => id === conversation.groupId)?.members.some(({ participantId }) => participantId === botId)
-    if (!botVisible) throw new Error(`机器人不在当前会话中：${botId}`)
-    return this.appendMessage(botId, conversation.id, content)
-  }
-
-  recordBotGroupMessage(botId: string, groupId: string, content: string): SandboxMessage[] {
-    const group = this.scene.groups.find(({ id }) => id === groupId)
-    if (!group?.members.some(({ participantId }) => participantId === botId)) throw new Error(`机器人不在群组中：${botId}`)
-    const conversation = this.scene.conversations.find((item) => item.type === 'group' && item.groupId === groupId)
-    if (!conversation) throw new Error(`群聊会话不存在：${groupId}`)
-    return [this.appendMessage(botId, conversation.id, content)]
-  }
-
   deleteBotMessage(botId: string, messageId: string, conversationId?: string): void {
     const visibleConversationIds = new Set(this.scene.conversations
       .filter((conversation) => this.isConversationVisible(botId, conversation))
@@ -902,6 +897,7 @@ export class SandboxControlService {
     for (const conversation of this.scene.conversations) {
       conversation.messageIds = conversation.messageIds.filter((id) => !removedIds.has(id))
     }
+    this.botDeliveries = this.botDeliveries.filter(({ messageId }) => !removedIds.has(messageId))
     for (const media of removed.flatMap(({ media }) => media ?? [])) this.mediaStorage.remove(media)
     this.scene.revision += 1
   }
@@ -918,14 +914,9 @@ export class SandboxControlService {
     const conversation = this.scene.conversations.find(({ id }) => id === conversationId)
     if (!conversation) throw new Error(`会话不存在：${conversationId}`)
 
-    const botId = conversation.type === 'group'
-      ? this.scene.groups.find(({ id }) => id === conversation.groupId)?.members
-        .find(({ participantId }) => this.isBot(participantId))?.participantId
-      : conversation.participantIds.find((participantId) => this.isBot(participantId))
     const message: SandboxMessage = {
       id: Random.id(),
       authorId,
-      botId,
       conversationId,
       content,
       createdAt: new Date().toISOString(),
@@ -1000,21 +991,24 @@ export class SandboxControlService {
     const peer = conversation.type === 'direct'
       ? this.getParticipant(getDirectConversationPeerId(conversation, input.operatorId))
       : undefined
-    const bot = conversation.type === 'direct'
-      ? peer?.kind === 'bot' ? peer : undefined
-      : group?.members
-        .map(({ participantId }) => this.scene.participants.find(({ id }) => id === participantId))
-        .find((participant): participant is SandboxBotProfile => participant?.kind === 'bot'
-          && participant.enabled && participant.id !== operator.id)
-        ?? (operator.kind === 'bot' ? operator : undefined)
-    if (bot && !bot.enabled) throw new Error(`机器人已停用：${bot.id}`)
     const reply = input.replyToMessageId
       ? this.scene.messages.find(({ id, conversationId }) => id === input.replyToMessageId && conversationId === conversation.id)
       : undefined
     if (input.replyToMessageId && !reply) throw new Error(`回复消息不存在：${input.replyToMessageId}`)
-    const runtimeBot = bot ? this.runtimeBots.get(bot.id) : undefined
-    if (bot && !runtimeBot) throw new Error(`机器人运行时不存在：${bot.id}`)
-    return { operator, peer, bot, conversation, group, reply, runtimeBot }
+    return { operator, peer, conversation, group, reply }
+  }
+
+  private getMessageRecipientBots(context: SandboxMessageContext): SandboxBotProfile[] {
+    // 消息本体只记录作者和逻辑会话；接收机器人必须在投递时按当前关系推导，
+    // 才能让一条群消息复用同一个 ID 派发给多个机器人，并避免成员变更留下过期归属。
+    if (context.conversation.type === 'direct') {
+      return context.peer?.kind === 'bot' && context.peer.enabled ? [context.peer] : []
+    }
+    return (context.group?.members ?? [])
+      .map(({ participantId }) => this.scene.participants.find(({ id }) => id === participantId))
+      .filter((participant): participant is SandboxBotProfile => participant?.kind === 'bot'
+        && participant.enabled
+        && participant.id !== context.operator.id)
   }
 
   private getMediaLabel(media: SandboxMedia): string {
@@ -1298,6 +1292,9 @@ export class SandboxControlService {
 
   private deleteConversations(predicate: (conversation: SandboxSnapshot['conversations'][number]) => boolean): void {
     const removedIds = new Set(this.scene.conversations.filter(predicate).map(({ id }) => id))
+    const removedMessageIds = new Set(this.scene.messages
+      .filter(({ conversationId }) => removedIds.has(conversationId))
+      .map(({ id }) => id))
     for (const media of this.scene.messages
       .filter(({ conversationId }) => removedIds.has(conversationId))
       .flatMap(({ media }) => media ?? [])) {
@@ -1305,6 +1302,7 @@ export class SandboxControlService {
     }
     this.scene.conversations = this.scene.conversations.filter(({ id }) => !removedIds.has(id))
     this.scene.messages = this.scene.messages.filter(({ conversationId }) => !removedIds.has(conversationId))
+    this.botDeliveries = this.botDeliveries.filter(({ messageId }) => !removedMessageIds.has(messageId))
   }
 
   private validateGroupMembers(members: SandboxSnapshot['groups'][number]['members']) {

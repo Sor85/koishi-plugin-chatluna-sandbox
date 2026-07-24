@@ -14,6 +14,7 @@ describe('WebQQ 消息列表', () => {
     expect(source).toContain('isMergedMessage')
     expect(source).toContain('class="webqq-message-quote is-clickable"')
     expect(source).toContain('class="webqq-message-event"')
+    expect(source).toContain("message.authorId === model.currentOperatorId ? 'is-outgoing' : 'is-incoming'")
     expect(source).toContain('loadHistory: [resolve: () => void')
     expect(chatPaneSource).toContain('<WebqqMessageList')
     expect(chatPaneSource).not.toContain('class="webqq-messages"')

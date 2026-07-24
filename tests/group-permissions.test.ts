@@ -162,12 +162,14 @@ describe('模拟 QQ 环境群权限操作', () => {
       conversationId: 'group:30001',
     })
 
-    expect(control.getSnapshot().messages).toContainEqual(expect.objectContaining({
+    const pokeMessage = control.getSnapshot().messages.find(({ event }) => event?.type === 'poke')
+    expect(pokeMessage).toEqual(expect.objectContaining({
       authorId: '10003',
       conversationId: 'group:30001',
       content: '测试用户3 戳了戳 测试用户1',
       event: { type: 'poke', targetId: '10001' },
     }))
+    expect(pokeMessage).not.toHaveProperty('botId')
     expect(notices).toContainEqual({
       noticeType: 'notify',
       subType: 'poke',
@@ -226,7 +228,9 @@ describe('模拟 QQ 环境群权限操作', () => {
   it('成员被踢后失去群聊访问，重新入群恢复同一会话历史', async () => {
     const { control } = await createControl()
     const group = control.getSnapshot().groups[0]
-    const [message] = control.recordBotGroupMessage('20001', group.id, '保留的群聊历史')
+    const result = await control.sendMessage({ operatorId: '20001', conversationId: 'group:30001', content: '保留的群聊历史' })
+    const message = control.getSnapshot().messages.find(({ id }) => id === result.messageId)
+    if (!message) throw new Error('群聊消息未保存')
 
     await control.performGroupAction({ action: 'kick', operatorId: '10001', groupId: group.id, targetId: '10003' })
 

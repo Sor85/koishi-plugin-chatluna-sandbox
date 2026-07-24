@@ -136,8 +136,6 @@ export function getDirectConversationPeerId(conversation: SandboxDirectConversat
 export interface SandboxMessage {
   id: string
   authorId: string
-  /** 群消息或机器人私聊消息的接收机器人；普通用户私聊没有该字段。 */
-  botId?: string
   conversationId: string
   content: string
   createdAt: string
@@ -148,6 +146,14 @@ export interface SandboxMessage {
     type: 'poke'
     targetId: string
   }
+}
+
+export interface SandboxBotDelivery {
+  id: string
+  recipientBotId: string
+  messageId: string
+  conversationId: string
+  createdAt: string
 }
 
 export type SandboxMediaType = 'image' | 'file' | 'audio' | 'video'

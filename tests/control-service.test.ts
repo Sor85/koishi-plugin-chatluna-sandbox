@@ -70,6 +70,9 @@ describe('模拟 QQ 环境消息闭环', () => {
       elementSource: message?.media?.[0].reference,
       rawMessage: [{ type: 'image', data: { file: message?.media?.[0].reference } }],
     }))
+    expect(control.getBotDeliveries()).toEqual([
+      expect.objectContaining({ recipientBotId: '20001', messageId: result.messageId }),
+    ])
     expect(control.getMediaContent({
       operatorId: '10001',
       mediaId: message?.media?.[0].id ?? '',
@@ -200,9 +203,9 @@ describe('模拟 QQ 环境消息闭环', () => {
     await app.start()
     if (!control) throw new Error('沙盒控制服务未注册')
 
-    control.recordBotMessage('20001', 'private:10001:20001', '第一条')
-    control.recordBotMessage('20001', 'private:10001:20001', '第二条')
-    control.recordBotMessage('20001', 'private:10002:20001', '其他用户消息')
+    await control.sendMessage({ operatorId: '20001', conversationId: 'private:10001:20001', content: '第一条' })
+    await control.sendMessage({ operatorId: '20001', conversationId: 'private:10001:20001', content: '第二条' })
+    await control.sendMessage({ operatorId: '20001', conversationId: 'private:10002:20001', content: '其他用户消息' })
 
     const visible = control.getVisibleSnapshot('10001', 1)
     expect(visible.conversations.every((conversation) => conversation.type === 'direct'
@@ -312,9 +315,13 @@ describe('模拟 QQ 环境消息闭环', () => {
     ])
     expect(control.getSnapshot().messages).toContainEqual(expect.objectContaining({
       id: second.messageId,
-      botId: '20002',
       replyToMessageId: first.messageId,
     }))
+    expect(control.getSnapshot().messages.find(({ id }) => id === second.messageId)).not.toHaveProperty('botId')
+    expect(control.getBotDeliveries().map(({ recipientBotId, messageId }) => ({ recipientBotId, messageId }))).toEqual([
+      { recipientBotId: '20002', messageId: first.messageId },
+      { recipientBotId: '20002', messageId: second.messageId },
+    ])
   })
 
   it('普通用户发送文本后，被测插件收到正确 Session 并回复到同一会话', async () => {

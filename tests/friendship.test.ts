@@ -117,12 +117,14 @@ describe('模拟 QQ 环境好友关系', () => {
     expect(control.getSnapshot().conversations.some(({ id }) => id === 'private:10004:20001')).toBe(true)
 
     await control.performFriendAction({ action: 'poke', operatorId: '10004', targetId: '20001' })
-    expect(control.getSnapshot().messages).toContainEqual(expect.objectContaining({
+    const pokeMessage = control.getSnapshot().messages.find(({ event }) => event?.type === 'poke')
+    expect(pokeMessage).toEqual(expect.objectContaining({
       authorId: '10004',
       conversationId: 'private:10004:20001',
       content: '申请用户 戳了戳 Koishi',
       event: { type: 'poke', targetId: '20001' },
     }))
+    expect(pokeMessage).not.toHaveProperty('botId')
     await control.performFriendAction({ action: 'delete', operatorId: '10004', targetId: '20001' })
     expect(notices).toEqual([
       { type: 'notice', noticeType: 'notify', userId: 10004, targetId: 20001 },
