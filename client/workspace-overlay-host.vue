@@ -12,36 +12,40 @@
   />
   <Dialog v-model:open="remarkOpen">
     <DialogContent :style="{ '--webqq-accent': accentColor }">
-      <DialogTitle>设置好友备注</DialogTitle>
-      <DialogDescription>备注只对当前测试用户生效，不会修改对方资料昵称。</DialogDescription>
+      <DialogHeader>
+        <DialogTitle>设置好友备注</DialogTitle>
+        <DialogDescription>备注只对当前测试用户生效，不会修改对方资料昵称。</DialogDescription>
+      </DialogHeader>
       <Input
         v-model="remarkInput"
         class="border-slate-200 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700"
         placeholder="留空可删除备注"
         @keydown.enter="submitRemark"
       />
-      <div class="webqq-dialog-actions">
+      <DialogFooter>
         <Button variant="outline" class="border-slate-200 bg-white hover:bg-slate-100 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800" @click="remarkOpen = false">取消</Button>
         <Button class="bg-[var(--webqq-accent)] text-white hover:opacity-90" @click="submitRemark">保存</Button>
-      </div>
+      </DialogFooter>
     </DialogContent>
   </Dialog>
   <Dialog v-model:open="groupActionOpen">
     <DialogContent :style="{ '--webqq-accent': accentColor }">
-      <DialogTitle>{{ groupActionMode === 'name' ? '修改群名称' : '修改群名片' }}</DialogTitle>
-      <DialogDescription>
-        {{ groupActionMode === 'name' ? '新的群名称会对所有群成员和机器人可见。' : '留空可以清除当前群名片。' }}
-      </DialogDescription>
+      <DialogHeader>
+        <DialogTitle>{{ groupActionMode === 'name' ? '修改群名称' : '修改群名片' }}</DialogTitle>
+        <DialogDescription>
+          {{ groupActionMode === 'name' ? '新的群名称会对所有群成员和机器人可见。' : '留空可以清除当前群名片。' }}
+        </DialogDescription>
+      </DialogHeader>
       <Input
         v-model="groupActionInput"
         class="border-slate-200 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700"
         :placeholder="groupActionMode === 'name' ? '输入群名称' : '输入群名片'"
         @keydown.enter="submitGroupAction"
       />
-      <div class="webqq-dialog-actions">
+      <DialogFooter>
         <Button variant="outline" class="border-slate-200 bg-white hover:bg-slate-100 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800" @click="groupActionOpen = false">取消</Button>
         <Button class="bg-[var(--webqq-accent)] text-white hover:opacity-90" @click="submitGroupAction">保存</Button>
-      </div>
+      </DialogFooter>
     </DialogContent>
   </Dialog>
 </template>
@@ -49,7 +53,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Button } from './components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from './components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './components/ui/dialog'
 import { Input } from './components/ui/input'
 import EnvironmentEntityDialog from './environment-entity-dialog.vue'
 import type {

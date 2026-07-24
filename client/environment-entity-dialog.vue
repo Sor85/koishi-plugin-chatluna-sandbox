@@ -1,13 +1,13 @@
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
     <DialogContent :style="{ '--webqq-accent': accentColor }">
-      <header class="grid gap-1 pr-8">
+      <DialogHeader>
         <DialogTitle>{{ dialogTitle }}</DialogTitle>
         <DialogDescription>{{ dialogDescription }}</DialogDescription>
-      </header>
+      </DialogHeader>
 
-      <form v-if="mode === 'edit'" class="grid gap-4" @submit.prevent="submitEdit">
-        <div class="grid gap-1.5">
+      <form v-if="mode === 'edit'" class="webqq-secondary-form" @submit.prevent="submitEdit">
+        <div class="webqq-secondary-field">
           <Label :for="`${fieldPrefix}-id`">{{ target?.type === 'group' ? '群号' : 'QQ ID' }}</Label>
           <Input
             :id="`${fieldPrefix}-id`"
@@ -16,7 +16,7 @@
             disabled
           />
         </div>
-        <div class="grid gap-1.5">
+        <div class="webqq-secondary-field">
           <Label :for="`${fieldPrefix}-name`">{{ nameLabel }}</Label>
           <Input
             :id="`${fieldPrefix}-name`"
@@ -27,7 +27,7 @@
         </div>
 
         <template v-if="target?.type === 'bot'">
-          <div class="grid gap-1.5">
+          <div class="webqq-secondary-field">
             <Label :for="`${fieldPrefix}-implementation`">实现配置</Label>
             <Select v-model="draft.implementation">
               <SelectTrigger
@@ -143,21 +143,21 @@
         <p v-if="errorMessage" class="m-0 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/50 dark:text-red-300" role="alert">
           {{ errorMessage }}
         </p>
-        <footer class="flex justify-end gap-2">
+        <DialogFooter>
           <Button type="button" variant="outline" class="border-slate-200 bg-white hover:bg-slate-100 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800" @click="emit('update:open', false)">取消</Button>
           <Button type="submit" class="bg-[var(--webqq-accent)] text-white hover:opacity-90" :disabled="busy">{{ busy ? '保存中...' : '保存' }}</Button>
-        </footer>
+        </DialogFooter>
       </form>
 
-      <div v-else class="grid gap-4">
+      <div v-else class="webqq-secondary-form">
         <p class="m-0 text-sm leading-6 text-slate-600 dark:text-slate-300">{{ deleteMessage }}</p>
         <p v-if="errorMessage" class="m-0 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/50 dark:text-red-300" role="alert">
           {{ errorMessage }}
         </p>
-        <footer class="flex justify-end gap-2">
+        <DialogFooter>
           <Button type="button" variant="outline" class="border-slate-200 bg-white hover:bg-slate-100 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800" @click="emit('update:open', false)">取消</Button>
           <Button type="button" variant="destructive" :disabled="busy" @click="submitDelete">{{ busy ? '删除中...' : '确认删除' }}</Button>
-        </footer>
+        </DialogFooter>
       </div>
       <!-- Select 必须挂在 Dialog 内部，否则 reka-ui 的默认 Portal 层级会落到遮罩下方。绝对定位宿主不参与 Dialog 高度计算。 -->
       <div
@@ -174,7 +174,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
 import { Checkbox } from './components/ui/checkbox'
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from './components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './components/ui/dialog'
 import { Input } from './components/ui/input'
 import { Label } from './components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'

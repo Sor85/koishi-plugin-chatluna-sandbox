@@ -1,5 +1,16 @@
-.webqq-dialog-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
+[data-slot='dialog-content'],
+[data-slot='popover-content'] {
+  --webqq-secondary-title-gap: 4px;
+  --webqq-secondary-row-gap: 8px;
+  --webqq-secondary-section-gap: 16px;
+}
+
+.webqq-secondary-form {
+  display: grid;
+  gap: var(--webqq-secondary-section-gap, 16px);
+}
+
+.webqq-secondary-field {
+  display: grid;
+  gap: var(--webqq-secondary-row-gap, 8px);
 }

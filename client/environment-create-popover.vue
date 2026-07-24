@@ -10,13 +10,13 @@
       :aria-label="title"
       :style="{ '--webqq-accent': accentColor }"
     >
-      <form class="grid gap-4" @submit.prevent="submit">
+      <form class="webqq-secondary-form" @submit.prevent="submit">
         <header class="grid gap-1">
           <strong class="text-sm">{{ title }}</strong>
           <p class="m-0 text-xs leading-5 text-slate-500 dark:text-slate-400">{{ description }}</p>
         </header>
 
-        <div v-if="type === 'participant'" class="grid gap-1.5">
+        <div v-if="type === 'participant'" class="webqq-secondary-field">
           <Label for="environment-create-type">账号类型</Label>
           <Select v-model="participantType">
             <SelectTrigger
@@ -32,7 +32,7 @@
           </Select>
         </div>
 
-        <div class="grid gap-1.5">
+        <div class="webqq-secondary-field">
           <Label for="environment-create-id">{{ effectiveType === 'group' ? '群号' : 'QQ ID' }}</Label>
           <Input
             id="environment-create-id"
@@ -44,7 +44,7 @@
           />
         </div>
 
-        <div class="grid gap-1.5">
+        <div class="webqq-secondary-field">
           <Label for="environment-create-name">{{ effectiveType === 'user' ? '用户昵称' : effectiveType === 'bot' ? '机器人昵称' : '群名称' }}</Label>
           <Input
             id="environment-create-name"
@@ -55,7 +55,7 @@
         </div>
 
         <template v-if="effectiveType === 'bot'">
-          <div class="grid gap-1.5">
+          <div class="webqq-secondary-field">
             <Label for="environment-create-implementation">实现配置</Label>
             <Select v-model="botImplementation">
               <SelectTrigger

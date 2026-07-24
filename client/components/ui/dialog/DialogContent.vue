@@ -21,9 +21,10 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
     <DialogContent
       v-webqq-scrollbar
       data-slot="dialog-content"
+      class="sandbox-dialog-content"
       v-bind="{ ...$attrs, ...forwarded }"
       :class="cn(
-        'fixed inset-x-0 top-4 z-[151] mx-auto grid max-h-[calc(100vh-32px)] w-[min(520px,calc(100vw-24px))] gap-4 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
+        'fixed inset-x-0 top-4 z-[151] mx-auto grid max-h-[calc(100vh-32px)] w-[min(520px,calc(100vw-24px))] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
         props.class,
       )"
     >
@@ -34,3 +35,9 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
     </DialogContent>
   </DialogPortal>
 </template>
+
+<style scoped>
+.sandbox-dialog-content {
+  gap: var(--webqq-secondary-row-gap, 8px);
+}
+</style>
