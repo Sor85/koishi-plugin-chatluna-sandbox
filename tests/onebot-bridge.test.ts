@@ -21,6 +21,50 @@ async function createControl() {
 }
 
 describe('Koishi 与 OneBot 机器人桥接', () => {
+  it('多个机器人始终使用各自真实 selfId 处理协议事件与 action', async () => {
+    const { app, control } = await createControl()
+    control.createBot({ id: '20002', name: '第二机器人', implementation: 'llbot', enabled: true })
+    const secondBot = control.getRuntimeBot('20002')
+    const group = control.getSnapshot().groups[0]
+    control.updateGroup({
+      id: group.id,
+      name: group.name,
+      members: [...group.members, { participantId: '20002', role: 'admin' }],
+    })
+    const received: Array<{ selfId?: string; rawSelfId?: number; messageId?: string }> = []
+    app.middleware((session) => {
+      received.push({
+        selfId: session.selfId,
+        rawSelfId: (session as typeof session & { onebot?: { self_id?: number } }).onebot?.self_id,
+        messageId: session.messageId,
+      })
+    })
+
+    expect(secondBot.selfId).toBe('20002')
+    await expect(secondBot.internal._request('get_login_info', {})).resolves.toEqual({
+      status: 'ok',
+      retcode: 0,
+      data: { user_id: 20002, nickname: '第二机器人' },
+    })
+    const sent = await control.sendMessage({ operatorId: '10001', conversationId: 'group:30001', content: '多机器人事件' })
+    expect(received).toEqual(expect.arrayContaining([
+      { selfId: '20001', rawSelfId: 20001, messageId: sent.messageId },
+      { selfId: '20002', rawSelfId: 20002, messageId: sent.messageId },
+    ]))
+
+    await secondBot.internal._request('set_qq_profile', { nickname: '第二机器人新昵称' })
+    expect(control.getSnapshot().participants.find(({ id }) => id === '20002')).toMatchObject({ name: '第二机器人新昵称' })
+    expect(control.getSnapshot().participants.find(({ id }) => id === '20001')).toMatchObject({ name: 'Koishi' })
+
+    const privateResult = await secondBot.internal._request('send_private_msg', { user_id: 10001, message: '机器人主动私聊' }) as {
+      data: { message_id: string }
+    }
+    expect(control.getSnapshot().messages.find(({ id }) => id === privateResult.data.message_id)).toMatchObject({
+      authorId: '20002',
+      conversationId: 'private:10001:20002',
+    })
+  })
+
   it('机器人注册为在线 OneBot Bot，并通过 action 修改共享资料', async () => {
     const { control } = await createControl()
     const bot = control.bot

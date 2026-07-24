@@ -1,6 +1,7 @@
 import { Context, h, Random, Universal } from 'koishi'
 import { resolve } from 'node:path'
 import { SandboxBot } from './bot'
+import { SandboxChatLunaStateStore } from './chatluna-state'
 import { SandboxMediaStorage } from './media-storage'
 import {
   createDirectConversationId,
@@ -21,6 +22,7 @@ import {
   type PerformGroupActionResult,
   type SandboxBotDelivery,
   type SandboxBotProfile,
+  type SandboxChatLunaState,
   type SandboxConversation,
   type SandboxFriendship,
   type SandboxGroup,
@@ -128,10 +130,16 @@ export class SandboxControlService {
   private scene: SandboxSnapshot = createDefaultScene()
   private runtimeBots = new Map<string, SandboxBot>()
   private botDeliveries: SandboxBotDelivery[] = []
+  private chatLunaState: SandboxChatLunaStateStore
   private mediaStorage: SandboxMediaStorage
 
   constructor(private ctx: Context, options: SandboxControlServiceOptions = {}) {
     this.mediaStorage = new SandboxMediaStorage(options.mediaDirectory ?? resolve(ctx.baseDir, 'data/onebot-sandbox/media'))
+    this.chatLunaState = new SandboxChatLunaStateStore(ctx, (botParticipantId, conversationId) => {
+      const participant = this.scene.participants.find(({ id }) => id === botParticipantId)
+      const conversation = this.scene.conversations.find(({ id }) => id === conversationId)
+      return participant?.kind === 'bot' && !!conversation && this.isConversationVisible(botParticipantId, conversation)
+    })
     this.bot = this.createRuntimeBot({
       selfId: DEFAULT_BOT_ID,
       name: 'Koishi',
@@ -144,6 +152,10 @@ export class SandboxControlService {
 
   getBotDeliveries(): SandboxBotDelivery[] {
     return structuredClone(this.botDeliveries)
+  }
+
+  getChatLunaStates(): SandboxChatLunaState[] {
+    return this.chatLunaState.getStates()
   }
 
   getRuntimeBot(botId: string): SandboxBot {
@@ -280,6 +292,7 @@ export class SandboxControlService {
   deleteBot(input: DeleteSandboxBotInput): void {
     const index = this.scene.participants.findIndex(({ id, kind }) => id === input.id && kind === 'bot')
     if (index < 0) throw new Error(`机器人不存在：${input.id}`)
+    this.chatLunaState.deleteByBotParticipant(input.id)
     this.scene.participants.splice(index, 1)
     const runtime = this.runtimeBots.get(input.id)
     this.runtimeBots.delete(input.id)
@@ -1295,6 +1308,7 @@ export class SandboxControlService {
     const removedMessageIds = new Set(this.scene.messages
       .filter(({ conversationId }) => removedIds.has(conversationId))
       .map(({ id }) => id))
+    this.chatLunaState.deleteByConversationIds(removedIds)
     for (const media of this.scene.messages
       .filter(({ conversationId }) => removedIds.has(conversationId))
       .flatMap(({ media }) => media ?? [])) {

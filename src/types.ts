@@ -156,6 +156,20 @@ export interface SandboxBotDelivery {
   createdAt: string
 }
 
+export interface SandboxChatLunaTokenUsage {
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+}
+
+export interface SandboxChatLunaState {
+  botParticipantId: string
+  conversationId: string
+  thinking: boolean
+  usage?: SandboxChatLunaTokenUsage
+  updatedAt: string
+}
+
 export type SandboxMediaType = 'image' | 'file' | 'audio' | 'video'
 
 export interface SandboxMedia {
