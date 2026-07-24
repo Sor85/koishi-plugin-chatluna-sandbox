@@ -1,4 +1,4 @@
-import { App } from '@koishijs/core'
+import { App, Universal } from '@koishijs/core'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -34,7 +34,11 @@ describe('Koishi 控制台适配器', () => {
     })
     runningApps.push(app)
 
-    app.middleware((session) => `回复：${session.content}`)
+    let middlewareCalls = 0
+    app.middleware((session) => {
+      middlewareCalls += 1
+      return `回复：${session.content}`
+    })
     await app.start()
     if (!control) throw new Error('沙盒控制服务未注册')
 
@@ -51,6 +55,20 @@ describe('Koishi 控制台适配器', () => {
 
     registerConsole(consoleRegistrar, control, appearance)
 
+    const chatLunaSession = control.bot.session({
+      type: 'message',
+      user: { id: '10001', name: '测试用户1' },
+      channel: { id: 'private:10001:20001', type: Universal.Channel.Type.DIRECT },
+    })
+    await (app.parallel as unknown as (event: string, ...args: unknown[]) => Promise<void>)(
+      'chatluna/before-chat',
+      'console:chatluna',
+      {},
+      {},
+      {},
+      chatLunaSession,
+    )
+
     expect(entries).toEqual([{
       dev: expect.stringContaining('client/index.ts'),
       prod: expect.stringContaining('dist'),
@@ -66,6 +84,7 @@ describe('Koishi 控制台适配器', () => {
     const manageEnvironmentListener = listeners.get('onebot-sandbox/manage-environment')
     const friendActionListener = listeners.get('onebot-sandbox/friend-action')
     const groupActionListener = listeners.get('onebot-sandbox/group-action')
+    const botDeliveriesListener = listeners.get('onebot-sandbox/bot-deliveries')
     if (typeof snapshotListener !== 'function'
       || typeof historyListener !== 'function'
       || typeof sendMessageListener !== 'function'
@@ -75,24 +94,34 @@ describe('Koishi 控制台适配器', () => {
       || typeof deleteGroupAnnouncementListener !== 'function'
       || typeof manageEnvironmentListener !== 'function'
       || typeof friendActionListener !== 'function'
-      || typeof groupActionListener !== 'function') {
+      || typeof groupActionListener !== 'function'
+      || typeof botDeliveriesListener !== 'function') {
       throw new Error('控制台监听器未注册')
     }
 
-    const initialWorkspace = snapshotListener({ actorUserId: '10001' })
-    expect(initialWorkspace.snapshot.users.map(({ id }: { id: string }) => id)).toEqual([
+    const initialWorkspace = snapshotListener({ operatorId: '10001' })
+    expect(initialWorkspace.snapshot.participants.filter(({ kind }: { kind: string }) => kind === 'user').map(({ id }: { id: string }) => id)).toEqual([
       '10001',
       '10002',
       '10003',
     ])
-    expect(initialWorkspace.snapshot.bots.map(({ id }: { id: string }) => id)).toEqual(['20001'])
+    expect(initialWorkspace.snapshot.participants.filter(({ kind }: { kind: string }) => kind === 'bot').map(({ id }: { id: string }) => id)).toEqual(['20001'])
     expect(initialWorkspace.snapshot.groups.map(({ id }: { id: string }) => id)).toEqual(['30001'])
-    expect(initialWorkspace.snapshot.conversations.every(({ userId }: { userId: string }) => userId === '10001')).toBe(true)
+    expect(initialWorkspace.snapshot.conversations.every((conversation: { type: string; participantIds?: readonly string[]; groupId?: string }) => conversation.type === 'direct'
+      ? conversation.participantIds?.includes('10001')
+      : initialWorkspace.snapshot.groups.find(({ id }: { id: string }) => id === conversation.groupId)?.members
+        .some(({ participantId }: { participantId: string }) => participantId === '10001'))).toBe(true)
     expect(initialWorkspace.appearance).toEqual(appearance)
+    expect(initialWorkspace.chatLunaStates).toEqual([
+      expect.objectContaining({
+        botParticipantId: '20001',
+        conversationId: 'private:10001:20001',
+        thinking: true,
+      }),
+    ])
 
     const snapshot = await sendMessageListener({
-      actorUserId: '10001',
-      botId: '20001',
+      operatorId: '10001',
       conversationId: 'private:10001:20001',
       content: '控制台消息',
     })
@@ -100,10 +129,16 @@ describe('Koishi 控制台适配器', () => {
       '控制台消息',
       '回复：控制台消息',
     ])
+    expect(snapshot.snapshot.messages.every((message: Record<string, unknown>) => !('botId' in message))).toBe(true)
+    expect(snapshot.snapshot.conversations.every((conversation: Record<string, unknown>) => !('userId' in conversation) && !('botId' in conversation))).toBe(true)
+    const messageId = snapshot.snapshot.messages.find(({ content }: { content: string }) => content === '控制台消息')?.id
+    expect(botDeliveriesListener({ recipientBotId: '20001', messageId })).toEqual([
+      expect.objectContaining({ recipientBotId: '20001', messageId }),
+    ])
+    expect(() => botDeliveriesListener({ botId: '20001' })).toThrow('不支持旧 RPC 字段：botId')
 
     const mediaWorkspace = await sendMediaMessageListener({
-      actorUserId: '10001',
-      botId: '20001',
+      operatorId: '10001',
       conversationId: 'private:10001:20001',
       fileName: '控制台图片.png',
       mimeType: 'image/png',
@@ -111,17 +146,21 @@ describe('Koishi 控制台适配器', () => {
     })
     const media = mediaWorkspace.snapshot.messages.find(({ media }: { media?: unknown[] }) => media?.length)?.media?.[0]
     expect(media).toEqual(expect.objectContaining({ name: '控制台图片.png', type: 'image' }))
-    expect(getMediaContentListener({ actorUserId: '10001', mediaId: media.id })).toEqual(expect.objectContaining({
+    expect(getMediaContentListener({ operatorId: '10001', mediaId: media.id })).toEqual(expect.objectContaining({
       id: media.id,
       dataBase64: 'Y29uc29sZS1pbWFnZQ==',
     }))
 
-    const otherWorkspace = snapshotListener({ actorUserId: '10002' })
-    expect(otherWorkspace.snapshot.conversations.every(({ userId }: { userId: string }) => userId === '10002')).toBe(true)
+    const otherWorkspace = snapshotListener({ operatorId: '10002' })
+    expect(otherWorkspace.snapshot.conversations.every((conversation: { type: string; participantIds?: readonly string[]; groupId?: string }) => conversation.type === 'direct'
+      ? conversation.participantIds?.includes('10002')
+      : otherWorkspace.snapshot.groups.find(({ id }: { id: string }) => id === conversation.groupId)?.members
+        .some(({ participantId }: { participantId: string }) => participantId === '10002'))).toBe(true)
     expect(otherWorkspace.snapshot.messages).toEqual([])
+    expect(otherWorkspace.chatLunaStates).toEqual([])
 
     const history = historyListener({
-      actorUserId: '10001',
+      operatorId: '10001',
       conversationId: 'private:10001:20001',
       limit: 1,
     })
@@ -129,46 +168,77 @@ describe('Koishi 控制台适配器', () => {
     expect(history.nextBeforeMessageId).toBeDefined()
 
     const updated = setGroupAnnouncementListener({
-      actorUserId: '10001',
+      operatorId: '10001',
       groupId: '30001',
       content: '控制台发布的公告',
     })
     expect(updated.snapshot.groups[0].announcements[0].content).toBe('控制台发布的公告')
     const removed = deleteGroupAnnouncementListener({
-      actorUserId: '10001',
+      operatorId: '10001',
       groupId: '30001',
       announcementId: updated.snapshot.groups[0].announcements[0].id,
     })
     expect(removed.snapshot.groups[0].announcements.some(({ content }: { content: string }) => content === '控制台发布的公告')).toBe(false)
 
+    const middlewareCallsBeforeManage = middlewareCalls
     const managed = manageEnvironmentListener({
       action: 'create-user',
       data: { id: '10099', name: '控制台用户' },
     })
-    expect(managed.snapshot.users).toContainEqual({ id: '10099', name: '控制台用户' })
+    expect(managed.snapshot.participants).toContainEqual({ kind: 'user', id: '10099', name: '控制台用户' })
+    expect(middlewareCalls).toBe(middlewareCallsBeforeManage)
 
     const friendWorkspace = await friendActionListener({
       action: 'request',
-      actorUserId: '10001',
+      operatorId: '10001',
       targetId: '10002',
     })
     expect(friendWorkspace.snapshot.requests.some(({ requesterId, targetId }: { requesterId: string; targetId?: string }) => requesterId === '10001' && targetId === '10002')).toBe(true)
 
     const groupWorkspace = await groupActionListener({
       action: 'set-card',
-      actorUserId: '10002',
+      operatorId: '10002',
       groupId: '30001',
       targetId: '10002',
       card: '控制台群名片',
     })
     expect(groupWorkspace.snapshot.groups[0].members.find(({ participantId }: { participantId: string }) => participantId === '10002')?.card).toBe('控制台群名片')
 
+    const botWorkspace = snapshotListener({ operatorId: '20001' })
+    expect(botWorkspace.snapshot.conversations.length).toBeGreaterThan(0)
+    expect(botWorkspace.snapshot.conversations.every((conversation: { type: string; participantIds?: readonly string[]; groupId?: string }) => conversation.type === 'direct'
+      ? conversation.participantIds?.includes('20001')
+      : botWorkspace.snapshot.groups.find(({ id }: { id: string }) => id === conversation.groupId)?.members
+        .some(({ participantId }: { participantId: string }) => participantId === '20001'))).toBe(true)
+    const botConversationUserIds = new Set(botWorkspace.snapshot.conversations.flatMap((conversation: { type: string; participantIds?: readonly string[] }) => conversation.type === 'direct'
+      ? conversation.participantIds?.filter((id) => id !== '20001') ?? []
+      : []))
+    expect(['10001', '10002', '10003'].every((userId) => botConversationUserIds.has(userId))).toBe(true)
+
     const afterCurrentUserDeleted = manageEnvironmentListener({
-      actorUserId: '10001',
       action: 'delete-user',
       data: { id: '10001' },
     })
-    expect(afterCurrentUserDeleted.snapshot.users.some(({ id }: { id: string }) => id === '10001')).toBe(false)
-    expect(afterCurrentUserDeleted.snapshot.conversations.every(({ userId }: { userId: string }) => userId === '10002')).toBe(true)
+    expect(afterCurrentUserDeleted.snapshot.participants.some(({ id }: { id: string }) => id === '10001')).toBe(false)
+    expect(afterCurrentUserDeleted.snapshot.conversations.every((conversation: { type: string; participantIds?: readonly string[]; groupId?: string }) => conversation.type === 'direct'
+      ? conversation.participantIds?.includes('10002')
+      : afterCurrentUserDeleted.snapshot.groups.find(({ id }: { id: string }) => id === conversation.groupId)?.members
+        .some(({ participantId }: { participantId: string }) => participantId === '10002'))).toBe(true)
+
+    expect(() => snapshotListener({ operatorId: '99999' })).toThrow('参与者不存在：99999')
+    expect(() => snapshotListener({ userId: '10001' })).toThrow('不支持旧 RPC 字段：userId')
+    await expect(sendMessageListener({
+      operatorId: '10002',
+      senderId: '10003',
+      botId: '20001',
+      conversationId: 'private:10002:20001',
+      content: '伪造发送者',
+    })).rejects.toThrow('不支持旧 RPC 字段：senderId')
+    expect(() => manageEnvironmentListener({
+      operatorId: '10002',
+      action: 'create-user',
+      data: { id: '10100', name: '不应创建' },
+    })).toThrow('环境管理不接受操作者字段：operatorId')
+    expect(control.getSnapshot().participants.some(({ id }) => id === '10100')).toBe(false)
   })
 })

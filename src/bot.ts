@@ -1,5 +1,6 @@
 import { Bot, Context, Fragment, h, Universal } from 'koishi'
 import type { SandboxControlService } from './control-service'
+import { createDirectConversationId, createGroupConversationId, getDirectConversationPeerId } from './types'
 
 export namespace SandboxBot {
   export interface Config {
@@ -102,8 +103,12 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           const groupId = String(params.group_id ?? '')
           await this.getGuild(groupId)
           const content = this.normalizeOneBotMessage(params.message)
-          const messageIds = this.control.recordBotGroupMessage(this.selfId, groupId, content).map(({ id }) => id)
-          return { status: 'ok', retcode: 0, data: { message_id: messageIds[0] } }
+          const result = await this.control.sendMessage({
+            operatorId: this.selfId,
+            conversationId: createGroupConversationId(groupId),
+            content,
+          })
+          return { status: 'ok', retcode: 0, data: { message_id: result.messageId } }
         }
         if (action === 'send_msg') {
           if (params.message_type === 'group' || params.group_id !== undefined) {
@@ -209,18 +214,16 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
 
   async createDirectChannel(userId: string): Promise<Universal.Channel> {
     return {
-      id: `private:${userId}:${this.selfId}`,
+      id: createDirectConversationId(userId, this.selfId),
       type: Universal.Channel.Type.DIRECT,
     }
   }
 
   async getUser(userId: string): Promise<Universal.User> {
     const snapshot = this.control.getSnapshot()
-    const user = snapshot.users.find(({ id }) => id === userId)
-    const bot = snapshot.bots.find(({ id }) => id === userId)
-    const participant = user ?? bot
+    const participant = snapshot.participants.find(({ id }) => id === userId)
     if (!participant) throw new Error(`参与者不存在：${userId}`)
-    return { id: participant.id, name: participant.name, avatar: participant.avatar, isBot: !!bot }
+    return { id: participant.id, name: participant.name, avatar: participant.avatar, isBot: participant.kind === 'bot' }
   }
 
   async getFriendList(): Promise<Universal.List<Universal.Friend>> {
@@ -330,8 +333,8 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     if (this.status !== Universal.Status.ONLINE) throw new Error(`机器人已离线：${this.selfId}`)
     const content = h.normalize(fragment).join('').trim()
     if (!content) return []
-    const message = this.control.recordBotMessage(channelId, content)
-    return [message.id]
+    const result = await this.control.sendMessage({ operatorId: this.selfId, conversationId: channelId, content })
+    return [result.messageId]
   }
 
   private toOneBotUser(user?: Universal.User) {
@@ -353,14 +356,14 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
   }
 
   private getVisibleConversation(channelId: string) {
-    const conversation = this.control.getSnapshot().conversations.find(({ id, botId }) => id === channelId && botId === this.selfId)
+    const conversation = this.control.getVisibleSnapshot(this.selfId).conversations.find(({ id }) => id === channelId)
     if (!conversation) throw new Error(`会话不存在：${channelId}`)
     return conversation
   }
 
   private findVisibleMessage(messageId: string, channelId?: string) {
-    const snapshot = this.control.getSnapshot()
-    const message = snapshot.messages.find(({ id, botId, conversationId }) => id === messageId && botId === this.selfId
+    const snapshot = this.control.getVisibleSnapshot(this.selfId)
+    const message = snapshot.messages.find(({ id, conversationId }) => id === messageId
       && (!channelId || conversationId === channelId))
     if (!message) throw new Error(`消息不存在：${messageId}`)
     return message
@@ -399,13 +402,16 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
 
   private toOneBotMessage(message: ReturnType<SandboxControlService['getSnapshot']>['messages'][number]) {
     const conversation = this.control.getSnapshot().conversations.find(({ id }) => id === message.conversationId)
+    const directPeerId = conversation?.type === 'direct'
+      ? getDirectConversationPeerId(conversation, this.selfId)
+      : undefined
     return {
       time: Math.floor(new Date(message.createdAt).getTime() / 1000),
       message_type: conversation?.type === 'group' ? 'group' : 'private',
       message_id: message.id,
       real_id: message.id,
-      sender: { user_id: Number(message.authorId), nickname: this.control.getSnapshot().users.find(({ id }) => id === message.authorId)?.name ?? this.user?.name ?? message.authorId },
-      user_id: Number(conversation?.userId ?? message.authorId),
+      sender: { user_id: Number(message.authorId), nickname: this.control.getSnapshot().participants.find(({ id }) => id === message.authorId)?.name ?? this.user?.name ?? message.authorId },
+      user_id: Number(conversation?.type === 'group' ? message.authorId : directPeerId ?? message.authorId),
       group_id: conversation?.groupId ? Number(conversation.groupId) : undefined,
       message: [{ type: 'text', data: { text: message.content } }],
       raw_message: message.content,

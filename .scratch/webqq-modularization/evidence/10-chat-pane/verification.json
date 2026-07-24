@@ -1,0 +1,12 @@
+{
+  "verifiedAt": "2026-07-23",
+  "route": "http://127.0.0.1:5140/onebot-sandbox",
+  "chatRoots": 1,
+  "title": "测试群",
+  "messageListVisible": true,
+  "composerVisible": true,
+  "detailsButton": "关闭会话信息",
+  "sentMessage": "票据10聊天区域验证",
+  "composerErrors": [],
+  "consoleFailures": []
+}

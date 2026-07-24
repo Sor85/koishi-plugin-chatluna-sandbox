@@ -1,0 +1,465 @@
+.webqq-composer-layout-root {
+  position: absolute;
+  right: 0;
+  bottom: 20px;
+  left: 0;
+  z-index: 3;
+  height: 44px;
+  pointer-events: none;
+}
+
+.webqq-composer {
+  position: absolute;
+  right: calc(50% - 230px);
+  bottom: 0;
+  z-index: 1;
+  isolation: isolate;
+  display: flex;
+  width: 460px;
+  max-width: calc(100% - 96px);
+  min-height: 44px;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--webqq-text);
+  background: transparent;
+  pointer-events: auto;
+}
+
+.webqq-composer-reply,
+.webqq-composer-media {
+  position: absolute;
+  right: 14px;
+  bottom: calc(100% + 8px);
+  left: 14px;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--webqq-border);
+  border-radius: 12px;
+  color: var(--webqq-muted);
+  background: var(--webqq-panel);
+  box-shadow: 0 8px 18px rgb(15 23 42 / 8%);
+  font-size: 12px;
+}
+
+.webqq-composer-reply span,
+.webqq-composer-media span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webqq-composer-reply button,
+.webqq-composer-media button {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  color: inherit;
+  background: transparent;
+}
+
+.webqq-composer-reply button:hover,
+.webqq-composer-reply button:focus-visible,
+.webqq-composer-media button:hover,
+.webqq-composer-media button:focus-visible {
+  color: var(--webqq-text);
+  outline: none;
+  background: var(--webqq-hover);
+}
+
+.webqq-composer-media {
+  bottom: calc(100% + 8px);
+}
+
+.webqq-composer-media.has-reply {
+  bottom: calc(100% + 54px);
+}
+
+.webqq-composer::before {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  bottom: -1px;
+  left: calc(-1px - var(--webqq-composer-visual-extension, 0px));
+  z-index: -1;
+  box-sizing: border-box;
+  border: 1px solid rgb(255 255 255 / 66%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 94%);
+  box-shadow: 0 8px 18px rgb(15 23 42 / 8%);
+  content: "";
+  pointer-events: none;
+  transition: left 0.18s ease;
+}
+
+.webqq-workspace.is-frosted .webqq-composer::before {
+  background: rgb(255 255 255 / 62%);
+  backdrop-filter: saturate(180%) blur(22px);
+}
+
+.webqq-composer-user-layout-root {
+  position: relative;
+  display: inline-flex;
+  width: var(--webqq-user-layout-width, 36px);
+  height: 36px;
+  flex: 0 0 auto;
+}
+
+.webqq-composer-user-capsule {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  display: inline-flex;
+  width: var(--webqq-user-capsule-collapsed-width, 36px);
+  height: 36px;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 0;
+  box-sizing: border-box;
+  pointer-events: auto;
+  transition: width 0.18s ease;
+}
+
+.webqq-composer-user-capsule.is-expanded {
+  width: var(--webqq-user-capsule-expanded-width, var(--webqq-user-capsule-collapsed-width, 36px));
+}
+
+.webqq-composer-user-avatar {
+  --webqq-avatar-size: 36px;
+  --webqq-bot-badge-size: 15px;
+  --webqq-bot-badge-offset: -2px;
+  --webqq-bot-badge-border: 2px;
+
+  position: relative;
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--webqq-accent);
+  box-shadow: 0 0 0 2px #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.webqq-composer-user-stack {
+  position: relative;
+  z-index: 2;
+  width: var(--webqq-user-stack-collapsed-width, 36px);
+  height: 36px;
+  flex: 0 0 auto;
+  margin: 0;
+  pointer-events: auto;
+  transition: width 0.18s ease;
+}
+
+.webqq-composer-user-stack.is-expanded {
+  width: var(--webqq-user-stack-expanded-width, var(--webqq-user-stack-collapsed-width, 36px));
+}
+
+.webqq-composer-user-stack.is-expanded .webqq-composer-user-switch {
+  right: var(--webqq-user-expanded-right, 0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.webqq-composer-user-stack.is-expanded .webqq-composer-user-overflow {
+  right: var(--webqq-user-overflow-expanded-right, var(--webqq-user-overflow-right, 0));
+  opacity: 0;
+}
+
+.webqq-composer-user-stack.is-expanded .webqq-composer-user-add {
+  right: var(--webqq-user-add-expanded-right, var(--webqq-user-add-collapsed-right, 0));
+}
+
+.webqq-composer-user-switch {
+  position: absolute;
+  top: 0;
+  right: var(--webqq-user-collapsed-right, 0);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  transition: right 0.18s ease, opacity 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.webqq-composer-user-button {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 折叠时只能用透明度隐藏额外头像；display/visibility 会让 Anime.js FLIP
+   把节点当作进入或离开元素，导致头像跟随胶囊位移并留下重影。 */
+.webqq-composer-user-switch.is-collapsed-extra {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.webqq-composer-user-button:focus-visible {
+  z-index: 20 !important;
+  outline: 2px solid var(--webqq-accent);
+  outline-offset: 3px;
+}
+
+.webqq-composer-user-menu {
+  translate: 0 calc(-100% - 16px);
+}
+
+.webqq-composer-user-avatar.is-bot {
+  color: #fff;
+  background: #475569;
+}
+
+.webqq-workspace[data-color-mode="dark"] .webqq-composer-user-avatar.is-bot {
+  background: #64748b;
+}
+
+.webqq-composer-user-add {
+  position: absolute;
+  top: 0;
+  right: var(--webqq-user-add-collapsed-right, 0);
+  z-index: 0;
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border: 1px dashed color-mix(in srgb, var(--webqq-accent) 52%, transparent);
+  border-radius: 50%;
+  color: var(--webqq-accent);
+  background: color-mix(in srgb, var(--webqq-accent) 11%, #fff);
+  box-shadow: 0 0 0 2px #fff;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: right 0.18s ease, opacity 0.12s ease, background-color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.webqq-composer-user-add.is-collapsed-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.webqq-composer-user-add:hover {
+  background: color-mix(in srgb, var(--webqq-accent) 18%, #fff);
+}
+
+.webqq-composer-user-add:focus-visible {
+  z-index: 20;
+  outline: 2px solid var(--webqq-accent);
+  outline-offset: 3px;
+}
+
+.webqq-composer-user-stack.is-expanded .webqq-composer-user-switch.is-collapsed-extra {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.webqq-composer-user-overflow {
+  position: absolute;
+  top: 0;
+  right: var(--webqq-user-overflow-right, 0);
+  z-index: var(--webqq-user-overflow-z-index, 0);
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding-right: 15px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  color: var(--webqq-text);
+  background: color-mix(in srgb, var(--webqq-accent) 16%, #fff 84%);
+  box-shadow: 0 0 0 2px #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: left;
+  pointer-events: none;
+  transition: right 0.18s ease, opacity 0.12s ease;
+  will-change: opacity;
+}
+
+.webqq-composer-user-overflow-avatar,
+.webqq-composer-user-overflow-label {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+}
+
+.webqq-composer-user-overflow-avatar {
+  color: #fff;
+  background: var(--webqq-accent);
+  opacity: 0;
+  clip-path: inset(0 100% 0 0 round 999px);
+}
+
+.webqq-composer-user-overflow-label {
+  padding-right: 15px;
+  box-sizing: border-box;
+  background: inherit;
+  clip-path: inset(0 0 0 0 round 999px);
+}
+
+.webqq-composer-user-overflow-plus,
+.webqq-composer-user-overflow-count {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.webqq-composer-user-stack.is-overflow-expanding .webqq-composer-user-overflow {
+  opacity: 1;
+}
+
+.webqq-composer-user-stack.is-overflow-expanding .webqq-composer-user-switch.is-collapsed-extra,
+.webqq-composer-user-stack.is-overflow-collapsing .webqq-composer-user-switch.is-collapsed-extra {
+  opacity: 1;
+  pointer-events: none;
+}
+
+.webqq-composer-user-stack.is-overflow-collapsing .webqq-composer-user-overflow {
+  opacity: 1;
+}
+
+.webqq-composer-user-stack.is-overflow-collapsing .webqq-composer-user-overflow-avatar {
+  animation: webqq-user-overflow-avatar-erase 190ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.webqq-composer-user-stack.is-overflow-collapsing .webqq-composer-user-overflow-label {
+  animation: webqq-user-overflow-label-reveal 190ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes webqq-user-overflow-avatar-erase {
+  0% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 999px);
+  }
+
+  100% {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0 round 999px);
+  }
+}
+
+@keyframes webqq-user-overflow-label-reveal {
+  0% {
+    clip-path: inset(0 0 0 100% round 999px);
+  }
+
+  100% {
+    clip-path: inset(0 0 0 0 round 999px);
+  }
+}
+
+.webqq-composer-main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.webqq-composer textarea {
+  display: block;
+  width: 100%;
+  height: 32px;
+  max-height: 92px;
+  overflow-y: auto;
+  resize: none;
+  border: 0;
+  padding: 6px 2px;
+  outline: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  line-height: 20px;
+}
+
+.webqq-composer textarea::placeholder {
+  color: var(--webqq-muted);
+}
+
+.webqq-composer-action {
+  display: inline-flex;
+  width: 32px;
+  min-height: 32px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--webqq-accent);
+  background: transparent;
+  cursor: pointer;
+}
+
+.webqq-composer-action.is-primary {
+  width: 36px;
+  min-height: 36px;
+  color: #fff;
+  background: var(--webqq-accent);
+}
+
+.webqq-composer-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.webqq-composer-error {
+  position: absolute;
+  right: 8px;
+  bottom: calc(100% + 8px);
+  max-width: 100%;
+  overflow: hidden;
+  color: #dc2626;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webqq-workspace[data-color-mode="dark"] .webqq-composer-user-add {
+  background: color-mix(in srgb, var(--webqq-accent) 18%, #0f172a);
+  box-shadow: 0 0 0 2px #0f172a;
+}

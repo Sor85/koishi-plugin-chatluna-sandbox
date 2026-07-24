@@ -1,0 +1,18 @@
+{
+  "verifiedAt": "2026-07-23",
+  "route": "http://127.0.0.1:5140/onebot-sandbox",
+  "viewport": {
+    "width": 1738,
+    "height": 949
+  },
+  "theme": "light",
+  "interactions": {
+    "textMessage": {
+      "content": "票据04浏览器验证",
+      "messageVisible": true,
+      "inputCleared": true
+    }
+  },
+  "chatLunaMarkupChanged": false,
+  "consoleFailures": []
+}

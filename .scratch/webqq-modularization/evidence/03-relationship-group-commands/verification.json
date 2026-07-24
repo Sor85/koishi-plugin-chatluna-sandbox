@@ -1,0 +1,29 @@
+{
+  "verifiedAt": "2026-07-23",
+  "route": "http://127.0.0.1:5140/onebot-sandbox",
+  "viewport": {
+    "width": 1400,
+    "height": 900
+  },
+  "theme": "light",
+  "interactions": {
+    "friendRemark": {
+      "target": "Koishi",
+      "temporaryRemark": "控制模块验证",
+      "listUpdated": true,
+      "restored": true
+    },
+    "groupName": {
+      "groupId": "30001",
+      "temporaryName": "控制模块验证群",
+      "sidebarUpdated": true,
+      "chatHeaderUpdated": true,
+      "restored": true
+    },
+    "finalState": {
+      "currentOperator": "测试用户1",
+      "groupName": "测试群"
+    }
+  },
+  "consoleFailures": []
+}

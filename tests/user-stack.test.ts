@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { getUserStackLayoutMetrics, getUserStackMetrics, orderUsersByActive } from '../client/user-stack'
+import { getUserStackLayoutMetrics, getUserStackMetrics, orderUsersByActive } from '../client/webqq/user-stack'
 
 describe('发送框用户头像组', () => {
   const users = [
@@ -51,21 +51,20 @@ describe('发送框用户头像组', () => {
   })
 
   it('在发送消息控件中统一创建普通用户和机器人', () => {
-    const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
+    const composerSource = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
     const popoverSource = readFileSync(resolve('client/environment-create-popover.vue'), 'utf8')
 
-    expect(pageSource).toContain('type="participant"')
-    expect(pageSource).not.toContain('type="bot"')
+    expect(composerSource).toContain('type="participant"')
     expect(popoverSource).toContain('<SelectItem value="user"')
     expect(popoverSource).toContain('<SelectItem value="bot"')
   })
 
   it('头像菜单在 Tooltip 内部直接绑定按钮以保留右键坐标', () => {
-    const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
+    const composerSource = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
 
-    expect(pageSource).toContain('<Tooltip\n                        v-for="(sender, index) in userStackUsers"')
-    expect(pageSource).toContain('<ContextMenu>\n                              <ContextMenuTrigger as-child>\n                                <button')
-    expect(pageSource).not.toContain('<ContextMenu\n                        v-for="(sender, index) in userStackUsers"')
-    expect(pageSource).toContain('class="webqq-composer-user-menu" style="z-index: 160"')
+    expect(composerSource).toContain('<Tooltip v-for="(sender, index) in orderedSenders"')
+    expect(composerSource).toContain('<ContextMenu>\n                      <ContextMenuTrigger as-child>\n                        <button')
+    expect(composerSource).not.toContain('<ContextMenu v-for="(sender, index) in orderedSenders"')
+    expect(composerSource).toContain('class="webqq-composer-user-menu" style="z-index: 160"')
   })
 })

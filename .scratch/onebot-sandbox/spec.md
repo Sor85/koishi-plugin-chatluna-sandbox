@@ -13,20 +13,20 @@ Koishi 原版 sandbox 适合快速发送消息和观察插件回复，但不足�
 - 一个 Koishi 实例中同时存在多个机器人时，插件是否正确区分机器人、会话和状态
 - 插件修改机器人自身昵称或头像后，新的机器人资料是否真实反映在后续环境中
 - ChatLuna 的思考状态和 Token 用量是否与正确的机器人及会话关联
-- 外部 AI 是否可以自主准备测试用户、执行交互并读取结构化结果，而不获得不必要的完整环境管理权限
+- 外部 AI 是否可以在隔离测试空间中自主准备参与者、执行交互并读取结构化结果，而不污染主模拟 QQ 环境
 
 现有 `koishi-plugin-onebot-webqq` 提供了接近 QQ 的 WebQQ 视觉和交互形式，但其界面入口、Vue 实现、胶囊运行方式和真实 OneBot 运行时耦合，不适合作为本插件的直接实现。用户需要保留该界面的视觉与使用习惯，同时把它改造成从 Koishi 左侧导航进入、铺满内容区域的独立沙盒工作台。
 
 ## Solution
 
-创建 `onebot-sandbox` Koishi 插件，在一个服务端持有的沙盒场景中模拟用户、虚拟 OneBot 机器人、好友关系、群组、成员角色、消息、申请、通知、媒体和权限。插件同时提供：
+创建 `onebot-sandbox` Koishi 插件，在服务端持有的沙盒场景中模拟参与者、好友关系、群组、成员角色、逻辑会话、消息、申请、通知、媒体和权限。插件同时提供：
 
 - 一个以 `onebot-webqq` 当前界面为视觉基线、使用 Vue、Tailwind CSS 和 shadcn-vue 重写的 WebQQ 工作台
 - 一个兼容标准 Koishi 行为、OneBot 原始事件、`bot.internal` 和底层 action 调用的虚拟 OneBot 机器人层
 - 可分别选择 NapCat 或 LLBot 实现配置的多机器人目录，以及按机器人禁用能力的能力覆盖
 - 默认以内存为唯一真实状态，并可选择 Koishi Database 进行场景持久化的状态层
 - 用于观察 OneBot 调用、原始事件、错误、ChatLuna 思考状态和 Token 用量的调试能力
-- 默认关闭、独立监听、安全受控的 MCP Streamable HTTP 测试控制端点，供外部 AI 读取环境、创建测试用户、执行真实用户交互并等待结果
+- 默认关闭、独立监听、安全受控的 MCP Streamable HTTP 测试控制端点，供外部 AI 读取环境、执行真实用户交互并等待结果；隔离 AI 测试空间在基础 MCP 完成后单独实现
 
 WebQQ 与 MCP 共用同一个传输无关的测试控制服务。该服务是主要测试接缝，也是用户交互、环境管理、权限校验、事件生成和状态变更的唯一领域入口。WebQQ RPC 与 MCP 只负责输入输出适配，不复制业务规则。
 
@@ -37,15 +37,15 @@ WebQQ 与 MCP 共用同一个传输无关的测试控制服务。该服务是主
 3. As a WebQQ user, I want the workspace to visually reproduce the existing onebot-webqq interface, so that familiar navigation, conversations and controls remain recognizable.
 4. As a WebQQ user, I want the workspace to fill the available Koishi content area, so that the QQ-style three-column interface has enough usable space.
 5. As a Koishi administrator, I want appearance options to be global plugin configuration, so that all operators see one consistent WebQQ theme.
-6. As a WebQQ user, I want my selected current user and current view to remain browser-local, so that another browser can independently operate a different user without changing the shared environment.
-7. As a WebQQ user, I want to switch between ordinary users freely, so that I can reproduce interactions from different QQ identities.
+6. As a WebQQ user, I want my selected current operator and current view to remain browser-local, so that another browser can independently operate a different participant without changing the shared environment.
+7. As a WebQQ user, I want to switch between ordinary users and virtual OneBot robots freely, so that I can reproduce interactions from different QQ identities.
 8. As a test environment administrator, I want to create, edit and delete ordinary users, so that I can prepare the exact participants required by a plugin test.
 9. As a test environment administrator, I want to create, enable, disable and delete virtual OneBot robots freely, so that I am not limited to fixed NapCat and LLBot slots.
 10. As a test environment administrator, I want each virtual robot to select NapCat or LLBot independently, so that both implementations can coexist in one scene.
 11. As a plugin developer, I want each robot to expose its implementation baseline and snapshot date, so that I know which upstream behavior is being simulated.
 12. As a plugin developer, I want to disable individual supported capabilities on a robot, so that I can verify capability detection and graceful degradation.
 13. As a plugin developer, I want unsupported actions to return an explicit unsupported result, so that the sandbox never hides a missing capability by pretending success.
-14. As a WebQQ user, I want every manual action to originate from the selected current user, so that the workspace behaves like a user-side QQ client.
+14. As a WebQQ user, I want every manual action to originate from the selected current operator, so that the workspace consistently follows one participant identity.
 15. As a plugin developer, I want operators to be unable to act directly as a robot, so that tests cannot bypass the plugin behavior being validated.
 16. As a WebQQ user, I want to send private messages to friends and robots, so that I can test normal direct-message handling.
 17. As a WebQQ user, I want to send messages to groups I belong to, so that I can test group message handling.
@@ -101,16 +101,16 @@ WebQQ 与 MCP 共用同一个传输无关的测试控制服务。该服务是主
 67. As a Koishi administrator, I want an explicit insecure-remote escape hatch with persistent warnings, so that temporary development needs do not silently become production defaults.
 68. As a Koishi administrator, I want multiple named Bearer credentials, so that different test controllers can be identified and revoked independently.
 69. As a Koishi administrator, I want generated credential tokens displayed only once and stored only as digests, so that plaintext secrets cannot be recovered from configuration or logs.
-70. As a Koishi administrator, I want credentials scoped to read, interact, provision, manage and debug capabilities, so that each controller receives only the access it needs.
+70. As a Koishi administrator, I want credentials scoped to read, interact, manage and debug capabilities, so that each controller receives only the access it needs.
 71. As an external AI with read access, I want to inspect the scene, roles, capabilities, conversations and requests, so that I can understand the current test conditions.
 72. As an external AI with interact access, I want to act as an explicitly selected ordinary user, so that my actions obey the same QQ permissions as WebQQ interactions.
-73. As an external AI, I want every interactive tool to require `actorUserId`, so that there is no hidden or session-global identity.
-74. As an external AI, I want to create a test user with the required profile, relationships and group role, so that I can autonomously prepare missing test identities.
-75. As an external AI, I want to create a new group owned by my test user when group-owner behavior is required, so that I can test owner-only actions without taking over an existing group.
-76. As a Koishi administrator, I want provision access separated from full environment management, so that an AI can create its own test users without modifying unrelated existing entities.
-77. As an external AI, I want test users tied to my credential and optional test run, so that I cannot alter or release another controller's users.
-78. As an external AI, I want test users to expire automatically, so that abandoned automation runs do not permanently pollute the scene.
-79. As an external AI, I want to release my own test user without a destructive confirmation flow, so that normal cleanup remains simple.
+73. As an external AI, I want every interactive tool to require `operatorId`, so that there is no hidden or session-global identity.
+74. As an external AI, I want to create an isolated blank test space after the base MCP surface is complete, so that I can prepare test participants without modifying the main environment.
+75. As an external AI, I want every test-space operation to require `spaceId`, so that concurrent tests cannot affect another space.
+76. As a WebQQ user, I want to observe all test spaces as live workspace thumbnails, so that I can see what external AI controllers are doing.
+77. As a WebQQ user, I want to take over and return a test space, so that I can safely intervene without racing the AI controller.
+78. As an external AI, I want completed spaces preserved by default, so that users can inspect test evidence after execution.
+79. As an external AI, I want to delete my completed space when the user requests cleanup, so that temporary environments can be removed deliberately.
 80. As an external AI, I want to upload media once and reference it by ID, so that message tools do not carry large Base64 payloads repeatedly.
 81. As a Koishi administrator, I want external HTTPS media references not to be fetched by the server, so that the MCP surface cannot be used for SSRF.
 82. As an external AI, I want mutating calls to require idempotency keys, so that retries cannot duplicate messages, users or management operations.
@@ -137,8 +137,8 @@ WebQQ 与 MCP 共用同一个传输无关的测试控制服务。该服务是主
 
 ### Product Boundary
 
-- The plugin models one shared simulated QQ environment per Koishi instance.
-- A sandbox scene contains virtual OneBot robots, ordinary users, test users, friendships, groups, memberships, roles, requests, conversations, messages, media references, notifications and capability settings.
+- The main simulated QQ environment and every future AI test space own independent sandbox scenes.
+- A sandbox scene contains a unified participant directory, friendships, groups, memberships, roles, requests, logical conversations, single-copy messages, media references, notifications and capability settings.
 - Virtual OneBot robots do not accept external OneBot HTTP or WebSocket connections.
 - The first release prioritizes capabilities that query or modify the simulated QQ environment and the common runtime status calls required by plugins.
 - Host-only capabilities such as cookies, login credentials, device control, cache manipulation, OCR and AI voice are not simulated in the first release.
@@ -152,12 +152,12 @@ WebQQ 与 MCP 共用同一个传输无关的测试控制服务。该服务是主
 - The WebQQ workspace is registered directly as a Koishi Vue console page without an additional cross-framework mounting layer.
 - The workspace is registered in the Koishi left navigation and fills the content area rather than opening through a capsule.
 - Layout and interactions use an 8 px spacing system, avoid arbitrary colors and gradients, and use SVG icons with Tabler Icons as the first choice.
-- Global appearance options live in Koishi plugin configuration. Browser-local storage is limited to the selected current user, active conversation and other view state.
+- Global appearance options live in Koishi plugin configuration. Browser-local storage is limited to the selected current operator, active conversation and other view state.
 - The WebUI must support current Chrome and Firefox releases without browser-specific experimental APIs that lack a compatible fallback.
 
 ### State Ownership
 
-- The server is the authoritative owner of the sandbox scene.
+- The server is the authoritative owner of every sandbox scene.
 - Memory is the default and only authoritative storage in the default mode. A plugin restart restores the default scene.
 - Koishi Database persistence is optional. When enabled, the database persists structured scene state and media metadata across restarts.
 - WebQQ, OneBot action handlers and MCP never maintain independent authoritative copies of the scene.
@@ -175,13 +175,13 @@ WebQQ 与 MCP 共用同一个传输无关的测试控制服务。该服务是主
 
 ### Identity and Permission Model
 
-- WebQQ always operates as the selected current user.
-- MCP interactive operations always require an explicit `actorUserId`; there is no server-side current-user session.
+- WebQQ always operates as the selected current operator from the unified participant directory.
+- MCP interactive operations always require an explicit `operatorId`; there is no server-side current-operator session.
 - Operators and external test controllers cannot impersonate a virtual OneBot robot.
 - Friend, group and management actions follow QQ-style permission rules at execution time.
 - User nickname, friend remark, group card, group name and robot profile are separate fields with separate mutation rules.
 - Group owner, administrator and member roles determine actions such as member removal, administrator changes, group-name changes and member-card changes.
-- Existing group ownership cannot be silently transferred merely to prepare a test. A new test group may instead be created with the test user as owner.
+- Environment management does not carry an operator identity; real QQ interactions always use `operatorId` and current permissions.
 
 ### Relationship Requests
 
@@ -247,17 +247,16 @@ WebQQ 与 MCP 共用同一个传输无关的测试控制服务。该服务是主
 - Only a SHA-256 token digest and credential metadata are persisted in the plugin data directory.
 - Credentials are not stored in Koishi Database and are not affected by scene reset or import.
 - MCP cannot create, edit or revoke credentials or alter endpoint configuration.
-- The five capability scopes are `read`, `interact`, `provision`, `manage` and `debug`.
+- The base MCP capability scopes are `read`, `interact`, `manage` and `debug`.
 - New credentials default to `read` only.
 - Scopes apply to the shared scene rather than individual users, robots or groups.
 - Tools unavailable to the authenticated credential are omitted from MCP discovery.
 
 ### MCP Tool Contract
 
-- The first test-control API version exposes 27 high-level domain tools and no raw arbitrary OneBot action tool.
+- The base test-control API exposes 25 high-level domain tools and no raw arbitrary OneBot action tool.
 - Read tools are `get_server_info`, `get_scene_snapshot`, `list_conversations`, `get_conversation`, `list_pending_requests`, `get_capability_matrix` and `export_scene`.
 - Interact tools are `upload_media`, `send_message`, `perform_friend_action`, `perform_group_action`, `handle_request`, `wait_for_event`, `wait_for_message` and `wait_for_chatluna_state`.
-- Provision tools are `provision_test_user` and `release_test_user`.
 - Manage tools are `apply_environment_changes`, `prepare_destructive_action`, `delete_environment_entity`, `reset_scene`, `clear_scene` and `import_scene`.
 - Debug tools are `list_onebot_debug_records`, `clear_onebot_debug_records`, `list_mcp_call_records` and `clear_mcp_call_records`.
 - All IDs are strings. Generated QQ IDs are decimal numeric strings, and requested IDs must be unused decimal numeric strings.
@@ -265,29 +264,16 @@ WebQQ 与 MCP 共用同一个传输无关的测试控制服务。该服务是主
 - Mutating commands return affected identifiers, the resulting scene revision and an event cursor immediately; observation uses separate wait tools.
 - The server returns structured facts and never decides whether an external AI's test has passed.
 
-### Test Users
-
-- The `provision` scope creates ordinary test users without granting full management access.
-- A provision request can configure profile fields, friendships, memberships, administrator roles and an optional newly created owned group.
-- Test users record the creating credential, optional test-run identifier and expiry.
-- The default lifetime is 60 minutes, configurable per request from 5 to 1440 minutes.
-- A provisioned test user behaves exactly like any other ordinary user during interactions.
-- A credential can modify or release only its own test users through provision operations.
-- Releasing an owned test user is silent and does not require destructive two-step confirmation.
-- Expired test users are cleaned silently and increment the scene revision.
-- Tests that need observable leave, kick or relationship-removal events must perform real interactions before cleanup.
-
 ### Concurrency and Safety
 
-- Every interact, provision and manage mutation requires an idempotency key.
+- Every interact and manage mutation requires an idempotency key.
 - Idempotency is scoped by credential, tool, key and current event epoch.
 - A repeated call with identical normalized arguments replays the original result without executing again.
 - Reusing a key with different arguments returns an idempotency-conflict error.
-- Provision and manage operations require an expected scene revision.
+- Manage operations require an expected scene revision.
 - Interact operations do not require a revision and instead perform current-time QQ permission and relationship checks.
 - Deleting an existing entity, resetting, clearing or importing the scene requires a short-lived confirmation token prepared for the exact credential, action, arguments and revision.
 - Confirmation tokens expire after 60 seconds, are single-use and become invalid when parameters or scene revision change.
-- Releasing a credential-owned test user is excluded from destructive confirmation.
 
 ### Events and Waiting
 
@@ -387,8 +373,7 @@ WebQQ 与 MCP 共用同一个传输无关的测试控制服务。该服务是主
 - Test TLS requirements and the explicit insecure-remote warning state.
 - Test Bearer authentication, disabled credentials, expired credentials and digest-only persistence.
 - Test tool discovery for every scope combination.
-- Test all 27 tool schemas and their stable success and failure result shapes.
-- Test test-user ownership, TTL cleanup, requested numeric IDs and owned-group creation.
+- Test all 25 base tool schemas and their stable success and failure result shapes.
 - Test idempotent replay and idempotency conflicts.
 - Test scene-revision conflicts.
 - Test destructive confirmation binding, expiry and single use.
@@ -442,13 +427,13 @@ WebQQ 与 MCP 共用同一个传输无关的测试控制服务。该服务是主
 - Persisting event streams, wait subscriptions, idempotency caches or confirmation tokens
 - Exporting media binaries, credentials, MCP configuration or debug records in scene packages
 - Automatically accepting friend requests, group applications or invitations addressed to a virtual robot
-- Silently transferring ownership of an existing group to a provisioned test user
+- Implementing AI test spaces before the base MCP tools and security model are complete
 
 ## Further Notes
 
 - The canonical product term is “模拟 QQ 环境”, not “模拟 QQ 世界”.
 - The canonical automation actor is “外部测试控制器”. It is not an external Bot, AI user or OneBot client.
-- The canonical managed automation identity is “测试用户”. It remains an ordinary QQ user inside the scene.
+- The canonical isolated automation environment is “AI 测试空间”; its participants still follow the same ordinary-user and virtual-robot rules as the main environment.
 - The visual one-to-one requirement applies to the main WebQQ appearance and interaction language. Deliberate differences, including the left-navigation full-page entry and sandbox-specific management surfaces, should be reviewed separately before implementation.
 - The implementation should remain minimal and avoid speculative extension points beyond the confirmed NapCat, LLBot, WebQQ, ChatLuna and MCP requirements.
 - The architectural decisions already recorded for this feature remain normative background for implementation trade-offs.

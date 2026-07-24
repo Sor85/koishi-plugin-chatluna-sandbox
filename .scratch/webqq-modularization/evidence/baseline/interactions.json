@@ -1,0 +1,146 @@
+{
+  "capturedAt": "2026-07-23T04:39:50.502Z",
+  "route": "http://127.0.0.1:5140/onebot-sandbox",
+  "viewport": {
+    "width": 1400,
+    "height": 900
+  },
+  "theme": "light",
+  "results": [
+    {
+      "name": "主导航切换联系人",
+      "passed": true,
+      "observed": {
+        "activeView": "联系人"
+      }
+    },
+    {
+      "name": "侧栏切换群组目录",
+      "passed": true,
+      "observed": {
+        "searchPlaceholder": "搜索群组..."
+      }
+    },
+    {
+      "name": "侧栏切换好友目录",
+      "passed": true,
+      "observed": {
+        "searchPlaceholder": "搜索好友..."
+      }
+    },
+    {
+      "name": "返回消息视图",
+      "passed": true,
+      "observed": {
+        "activeView": "消息"
+      }
+    },
+    {
+      "name": "通知 Popover 打开",
+      "passed": true,
+      "observed": {
+        "notificationVisible": true
+      }
+    },
+    {
+      "name": "切换当前操作者",
+      "passed": true,
+      "observed": {
+        "senderLabel": "当前发送者：测试用户1"
+      }
+    },
+    {
+      "name": "恢复基准当前操作者",
+      "passed": true,
+      "observed": {
+        "senderLabel": "当前发送者：测试用户3"
+      }
+    },
+    {
+      "name": "消息输入启用发送",
+      "passed": true,
+      "observed": {
+        "verifiedInInitialBaselineRun": true
+      }
+    },
+    {
+      "name": "发送消息并写入消息流",
+      "passed": true,
+      "observed": {
+        "count": 2,
+        "found": true
+      }
+    },
+    {
+      "name": "消息右键菜单打开",
+      "passed": true,
+      "observed": {
+        "replyMenuVisible": true
+      }
+    },
+    {
+      "name": "回复预览显示",
+      "passed": true,
+      "observed": {
+        "replyVisible": true
+      }
+    },
+    {
+      "name": "选择附件并显示待发送状态",
+      "passed": true,
+      "observed": {
+        "selected": true,
+        "removable": true
+      }
+    },
+    {
+      "name": "发送者头像右键菜单打开",
+      "passed": true,
+      "observed": {
+        "composerMenu": [
+          "编辑机器人",
+          "删除机器人"
+        ]
+      }
+    },
+    {
+      "name": "机器人编辑 Dialog 打开",
+      "passed": true,
+      "observed": {
+        "title": "编辑机器人",
+        "comboboxes": 1,
+        "closeButtons": [
+          "启用机器人",
+          "关闭"
+        ]
+      }
+    },
+    {
+      "name": "实现配置 Select 打开",
+      "passed": true,
+      "observed": {
+        "selectOptions": [
+          "NapCat",
+          "LLBot"
+        ]
+      }
+    },
+    {
+      "name": "群聊与右侧群信息打开",
+      "passed": true,
+      "observed": {
+        "clicked": true,
+        "title": "测试群",
+        "details": "群信息",
+        "memberRows": 0
+      }
+    },
+    {
+      "name": "交互期间无控制台异常",
+      "passed": true,
+      "observed": {
+        "exceptions": []
+      }
+    }
+  ]
+}

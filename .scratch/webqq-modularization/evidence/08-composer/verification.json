@@ -1,0 +1,27 @@
+{
+  "verifiedAt": "2026-07-23",
+  "route": "http://127.0.0.1:5140/onebot-sandbox",
+  "layout": {
+    "collapsedRootX": 436,
+    "expandedRootX": 436,
+    "collapsedAvatarX": [721.5, 700.5, 679.5, 658.5],
+    "expandedAvatarX": [721.5, 694.5, 667.5, 640.5],
+    "expandsLeftOnly": true
+  },
+  "operatorSwitch": {
+    "active": "当前发送者：Koishi（机器人）",
+    "inputAfterSwitch": "",
+    "rootDidNotMove": true
+  },
+  "contextMenu": {
+    "opened": true,
+    "tooltipVisible": false,
+    "zIndexClass": 160
+  },
+  "send": {
+    "content": "票据08发送控件验证",
+    "inputAfterSend": "",
+    "errors": []
+  },
+  "consoleFailures": []
+}

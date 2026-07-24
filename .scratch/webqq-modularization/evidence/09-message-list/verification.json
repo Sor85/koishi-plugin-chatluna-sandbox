@@ -1,0 +1,14 @@
+{
+  "verifiedAt": "2026-07-23",
+  "route": "http://127.0.0.1:5140/onebot-sandbox",
+  "reply": {
+    "sourceMessageId": "7d3501c8",
+    "composerBanner": "回复 Koishi：票据08发送控件验证",
+    "quoteText": "Koishi票据08发送控件验证",
+    "highlightedMessageId": "7d3501c8"
+  },
+  "clusters": ["webqq-message-row is-incoming", "webqq-message-row is-outgoing"],
+  "mediaFallbackPreserved": true,
+  "systemEventRendererPreserved": true,
+  "consoleFailures": []
+}

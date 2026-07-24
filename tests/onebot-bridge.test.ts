@@ -21,6 +21,50 @@ async function createControl() {
 }
 
 describe('Koishi 与 OneBot 机器人桥接', () => {
+  it('多个机器人始终使用各自真实 selfId 处理协议事件与 action', async () => {
+    const { app, control } = await createControl()
+    control.createBot({ id: '20002', name: '第二机器人', implementation: 'llbot', enabled: true })
+    const secondBot = control.getRuntimeBot('20002')
+    const group = control.getSnapshot().groups[0]
+    control.updateGroup({
+      id: group.id,
+      name: group.name,
+      members: [...group.members, { participantId: '20002', role: 'admin' }],
+    })
+    const received: Array<{ selfId?: string; rawSelfId?: number; messageId?: string }> = []
+    app.middleware((session) => {
+      received.push({
+        selfId: session.selfId,
+        rawSelfId: (session as typeof session & { onebot?: { self_id?: number } }).onebot?.self_id,
+        messageId: session.messageId,
+      })
+    })
+
+    expect(secondBot.selfId).toBe('20002')
+    await expect(secondBot.internal._request('get_login_info', {})).resolves.toEqual({
+      status: 'ok',
+      retcode: 0,
+      data: { user_id: 20002, nickname: '第二机器人' },
+    })
+    const sent = await control.sendMessage({ operatorId: '10001', conversationId: 'group:30001', content: '多机器人事件' })
+    expect(received).toEqual(expect.arrayContaining([
+      { selfId: '20001', rawSelfId: 20001, messageId: sent.messageId },
+      { selfId: '20002', rawSelfId: 20002, messageId: sent.messageId },
+    ]))
+
+    await secondBot.internal._request('set_qq_profile', { nickname: '第二机器人新昵称' })
+    expect(control.getSnapshot().participants.find(({ id }) => id === '20002')).toMatchObject({ name: '第二机器人新昵称' })
+    expect(control.getSnapshot().participants.find(({ id }) => id === '20001')).toMatchObject({ name: 'Koishi' })
+
+    const privateResult = await secondBot.internal._request('send_private_msg', { user_id: 10001, message: '机器人主动私聊' }) as {
+      data: { message_id: string }
+    }
+    expect(control.getSnapshot().messages.find(({ id }) => id === privateResult.data.message_id)).toMatchObject({
+      authorId: '20002',
+      conversationId: 'private:10001:20002',
+    })
+  })
+
   it('机器人注册为在线 OneBot Bot，并通过 action 修改共享资料', async () => {
     const { control } = await createControl()
     const bot = control.bot
@@ -43,7 +87,8 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     await bot.internal._request('set_qq_profile', { nickname: '新 Koishi' })
     await bot.internal._request('set_qq_avatar', { file: 'https://example.com/koishi.png' })
 
-    expect(control.getSnapshot().bots[0]).toMatchObject({
+    expect(control.getSnapshot().participants.find(({ id }) => id === '20001')).toMatchObject({
+      kind: 'bot',
       id: '20001',
       name: '新 Koishi',
       avatar: 'https://example.com/koishi.png',
@@ -119,7 +164,7 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     const groupResult = await bot.internal._request('send_group_msg', { group_id: 30001, message: [{ type: 'text', data: { text: '群广播' } }] }) as {
       data: { message_id: string }
     }
-    expect(control.getSnapshot().messages.filter(({ content }) => content === '群广播')).toHaveLength(3)
+    expect(control.getSnapshot().messages.filter(({ content }) => content === '群广播')).toHaveLength(1)
 
     await bot.internal._request('delete_msg', { message_id: groupResult.data.message_id })
     expect(control.getSnapshot().messages.some(({ content }) => content === '群广播')).toBe(false)
@@ -131,14 +176,14 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     const { control } = await createControl()
     const bot = control.bot
     control.createUser({ id: '10004', name: '申请用户' })
-    await control.performFriendAction({ action: 'delete', actorUserId: '10004', targetId: '20001' })
-    const friendRequest = await control.performFriendAction({ action: 'request', actorUserId: '10004', targetId: '20001' })
+    await control.performFriendAction({ action: 'delete', operatorId: '10004', targetId: '20001' })
+    const friendRequest = await control.performFriendAction({ action: 'request', operatorId: '10004', targetId: '20001' })
     if (!friendRequest.requestId) throw new Error('好友申请未创建')
 
     await bot.handleFriendRequest(friendRequest.requestId, true, '申请用户')
     expect(control.getSnapshot().friendships.some(({ participantIds }) => participantIds.includes('10004') && participantIds.includes('20001'))).toBe(true)
 
-    const groupRequest = await control.performGroupAction({ action: 'request-join', actorUserId: '10004', groupId: '30001' })
+    const groupRequest = await control.performGroupAction({ action: 'request-join', operatorId: '10004', groupId: '30001' })
     if (!groupRequest.requestId) throw new Error('入群申请未创建')
     await bot.handleGuildMemberRequest(groupRequest.requestId, true)
     expect(control.getSnapshot().groups[0].members).toContainEqual({ participantId: '10004', role: 'member' })
@@ -176,9 +221,9 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     })
 
     control.createUser({ id: '10004', name: '申请用户' })
-    await control.performFriendAction({ action: 'delete', actorUserId: '10004', targetId: '20001' })
-    await control.performFriendAction({ action: 'request', actorUserId: '10004', targetId: '20001' })
-    const groupRequest = await control.performGroupAction({ action: 'request-join', actorUserId: '10004', groupId: '30001' })
+    await control.performFriendAction({ action: 'delete', operatorId: '10004', targetId: '20001' })
+    await control.performFriendAction({ action: 'request', operatorId: '10004', targetId: '20001' })
+    const groupRequest = await control.performGroupAction({ action: 'request-join', operatorId: '10004', groupId: '30001' })
     if (!groupRequest.requestId) throw new Error('入群申请未创建')
     await control.bot.handleGuildMemberRequest(groupRequest.requestId, true)
     await control.bot.internal._request('set_group_card', { group_id: 30001, user_id: 10003, card: '新名片' })

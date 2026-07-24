@@ -23,15 +23,15 @@
       </button>
     </nav>
     <div v-if="section === 'users'" v-webqq-scrollbar class="directory-list">
-      <article v-for="user in snapshot.users" :key="user.id" class="directory-card">
-        <span class="directory-avatar">{{ getInitial(user.name) }}</span>
+      <article v-for="user in users" :key="user.id" class="directory-card">
+        <WebqqAvatar class="directory-avatar" kind="user" :name="user.name" :avatar="user.avatar" />
         <span class="directory-copy"><strong>{{ user.name }}</strong><small>{{ user.id }}</small></span>
       </article>
     </div>
 
     <div v-else-if="section === 'bots'" v-webqq-scrollbar class="directory-list">
-      <article v-for="bot in snapshot.bots" :key="bot.id" class="directory-card">
-        <span class="directory-avatar is-bot">{{ getInitial(bot.name) }}</span>
+      <article v-for="bot in bots" :key="bot.id" class="directory-card">
+        <WebqqAvatar class="directory-avatar" kind="bot" :name="bot.name" :avatar="bot.avatar" />
         <span class="directory-copy">
           <strong>{{ bot.name }}</strong>
           <small>{{ bot.id }} · {{ bot.implementation === 'napcat' ? 'NapCat' : 'LLBot' }}</small>
@@ -44,7 +44,7 @@
 
     <div v-else v-webqq-scrollbar class="directory-list">
       <article v-for="group in snapshot.groups" :key="group.id" class="directory-card">
-        <span class="directory-avatar is-group">{{ getInitial(group.name) }}</span>
+        <WebqqAvatar class="directory-avatar" kind="group" :name="group.name" />
         <span class="directory-copy"><strong>{{ group.name }}</strong><small>{{ group.id }} · {{ group.members.length }} 人</small></span>
       </article>
     </div>
@@ -54,23 +54,23 @@
 <script setup lang="ts">
 import { IconRobot, IconUser, IconUsers } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
+import WebqqAvatar from './webqq-avatar.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
-import type { SandboxSnapshot } from '../src/types'
+import { getSandboxBots, getSandboxUsers, type SandboxSnapshot } from '../src/types'
 
 const props = defineProps<{ snapshot: SandboxSnapshot }>()
+const users = computed(() => getSandboxUsers(props.snapshot))
+const bots = computed(() => getSandboxBots(props.snapshot))
 
 type EnvironmentSection = 'users' | 'bots' | 'groups'
 const section = ref<EnvironmentSection>('users')
 
 const sections = computed(() => [
-  { id: 'users' as const, label: '普通用户', icon: IconUser, count: props.snapshot.users.length },
-  { id: 'bots' as const, label: '机器人', icon: IconRobot, count: props.snapshot.bots.length },
+  { id: 'users' as const, label: '普通用户', icon: IconUser, count: users.value.length },
+  { id: 'bots' as const, label: '机器人', icon: IconRobot, count: bots.value.length },
   { id: 'groups' as const, label: '群组', icon: IconUsers, count: props.snapshot.groups.length },
 ])
 
-function getInitial(name?: string) {
-  return name?.trim().slice(0, 1).toUpperCase() || '?'
-}
 </script>
 
 <style scoped>
@@ -169,6 +169,11 @@ function getInitial(name?: string) {
 }
 
 .directory-avatar {
+  --webqq-avatar-size: 36px;
+  --webqq-bot-badge-size: 15px;
+  --webqq-bot-badge-offset: -2px;
+  --webqq-bot-badge-border: 2px;
+
   display: inline-flex;
   width: 36px;
   height: 36px;
@@ -179,10 +184,6 @@ function getInitial(name?: string) {
   background: #64748b;
   font-size: 12px;
   font-weight: 700;
-}
-
-.directory-avatar.is-bot {
-  background: var(--webqq-accent);
 }
 
 .directory-avatar.is-group {

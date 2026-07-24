@@ -15,4 +15,4 @@
 - [ ] Bearer Token、媒体 Base64、TLS 私钥和敏感配置不会进入日志或调试结果
 - [ ] `debug` 权限可以分别读取和清理 OneBot 与 MCP 调试记录
 - [ ] MCP 监听器、认证、日志或限流组件失败时 WebQQ 和沙盒主体继续工作
-- [ ] 27 个 MCP 工具、Resources、权限发现和安全边界完成端到端验收
+- [ ] 25 个基础 MCP 工具、Resources、权限发现和安全边界完成端到端验收

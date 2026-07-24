@@ -1,4 +1,4 @@
-import type { SandboxGroupMember } from '../src/types'
+import type { SandboxGroupMember } from '../../src/types'
 
 export type GroupMemberMenuAction = 'poke' | 'set-card' | 'kick' | 'set-admin' | 'unset-admin' | 'transfer-owner'
 

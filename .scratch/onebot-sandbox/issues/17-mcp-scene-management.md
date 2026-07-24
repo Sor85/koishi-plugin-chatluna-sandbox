@@ -2,7 +2,7 @@
 
 **What to build:** 持有 `manage` 权限的测试控制器可以原子准备或替换模拟 QQ 环境，并通过版本化 JSON 导入导出可复现的测试场景。删除、重置、清空和导入等破坏性行为需要绑定参数与场景版本的两步确认。
 
-**Blocked by:** 11 — 增加 Koishi Database 可选持久化；13 — 提供安全的 MCP 只读端点；16 — 让 MCP 自主准备和释放测试用户
+**Blocked by:** 11 — 增加 Koishi Database 可选持久化；13 — 提供安全的 MCP 只读端点
 
 **Status:** ready-for-agent
 

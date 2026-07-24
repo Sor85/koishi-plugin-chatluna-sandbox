@@ -1,0 +1,26 @@
+{
+  "verifiedAt": "2026-07-23",
+  "route": "http://127.0.0.1:5140/onebot-sandbox",
+  "identityColors": {
+    "user": "rgb(37, 99, 235)",
+    "bot": "rgb(71, 85, 105)",
+    "group": "rgb(15, 118, 110)"
+  },
+  "avatarSamples": [
+    { "region": "recent", "size": "38px", "botBadge": "15.8281px" },
+    { "region": "message", "size": "32px", "botBadge": "13.3281px" },
+    { "region": "composer", "size": "36px", "botBadge": "15px" },
+    { "region": "group-member", "size": "30px", "botBadge": "12.5px" },
+    { "region": "private-profile", "size": "76px", "botBadge": "31.6641px" }
+  ],
+  "shape": {
+    "borderRadius": "50%",
+    "imageObjectFit": "cover",
+    "fallback": "name-initial"
+  },
+  "interactionOwnership": {
+    "contextMenuOutsideAvatar": true,
+    "tooltipOutsideAvatar": true
+  },
+  "consoleFailures": []
+}

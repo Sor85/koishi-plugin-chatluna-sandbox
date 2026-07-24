@@ -1,5 +1,3 @@
-import type { SandboxUser } from '../src/types'
-
 export const USER_AVATAR_SIZE = 36
 export const USER_STACK_COLLAPSED_STEP = 21
 export const USER_STACK_EXPANDED_STEP = 27
@@ -18,7 +16,7 @@ export interface UserStackLayoutMetrics {
   addExpandedRight: number
 }
 
-export function orderUsersByActive<User extends SandboxUser>(users: User[], activeUserId?: string): User[] {
+export function orderUsersByActive<User extends { id: string }>(users: User[], activeUserId?: string): User[] {
   const activeIndex = users.findIndex(({ id }) => id === activeUserId)
   return activeIndex > 0
     ? [users[activeIndex], ...users.slice(0, activeIndex), ...users.slice(activeIndex + 1)]

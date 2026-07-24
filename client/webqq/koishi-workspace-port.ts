@@ -1,0 +1,15 @@
+import { send } from '@koishijs/client'
+import type { WorkspacePort } from './workspace-port'
+
+export const koishiWorkspacePort: WorkspacePort = {
+  getWorkspace: (input) => send('onebot-sandbox/workspace', input),
+  getMessageHistory: (input) => send('onebot-sandbox/message-history', input),
+  sendMessage: (input) => send('onebot-sandbox/send-message', input),
+  sendMediaMessage: (input) => send('onebot-sandbox/send-media-message', input),
+  getMediaContent: (input) => send('onebot-sandbox/media-content', input),
+  setGroupAnnouncement: (input) => send('onebot-sandbox/set-group-announcement', input),
+  deleteGroupAnnouncement: (input) => send('onebot-sandbox/delete-group-announcement', input),
+  manageEnvironment: (input) => send('onebot-sandbox/manage-environment', input),
+  performFriendAction: (input) => send('onebot-sandbox/friend-action', input),
+  performGroupAction: (input) => send('onebot-sandbox/group-action', input),
+}

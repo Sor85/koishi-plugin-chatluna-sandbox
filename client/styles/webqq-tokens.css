@@ -1,0 +1,35 @@
+.webqq-workspace {
+  --webqq-bg: #f8fafc;
+  --webqq-rail: #f8fafc;
+  --webqq-surface: #f8fafc;
+  --webqq-surface-muted: #f5f7fb;
+  --webqq-border: #dfe5ee;
+  --webqq-text: #202938;
+  --webqq-muted: #7a8494;
+  --webqq-hover: #edf2f8;
+  --webqq-accent-shadow: color-mix(in srgb, var(--webqq-accent) 28%, transparent);
+}
+
+.webqq-workspace[data-color-mode="dark"] {
+  --webqq-bg: #0f172a;
+  --webqq-rail: #0f172a;
+  --webqq-surface: #0f172a;
+  --webqq-surface-muted: #162032;
+  --webqq-border: #2f3a4d;
+  --webqq-text: #edf2f7;
+  --webqq-muted: #9ba7b8;
+  --webqq-hover: #273247;
+}
+
+@media (prefers-color-scheme: dark) {
+  .webqq-workspace[data-color-mode="auto"] {
+    --webqq-bg: #0f172a;
+    --webqq-rail: #0f172a;
+    --webqq-surface: #0f172a;
+    --webqq-surface-muted: #162032;
+    --webqq-border: #2f3a4d;
+    --webqq-text: #edf2f7;
+    --webqq-muted: #9ba7b8;
+    --webqq-hover: #273247;
+  }
+}

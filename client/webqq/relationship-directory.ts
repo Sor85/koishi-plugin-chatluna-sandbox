@@ -1,15 +1,26 @@
-import type { SandboxConversation, SandboxSnapshot } from '../src/types'
+import type { SandboxConversation, SandboxSnapshot } from '../../src/types'
+
+export function getConversationPeerId(conversation: SandboxConversation, operatorId: string | undefined) {
+  if (conversation.type === 'direct') return conversation.participantIds.find((id) => id !== operatorId) ?? conversation.participantIds[0]
+  return undefined
+}
+
+export function getVisibleRecentConversations(
+  conversations: SandboxConversation[],
+) {
+  return conversations
+}
 
 export function getFriendDirectory(snapshot: SandboxSnapshot, operatorId?: string) {
   if (!operatorId) return []
 
-  return [...snapshot.users, ...snapshot.bots]
+  return snapshot.participants
     .filter(({ id }) => id !== operatorId)
     .map((participant) => {
       const friendship = snapshot.friendships.find(({ participantIds }) => participantIds.includes(operatorId) && participantIds.includes(participant.id))
       const pendingOutgoing = snapshot.requests.some(({ type, requesterId, targetId }) => type === 'friend' && requesterId === operatorId && targetId === participant.id)
       const pendingIncoming = snapshot.requests.some(({ type, requesterId, targetId }) => type === 'friend' && requesterId === participant.id && targetId === operatorId)
-      const isBot = snapshot.bots.some(({ id }) => id === participant.id)
+      const isBot = participant.kind === 'bot'
       const conversationId = snapshot.conversations.find((conversation) => isDirectConversationBetween(conversation, operatorId, participant.id))?.id
 
       return {
@@ -40,7 +51,9 @@ export function getGroupDirectory(snapshot: SandboxSnapshot, operatorId?: string
     const member = group.members.find(({ participantId }) => participantId === operatorId)
     const pending = snapshot.requests.some(({ type, subType, requesterId, groupId }) => type === 'group'
       && (subType ?? 'add') === 'add' && requesterId === operatorId && groupId === group.id)
-    const conversationId = snapshot.conversations.find((conversation) => isGroupConversationFor(conversation, group.id, operatorId))?.id
+    const conversationId = member
+      ? snapshot.conversations.find((conversation) => isGroupConversationFor(conversation, group.id))?.id
+      : undefined
 
     return {
       ...group,
@@ -54,12 +67,11 @@ export function getGroupDirectory(snapshot: SandboxSnapshot, operatorId?: string
 
 function isDirectConversationBetween(conversation: SandboxConversation, firstId: string, secondId: string) {
   return conversation.type === 'direct'
-    && ((conversation.userId === firstId && conversation.botId === secondId)
-      || (conversation.userId === secondId && conversation.botId === firstId))
+    && conversation.participantIds.includes(firstId)
+    && conversation.participantIds.includes(secondId)
 }
 
-function isGroupConversationFor(conversation: SandboxConversation, groupId: string, operatorId: string) {
+function isGroupConversationFor(conversation: SandboxConversation, groupId: string) {
   return conversation.type === 'group'
     && conversation.groupId === groupId
-    && (conversation.userId === operatorId || conversation.botId === operatorId)
 }

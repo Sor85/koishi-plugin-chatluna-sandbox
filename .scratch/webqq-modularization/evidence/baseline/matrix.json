@@ -1,0 +1,296 @@
+{
+  "capturedAt": "2026-07-23T04:35:27.777Z",
+  "route": "http://127.0.0.1:5140/onebot-sandbox",
+  "scenario": {
+    "activeConversation": "Koishi",
+    "currentOperator": "测试用户3",
+    "appearanceColorMode": "auto",
+    "chatStyle": "tim",
+    "frostedGlass": true,
+    "timBubbleTail": true
+  },
+  "cases": [
+    {
+      "theme": "light",
+      "width": 1400,
+      "height": 900,
+      "screenshot": "light-1400x900.png",
+      "state": {
+        "url": "http://127.0.0.1:5140/onebot-sandbox",
+        "title": "OneBot 沙盒 | Koishi 控制台",
+        "viewport": {
+          "width": 1400,
+          "height": 900
+        },
+        "colorMode": "auto",
+        "chatStyle": "tim",
+        "mobileView": "messages",
+        "workspaceClasses": "webqq-workspace is-frosted has-tim-tail is-details-open",
+        "workspaceBackground": "rgba(244, 246, 248, 0.78)",
+        "workspaceTextColor": "rgb(32, 41, 56)",
+        "gridColumns": "72px 300px 684px 280px",
+        "profileDisplay": "flex",
+        "profileLabel": "私聊信息",
+        "chatVisibility": "visible",
+        "messagesOverflowY": "auto",
+        "composerDisplay": "flex",
+        "currentTitle": "Koishi",
+        "currentSubtitle": "在线 · 虚拟 OneBot 机器人",
+        "currentSender": "当前发送者：测试用户3",
+        "detailsButtonLabel": "关闭会话信息",
+        "navigation": [
+          {
+            "label": "消息",
+            "current": "page"
+          },
+          {
+            "label": "联系人",
+            "current": null
+          },
+          {
+            "label": "资料",
+            "current": null
+          }
+        ],
+        "conversations": [],
+        "messageRows": 0,
+        "consoleReady": true
+      }
+    },
+    {
+      "theme": "light",
+      "width": 1000,
+      "height": 900,
+      "screenshot": "light-1000x900.png",
+      "state": {
+        "url": "http://127.0.0.1:5140/onebot-sandbox",
+        "title": "OneBot 沙盒 | Koishi 控制台",
+        "viewport": {
+          "width": 1000,
+          "height": 900
+        },
+        "colorMode": "auto",
+        "chatStyle": "tim",
+        "mobileView": "messages",
+        "workspaceClasses": "webqq-workspace is-frosted has-tim-tail is-details-closed",
+        "workspaceBackground": "rgba(244, 246, 248, 0.78)",
+        "workspaceTextColor": "rgb(32, 41, 56)",
+        "gridColumns": "72px 300px 564px",
+        "profileDisplay": "none",
+        "profileLabel": "私聊信息",
+        "chatVisibility": "visible",
+        "messagesOverflowY": "auto",
+        "composerDisplay": "flex",
+        "currentTitle": "Koishi",
+        "currentSubtitle": "在线 · 虚拟 OneBot 机器人",
+        "currentSender": "当前发送者：测试用户3",
+        "detailsButtonLabel": "打开会话信息",
+        "navigation": [
+          {
+            "label": "消息",
+            "current": "page"
+          },
+          {
+            "label": "联系人",
+            "current": null
+          },
+          {
+            "label": "资料",
+            "current": null
+          }
+        ],
+        "conversations": [],
+        "messageRows": 0,
+        "consoleReady": true
+      }
+    },
+    {
+      "theme": "light",
+      "width": 700,
+      "height": 900,
+      "screenshot": "light-700x900.png",
+      "state": {
+        "url": "http://127.0.0.1:5140/onebot-sandbox",
+        "title": "OneBot 沙盒 | Koishi 控制台",
+        "viewport": {
+          "width": 700,
+          "height": 900
+        },
+        "colorMode": "auto",
+        "chatStyle": "tim",
+        "mobileView": "messages",
+        "workspaceClasses": "webqq-workspace is-frosted has-tim-tail is-details-closed",
+        "workspaceBackground": "rgba(244, 246, 248, 0.78)",
+        "workspaceTextColor": "rgb(32, 41, 56)",
+        "gridColumns": "72px 230px 360px",
+        "profileDisplay": "none",
+        "profileLabel": "私聊信息",
+        "chatVisibility": "visible",
+        "messagesOverflowY": "auto",
+        "composerDisplay": "flex",
+        "currentTitle": "Koishi",
+        "currentSubtitle": "在线 · 虚拟 OneBot 机器人",
+        "currentSender": "当前发送者：测试用户3",
+        "detailsButtonLabel": "打开会话信息",
+        "navigation": [
+          {
+            "label": "消息",
+            "current": "page"
+          },
+          {
+            "label": "联系人",
+            "current": null
+          },
+          {
+            "label": "资料",
+            "current": null
+          }
+        ],
+        "conversations": [],
+        "messageRows": 0,
+        "consoleReady": true
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1400,
+      "height": 900,
+      "screenshot": "dark-1400x900.png",
+      "state": {
+        "url": "http://127.0.0.1:5140/onebot-sandbox",
+        "title": "OneBot 沙盒 | Koishi 控制台",
+        "viewport": {
+          "width": 1400,
+          "height": 900
+        },
+        "colorMode": "auto",
+        "chatStyle": "tim",
+        "mobileView": "messages",
+        "workspaceClasses": "webqq-workspace is-frosted has-tim-tail is-details-open",
+        "workspaceBackground": "rgba(244, 246, 248, 0.78)",
+        "workspaceTextColor": "rgb(237, 242, 247)",
+        "gridColumns": "72px 300px 684px 280px",
+        "profileDisplay": "flex",
+        "profileLabel": "私聊信息",
+        "chatVisibility": "visible",
+        "messagesOverflowY": "auto",
+        "composerDisplay": "flex",
+        "currentTitle": "Koishi",
+        "currentSubtitle": "在线 · 虚拟 OneBot 机器人",
+        "currentSender": "当前发送者：测试用户3",
+        "detailsButtonLabel": "关闭会话信息",
+        "navigation": [
+          {
+            "label": "消息",
+            "current": "page"
+          },
+          {
+            "label": "联系人",
+            "current": null
+          },
+          {
+            "label": "资料",
+            "current": null
+          }
+        ],
+        "conversations": [],
+        "messageRows": 0,
+        "consoleReady": true
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1000,
+      "height": 900,
+      "screenshot": "dark-1000x900.png",
+      "state": {
+        "url": "http://127.0.0.1:5140/onebot-sandbox",
+        "title": "OneBot 沙盒 | Koishi 控制台",
+        "viewport": {
+          "width": 1000,
+          "height": 900
+        },
+        "colorMode": "auto",
+        "chatStyle": "tim",
+        "mobileView": "messages",
+        "workspaceClasses": "webqq-workspace is-frosted has-tim-tail is-details-closed",
+        "workspaceBackground": "rgba(244, 246, 248, 0.78)",
+        "workspaceTextColor": "rgb(237, 242, 247)",
+        "gridColumns": "72px 300px 564px",
+        "profileDisplay": "none",
+        "profileLabel": "私聊信息",
+        "chatVisibility": "visible",
+        "messagesOverflowY": "auto",
+        "composerDisplay": "flex",
+        "currentTitle": "Koishi",
+        "currentSubtitle": "在线 · 虚拟 OneBot 机器人",
+        "currentSender": "当前发送者：测试用户3",
+        "detailsButtonLabel": "打开会话信息",
+        "navigation": [
+          {
+            "label": "消息",
+            "current": "page"
+          },
+          {
+            "label": "联系人",
+            "current": null
+          },
+          {
+            "label": "资料",
+            "current": null
+          }
+        ],
+        "conversations": [],
+        "messageRows": 0,
+        "consoleReady": true
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 700,
+      "height": 900,
+      "screenshot": "dark-700x900.png",
+      "state": {
+        "url": "http://127.0.0.1:5140/onebot-sandbox",
+        "title": "OneBot 沙盒 | Koishi 控制台",
+        "viewport": {
+          "width": 700,
+          "height": 900
+        },
+        "colorMode": "auto",
+        "chatStyle": "tim",
+        "mobileView": "messages",
+        "workspaceClasses": "webqq-workspace is-frosted has-tim-tail is-details-closed",
+        "workspaceBackground": "rgba(244, 246, 248, 0.78)",
+        "workspaceTextColor": "rgb(237, 242, 247)",
+        "gridColumns": "72px 230px 360px",
+        "profileDisplay": "none",
+        "profileLabel": "私聊信息",
+        "chatVisibility": "visible",
+        "messagesOverflowY": "auto",
+        "composerDisplay": "flex",
+        "currentTitle": "Koishi",
+        "currentSubtitle": "在线 · 虚拟 OneBot 机器人",
+        "currentSender": "当前发送者：测试用户3",
+        "detailsButtonLabel": "打开会话信息",
+        "navigation": [
+          {
+            "label": "消息",
+            "current": "page"
+          },
+          {
+            "label": "联系人",
+            "current": null
+          },
+          {
+            "label": "资料",
+            "current": null
+          }
+        ],
+        "conversations": [],
+        "messageRows": 0,
+        "consoleReady": true
+      }
+    }
+  ]
+}

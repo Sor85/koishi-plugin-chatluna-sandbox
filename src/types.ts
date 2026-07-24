@@ -1,12 +1,16 @@
-export interface SandboxUser {
+interface SandboxParticipantBase {
   id: string
   name: string
   avatar?: string
 }
 
-export interface CreateSandboxUserInput extends SandboxUser {}
+export interface SandboxUser extends SandboxParticipantBase {
+  kind: 'user'
+}
 
-export interface UpdateSandboxUserInput extends SandboxUser {}
+export type CreateSandboxUserInput = Omit<SandboxUser, 'kind'>
+
+export type UpdateSandboxUserInput = CreateSandboxUserInput
 
 export interface DeleteSandboxUserInput {
   id: string
@@ -15,6 +19,7 @@ export interface DeleteSandboxUserInput {
 export type SandboxImplementationProfile = 'napcat' | 'llbot'
 
 export interface SandboxBotProfile {
+  kind: 'bot'
   id: string
   name: string
   avatar?: string
@@ -22,9 +27,27 @@ export interface SandboxBotProfile {
   enabled: boolean
 }
 
-export interface CreateSandboxBotInput extends SandboxBotProfile {}
+export type CreateSandboxBotInput = Omit<SandboxBotProfile, 'kind'>
 
-export interface UpdateSandboxBotInput extends SandboxBotProfile {}
+export type UpdateSandboxBotInput = CreateSandboxBotInput
+
+export type SandboxParticipant = SandboxUser | SandboxBotProfile
+
+export function isSandboxUser(participant: SandboxParticipant): participant is SandboxUser {
+  return participant.kind === 'user'
+}
+
+export function isSandboxBot(participant: SandboxParticipant): participant is SandboxBotProfile {
+  return participant.kind === 'bot'
+}
+
+export function getSandboxUsers(snapshot: Pick<SandboxSnapshot, 'participants'>): SandboxUser[] {
+  return snapshot.participants.filter(isSandboxUser)
+}
+
+export function getSandboxBots(snapshot: Pick<SandboxSnapshot, 'participants'>): SandboxBotProfile[] {
+  return snapshot.participants.filter(isSandboxBot)
+}
 
 export interface DeleteSandboxBotInput {
   id: string
@@ -64,7 +87,7 @@ export interface DeleteSandboxGroupInput {
   id: string
 }
 
-export type ManageSandboxEnvironmentInput = { actorUserId?: string } & (
+export type ManageSandboxEnvironmentInput =
   | { action: 'create-user', data: CreateSandboxUserInput }
   | { action: 'update-user', data: UpdateSandboxUserInput }
   | { action: 'delete-user', data: DeleteSandboxUserInput }
@@ -74,22 +97,45 @@ export type ManageSandboxEnvironmentInput = { actorUserId?: string } & (
   | { action: 'create-group', data: CreateSandboxGroupInput }
   | { action: 'update-group', data: UpdateSandboxGroupInput }
   | { action: 'delete-group', data: DeleteSandboxGroupInput }
-)
 
-export interface SandboxConversation {
+export interface SandboxDirectConversation {
   id: string
-  type: 'direct' | 'group'
-  userId: string
-  botId: string
-  groupId?: string
+  type: 'direct'
+  participantIds: readonly [string, string]
+  groupId?: never
   messageIds: string[]
   hasMoreMessages?: boolean
+}
+
+export interface SandboxGroupConversation {
+  id: string
+  type: 'group'
+  groupId: string
+  participantIds?: never
+  messageIds: string[]
+  hasMoreMessages?: boolean
+}
+
+export type SandboxConversation = SandboxDirectConversation | SandboxGroupConversation
+
+export function createDirectConversationId(firstId: string, secondId: string): string {
+  const [left, right] = [firstId, secondId].sort()
+  return `private:${left}:${right}`
+}
+
+export function createGroupConversationId(groupId: string): string {
+  return `group:${groupId}`
+}
+
+export function getDirectConversationPeerId(conversation: SandboxDirectConversation, participantId: string): string {
+  const peerId = conversation.participantIds.find((id) => id !== participantId)
+  if (!peerId) throw new Error(`参与者不在当前私聊中：${participantId}`)
+  return peerId
 }
 
 export interface SandboxMessage {
   id: string
   authorId: string
-  botId: string
   conversationId: string
   content: string
   createdAt: string
@@ -100,6 +146,28 @@ export interface SandboxMessage {
     type: 'poke'
     targetId: string
   }
+}
+
+export interface SandboxBotDelivery {
+  id: string
+  recipientBotId: string
+  messageId: string
+  conversationId: string
+  createdAt: string
+}
+
+export interface SandboxChatLunaTokenUsage {
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+}
+
+export interface SandboxChatLunaState {
+  botParticipantId: string
+  conversationId: string
+  thinking: boolean
+  usage?: SandboxChatLunaTokenUsage
+  updatedAt: string
 }
 
 export type SandboxMediaType = 'image' | 'file' | 'audio' | 'video'
@@ -134,8 +202,7 @@ export interface SandboxFriendship {
 
 export interface SandboxSnapshot {
   revision: number
-  users: SandboxUser[]
-  bots: SandboxBotProfile[]
+  participants: SandboxParticipant[]
   groups: SandboxGroup[]
   conversations: SandboxConversation[]
   messages: SandboxMessage[]
@@ -151,7 +218,7 @@ export type SandboxFriendAction =
   | { action: 'poke'; targetId: string; conversationId?: string }
 
 export type PerformFriendActionInput = SandboxFriendAction extends infer Action
-  ? Action extends SandboxFriendAction ? Action & { actorUserId: string } : never
+  ? Action extends SandboxFriendAction ? Action & { operatorId: string } : never
   : never
 
 export interface PerformFriendActionResult {
@@ -172,7 +239,7 @@ export type SandboxGroupAction =
   | { action: 'poke'; groupId: string; targetId: string; conversationId?: string }
 
 export type PerformGroupActionInput = SandboxGroupAction extends infer Action
-  ? Action extends SandboxGroupAction ? Action & { actorUserId: string } : never
+  ? Action extends SandboxGroupAction ? Action & { operatorId: string } : never
   : never
 
 export interface PerformGroupActionResult {
@@ -190,16 +257,22 @@ export interface SandboxAppearance {
 
 export interface SandboxWorkspaceState {
   snapshot: SandboxSnapshot
+  chatLunaStates: SandboxChatLunaState[]
   appearance: SandboxAppearance
 }
 
 export interface GetSandboxWorkspaceInput {
-  actorUserId?: string
+  operatorId?: string
   messageLimit?: number
 }
 
+export interface GetSandboxBotDeliveriesInput {
+  recipientBotId?: string
+  messageId?: string
+}
+
 export interface GetMessageHistoryInput {
-  actorUserId: string
+  operatorId: string
   conversationId: string
   beforeMessageId?: string
   limit?: number
@@ -211,9 +284,7 @@ export interface SandboxMessageHistory {
 }
 
 export interface SendMessageInput {
-  actorUserId: string
-  senderId?: string
-  botId: string
+  operatorId: string
   conversationId: string
   content: string
   replyToMessageId?: string
@@ -225,9 +296,7 @@ export interface SendMessageResult {
 }
 
 export interface SendMediaMessageInput {
-  actorUserId: string
-  senderId?: string
-  botId: string
+  operatorId: string
   conversationId: string
   fileName: string
   mimeType: string
@@ -237,7 +306,7 @@ export interface SendMediaMessageInput {
 }
 
 export interface GetMediaContentInput {
-  actorUserId: string
+  operatorId: string
   mediaId: string
 }
 
@@ -246,13 +315,13 @@ export interface SandboxMediaContent extends SandboxMedia {
 }
 
 export interface SetGroupAnnouncementInput {
-  actorUserId: string
+  operatorId: string
   groupId: string
   content: string
 }
 
 export interface DeleteGroupAnnouncementInput {
-  actorUserId: string
+  operatorId: string
   groupId: string
   announcementId: string
 }

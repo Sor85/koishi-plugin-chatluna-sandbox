@@ -1,0 +1,198 @@
+.onebot-sandbox-page .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+[data-webqq-scrollbar="true"] {
+  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
+}
+
+[data-webqq-scrollbar="true"]::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+[data-webqq-scrollbar="true"]::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.webqq-scrollbar-overlay {
+  position: fixed;
+  z-index: 10001;
+  width: 10px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.14s ease;
+}
+
+.webqq-scrollbar-overlay.is-visible {
+  opacity: 1;
+}
+
+.webqq-scrollbar-thumb {
+  position: absolute;
+  top: var(--webqq-scrollbar-thumb-top);
+  right: 2px;
+  width: 4px;
+  min-height: 28px;
+  height: var(--webqq-scrollbar-thumb-height);
+  border-radius: 999px;
+  background: #94a3b8;
+  cursor: default;
+  pointer-events: auto;
+  transition: width 0.14s ease, right 0.14s ease, background 0.14s ease;
+}
+
+.webqq-scrollbar-overlay.is-accent .webqq-scrollbar-thumb {
+  background: color-mix(in srgb, var(--webqq-accent) 78%, #60a5fa 22%);
+}
+
+.webqq-scrollbar-overlay.is-wide .webqq-scrollbar-thumb,
+.webqq-scrollbar-thumb:hover {
+  right: 2px;
+  width: 6px;
+}
+
+.webqq-scrollbar-thumb.is-dragging {
+  cursor: default;
+}
+
+.webqq-menu-avatar,
+.webqq-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  color: #fff;
+  background: var(--webqq-accent);
+  user-select: none;
+}
+
+.webqq-identity-avatar > img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
+.webqq-rail-button,
+.webqq-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  color: var(--webqq-muted);
+  background: transparent;
+}
+
+.webqq-rail-button:hover,
+.webqq-rail-button:focus-visible,
+.webqq-icon-button:hover,
+.webqq-icon-button:focus-visible {
+  color: var(--webqq-text);
+  background: var(--webqq-hover);
+  outline: none;
+}
+
+.webqq-icon-button {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+
+.webqq-icon-button.is-active {
+  color: var(--webqq-accent);
+  background: color-mix(in srgb, var(--webqq-accent) 14%, transparent);
+}
+
+.webqq-menu-avatar {
+  --webqq-avatar-size: 30px;
+  --webqq-bot-badge-size: 12.5px;
+  --webqq-bot-badge-offset: -1.667px;
+  --webqq-bot-badge-border: 1.667px;
+
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.webqq-avatar {
+  --webqq-avatar-size: 38px;
+  --webqq-bot-badge-size: 15.833px;
+  --webqq-bot-badge-offset: -2.111px;
+  --webqq-bot-badge-border: 2.111px;
+
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  font-size: 12.667px;
+  font-weight: 700;
+}
+
+.webqq-avatar-bot {
+  background: #59657a;
+}
+
+.webqq-identity-avatar.is-group {
+  background: #0f766e;
+}
+
+.webqq-identity-avatar.is-bot {
+  position: relative;
+  color: #fff;
+  background: #475569;
+}
+
+.webqq-avatar-bot-badge,
+.webqq-composer-user-bot-badge {
+  position: absolute;
+  right: var(--webqq-bot-badge-offset);
+  bottom: var(--webqq-bot-badge-offset);
+  z-index: 1;
+  display: inline-flex;
+  width: var(--webqq-bot-badge-size);
+  height: var(--webqq-bot-badge-size);
+  align-items: center;
+  justify-content: center;
+  border: var(--webqq-bot-badge-border) solid #fff;
+  border-radius: 50%;
+  color: #fff;
+  background: #334155;
+}
+
+.webqq-avatar-bot-badge svg,
+.webqq-composer-user-bot-badge svg {
+  width: 66.667%;
+  height: 66.667%;
+}
+
+.webqq-workspace[data-color-mode="dark"] .webqq-identity-avatar.is-bot {
+  background: #64748b;
+}
+
+.webqq-workspace[data-color-mode="dark"] .webqq-avatar-bot-badge,
+.webqq-workspace[data-color-mode="dark"] .webqq-composer-user-bot-badge {
+  border-color: #0f172a;
+  background: #94a3b8;
+}
+
+.webqq-avatar-create {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed color-mix(in srgb, var(--webqq-accent) 46%, transparent);
+  color: var(--webqq-accent);
+  background: color-mix(in srgb, var(--webqq-accent) 9%, var(--webqq-bg));
+}

@@ -102,7 +102,6 @@
 </template>
 
 <script setup lang="ts">
-import { send } from '@koishijs/client'
 import { useMediaQuery } from '@vueuse/core'
 import { computed, reactive, ref, watch } from 'vue'
 import { Button } from './components/ui/button'
@@ -113,9 +112,9 @@ import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
 import type {
   ManageSandboxEnvironmentInput,
+  SandboxBotProfile,
   SandboxImplementationProfile,
-  SandboxSnapshot,
-  SandboxWorkspaceState,
+  SandboxParticipant,
 } from '../src/types'
 
 type EnvironmentCreateType = 'user' | 'bot' | 'group' | 'participant'
@@ -123,15 +122,16 @@ type ParticipantCreateType = 'user' | 'bot'
 
 const props = withDefaults(defineProps<{
   type: EnvironmentCreateType
-  snapshot: SandboxSnapshot
-  currentUserId?: string
+  currentOperator?: Pick<SandboxParticipant, 'id' | 'name'>
+  bots?: Pick<SandboxBotProfile, 'id' | 'name'>[]
   accentColor: string
   side?: 'top' | 'right' | 'bottom' | 'left'
 }>(), {
+  bots: () => [],
   side: 'right',
 })
 const emit = defineEmits<{
-  updated: [workspace: SandboxWorkspaceState]
+  submit: [input: ManageSandboxEnvironmentInput, resolve: () => void, reject: (error: unknown) => void]
   openChange: [open: boolean]
 }>()
 
@@ -145,8 +145,7 @@ const botEnabled = ref(true)
 const selectPortalTarget = ref<HTMLElement | null>(null)
 const isNarrow = useMediaQuery('(max-width: 768px)')
 const resolvedSide = computed(() => props.side === 'right' && isNarrow.value ? 'bottom' : props.side)
-const currentUser = computed(() => props.snapshot.users.find(({ id }) => id === props.currentUserId))
-const canCreateGroup = computed(() => !!currentUser.value && props.snapshot.bots.length > 0)
+const canCreateGroup = computed(() => !!props.currentOperator && props.bots.length > 0)
 const effectiveType = computed(() => props.type === 'participant' ? participantType.value : props.type)
 const title = computed(() => props.type === 'participant'
   ? '添加测试账号'
@@ -155,9 +154,9 @@ const submitLabel = computed(() => effectiveType.value === 'user' ? '添加测�
 const description = computed(() => {
   if (effectiveType.value === 'user') return '创建后可在发送框头像区域切换身份'
   if (effectiveType.value === 'bot') return '创建后会为所有测试用户建立私聊会话'
-  if (!currentUser.value) return '请先创建并选择一位测试用户'
-  if (!props.snapshot.bots.length) return '请先在发送消息控件中添加测试机器人'
-  return `当前用户“${currentUser.value.name}”为群主，现有机器人自动加入群组`
+  if (!props.currentOperator) return '请先创建并选择一位测试参与者'
+  if (!props.bots.length) return '请先在发送消息控件中添加测试机器人'
+  return `当前操作者“${props.currentOperator.name}”为群主，现有机器人自动加入群组`
 })
 
 watch(open, (value) => {
@@ -178,7 +177,7 @@ async function submit() {
   busy.value = true
   errorMessage.value = ''
   try {
-    emit('updated', await send('onebot-sandbox/manage-environment', { ...input, actorUserId: props.currentUserId }))
+    await new Promise<void>((resolve, reject) => emit('submit', input, resolve, reject))
     open.value = false
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '创建失败'
@@ -197,8 +196,8 @@ function createInput(): ManageSandboxEnvironmentInput | undefined {
       data: { id: draft.id, name: draft.name, implementation: botImplementation.value, enabled: botEnabled.value },
     }
   }
-  const owner = currentUser.value
-  if (!owner || !props.snapshot.bots.length) return undefined
+  const owner = props.currentOperator
+  if (!owner || !props.bots.length) return undefined
   return {
     action: 'create-group',
     data: {
@@ -206,7 +205,9 @@ function createInput(): ManageSandboxEnvironmentInput | undefined {
       name: draft.name,
       members: [
         { participantId: owner.id, card: owner.name, role: 'owner' },
-        ...props.snapshot.bots.map((bot) => ({ participantId: bot.id, card: bot.name, role: 'member' as const })),
+        ...props.bots
+          .filter(({ id }) => id !== owner.id)
+          .map((bot) => ({ participantId: bot.id, card: bot.name, role: 'member' as const })),
       ],
     },
   }

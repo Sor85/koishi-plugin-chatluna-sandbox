@@ -1,0 +1,25 @@
+{
+  "verifiedAt": "2026-07-23",
+  "route": "http://127.0.0.1:5140/onebot-sandbox",
+  "viewport": {
+    "width": 1738,
+    "height": 949
+  },
+  "theme": "light",
+  "interactions": {
+    "createUser": {
+      "id": "10999",
+      "name": "临时测试用户",
+      "visibleInComposer": true
+    },
+    "editUser": {
+      "name": "临时用户已编辑",
+      "visibleInComposer": true
+    },
+    "deleteUser": {
+      "removedFromDirectory": true,
+      "currentOperator": "测试用户1"
+    }
+  },
+  "consoleFailures": []
+}

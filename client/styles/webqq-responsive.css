@@ -1,0 +1,114 @@
+@media (max-width: 1180px) {
+  .webqq-workspace {
+    grid-template-columns: 72px minmax(220px, 280px) minmax(360px, 1fr);
+  }
+
+  .webqq-profile {
+    display: none;
+  }
+
+  .webqq-workspace.is-details-open .webqq-profile {
+    z-index: 4;
+    display: flex;
+    width: 100%;
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: stretch;
+    border-left: 1px solid var(--webqq-border);
+  }
+
+  .webqq-workspace.is-details-open .webqq-chat {
+    visibility: hidden;
+  }
+
+  .webqq-info-close {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 768px) {
+  .onebot-sandbox-page {
+    margin-left: var(--activity-width, 3.5rem);
+    width: calc(100% - var(--activity-width, 3.5rem));
+  }
+
+  .webqq-workspace {
+    grid-template-columns: 60px minmax(0, 1fr);
+  }
+
+  .webqq-rail {
+    grid-column: 1;
+    grid-row: 1;
+    padding: 10px 8px;
+  }
+
+  .webqq-rail-button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .webqq-conversations,
+  .webqq-chat,
+  .webqq-profile {
+    display: none;
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .webqq-workspace[data-mobile-view="contacts"] .webqq-conversations,
+  .webqq-workspace[data-mobile-view="messages"] .webqq-chat,
+  .webqq-workspace[data-mobile-view="profile"] .webqq-chat {
+    display: flex;
+  }
+
+  .webqq-workspace[data-mobile-view="profile"] .webqq-chat {
+    display: grid;
+  }
+
+  .webqq-workspace.is-details-open[data-mobile-view="messages"] .webqq-profile {
+    z-index: 4;
+    display: flex;
+    width: 100%;
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: stretch;
+  }
+
+  .webqq-workspace[data-mobile-view="messages"] .webqq-chat {
+    display: grid;
+  }
+
+  .webqq-profile {
+    border-right: 0;
+  }
+
+  .webqq-message-bubble {
+    max-width: 100%;
+  }
+
+  .webqq-message-row {
+    max-width: 88%;
+  }
+
+  .webqq-messages {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .webqq-composer {
+    right: 12px;
+    left: 12px;
+    width: calc(100% - 24px);
+  }
+
+  .webqq-composer-layout-root {
+    bottom: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .webqq-composer-user-stack.is-overflow-collapsing .webqq-composer-user-overflow-avatar,
+  .webqq-composer-user-stack.is-overflow-collapsing .webqq-composer-user-overflow-label {
+    animation: none;
+  }
+}
