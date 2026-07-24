@@ -38,7 +38,8 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     this.user = { id: config.selfId, name: config.name, avatar: config.avatar }
     this.status = Universal.Status.ONLINE
     const request = async (requestedAction: string, params: Record<string, unknown>) => {
-        const action = resolveOneBotAction(this.implementation, this.disabledCapabilities, requestedAction)
+        const capability = resolveOneBotAction(this.implementation, this.disabledCapabilities, requestedAction)
+        const action = capability.handler
         if (action === 'get_status') {
           const online = this.status === Universal.Status.ONLINE
           return { status: 'ok', retcode: 0, data: { online, good: online && !this.error } }
@@ -152,12 +153,19 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
             enabled: params.enable === true,
           })
         }
-        if (action === 'set_group_owner') {
-          return this.control.performBotGroupAction(this.selfId, {
-            action: 'transfer-owner',
-            groupId: String(params.group_id ?? ''),
-            targetId: String(params.user_id ?? ''),
-          })
+        if (action === 'batch_kick_group_members') {
+          const rawUserIds = this.implementation === 'napcat' ? params.user_id : params.user_ids
+          if (!Array.isArray(rawUserIds) || !rawUserIds.length) {
+            throw new Error(`${capability.action} 需要至少一个群成员 ID`)
+          }
+          for (const userId of rawUserIds) {
+            await this.control.performBotGroupAction(this.selfId, {
+              action: 'kick',
+              groupId: String(params.group_id ?? ''),
+              targetId: String(userId),
+            })
+          }
+          return { status: 'ok', retcode: 0, data: null }
         }
         if (action === 'set_group_card') {
           return this.control.performBotGroupAction(this.selfId, {
@@ -173,6 +181,16 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
             groupId: String(params.group_id ?? ''),
             name: typeof params.group_name === 'string' ? params.group_name : '',
           })
+        }
+        if (action === 'delete_group_notice') {
+          const noticeId = String(params.notice_id ?? '')
+          if (!noticeId) throw new Error(`${capability.action} 缺少 notice_id`)
+          this.control.deleteGroupAnnouncement({
+            operatorId: this.selfId,
+            groupId: String(params.group_id ?? ''),
+            announcementId: noticeId,
+          })
+          return { status: 'ok', retcode: 0, data: null }
         }
         if (action === 'set_qq_profile') {
           if (typeof params.nickname !== 'string' || !params.nickname.trim()) throw new Error('机器人昵称不能为空')
@@ -220,7 +238,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
             conversationId: createDirectConversationId(this.selfId, targetId),
           })
         }
-        throw new Error(`OneBot action 已声明但未接入处理器：${action}`)
+        throw new Error(`OneBot action 已声明但未接入处理器：${capability.action}`)
     }
     const internal: SandboxBot.Internal = {
       _request: request,

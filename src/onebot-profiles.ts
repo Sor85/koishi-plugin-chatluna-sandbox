@@ -3,7 +3,10 @@ import type { SandboxImplementationProfile } from './types'
 export type SandboxOneBotCapabilitySurface = 'standard' | 'native'
 
 export interface SandboxOneBotCapability {
+  id: string
   action: string
+  handler: string
+  description: string
   aliases?: string[]
   surface: SandboxOneBotCapabilitySurface
   supported: boolean
@@ -28,42 +31,56 @@ export interface SandboxOneBotMessageEventFields {
   font: number
 }
 
-const standardActions = [
-  'get_status',
-  'get_login_info',
-  'get_version_info',
-  'get_friend_list',
-  'get_group_list',
-  'get_group_info',
-  'get_group_member_info',
-  'get_group_member_list',
-  'send_private_msg',
-  'send_group_msg',
-  'send_msg',
-  'get_msg',
-  'delete_msg',
-  'set_group_kick',
-  'set_group_admin',
-  'set_group_card',
-  'set_group_name',
-  'set_friend_add_request',
-  'set_group_add_request',
-] as const
+const standardActions = {
+  get_status: '获取机器人在线状态和运行状态',
+  get_login_info: '获取当前机器人的 QQ ID 和昵称',
+  get_version_info: '获取当前 OneBot 实现和协议版本信息',
+  get_friend_list: '获取当前机器人的好友列表',
+  get_group_list: '获取当前机器人已加入的群列表',
+  get_group_info: '获取指定群的名称和成员数量',
+  get_group_member_info: '获取指定群成员的资料和群身份',
+  get_group_member_list: '获取指定群的全部成员列表',
+  send_private_msg: '向指定好友发送私聊消息',
+  send_group_msg: '向指定群发送群聊消息',
+  send_msg: '根据参数自动发送私聊或群聊消息',
+  get_msg: '按消息 ID 获取机器人可见的消息详情',
+  delete_msg: '撤回机器人发送且仍可操作的消息',
+  set_group_kick: '将指定普通成员踢出群聊',
+  set_group_admin: '设置或取消指定成员的管理员身份',
+  set_group_card: '修改指定成员的群名片',
+  set_group_name: '修改指定群的群名称',
+  set_friend_add_request: '同意或拒绝好友申请',
+  set_group_add_request: '同意或拒绝加群申请或群邀请',
+} as const
 
 const nativeActions: SandboxOneBotCapability[] = [
-  { action: 'get_stranger_info', surface: 'native', supported: true },
-  { action: 'delete_friend', surface: 'native', supported: true },
-  { action: 'set_group_owner', surface: 'native', supported: true },
-  { action: 'set_qq_profile', surface: 'native', supported: true },
-  { action: 'set_qq_avatar', surface: 'native', supported: true },
-  { action: 'send_poke', aliases: ['friend_poke', 'group_poke'], surface: 'native', supported: true },
+  { id: 'get_stranger_info', action: 'get_stranger_info', handler: 'get_stranger_info', description: '获取指定 QQ 用户的基础资料', surface: 'native', supported: true },
+  { id: 'delete_friend', action: 'delete_friend', handler: 'delete_friend', description: '删除当前机器人的指定好友', surface: 'native', supported: true },
+  { id: 'set_qq_profile', action: 'set_qq_profile', handler: 'set_qq_profile', description: '修改当前机器人的昵称资料', surface: 'native', supported: true },
+  { id: 'set_qq_avatar', action: 'set_qq_avatar', handler: 'set_qq_avatar', description: '修改当前机器人的头像', surface: 'native', supported: true },
+  {
+    id: 'send_poke',
+    action: 'send_poke',
+    handler: 'send_poke',
+    description: '向好友或群成员发送戳一戳',
+    aliases: ['friend_poke', 'group_poke'],
+    surface: 'native',
+    supported: true,
+  },
 ]
 
-function createCapabilities(unsupported: SandboxOneBotCapability[]): SandboxOneBotCapability[] {
+function createCapabilities(profileCapabilities: SandboxOneBotCapability[]): SandboxOneBotCapability[] {
   return [
-    ...standardActions.map((action) => ({ action, surface: 'standard' as const, supported: true })),
+    ...Object.entries(standardActions).map(([action, description]) => ({
+      id: action,
+      action,
+      handler: action,
+      description,
+      surface: 'standard' as const,
+      supported: true,
+    })),
     ...nativeActions,
-    ...unsupported,
+    ...profileCapabilities,
   ]
 }
 
@@ -76,7 +93,40 @@ const baselines: Record<SandboxImplementationProfile, SandboxOneBotProfileBaseli
     appName: 'NapCat.Onebot',
     appVersion: 'sandbox-2026.07.24',
     capabilities: createCapabilities([
-      { action: 'get_ai_characters', surface: 'native', supported: false, reason: '沙盒未模拟 NapCat 群聊 AI 声聊资源' },
+      {
+        id: 'group.notice.delete',
+        action: '_del_group_notice',
+        handler: 'delete_group_notice',
+        description: '删除指定群公告',
+        surface: 'native',
+        supported: true,
+      },
+      {
+        id: 'group.member.kick-batch',
+        action: 'set_group_kick_members',
+        handler: 'batch_kick_group_members',
+        description: '一次将多个普通成员踢出群聊',
+        surface: 'native',
+        supported: true,
+      },
+      {
+        id: 'group.album.list',
+        action: 'get_qun_album_list',
+        handler: 'get_group_album_list',
+        description: '获取指定群的相册列表',
+        surface: 'native',
+        supported: false,
+        reason: '沙盒未模拟 NapCat 群相册资源',
+      },
+      {
+        id: 'group.ai.characters',
+        action: 'get_ai_characters',
+        handler: 'get_ai_characters',
+        description: '获取 NapCat 群聊 AI 声聊角色列表',
+        surface: 'native',
+        supported: false,
+        reason: '沙盒未模拟 NapCat 群聊 AI 声聊资源',
+      },
     ]),
   },
   llbot: {
@@ -87,7 +137,40 @@ const baselines: Record<SandboxImplementationProfile, SandboxOneBotProfileBaseli
     appName: 'LLOneBot',
     appVersion: 'sandbox-2026.07.24',
     capabilities: createCapabilities([
-      { action: 'get_flash_file_info', surface: 'native', supported: false, reason: '沙盒未模拟 LLBot 闪传文件' },
+      {
+        id: 'group.notice.delete',
+        action: '_delete_group_notice',
+        handler: 'delete_group_notice',
+        description: '删除指定群公告',
+        surface: 'native',
+        supported: true,
+      },
+      {
+        id: 'group.member.kick-batch',
+        action: 'batch_delete_group_member',
+        handler: 'batch_kick_group_members',
+        description: '一次将多个普通成员踢出群聊',
+        surface: 'native',
+        supported: true,
+      },
+      {
+        id: 'group.album.list',
+        action: 'get_group_album_list',
+        handler: 'get_group_album_list',
+        description: '获取指定群的相册列表',
+        surface: 'native',
+        supported: false,
+        reason: '沙盒未模拟 LLBot 群相册资源',
+      },
+      {
+        id: 'flash.file.info',
+        action: 'get_flash_file_info',
+        handler: 'get_flash_file_info',
+        description: '获取 LLBot 闪传文件信息',
+        surface: 'native',
+        supported: false,
+        reason: '沙盒未模拟 LLBot 闪传文件',
+      },
     ]),
   },
 }
@@ -101,7 +184,7 @@ export function getOneBotCapabilityMatrix(
   disabledCapabilities: readonly string[] = [],
 ): SandboxOneBotCapability[] {
   const disabled = new Set(disabledCapabilities)
-  return getOneBotProfileBaseline(profile).capabilities.map((capability) => disabled.has(capability.action)
+  return getOneBotProfileBaseline(profile).capabilities.map((capability) => disabled.has(capability.id)
     ? { ...capability, supported: false, reason: '已被机器人能力覆盖禁用' }
     : capability)
 }
@@ -110,13 +193,13 @@ export function resolveOneBotAction(
   profile: SandboxImplementationProfile,
   disabledCapabilities: readonly string[],
   action: string,
-): string {
+): SandboxOneBotCapability {
   const baseline = baselines[profile]
   const capability = baseline.capabilities.find((item) => item.action === action || item.aliases?.includes(action))
   if (!capability) throw new Error(`${baseline.label} 基线不支持 OneBot action：${action}`)
-  if (disabledCapabilities.includes(capability.action)) throw new Error(`能力已被禁用：${capability.action}`)
+  if (disabledCapabilities.includes(capability.id)) throw new Error(`能力已被禁用：${capability.id}`)
   if (!capability.supported) throw new Error(`${baseline.label} 暂不支持 ${capability.action}：${capability.reason}`)
-  return capability.action
+  return capability
 }
 
 export function normalizeDisabledCapabilities(
@@ -124,9 +207,9 @@ export function normalizeDisabledCapabilities(
   values: readonly string[] | undefined,
 ): string[] | undefined {
   if (!values?.length) return undefined
-  const supported = new Set(baselines[profile].capabilities.filter(({ supported }) => supported).map(({ action }) => action))
+  const supported = new Set(baselines[profile].capabilities.filter(({ supported }) => supported).map(({ id }) => id))
   const normalized = [...new Set(values.map((value) => value.trim()).filter(Boolean))]
-  const unknown = normalized.find((action) => !supported.has(action))
+  const unknown = normalized.find((id) => !supported.has(id))
   if (unknown) throw new Error(`${baselines[profile].label} 基线中不存在可禁用能力：${unknown}`)
   return normalized.length ? normalized : undefined
 }

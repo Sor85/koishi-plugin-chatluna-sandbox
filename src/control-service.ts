@@ -491,7 +491,13 @@ export class SandboxControlService {
         return { revision: this.scene.revision }
       }
       if (input.action === 'transfer-owner') {
-        await runtime.internal._request('set_group_owner', { group_id: input.groupId, user_id: input.targetId })
+        // WebQQ 的群主转让是“当前操作者”的客户端行为，不应伪造为 NapCat/LLBot 均不存在的原始 action。
+        // 直接进入统一领域操作，仍会以该机器人身份执行权限检查和状态变更。
+        await this.performBotGroupAction(bot.id, {
+          action: 'transfer-owner',
+          groupId: input.groupId,
+          targetId: input.targetId,
+        })
         return { revision: this.scene.revision }
       }
       if (input.action === 'set-card') {

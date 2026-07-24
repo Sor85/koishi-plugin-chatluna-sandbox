@@ -119,7 +119,7 @@ describe('模拟 QQ 环境群权限操作', () => {
     await expect(control.performGroupAction({ action: 'transfer-owner', operatorId: '10002', groupId: '30001', targetId: '10003' }))
       .rejects.toThrow('只有群主可以转让群主身份')
 
-    await control.bot.internal._request('set_group_owner', { group_id: 30001, user_id: 10002 })
+    await control.performGroupAction({ action: 'transfer-owner', operatorId: '20001', groupId: '30001', targetId: '10002' })
     expect(control.getSnapshot().groups[0].members).toEqual(expect.arrayContaining([
       expect.objectContaining({ participantId: '20001', role: 'member' }),
       expect.objectContaining({ participantId: '10002', role: 'owner' }),

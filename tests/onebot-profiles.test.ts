@@ -40,13 +40,57 @@ describe('OneBot 实现配置', () => {
       sourceRevision: 'd6e2f485b8164597d04a2907d307739ecfcf4a55',
     })
     expect(napcat.capabilities).toEqual(expect.arrayContaining([
-      expect.objectContaining({ action: 'get_version_info', surface: 'standard', supported: true }),
-      expect.objectContaining({ action: 'set_qq_profile', surface: 'native', supported: true }),
+      expect.objectContaining({ action: 'get_version_info', description: expect.any(String), surface: 'standard', supported: true }),
+      expect.objectContaining({ action: 'set_qq_profile', description: expect.any(String), surface: 'native', supported: true }),
+      expect.objectContaining({ action: 'send_poke', aliases: ['friend_poke', 'group_poke'], description: expect.stringContaining('戳一戳') }),
     ]))
     expect(llbot.capabilities).toEqual(expect.arrayContaining([
-      expect.objectContaining({ action: 'get_version_info', surface: 'standard', supported: true }),
-      expect.objectContaining({ action: 'set_qq_avatar', surface: 'native', supported: true }),
+      expect.objectContaining({ action: 'get_version_info', description: expect.any(String), surface: 'standard', supported: true }),
+      expect.objectContaining({ action: 'set_qq_avatar', description: expect.any(String), surface: 'native', supported: true }),
+      expect.objectContaining({ action: 'send_poke', aliases: ['friend_poke', 'group_poke'], description: expect.stringContaining('戳一戳') }),
     ]))
+    expect(napcat.capabilities).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'group.notice.delete', action: '_del_group_notice', handler: 'delete_group_notice', supported: true }),
+      expect.objectContaining({ id: 'group.member.kick-batch', action: 'set_group_kick_members', handler: 'batch_kick_group_members', supported: true }),
+    ]))
+    expect(llbot.capabilities).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'group.notice.delete', action: '_delete_group_notice', handler: 'delete_group_notice', supported: true }),
+      expect.objectContaining({ id: 'group.member.kick-batch', action: 'batch_delete_group_member', handler: 'batch_kick_group_members', supported: true }),
+    ]))
+    expect(napcat.capabilities.filter(({ supported }) => supported).map(({ action }) => action))
+      .not.toEqual(llbot.capabilities.filter(({ supported }) => supported).map(({ action }) => action))
+  })
+
+  it('同一领域能力按实现配置接受各自 action 与参数名', async () => {
+    const control = await createControl()
+    control.createBot({ id: '20002', name: 'LLBot 机器人', implementation: 'llbot', enabled: true })
+    control.createUser({ id: '10004', name: 'NapCat 待移除成员' })
+    control.createUser({ id: '10005', name: 'LLBot 待移除成员' })
+    const group = control.getSnapshot().groups[0]
+    control.updateGroup({
+      id: group.id,
+      name: group.name,
+      members: [
+        ...group.members,
+        { participantId: '20002', role: 'admin' },
+        { participantId: '10004', role: 'member' },
+        { participantId: '10005', role: 'member' },
+      ],
+    })
+
+    const firstAnnouncementId = control.getSnapshot().groups[0].announcements[0].id
+    await control.bot.internal._request('_del_group_notice', { group_id: 30001, notice_id: firstAnnouncementId })
+    control.setGroupAnnouncement({ operatorId: '20002', groupId: '30001', content: 'LLBot 公告' })
+    const secondAnnouncementId = control.getSnapshot().groups[0].announcements[0].id
+    await control.getRuntimeBot('20002').internal._request('_delete_group_notice', { group_id: 30001, notice_id: secondAnnouncementId })
+
+    await control.bot.internal._request('set_group_kick_members', { group_id: 30001, user_id: [10004] })
+    await control.getRuntimeBot('20002').internal._request('batch_delete_group_member', { group_id: 30001, user_ids: [10005] })
+
+    const updatedGroup = control.getSnapshot().groups[0]
+    expect(updatedGroup.announcements).toHaveLength(0)
+    expect(updatedGroup.members.map(({ participantId }) => participantId)).not.toContain('10004')
+    expect(updatedGroup.members.map(({ participantId }) => participantId)).not.toContain('10005')
   })
 
   it('按机器人实现配置生成版本返回并隔离能力覆盖', async () => {

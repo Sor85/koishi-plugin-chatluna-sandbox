@@ -6,6 +6,15 @@
 
 WebQQ 的毛玻璃、聊天样式、气泡尾部、颜色模式和强调色由 Koishi 插件全局配置统一控制。
 
+## OneBot 基线
+
+| 实现配置 | 文档快照日期 | 上游来源版本 | `get_version_info.app_name` |
+| --- | --- | --- | --- |
+| NapCat | 2026-07-24 | `NapNeko/NapCatQQ@33546b936e008c017b2b9c1c41a0bb4f9e86c5be` | `NapCat.Onebot` |
+| LLBot | 2026-07-24 | `LLOneBot/LuckyLilliaBot@d6e2f485b8164597d04a2907d307739ecfcf4a55` | `LLOneBot` |
+
+能力覆盖支持按 action、别名和作用说明搜索；各能力的 API 兼容性说明见 `docs/onebot-profiles.md`。
+
 ## 开发
 
 ```bash

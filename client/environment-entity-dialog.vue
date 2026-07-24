@@ -45,29 +45,48 @@
           <div class="grid gap-2">
             <div class="grid gap-1">
               <Label>能力覆盖</Label>
-              <p class="m-0 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                {{ profileBaseline.label }} 基线 · {{ profileBaseline.snapshotDate }} · {{ profileBaseline.sourceRevision.slice(0, 7) }}
-              </p>
+            </div>
+            <div class="relative">
+              <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center" aria-hidden="true">
+                <IconSearch class="size-4 text-slate-400" />
+              </span>
+              <Input
+                v-model="capabilitySearch"
+                class="border-slate-200 pl-9 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700"
+                placeholder="搜索 action、别名或作用"
+                aria-label="搜索能力覆盖"
+              />
             </div>
             <div class="grid max-h-48 gap-2 overflow-y-auto rounded-lg bg-slate-50 p-3 dark:bg-slate-900/60">
               <label
-                v-for="capability in configurableCapabilities"
-                :key="capability.action"
+                v-for="capability in filteredCapabilities"
+                :key="capability.id"
                 class="flex items-start gap-2"
               >
                 <Checkbox
-                  :model-value="!draft.disabledCapabilities.includes(capability.action)"
+                  :model-value="capability.supported && !draft.disabledCapabilities.includes(capability.id)"
+                  :disabled="!capability.supported"
                   class="mt-0.5 border-slate-300 data-[state=checked]:border-[var(--webqq-accent)] data-[state=checked]:bg-[var(--webqq-accent)] data-[state=checked]:text-white dark:border-slate-600"
-                  @update:model-value="setCapabilityEnabled(capability.action, $event === true)"
+                  @update:model-value="setCapabilityEnabled(capability.id, $event === true)"
                 />
                 <span class="grid min-w-0 gap-0.5">
-                  <span class="text-sm">{{ capability.action }}</span>
-                  <small class="text-xs text-slate-500 dark:text-slate-400">
-                    {{ capability.surface === 'standard' ? '标准能力' : '原生扩展' }}
-                    <template v-if="capability.aliases?.length"> · 别名 {{ capability.aliases.join('、') }}</template>
+                  <span class="flex min-w-0 items-center gap-1.5">
+                    <span class="min-w-0 truncate text-sm">{{ capability.action }}</span>
+                    <Badge variant="secondary" class="shrink-0">
+                      {{ capability.surface === 'standard' ? '标准能力' : '原生扩展' }}
+                    </Badge>
+                  </span>
+                  <span class="text-xs leading-5 text-slate-600 dark:text-slate-300">{{ capability.description }}</span>
+                  <small v-if="capability.aliases?.length || !capability.supported" class="text-xs text-slate-500 dark:text-slate-400">
+                    <template v-if="capability.aliases?.length">别名 {{ capability.aliases.join('、') }}</template>
+                    <template v-if="capability.aliases?.length && !capability.supported"> · </template>
+                    <template v-if="!capability.supported">{{ capability.reason }}</template>
                   </small>
                 </span>
               </label>
+              <p v-if="!filteredCapabilities.length" class="m-0 py-3 text-center text-xs text-slate-500 dark:text-slate-400">
+                没有匹配的能力
+              </p>
             </div>
           </div>
           <div class="flex items-center gap-2">
@@ -150,8 +169,9 @@
 </template>
 
 <script setup lang="ts">
-import { IconPlus, IconTrash } from '@tabler/icons-vue'
+import { IconPlus, IconSearch, IconTrash } from '@tabler/icons-vue'
 import { computed, reactive, ref, watch } from 'vue'
+import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
 import { Checkbox } from './components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './components/ui/dialog'
@@ -187,6 +207,7 @@ const emit = defineEmits<{
 
 const busy = ref(false)
 const errorMessage = ref('')
+const capabilitySearch = ref('')
 const selectPortalTarget = ref<HTMLElement | null>(null)
 const draft = reactive<{
   id: string
@@ -218,11 +239,22 @@ const deleteMessage = computed(() => {
 const nameLabel = computed(() => props.target?.type === 'user' ? '用户昵称' : props.target?.type === 'bot' ? '机器人昵称' : '群名称')
 const fieldPrefix = computed(() => `environment-${props.target?.type ?? 'entity'}-edit`)
 const profileBaseline = computed(() => getOneBotProfileBaseline(draft.implementation))
-const configurableCapabilities = computed(() => profileBaseline.value.capabilities.filter(({ supported }) => supported))
+const filteredCapabilities = computed(() => {
+  const query = capabilitySearch.value.trim().toLowerCase()
+  if (!query) return profileBaseline.value.capabilities
+  return profileBaseline.value.capabilities.filter((capability) => [
+    capability.id,
+    capability.action,
+    capability.description,
+    capability.reason,
+    ...(capability.aliases ?? []),
+  ].some((value) => value?.toLowerCase().includes(query)))
+})
 
 watch([() => props.open, () => props.target], ([open]) => {
   if (!open) return
   errorMessage.value = ''
+  capabilitySearch.value = ''
   if (props.target?.type === 'user') {
     const value = props.users.find(({ id }) => id === props.target?.id)
     if (!value) return
@@ -271,10 +303,10 @@ async function submitEdit() {
   }
 }
 
-function setCapabilityEnabled(action: string, enabled: boolean) {
+function setCapabilityEnabled(capabilityId: string, enabled: boolean) {
   draft.disabledCapabilities = enabled
-    ? draft.disabledCapabilities.filter((value) => value !== action)
-    : [...new Set([...draft.disabledCapabilities, action])]
+    ? draft.disabledCapabilities.filter((value) => value !== capabilityId)
+    : [...new Set([...draft.disabledCapabilities, capabilityId])]
 }
 
 async function submitDelete() {

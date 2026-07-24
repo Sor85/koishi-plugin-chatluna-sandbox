@@ -18,7 +18,9 @@
 ## Answer
 
 - 新增 NapCat 与 LLBot 独立基线、来源版本、快照日期和能力矩阵
+- 以稳定语义能力 ID 映射各实现真实 action；删除群公告和批量踢人分别使用 NapCat、LLBot 的不同名称与参数结构
 - OneBot action、`bot.internal` 具名方法和方法别名统一经过逐机器人能力门禁
 - 消息原始字段与 `get_version_info` 按接收机器人实现配置生成
 - 机器人编辑 Dialog 可以查看基线并禁用单项能力
+- 能力覆盖支持搜索 action、别名和作用说明，并展示每项能力的简短用途
 - 基线维护说明见 `docs/onebot-profiles.md`
