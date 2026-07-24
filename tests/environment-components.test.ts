@@ -27,4 +27,13 @@ describe('环境管理组件传输边界', () => {
     expect(overlaySource).toContain('<EnvironmentEntityDialog')
     expect(overlaySource.match(/<Dialog /g)).toHaveLength(2)
   })
+
+  it('机器人编辑 Dialog 使用 shadcn-vue 能力覆盖控件', () => {
+    const source = readFileSync(resolve('client/environment-entity-dialog.vue'), 'utf8')
+
+    expect(source).toContain('getOneBotProfileBaseline')
+    expect(source).toContain('能力覆盖')
+    expect(source).toContain('<Checkbox')
+    expect(source).toContain('disabledCapabilities')
+  })
 })

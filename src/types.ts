@@ -25,6 +25,7 @@ export interface SandboxBotProfile {
   avatar?: string
   implementation: SandboxImplementationProfile
   enabled: boolean
+  disabledCapabilities?: string[]
 }
 
 export type CreateSandboxBotInput = Omit<SandboxBotProfile, 'kind'>

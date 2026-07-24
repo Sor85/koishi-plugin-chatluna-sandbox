@@ -1,12 +1,15 @@
 import { Bot, Context, Fragment, h, Universal } from 'koishi'
 import type { SandboxControlService } from './control-service'
-import { createDirectConversationId, createGroupConversationId, getDirectConversationPeerId } from './types'
+import { getOneBotMessageSequence, getOneBotProfileBaseline, resolveOneBotAction } from './onebot-profiles'
+import { createDirectConversationId, createGroupConversationId, getDirectConversationPeerId, type SandboxImplementationProfile } from './types'
 
 export namespace SandboxBot {
   export interface Config {
     selfId: string
     name: string
     avatar?: string
+    implementation: SandboxImplementationProfile
+    disabledCapabilities?: string[]
   }
 
   export interface Internal {
@@ -21,6 +24,8 @@ export namespace SandboxBot {
 export class SandboxBot extends Bot<any, SandboxBot.Config> {
   hidden = true
   internal: SandboxBot.Internal
+  private implementation: SandboxImplementationProfile
+  private disabledCapabilities: string[]
 
   constructor(ctx: Context, public control: SandboxControlService, config: SandboxBot.Config) {
     // 被测插件通常按 session.platform === 'onebot' 选择协议逻辑；
@@ -28,9 +33,12 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     super(ctx, config, 'onebot')
     this.platform = 'onebot'
     this.selfId = config.selfId
+    this.implementation = config.implementation
+    this.disabledCapabilities = config.disabledCapabilities ?? []
     this.user = { id: config.selfId, name: config.name, avatar: config.avatar }
     this.status = Universal.Status.ONLINE
-    const request = async (action: string, params: Record<string, unknown>) => {
+    const request = async (requestedAction: string, params: Record<string, unknown>) => {
+        const action = resolveOneBotAction(this.implementation, this.disabledCapabilities, requestedAction)
         if (action === 'get_status') {
           const online = this.status === Universal.Status.ONLINE
           return { status: 'ok', retcode: 0, data: { online, good: online && !this.error } }
@@ -43,10 +51,11 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           }
         }
         if (action === 'get_version_info') {
+          const baseline = getOneBotProfileBaseline(this.implementation)
           return {
             status: 'ok',
             retcode: 0,
-            data: { app_name: 'onebot-sandbox', app_version: '0.0.1', protocol_version: 'v11' },
+            data: { app_name: baseline.appName, app_version: baseline.appVersion, protocol_version: 'v11' },
           }
         }
         if (action === 'get_stranger_info') {
@@ -192,17 +201,31 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
             reason: typeof params.reason === 'string' ? params.reason : undefined,
           })
         }
-        throw new Error(`不支持的 OneBot action：${action}`)
+        if (action === 'send_poke') {
+          const targetId = String(params.target_id ?? params.user_id ?? '')
+          if (params.group_id !== undefined) {
+            const groupId = String(params.group_id)
+            return this.control.performGroupAction({
+              action: 'poke',
+              operatorId: this.selfId,
+              groupId,
+              targetId,
+              conversationId: createGroupConversationId(groupId),
+            })
+          }
+          return this.control.performFriendAction({
+            action: 'poke',
+            operatorId: this.selfId,
+            targetId,
+            conversationId: createDirectConversationId(this.selfId, targetId),
+          })
+        }
+        throw new Error(`OneBot action 已声明但未接入处理器：${action}`)
     }
     const internal: SandboxBot.Internal = {
       _request: request,
-      set_friend_add_request: (input) => this.control.handleBotFriendRequest(this.selfId, input),
-      set_group_add_request: (input) => this.control.handleBotGroupRequest(this.selfId, {
-        flag: input.flag,
-        subType: input.sub_type,
-        approve: input.approve,
-        reason: input.reason,
-      }),
+      set_friend_add_request: (input) => request('set_friend_add_request', input),
+      set_group_add_request: (input) => request('set_group_add_request', input),
     }
     this.internal = new Proxy(internal, {
       get: (target, property) => {
@@ -210,6 +233,11 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
         if (typeof property === 'string') return (params: Record<string, unknown> = {}) => request(property, params)
       },
     })
+  }
+
+  updateImplementation(implementation: SandboxImplementationProfile, disabledCapabilities: string[] | undefined) {
+    this.implementation = implementation
+    this.disabledCapabilities = disabledCapabilities ?? []
   }
 
   async createDirectChannel(userId: string): Promise<Universal.Channel> {
@@ -405,15 +433,19 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     const directPeerId = conversation?.type === 'direct'
       ? getDirectConversationPeerId(conversation, this.selfId)
       : undefined
+    const sequence = getOneBotMessageSequence(message.id)
     return {
       time: Math.floor(new Date(message.createdAt).getTime() / 1000),
       message_type: conversation?.type === 'group' ? 'group' : 'private',
       message_id: message.id,
-      real_id: message.id,
+      message_seq: sequence,
+      real_id: sequence,
       sender: { user_id: Number(message.authorId), nickname: this.control.getSnapshot().participants.find(({ id }) => id === message.authorId)?.name ?? this.user?.name ?? message.authorId },
       user_id: Number(conversation?.type === 'group' ? message.authorId : directPeerId ?? message.authorId),
       group_id: conversation?.groupId ? Number(conversation.groupId) : undefined,
       message: [{ type: 'text', data: { text: message.content } }],
+      message_format: 'array',
+      font: 0,
       raw_message: message.content,
     }
   }

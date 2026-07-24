@@ -137,7 +137,7 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     await expect(bot.internal._request('get_version_info', {})).resolves.toEqual({
       status: 'ok',
       retcode: 0,
-      data: { app_name: 'onebot-sandbox', app_version: '0.0.1', protocol_version: 'v11' },
+      data: { app_name: 'NapCat.Onebot', app_version: 'sandbox-2026.07.24', protocol_version: 'v11' },
     })
   })
 

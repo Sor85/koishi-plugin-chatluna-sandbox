@@ -42,6 +42,34 @@
               </SelectContent>
             </Select>
           </div>
+          <div class="grid gap-2">
+            <div class="grid gap-1">
+              <Label>能力覆盖</Label>
+              <p class="m-0 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                {{ profileBaseline.label }} 基线 · {{ profileBaseline.snapshotDate }} · {{ profileBaseline.sourceRevision.slice(0, 7) }}
+              </p>
+            </div>
+            <div class="grid max-h-48 gap-2 overflow-y-auto rounded-lg bg-slate-50 p-3 dark:bg-slate-900/60">
+              <label
+                v-for="capability in configurableCapabilities"
+                :key="capability.action"
+                class="flex items-start gap-2"
+              >
+                <Checkbox
+                  :model-value="!draft.disabledCapabilities.includes(capability.action)"
+                  class="mt-0.5 border-slate-300 data-[state=checked]:border-[var(--webqq-accent)] data-[state=checked]:bg-[var(--webqq-accent)] data-[state=checked]:text-white dark:border-slate-600"
+                  @update:model-value="setCapabilityEnabled(capability.action, $event === true)"
+                />
+                <span class="grid min-w-0 gap-0.5">
+                  <span class="text-sm">{{ capability.action }}</span>
+                  <small class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ capability.surface === 'standard' ? '标准能力' : '原生扩展' }}
+                    <template v-if="capability.aliases?.length"> · 别名 {{ capability.aliases.join('、') }}</template>
+                  </small>
+                </span>
+              </label>
+            </div>
+          </div>
           <div class="flex items-center gap-2">
             <Checkbox
               :id="`${fieldPrefix}-enabled`"
@@ -130,6 +158,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from './compone
 import { Input } from './components/ui/input'
 import { Label } from './components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
+import { getOneBotProfileBaseline } from '../src/onebot-profiles'
 import type {
   ManageSandboxEnvironmentInput,
   SandboxBotProfile,
@@ -164,8 +193,9 @@ const draft = reactive<{
   name: string
   implementation: SandboxImplementationProfile
   enabled: boolean
+  disabledCapabilities: string[]
   members: SandboxGroupMember[]
-}>({ id: '', name: '', implementation: 'napcat', enabled: true, members: [] })
+}>({ id: '', name: '', implementation: 'napcat', enabled: true, disabledCapabilities: [], members: [] })
 
 const entity = computed(() => {
   if (props.target?.type === 'user') return props.users.find(({ id }) => id === props.target?.id)
@@ -187,6 +217,8 @@ const deleteMessage = computed(() => {
 })
 const nameLabel = computed(() => props.target?.type === 'user' ? '用户昵称' : props.target?.type === 'bot' ? '机器人昵称' : '群名称')
 const fieldPrefix = computed(() => `environment-${props.target?.type ?? 'entity'}-edit`)
+const profileBaseline = computed(() => getOneBotProfileBaseline(draft.implementation))
+const configurableCapabilities = computed(() => profileBaseline.value.capabilities.filter(({ supported }) => supported))
 
 watch([() => props.open, () => props.target], ([open]) => {
   if (!open) return
@@ -194,15 +226,15 @@ watch([() => props.open, () => props.target], ([open]) => {
   if (props.target?.type === 'user') {
     const value = props.users.find(({ id }) => id === props.target?.id)
     if (!value) return
-    Object.assign(draft, { id: value.id, name: value.name, implementation: 'napcat', enabled: true, members: [] })
+    Object.assign(draft, { id: value.id, name: value.name, implementation: 'napcat', enabled: true, disabledCapabilities: [], members: [] })
   } else if (props.target?.type === 'bot') {
     const value = props.bots.find(({ id }) => id === props.target?.id)
     if (!value) return
-    Object.assign(draft, { ...value, members: [] })
+    Object.assign(draft, { ...value, disabledCapabilities: value.disabledCapabilities ?? [], members: [] })
   } else if (props.target?.type === 'group') {
     const value = props.groups.find(({ id }) => id === props.target?.id)
     if (!value) return
-    Object.assign(draft, { id: value.id, name: value.name, implementation: 'napcat', enabled: true, members: value.members.map((member) => ({ ...member })) })
+    Object.assign(draft, { id: value.id, name: value.name, implementation: 'napcat', enabled: true, disabledCapabilities: [], members: value.members.map((member) => ({ ...member })) })
   }
 }, { immediate: true })
 
@@ -224,10 +256,25 @@ async function submitEdit() {
   if (props.target?.type === 'user') {
     await runAction({ action: 'update-user', data: { id: draft.id, name: draft.name } })
   } else if (props.target?.type === 'bot') {
-    await runAction({ action: 'update-bot', data: { id: draft.id, name: draft.name, implementation: draft.implementation, enabled: draft.enabled } })
+    await runAction({
+      action: 'update-bot',
+      data: {
+        id: draft.id,
+        name: draft.name,
+        implementation: draft.implementation,
+        enabled: draft.enabled,
+        disabledCapabilities: [...draft.disabledCapabilities],
+      },
+    })
   } else if (props.target?.type === 'group') {
     await runAction({ action: 'update-group', data: { id: draft.id, name: draft.name, members: draft.members.map((member) => ({ ...member })) } })
   }
+}
+
+function setCapabilityEnabled(action: string, enabled: boolean) {
+  draft.disabledCapabilities = enabled
+    ? draft.disabledCapabilities.filter((value) => value !== action)
+    : [...new Set([...draft.disabledCapabilities, action])]
 }
 
 async function submitDelete() {

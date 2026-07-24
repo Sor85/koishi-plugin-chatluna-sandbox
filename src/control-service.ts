@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { SandboxBot } from './bot'
 import { SandboxChatLunaStateStore } from './chatluna-state'
 import { SandboxMediaStorage } from './media-storage'
+import { getOneBotCapabilityMatrix, getOneBotMessageEventFields, normalizeDisabledCapabilities, type SandboxOneBotCapability } from './onebot-profiles'
 import {
   createDirectConversationId,
   createGroupConversationId,
@@ -144,6 +145,7 @@ export class SandboxControlService {
     this.bot = this.createRuntimeBot({
       selfId: DEFAULT_BOT_ID,
       name: 'Koishi',
+      implementation: 'napcat',
     })
   }
 
@@ -166,6 +168,12 @@ export class SandboxControlService {
     const bot = this.runtimeBots.get(botId)
     if (!bot) throw new Error(`机器人运行时不存在：${botId}`)
     return bot
+  }
+
+  getBotCapabilities(botId: string): SandboxOneBotCapability[] {
+    const bot = this.getBots().find(({ id }) => id === botId)
+    if (!bot) throw new Error(`机器人不存在：${botId}`)
+    return getOneBotCapabilityMatrix(bot.implementation, bot.disabledCapabilities)
   }
 
   getVisibleSnapshot(operatorId: string, messageLimit = 50): SandboxSnapshot {
@@ -252,6 +260,7 @@ export class SandboxControlService {
       throw new Error(`参与者已存在：${id}`)
     }
 
+    const disabledCapabilities = normalizeDisabledCapabilities(input.implementation, input.disabledCapabilities)
     this.scene.participants.push({
       kind: 'bot',
       id,
@@ -259,8 +268,15 @@ export class SandboxControlService {
       avatar: input.avatar?.trim() || undefined,
       implementation: input.implementation,
       enabled: input.enabled,
+      ...(disabledCapabilities ? { disabledCapabilities } : {}),
     })
-    this.createRuntimeBot({ selfId: id, name, avatar: input.avatar?.trim() || undefined })
+    this.createRuntimeBot({
+      selfId: id,
+      name,
+      avatar: input.avatar?.trim() || undefined,
+      implementation: input.implementation,
+      disabledCapabilities,
+    })
     for (const participant of this.scene.participants) {
       if (participant.id !== id) this.addFriendship(participant.id, id)
     }
@@ -272,12 +288,16 @@ export class SandboxControlService {
     if (!bot) throw new Error(`机器人不存在：${input.id}`)
     bot.name = this.validateName(input.name, '机器人昵称')
     if (input.avatar !== undefined) bot.avatar = input.avatar.trim() || undefined
+    const disabledCapabilities = normalizeDisabledCapabilities(input.implementation, input.disabledCapabilities)
     bot.implementation = input.implementation
     bot.enabled = input.enabled
+    if (disabledCapabilities) bot.disabledCapabilities = disabledCapabilities
+    else delete bot.disabledCapabilities
     const runtime = this.runtimeBots.get(bot.id)
     if (runtime) {
       runtime.user = { id: bot.id, name: bot.name, avatar: bot.avatar }
       runtime.status = bot.enabled ? Universal.Status.ONLINE : Universal.Status.OFFLINE
+      runtime.updateImplementation(bot.implementation, bot.disabledCapabilities)
     }
     this.scene.revision += 1
   }
@@ -839,7 +859,7 @@ export class SandboxControlService {
         post_type: 'message',
         message_type: context.conversation.type === 'group' ? 'group' : 'private',
         sub_type: context.conversation.type === 'group' ? 'normal' : 'friend',
-        message_id: Number.parseInt(message.id, 16),
+        ...getOneBotMessageEventFields(recipientBot.implementation, message.id),
         user_id: Number(context.operator.id),
         group_id: context.group ? Number(context.group.id) : undefined,
         message: onebotMessage,
