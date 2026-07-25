@@ -66,10 +66,14 @@ describe('环境管理组件传输边界', () => {
     expect(createPopover).toContain('<form class="webqq-secondary-form"')
   })
 
-  it('删除确认按钮在 Portal 中使用显式危险色', () => {
-    const source = readFileSync(resolve('client/environment-entity-dialog.vue'), 'utf8')
+  it('危险按钮和下拉浮层使用全局显式主题，避免 Portal 中样式退化', () => {
+    const entityDialog = readFileSync(resolve('client/environment-entity-dialog.vue'), 'utf8')
+    const buttonVariants = readFileSync(resolve('client/components/ui/button/index.ts'), 'utf8')
+    const selectContent = readFileSync(resolve('client/components/ui/select/SelectContent.vue'), 'utf8')
 
-    expect(source).toContain('variant="destructive"')
-    expect(source).toContain('bg-red-600 text-white hover:bg-red-700')
+    expect(entityDialog).toContain('variant="destructive"')
+    expect(buttonVariants).toContain('bg-red-600 text-white shadow-xs')
+    expect(selectContent).toContain('z-[200]')
+    expect(selectContent).toContain('border-slate-200 bg-white text-slate-900')
   })
 })

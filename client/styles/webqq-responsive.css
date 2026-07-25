@@ -84,7 +84,7 @@
   }
 
   .webqq-workspace[data-mobile-view="debug"] .webqq-chat {
-    display: block;
+    display: grid;
   }
 
   .webqq-profile {

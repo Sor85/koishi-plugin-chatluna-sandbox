@@ -6,11 +6,11 @@
         <p>查看最近的 action、原始事件和错误。调试记录仅保存在内存中，不能重放。</p>
       </div>
       <div class="webqq-debug-actions">
-        <Button variant="outline" :disabled="loading" @click="applyFilters">
+        <Button variant="outline" class="webqq-debug-button" :disabled="loading" @click="applyFilters">
           <IconRefresh :size="16" aria-hidden="true" />
           刷新
         </Button>
-        <Button variant="outline" :disabled="loading || !records.length" class="text-red-600 hover:text-red-700 dark:text-red-400" @click="emit('clear')">
+        <Button variant="destructive" :disabled="loading || !records.length" @click="emit('clear')">
           <IconTrash :size="16" aria-hidden="true" />
           清理调试记录
         </Button>
@@ -21,7 +21,7 @@
       <label>
         <span>机器人</span>
         <Select v-model="botId">
-          <SelectTrigger class="w-full border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900" aria-label="按机器人筛选">
+          <SelectTrigger class="webqq-debug-control" aria-label="按机器人筛选">
             <SelectValue />
           </SelectTrigger>
           <SelectContent class="w-[var(--reka-select-trigger-width)] border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
@@ -33,7 +33,7 @@
       <label>
         <span>方向</span>
         <Select v-model="direction">
-          <SelectTrigger class="w-full border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900" aria-label="按方向筛选">
+          <SelectTrigger class="webqq-debug-control" aria-label="按方向筛选">
             <SelectValue />
           </SelectTrigger>
           <SelectContent class="w-[var(--reka-select-trigger-width)] border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
@@ -45,7 +45,7 @@
       </label>
       <label>
         <span>类型</span>
-        <Input v-model="type" placeholder="例如 get_login_info" @keyup.enter="applyFilters" />
+        <Input v-model="type" class="webqq-debug-control" placeholder="例如 get_login_info" @keyup.enter="applyFilters" />
       </label>
       <label class="webqq-debug-error-filter">
         <Checkbox v-model="errorsOnly" class="border-slate-300 data-[state=checked]:border-[var(--webqq-accent)] data-[state=checked]:bg-[var(--webqq-accent)] data-[state=checked]:text-white" />
@@ -74,11 +74,11 @@
         <p v-if="record.error" class="webqq-debug-trace">{{ record.error.message }} · trace {{ record.error.traceId }}</p>
         <div class="webqq-debug-payloads">
           <section v-if="record.payload !== undefined">
-            <h2>载荷</h2>
+            <h2>{{ record.direction === 'action' ? '输入' : '事件数据' }}</h2>
             <pre v-webqq-scrollbar>{{ formatPayload(record.payload) }}</pre>
           </section>
           <section v-if="record.result !== undefined">
-            <h2>结果</h2>
+            <h2>{{ record.direction === 'action' ? '输出' : '处理结果' }}</h2>
             <pre v-webqq-scrollbar>{{ formatPayload(record.result) }}</pre>
           </section>
         </div>

@@ -156,7 +156,7 @@
         </p>
         <DialogFooter>
           <Button type="button" variant="outline" class="border-slate-200 bg-white hover:bg-slate-100 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800" @click="emit('update:open', false)">取消</Button>
-          <Button type="button" variant="destructive" class="bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500/20 dark:bg-red-600 dark:hover:bg-red-500" :disabled="busy" @click="submitDelete">{{ busy ? '删除中...' : '确认删除' }}</Button>
+          <Button type="button" variant="destructive" :disabled="busy" @click="submitDelete">{{ busy ? '删除中...' : '确认删除' }}</Button>
         </DialogFooter>
       </div>
       <!-- Select 必须挂在 Dialog 内部，否则 reka-ui 的默认 Portal 层级会落到遮罩下方。绝对定位宿主不参与 Dialog 高度计算。 -->

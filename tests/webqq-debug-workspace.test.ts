@@ -16,7 +16,22 @@ describe('WebQQ OneBot 调试工作台', () => {
     expect(debugSource).toContain("from './components/ui/checkbox'")
     expect(debugSource).toContain("from './components/ui/button'")
     expect(debugSource).toContain('清理调试记录')
+    expect(debugSource).toMatch(/variant="destructive"[^>]*>\s*<IconTrash/s)
+    expect(debugSource).toContain("record.direction === 'action' ? '输入' : '事件数据'")
+    expect(debugSource).toContain("record.direction === 'action' ? '输出' : '处理结果'")
     expect(debugSource).toContain('不能重放')
     expect(debugSource).not.toContain("emit('replay'")
+  })
+
+  it('使用独立网格和显式 WebQQ 控件主题，避免筛选器溢出与黑色描边', () => {
+    const debugSource = readFileSync(resolve('client/onebot-debug-workspace.vue'), 'utf8')
+    const debugStyles = readFileSync(resolve('client/styles/webqq-debug.css'), 'utf8')
+
+    expect(debugSource).toContain('webqq-debug-control')
+    expect(debugSource).toContain('webqq-debug-button')
+    expect(debugStyles).toMatch(/\.webqq-debug-workspace\s*\{[^}]*grid-template-rows:\s*auto auto minmax\(0, 1fr\)/s)
+    expect(debugStyles).toMatch(/\.webqq-debug-control[^}]*border-color:\s*var\(--webqq-border\)/s)
+    expect(debugStyles).toMatch(/\.webqq-debug-button[^}]*border-color:\s*var\(--webqq-border\)/s)
+    expect(debugStyles).toMatch(/\.webqq-debug-records\s*\{[^}]*height:\s*100%/s)
   })
 })
