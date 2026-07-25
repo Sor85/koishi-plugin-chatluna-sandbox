@@ -76,4 +76,28 @@ describe('环境管理组件传输边界', () => {
     expect(selectContent).toContain('z-[200]')
     expect(selectContent).toContain('border-slate-200 bg-white text-slate-900')
   })
+
+  it('Portal 二级菜单提供完整的 shadcn 颜色变量，避免控件回退为黑色描边', () => {
+    const overlayStyles = readFileSync(resolve('client/styles/webqq-overlays.css'), 'utf8')
+
+    for (const token of [
+      '--color-background',
+      '--color-primary',
+      '--color-primary-foreground',
+      '--color-accent',
+      '--color-accent-foreground',
+      '--color-border',
+      '--color-input',
+      '--color-ring',
+    ]) {
+      expect(overlayStyles).toContain(token)
+    }
+
+    expect(overlayStyles).toContain("[data-slot='input']")
+    expect(overlayStyles).toContain("[data-slot='checkbox']")
+    expect(overlayStyles).toContain("[data-slot='button'][data-variant='outline']")
+    expect(overlayStyles).toContain("[data-slot='button']:not([data-variant])")
+    expect(overlayStyles).toContain('border-color: var(--color-input)')
+    expect(overlayStyles).toContain('background: var(--color-primary)')
+  })
 })
