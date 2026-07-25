@@ -317,9 +317,14 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
 
   async function manageEnvironment(input: ManageSandboxEnvironmentInput) {
     try {
-      const operatorId = getCurrentOperatorId()
-      await port.manageEnvironment(input)
-      replaceWorkspace(await port.getWorkspace({ operatorId }))
+      const operatorId = currentOperatorIdState.value
+      const managedWorkspace = await port.manageEnvironment(input)
+      const deletesCurrentOperator = (input.action === 'delete-user' || input.action === 'delete-bot')
+        && input.data.id === operatorId
+      // Koishi send 会把缺省 RPC 入参传成 null；空环境创建首个参与者或删除当前操作者时，直接使用管理接口返回的 fallback 工作区。
+      replaceWorkspace(operatorId && !deletesCurrentOperator
+        ? await port.getWorkspace({ operatorId })
+        : managedWorkspace)
     } catch (error) {
       throw normalizeWorkspaceError(error, '环境管理失败')
     }

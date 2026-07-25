@@ -621,7 +621,7 @@ describe('WebQQ 工作区控制模块', () => {
 
     await controller.manageEnvironment({ action: 'delete-user', data: { id: '10001' } })
 
-    expect(port.calls.at(-2)).toEqual({
+    expect(port.calls.at(-1)).toEqual({
       operation: 'manageEnvironment',
       input: { action: 'delete-user', data: { id: '10001' } },
     })
@@ -634,6 +634,42 @@ describe('WebQQ 工作区控制模块', () => {
       controller.composer.value.revision,
       controller.details.value.revision,
     ]).toEqual([8, 8, 8, 8])
+  })
+
+  it('空环境可以创建首个用户并自动选择为当前操作者', async () => {
+    const emptyWorkspace: SandboxWorkspaceState = {
+      ...workspace,
+      snapshot: {
+        ...workspace.snapshot,
+        revision: 0,
+        participants: [],
+        groups: [],
+        conversations: [],
+        messages: [],
+        friendships: [],
+        requests: [],
+      },
+      chatLunaStates: [],
+    }
+    const port = createFakeWorkspacePort(emptyWorkspace)
+    const controller = createWorkspaceController(port, createStorage())
+    await controller.load()
+    port.workspaceResult = {
+      ...emptyWorkspace,
+      snapshot: {
+        ...emptyWorkspace.snapshot,
+        revision: 1,
+        participants: [{ kind: 'user', id: '10099', name: '新用户' }],
+      },
+    }
+
+    await controller.manageEnvironment({ action: 'create-user', data: { id: '10099', name: '新用户' } })
+
+    expect(port.calls.at(-1)).toEqual({
+      operation: 'manageEnvironment',
+      input: { action: 'create-user', data: { id: '10099', name: '新用户' } },
+    })
+    expect(controller.currentOperatorId.value).toBe('10099')
   })
 
   it('环境管理失败时保留工作区和当前选择', async () => {

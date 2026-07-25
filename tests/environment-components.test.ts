@@ -65,4 +65,11 @@ describe('环境管理组件传输边界', () => {
     expect(overlayHost.match(/<DialogFooter>/g)).toHaveLength(2)
     expect(createPopover).toContain('<form class="webqq-secondary-form"')
   })
+
+  it('删除确认按钮在 Portal 中使用显式危险色', () => {
+    const source = readFileSync(resolve('client/environment-entity-dialog.vue'), 'utf8')
+
+    expect(source).toContain('variant="destructive"')
+    expect(source).toContain('bg-red-600 text-white hover:bg-red-700')
+  })
 })
