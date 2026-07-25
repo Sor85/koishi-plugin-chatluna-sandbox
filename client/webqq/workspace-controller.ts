@@ -2,6 +2,7 @@ import { computed, readonly, ref, type DeepReadonly } from 'vue'
 import type {
   DeleteGroupAnnouncementInput,
   GetMessageHistoryInput,
+  GetSandboxOneBotDebugRecordsInput,
   ManageSandboxEnvironmentInput,
   SandboxAppearance,
   SandboxBotProfile,
@@ -11,6 +12,7 @@ import type {
   SandboxGroup,
   SandboxGroupAction,
   SandboxMessage,
+  SandboxOneBotDebugRecord,
   SandboxParticipant,
   SandboxSnapshot,
   SandboxWorkspaceState,
@@ -103,6 +105,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   const currentOperatorIdState = ref<string>()
   const activeConversationIdState = ref<string>()
   const currentViewState = ref<SandboxWorkspaceView>('messages')
+  const oneBotDebugRecordsState = ref<SandboxOneBotDebugRecord[]>([])
 
   const snapshot = computed(() => workspaceState.value.snapshot)
   const currentOperator = computed<WorkspaceParticipant | undefined>(() => {
@@ -341,6 +344,23 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     }
   }
 
+  async function loadOneBotDebugRecords(input: GetSandboxOneBotDebugRecordsInput = {}) {
+    try {
+      oneBotDebugRecordsState.value = await port.getOneBotDebugRecords(input)
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '读取 OneBot 调试记录失败')
+    }
+  }
+
+  async function clearOneBotDebugRecords() {
+    try {
+      await port.clearOneBotDebugRecords()
+      oneBotDebugRecordsState.value = []
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '清理 OneBot 调试记录失败')
+    }
+  }
+
   async function handleRelationshipRequest(requestId: string, approve: boolean) {
     const operatorId = getCurrentOperatorId()
     const request = snapshot.value.requests.find(({ id }) => id === requestId)
@@ -360,6 +380,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     currentOperatorId: readonly(currentOperatorIdState),
     activeConversationId: readonly(activeConversationIdState),
     currentView: readonly(currentViewState),
+    oneBotDebugRecords: readonly(oneBotDebugRecordsState),
     sidebar,
     chat,
     composer,
@@ -369,9 +390,11 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     handleRelationshipRequest,
     load,
     loadMessageHistory,
+    loadOneBotDebugRecords,
     manageEnvironment,
     performFriendAction,
     performGroupAction,
+    clearOneBotDebugRecords,
     replaceWorkspace,
     selectConversation,
     selectOperator,

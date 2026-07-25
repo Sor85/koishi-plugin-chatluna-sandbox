@@ -5,6 +5,7 @@ import type { WebqqDetailsPanelModel } from '../webqq-details-panel.vue'
 import type { WebqqMessageListModel } from '../webqq-message-list.vue'
 import type { WebqqSidebarModel } from '../webqq-sidebar.vue'
 import type {
+  GetSandboxOneBotDebugRecordsInput,
   ManageSandboxEnvironmentInput,
   SandboxConversation,
   SandboxFriendAction,
@@ -44,6 +45,8 @@ export function createWebqqWorkspaceShell(
   const mediaSources = ref<Record<string, string>>({})
   const mediaLoadFailures = ref<Record<string, true>>({})
   const errorMessage = ref('')
+  const debugLoading = ref(false)
+  const debugError = ref('')
   const snapshot = computed(() => workspace.value.snapshot)
   const users = computed(() => getSandboxUsers(snapshot.value))
   const bots = computed(() => getSandboxBots(snapshot.value))
@@ -201,6 +204,12 @@ export function createWebqqWorkspaceShell(
     accentColor: appearance.value.webQQAccentColor,
   }))
   const environmentModel = computed(() => snapshot.value)
+  const debugWorkspaceModel = computed(() => ({
+    records: workspaceController.oneBotDebugRecords.value,
+    bots: bots.value,
+    loading: debugLoading.value,
+    error: debugError.value,
+  }))
 
   onMounted(() => workspaceController.load())
 
@@ -346,6 +355,31 @@ export function createWebqqWorkspaceShell(
 
   function selectNavigation(view: SandboxWorkspaceView) {
     workspaceController.selectView(view)
+    if (view === 'debug') void loadOneBotDebugRecords()
+  }
+
+  async function loadOneBotDebugRecords(input: GetSandboxOneBotDebugRecordsInput = {}) {
+    debugLoading.value = true
+    debugError.value = ''
+    try {
+      await workspaceController.loadOneBotDebugRecords(input)
+    } catch (error) {
+      debugError.value = error instanceof Error ? error.message : '读取 OneBot 调试记录失败'
+    } finally {
+      debugLoading.value = false
+    }
+  }
+
+  async function clearOneBotDebugRecords() {
+    debugLoading.value = true
+    debugError.value = ''
+    try {
+      await workspaceController.clearOneBotDebugRecords()
+    } catch (error) {
+      debugError.value = error instanceof Error ? error.message : '清理 OneBot 调试记录失败'
+    } finally {
+      debugLoading.value = false
+    }
   }
 
   function toggleDetails() {
@@ -452,16 +486,19 @@ export function createWebqqWorkspaceShell(
   return {
     appearance,
     chatPaneModel,
+    clearOneBotDebugRecords,
     closeDetails,
     currentView,
     deleteAnnouncement,
     deleteFriend,
     detailsPanelModel,
     detailsVisible,
+    debugWorkspaceModel,
     environmentModel,
     handleSidebarNotification,
     kickGroupMember,
     loadEarlierMessages,
+    loadOneBotDebugRecords,
     manageEnvironment,
     openComposerParticipantDialog,
     openEntityDialog,

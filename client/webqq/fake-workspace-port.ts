@@ -1,13 +1,16 @@
 import type {
   DeleteGroupAnnouncementInput,
+  ClearSandboxOneBotDebugRecordsResult,
   GetMediaContentInput,
   GetMessageHistoryInput,
   GetSandboxWorkspaceInput,
+  GetSandboxOneBotDebugRecordsInput,
   ManageSandboxEnvironmentInput,
   PerformFriendActionInput,
   PerformGroupActionInput,
   SandboxMediaContent,
   SandboxMessageHistory,
+  SandboxOneBotDebugRecord,
   SandboxWorkspaceState,
   SendMediaMessageInput,
   SendMessageInput,
@@ -35,6 +38,8 @@ export class FakeWorkspacePort implements WorkspacePort {
     reference: 'sandbox-media://media-1',
     dataBase64: '',
   }
+  debugRecordsResult: SandboxOneBotDebugRecord[] = []
+  clearDebugRecordsResult: ClearSandboxOneBotDebugRecordsResult = { cleared: 0 }
   private readonly failures = new Map<WorkspacePortOperation, Error[]>()
 
   constructor(workspace: SandboxWorkspaceState) {
@@ -91,6 +96,14 @@ export class FakeWorkspacePort implements WorkspacePort {
 
   performGroupAction(input: PerformGroupActionInput) {
     return this.invoke('performGroupAction', input, this.workspaceResult)
+  }
+
+  getOneBotDebugRecords(input?: GetSandboxOneBotDebugRecordsInput) {
+    return this.invoke('getOneBotDebugRecords', input, this.debugRecordsResult)
+  }
+
+  clearOneBotDebugRecords() {
+    return this.invoke('clearOneBotDebugRecords', undefined, this.clearDebugRecordsResult)
   }
 }
 

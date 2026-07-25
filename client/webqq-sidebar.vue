@@ -268,7 +268,7 @@
 
 <script setup lang="ts">
 import {
-  IconAddressBook, IconBell, IconClock, IconEdit, IconMessageCircle, IconPlus,
+  IconAddressBook, IconBell, IconBug, IconClock, IconEdit, IconMessageCircle, IconPlus,
   IconSearch, IconTag, IconTrash, IconUser, IconUserCircle, IconUserMinus, IconUserPlus, IconUsers,
 } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
@@ -328,7 +328,7 @@ interface SidebarParticipant {
 
 export interface WebqqSidebarModel {
   appearance: SandboxAppearance
-  currentView: 'messages' | 'contacts' | 'profile'
+  currentView: 'messages' | 'contacts' | 'profile' | 'debug'
   activeConversationId?: string
   currentGroupId?: string
   currentGroupMemberIds: string[]
@@ -367,6 +367,7 @@ const notificationErrorMessage = ref('')
 const navigationItems = [
   { id: 'messages' as const, label: '消息', icon: IconMessageCircle },
   { id: 'contacts' as const, label: '联系人', icon: IconAddressBook },
+  { id: 'debug' as const, label: '调试', icon: IconBug },
   { id: 'profile' as const, label: '资料', icon: IconUserCircle },
 ]
 const sidebarTabs = [

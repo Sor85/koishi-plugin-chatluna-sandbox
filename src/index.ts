@@ -6,6 +6,7 @@ import type { SandboxAppearance, SandboxPersistenceMode } from './types'
 
 export * from './control-service'
 export * from './persistence'
+export * from './onebot-debug'
 export * from './types'
 
 export const name = 'onebot-sandbox'

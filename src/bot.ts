@@ -1,4 +1,4 @@
-import { Bot, Context, Fragment, h, Universal } from 'koishi'
+import { Bot, Context, Fragment, h, Random, Universal } from 'koishi'
 import type { SandboxControlService } from './control-service'
 import { getOneBotMessageSequence, getOneBotProfileBaseline, resolveOneBotAction } from './onebot-profiles'
 import { createDirectConversationId, createGroupConversationId, getDirectConversationPeerId, type SandboxImplementationProfile } from './types'
@@ -37,8 +37,10 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     this.disabledCapabilities = config.disabledCapabilities ?? []
     this.user = { id: config.selfId, name: config.name, avatar: config.avatar }
     this.status = Universal.Status.ONLINE
-    const request = async (requestedAction: string, params: Record<string, unknown>) => {
-        const capability = resolveOneBotAction(this.implementation, this.disabledCapabilities, requestedAction)
+    const executeRequest = async (
+      capability: ReturnType<typeof resolveOneBotAction>,
+      params: Record<string, unknown>,
+    ) => {
         const action = capability.handler
         if (action === 'get_status') {
           const online = this.status === Universal.Status.ONLINE
@@ -121,10 +123,13 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           return { status: 'ok', retcode: 0, data: { message_id: result.messageId } }
         }
         if (action === 'send_msg') {
-          if (params.message_type === 'group' || params.group_id !== undefined) {
-            return this.internal._request('send_group_msg', params)
-          }
-          return this.internal._request('send_private_msg', params)
+          const targetAction = params.message_type === 'group' || params.group_id !== undefined
+            ? 'send_group_msg'
+            : 'send_private_msg'
+          const targetCapability = resolveOneBotAction(this.implementation, this.disabledCapabilities, targetAction)
+          if (!targetCapability) throw new Error(`OneBot action ${targetAction} is not supported`)
+          // send_msg 只是协议级分流入口；直接进入具体实现，避免一次外部调用生成两条调试记录。
+          return executeRequest(targetCapability, params)
         }
         if (action === 'get_msg') {
           const message = this.findVisibleMessage(String(params.message_id ?? ''))
@@ -239,6 +244,45 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           })
         }
         throw new Error(`OneBot action 已声明但未接入处理器：${capability.action}`)
+    }
+    const request = async (requestedAction: string, params: Record<string, unknown>) => {
+      const startedAt = Date.now()
+      let resolvedType: string | undefined
+      try {
+        const capability = resolveOneBotAction(this.implementation, this.disabledCapabilities, requestedAction)
+        resolvedType = capability.handler
+        const result = await executeRequest(capability, params)
+        this.control.recordOneBotDebug({
+          botId: this.selfId,
+          implementation: this.implementation,
+          direction: 'action',
+          type: requestedAction,
+          resolvedType,
+          status: 'success',
+          durationMs: Date.now() - startedAt,
+          payload: params,
+          result,
+        })
+        return result
+      } catch (error) {
+        const traceId = Random.id()
+        this.ctx.logger('onebot-sandbox').error(`OneBot action 调用失败 [${traceId}]`, error)
+        this.control.recordOneBotDebug({
+          botId: this.selfId,
+          implementation: this.implementation,
+          direction: 'action',
+          type: requestedAction,
+          resolvedType,
+          status: 'error',
+          durationMs: Date.now() - startedAt,
+          payload: params,
+          error: {
+            message: error instanceof Error ? error.message : 'OneBot action 调用失败',
+            traceId,
+          },
+        })
+        throw error
+      }
     }
     const internal: SandboxBot.Internal = {
       _request: request,

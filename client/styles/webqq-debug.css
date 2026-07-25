@@ -1,0 +1,153 @@
+.webqq-debug-workspace {
+  min-width: 0;
+  overflow: hidden;
+  padding: 24px;
+  background: var(--webqq-panel);
+}
+
+.webqq-debug-header,
+.webqq-debug-record > header,
+.webqq-debug-record-title,
+.webqq-debug-actions,
+.webqq-debug-error-filter {
+  display: flex;
+  align-items: center;
+}
+
+.webqq-debug-header {
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.webqq-debug-header h1 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.webqq-debug-header p,
+.webqq-debug-record p {
+  margin: 0;
+  color: var(--webqq-muted);
+}
+
+.webqq-debug-actions,
+.webqq-debug-record-title,
+.webqq-debug-error-filter {
+  gap: 8px;
+}
+
+.webqq-debug-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: 16px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--webqq-border);
+  border-radius: 16px;
+  background: var(--webqq-surface);
+}
+
+.webqq-debug-filters > label:not(.webqq-debug-error-filter) {
+  display: grid;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.webqq-debug-error-filter {
+  align-self: end;
+  min-height: 40px;
+  white-space: nowrap;
+}
+
+.webqq-debug-records {
+  display: grid;
+  gap: 16px;
+  min-height: 0;
+  max-height: calc(100vh - 240px);
+  overflow: auto;
+  padding-right: 8px;
+}
+
+.webqq-debug-record {
+  padding: 16px;
+  border: 1px solid var(--webqq-border);
+  border-radius: 16px;
+  background: var(--webqq-surface);
+}
+
+.webqq-debug-record > header {
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.webqq-debug-record time,
+.webqq-debug-resolved,
+.webqq-debug-entities,
+.webqq-debug-trace {
+  font-size: 13px;
+}
+
+.webqq-debug-status-success {
+  color: #047857;
+  background: #d1fae5;
+}
+
+.webqq-debug-status-error,
+.webqq-debug-error,
+.webqq-debug-trace {
+  color: #b91c1c;
+}
+
+.webqq-debug-status-error {
+  background: #fee2e2;
+}
+
+.webqq-debug-payloads {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.webqq-debug-payloads h2 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.webqq-debug-payloads pre {
+  max-height: 240px;
+  overflow: auto;
+  padding: 12px;
+  margin: 0;
+  border-radius: 12px;
+  color: var(--webqq-text);
+  background: var(--webqq-chat-bg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.webqq-debug-empty,
+.webqq-debug-error {
+  padding: 32px;
+  text-align: center;
+}
+
+@media (max-width: 960px) {
+  .webqq-debug-workspace {
+    padding: 16px;
+  }
+
+  .webqq-debug-header,
+  .webqq-debug-record > header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .webqq-debug-filters,
+  .webqq-debug-payloads {
+    grid-template-columns: 1fr;
+  }
+}

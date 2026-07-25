@@ -2,14 +2,17 @@ declare module '@koishijs/client' {
   import type { Component } from 'vue'
   import type {
     DeleteGroupAnnouncementInput,
+    ClearSandboxOneBotDebugRecordsResult,
     GetMediaContentInput,
     GetMessageHistoryInput,
     GetSandboxWorkspaceInput,
+    GetSandboxOneBotDebugRecordsInput,
     ManageSandboxEnvironmentInput,
     PerformFriendActionInput,
     PerformGroupActionInput,
     SandboxMediaContent,
     SandboxMessageHistory,
+    SandboxOneBotDebugRecord,
     SandboxWorkspaceState,
     SendMediaMessageInput,
     SendMessageInput,
@@ -37,4 +40,6 @@ declare module '@koishijs/client' {
   export function send(event: 'onebot-sandbox/manage-environment', input: ManageSandboxEnvironmentInput): Promise<SandboxWorkspaceState>
   export function send(event: 'onebot-sandbox/friend-action', input: PerformFriendActionInput): Promise<SandboxWorkspaceState>
   export function send(event: 'onebot-sandbox/group-action', input: PerformGroupActionInput): Promise<SandboxWorkspaceState>
+  export function send(event: 'onebot-sandbox/debug-records', input?: GetSandboxOneBotDebugRecordsInput): Promise<SandboxOneBotDebugRecord[]>
+  export function send(event: 'onebot-sandbox/clear-debug-records'): Promise<ClearSandboxOneBotDebugRecordsResult>
 }

@@ -3,9 +3,11 @@ import type {} from '@koishijs/console'
 import type { SandboxControlService } from './control-service'
 import type {
   DeleteGroupAnnouncementInput,
+  ClearSandboxOneBotDebugRecordsResult,
   GetMediaContentInput,
   GetMessageHistoryInput,
   GetSandboxBotDeliveriesInput,
+  GetSandboxOneBotDebugRecordsInput,
   GetSandboxWorkspaceInput,
   ManageSandboxEnvironmentInput,
   PerformFriendActionInput,
@@ -13,6 +15,7 @@ import type {
   SandboxAppearance,
   SandboxBotDelivery,
   SandboxMediaContent,
+  SandboxOneBotDebugRecord,
   SandboxMessageHistory,
   SandboxWorkspaceState,
   SendMediaMessageInput,
@@ -33,6 +36,8 @@ interface ConsoleEventMap {
   'onebot-sandbox/friend-action': (input: PerformFriendActionInput) => Promise<SandboxWorkspaceState>
   'onebot-sandbox/group-action': (input: PerformGroupActionInput) => Promise<SandboxWorkspaceState>
   'onebot-sandbox/bot-deliveries': (input?: GetSandboxBotDeliveriesInput) => SandboxBotDelivery[]
+  'onebot-sandbox/debug-records': (input?: GetSandboxOneBotDebugRecordsInput) => SandboxOneBotDebugRecord[]
+  'onebot-sandbox/clear-debug-records': () => ClearSandboxOneBotDebugRecordsResult
 }
 
 const legacyRpcFields = ['senderId', 'botId', 'actorUserId', 'userId', 'currentUserId'] as const
@@ -154,6 +159,8 @@ export function registerConsole(
     return getWorkspace({ operatorId: input.operatorId })
   }, { authority: 4 })
   console.addListener('onebot-sandbox/bot-deliveries', (input) => control.getBotDeliveries(assertInteractionInput(input ?? {})), { authority: 4 })
+  console.addListener('onebot-sandbox/debug-records', (input) => control.getOneBotDebugRecords(input ?? {}), { authority: 4 })
+  console.addListener('onebot-sandbox/clear-debug-records', () => ({ cleared: control.clearOneBotDebugRecords() }), { authority: 4 })
 }
 
 declare module '@koishijs/console' {
@@ -169,5 +176,7 @@ declare module '@koishijs/console' {
     'onebot-sandbox/friend-action'(input: PerformFriendActionInput): Promise<SandboxWorkspaceState>
     'onebot-sandbox/group-action'(input: PerformGroupActionInput): Promise<SandboxWorkspaceState>
     'onebot-sandbox/bot-deliveries'(input?: GetSandboxBotDeliveriesInput): SandboxBotDelivery[]
+    'onebot-sandbox/debug-records'(input?: GetSandboxOneBotDebugRecordsInput): SandboxOneBotDebugRecord[]
+    'onebot-sandbox/clear-debug-records'(): ClearSandboxOneBotDebugRecordsResult
   }
 }

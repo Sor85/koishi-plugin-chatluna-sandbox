@@ -180,6 +180,44 @@ export interface SandboxPersistenceStatus {
   message?: string
 }
 
+export type SandboxOneBotDebugDirection = 'action' | 'event'
+export type SandboxOneBotDebugStatus = 'success' | 'error'
+
+export interface SandboxOneBotDebugRecord {
+  id: string
+  createdAt: string
+  botId: string
+  implementation: SandboxImplementationProfile
+  direction: SandboxOneBotDebugDirection
+  type: string
+  resolvedType?: string
+  status: SandboxOneBotDebugStatus
+  durationMs: number
+  payload?: unknown
+  result?: unknown
+  entities: {
+    userId?: string
+    groupId?: string
+    conversationId?: string
+    messageId?: string
+  }
+  error?: {
+    message: string
+    traceId: string
+  }
+}
+
+export interface GetSandboxOneBotDebugRecordsInput {
+  botId?: string
+  direction?: SandboxOneBotDebugDirection
+  type?: string
+  errorsOnly?: boolean
+}
+
+export interface ClearSandboxOneBotDebugRecordsResult {
+  cleared: number
+}
+
 export type SandboxMediaType = 'image' | 'file' | 'audio' | 'video'
 
 export interface SandboxMedia {

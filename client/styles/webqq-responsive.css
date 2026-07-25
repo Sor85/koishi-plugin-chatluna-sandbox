@@ -57,6 +57,7 @@
 
   .webqq-workspace[data-mobile-view="contacts"] .webqq-conversations,
   .webqq-workspace[data-mobile-view="messages"] .webqq-chat,
+  .webqq-workspace[data-mobile-view="debug"] .webqq-chat,
   .webqq-workspace[data-mobile-view="profile"] .webqq-chat {
     display: flex;
   }
@@ -76,6 +77,10 @@
 
   .webqq-workspace[data-mobile-view="messages"] .webqq-chat {
     display: grid;
+  }
+
+  .webqq-workspace[data-mobile-view="debug"] .webqq-chat {
+    display: block;
   }
 
   .webqq-profile {

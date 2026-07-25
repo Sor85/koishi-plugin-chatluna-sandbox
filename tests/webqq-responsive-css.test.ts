@@ -12,6 +12,7 @@ describe('WebQQ 响应式样式', () => {
     expect(entry.indexOf(responsiveImport)).toBeGreaterThan(entry.indexOf('@import "./styles/webqq-overlays.css";'))
     expect(responsive).toContain('@media (max-width: 1180px)')
     expect(responsive).toContain('@media (max-width: 768px)')
+    expect(responsive).toContain('[data-mobile-view="debug"] .webqq-chat')
     expect(responsive).toContain('@media (prefers-reduced-motion: reduce)')
     expect(entry).not.toContain('@media (max-width: 1180px)')
   })

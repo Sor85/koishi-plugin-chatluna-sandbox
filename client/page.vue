@@ -6,8 +6,8 @@
         :class="{
           'is-frosted': appearance.enableWebQQFrostedGlass,
           'has-tim-tail': appearance.webQQTimBubbleTail,
-          'is-details-open': detailsVisible,
-          'is-details-closed': !detailsVisible,
+          'is-details-open': detailsVisible && currentView !== 'debug',
+          'is-details-closed': !detailsVisible || currentView === 'debug',
         }"
         :data-chat-style="appearance.webQQChatStyle"
         :data-color-mode="appearance.webQQColorMode"
@@ -30,6 +30,15 @@
         <main v-if="currentView === 'profile'" class="webqq-chat is-environment">
           <EnvironmentManager :snapshot="environmentModel" />
         </main>
+        <OneBotDebugWorkspace
+          v-else-if="currentView === 'debug'"
+          :records="debugWorkspaceModel.records"
+          :bots="debugWorkspaceModel.bots"
+          :loading="debugWorkspaceModel.loading"
+          :error="debugWorkspaceModel.error"
+          @query="loadOneBotDebugRecords"
+          @clear="clearOneBotDebugRecords"
+        />
         <WebqqChatPane
           v-else
           :model="chatPaneModel"
@@ -52,6 +61,7 @@
         />
 
         <WebqqDetailsPanel
+          v-if="currentView !== 'debug'"
           :model="detailsPanelModel"
           @close="closeDetails"
           @publish-announcement="publishAnnouncement"
@@ -80,6 +90,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import EnvironmentManager from './environment-manager.vue'
+import OneBotDebugWorkspace from './onebot-debug-workspace.vue'
 import WebqqChatPane from './webqq-chat-pane.vue'
 import WebqqDetailsPanel from './webqq-details-panel.vue'
 import WebqqSidebar from './webqq-sidebar.vue'
@@ -95,16 +106,19 @@ const overlayHostRef = ref<InstanceType<typeof WorkspaceOverlayHost>>()
 const {
   appearance,
   chatPaneModel,
+  clearOneBotDebugRecords,
   closeDetails,
   currentView,
   deleteAnnouncement,
   deleteFriend,
   detailsPanelModel,
   detailsVisible,
+  debugWorkspaceModel,
   environmentModel,
   handleSidebarNotification,
   kickGroupMember,
   loadEarlierMessages,
+  loadOneBotDebugRecords,
   manageEnvironment,
   openComposerParticipantDialog,
   openEntityDialog,

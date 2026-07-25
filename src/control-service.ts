@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { SandboxBot } from './bot'
 import { SandboxChatLunaStateStore } from './chatluna-state'
 import { SandboxMediaStorage } from './media-storage'
+import { SandboxOneBotDebugStore, type AppendOneBotDebugRecordInput } from './onebot-debug'
 import type { SandboxScenePersistence } from './persistence'
 import { getOneBotCapabilityMatrix, getOneBotMessageEventFields, normalizeDisabledCapabilities, type SandboxOneBotCapability } from './onebot-profiles'
 import {
@@ -19,6 +20,7 @@ import {
   type GetMediaContentInput,
   type GetSandboxBotDeliveriesInput,
   type GetMessageHistoryInput,
+  type GetSandboxOneBotDebugRecordsInput,
   type PerformFriendActionInput,
   type PerformFriendActionResult,
   type PerformGroupActionInput,
@@ -34,6 +36,7 @@ import {
   type SandboxMediaContent,
   type SandboxMessage,
   type SandboxMessageHistory,
+  type SandboxOneBotDebugRecord,
   type SandboxPersistenceStatus,
   type SandboxSnapshot,
   type SandboxParticipant,
@@ -50,6 +53,7 @@ import {
 export interface SandboxControlServiceOptions {
   mediaDirectory?: string
   persistence?: SandboxScenePersistence
+  debugRecordLimit?: number
 }
 
 interface SandboxMessageContext {
@@ -134,12 +138,14 @@ export class SandboxControlService {
   private runtimeBots = new Map<string, SandboxBot>()
   private botDeliveries: SandboxBotDelivery[] = []
   private chatLunaState: SandboxChatLunaStateStore
+  private oneBotDebug: SandboxOneBotDebugStore
   private mediaStorage: SandboxMediaStorage
   private persistence?: SandboxScenePersistence
   private persistenceQueue = Promise.resolve()
 
   constructor(private ctx: Context, options: SandboxControlServiceOptions = {}) {
     this.persistence = options.persistence
+    this.oneBotDebug = new SandboxOneBotDebugStore(options.debugRecordLimit)
     this.mediaStorage = new SandboxMediaStorage(options.mediaDirectory ?? resolve(ctx.baseDir, 'data/onebot-sandbox/media'))
     if (!this.persistence || !this.persistence.getStatus().available) this.mediaStorage.clear()
     this.chatLunaState = new SandboxChatLunaStateStore(ctx, (botParticipantId, conversationId) => {
@@ -185,6 +191,18 @@ export class SandboxControlService {
     }
   }
 
+  getOneBotDebugRecords(input: GetSandboxOneBotDebugRecordsInput = {}): SandboxOneBotDebugRecord[] {
+    return this.oneBotDebug.getRecords(input)
+  }
+
+  clearOneBotDebugRecords(): number {
+    return this.oneBotDebug.clear()
+  }
+
+  recordOneBotDebug(input: AppendOneBotDebugRecordInput): SandboxOneBotDebugRecord {
+    return this.oneBotDebug.append(input)
+  }
+
   waitForPersistence(): Promise<void> {
     return this.persistenceQueue
   }
@@ -192,6 +210,7 @@ export class SandboxControlService {
   resetScene(): void {
     this.mediaStorage.clear()
     this.chatLunaState.clear()
+    this.oneBotDebug.clear()
     this.botDeliveries = []
     this.scene = createDefaultScene()
     this.syncRuntimeBots()
@@ -929,7 +948,7 @@ export class SandboxControlService {
       })
     })
 
-    runtimeBot.dispatch(session)
+    await this.dispatchOneBotEvent(runtimeBot, session)
     await middlewareFinished
     this.botDeliveries.push({
       id: Random.id(),
@@ -1304,7 +1323,7 @@ export class SandboxControlService {
         flag,
       },
     })
-    await bot.dispatch(session)
+    await this.dispatchOneBotEvent(bot, session)
   }
 
   private async dispatchBotNotice(botId: string, userId: string, noticeType: 'notify' | 'friend_del') {
@@ -1326,7 +1345,7 @@ export class SandboxControlService {
         target_id: Number(botId),
       },
     })
-    await bot.dispatch(session)
+    await this.dispatchOneBotEvent(bot, session)
   }
 
   private async dispatchGroupRequest(group: SandboxGroup, request: SandboxSnapshot['requests'][number]) {
@@ -1355,7 +1374,7 @@ export class SandboxControlService {
           flag: request.id,
         },
       })
-      await bot.dispatch(session)
+      await this.dispatchOneBotEvent(bot, session)
     }))
   }
 
@@ -1405,13 +1424,58 @@ export class SandboxControlService {
           ...noticeData,
         },
       })
-      await bot.dispatch(session)
+      await this.dispatchOneBotEvent(bot, session)
       if (standardType !== 'notice') {
         // OneBot 插件仍会监听原始 notice；标准事件和原始事件必须复用同一个 Session，
         // 避免重复派发 internal/session 导致调试记录和等待器各收到两次。
         ;(this.ctx.emit as unknown as (session: unknown, name: string, payload: unknown) => void)(session, 'notice', session)
       }
     }))
+  }
+
+  private async dispatchOneBotEvent(bot: SandboxBot, session: ReturnType<SandboxBot['session']>): Promise<void> {
+    const startedAt = Date.now()
+    const payload = Reflect.get(session, 'onebot')
+    const profile = this.getBots().find(({ id }) => id === bot.selfId)
+    if (!profile) throw new Error(`机器人不存在：${bot.selfId}`)
+    const type = this.getOneBotEventType(payload)
+    try {
+      await bot.dispatch(session)
+      this.recordOneBotDebug({
+        botId: bot.selfId,
+        implementation: profile.implementation,
+        direction: 'event',
+        type,
+        status: 'success',
+        durationMs: Date.now() - startedAt,
+        payload,
+        result: { delivered: true },
+      })
+    } catch (error) {
+      const traceId = Random.id()
+      this.ctx.logger('onebot-sandbox').error(`OneBot 原始事件派发失败 [${traceId}]`, error)
+      this.recordOneBotDebug({
+        botId: bot.selfId,
+        implementation: profile.implementation,
+        direction: 'event',
+        type,
+        status: 'error',
+        durationMs: Date.now() - startedAt,
+        payload,
+        error: {
+          message: error instanceof Error ? error.message : 'OneBot 原始事件派发失败',
+          traceId,
+        },
+      })
+      throw error
+    }
+  }
+
+  private getOneBotEventType(payload: unknown): string {
+    if (!payload || typeof payload !== 'object') return 'unknown'
+    const postType = String(Reflect.get(payload, 'post_type') ?? 'unknown')
+    const detail = Reflect.get(payload, `${postType}_type`)
+    return detail === undefined ? postType : `${postType}.${String(detail)}`
   }
 
   private deleteConversations(predicate: (conversation: SandboxSnapshot['conversations'][number]) => boolean): void {

@@ -13,4 +13,6 @@ export const koishiWorkspacePort: WorkspacePort = {
   manageEnvironment: (input) => send('onebot-sandbox/manage-environment', input),
   performFriendAction: (input) => send('onebot-sandbox/friend-action', input),
   performGroupAction: (input) => send('onebot-sandbox/group-action', input),
+  getOneBotDebugRecords: (input = {}) => send('onebot-sandbox/debug-records', input),
+  clearOneBotDebugRecords: () => send('onebot-sandbox/clear-debug-records'),
 }
