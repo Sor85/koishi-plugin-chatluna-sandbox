@@ -100,6 +100,11 @@ describe('Koishi 控制台适配器', () => {
     }
 
     const initialWorkspace = snapshotListener({ operatorId: '10001' })
+    expect(initialWorkspace.persistence).toEqual({
+      mode: 'memory',
+      available: true,
+      persisted: false,
+    })
     expect(initialWorkspace.snapshot.participants.filter(({ kind }: { kind: string }) => kind === 'user').map(({ id }: { id: string }) => id)).toEqual([
       '10001',
       '10002',

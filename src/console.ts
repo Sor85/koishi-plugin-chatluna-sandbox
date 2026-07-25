@@ -89,6 +89,7 @@ export function registerConsole(
       snapshot: visibleSnapshot,
       chatLunaStates: control.getChatLunaStates().filter(({ conversationId }) => visibleConversationIds.has(conversationId)),
       appearance,
+      persistence: control.getPersistenceStatus(),
     }
   }
 

@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { SandboxBot } from './bot'
 import { SandboxChatLunaStateStore } from './chatluna-state'
 import { SandboxMediaStorage } from './media-storage'
+import type { SandboxScenePersistence } from './persistence'
 import { getOneBotCapabilityMatrix, getOneBotMessageEventFields, normalizeDisabledCapabilities, type SandboxOneBotCapability } from './onebot-profiles'
 import {
   createDirectConversationId,
@@ -33,6 +34,7 @@ import {
   type SandboxMediaContent,
   type SandboxMessage,
   type SandboxMessageHistory,
+  type SandboxPersistenceStatus,
   type SandboxSnapshot,
   type SandboxParticipant,
   type SandboxUser,
@@ -47,6 +49,7 @@ import {
 
 export interface SandboxControlServiceOptions {
   mediaDirectory?: string
+  persistence?: SandboxScenePersistence
 }
 
 interface SandboxMessageContext {
@@ -127,30 +130,72 @@ function createFriendship(firstId: string, secondId: string, createdAt = new Dat
 }
 
 export class SandboxControlService {
-  readonly bot: SandboxBot
-
   private scene: SandboxSnapshot = createDefaultScene()
   private runtimeBots = new Map<string, SandboxBot>()
   private botDeliveries: SandboxBotDelivery[] = []
   private chatLunaState: SandboxChatLunaStateStore
   private mediaStorage: SandboxMediaStorage
+  private persistence?: SandboxScenePersistence
+  private persistenceQueue = Promise.resolve()
 
   constructor(private ctx: Context, options: SandboxControlServiceOptions = {}) {
+    this.persistence = options.persistence
     this.mediaStorage = new SandboxMediaStorage(options.mediaDirectory ?? resolve(ctx.baseDir, 'data/onebot-sandbox/media'))
+    if (!this.persistence || !this.persistence.getStatus().available) this.mediaStorage.clear()
     this.chatLunaState = new SandboxChatLunaStateStore(ctx, (botParticipantId, conversationId) => {
       const participant = this.scene.participants.find(({ id }) => id === botParticipantId)
       const conversation = this.scene.conversations.find(({ id }) => id === conversationId)
       return participant?.kind === 'bot' && !!conversation && this.isConversationVisible(botParticipantId, conversation)
     })
-    this.bot = this.createRuntimeBot({
+    this.createRuntimeBot({
       selfId: DEFAULT_BOT_ID,
       name: 'Koishi',
       implementation: 'napcat',
     })
+    ctx.on('ready', async () => {
+      if (!this.persistence) return
+      const scene = await this.persistence.load()
+      if (scene) {
+        this.scene = structuredClone(scene)
+        this.syncRuntimeBots()
+      } else {
+        // 数据库读取失败时场景会回到默认值，旧媒体已失去引用，必须同步清理以避免跨重启孤儿文件。
+        if (!this.persistence.getStatus().available) this.mediaStorage.clear()
+        await this.persistence.save(this.getSnapshot())
+      }
+    })
+    ctx.on('dispose', () => this.waitForPersistence())
   }
 
   getSnapshot(): SandboxSnapshot {
     return structuredClone(this.scene)
+  }
+
+  get bot(): SandboxBot {
+    const bot = this.runtimeBots.get(DEFAULT_BOT_ID) ?? this.runtimeBots.values().next().value
+    if (!bot) throw new Error('机器人运行时不存在')
+    return bot
+  }
+
+  getPersistenceStatus(): SandboxPersistenceStatus {
+    return this.persistence?.getStatus() ?? {
+      mode: 'memory',
+      available: true,
+      persisted: false,
+    }
+  }
+
+  waitForPersistence(): Promise<void> {
+    return this.persistenceQueue
+  }
+
+  resetScene(): void {
+    this.mediaStorage.clear()
+    this.chatLunaState.clear()
+    this.botDeliveries = []
+    this.scene = createDefaultScene()
+    this.syncRuntimeBots()
+    this.queueScenePersistence()
   }
 
   getBotDeliveries(input: GetSandboxBotDeliveriesInput = {}): SandboxBotDelivery[] {
@@ -221,14 +266,14 @@ export class SandboxControlService {
     this.scene.participants.push({ kind: 'user', id, name })
     // 环境管理属于测试前置配置，可静默建立关系；WebQQ 用户操作仍必须走好友申请审批。
     for (const bot of this.getBots()) this.addFriendship(id, bot.id)
-    this.scene.revision += 1
+    this.commitSceneMutation()
   }
 
   updateUser(input: UpdateSandboxUserInput): void {
     const user = this.getUsers().find(({ id }) => id === input.id)
     if (!user) throw new Error(`用户不存在：${input.id}`)
     user.name = this.validateName(input.name, '用户昵称')
-    this.scene.revision += 1
+    this.commitSceneMutation()
   }
 
   deleteUser(input: DeleteSandboxUserInput): void {
@@ -250,7 +295,7 @@ export class SandboxControlService {
     this.deleteConversations((conversation) => conversation.type === 'direct'
       ? conversation.participantIds.includes(input.id)
       : ownedGroupIds.has(conversation.groupId))
-    this.scene.revision += 1
+    this.commitSceneMutation()
   }
 
   createBot(input: CreateSandboxBotInput): void {
@@ -280,7 +325,7 @@ export class SandboxControlService {
     for (const participant of this.scene.participants) {
       if (participant.id !== id) this.addFriendship(participant.id, id)
     }
-    this.scene.revision += 1
+    this.commitSceneMutation()
   }
 
   updateBot(input: UpdateSandboxBotInput): void {
@@ -299,7 +344,7 @@ export class SandboxControlService {
       runtime.status = bot.enabled ? Universal.Status.ONLINE : Universal.Status.OFFLINE
       runtime.updateImplementation(bot.implementation, bot.disabledCapabilities)
     }
-    this.scene.revision += 1
+    this.commitSceneMutation()
   }
 
   updateBotSelfProfile(botId: string, input: { name?: string; avatar?: string }) {
@@ -309,7 +354,7 @@ export class SandboxControlService {
     if (input.avatar !== undefined) bot.avatar = input.avatar.trim() || undefined
     const runtime = this.getRuntimeBot(botId)
     runtime.user = { id: bot.id, name: bot.name, avatar: bot.avatar }
-    this.scene.revision += 1
+    this.commitSceneMutation()
     return { status: 'ok', retcode: 0, data: null }
   }
 
@@ -336,7 +381,7 @@ export class SandboxControlService {
     this.deleteConversations((conversation) => conversation.type === 'direct'
       ? conversation.participantIds.includes(input.id)
       : ownedGroupIds.has(conversation.groupId))
-    this.scene.revision += 1
+    this.commitSceneMutation()
   }
 
   createGroup(input: CreateSandboxGroupInput): void {
@@ -350,7 +395,7 @@ export class SandboxControlService {
       announcements: [],
     })
     this.syncGroupConversations(id)
-    this.scene.revision += 1
+    this.commitSceneMutation()
   }
 
   updateGroup(input: UpdateSandboxGroupInput): void {
@@ -359,7 +404,7 @@ export class SandboxControlService {
     group.name = this.validateName(input.name, '群名称')
     group.members = this.validateGroupMembers(input.members)
     this.syncGroupConversations(group.id)
-    this.scene.revision += 1
+    this.commitSceneMutation()
   }
 
   deleteGroup(input: DeleteSandboxGroupInput): void {
@@ -368,7 +413,7 @@ export class SandboxControlService {
     this.scene.groups.splice(index, 1)
     this.scene.requests = this.scene.requests.filter(({ groupId }) => groupId !== input.id)
     this.deleteConversations((conversation) => conversation.groupId === input.id)
-    this.scene.revision += 1
+    this.commitSceneMutation()
   }
 
   async performFriendAction(input: PerformFriendActionInput): Promise<PerformFriendActionResult> {
@@ -411,7 +456,7 @@ export class SandboxControlService {
         comment: input.comment?.trim() || undefined,
       }
       this.scene.requests.push(request)
-      this.scene.revision += 1
+      this.commitSceneMutation()
       if (this.isBot(target.id)) await this.dispatchFriendRequest(target.id, input.operatorId, request.id, request.comment)
       return { revision: this.scene.revision, requestId: request.id }
     }
@@ -421,7 +466,7 @@ export class SandboxControlService {
       const remark = input.remark.trim()
       if (remark) friendship.remarks[input.operatorId] = remark
       else delete friendship.remarks[input.operatorId]
-      this.scene.revision += 1
+      this.commitSceneMutation()
       return { revision: this.scene.revision }
     }
 
@@ -461,7 +506,7 @@ export class SandboxControlService {
     if (this.isBot(target.id)) {
       await this.dispatchBotNotice(target.id, input.operatorId, 'friend_del')
     }
-    this.scene.revision += 1
+    this.commitSceneMutation()
     return { revision: this.scene.revision }
   }
 
@@ -532,7 +577,7 @@ export class SandboxControlService {
         comment: input.comment?.trim() || undefined,
       }
       this.scene.requests.push(request)
-      this.scene.revision += 1
+      this.commitSceneMutation()
       await this.dispatchGroupRequest(group, request)
       return { revision: this.scene.revision, requestId: request.id }
     }
@@ -557,7 +602,7 @@ export class SandboxControlService {
         comment: input.comment?.trim() || undefined,
       }
       this.scene.requests.push(request)
-      this.scene.revision += 1
+      this.commitSceneMutation()
       await this.dispatchGroupRequest(group, request)
       return { revision: this.scene.revision, requestId: request.id }
     }
@@ -577,7 +622,7 @@ export class SandboxControlService {
       if (actor.role === 'member') throw new Error('只有群主或管理员可以修改群名称')
       const previousName = group.name
       group.name = this.validateName(input.name, '群名称')
-      this.scene.revision += 1
+      this.commitSceneMutation()
       await this.dispatchGroupNotice(group, 'group_name', {
         user_id: Number(input.operatorId),
         name_old: previousName,
@@ -602,7 +647,7 @@ export class SandboxControlService {
       if (actor.role !== 'owner') throw new Error('只有群主可以设置管理员')
       if (target.role === 'owner') throw new Error('不能修改群主权限')
       target.role = input.enabled ? 'admin' : 'member'
-      this.scene.revision += 1
+      this.commitSceneMutation()
       await this.dispatchGroupNotice(group, 'group_admin', {
         sub_type: input.enabled ? 'set' : 'unset',
         user_id: Number(target.participantId),
@@ -619,7 +664,7 @@ export class SandboxControlService {
       if (target.participantId !== input.operatorId) this.assertCanManageMember(actor, target, '修改群名片')
       const previousCard = target.card ?? ''
       target.card = input.card.trim() || undefined
-      this.scene.revision += 1
+      this.commitSceneMutation()
       await this.dispatchGroupNotice(group, 'group_card', {
         user_id: Number(target.participantId),
         card_old: previousCard,
@@ -661,7 +706,7 @@ export class SandboxControlService {
       const remark = input.remark?.trim()
       if (remark) friendship.remarks[botId] = remark
     }
-    this.scene.revision += 1
+    this.commitSceneMutation()
     return { status: 'ok', retcode: 0, data: null }
   }
 
@@ -686,7 +731,7 @@ export class SandboxControlService {
       const participantId = input.subType === 'invite' ? botId : request.requesterId
       await this.addApprovedGroupMember(group, participantId, input.subType === 'invite' ? request.requesterId : botId, input.subType)
     } else {
-      this.scene.revision += 1
+      this.commitSceneMutation()
     }
     return { status: 'ok', retcode: 0, data: null }
   }
@@ -695,7 +740,7 @@ export class SandboxControlService {
     const friendship = this.getFriendship(botId, userId)
     if (!friendship) throw new Error('好友关系不存在')
     this.scene.friendships = this.scene.friendships.filter(({ id }) => id !== friendship.id)
-    this.scene.revision += 1
+    this.commitSceneMutation()
   }
 
   async performBotGroupAction(botId: string, input:
@@ -712,7 +757,7 @@ export class SandboxControlService {
       if (actor.role === 'member') throw new Error('只有群主或管理员可以修改群名称')
       const previousName = group.name
       group.name = this.validateName(input.name, '群名称')
-      this.scene.revision += 1
+      this.commitSceneMutation()
       await this.dispatchGroupNotice(group, 'group_name', {
         user_id: Number(botId),
         name_old: previousName,
@@ -737,7 +782,7 @@ export class SandboxControlService {
       if (actor.role !== 'owner') throw new Error('只有群主可以设置管理员')
       if (target.role === 'owner') throw new Error('不能修改群主权限')
       target.role = input.enabled ? 'admin' : 'member'
-      this.scene.revision += 1
+      this.commitSceneMutation()
       await this.dispatchGroupNotice(group, 'group_admin', {
         sub_type: input.enabled ? 'set' : 'unset',
         user_id: Number(target.participantId),
@@ -753,7 +798,7 @@ export class SandboxControlService {
     if (target.participantId !== botId) this.assertCanManageMember(actor, target, '修改群名片')
     const previousCard = target.card ?? ''
     target.card = input.card.trim() || undefined
-    this.scene.revision += 1
+    this.commitSceneMutation()
     await this.dispatchGroupNotice(group, 'group_card', {
       user_id: Number(target.participantId),
       card_old: previousCard,
@@ -911,7 +956,7 @@ export class SandboxControlService {
       content,
       createdAt: new Date().toISOString(),
     })
-    this.scene.revision += 1
+    this.commitSceneMutation()
   }
 
   deleteGroupAnnouncement(input: DeleteGroupAnnouncementInput): void {
@@ -925,7 +970,7 @@ export class SandboxControlService {
     const index = group.announcements.findIndex(({ id }) => id === input.announcementId)
     if (index < 0) throw new Error(`群公告不存在：${input.announcementId}`)
     group.announcements.splice(index, 1)
-    this.scene.revision += 1
+    this.commitSceneMutation()
   }
 
   deleteBotMessage(botId: string, messageId: string, conversationId?: string): void {
@@ -945,7 +990,7 @@ export class SandboxControlService {
     }
     this.botDeliveries = this.botDeliveries.filter(({ messageId }) => !removedIds.has(messageId))
     for (const media of removed.flatMap(({ media }) => media ?? [])) this.mediaStorage.remove(media)
-    this.scene.revision += 1
+    this.commitSceneMutation()
   }
 
   private appendMessage(
@@ -973,8 +1018,20 @@ export class SandboxControlService {
     }
     this.scene.messages.push(message)
     conversation.messageIds.push(message.id)
-    this.scene.revision += 1
+    this.commitSceneMutation()
     return message
+  }
+
+  private commitSceneMutation(): void {
+    this.scene.revision += 1
+    this.queueScenePersistence()
+  }
+
+  private queueScenePersistence(): void {
+    const persistence = this.persistence
+    if (!persistence) return
+    const snapshot = this.getSnapshot()
+    this.persistenceQueue = this.persistenceQueue.then(() => persistence.save(snapshot))
   }
 
   private validateParticipantId(value: string): string {
@@ -1072,6 +1129,27 @@ export class SandboxControlService {
     return bot
   }
 
+  private syncRuntimeBots(): void {
+    const botIds = new Set(this.getBots().map(({ id }) => id))
+    for (const [botId, runtime] of this.runtimeBots) {
+      if (botIds.has(botId)) continue
+      this.runtimeBots.delete(botId)
+      void runtime.dispose()
+    }
+    for (const profile of this.getBots()) {
+      const runtime = this.runtimeBots.get(profile.id) ?? this.createRuntimeBot({
+        selfId: profile.id,
+        name: profile.name,
+        avatar: profile.avatar,
+        implementation: profile.implementation,
+        disabledCapabilities: profile.disabledCapabilities,
+      })
+      runtime.user = { id: profile.id, name: profile.name, avatar: profile.avatar }
+      runtime.status = profile.enabled ? Universal.Status.ONLINE : Universal.Status.OFFLINE
+      runtime.updateImplementation(profile.implementation, profile.disabledCapabilities)
+    }
+  }
+
   private handleUserRelationshipRequest(input: Extract<PerformFriendActionInput, { action: 'handle-request' }>): PerformFriendActionResult | Promise<PerformGroupActionResult> {
     const requestIndex = this.scene.requests.findIndex(({ id }) => id === input.requestId)
     if (requestIndex < 0) throw new Error(`关系申请不存在：${input.requestId}`)
@@ -1081,7 +1159,7 @@ export class SandboxControlService {
       if (request.targetId !== input.operatorId) throw new Error('只能处理发给自己的好友申请')
       this.scene.requests.splice(requestIndex, 1)
       if (input.approve) this.addFriendship(request.requesterId, input.operatorId)
-      this.scene.revision += 1
+      this.commitSceneMutation()
       return { revision: this.scene.revision }
     }
 
@@ -1115,7 +1193,7 @@ export class SandboxControlService {
       if (!participantId) throw new Error('群申请缺少目标参与者')
       await this.addApprovedGroupMember(group, participantId, input.operatorId, subType)
     } else {
-      this.scene.revision += 1
+      this.commitSceneMutation()
     }
     return { revision: this.scene.revision }
   }
@@ -1143,7 +1221,7 @@ export class SandboxControlService {
     if (actor.participantId === target.participantId) throw new Error('不能把群主身份转让给自己')
     actor.role = 'member'
     target.role = 'owner'
-    this.scene.revision += 1
+    this.commitSceneMutation()
     await this.dispatchGroupNotice(group, 'group_owner', {
       operator_id: Number(actor.participantId),
       user_id: Number(target.participantId),
@@ -1158,7 +1236,7 @@ export class SandboxControlService {
       group.members.push({ participantId, role: 'member' })
       this.syncGroupConversations(group.id)
     }
-    this.scene.revision += 1
+    this.commitSceneMutation()
     await this.dispatchGroupNotice(group, 'group_increase', {
       sub_type: subType === 'add' ? 'approve' : 'invite',
       operator_id: Number(operatorId),
@@ -1171,7 +1249,7 @@ export class SandboxControlService {
     this.scene.requests = this.scene.requests.filter((request) => request.groupId !== group.id
       || (request.requesterId !== participantId && request.targetId !== participantId))
     this.syncGroupConversations(group.id)
-    this.scene.revision += 1
+    this.commitSceneMutation()
   }
 
   private addFriendship(firstId: string, secondId: string): SandboxFriendship {

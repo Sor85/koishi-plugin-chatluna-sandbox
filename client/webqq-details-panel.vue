@@ -10,7 +10,7 @@
     <div v-if="model.view === 'profile'" v-webqq-scrollbar class="webqq-private-info">
       <div class="webqq-profile-hero">
         <span class="webqq-avatar webqq-avatar-profile webqq-avatar-bot"><IconDatabase :size="32" aria-hidden="true" /></span>
-        <h2>默认内存场景</h2>
+        <h2>{{ persistenceTitle }}</h2>
         <p>修订 {{ model.revision }}</p>
       </div>
       <dl class="webqq-profile-details">
@@ -18,7 +18,7 @@
         <div><dt>虚拟机器人</dt><dd>{{ model.counts.bots }}</dd></div>
         <div><dt>群组</dt><dd>{{ model.counts.groups }}</dd></div>
         <div><dt>待处理申请</dt><dd>{{ model.counts.requests }}</dd></div>
-        <div><dt>状态来源</dt><dd>服务端内存</dd></div>
+        <div><dt>状态来源</dt><dd :title="model.persistence.message">{{ persistenceLabel }}</dd></div>
       </dl>
     </div>
 
@@ -82,7 +82,7 @@
         <div><dt>平台</dt><dd>OneBot</dd></div>
         <div><dt>会话类型</dt><dd>私聊</dd></div>
         <div><dt>当前操作者</dt><dd>{{ model.currentOperatorName || '未选择' }}</dd></div>
-        <div><dt>模拟环境</dt><dd>服务端内存</dd></div>
+        <div><dt>模拟环境</dt><dd :title="model.persistence.message">{{ persistenceLabel }}</dd></div>
       </dl>
     </div>
   </aside>
@@ -95,7 +95,7 @@ import { ContextMenu, ContextMenuTrigger } from './components/ui/context-menu'
 import GroupMemberMenu from './group-member-menu.vue'
 import WebqqAvatar from './webqq-avatar.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
-import type { SandboxBotProfile, SandboxGroup, SandboxGroupMember } from '../src/types'
+import type { SandboxBotProfile, SandboxGroup, SandboxGroupMember, SandboxPersistenceStatus } from '../src/types'
 
 export interface WebqqDetailsParticipant {
   name: string
@@ -113,6 +113,7 @@ export interface WebqqDetailsPanelModel {
   privateParticipant?: { id: string, name: string, avatar?: string, isBot: boolean }
   currentOperatorName?: string
   currentOperatorId?: string
+  persistence: SandboxPersistenceStatus
   participants: Record<string, WebqqDetailsParticipant>
 }
 
@@ -135,6 +136,13 @@ const deletingAnnouncementId = ref('')
 const groupMemberSearch = ref('')
 const errorMessage = ref('')
 const panelLabel = computed(() => props.model.view === 'profile' ? '环境摘要' : props.model.group ? '群信息' : '私聊信息')
+const persistenceTitle = computed(() => props.model.persistence.mode === 'database' ? '数据库持久化场景' : '默认内存场景')
+const persistenceLabel = computed(() => {
+  const persistence = props.model.persistence
+  if (persistence.mode === 'memory') return '服务端内存'
+  if (!persistence.available) return 'Koishi Database 不可用'
+  return persistence.persisted ? 'Koishi Database' : 'Koishi Database 待写入'
+})
 const visibleGroupMembers = computed(() => {
   const group = props.model.group
   const query = groupMemberSearch.value.trim().toLowerCase()

@@ -98,6 +98,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     snapshot: emptySnapshot,
     chatLunaStates: [],
     appearance: defaultAppearance,
+    persistence: { mode: 'memory', available: true, persisted: false },
   })
   const currentOperatorIdState = ref<string>()
   const activeConversationIdState = ref<string>()

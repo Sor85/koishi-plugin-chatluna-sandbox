@@ -53,6 +53,9 @@
     "service": {
       "required": [
         "console"
+      ],
+      "optional": [
+        "database"
       ]
     }
   },

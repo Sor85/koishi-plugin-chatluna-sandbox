@@ -8,6 +8,9 @@ describe('WebQQ 右侧信息栏', () => {
     const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
 
     expect(source).toContain('model: WebqqDetailsPanelModel')
+    expect(source).toContain('persistence: SandboxPersistenceStatus')
+    expect(source).toContain('persistenceLabel')
+    expect(source).not.toContain('<dd>服务端内存</dd>')
     expect(source).toContain("const announcementInput = ref('')")
     expect(source).toContain("const groupMemberSearch = ref('')")
     expect(source).toContain('publishAnnouncement: [content: string')

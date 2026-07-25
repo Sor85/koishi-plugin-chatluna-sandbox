@@ -1,19 +1,28 @@
 import { Context, Schema } from 'koishi'
 import { registerConsole } from './console'
 import { SandboxControlService } from './control-service'
-import type { SandboxAppearance } from './types'
+import { KoishiDatabaseScenePersistence, registerSandboxSceneModel } from './persistence'
+import type { SandboxAppearance, SandboxPersistenceMode } from './types'
 
 export * from './control-service'
+export * from './persistence'
 export * from './types'
 
 export const name = 'onebot-sandbox'
 export const inject = {
   required: ['console'],
+  optional: ['database'],
 }
 
-export interface Config extends SandboxAppearance {}
+export interface Config extends SandboxAppearance {
+  persistenceMode: SandboxPersistenceMode
+}
 
 export const Config: Schema<Config> = Schema.object({
+  persistenceMode: Schema.union([
+    Schema.const('memory').description('服务端内存'),
+    Schema.const('database').description('Koishi Database'),
+  ]).default('memory').role('radio').description('模拟 QQ 环境状态存储方式'),
   enableWebQQFrostedGlass: Schema.boolean().default(true).description('启用 WebQQ 毛玻璃效果'),
   webQQChatStyle: Schema.union([
     Schema.const('tim').description('TIM'),
@@ -26,7 +35,7 @@ export const Config: Schema<Config> = Schema.object({
     Schema.const('dark').description('暗色'),
   ]).default('auto').role('radio').description('WebQQ 颜色模式'),
   webQQAccentColor: Schema.string().default('#2563eb').role('color').description('WebQQ 强调色'),
-}).description('WebQQ 外观')
+}).description('OneBot 沙盒')
 
 declare module 'koishi' {
   interface Context {
@@ -35,7 +44,17 @@ declare module 'koishi' {
 }
 
 export function apply(ctx: Context, config: Config) {
-  const control = new SandboxControlService(ctx)
-  ctx.provide('onebotSandbox', control, true)
-  registerConsole(ctx.console, control, config)
+  ctx.inject({
+    console: { required: true },
+    database: { required: false },
+  }, (inner) => {
+    let persistence: KoishiDatabaseScenePersistence | undefined
+    if (config.persistenceMode === 'database') {
+      registerSandboxSceneModel(inner)
+      persistence = new KoishiDatabaseScenePersistence(inner.database)
+    }
+    const control = new SandboxControlService(inner, { persistence })
+    inner.provide('onebotSandbox', control, true)
+    registerConsole(inner.console, control, config)
+  })
 }

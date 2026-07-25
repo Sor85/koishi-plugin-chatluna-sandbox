@@ -99,6 +99,11 @@ export class SandboxChatLunaStateStore {
     return structuredClone([...this.states.values()])
   }
 
+  clear(): void {
+    this.states.clear()
+    this.activeStateKeys.clear()
+  }
+
   deleteByBotParticipant(botParticipantId: string): void {
     this.deleteWhere(({ botParticipantId: id }) => id === botParticipantId)
   }

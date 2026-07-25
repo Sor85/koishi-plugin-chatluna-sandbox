@@ -171,6 +171,15 @@ export interface SandboxChatLunaState {
   updatedAt: string
 }
 
+export type SandboxPersistenceMode = 'memory' | 'database'
+
+export interface SandboxPersistenceStatus {
+  mode: SandboxPersistenceMode
+  available: boolean
+  persisted: boolean
+  message?: string
+}
+
 export type SandboxMediaType = 'image' | 'file' | 'audio' | 'video'
 
 export interface SandboxMedia {
@@ -260,6 +269,7 @@ export interface SandboxWorkspaceState {
   snapshot: SandboxSnapshot
   chatLunaStates: SandboxChatLunaState[]
   appearance: SandboxAppearance
+  persistence: SandboxPersistenceStatus
 }
 
 export interface GetSandboxWorkspaceInput {

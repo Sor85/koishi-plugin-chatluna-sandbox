@@ -147,6 +147,7 @@ export function createWebqqWorkspaceShell(
     } : undefined,
     currentOperatorName: currentOperator.value?.name,
     currentOperatorId: currentOperatorId.value,
+    persistence: workspace.value.persistence,
     participants: participants.value,
   }))
   const sidebarConversations = computed(() => getVisibleRecentConversations(

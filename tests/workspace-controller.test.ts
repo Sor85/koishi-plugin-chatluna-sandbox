@@ -53,6 +53,7 @@ const snapshot: SandboxSnapshot = {
 
 const workspace: SandboxWorkspaceState = {
   snapshot,
+  persistence: { mode: 'memory', available: true, persisted: false },
   chatLunaStates: [{
     botParticipantId: '20001',
     conversationId: 'private:10001:20001',

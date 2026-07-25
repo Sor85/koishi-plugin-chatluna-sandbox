@@ -35,8 +35,12 @@ const MEDIA_TYPES = new Map<string, SandboxMediaType>([
 
 export class SandboxMediaStorage {
   constructor(private directory: string) {
-    rmSync(directory, { recursive: true, force: true })
     mkdirSync(directory, { recursive: true })
+  }
+
+  clear(): void {
+    rmSync(this.directory, { recursive: true, force: true })
+    mkdirSync(this.directory, { recursive: true })
   }
 
   save(input: { fileName: string; mimeType: string; dataBase64: string }): SandboxMedia {
