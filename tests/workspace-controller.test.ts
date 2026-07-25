@@ -133,6 +133,30 @@ describe('WebQQ 工作区控制模块', () => {
     })
   })
 
+  it('快速切换会话时只显示当前逻辑会话的 ChatLuna 状态', async () => {
+    const controller = createWorkspaceController(createFakeWorkspacePort(workspace), createStorage())
+    await controller.load()
+
+    controller.selectConversation('group:30001')
+    expect(controller.chat.value.chatLunaStates).toEqual([
+      expect.objectContaining({
+        conversationId: 'group:30001',
+        usage: { inputTokens: 20, outputTokens: 8, totalTokens: 28 },
+      }),
+    ])
+
+    controller.selectConversation('private:10001:20001')
+    expect(controller.chat.value.chatLunaStates).toEqual([
+      expect.objectContaining({
+        conversationId: 'private:10001:20001',
+        usage: { inputTokens: 12, outputTokens: 5, totalTokens: 17 },
+      }),
+    ])
+
+    controller.selectConversation('private:10001:10002')
+    expect(controller.chat.value.chatLunaStates).toEqual([])
+  })
+
   it('进入普通用户私聊时发送控件仍保留机器人参与者', async () => {
     const controller = createWorkspaceController(createFakeWorkspacePort(workspace), createStorage())
     await controller.load()

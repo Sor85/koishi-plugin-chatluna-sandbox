@@ -36,11 +36,51 @@ function createGroupSession(control: SandboxControlService, botParticipantId: st
   })
 }
 
+function createDirectSession(control: SandboxControlService, botParticipantId: string) {
+  return control.getRuntimeBot(botParticipantId).session({
+    type: 'message',
+    user: { id: '10001', name: '测试用户1' },
+    channel: { id: `private:10001:${botParticipantId}`, type: Universal.Channel.Type.DIRECT },
+  })
+}
+
 async function emit(app: App, event: string, ...args: unknown[]) {
   await (app.parallel as unknown as (event: string, ...args: unknown[]) => Promise<void>)(event, ...args)
 }
 
 describe('ChatLuna 多机器人对话状态', () => {
+  it('同一机器人在私聊和群聊并发时分别记录状态与 Token 用量', async () => {
+    const { app, control } = await createControl()
+    const directSession = createDirectSession(control, '20001')
+    const groupSession = createGroupSession(control, '20001')
+
+    await emit(app, 'chatluna/before-chat', 'chatluna:direct', {}, {}, {}, directSession)
+    await emit(app, 'chatluna/before-chat', 'chatluna:group', {}, {}, {}, groupSession)
+    await emit(app, 'chatluna/model-usage', {
+      context: { conversationId: 'chatluna:direct' },
+      usageMetadata: { input_tokens: 8, output_tokens: 3, total_tokens: 11 },
+    })
+    await emit(app, 'chatluna/model-usage', {
+      context: { conversationId: 'chatluna:group' },
+      usageMetadata: { input_tokens: 21, output_tokens: 13, total_tokens: 34 },
+    })
+
+    expect(control.getChatLunaStates()).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        botParticipantId: '20001',
+        conversationId: 'private:10001:20001',
+        thinking: true,
+        usage: { inputTokens: 8, outputTokens: 3, totalTokens: 11 },
+      }),
+      expect.objectContaining({
+        botParticipantId: '20001',
+        conversationId: 'group:30001',
+        thinking: true,
+        usage: { inputTokens: 21, outputTokens: 13, totalTokens: 34 },
+      }),
+    ]))
+  })
+
   it('按机器人参与者和逻辑会话分别记录思考状态与 Token 用量', async () => {
     const { app, control } = await createControl()
     const firstSession = createGroupSession(control, '20001')
