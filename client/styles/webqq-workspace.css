@@ -45,6 +45,14 @@ body,
   grid-template-columns: 72px minmax(230px, 300px) minmax(360px, 1fr);
 }
 
+.webqq-workspace.is-standalone-view {
+  grid-template-columns: 72px minmax(0, 1fr);
+}
+
+.webqq-workspace.is-standalone-view .webqq-chat {
+  grid-column: 2;
+}
+
 .webqq-workspace.is-details-closed .webqq-profile {
   display: none;
 }

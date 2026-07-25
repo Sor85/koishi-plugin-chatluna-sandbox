@@ -15,6 +15,10 @@
   border-radius: 13px;
 }
 
+.webqq-rail-tooltip-trigger {
+  display: flex;
+}
+
 .webqq-rail-button.is-active {
   color: #fff;
   background: var(--webqq-accent);

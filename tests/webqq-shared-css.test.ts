@@ -20,6 +20,7 @@ describe('WebQQ 共享样式', () => {
     expect(tokens).toContain('--webqq-accent-shadow')
     expect(workspace).toContain('.onebot-sandbox-page')
     expect(workspace).toContain('.webqq-workspace.is-details-closed')
+    expect(workspace).toContain('.webqq-workspace.is-standalone-view')
     expect(primitives).toContain('[data-webqq-scrollbar="true"]')
     expect(primitives).toContain('.webqq-avatar-bot-badge')
     expect(overlays).toContain('--webqq-secondary-row-gap: 8px')

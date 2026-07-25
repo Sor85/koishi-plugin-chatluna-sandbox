@@ -6,8 +6,9 @@
         :class="{
           'is-frosted': appearance.enableWebQQFrostedGlass,
           'has-tim-tail': appearance.webQQTimBubbleTail,
-          'is-details-open': detailsVisible && currentView !== 'debug',
-          'is-details-closed': !detailsVisible || currentView === 'debug',
+          'is-details-open': detailsVisible && isWebqqView,
+          'is-details-closed': !detailsVisible || !isWebqqView,
+          'is-standalone-view': !isWebqqView,
         }"
         :data-chat-style="appearance.webQQChatStyle"
         :data-color-mode="appearance.webQQColorMode"
@@ -61,7 +62,7 @@
         />
 
         <WebqqDetailsPanel
-          v-if="currentView !== 'debug'"
+          v-if="isWebqqView"
           :model="detailsPanelModel"
           @close="closeDetails"
           @publish-announcement="publishAnnouncement"
@@ -88,7 +89,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import EnvironmentManager from './environment-manager.vue'
 import OneBotDebugWorkspace from './onebot-debug-workspace.vue'
 import WebqqChatPane from './webqq-chat-pane.vue'
@@ -142,4 +143,5 @@ const {
   toggleDetails,
   transferGroupOwner,
 } = createWebqqWorkspaceShell(workspaceController, workspaceLayout, () => overlayHostRef.value)
+const isWebqqView = computed(() => currentView.value === 'messages' || currentView.value === 'contacts')
 </script>

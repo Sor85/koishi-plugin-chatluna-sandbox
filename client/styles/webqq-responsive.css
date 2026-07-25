@@ -36,6 +36,10 @@
     grid-template-columns: 60px minmax(0, 1fr);
   }
 
+  .webqq-workspace.is-standalone-view {
+    grid-template-columns: 60px minmax(0, 1fr);
+  }
+
   .webqq-rail {
     grid-column: 1;
     grid-row: 1;

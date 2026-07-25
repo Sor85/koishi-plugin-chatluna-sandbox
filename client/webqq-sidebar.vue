@@ -1,20 +1,27 @@
 <template>
         <nav class="webqq-rail" aria-label="WebQQ 主导航">
-          <button
-            v-for="item in navigationItems"
-            :key="item.id"
-            type="button"
-            class="webqq-rail-button"
-            :class="{ 'is-active': currentView === item.id }"
-            :aria-label="item.label"
-            :aria-current="currentView === item.id ? 'page' : undefined"
-            @click="selectNavigation(item.id)"
-          >
-            <component :is="item.icon" :size="22" stroke-width="1.8" aria-hidden="true" />
-          </button>
+          <TooltipProvider>
+            <Tooltip v-for="item in navigationItems" :key="item.id">
+              <TooltipTrigger as-child>
+                <span class="webqq-rail-tooltip-trigger">
+                  <button
+                    type="button"
+                    class="webqq-rail-button"
+                    :class="{ 'is-active': isNavigationActive(item.id) }"
+                    :aria-label="item.label"
+                    :aria-current="isNavigationActive(item.id) ? 'page' : undefined"
+                    @click="selectNavigation(item.id)"
+                  >
+                    <component :is="item.icon" :size="22" stroke-width="1.8" aria-hidden="true" />
+                  </button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="right">{{ item.label }}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </nav>
 
-        <aside class="webqq-conversations" aria-label="会话列表">
+        <aside v-if="isWebqqView" class="webqq-conversations" aria-label="会话列表">
           <header class="webqq-sidebar-tabs-row">
             <div class="webqq-sidebar-tabs" aria-label="会话分类">
               <button
@@ -268,12 +275,13 @@
 
 <script setup lang="ts">
 import {
-  IconAddressBook, IconBell, IconBug, IconClock, IconEdit, IconMessageCircle, IconPlus,
+  IconBell, IconBug, IconClock, IconEdit, IconMessageCircle, IconPlus,
   IconSearch, IconTag, IconTrash, IconUser, IconUserCircle, IconUserMinus, IconUserPlus, IconUsers,
 } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from './components/ui/context-menu'
 import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip'
 import EnvironmentCreatePopover from './environment-create-popover.vue'
 import NotificationMenu from './notification-menu.vue'
 import WebqqAvatar from './webqq-avatar.vue'
@@ -357,6 +365,7 @@ const emit = defineEmits<{
 
 const appearance = computed(() => props.model.appearance)
 const currentView = computed(() => props.model.currentView)
+const isWebqqView = computed(() => currentView.value === 'messages' || currentView.value === 'contacts')
 const activeConversationId = computed(() => props.model.activeConversationId)
 const currentGroupId = computed(() => props.model.currentGroupId)
 const searchQuery = ref('')
@@ -366,7 +375,6 @@ const handlingRequestId = ref('')
 const notificationErrorMessage = ref('')
 const navigationItems = [
   { id: 'messages' as const, label: '消息', icon: IconMessageCircle },
-  { id: 'contacts' as const, label: '联系人', icon: IconAddressBook },
   { id: 'debug' as const, label: '调试', icon: IconBug },
   { id: 'profile' as const, label: '资料', icon: IconUserCircle },
 ]
@@ -393,6 +401,10 @@ function selectNavigation(view: WebqqSidebarModel['currentView']) {
   if (view === 'messages') sidebarTab.value = 'recent'
   if (view === 'contacts') sidebarTab.value = 'friends'
   emit('selectView', view)
+}
+
+function isNavigationActive(view: typeof navigationItems[number]['id']) {
+  return view === 'messages' ? isWebqqView.value : currentView.value === view
 }
 
 function selectSidebarTab(tab: SidebarTab) {
