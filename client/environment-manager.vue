@@ -19,7 +19,7 @@
       >
         <component :is="item.icon" :size="17" aria-hidden="true" />
         {{ item.label }}
-        <span>{{ item.count }}</span>
+        <span v-if="item.count !== undefined">{{ item.count }}</span>
       </button>
     </nav>
     <div v-if="section === 'users'" v-webqq-scrollbar class="directory-list">
@@ -42,6 +42,8 @@
       </article>
     </div>
 
+    <McpCredentialManager v-else-if="section === 'credentials'" />
+
     <div v-else v-webqq-scrollbar class="directory-list">
       <article v-for="group in snapshot.groups" :key="group.id" class="directory-card">
         <WebqqAvatar class="directory-avatar" kind="group" :name="group.name" />
@@ -52,9 +54,10 @@
 </template>
 
 <script setup lang="ts">
-import { IconRobot, IconUser, IconUsers } from '@tabler/icons-vue'
+import { IconKey, IconRobot, IconUser, IconUsers } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
 import WebqqAvatar from './webqq-avatar.vue'
+import McpCredentialManager from './mcp-credential-manager.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import { getSandboxBots, getSandboxUsers, type SandboxSnapshot } from '../src/types'
 
@@ -62,13 +65,14 @@ const props = defineProps<{ snapshot: SandboxSnapshot }>()
 const users = computed(() => getSandboxUsers(props.snapshot))
 const bots = computed(() => getSandboxBots(props.snapshot))
 
-type EnvironmentSection = 'users' | 'bots' | 'groups'
+type EnvironmentSection = 'users' | 'bots' | 'groups' | 'credentials'
 const section = ref<EnvironmentSection>('users')
 
 const sections = computed(() => [
   { id: 'users' as const, label: '普通用户', icon: IconUser, count: users.value.length },
   { id: 'bots' as const, label: '机器人', icon: IconRobot, count: bots.value.length },
   { id: 'groups' as const, label: '群组', icon: IconUsers, count: props.snapshot.groups.length },
+  { id: 'credentials' as const, label: 'MCP 凭证', icon: IconKey, count: undefined },
 ])
 
 </script>

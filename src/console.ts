@@ -1,6 +1,8 @@
 import { resolve } from 'node:path'
 import type {} from '@koishijs/console'
 import type { SandboxControlService } from './control-service'
+import type { SandboxMcpService } from './mcp/service'
+import type { SandboxMcpScope } from './mcp/types'
 import type {
   DeleteGroupAnnouncementInput,
   ClearSandboxOneBotDebugRecordsResult,
@@ -38,6 +40,10 @@ interface ConsoleEventMap {
   'onebot-sandbox/bot-deliveries': (input?: GetSandboxBotDeliveriesInput) => SandboxBotDelivery[]
   'onebot-sandbox/debug-records': (input?: GetSandboxOneBotDebugRecordsInput) => SandboxOneBotDebugRecord[]
   'onebot-sandbox/clear-debug-records': () => ClearSandboxOneBotDebugRecordsResult
+  'onebot-sandbox/mcp-credentials': () => Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string }>
+  'onebot-sandbox/create-mcp-credential': (input: { name: string; scopes: SandboxMcpScope[] }) => { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
+  'onebot-sandbox/set-mcp-credential-enabled': (input: { id: string; enabled: boolean }) => void
+  'onebot-sandbox/revoke-mcp-credential': (input: { id: string }) => void
 }
 
 const legacyRpcFields = ['senderId', 'botId', 'actorUserId', 'userId', 'currentUserId'] as const
@@ -75,6 +81,7 @@ export function registerConsole(
   console: SandboxConsoleRegistrar,
   control: SandboxControlService,
   appearance: SandboxAppearance,
+  mcp?: SandboxMcpService,
 ) {
   console.addEntry({
     dev: resolve(__dirname, '../client/index.ts'),
@@ -161,6 +168,12 @@ export function registerConsole(
   console.addListener('onebot-sandbox/bot-deliveries', (input) => control.getBotDeliveries(assertInteractionInput(input ?? {})), { authority: 4 })
   console.addListener('onebot-sandbox/debug-records', (input) => control.getOneBotDebugRecords(input ?? {}), { authority: 4 })
   console.addListener('onebot-sandbox/clear-debug-records', () => ({ cleared: control.clearOneBotDebugRecords() }), { authority: 4 })
+  if (mcp) {
+    console.addListener('onebot-sandbox/mcp-credentials', () => mcp.listCredentials(), { authority: 4 })
+    console.addListener('onebot-sandbox/create-mcp-credential', (input) => mcp.createCredential(input.name, input.scopes), { authority: 4 })
+    console.addListener('onebot-sandbox/set-mcp-credential-enabled', (input) => mcp.setCredentialEnabled(input.id, input.enabled), { authority: 4 })
+    console.addListener('onebot-sandbox/revoke-mcp-credential', (input) => mcp.revokeCredential(input.id), { authority: 4 })
+  }
 }
 
 declare module '@koishijs/console' {
@@ -178,5 +191,9 @@ declare module '@koishijs/console' {
     'onebot-sandbox/bot-deliveries'(input?: GetSandboxBotDeliveriesInput): SandboxBotDelivery[]
     'onebot-sandbox/debug-records'(input?: GetSandboxOneBotDebugRecordsInput): SandboxOneBotDebugRecord[]
     'onebot-sandbox/clear-debug-records'(): ClearSandboxOneBotDebugRecordsResult
+    'onebot-sandbox/mcp-credentials'(): Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string }>
+    'onebot-sandbox/create-mcp-credential'(input: { name: string; scopes: SandboxMcpScope[] }): { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
+    'onebot-sandbox/set-mcp-credential-enabled'(input: { id: string; enabled: boolean }): void
+    'onebot-sandbox/revoke-mcp-credential'(input: { id: string }): void
   }
 }

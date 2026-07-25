@@ -142,6 +142,7 @@ export class SandboxControlService {
   private mediaStorage: SandboxMediaStorage
   private persistence?: SandboxScenePersistence
   private persistenceQueue = Promise.resolve()
+  private sceneMutationListeners = new Set<(snapshot: SandboxSnapshot) => void>()
 
   constructor(private ctx: Context, options: SandboxControlServiceOptions = {}) {
     this.persistence = options.persistence
@@ -175,6 +176,69 @@ export class SandboxControlService {
 
   getSnapshot(): SandboxSnapshot {
     return structuredClone(this.scene)
+  }
+
+  onSceneMutation(listener: (snapshot: SandboxSnapshot) => void): () => void {
+    this.sceneMutationListeners.add(listener)
+    return () => this.sceneMutationListeners.delete(listener)
+  }
+
+  replaceScene(snapshot: SandboxSnapshot): void {
+    const next = structuredClone(snapshot)
+    const participantIds = new Set(next.participants.map(({ id }) => id))
+    if (participantIds.size !== next.participants.length) throw new Error('参与者 ID 不能重复')
+    if (next.participants.some(({ id }) => !/^\d+$/.test(id))) throw new Error('参与者 ID 必须是十进制字符串')
+    if (new Set(next.groups.map(({ id }) => id)).size !== next.groups.length) throw new Error('群组 ID 不能重复')
+    for (const group of next.groups) {
+      if (!group.members.every(({ participantId }) => participantIds.has(participantId))) throw new Error(`群组包含不存在的成员：${group.id}`)
+      if (group.members.filter(({ role }) => role === 'owner').length !== 1) throw new Error(`群组必须且只能有一个群主：${group.id}`)
+    }
+    const groupIds = new Set(next.groups.map(({ id }) => id))
+    const conversationIds = new Set(next.conversations.map(({ id }) => id))
+    if (conversationIds.size !== next.conversations.length) throw new Error('会话 ID 不能重复')
+    for (const conversation of next.conversations) {
+      if (conversation.type === 'direct' && !conversation.participantIds.every((id) => participantIds.has(id))) throw new Error(`私聊包含不存在的参与者：${conversation.id}`)
+      if (conversation.type === 'group' && !groupIds.has(conversation.groupId)) throw new Error(`群聊引用不存在的群组：${conversation.id}`)
+    }
+    const messageIds = new Set(next.messages.map(({ id }) => id))
+    if (messageIds.size !== next.messages.length) throw new Error('消息 ID 不能重复')
+    if (next.messages.some(({ authorId, conversationId }) => !participantIds.has(authorId) || !conversationIds.has(conversationId))) throw new Error('消息引用不存在的参与者或会话')
+    if (next.messages.some(({ media }) => media?.some(({ id, reference }) => reference !== `sandbox-media://${id}`))) throw new Error('消息包含无效媒体引用')
+    if (next.conversations.some((conversation) => conversation.messageIds.some((id) => !messageIds.has(id)))) throw new Error('会话引用不存在的消息')
+    if (next.friendships.some(({ participantIds: ids }) => !ids.every((id) => participantIds.has(id)))) throw new Error('好友关系引用不存在的参与者')
+    next.revision = this.scene.revision + 1
+    this.scene = next
+    this.botDeliveries = []
+    this.chatLunaState.clear()
+    this.syncRuntimeBots()
+    this.queueScenePersistence()
+    this.notifySceneMutation()
+  }
+
+  storeMedia(input: { fileName: string; mimeType: string; dataBase64: string }): SandboxMedia {
+    return this.mediaStorage.save(input)
+  }
+
+  async sendStoredMediaMessage(input: Pick<SendMessageInput, 'operatorId' | 'conversationId' | 'content' | 'replyToMessageId'> & { media: SandboxMedia[] }): Promise<SendMessageResult> {
+    const context = this.getMessageContext(input)
+    const message = this.appendMessage(input.operatorId, context.conversation.id, input.content.trim(), input.replyToMessageId, input.media)
+    const elements = input.media.map((media) => h(media.type === 'image' ? 'img' : media.type, {
+      src: media.reference,
+      file: media.reference,
+      title: media.name,
+      mime: media.mimeType,
+      size: media.size,
+    }))
+    if (input.content.trim()) elements.push(h.text(input.content.trim()))
+    const onebotMessage: Array<{ type: string; data: Record<string, string> }> = input.media.map((media) => ({
+      type: media.type === 'audio' ? 'record' : media.type,
+      data: { file: media.reference },
+    }))
+    if (context.reply) onebotMessage.unshift({ type: 'reply', data: { id: context.reply.id } })
+    if (input.content.trim()) onebotMessage.push({ type: 'text', data: { text: input.content.trim() } })
+    const rawMessage = `${context.reply ? `[CQ:reply,id=${context.reply.id}]` : ''}${input.media.map((media) => `[CQ:${media.type === 'audio' ? 'record' : media.type},file=${media.reference}]`).join('')}${input.content.trim()}`
+    await this.dispatchMessageToBots(context, message, elements, onebotMessage, rawMessage)
+    return { messageId: message.id, revision: this.scene.revision }
   }
 
   get bot(): SandboxBot {
@@ -1044,6 +1108,13 @@ export class SandboxControlService {
   private commitSceneMutation(): void {
     this.scene.revision += 1
     this.queueScenePersistence()
+    this.notifySceneMutation()
+  }
+
+  private notifySceneMutation(): void {
+    if (!this.sceneMutationListeners.size) return
+    const snapshot = this.getSnapshot()
+    for (const listener of this.sceneMutationListeners) listener(snapshot)
   }
 
   private queueScenePersistence(): void {

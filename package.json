@@ -65,7 +65,9 @@
   },
   "dependencies": {
     "@koishijs/console": "^5.30.11",
-    "animejs": "4.4.1"
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "animejs": "4.4.1",
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@koishijs/client": "^5.30.11",

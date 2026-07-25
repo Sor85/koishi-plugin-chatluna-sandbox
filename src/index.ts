@@ -2,12 +2,18 @@ import { Context, Schema } from 'koishi'
 import { registerConsole } from './console'
 import { SandboxControlService } from './control-service'
 import { KoishiDatabaseScenePersistence, registerSandboxSceneModel } from './persistence'
+import { SandboxMcpHttpServer, type SandboxMcpServerConfig } from './mcp/server'
+import { SandboxMcpService } from './mcp/service'
+import { resolve } from 'node:path'
 import type { SandboxAppearance, SandboxPersistenceMode } from './types'
 
 export * from './control-service'
 export * from './persistence'
 export * from './onebot-debug'
 export * from './types'
+export * from './mcp/server'
+export * from './mcp/service'
+export * from './mcp/types'
 
 export const name = 'onebot-sandbox'
 export const inject = {
@@ -17,6 +23,7 @@ export const inject = {
 
 export interface Config extends SandboxAppearance {
   persistenceMode: SandboxPersistenceMode
+  mcp: SandboxMcpServerConfig
 }
 
 export const Config: Schema<Config> = Schema.object({
@@ -36,6 +43,24 @@ export const Config: Schema<Config> = Schema.object({
     Schema.const('dark').description('暗色'),
   ]).default('auto').role('radio').description('WebQQ 颜色模式'),
   webQQAccentColor: Schema.string().default('#2563eb').role('color').description('WebQQ 强调色'),
+  mcp: Schema.object({
+    enabled: Schema.boolean().default(false).description('启用独立 MCP Streamable HTTP 端点'),
+    host: Schema.string().default('127.0.0.1').description('监听地址'),
+    port: Schema.number().min(1).max(65535).default(61901).description('监听端口'),
+    path: Schema.string().default('/mcp').description('请求路径'),
+    allowedSources: Schema.array(String).default(['127.0.0.1', '::1']).description('允许的真实来源 IP 或 IPv4 CIDR'),
+    allowedOrigins: Schema.array(String).default([]).description('允许的精确 Origin；无 Origin 请求仍可访问'),
+    allowInsecureRemote: Schema.boolean().default(false).description('允许非回环地址使用明文 HTTP（不推荐）'),
+    tlsCertPath: Schema.string().description('TLS 证书路径'),
+    tlsKeyPath: Schema.string().description('TLS 私钥路径'),
+    readPerMinute: Schema.number().min(1).default(120).description('每个凭证每分钟读取调用上限'),
+    mutationPerMinute: Schema.number().min(1).default(60).description('每个凭证每分钟变更调用上限'),
+    waitPerMinute: Schema.number().min(1).default(120).description('每个凭证每分钟等待调用上限'),
+    uploadPerMinute: Schema.number().min(1).default(30).description('每个凭证每分钟上传调用上限'),
+    maxConcurrentMutations: Schema.number().min(1).default(4).description('每个凭证最大并发变更数'),
+    maxConcurrentWaits: Schema.number().min(1).default(8).description('每个凭证最大并发等待数'),
+    maxConcurrentUploads: Schema.number().min(1).default(2).description('每个凭证最大并发上传数'),
+  }).description('MCP 测试端点'),
 }).description('OneBot 沙盒')
 
 declare module 'koishi' {
@@ -56,6 +81,24 @@ export function apply(ctx: Context, config: Config) {
     }
     const control = new SandboxControlService(inner, { persistence })
     inner.provide('onebotSandbox', control, true)
-    registerConsole(inner.console, control, config)
+    try {
+      const mcp = new SandboxMcpService(control, {
+        dataDirectory: resolve(inner.baseDir, 'data/onebot-sandbox'),
+        readPerMinute: config.mcp.readPerMinute,
+        mutationPerMinute: config.mcp.mutationPerMinute,
+        waitPerMinute: config.mcp.waitPerMinute,
+        uploadPerMinute: config.mcp.uploadPerMinute,
+        maxConcurrentMutations: config.mcp.maxConcurrentMutations,
+        maxConcurrentWaits: config.mcp.maxConcurrentWaits,
+        maxConcurrentUploads: config.mcp.maxConcurrentUploads,
+      })
+      const mcpServer = new SandboxMcpHttpServer(inner, mcp, config.mcp)
+      registerConsole(inner.console, control, config, mcp)
+      inner.on('ready', () => mcpServer.start().catch((error) => inner.logger('onebot-sandbox').error('MCP 监听器启动失败；WebQQ 仍可继续使用。', error)))
+      inner.on('dispose', () => mcpServer.stop())
+    } catch (error) {
+      inner.logger('onebot-sandbox').error('MCP 初始化失败；WebQQ 仍可继续使用。', error)
+      registerConsole(inner.console, control, config)
+    }
   })
 }

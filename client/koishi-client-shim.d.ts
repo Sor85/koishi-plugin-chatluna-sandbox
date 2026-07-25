@@ -18,6 +18,7 @@ declare module '@koishijs/client' {
     SendMessageInput,
     SetGroupAnnouncementInput,
   } from '../src/types'
+  import type { SandboxMcpScope } from '../src/mcp/types'
 
   export interface Context {
     page(options: {
@@ -42,4 +43,8 @@ declare module '@koishijs/client' {
   export function send(event: 'onebot-sandbox/group-action', input: PerformGroupActionInput): Promise<SandboxWorkspaceState>
   export function send(event: 'onebot-sandbox/debug-records', input?: GetSandboxOneBotDebugRecordsInput): Promise<SandboxOneBotDebugRecord[]>
   export function send(event: 'onebot-sandbox/clear-debug-records'): Promise<ClearSandboxOneBotDebugRecordsResult>
+  export function send(event: 'onebot-sandbox/mcp-credentials'): Promise<Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string }>>
+  export function send(event: 'onebot-sandbox/create-mcp-credential', input: { name: string; scopes: SandboxMcpScope[] }): Promise<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }>
+  export function send(event: 'onebot-sandbox/set-mcp-credential-enabled', input: { id: string; enabled: boolean }): Promise<void>
+  export function send(event: 'onebot-sandbox/revoke-mcp-credential', input: { id: string }): Promise<void>
 }
