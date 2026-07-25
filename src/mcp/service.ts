@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypt
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { SandboxControlService } from '../control-service'
+import type { SandboxTestSpaceService } from '../test-spaces'
 import type { SandboxMedia, SandboxSnapshot } from '../types'
 import { createDirectConversationId } from '../types'
 import { getOneBotCapabilityMatrix } from '../onebot-profiles'
@@ -18,6 +19,7 @@ export interface SandboxMcpServiceOptions {
   maxConcurrentMutations?: number
   maxConcurrentWaits?: number
   maxConcurrentUploads?: number
+  testSpaces?: SandboxTestSpaceService
 }
 
 interface ToolDefinition {
@@ -28,6 +30,8 @@ interface ToolDefinition {
 
 const TOOL_DEFINITIONS: ToolDefinition[] = [
   ['get_server_info', 'read', '获取沙盒服务、测试 API 和 MCP 状态'],
+  ['list_test_spaces', 'read', '列出当前凭证创建的 AI 测试空间'],
+  ['get_test_space', 'read', '读取单个 AI 测试空间状态'],
   ['get_scene_snapshot', 'read', '读取当前模拟 QQ 场景快照'],
   ['list_conversations', 'read', '分页列出当前操作者可见会话'],
   ['get_conversation', 'read', '读取单个会话及其消息'],
@@ -43,6 +47,11 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   ['wait_for_message', 'interact', '从事件游标等待消息'],
   ['wait_for_chatluna_state', 'interact', '从事件游标等待 ChatLuna 状态'],
   ['apply_environment_changes', 'manage', '原子应用测试环境变更'],
+  ['create_test_space', 'manage', '创建空白且隔离的 AI 测试空间'],
+  ['complete_test_space', 'manage', '将 AI 测试空间标记为已完成并停止机器人'],
+  ['fail_test_space', 'manage', '将 AI 测试空间标记为失败并停止机器人'],
+  ['reactivate_test_space', 'manage', '重新激活已完成或失败的 AI 测试空间'],
+  ['delete_test_space', 'manage', '删除当前凭证创建的 AI 测试空间；除非用户明确要求，否则测试完成后应默认保留'],
   ['prepare_destructive_action', 'manage', '准备一次性破坏性操作确认令牌'],
   ['delete_environment_entity', 'manage', '删除现有环境实体'],
   ['reset_scene', 'manage', '恢复默认场景'],
@@ -102,8 +111,10 @@ export class SandboxMcpService {
   private rateWindows = new Map<string, number[]>()
   private activeCalls = new Map<string, number>()
   private concurrentLimits: Record<'mutation' | 'wait' | 'upload', number>
+  private testSpaces?: SandboxTestSpaceService
 
   constructor(private control: SandboxControlService, options: SandboxMcpServiceOptions) {
+    this.testSpaces = options.testSpaces
     mkdirSync(options.dataDirectory, { recursive: true })
     this.credentialFile = join(options.dataDirectory, 'mcp-credentials.json')
     this.eventLimit = options.eventLimit ?? 1000
@@ -118,14 +129,13 @@ export class SandboxMcpService {
       upload: options.maxConcurrentUploads ?? 2,
     }
     this.loadCredentials()
-    let previous = this.control.getSnapshot()
-    this.control.onSceneMutation((snapshot) => {
-      const previousMessageIds = new Set(previous.messages.map(({ id }) => id))
-      for (const message of snapshot.messages) {
-        if (!previousMessageIds.has(message.id)) this.appendEvent('message.created', message)
-      }
-      this.appendEvent('scene.changed', { revision: snapshot.revision })
-      previous = snapshot
+    this.observeControl(this.control)
+    this.testSpaces?.onSpaceCreated((spaceId, control) => this.observeControl(control, spaceId))
+  }
+
+  private observeControl(control: SandboxControlService, spaceId?: string): void {
+    control.onSceneMutation((snapshot) => {
+      this.appendEvent('scene.changed', { revision: snapshot.revision }, spaceId)
     })
   }
 
@@ -183,10 +193,22 @@ export class SandboxMcpService {
     this.requireScope(this.requireCredential(token), 'read')
     if (uri === 'onebot-sandbox://guide') return { testApiVersion: 1, tools: TOOL_DEFINITIONS }
     if (uri === 'onebot-sandbox://scene-schema') return { testApiVersion: { const: 1 }, scene: { type: 'object' } }
-    if (uri === 'onebot-sandbox://capabilities/napcat') return this.getCapabilityMatrix('napcat')
-    if (uri === 'onebot-sandbox://capabilities/llbot') return this.getCapabilityMatrix('llbot')
-    if (uri === 'onebot-sandbox://errors') return ['unauthorized', 'permission_denied', 'invalid_arguments', 'idempotency_conflict', 'cursor_expired', 'confirmation_required', 'revision_conflict', 'rate_limited', 'internal_error']
-    if (uri === 'onebot-sandbox://examples') return { send_message: { operatorId: '10001', conversationId: 'private:10001:20001', content: '你好', idempotencyKey: 'example-1' } }
+    if (uri === 'onebot-sandbox://capabilities/napcat') return this.getCapabilityMatrix(this.control, 'napcat')
+    if (uri === 'onebot-sandbox://capabilities/llbot') return this.getCapabilityMatrix(this.control, 'llbot')
+    if (uri === 'onebot-sandbox://errors') return ['unauthorized', 'permission_denied', 'invalid_arguments', 'idempotency_conflict', 'cursor_expired', 'confirmation_required', 'revision_conflict', 'rate_limited', 'space_id_required', 'space_taken_over', 'space_forbidden', 'space_not_found', 'space_unavailable', 'test_spaces_unavailable', 'internal_error']
+    if (uri === 'onebot-sandbox://examples') return {
+      create_test_space: {
+        name: '退群公告测试',
+        idempotencyKey: 'example-space-1',
+      },
+      send_message: {
+        spaceId: '<create_test_space.spaceId>',
+        operatorId: '10001',
+        conversationId: 'private:10001:20001',
+        content: '你好',
+        idempotencyKey: 'example-message-1',
+      },
+    }
     throw new SandboxMcpError('resource_not_found', `资源不存在：${uri}`)
   }
 
@@ -226,109 +248,132 @@ export class SandboxMcpService {
 
   private async executeTool(credential: SandboxMcpCredential, tool: string, args: Record<string, unknown>): Promise<unknown> {
     if (tool === 'get_server_info') return { name: 'onebot-sandbox', testApiVersion: 1, transport: 'streamable-http', stateless: true, cursor: this.currentCursor() }
-    if (tool === 'get_scene_snapshot') return this.control.getSnapshot()
-    if (tool === 'list_conversations') return this.listConversations(args)
-    if (tool === 'get_conversation') return this.getConversation(args)
-    if (tool === 'list_pending_requests') return this.control.getSnapshot().requests
-    if (tool === 'get_capability_matrix') return this.getCapabilityMatrix(args.implementation)
-    if (tool === 'export_scene') return this.exportScene()
-    if (tool === 'upload_media') return this.uploadMedia(args)
-    if (tool === 'send_message') return this.withIdempotency(credential, tool, args, async () => this.sendMessage(args))
-    if (tool === 'perform_friend_action') return this.withIdempotency(credential, tool, args, async () => this.performFriendAction(args))
-    if (tool === 'perform_group_action') return this.withIdempotency(credential, tool, args, async () => this.performGroupAction(args))
-    if (tool === 'handle_request') return this.withIdempotency(credential, tool, args, async () => this.handleRequest(args))
+    if (tool === 'list_test_spaces') return this.requireTestSpaces().listSpaces().filter(({ controllerId }) => controllerId === credential.id)
+    if (tool === 'get_test_space') return this.getOwnedTestSpace(credential, args)
+    if (tool === 'create_test_space') return this.withIdempotency(credential, tool, args, async () => {
+      const space = this.requireTestSpaces().createSpace({ controllerId: credential.id, name: typeof args.name === 'string' ? args.name : undefined })
+      return { spaceId: space.id, status: space.status, revision: space.snapshot.revision, cursor: this.appendEvent('test-space.created', { spaceId: space.id }, space.id) }
+    })
+    if (tool === 'complete_test_space') return this.withIdempotency(credential, tool, args, async () => this.completeTestSpace(credential, args, false))
+    if (tool === 'fail_test_space') return this.withIdempotency(credential, tool, args, async () => this.completeTestSpace(credential, args, true))
+    if (tool === 'reactivate_test_space') return this.withIdempotency(credential, tool, args, async () => this.reactivateTestSpace(credential, args))
+    if (tool === 'delete_test_space') return this.withIdempotency(credential, tool, args, async () => this.deleteTestSpace(credential, args))
+    const activeControl = this.resolveControl(credential, args, tool !== 'get_scene_snapshot' && tool !== 'list_conversations' && tool !== 'get_conversation' && tool !== 'list_pending_requests' && tool !== 'get_capability_matrix' && tool !== 'export_scene' && tool !== 'list_onebot_debug_records')
+    if (tool === 'get_scene_snapshot') return activeControl.getSnapshot()
+    if (tool === 'list_conversations') return this.listConversations(activeControl, args)
+    if (tool === 'get_conversation') return this.getConversation(activeControl, args)
+    if (tool === 'list_pending_requests') return activeControl.getSnapshot().requests
+    if (tool === 'get_capability_matrix') return this.getCapabilityMatrix(activeControl, args.implementation)
+    if (tool === 'export_scene') return this.exportScene(activeControl)
+    if (tool === 'upload_media') return this.uploadMedia(activeControl, args)
+    if (tool === 'send_message') return this.withIdempotency(credential, tool, args, async () => this.sendMessage(activeControl, args))
+    if (tool === 'perform_friend_action') return this.withIdempotency(credential, tool, args, async () => this.performFriendAction(activeControl, args))
+    if (tool === 'perform_group_action') return this.withIdempotency(credential, tool, args, async () => this.performGroupAction(activeControl, args))
+    if (tool === 'handle_request') return this.withIdempotency(credential, tool, args, async () => this.handleRequest(activeControl, args))
     if (tool === 'wait_for_event') return this.waitFor(args, (event) => !args.type || event.type === args.type)
     if (tool === 'wait_for_message') return this.waitFor(args, (event) => event.type === 'message.created'
-      && (!args.conversationId || Reflect.get(event.data as object, 'conversationId') === args.conversationId))
-    if (tool === 'wait_for_chatluna_state') return this.waitForChatLuna(args)
-    if (tool === 'apply_environment_changes') return this.applyEnvironmentChanges(args)
-    if (tool === 'prepare_destructive_action') return this.prepareDestructiveAction(credential, args)
-    if (tool === 'delete_environment_entity') return this.runDestructive(credential, tool, args, () => this.deleteEnvironmentEntity(args))
-    if (tool === 'reset_scene') return this.runDestructive(credential, tool, args, () => this.control.resetScene())
-    if (tool === 'clear_scene') return this.runDestructive(credential, tool, args, () => this.control.replaceScene({ revision: this.control.getSnapshot().revision, participants: [], groups: [], conversations: [], messages: [], friendships: [], requests: [] }))
-    if (tool === 'import_scene') return this.runDestructive(credential, tool, args, () => this.importScene(args))
-    if (tool === 'list_onebot_debug_records') return this.control.getOneBotDebugRecords(args)
-    if (tool === 'clear_onebot_debug_records') return { cleared: this.control.clearOneBotDebugRecords() }
+      && (!args.conversationId || Reflect.get(event.data as object, 'conversationId') === args.conversationId)
+      && (!args.recipientBotId || Reflect.get(event.data as object, 'recipientBotId') === args.recipientBotId))
+    if (tool === 'wait_for_chatluna_state') return this.waitForChatLuna(activeControl, args)
+    if (tool === 'apply_environment_changes') return this.applyEnvironmentChanges(activeControl, args)
+    if (tool === 'prepare_destructive_action') return this.prepareDestructiveAction(activeControl, credential, args)
+    if (tool === 'delete_environment_entity') return this.runDestructive(activeControl, credential, tool, args, () => this.deleteEnvironmentEntity(activeControl, args))
+    if (tool === 'reset_scene') return this.runDestructive(activeControl, credential, tool, args, () => activeControl.resetScene())
+    if (tool === 'clear_scene') return this.runDestructive(activeControl, credential, tool, args, () => activeControl.replaceScene({ revision: activeControl.getSnapshot().revision, participants: [], groups: [], conversations: [], messages: [], friendships: [], requests: [] }))
+    if (tool === 'import_scene') return this.runDestructive(activeControl, credential, tool, args, () => this.importScene(activeControl, args))
+    if (tool === 'list_onebot_debug_records') return activeControl.getOneBotDebugRecords(args)
+    if (tool === 'clear_onebot_debug_records') return { cleared: activeControl.clearOneBotDebugRecords() }
     if (tool === 'list_mcp_call_records') return structuredClone(this.callRecords).reverse()
     if (tool === 'clear_mcp_call_records') { const cleared = this.callRecords.length; this.callRecords = []; return { cleared } }
     throw new SandboxMcpError('tool_not_found', `工具不存在：${tool}`)
   }
 
-  private listConversations(args: Record<string, unknown>) {
+  private listConversations(control: SandboxControlService, args: Record<string, unknown>) {
     const operatorId = requireString(args.operatorId, 'operatorId')
-    const snapshot = this.control.getVisibleSnapshot(operatorId, 200)
+    const snapshot = control.getVisibleSnapshot(operatorId, 200)
     const limit = Math.min(Math.max(Number(args.limit ?? 50), 1), 200)
     const offset = Math.max(Number(args.offset ?? 0), 0)
     return { items: snapshot.conversations.slice(offset, offset + limit), nextOffset: offset + limit < snapshot.conversations.length ? offset + limit : undefined }
   }
 
-  private getConversation(args: Record<string, unknown>) {
+  private getConversation(control: SandboxControlService, args: Record<string, unknown>) {
     const operatorId = requireString(args.operatorId, 'operatorId')
     const conversationId = requireString(args.conversationId, 'conversationId')
-    const snapshot = this.control.getVisibleSnapshot(operatorId, Math.min(Math.max(Number(args.messageLimit ?? 50), 1), 200))
+    const snapshot = control.getVisibleSnapshot(operatorId, Math.min(Math.max(Number(args.messageLimit ?? 50), 1), 200))
     const conversation = snapshot.conversations.find(({ id }) => id === conversationId)
     if (!conversation) throw new SandboxMcpError('conversation_not_found', `会话不存在或不可见：${conversationId}`)
     const messageIds = new Set(conversation.messageIds)
     return { conversation, messages: snapshot.messages.filter(({ id }) => messageIds.has(id)) }
   }
 
-  private getCapabilityMatrix(implementation: unknown) {
+  private getCapabilityMatrix(control: SandboxControlService, implementation: unknown) {
     const profile = implementation === 'llbot' ? 'llbot' : 'napcat'
-    const snapshot = this.control.getSnapshot()
+    const snapshot = control.getSnapshot()
     const existing = snapshot.participants.find((participant) => participant.kind === 'bot' && participant.implementation === profile)
-    if (existing?.kind === 'bot') return this.control.getBotCapabilities(existing.id)
+    if (existing?.kind === 'bot') return control.getBotCapabilities(existing.id)
     return getOneBotCapabilityMatrix(profile)
   }
 
-  private exportScene(): SandboxMcpExport {
-    return { testApiVersion: 1, exportedAt: new Date().toISOString(), scene: this.control.getSnapshot() }
+  private exportScene(control: SandboxControlService): SandboxMcpExport {
+    return { testApiVersion: 1, exportedAt: new Date().toISOString(), scene: control.getSnapshot() }
   }
 
-  private uploadMedia(args: Record<string, unknown>) {
+  private uploadMedia(control: SandboxControlService, args: Record<string, unknown>) {
     const dataBase64 = requireString(args.dataBase64, 'dataBase64')
     const digest = createHash('sha256').update(Buffer.from(dataBase64, 'base64')).digest('hex')
     if (args.sha256 !== undefined && args.sha256 !== digest) throw new SandboxMcpError('digest_mismatch', '媒体摘要不匹配')
-    const media = this.control.storeMedia({ fileName: requireString(args.fileName, 'fileName'), mimeType: requireString(args.mimeType, 'mimeType'), dataBase64 })
-    this.uploadedMedia.set(media.id, { ...media, dataBase64 })
+    const media = control.storeMedia({ fileName: requireString(args.fileName, 'fileName'), mimeType: requireString(args.mimeType, 'mimeType'), dataBase64 })
+    this.uploadedMedia.set(this.mediaCacheKey(args, media.id), { ...media, dataBase64 })
     return { mediaId: media.id, sha256: digest, media }
   }
 
-  private async sendMessage(args: Record<string, unknown>) {
+  private async sendMessage(control: SandboxControlService, args: Record<string, unknown>) {
     const operatorId = requireString(args.operatorId, 'operatorId')
     const conversationId = requireString(args.conversationId, 'conversationId')
     const mediaIds = Array.isArray(args.mediaIds) ? args.mediaIds.map(String) : []
-    const media = mediaIds.map((id) => this.uploadedMedia.get(id) ?? (() => { throw new SandboxMcpError('media_not_found', `媒体不存在：${id}`) })())
+    const media = mediaIds.map((id) => this.uploadedMedia.get(this.mediaCacheKey(args, id)) ?? (() => { throw new SandboxMcpError('media_not_found', `媒体不存在：${id}`) })())
     const externalMediaUrls = Array.isArray(args.externalMediaUrls) ? args.externalMediaUrls.map(String) : []
     if (externalMediaUrls.some((value) => { try { return new URL(value).protocol !== 'https:' } catch { return true } })) throw new SandboxMcpError('invalid_media_url', '外部媒体只允许 HTTPS URL')
     const baseContent = typeof args.content === 'string' ? args.content.trim() : ''
     const content = [baseContent, ...externalMediaUrls].filter(Boolean).join('\n')
+    const previousMessageIds = new Set(control.getSnapshot().messages.map(({ id }) => id))
     const result = media.length
-      ? await this.control.sendStoredMediaMessage({ operatorId, conversationId, content, replyToMessageId: typeof args.replyToMessageId === 'string' ? args.replyToMessageId : undefined, media })
-      : await this.control.sendMessage({ operatorId, conversationId, content: requireString(content, 'content'), replyToMessageId: typeof args.replyToMessageId === 'string' ? args.replyToMessageId : undefined })
+      ? await control.sendStoredMediaMessage({ operatorId, conversationId, content, replyToMessageId: typeof args.replyToMessageId === 'string' ? args.replyToMessageId : undefined, media })
+      : await control.sendMessage({ operatorId, conversationId, content: requireString(content, 'content'), replyToMessageId: typeof args.replyToMessageId === 'string' ? args.replyToMessageId : undefined })
+    const spaceId = typeof args.spaceId === 'string' ? args.spaceId : undefined
+    for (const message of control.getSnapshot().messages.filter(({ id }) => !previousMessageIds.has(id))) {
+      const deliveries = control.getBotDeliveries({ messageId: message.id })
+      if (!deliveries.length) this.appendEvent('message.created', message, spaceId)
+      for (const delivery of deliveries) this.appendEvent('message.created', { ...message, recipientBotId: delivery.recipientBotId }, spaceId)
+    }
     return { ...result, cursor: this.currentCursor() }
   }
 
-  private async performFriendAction(args: Record<string, unknown>) {
-    const { idempotencyKey: _key, testRunId: _run, ...input } = args
-    const result = await this.control.performFriendAction(input as never)
-    return { ...result, cursor: this.appendEvent('friend.action', input), affected: [String(input.operatorId), String(input.targetId ?? input.requestId)] }
+  private mediaCacheKey(args: Record<string, unknown>, mediaId: string): string {
+    return `${typeof args.spaceId === 'string' ? args.spaceId : 'main'}:${mediaId}`
   }
 
-  private async performGroupAction(args: Record<string, unknown>) {
-    const { idempotencyKey: _key, testRunId: _run, ...input } = args
-    const result = await this.control.performGroupAction(input as never)
-    return { ...result, cursor: this.appendEvent('group.action', input), affected: [String(input.groupId ?? input.requestId), String(input.targetId ?? input.operatorId)] }
+  private async performFriendAction(control: SandboxControlService, args: Record<string, unknown>) {
+    const { idempotencyKey: _key, testRunId: _run, spaceId: _spaceId, ...input } = args
+    const result = await control.performFriendAction(input as never)
+    return { ...result, cursor: this.appendEvent('friend.action', input, typeof args.spaceId === 'string' ? args.spaceId : undefined), affected: [String(input.operatorId), String(input.targetId ?? input.requestId)] }
   }
 
-  private async handleRequest(args: Record<string, unknown>) {
+  private async performGroupAction(control: SandboxControlService, args: Record<string, unknown>) {
+    const { idempotencyKey: _key, testRunId: _run, spaceId: _spaceId, ...input } = args
+    const result = await control.performGroupAction(input as never)
+    return { ...result, cursor: this.appendEvent('group.action', input, typeof args.spaceId === 'string' ? args.spaceId : undefined), affected: [String(input.groupId ?? input.requestId), String(input.targetId ?? input.operatorId)] }
+  }
+
+  private async handleRequest(control: SandboxControlService, args: Record<string, unknown>) {
     const requestId = requireString(args.requestId, 'requestId')
-    const request = this.control.getSnapshot().requests.find(({ id }) => id === requestId)
+    const request = control.getSnapshot().requests.find(({ id }) => id === requestId)
     if (!request) throw new SandboxMcpError('request_not_found', `申请不存在：${requestId}`)
     const operatorId = requireString(args.operatorId, 'operatorId')
-    const target = request.targetId ? this.control.getSnapshot().participants.find(({ id }) => id === request.targetId) : undefined
+    const target = request.targetId ? control.getSnapshot().participants.find(({ id }) => id === request.targetId) : undefined
     if (target?.kind === 'bot') throw new SandboxMcpError('robot_request_forbidden', '发给机器人的申请必须由被测机器人处理')
-    if (request.type === 'friend') return this.performFriendAction({ operatorId, action: 'handle-request', requestId, approve: args.approve, idempotencyKey: args.idempotencyKey })
-    return this.performGroupAction({ operatorId, action: 'handle-request', requestId, approve: args.approve, idempotencyKey: args.idempotencyKey })
+    if (request.type === 'friend') return this.performFriendAction(control, { operatorId, action: 'handle-request', requestId, approve: args.approve, idempotencyKey: args.idempotencyKey })
+    return this.performGroupAction(control, { operatorId, action: 'handle-request', requestId, approve: args.approve, idempotencyKey: args.idempotencyKey })
   }
 
   private async waitFor(args: Record<string, unknown>, predicate: (event: SandboxMcpEvent) => boolean) {
@@ -337,7 +382,8 @@ export class SandboxMcpService {
     const sequence = Number(cursor.sequence)
     if (this.events.length && sequence < this.events[0].cursor.sequence - 1) throw new SandboxMcpError('cursor_expired', '事件游标已离开缓冲区')
     const timeoutMs = Math.min(Math.max(Number(args.timeoutSeconds ?? 30), 1), 120) * 1000
-    const matches = () => this.events.find((event) => event.cursor.sequence > sequence && predicate(event))
+    const spaceId = typeof args.spaceId === 'string' ? args.spaceId : undefined
+    const matches = () => this.events.find((event) => event.cursor.sequence > sequence && event.spaceId === spaceId && predicate(event))
     const existing = matches()
     if (existing) return { matched: true, event: existing, cursor: existing.cursor }
     return new Promise((resolve) => {
@@ -355,11 +401,11 @@ export class SandboxMcpService {
     })
   }
 
-  private async waitForChatLuna(args: Record<string, unknown>) {
+  private async waitForChatLuna(control: SandboxControlService, args: Record<string, unknown>) {
     const cursor = asRecord(args.cursor)
     if (cursor.epoch !== this.epoch) throw new SandboxMcpError('cursor_expired', '事件游标已过期')
     const timeoutMs = Math.min(Math.max(Number(args.timeoutSeconds ?? 30), 1), 120) * 1000
-    const matches = () => this.control.getChatLunaStates().find((state) => (!args.botParticipantId || state.botParticipantId === args.botParticipantId)
+    const matches = () => control.getChatLunaStates().find((state) => (!args.botParticipantId || state.botParticipantId === args.botParticipantId)
       && (!args.conversationId || state.conversationId === args.conversationId)
       && (args.thinking === undefined || state.thinking === args.thinking))
     const existing = matches()
@@ -370,7 +416,7 @@ export class SandboxMcpService {
         if (!state) return
         clearInterval(timer)
         clearTimeout(timeout)
-        resolve({ matched: true, state, cursor: this.appendEvent('chatluna.state', state) })
+        resolve({ matched: true, state, cursor: this.appendEvent('chatluna.state', state, typeof args.spaceId === 'string' ? args.spaceId : undefined) })
       }, 20)
       const timeout = setTimeout(() => {
         clearInterval(timer)
@@ -393,9 +439,9 @@ export class SandboxMcpService {
     return result
   }
 
-  private applyEnvironmentChanges(args: Record<string, unknown>) {
-    this.assertRevision(args.expectedRevision)
-    const snapshot = structuredClone(this.control.getSnapshot())
+  private applyEnvironmentChanges(control: SandboxControlService, args: Record<string, unknown>) {
+    this.assertRevision(control, args.expectedRevision)
+    const snapshot = structuredClone(control.getSnapshot())
     const changes = Array.isArray(args.changes) ? args.changes : []
     for (const raw of changes) {
       const change = asRecord(raw)
@@ -433,54 +479,103 @@ export class SandboxMcpService {
       }
       else throw new SandboxMcpError('unsupported_change', `不支持的环境变更：${action}`)
     }
-    this.control.replaceScene(snapshot)
-    return { revision: this.control.getSnapshot().revision, cursor: this.currentCursor(), affected: changes.map((change) => String(asRecord(change).action)) }
+    control.replaceScene(snapshot)
+    return { revision: control.getSnapshot().revision, cursor: this.currentCursor(), affected: changes.map((change) => String(asRecord(change).action)) }
   }
 
-  private prepareDestructiveAction(credential: SandboxMcpCredential, args: Record<string, unknown>) {
-    this.assertRevision(args.expectedRevision)
+  private prepareDestructiveAction(control: SandboxControlService, credential: SandboxMcpCredential, args: Record<string, unknown>) {
+    this.assertRevision(control, args.expectedRevision)
     const tool = requireString(args.tool, 'tool')
     const toolArguments = asRecord(args.arguments)
     const token = randomBytes(32).toString('base64url')
-    this.confirmations.set(token, { credentialId: credential.id, tool, argumentsHash: createHash('sha256').update(stableValue(toolArguments)).digest('hex'), revision: this.control.getSnapshot().revision, expiresAt: Date.now() + 60_000 })
-    return { confirmationToken: token, expiresInSeconds: 60, revision: this.control.getSnapshot().revision }
+    this.confirmations.set(token, { credentialId: credential.id, tool, argumentsHash: createHash('sha256').update(stableValue(toolArguments)).digest('hex'), revision: control.getSnapshot().revision, expiresAt: Date.now() + 60_000 })
+    return { confirmationToken: token, expiresInSeconds: 60, revision: control.getSnapshot().revision }
   }
 
-  private runDestructive(credential: SandboxMcpCredential, tool: string, args: Record<string, unknown>, action: () => void) {
+  private runDestructive(control: SandboxControlService, credential: SandboxMcpCredential, tool: string, args: Record<string, unknown>, action: () => void) {
     const token = requireString(args.confirmationToken, 'confirmationToken')
     const confirmation = this.confirmations.get(token)
     this.confirmations.delete(token)
     const actionArgs = { ...args }; delete actionArgs.confirmationToken
-    if (!confirmation || confirmation.expiresAt < Date.now() || confirmation.credentialId !== credential.id || confirmation.tool !== tool || confirmation.revision !== this.control.getSnapshot().revision || confirmation.argumentsHash !== createHash('sha256').update(stableValue(actionArgs)).digest('hex')) {
+    if (!confirmation || confirmation.expiresAt < Date.now() || confirmation.credentialId !== credential.id || confirmation.tool !== tool || confirmation.revision !== control.getSnapshot().revision || confirmation.argumentsHash !== createHash('sha256').update(stableValue(actionArgs)).digest('hex')) {
       throw new SandboxMcpError('confirmation_required', '破坏性操作需要有效的一次性确认令牌')
     }
     action()
     this.rotateEpoch()
-    return { revision: this.control.getSnapshot().revision, cursor: this.currentCursor() }
+    return { revision: control.getSnapshot().revision, cursor: this.currentCursor() }
   }
 
-  private deleteEnvironmentEntity(args: Record<string, unknown>) {
+  private deleteEnvironmentEntity(control: SandboxControlService, args: Record<string, unknown>) {
     const kind = requireString(args.kind, 'kind')
     const id = requireString(args.id, 'id')
-    if (kind === 'user') this.control.deleteUser({ id })
-    else if (kind === 'bot') this.control.deleteBot({ id })
-    else if (kind === 'group') this.control.deleteGroup({ id })
+    if (kind === 'user') control.deleteUser({ id })
+    else if (kind === 'bot') control.deleteBot({ id })
+    else if (kind === 'group') control.deleteGroup({ id })
     else throw new SandboxMcpError('invalid_arguments', `未知实体类型：${kind}`)
   }
 
-  private importScene(args: Record<string, unknown>) {
+  private importScene(control: SandboxControlService, args: Record<string, unknown>) {
     const document = asRecord(args.document)
     if (document.testApiVersion !== 1) throw new SandboxMcpError('unsupported_scene_version', '仅支持 testApiVersion 1')
-    this.control.replaceScene(asRecord(document.scene) as unknown as SandboxSnapshot)
+    control.replaceScene(asRecord(document.scene) as unknown as SandboxSnapshot)
   }
 
-  private assertRevision(value: unknown) {
-    if (Number(value) !== this.control.getSnapshot().revision) throw new SandboxMcpError('revision_conflict', '场景版本已变化，请重新读取快照')
+  private assertRevision(control: SandboxControlService, value: unknown) {
+    if (Number(value) !== control.getSnapshot().revision) throw new SandboxMcpError('revision_conflict', '场景版本已变化，请重新读取快照')
   }
 
-  private appendEvent(type: string, data: unknown): SandboxMcpEventCursor {
+  private requireTestSpaces(): SandboxTestSpaceService {
+    if (!this.testSpaces) throw new SandboxMcpError('test_spaces_unavailable', 'AI 测试空间服务不可用')
+    return this.testSpaces
+  }
+
+  private getOwnedTestSpace(credential: SandboxMcpCredential, args: Record<string, unknown>) {
+    const spaceId = requireString(args.spaceId, 'spaceId')
+    const space = this.requireTestSpaces().getSpace(spaceId)
+    if (space.controllerId !== credential.id) throw new SandboxMcpError('space_forbidden', '测试凭证无权读取此空间')
+    return space
+  }
+
+  private resolveControl(credential: SandboxMcpCredential, args: Record<string, unknown>, mutation: boolean): SandboxControlService {
+    if (typeof args.spaceId !== 'string' || !args.spaceId.trim()) {
+      if (mutation && this.testSpaces) throw new SandboxMcpError('space_id_required', 'MCP 修改操作必须显式指定 AI 测试空间', false, '请先调用 create_test_space，再携带返回的 spaceId。')
+      return this.control
+    }
+    try {
+      return mutation
+        ? this.requireTestSpaces().requireAiControl(args.spaceId, credential.id)
+        : this.requireTestSpaces().requireReadable(args.spaceId, credential.id)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'AI 测试空间不可用'
+      const code = message.includes('用户接管') ? 'space_taken_over' : message.includes('无权') ? 'space_forbidden' : message.includes('不存在') ? 'space_not_found' : 'space_unavailable'
+      throw new SandboxMcpError(code, message, false, '请重新读取空间状态后重试。')
+    }
+  }
+
+  private completeTestSpace(credential: SandboxMcpCredential, args: Record<string, unknown>, failed: boolean) {
+    const spaceId = requireString(args.spaceId, 'spaceId')
+    const space = failed
+      ? this.requireTestSpaces().failSpace(spaceId, credential.id)
+      : this.requireTestSpaces().completeSpace(spaceId, credential.id)
+    return { spaceId, status: space.status, revision: space.snapshot.revision, cursor: this.appendEvent(`test-space.${space.status}`, { spaceId }, spaceId) }
+  }
+
+  private reactivateTestSpace(credential: SandboxMcpCredential, args: Record<string, unknown>) {
+    const spaceId = requireString(args.spaceId, 'spaceId')
+    const current = this.getOwnedTestSpace(credential, args)
+    const space = this.requireTestSpaces().reactivateSpace(current.id, 'running')
+    return { spaceId, status: space.status, revision: space.snapshot.revision, cursor: this.appendEvent('test-space.reactivated', { spaceId }, spaceId) }
+  }
+
+  private deleteTestSpace(credential: SandboxMcpCredential, args: Record<string, unknown>) {
+    const spaceId = requireString(args.spaceId, 'spaceId')
+    this.requireTestSpaces().deleteSpace(spaceId, credential.id)
+    return { spaceId, deleted: true, cursor: this.appendEvent('test-space.deleted', { spaceId }, spaceId) }
+  }
+
+  private appendEvent(type: string, data: unknown, spaceId?: string): SandboxMcpEventCursor {
     const cursor = { epoch: this.epoch, sequence: ++this.sequence }
-    this.events.push({ cursor, type, data: structuredClone(data), createdAt: new Date().toISOString() })
+    this.events.push({ cursor, spaceId, type, data: structuredClone(data), createdAt: new Date().toISOString() })
     if (this.events.length > this.eventLimit) this.events.splice(0, this.events.length - this.eventLimit)
     return cursor
   }

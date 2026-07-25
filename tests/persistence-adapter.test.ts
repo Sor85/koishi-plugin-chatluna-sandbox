@@ -1,6 +1,11 @@
 import { App } from '@koishijs/core'
 import { describe, expect, it, vi } from 'vitest'
-import { KoishiDatabaseScenePersistence, registerSandboxSceneModel } from '../src/persistence'
+import {
+  KoishiDatabaseScenePersistence,
+  KoishiDatabaseTestSpacePersistence,
+  registerSandboxSceneModel,
+  registerSandboxTestSpaceModel,
+} from '../src/persistence'
 import type { SandboxSnapshot } from '../src/types'
 
 const snapshot: SandboxSnapshot = {
@@ -47,6 +52,26 @@ function createDatabaseContext() {
   return { database, records }
 }
 
+function createTestSpaceDatabaseContext() {
+  type Record = Parameters<KoishiDatabaseTestSpacePersistence['save']>[0]
+  const records = new Map<string, Record>()
+  const database = {
+    get: vi.fn(async (_table: string, query: { id?: string }) => {
+      const values = query.id ? [records.get(query.id)].filter((record): record is Record => !!record) : [...records.values()]
+      return values.map((record) => structuredClone(record))
+    }),
+    upsert: vi.fn(async (_table: string, rows: Record[]) => {
+      for (const row of rows) records.set(row.id, structuredClone(row))
+      return {}
+    }),
+    remove: vi.fn(async (_table: string, query: { id: string }) => {
+      records.delete(query.id)
+      return {}
+    }),
+  }
+  return { database, records }
+}
+
 describe('Koishi Database 场景仓库', () => {
   it('注册场景表并只用 JSON 场景读写业务状态和媒体元数据', async () => {
     const context = createDatabaseContext()
@@ -87,5 +112,32 @@ describe('Koishi Database 场景仓库', () => {
       persisted: false,
       message: 'Koishi Database 服务未安装或不可用',
     })
+  })
+
+  it('持久化 AI 测试空间元数据和独立场景', async () => {
+    const context = createTestSpaceDatabaseContext()
+    const app = new App()
+    const extend = vi.spyOn(app.model, 'extend')
+    registerSandboxTestSpaceModel(app)
+    const persistence = new KoishiDatabaseTestSpacePersistence(context.database)
+    const record = {
+      id: 'space-1',
+      name: '退群公告测试',
+      status: 'completed' as const,
+      controllerId: 'credential-a',
+      createdAt: '2026-07-25T01:00:00.000Z',
+      updatedAt: '2026-07-25T02:00:00.000Z',
+      completedAt: '2026-07-25T02:00:00.000Z',
+      scene: snapshot,
+    }
+
+    expect(extend).toHaveBeenCalledWith('onebotSandboxTestSpace', expect.objectContaining({
+      id: expect.anything(),
+      scene: 'json',
+    }), { primary: 'id' })
+    await persistence.save(record)
+    expect(await persistence.loadAll()).toEqual([record])
+    await persistence.delete(record.id)
+    expect(await persistence.loadAll()).toEqual([])
   })
 })

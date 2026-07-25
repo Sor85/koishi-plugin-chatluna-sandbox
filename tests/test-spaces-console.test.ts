@@ -1,0 +1,34 @@
+import { App } from '@koishijs/core'
+import { afterEach, describe, expect, it } from 'vitest'
+import { registerConsole, type SandboxConsoleRegistrar } from '../src/console'
+import { SandboxControlService, SandboxRuntimeBotRegistry } from '../src/control-service'
+import { SandboxTestSpaceService } from '../src/test-spaces'
+import type { SandboxAppearance } from '../src/types'
+
+const apps: App[] = []
+const appearance: SandboxAppearance = { enableWebQQFrostedGlass: true, webQQChatStyle: 'tim', webQQTimBubbleTail: true, webQQColorMode: 'auto', webQQAccentColor: '#2563eb' }
+afterEach(async () => Promise.all(apps.splice(0).map((app) => app.stop())))
+
+describe('AI 测试空间 Console 适配器', () => {
+  it('支持观察、接管、操作、归还和重新激活空间', async () => {
+    const app = new App()
+    apps.push(app)
+    const runtimeBots = new SandboxRuntimeBotRegistry()
+    const control = new SandboxControlService(app, { runtimeBots })
+    const spaces = new SandboxTestSpaceService(app, runtimeBots)
+    const space = spaces.createSpace({ controllerId: 'credential-a', name: 'Console 空间' })
+    const listeners = new Map<string, (...args: any[]) => any>()
+    const registrar: SandboxConsoleRegistrar = { addEntry() {}, addListener(event, callback) { listeners.set(event, callback as never) } }
+    registerConsole(registrar, control, appearance, undefined, spaces)
+
+    expect(listeners.get('onebot-sandbox/test-spaces')?.()).toMatchObject([{ id: space.id, status: 'running' }])
+    expect(listeners.get('onebot-sandbox/workspace')?.({ spaceId: space.id }).snapshot.participants).toEqual([])
+    expect(() => listeners.get('onebot-sandbox/manage-environment')?.({ spaceId: space.id, action: 'create-user', data: { id: '11001', name: '用户' } })).toThrow('请先接管测试空间')
+
+    listeners.get('onebot-sandbox/take-over-test-space')?.({ spaceId: space.id })
+    const workspace = listeners.get('onebot-sandbox/manage-environment')?.({ spaceId: space.id, action: 'create-user', data: { id: '11001', name: '用户' } })
+    expect(workspace.snapshot.participants).toContainEqual({ kind: 'user', id: '11001', name: '用户' })
+    listeners.get('onebot-sandbox/return-test-space')?.({ spaceId: space.id })
+    expect(spaces.getSpace(space.id).status).toBe('running')
+  })
+})

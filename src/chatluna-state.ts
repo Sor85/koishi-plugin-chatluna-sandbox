@@ -72,27 +72,28 @@ function createStateKey(botParticipantId: string, conversationId: string) {
 export class SandboxChatLunaStateStore {
   private states = new Map<string, SandboxChatLunaState>()
   private activeStateKeys = new Map<string, Set<string>>()
+  private disposers: Array<() => void> = []
 
   constructor(ctx: Context, private validateTarget: ValidateTarget) {
     const on = ctx.on.bind(ctx) as unknown as ChatLunaEventRegistrar
-    on('chatluna/before-chat', (conversationId, _message, _variables, _chatInterface, session) => {
+    this.disposers.push(on('chatluna/before-chat', (conversationId, _message, _variables, _chatInterface, session) => {
       this.begin(session, conversationId)
-    })
-    on('chatluna/after-chat', (conversationId, _sourceMessage, _responseMessage, _variables, _chatInterface, session) => {
+    }))
+    this.disposers.push(on('chatluna/after-chat', (conversationId, _sourceMessage, _responseMessage, _variables, _chatInterface, session) => {
       this.finish(conversationId, session)
-    })
-    on('chatluna/after-chat-error', (_error, conversationId) => {
+    }))
+    this.disposers.push(on('chatluna/after-chat-error', (_error, conversationId) => {
       this.finish(conversationId)
-    })
-    on('chatluna/model-usage', (payload) => {
+    }))
+    this.disposers.push(on('chatluna/model-usage', (payload) => {
       this.recordUsage(payload)
-    })
-    on('chatluna_character/message_collect', (session) => {
+    }))
+    this.disposers.push(on('chatluna_character/message_collect', (session) => {
       this.begin(session)
-    })
-    on('chatluna_character/after-chat', (payload) => {
+    }))
+    this.disposers.push(on('chatluna_character/after-chat', (payload) => {
       this.finish(undefined, payload?.session)
-    })
+    }))
   }
 
   getStates(): SandboxChatLunaState[] {
@@ -102,6 +103,11 @@ export class SandboxChatLunaStateStore {
   clear(): void {
     this.states.clear()
     this.activeStateKeys.clear()
+  }
+
+  dispose(): void {
+    for (const dispose of this.disposers.splice(0)) dispose()
+    this.clear()
   }
 
   deleteByBotParticipant(botParticipantId: string): void {

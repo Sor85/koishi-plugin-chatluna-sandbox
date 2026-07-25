@@ -3,6 +3,7 @@ import type {} from '@koishijs/console'
 import type { SandboxControlService } from './control-service'
 import type { SandboxMcpService } from './mcp/service'
 import type { SandboxMcpScope } from './mcp/types'
+import type { SandboxTestSpaceService, SandboxTestSpaceSummary } from './test-spaces'
 import type {
   DeleteGroupAnnouncementInput,
   ClearSandboxOneBotDebugRecordsResult,
@@ -26,24 +27,32 @@ import type {
 } from './types'
 import { getSandboxUsers } from './types'
 
+type SpaceScoped<Input> = Input & { spaceId?: string }
+
 interface ConsoleEventMap {
-  'onebot-sandbox/workspace': (input?: GetSandboxWorkspaceInput) => SandboxWorkspaceState
-  'onebot-sandbox/message-history': (input: GetMessageHistoryInput) => SandboxMessageHistory
-  'onebot-sandbox/send-message': (input: SendMessageInput) => Promise<SandboxWorkspaceState>
-  'onebot-sandbox/send-media-message': (input: SendMediaMessageInput) => Promise<SandboxWorkspaceState>
-  'onebot-sandbox/media-content': (input: GetMediaContentInput) => SandboxMediaContent
-  'onebot-sandbox/set-group-announcement': (input: SetGroupAnnouncementInput) => SandboxWorkspaceState
-  'onebot-sandbox/delete-group-announcement': (input: DeleteGroupAnnouncementInput) => SandboxWorkspaceState
-  'onebot-sandbox/manage-environment': (input: ManageSandboxEnvironmentInput) => SandboxWorkspaceState
-  'onebot-sandbox/friend-action': (input: PerformFriendActionInput) => Promise<SandboxWorkspaceState>
-  'onebot-sandbox/group-action': (input: PerformGroupActionInput) => Promise<SandboxWorkspaceState>
-  'onebot-sandbox/bot-deliveries': (input?: GetSandboxBotDeliveriesInput) => SandboxBotDelivery[]
-  'onebot-sandbox/debug-records': (input?: GetSandboxOneBotDebugRecordsInput) => SandboxOneBotDebugRecord[]
-  'onebot-sandbox/clear-debug-records': () => ClearSandboxOneBotDebugRecordsResult
+  'onebot-sandbox/workspace': (input?: SpaceScoped<GetSandboxWorkspaceInput>) => SandboxWorkspaceState
+  'onebot-sandbox/message-history': (input: SpaceScoped<GetMessageHistoryInput>) => SandboxMessageHistory
+  'onebot-sandbox/send-message': (input: SpaceScoped<SendMessageInput>) => Promise<SandboxWorkspaceState>
+  'onebot-sandbox/send-media-message': (input: SpaceScoped<SendMediaMessageInput>) => Promise<SandboxWorkspaceState>
+  'onebot-sandbox/media-content': (input: SpaceScoped<GetMediaContentInput>) => SandboxMediaContent
+  'onebot-sandbox/set-group-announcement': (input: SpaceScoped<SetGroupAnnouncementInput>) => SandboxWorkspaceState
+  'onebot-sandbox/delete-group-announcement': (input: SpaceScoped<DeleteGroupAnnouncementInput>) => SandboxWorkspaceState
+  'onebot-sandbox/manage-environment': (input: SpaceScoped<ManageSandboxEnvironmentInput>) => SandboxWorkspaceState
+  'onebot-sandbox/friend-action': (input: SpaceScoped<PerformFriendActionInput>) => Promise<SandboxWorkspaceState>
+  'onebot-sandbox/group-action': (input: SpaceScoped<PerformGroupActionInput>) => Promise<SandboxWorkspaceState>
+  'onebot-sandbox/bot-deliveries': (input?: SpaceScoped<GetSandboxBotDeliveriesInput>) => SandboxBotDelivery[]
+  'onebot-sandbox/debug-records': (input?: SpaceScoped<GetSandboxOneBotDebugRecordsInput>) => SandboxOneBotDebugRecord[]
+  'onebot-sandbox/clear-debug-records': (input?: { spaceId?: string }) => ClearSandboxOneBotDebugRecordsResult
   'onebot-sandbox/mcp-credentials': () => Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string }>
   'onebot-sandbox/create-mcp-credential': (input: { name: string; scopes: SandboxMcpScope[] }) => { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
   'onebot-sandbox/set-mcp-credential-enabled': (input: { id: string; enabled: boolean }) => void
   'onebot-sandbox/revoke-mcp-credential': (input: { id: string }) => void
+  'onebot-sandbox/test-spaces': () => SandboxTestSpaceSummary[]
+  'onebot-sandbox/create-test-space': (input: { name?: string }) => SandboxTestSpaceSummary
+  'onebot-sandbox/take-over-test-space': (input: { spaceId: string }) => SandboxTestSpaceSummary
+  'onebot-sandbox/return-test-space': (input: { spaceId: string }) => SandboxTestSpaceSummary
+  'onebot-sandbox/reactivate-test-space': (input: { spaceId: string }) => SandboxTestSpaceSummary
+  'onebot-sandbox/delete-test-space': (input: { spaceId: string }) => void
 }
 
 const legacyRpcFields = ['senderId', 'botId', 'actorUserId', 'userId', 'currentUserId'] as const
@@ -82,118 +91,147 @@ export function registerConsole(
   control: SandboxControlService,
   appearance: SandboxAppearance,
   mcp?: SandboxMcpService,
+  testSpaces?: SandboxTestSpaceService,
 ) {
   console.addEntry({
     dev: resolve(__dirname, '../client/index.ts'),
     prod: resolve(__dirname, '../dist'),
   })
 
-  const getWorkspace = (input: GetSandboxWorkspaceInput = {}): SandboxWorkspaceState => {
+  const resolveControl = (input: { spaceId?: string } | undefined, mutation: boolean) => {
+    if (!input?.spaceId) return control
+    if (!testSpaces) throw new Error('AI 测试空间服务不可用')
+    return mutation ? testSpaces.requireUserControl(input.spaceId) : testSpaces.getControl(input.spaceId)
+  }
+  const withoutSpaceId = <Input extends { spaceId?: string }>(input: Input): Omit<Input, 'spaceId'> => {
+    const { spaceId: _spaceId, ...rest } = input
+    return rest
+  }
+  const getWorkspace = (input: SpaceScoped<GetSandboxWorkspaceInput> = {}): SandboxWorkspaceState => {
     assertNoLegacyRpcFields(input)
-    const snapshot = control.getSnapshot()
+    const activeControl = resolveControl(input, false)
+    const snapshot = activeControl.getSnapshot()
     if (input.operatorId && !snapshot.participants.some(({ id }) => id === input.operatorId)) {
       throw new Error(`参与者不存在：${input.operatorId}`)
     }
     const visibleParticipantId = input.operatorId ?? getSandboxUsers(snapshot)[0]?.id ?? snapshot.participants[0]?.id
-    const visibleSnapshot = visibleParticipantId ? control.getVisibleSnapshot(visibleParticipantId, input.messageLimit) : snapshot
+    const visibleSnapshot = visibleParticipantId ? activeControl.getVisibleSnapshot(visibleParticipantId, input.messageLimit) : snapshot
     const visibleConversationIds = new Set(visibleSnapshot.conversations.map(({ id }) => id))
     return {
       snapshot: visibleSnapshot,
-      chatLunaStates: control.getChatLunaStates().filter(({ conversationId }) => visibleConversationIds.has(conversationId)),
+      chatLunaStates: activeControl.getChatLunaStates().filter(({ conversationId }) => visibleConversationIds.has(conversationId)),
       appearance,
       persistence: control.getPersistenceStatus(),
     }
   }
 
   console.addListener('onebot-sandbox/workspace', (input) => getWorkspace(input), { authority: 4 })
-  console.addListener('onebot-sandbox/message-history', (input) => control.getMessageHistory(assertInteractionInput(input)), { authority: 4 })
+  console.addListener('onebot-sandbox/message-history', (input) => resolveControl(input, false).getMessageHistory(assertInteractionInput(withoutSpaceId(input)) as GetMessageHistoryInput), { authority: 4 })
   console.addListener('onebot-sandbox/send-message', async (input) => {
-    await control.sendMessage(assertInteractionInput(input))
-    return getWorkspace({ operatorId: input.operatorId })
+    await resolveControl(input, true).sendMessage(assertInteractionInput(withoutSpaceId(input)) as SendMessageInput)
+    return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
   console.addListener('onebot-sandbox/send-media-message', async (input) => {
-    await control.sendMediaMessage(assertInteractionInput(input))
-    return getWorkspace({ operatorId: input.operatorId })
+    await resolveControl(input, true).sendMediaMessage(assertInteractionInput(withoutSpaceId(input)) as SendMediaMessageInput)
+    return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
-  console.addListener('onebot-sandbox/media-content', (input) => control.getMediaContent(assertInteractionInput(input)), { authority: 4 })
+  console.addListener('onebot-sandbox/media-content', (input) => resolveControl(input, false).getMediaContent(assertInteractionInput(withoutSpaceId(input)) as GetMediaContentInput), { authority: 4 })
   console.addListener('onebot-sandbox/set-group-announcement', (input) => {
-    control.setGroupAnnouncement(assertInteractionInput(input))
-    return getWorkspace({ operatorId: input.operatorId })
+    resolveControl(input, true).setGroupAnnouncement(assertInteractionInput(withoutSpaceId(input)) as SetGroupAnnouncementInput)
+    return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
   console.addListener('onebot-sandbox/delete-group-announcement', (input) => {
-    control.deleteGroupAnnouncement(assertInteractionInput(input))
-    return getWorkspace({ operatorId: input.operatorId })
+    resolveControl(input, true).deleteGroupAnnouncement(assertInteractionInput(withoutSpaceId(input)) as DeleteGroupAnnouncementInput)
+    return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
   console.addListener('onebot-sandbox/manage-environment', (input) => {
-    assertEnvironmentInput(input)
-    switch (input.action) {
+    const activeControl = resolveControl(input, true)
+    const command = assertEnvironmentInput(withoutSpaceId(input) as ManageSandboxEnvironmentInput)
+    switch (command.action) {
       case 'create-user':
-        control.createUser(input.data)
+        activeControl.createUser(command.data)
         break
       case 'update-user':
-        control.updateUser(input.data)
+        activeControl.updateUser(command.data)
         break
       case 'delete-user':
-        control.deleteUser(input.data)
+        activeControl.deleteUser(command.data)
         break
       case 'create-bot':
-        control.createBot(input.data)
+        activeControl.createBot(command.data)
         break
       case 'update-bot':
-        control.updateBot(input.data)
+        activeControl.updateBot(command.data)
         break
       case 'delete-bot':
-        control.deleteBot(input.data)
+        activeControl.deleteBot(command.data)
         break
       case 'create-group':
-        control.createGroup(input.data)
+        activeControl.createGroup(command.data)
         break
       case 'update-group':
-        control.updateGroup(input.data)
+        activeControl.updateGroup(command.data)
         break
       case 'delete-group':
-        control.deleteGroup(input.data)
+        activeControl.deleteGroup(command.data)
         break
     }
-    return getWorkspace()
+    return getWorkspace({ spaceId: input.spaceId })
   }, { authority: 4 })
   console.addListener('onebot-sandbox/friend-action', async (input) => {
-    await control.performFriendAction(assertInteractionInput(input))
-    return getWorkspace({ operatorId: input.operatorId })
+    await resolveControl(input, true).performFriendAction(assertInteractionInput(withoutSpaceId(input)) as PerformFriendActionInput)
+    return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
   console.addListener('onebot-sandbox/group-action', async (input) => {
-    await control.performGroupAction(assertInteractionInput(input))
-    return getWorkspace({ operatorId: input.operatorId })
+    await resolveControl(input, true).performGroupAction(assertInteractionInput(withoutSpaceId(input)) as PerformGroupActionInput)
+    return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
-  console.addListener('onebot-sandbox/bot-deliveries', (input) => control.getBotDeliveries(assertInteractionInput(input ?? {})), { authority: 4 })
-  console.addListener('onebot-sandbox/debug-records', (input) => control.getOneBotDebugRecords(input ?? {}), { authority: 4 })
-  console.addListener('onebot-sandbox/clear-debug-records', () => ({ cleared: control.clearOneBotDebugRecords() }), { authority: 4 })
+  console.addListener('onebot-sandbox/bot-deliveries', (input = {}) => resolveControl(input, false).getBotDeliveries(assertInteractionInput(withoutSpaceId(input)) as GetSandboxBotDeliveriesInput), { authority: 4 })
+  console.addListener('onebot-sandbox/debug-records', (input = {}) => resolveControl(input, false).getOneBotDebugRecords(withoutSpaceId(input)), { authority: 4 })
+  console.addListener('onebot-sandbox/clear-debug-records', (input = {}) => ({ cleared: resolveControl(input, true).clearOneBotDebugRecords() }), { authority: 4 })
   if (mcp) {
     console.addListener('onebot-sandbox/mcp-credentials', () => mcp.listCredentials(), { authority: 4 })
     console.addListener('onebot-sandbox/create-mcp-credential', (input) => mcp.createCredential(input.name, input.scopes), { authority: 4 })
     console.addListener('onebot-sandbox/set-mcp-credential-enabled', (input) => mcp.setCredentialEnabled(input.id, input.enabled), { authority: 4 })
     console.addListener('onebot-sandbox/revoke-mcp-credential', (input) => mcp.revokeCredential(input.id), { authority: 4 })
   }
+  if (testSpaces) {
+    console.addListener('onebot-sandbox/test-spaces', () => testSpaces.listSpaces(), { authority: 4 })
+    console.addListener('onebot-sandbox/create-test-space', ({ name }) => {
+      const space = testSpaces.createSpace({ controllerId: 'console', name })
+      return testSpaces.takeOver(space.id)
+    }, { authority: 4 })
+    console.addListener('onebot-sandbox/take-over-test-space', ({ spaceId }) => testSpaces.takeOver(spaceId), { authority: 4 })
+    console.addListener('onebot-sandbox/return-test-space', ({ spaceId }) => testSpaces.returnControl(spaceId), { authority: 4 })
+    console.addListener('onebot-sandbox/reactivate-test-space', ({ spaceId }) => testSpaces.reactivateSpace(spaceId), { authority: 4 })
+    console.addListener('onebot-sandbox/delete-test-space', ({ spaceId }) => testSpaces.deleteSpace(spaceId), { authority: 4 })
+  }
 }
 
 declare module '@koishijs/console' {
   interface Events {
-    'onebot-sandbox/workspace'(input?: GetSandboxWorkspaceInput): SandboxWorkspaceState
-    'onebot-sandbox/message-history'(input: GetMessageHistoryInput): SandboxMessageHistory
-    'onebot-sandbox/send-message'(input: SendMessageInput): Promise<SandboxWorkspaceState>
-    'onebot-sandbox/send-media-message'(input: SendMediaMessageInput): Promise<SandboxWorkspaceState>
-    'onebot-sandbox/media-content'(input: GetMediaContentInput): SandboxMediaContent
-    'onebot-sandbox/set-group-announcement'(input: SetGroupAnnouncementInput): SandboxWorkspaceState
-    'onebot-sandbox/delete-group-announcement'(input: DeleteGroupAnnouncementInput): SandboxWorkspaceState
-    'onebot-sandbox/manage-environment'(input: ManageSandboxEnvironmentInput): SandboxWorkspaceState
-    'onebot-sandbox/friend-action'(input: PerformFriendActionInput): Promise<SandboxWorkspaceState>
-    'onebot-sandbox/group-action'(input: PerformGroupActionInput): Promise<SandboxWorkspaceState>
-    'onebot-sandbox/bot-deliveries'(input?: GetSandboxBotDeliveriesInput): SandboxBotDelivery[]
-    'onebot-sandbox/debug-records'(input?: GetSandboxOneBotDebugRecordsInput): SandboxOneBotDebugRecord[]
-    'onebot-sandbox/clear-debug-records'(): ClearSandboxOneBotDebugRecordsResult
+    'onebot-sandbox/workspace'(input?: SpaceScoped<GetSandboxWorkspaceInput>): SandboxWorkspaceState
+    'onebot-sandbox/message-history'(input: SpaceScoped<GetMessageHistoryInput>): SandboxMessageHistory
+    'onebot-sandbox/send-message'(input: SpaceScoped<SendMessageInput>): Promise<SandboxWorkspaceState>
+    'onebot-sandbox/send-media-message'(input: SpaceScoped<SendMediaMessageInput>): Promise<SandboxWorkspaceState>
+    'onebot-sandbox/media-content'(input: SpaceScoped<GetMediaContentInput>): SandboxMediaContent
+    'onebot-sandbox/set-group-announcement'(input: SpaceScoped<SetGroupAnnouncementInput>): SandboxWorkspaceState
+    'onebot-sandbox/delete-group-announcement'(input: SpaceScoped<DeleteGroupAnnouncementInput>): SandboxWorkspaceState
+    'onebot-sandbox/manage-environment'(input: SpaceScoped<ManageSandboxEnvironmentInput>): SandboxWorkspaceState
+    'onebot-sandbox/friend-action'(input: SpaceScoped<PerformFriendActionInput>): Promise<SandboxWorkspaceState>
+    'onebot-sandbox/group-action'(input: SpaceScoped<PerformGroupActionInput>): Promise<SandboxWorkspaceState>
+    'onebot-sandbox/bot-deliveries'(input?: SpaceScoped<GetSandboxBotDeliveriesInput>): SandboxBotDelivery[]
+    'onebot-sandbox/debug-records'(input?: SpaceScoped<GetSandboxOneBotDebugRecordsInput>): SandboxOneBotDebugRecord[]
+    'onebot-sandbox/clear-debug-records'(input?: { spaceId?: string }): ClearSandboxOneBotDebugRecordsResult
     'onebot-sandbox/mcp-credentials'(): Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string }>
     'onebot-sandbox/create-mcp-credential'(input: { name: string; scopes: SandboxMcpScope[] }): { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
     'onebot-sandbox/set-mcp-credential-enabled'(input: { id: string; enabled: boolean }): void
     'onebot-sandbox/revoke-mcp-credential'(input: { id: string }): void
+    'onebot-sandbox/test-spaces'(): SandboxTestSpaceSummary[]
+    'onebot-sandbox/create-test-space'(input: { name?: string }): SandboxTestSpaceSummary
+    'onebot-sandbox/take-over-test-space'(input: { spaceId: string }): SandboxTestSpaceSummary
+    'onebot-sandbox/return-test-space'(input: { spaceId: string }): SandboxTestSpaceSummary
+    'onebot-sandbox/reactivate-test-space'(input: { spaceId: string }): SandboxTestSpaceSummary
+    'onebot-sandbox/delete-test-space'(input: { spaceId: string }): void
   }
 }

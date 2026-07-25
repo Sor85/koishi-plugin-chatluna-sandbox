@@ -22,6 +22,7 @@ export interface SandboxMcpEventCursor {
 
 export interface SandboxMcpEvent {
   cursor: SandboxMcpEventCursor
+  spaceId?: string
   type: string
   createdAt: string
   data: unknown

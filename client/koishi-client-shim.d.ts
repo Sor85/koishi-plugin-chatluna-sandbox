@@ -19,6 +19,9 @@ declare module '@koishijs/client' {
     SetGroupAnnouncementInput,
   } from '../src/types'
   import type { SandboxMcpScope } from '../src/mcp/types'
+  import type { SandboxTestSpaceSummary } from '../src/test-spaces'
+
+  type SpaceScoped<Input> = Input & { spaceId?: string }
 
   export interface Context {
     page(options: {
@@ -31,20 +34,26 @@ declare module '@koishijs/client' {
     }): unknown
   }
 
-  export function send(event: 'onebot-sandbox/workspace', input?: GetSandboxWorkspaceInput): Promise<SandboxWorkspaceState>
-  export function send(event: 'onebot-sandbox/message-history', input: GetMessageHistoryInput): Promise<SandboxMessageHistory>
-  export function send(event: 'onebot-sandbox/send-message', input: SendMessageInput): Promise<SandboxWorkspaceState>
-  export function send(event: 'onebot-sandbox/send-media-message', input: SendMediaMessageInput): Promise<SandboxWorkspaceState>
-  export function send(event: 'onebot-sandbox/media-content', input: GetMediaContentInput): Promise<SandboxMediaContent>
-  export function send(event: 'onebot-sandbox/set-group-announcement', input: SetGroupAnnouncementInput): Promise<SandboxWorkspaceState>
-  export function send(event: 'onebot-sandbox/delete-group-announcement', input: DeleteGroupAnnouncementInput): Promise<SandboxWorkspaceState>
-  export function send(event: 'onebot-sandbox/manage-environment', input: ManageSandboxEnvironmentInput): Promise<SandboxWorkspaceState>
-  export function send(event: 'onebot-sandbox/friend-action', input: PerformFriendActionInput): Promise<SandboxWorkspaceState>
-  export function send(event: 'onebot-sandbox/group-action', input: PerformGroupActionInput): Promise<SandboxWorkspaceState>
-  export function send(event: 'onebot-sandbox/debug-records', input?: GetSandboxOneBotDebugRecordsInput): Promise<SandboxOneBotDebugRecord[]>
-  export function send(event: 'onebot-sandbox/clear-debug-records'): Promise<ClearSandboxOneBotDebugRecordsResult>
+  export function send(event: 'onebot-sandbox/workspace', input?: SpaceScoped<GetSandboxWorkspaceInput>): Promise<SandboxWorkspaceState>
+  export function send(event: 'onebot-sandbox/message-history', input: SpaceScoped<GetMessageHistoryInput>): Promise<SandboxMessageHistory>
+  export function send(event: 'onebot-sandbox/send-message', input: SpaceScoped<SendMessageInput>): Promise<SandboxWorkspaceState>
+  export function send(event: 'onebot-sandbox/send-media-message', input: SpaceScoped<SendMediaMessageInput>): Promise<SandboxWorkspaceState>
+  export function send(event: 'onebot-sandbox/media-content', input: SpaceScoped<GetMediaContentInput>): Promise<SandboxMediaContent>
+  export function send(event: 'onebot-sandbox/set-group-announcement', input: SpaceScoped<SetGroupAnnouncementInput>): Promise<SandboxWorkspaceState>
+  export function send(event: 'onebot-sandbox/delete-group-announcement', input: SpaceScoped<DeleteGroupAnnouncementInput>): Promise<SandboxWorkspaceState>
+  export function send(event: 'onebot-sandbox/manage-environment', input: SpaceScoped<ManageSandboxEnvironmentInput>): Promise<SandboxWorkspaceState>
+  export function send(event: 'onebot-sandbox/friend-action', input: SpaceScoped<PerformFriendActionInput>): Promise<SandboxWorkspaceState>
+  export function send(event: 'onebot-sandbox/group-action', input: SpaceScoped<PerformGroupActionInput>): Promise<SandboxWorkspaceState>
+  export function send(event: 'onebot-sandbox/debug-records', input?: SpaceScoped<GetSandboxOneBotDebugRecordsInput>): Promise<SandboxOneBotDebugRecord[]>
+  export function send(event: 'onebot-sandbox/clear-debug-records', input?: { spaceId?: string }): Promise<ClearSandboxOneBotDebugRecordsResult>
   export function send(event: 'onebot-sandbox/mcp-credentials'): Promise<Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string }>>
   export function send(event: 'onebot-sandbox/create-mcp-credential', input: { name: string; scopes: SandboxMcpScope[] }): Promise<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }>
   export function send(event: 'onebot-sandbox/set-mcp-credential-enabled', input: { id: string; enabled: boolean }): Promise<void>
   export function send(event: 'onebot-sandbox/revoke-mcp-credential', input: { id: string }): Promise<void>
+  export function send(event: 'onebot-sandbox/test-spaces'): Promise<SandboxTestSpaceSummary[]>
+  export function send(event: 'onebot-sandbox/create-test-space', input: { name?: string }): Promise<SandboxTestSpaceSummary>
+  export function send(event: 'onebot-sandbox/take-over-test-space', input: { spaceId: string }): Promise<SandboxTestSpaceSummary>
+  export function send(event: 'onebot-sandbox/return-test-space', input: { spaceId: string }): Promise<SandboxTestSpaceSummary>
+  export function send(event: 'onebot-sandbox/reactivate-test-space', input: { spaceId: string }): Promise<SandboxTestSpaceSummary>
+  export function send(event: 'onebot-sandbox/delete-test-space', input: { spaceId: string }): Promise<void>
 }

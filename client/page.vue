@@ -28,7 +28,15 @@
           @open-remark-dialog="openRemarkDialog"
         />
 
-        <main v-if="currentView === 'profile'" class="webqq-chat is-environment">
+        <AiTestSpaceOverview
+          v-if="currentView === 'spaces'"
+          :spaces="testSpaces"
+          :main-snapshot="mainSnapshot"
+          @enter="enterTestSpace"
+          @create="createTestSpace"
+          @action="handleTestSpaceAction"
+        />
+        <main v-else-if="currentView === 'profile'" class="webqq-chat is-environment">
           <EnvironmentManager :snapshot="environmentModel" />
         </main>
         <OneBotDebugWorkspace
@@ -90,18 +98,21 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import AiTestSpaceOverview from './ai-test-space-overview.vue'
 import EnvironmentManager from './environment-manager.vue'
 import OneBotDebugWorkspace from './onebot-debug-workspace.vue'
 import WebqqChatPane from './webqq-chat-pane.vue'
 import WebqqDetailsPanel from './webqq-details-panel.vue'
 import WebqqSidebar from './webqq-sidebar.vue'
 import WorkspaceOverlayHost from './workspace-overlay-host.vue'
-import { koishiWorkspacePort } from './webqq/koishi-workspace-port'
+import { createKoishiWorkspacePort } from './webqq/koishi-workspace-port'
 import { createWorkspaceController } from './webqq/workspace-controller'
 import { createWorkspaceLayout } from './webqq/workspace-layout'
 import { createWebqqWorkspaceShell } from './webqq/workspace-shell'
+import { createAiTestSpaceShell } from './webqq/test-space-shell'
 
-const workspaceController = createWorkspaceController(koishiWorkspacePort, window.localStorage)
+const activeSpaceId = ref<string>()
+const workspaceController = createWorkspaceController(createKoishiWorkspacePort(() => activeSpaceId.value), window.localStorage)
 const workspaceLayout = createWorkspaceLayout()
 const overlayHostRef = ref<InstanceType<typeof WorkspaceOverlayHost>>()
 const {
@@ -136,12 +147,19 @@ const {
   saveGroupAction,
   selectComposerOperator,
   selectConversation,
-  selectNavigation,
+  selectNavigation: selectWorkspaceNavigation,
   sendComposerMessage,
   setGroupAdmin,
   sidebarModel,
   toggleDetails,
   transferGroupOwner,
 } = createWebqqWorkspaceShell(workspaceController, workspaceLayout, () => overlayHostRef.value)
+
+const { createTestSpace, enterTestSpace, handleTestSpaceAction, mainSnapshot, selectNavigation, testSpaces } = createAiTestSpaceShell(
+  workspaceController,
+  activeSpaceId,
+  currentView,
+  selectWorkspaceNavigation,
+)
 const isWebqqView = computed(() => currentView.value === 'messages' || currentView.value === 'contacts')
 </script>

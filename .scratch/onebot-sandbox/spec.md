@@ -259,6 +259,8 @@ WebQQ 与 MCP 共用同一个传输无关的测试控制服务。该服务是主
 - Interact tools are `upload_media`, `send_message`, `perform_friend_action`, `perform_group_action`, `handle_request`, `wait_for_event`, `wait_for_message` and `wait_for_chatluna_state`.
 - Manage tools are `apply_environment_changes`, `prepare_destructive_action`, `delete_environment_entity`, `reset_scene`, `clear_scene` and `import_scene`.
 - Debug tools are `list_onebot_debug_records`, `clear_onebot_debug_records`, `list_mcp_call_records` and `clear_mcp_call_records`.
+- AI test-space tools add `list_test_spaces`, `get_test_space`, `create_test_space`, `complete_test_space`, `fail_test_space`, `reactivate_test_space` and `delete_test_space`, bringing a fully privileged credential to 32 discoverable tools.
+- MCP mutations never write the main simulated QQ environment. They require a `spaceId` returned by `create_test_space`; read-only tools may still inspect the main environment without a `spaceId`.
 - All IDs are strings. Generated QQ IDs are decimal numeric strings, and requested IDs must be unused decimal numeric strings.
 - Growing collections use cursor pagination with a default page size of 50 and maximum of 200.
 - Mutating commands return affected identifiers, the resulting scene revision and an event cursor immediately; observation uses separate wait tools.
@@ -283,6 +285,7 @@ WebQQ 与 MCP 共用同一个传输无关的测试控制服务。该服务是主
 - Wait calls accept a timeout from 1 to 120 seconds, defaulting to 30 seconds.
 - A wait timeout is a structured expected result rather than a protocol failure.
 - An optional client-supplied test-run identifier correlates commands and observations inside the sandbox only.
+- Test-space events carry `spaceId`; message delivery events also carry `recipientBotId` when the same message is delivered to a virtual OneBot robot.
 - Test-run identifiers, credentials and MCP origin data never enter tested-plugin-visible sessions, raw events or message elements.
 
 ### Errors, Limits and Records

@@ -1,9 +1,15 @@
 import { Context, Schema } from 'koishi'
 import { registerConsole } from './console'
-import { SandboxControlService } from './control-service'
-import { KoishiDatabaseScenePersistence, registerSandboxSceneModel } from './persistence'
+import { SandboxControlService, SandboxRuntimeBotRegistry } from './control-service'
+import {
+  KoishiDatabaseScenePersistence,
+  KoishiDatabaseTestSpacePersistence,
+  registerSandboxSceneModel,
+  registerSandboxTestSpaceModel,
+} from './persistence'
 import { SandboxMcpHttpServer, type SandboxMcpServerConfig } from './mcp/server'
 import { SandboxMcpService } from './mcp/service'
+import { SandboxTestSpaceService } from './test-spaces'
 import { resolve } from 'node:path'
 import type { SandboxAppearance, SandboxPersistenceMode } from './types'
 
@@ -14,6 +20,7 @@ export * from './types'
 export * from './mcp/server'
 export * from './mcp/service'
 export * from './mcp/types'
+export * from './test-spaces'
 
 export const name = 'onebot-sandbox'
 export const inject = {
@@ -77,9 +84,16 @@ export function apply(ctx: Context, config: Config) {
     let persistence: KoishiDatabaseScenePersistence | undefined
     if (config.persistenceMode === 'database') {
       registerSandboxSceneModel(inner)
+      registerSandboxTestSpaceModel(inner)
       persistence = new KoishiDatabaseScenePersistence(inner.database)
     }
-    const control = new SandboxControlService(inner, { persistence })
+    const runtimeBots = new SandboxRuntimeBotRegistry()
+    const control = new SandboxControlService(inner, { persistence, runtimeBots })
+    const testSpaces = new SandboxTestSpaceService(
+      inner,
+      runtimeBots,
+      config.persistenceMode === 'database' ? new KoishiDatabaseTestSpacePersistence(inner.database) : undefined,
+    )
     inner.provide('onebotSandbox', control, true)
     try {
       const mcp = new SandboxMcpService(control, {
@@ -91,14 +105,15 @@ export function apply(ctx: Context, config: Config) {
         maxConcurrentMutations: config.mcp.maxConcurrentMutations,
         maxConcurrentWaits: config.mcp.maxConcurrentWaits,
         maxConcurrentUploads: config.mcp.maxConcurrentUploads,
+        testSpaces,
       })
       const mcpServer = new SandboxMcpHttpServer(inner, mcp, config.mcp)
-      registerConsole(inner.console, control, config, mcp)
+      registerConsole(inner.console, control, config, mcp, testSpaces)
       inner.on('ready', () => mcpServer.start().catch((error) => inner.logger('onebot-sandbox').error('MCP 监听器启动失败；WebQQ 仍可继续使用。', error)))
       inner.on('dispose', () => mcpServer.stop())
     } catch (error) {
       inner.logger('onebot-sandbox').error('MCP 初始化失败；WebQQ 仍可继续使用。', error)
-      registerConsole(inner.console, control, config)
+      registerConsole(inner.console, control, config, undefined, testSpaces)
     }
   })
 }

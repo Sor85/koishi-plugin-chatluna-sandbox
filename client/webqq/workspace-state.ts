@@ -1,6 +1,6 @@
 import type { SandboxSnapshot } from '../../src/types'
 
-export type SandboxWorkspaceView = 'messages' | 'contacts' | 'profile' | 'debug'
+export type SandboxWorkspaceView = 'messages' | 'contacts' | 'profile' | 'debug' | 'spaces'
 export type SandboxDetailsPreference = 'auto' | 'open' | 'closed'
 
 export interface SandboxWorkspacePreferences {

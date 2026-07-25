@@ -54,6 +54,27 @@ export interface SandboxControlServiceOptions {
   mediaDirectory?: string
   persistence?: SandboxScenePersistence
   debugRecordLimit?: number
+  initialScene?: SandboxSnapshot
+  runtimeBots?: SandboxRuntimeBotRegistry
+  runtimeActive?: boolean
+}
+
+export class SandboxRuntimeBotRegistry {
+  private owners = new Map<string, object>()
+
+  assertAvailable(botId: string, owner: object): void {
+    const currentOwner = this.owners.get(botId)
+    if (currentOwner && currentOwner !== owner) throw new Error(`机器人 ID 已被活动场景占用：${botId}`)
+  }
+
+  claim(botId: string, owner: object): void {
+    this.assertAvailable(botId, owner)
+    this.owners.set(botId, owner)
+  }
+
+  release(botId: string, owner: object): void {
+    if (this.owners.get(botId) === owner) this.owners.delete(botId)
+  }
 }
 
 interface SandboxMessageContext {
@@ -70,7 +91,11 @@ const ADMIN_USER_ID = '10003'
 const DEFAULT_BOT_ID = '20001'
 const DEFAULT_GROUP_ID = '30001'
 
-function createDefaultScene(): SandboxSnapshot {
+export function createEmptyScene(): SandboxSnapshot {
+  return { revision: 0, participants: [], groups: [], conversations: [], messages: [], friendships: [], requests: [] }
+}
+
+export function createDefaultScene(): SandboxSnapshot {
   const createdAt = new Date().toISOString()
   const directConversations: SandboxConversation[] = [
     DEFAULT_USER_ID,
@@ -134,8 +159,11 @@ function createFriendship(firstId: string, secondId: string, createdAt = new Dat
 }
 
 export class SandboxControlService {
-  private scene: SandboxSnapshot = createDefaultScene()
+  private scene: SandboxSnapshot
   private runtimeBots = new Map<string, SandboxBot>()
+  private runtimeBotsActive: boolean
+  private runtimeBotRegistry: SandboxRuntimeBotRegistry
+  private runtimeOwner = {}
   private botDeliveries: SandboxBotDelivery[] = []
   private chatLunaState: SandboxChatLunaStateStore
   private oneBotDebug: SandboxOneBotDebugStore
@@ -143,8 +171,13 @@ export class SandboxControlService {
   private persistence?: SandboxScenePersistence
   private persistenceQueue = Promise.resolve()
   private sceneMutationListeners = new Set<(snapshot: SandboxSnapshot) => void>()
+  private contextDisposers: Array<() => void> = []
+  private disposePromise?: Promise<void>
 
   constructor(private ctx: Context, options: SandboxControlServiceOptions = {}) {
+    this.scene = structuredClone(options.initialScene ?? createDefaultScene())
+    this.runtimeBotsActive = options.runtimeActive ?? true
+    this.runtimeBotRegistry = options.runtimeBots ?? new SandboxRuntimeBotRegistry()
     this.persistence = options.persistence
     this.oneBotDebug = new SandboxOneBotDebugStore(options.debugRecordLimit)
     this.mediaStorage = new SandboxMediaStorage(options.mediaDirectory ?? resolve(ctx.baseDir, 'data/onebot-sandbox/media'))
@@ -154,12 +187,8 @@ export class SandboxControlService {
       const conversation = this.scene.conversations.find(({ id }) => id === conversationId)
       return participant?.kind === 'bot' && !!conversation && this.isConversationVisible(botParticipantId, conversation)
     })
-    this.createRuntimeBot({
-      selfId: DEFAULT_BOT_ID,
-      name: 'Koishi',
-      implementation: 'napcat',
-    })
-    ctx.on('ready', async () => {
+    this.syncRuntimeBots()
+    this.contextDisposers.push(ctx.on('ready', async () => {
       if (!this.persistence) return
       const scene = await this.persistence.load()
       if (scene) {
@@ -170,8 +199,8 @@ export class SandboxControlService {
         if (!this.persistence.getStatus().available) this.mediaStorage.clear()
         await this.persistence.save(this.getSnapshot())
       }
-    })
-    ctx.on('dispose', () => this.waitForPersistence())
+    }))
+    this.contextDisposers.push(ctx.on('dispose', () => this.dispose()))
   }
 
   getSnapshot(): SandboxSnapshot {
@@ -181,6 +210,18 @@ export class SandboxControlService {
   onSceneMutation(listener: (snapshot: SandboxSnapshot) => void): () => void {
     this.sceneMutationListeners.add(listener)
     return () => this.sceneMutationListeners.delete(listener)
+  }
+
+  setRuntimeActive(active: boolean): void {
+    if (active === this.runtimeBotsActive) return
+    if (active) {
+      for (const bot of this.getBots()) this.runtimeBotRegistry.assertAvailable(bot.id, this.runtimeOwner)
+      this.runtimeBotsActive = true
+      this.syncRuntimeBots()
+      return
+    }
+    this.runtimeBotsActive = false
+    void this.disposeRuntimeBots()
   }
 
   replaceScene(snapshot: SandboxSnapshot): void {
@@ -206,6 +247,11 @@ export class SandboxControlService {
     if (next.messages.some(({ media }) => media?.some(({ id, reference }) => reference !== `sandbox-media://${id}`))) throw new Error('消息包含无效媒体引用')
     if (next.conversations.some((conversation) => conversation.messageIds.some((id) => !messageIds.has(id)))) throw new Error('会话引用不存在的消息')
     if (next.friendships.some(({ participantIds: ids }) => !ids.every((id) => participantIds.has(id)))) throw new Error('好友关系引用不存在的参与者')
+    if (this.runtimeBotsActive) {
+      for (const participant of next.participants) {
+        if (participant.kind === 'bot') this.runtimeBotRegistry.assertAvailable(participant.id, this.runtimeOwner)
+      }
+    }
     next.revision = this.scene.revision + 1
     this.scene = next
     this.botDeliveries = []
@@ -269,6 +315,20 @@ export class SandboxControlService {
 
   waitForPersistence(): Promise<void> {
     return this.persistenceQueue
+  }
+
+  dispose(): Promise<void> {
+    if (this.disposePromise) return this.disposePromise
+    this.disposePromise = (async () => {
+      for (const dispose of this.contextDisposers.splice(0)) dispose()
+      this.chatLunaState.dispose()
+      this.sceneMutationListeners.clear()
+      this.runtimeBotsActive = false
+      const runtimeDisposal = this.disposeRuntimeBots()
+      await this.waitForPersistence()
+      await runtimeDisposal
+    })()
+    return this.disposePromise
   }
 
   resetScene(): void {
@@ -387,6 +447,7 @@ export class SandboxControlService {
     if (this.scene.participants.some((participant) => participant.id === id)) {
       throw new Error(`参与者已存在：${id}`)
     }
+    if (this.runtimeBotsActive) this.runtimeBotRegistry.assertAvailable(id, this.runtimeOwner)
 
     const disabledCapabilities = normalizeDisabledCapabilities(input.implementation, input.disabledCapabilities)
     this.scene.participants.push({
@@ -448,7 +509,10 @@ export class SandboxControlService {
     this.scene.participants.splice(index, 1)
     const runtime = this.runtimeBots.get(input.id)
     this.runtimeBots.delete(input.id)
-    void runtime?.dispose()
+    if (runtime) {
+      this.runtimeBotRegistry.release(input.id, this.runtimeOwner)
+      void runtime.dispose()
+    }
     const ownedGroupIds = new Set(this.scene.groups
       .filter(({ members }) => members.some(({ participantId, role }) => participantId === input.id && role === 'owner'))
       .map(({ id }) => id))
@@ -1214,16 +1278,24 @@ export class SandboxControlService {
   }
 
   private createRuntimeBot(config: SandboxBot.Config) {
-    const bot = new SandboxBot(this.ctx, this, config)
-    this.runtimeBots.set(config.selfId, bot)
-    return bot
+    this.runtimeBotRegistry.claim(config.selfId, this.runtimeOwner)
+    try {
+      const bot = new SandboxBot(this.ctx, this, config)
+      this.runtimeBots.set(config.selfId, bot)
+      return bot
+    } catch (error) {
+      this.runtimeBotRegistry.release(config.selfId, this.runtimeOwner)
+      throw error
+    }
   }
 
   private syncRuntimeBots(): void {
+    if (!this.runtimeBotsActive) return
     const botIds = new Set(this.getBots().map(({ id }) => id))
     for (const [botId, runtime] of this.runtimeBots) {
       if (botIds.has(botId)) continue
       this.runtimeBots.delete(botId)
+      this.runtimeBotRegistry.release(botId, this.runtimeOwner)
       void runtime.dispose()
     }
     for (const profile of this.getBots()) {
@@ -1238,6 +1310,13 @@ export class SandboxControlService {
       runtime.status = profile.enabled ? Universal.Status.ONLINE : Universal.Status.OFFLINE
       runtime.updateImplementation(profile.implementation, profile.disabledCapabilities)
     }
+  }
+
+  private async disposeRuntimeBots(): Promise<void> {
+    const runtimes = [...this.runtimeBots]
+    this.runtimeBots.clear()
+    for (const [botId] of runtimes) this.runtimeBotRegistry.release(botId, this.runtimeOwner)
+    await Promise.all(runtimes.map(([, runtime]) => runtime.dispose()))
   }
 
   private handleUserRelationshipRequest(input: Extract<PerformFriendActionInput, { action: 'handle-request' }>): PerformFriendActionResult | Promise<PerformGroupActionResult> {
