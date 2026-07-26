@@ -21,9 +21,13 @@ NapCat 与 LLBot 都提供 `send_poke`、`friend_poke` 和 `group_poke`。沙盒
 
 | 语义能力 | NapCat | LLBot |
 | --- | --- | --- |
+| 获取好友分组 | `get_friends_with_category` | `get_friends_with_category` |
+| 获取最近会话 | `get_recent_contact` | 不提供此 action |
 | 删除群公告 | `_del_group_notice` | `_delete_group_notice` |
 | 批量踢出群成员 | `set_group_kick_members`，参数 `user_id` | `batch_delete_group_member`，参数 `user_ids` |
 | 获取群相册列表（沙盒暂未实现） | `get_qun_album_list` | `get_group_album_list` |
+
+沙盒尚未维护独立的 QQ 好友分组，因此 `get_friends_with_category` 会把当前机器人的真实好友关系放入“我的好友”默认分组。NapCat 的 `get_recent_contact` 从当前机器人可见的逻辑会话和最后一条消息实时生成，并遵守 `count` 参数；LLBot 基线不声明这个 action，避免掩盖两种实现的真实差异。
 
 能力覆盖界面同时展示每项能力的作用说明、已支持能力和暂未实现能力。暂未实现项不可勾选，并直接显示缺少的沙盒领域模型，避免把上游存在的 action 误报为可用。
 

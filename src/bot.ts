@@ -76,6 +76,24 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
             })),
           }
         }
+        if (action === 'get_friends_with_category') {
+          const friends = await this.getFriendList()
+          const buddyList = friends.data.map(({ user, nick }) => ({
+            ...this.toOneBotUser(user),
+            remark: nick ?? '',
+          }))
+          return {
+            status: 'ok',
+            retcode: 0,
+            data: [{
+              categoryId: 0,
+              categoryName: '我的好友',
+              categoryMbCount: buddyList.length,
+              buddyList,
+              ...(this.implementation === 'llbot' ? { categorySortId: 0, onlineCount: buddyList.length } : {}),
+            }],
+          }
+        }
         if (action === 'get_group_list') {
           const groups = await this.getGuildList()
           const snapshot = this.control.getSnapshot()
@@ -87,6 +105,45 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
               return { group_id: Number(group.id), group_name: group.name, member_count: memberCount, max_member_count: memberCount }
             }),
           }
+        }
+        if (action === 'get_recent_contact') {
+          const count = Number(params.count)
+          const limit = Number.isFinite(count) && count > 0 ? Math.floor(count) : 10
+          const snapshot = this.control.getVisibleSnapshot(this.selfId, 1)
+          const participants = new Map(snapshot.participants.map((participant) => [participant.id, participant]))
+          const groups = new Map(snapshot.groups.map((group) => [group.id, group]))
+          const messages = new Map(snapshot.messages.map((message) => [message.id, message]))
+          const recentContacts = snapshot.conversations.flatMap((conversation) => {
+            const latestMessage = messages.get(conversation.messageIds.at(-1) ?? '')
+            if (!latestMessage) return []
+            const peerId = conversation.type === 'group'
+              ? conversation.groupId
+              : getDirectConversationPeerId(conversation, this.selfId)
+            const peerName = conversation.type === 'group'
+              ? groups.get(peerId)?.name ?? peerId
+              : participants.get(peerId)?.name ?? peerId
+            const senderName = participants.get(latestMessage.authorId)?.name ?? latestMessage.authorId
+            const sendMemberName = conversation.type === 'group'
+              ? groups.get(peerId)?.members.find(({ participantId }) => participantId === latestMessage.authorId)?.card ?? ''
+              : ''
+            return [{
+              createdAt: new Date(latestMessage.createdAt).getTime(),
+              contact: {
+                lastestMsg: this.toOneBotMessage(latestMessage),
+                peerUin: peerId,
+                remark: conversation.type === 'direct'
+                  ? snapshot.friendships.find(({ participantIds }) => participantIds.includes(this.selfId) && participantIds.includes(peerId))?.remarks[this.selfId] ?? ''
+                  : '',
+                msgTime: String(Math.floor(new Date(latestMessage.createdAt).getTime() / 1000)),
+                chatType: conversation.type === 'group' ? 2 : 1,
+                msgId: latestMessage.id,
+                sendNickName: senderName,
+                sendMemberName,
+                peerName,
+              },
+            }]
+          }).sort((left, right) => right.createdAt - left.createdAt).slice(0, limit).map(({ contact }) => contact)
+          return { status: 'ok', retcode: 0, data: recentContacts }
         }
         if (action === 'get_group_info') {
           const group = await this.getGuild(String(params.group_id ?? ''))

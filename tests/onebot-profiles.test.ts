@@ -93,6 +93,54 @@ describe('OneBot 实现配置', () => {
     expect(updatedGroup.members.map(({ participantId }) => participantId)).not.toContain('10005')
   })
 
+  it('提供 WebQQ 使用的好友分组，并只为 NapCat 提供最近会话', async () => {
+    const control = await createControl()
+    control.createBot({ id: '20002', name: 'LLBot 机器人', implementation: 'llbot', enabled: true })
+
+    await expect(control.bot.internal._request('get_friends_with_category', {})).resolves.toMatchObject({
+      data: [{
+        categoryId: 0,
+        categoryName: '我的好友',
+        categoryMbCount: expect.any(Number),
+        buddyList: expect.arrayContaining([
+          expect.objectContaining({ user_id: 10001, nickname: '测试用户1' }),
+        ]),
+      }],
+    })
+    await expect(control.getRuntimeBot('20002').internal._request('get_friends_with_category', {})).resolves.toMatchObject({
+      data: [expect.objectContaining({ categoryName: '我的好友', categoryMbCount: expect.any(Number) })],
+    })
+
+    await control.sendMessage({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      content: '最近会话测试',
+    })
+    await control.sendMessage({
+      operatorId: '10002',
+      conversationId: 'group:30001',
+      content: '最近群聊测试',
+    })
+    await expect(control.bot.internal._request('get_recent_contact', { count: 50 })).resolves.toMatchObject({
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          chatType: 1,
+          peerUin: '10001',
+          peerName: '测试用户1',
+          lastestMsg: expect.objectContaining({ raw_message: '最近会话测试' }),
+        }),
+        expect.objectContaining({
+          chatType: 2,
+          peerUin: '30001',
+          peerName: '测试群',
+          lastestMsg: expect.objectContaining({ raw_message: '最近群聊测试' }),
+        }),
+      ]),
+    })
+    await expect(control.getRuntimeBot('20002').internal._request('get_recent_contact', { count: 50 }))
+      .rejects.toThrow('LLBot 基线不支持 OneBot action：get_recent_contact')
+  })
+
   it('按机器人实现配置生成版本返回并隔离能力覆盖', async () => {
     const control = await createControl()
     control.createBot({
