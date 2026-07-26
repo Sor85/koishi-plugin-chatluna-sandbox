@@ -141,6 +141,40 @@ describe('OneBot 实现配置', () => {
       .rejects.toThrow('LLBot 基线不支持 OneBot action：get_recent_contact')
   })
 
+  it('NapCat 与 LLBot 都提供私聊和群聊历史消息', async () => {
+    const control = await createControl()
+    control.createBot({ id: '20002', name: 'LLBot 机器人', implementation: 'llbot', enabled: true })
+    const group = control.getSnapshot().groups[0]
+    control.updateGroup({
+      id: group.id,
+      name: group.name,
+      members: [...group.members, { participantId: '20002', role: 'admin' }],
+    })
+    await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content: 'NapCat 私聊历史' })
+    await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20002', content: 'LLBot 私聊历史' })
+    await control.sendMessage({ operatorId: '10002', conversationId: 'group:30001', content: '群聊历史' })
+
+    await expect(control.bot.internal._request('get_friend_msg_history', {
+      user_id: 10001,
+      message_seq: 0,
+      count: 30,
+    })).resolves.toMatchObject({ data: { messages: [expect.objectContaining({ raw_message: 'NapCat 私聊历史' })] } })
+    await expect(control.getRuntimeBot('20002').internal._request('get_friend_msg_history', {
+      user_id: 10001,
+      message_seq: 0,
+      count: 30,
+      reverseOrder: false,
+    })).resolves.toMatchObject({ data: { messages: [expect.objectContaining({ raw_message: 'LLBot 私聊历史' })] } })
+    for (const botId of ['20001', '20002']) {
+      await expect(control.getRuntimeBot(botId).internal._request('get_group_msg_history', {
+        group_id: 30001,
+        message_seq: 0,
+        count: 30,
+        ...(botId === '20002' ? { reverseOrder: false } : {}),
+      })).resolves.toMatchObject({ data: { messages: [expect.objectContaining({ raw_message: '群聊历史' })] } })
+    }
+  })
+
   it('按机器人实现配置生成版本返回并隔离能力覆盖', async () => {
     const control = await createControl()
     control.createBot({

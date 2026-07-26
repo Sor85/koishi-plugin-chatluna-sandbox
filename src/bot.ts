@@ -1,5 +1,6 @@
 import { Bot, Context, Fragment, h, Random, Universal } from 'koishi'
 import type { SandboxControlService } from './control-service'
+import { toOneBotMessageSegments, toOneBotRawMessage } from './onebot-message'
 import { getOneBotMessageSequence, getOneBotProfileBaseline, resolveOneBotAction } from './onebot-profiles'
 import { createDirectConversationId, createGroupConversationId, getDirectConversationPeerId, type SandboxImplementationProfile } from './types'
 
@@ -191,6 +192,12 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
         if (action === 'get_msg') {
           const message = this.findVisibleMessage(String(params.message_id ?? ''))
           return { status: 'ok', retcode: 0, data: this.toOneBotMessage(message) }
+        }
+        if (action === 'get_friend_msg_history') {
+          return this.getOneBotMessageHistory(createDirectConversationId(this.selfId, String(params.user_id ?? '')), params)
+        }
+        if (action === 'get_group_msg_history') {
+          return this.getOneBotMessageHistory(createGroupConversationId(String(params.group_id ?? '')), params)
         }
         if (action === 'delete_msg') {
           this.control.deleteBotMessage(this.selfId, String(params.message_id ?? ''))
@@ -516,6 +523,26 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     return message
   }
 
+  private getOneBotMessageHistory(conversationId: string, params: Record<string, unknown>) {
+    const count = Number(params.count ?? 20)
+    const limit = Number.isInteger(count) && count > 0 ? Math.min(count, 100) : 20
+    const messageSequence = Number(params.message_seq)
+    let beforeMessageId: string | undefined
+    if (Number.isFinite(messageSequence) && messageSequence > 0) {
+      const conversation = this.getVisibleConversation(conversationId)
+      beforeMessageId = conversation.messageIds.find((messageId) => getOneBotMessageSequence(messageId) === messageSequence)
+      if (!beforeMessageId) throw new Error(`消息不存在：${params.message_seq}`)
+    }
+    const messages = this.control.getMessageHistory({
+      operatorId: this.selfId,
+      conversationId,
+      limit,
+      beforeMessageId,
+    }).messages.map((message) => this.toOneBotMessage(message))
+    if (params.reverseOrder === true || params.reverse_order === true) messages.reverse()
+    return { status: 'ok', retcode: 0, data: { messages } }
+  }
+
   private async toUniversalMessage(message: ReturnType<SandboxControlService['getSnapshot']>['messages'][number]): Promise<Universal.Message> {
     const snapshot = this.control.getSnapshot()
     const conversation = snapshot.conversations.find(({ id }) => id === message.conversationId)
@@ -548,24 +575,34 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
   }
 
   private toOneBotMessage(message: ReturnType<SandboxControlService['getSnapshot']>['messages'][number]) {
-    const conversation = this.control.getSnapshot().conversations.find(({ id }) => id === message.conversationId)
+    const snapshot = this.control.getSnapshot()
+    const conversation = snapshot.conversations.find(({ id }) => id === message.conversationId)
     const directPeerId = conversation?.type === 'direct'
       ? getDirectConversationPeerId(conversation, this.selfId)
       : undefined
     const sequence = getOneBotMessageSequence(message.id)
+    const participant = snapshot.participants.find(({ id }) => id === message.authorId)
+    const groupMember = conversation?.groupId
+      ? snapshot.groups.find(({ id }) => id === conversation.groupId)?.members.find(({ participantId }) => participantId === message.authorId)
+      : undefined
+    const onebotMessage = toOneBotMessageSegments(message.content, message.media)
     return {
       time: Math.floor(new Date(message.createdAt).getTime() / 1000),
       message_type: conversation?.type === 'group' ? 'group' : 'private',
       message_id: message.id,
       message_seq: sequence,
       real_id: sequence,
-      sender: { user_id: Number(message.authorId), nickname: this.control.getSnapshot().participants.find(({ id }) => id === message.authorId)?.name ?? this.user?.name ?? message.authorId },
+      sender: {
+        user_id: Number(message.authorId),
+        nickname: participant?.name ?? this.user?.name ?? message.authorId,
+        ...(groupMember ? { card: groupMember.card ?? '', role: groupMember.role } : {}),
+      },
       user_id: Number(conversation?.type === 'group' ? message.authorId : directPeerId ?? message.authorId),
       group_id: conversation?.groupId ? Number(conversation.groupId) : undefined,
-      message: [{ type: 'text', data: { text: message.content } }],
+      message: onebotMessage,
       message_format: 'array',
       font: 0,
-      raw_message: message.content,
+      raw_message: toOneBotRawMessage(onebotMessage),
     }
   }
 }

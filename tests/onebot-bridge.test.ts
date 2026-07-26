@@ -1,4 +1,4 @@
-import { App, Universal } from '@koishijs/core'
+import { App, h, Universal } from '@koishijs/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SandboxControlService } from '../src/control-service'
 
@@ -21,6 +21,41 @@ async function createControl() {
 }
 
 describe('Koishi 与 OneBot 机器人桥接', () => {
+  it('后置中间件回复会写回原会话，并保留图片消息段', async () => {
+    const { app, control } = await createControl()
+    const imageSource = `data:image/png;base64,${Buffer.from('reply-image').toString('base64')}`
+    app.middleware((session, next) => next(async (nextMiddleware) => {
+      if (session.selfId !== '20001' || session.userId !== '10001') return nextMiddleware?.()
+      await session.sendQueued(h.image(imageSource), 0)
+    }))
+
+    await control.sendMessage({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      content: '触发机器人回复',
+    })
+
+    const messages = control.getSnapshot().messages
+    expect(messages).toHaveLength(2)
+    expect(messages[1]).toMatchObject({
+      authorId: '20001',
+      conversationId: 'private:10001:20001',
+      content: expect.stringContaining('<img'),
+    })
+    await expect(control.bot.internal._request('get_friend_msg_history', {
+      user_id: 10001,
+      message_seq: 0,
+      count: 30,
+    })).resolves.toMatchObject({
+      data: {
+        messages: [
+          expect.objectContaining({ message: [{ type: 'text', data: { text: '触发机器人回复' } }] }),
+          expect.objectContaining({ message: [{ type: 'image', data: expect.objectContaining({ url: imageSource }) }] }),
+        ],
+      },
+    })
+  })
+
   it('多个机器人始终使用各自真实 selfId 处理协议事件与 action', async () => {
     const { app, control } = await createControl()
     control.createBot({ id: '20002', name: '第二机器人', implementation: 'llbot', enabled: true })

@@ -4,6 +4,7 @@ import { SandboxBot } from './bot'
 import { SandboxChatLunaStateStore } from './chatluna-state'
 import { SandboxMediaStorage } from './media-storage'
 import { SandboxOneBotDebugStore, type AppendOneBotDebugRecordInput } from './onebot-debug'
+import { toOneBotMessageSegments, toOneBotRawMessage } from './onebot-message'
 import type { SandboxScenePersistence } from './persistence'
 import { getOneBotCapabilityMatrix, getOneBotMessageEventFields, normalizeDisabledCapabilities, type SandboxOneBotCapability } from './onebot-profiles'
 import {
@@ -958,10 +959,12 @@ export class SandboxControlService {
     if (!input.content.trim()) throw new Error('消息内容不能为空')
     const context = this.getMessageContext(input)
     const message = this.appendMessage(input.operatorId, context.conversation.id, input.content.trim(), input.replyToMessageId)
-    await this.dispatchMessageToBots(context, message, h.parse(message.content), [
+    const elements = h.parse(message.content)
+    const onebotMessage = [
       ...(context.reply ? [{ type: 'reply', data: { id: context.reply.id } }] : []),
-      { type: 'text', data: { text: message.content } },
-    ], `${context.reply ? `[CQ:reply,id=${context.reply.id}]` : ''}${message.content}`)
+      ...toOneBotMessageSegments(message.content),
+    ]
+    await this.dispatchMessageToBots(context, message, elements, onebotMessage, toOneBotRawMessage(onebotMessage))
     return { messageId: message.id, revision: this.scene.revision }
   }
 
