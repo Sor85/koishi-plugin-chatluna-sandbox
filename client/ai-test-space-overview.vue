@@ -29,7 +29,7 @@
       >
         <WorkspaceThumbnail :snapshot="space.snapshot" :running="space.status === 'running'" />
         <footer>
-          <div><strong>{{ space.name }}</strong><small>{{ statusLabel(space.status) }} · {{ formatTime(space.createdAt) }}</small></div>
+          <div><strong>{{ space.name }}</strong><small><span v-if="space.status === 'running'" class="webqq-agent-pulse-dot" aria-hidden="true" />{{ statusLabel(space.status) }} · {{ formatTime(space.createdAt) }}</small></div>
           <div class="webqq-space-card-actions" @click.stop>
             <Button v-if="space.status === 'running'" size="xs" variant="outline" @click="$emit('action', 'take-over', space.id)">接管</Button>
             <Button v-else-if="space.status === 'taken-over'" size="xs" variant="outline" @click="$emit('action', 'return', space.id)">归还</Button>

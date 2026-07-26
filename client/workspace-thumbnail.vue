@@ -37,17 +37,13 @@
       </main>
     </div>
     <!-- AI 控制中的游走光标放在 scale 层之外，保持真实尺寸覆盖在迷你界面上。 -->
-    <div v-if="running" class="webqq-space-agent-cursor">
-      <span class="webqq-space-agent-cursor-float">
-        <IconPointerFilled :size="16" aria-hidden="true" />
-        <span class="webqq-space-agent-cursor-label">AI</span>
-      </span>
-    </div>
+    <AgentCursor v-if="running" :size="16" />
   </div>
 </template>
 <script setup lang="ts">
-import { IconBug, IconLayoutGrid, IconMessageCircle, IconPointerFilled, IconUserCircle } from '@tabler/icons-vue'
+import { IconBug, IconLayoutGrid, IconMessageCircle, IconUserCircle } from '@tabler/icons-vue'
 import { computed } from 'vue'
+import AgentCursor from './agent-cursor.vue'
 import WebqqAvatar from './webqq-avatar.vue'
 import { buildWorkspacePreview } from './webqq/workspace-preview'
 import type { SandboxSnapshot } from '../src/types'

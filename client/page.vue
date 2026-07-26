@@ -91,6 +91,11 @@
           @save-remark="saveFriendRemark"
           @save-group-action="saveGroupAction"
         />
+        <AgentObserveOverlay
+          v-if="observingSpace"
+          :space-name="observingSpace.name"
+          @take-over="handleTestSpaceAction('take-over', observingSpace.id)"
+        />
       </div>
     </k-content>
   </k-layout>
@@ -98,6 +103,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import AgentObserveOverlay from './agent-observe-overlay.vue'
 import AiTestSpaceOverview from './ai-test-space-overview.vue'
 import EnvironmentManager from './environment-manager.vue'
 import OneBotDebugWorkspace from './onebot-debug-workspace.vue'
@@ -162,4 +168,8 @@ const { createTestSpace, enterTestSpace, handleTestSpaceAction, mainSnapshot, se
   selectWorkspaceNavigation,
 )
 const isWebqqView = computed(() => currentView.value === 'messages' || currentView.value === 'contacts')
+// 正在观察一个仍由 AI 控制的测试空间时，叠加 ego 式被控覆盖层（发光边缘 + 控制条 + agent 光标）。
+const observingSpace = computed(() => isWebqqView.value
+  ? testSpaces.value.find((space) => space.id === activeSpaceId.value && space.status === 'running')
+  : undefined)
 </script>

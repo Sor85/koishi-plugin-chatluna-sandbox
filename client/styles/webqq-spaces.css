@@ -31,18 +31,33 @@
 .webqq-space-mini-chat { display: flex; flex-direction: column; justify-content: flex-end; padding: 20px 22px; overflow: hidden; background: var(--webqq-surface-muted); }
 .webqq-space-mini-empty { align-self: center; margin: auto; color: var(--webqq-muted); font-size: 13px; }
 
-/* AI 光标在迷你界面上游走：外层用 top/left 关键帧走位（ego 同款曲线），内层做悬浮呼吸，两层拆开避免 transform 互相覆盖。 */
-.webqq-space-agent-cursor { position: absolute; top: 34%; left: 56%; z-index: 1; pointer-events: none; animation: webqq-space-agent-roam 10s cubic-bezier(0.32, 0.72, 0, 1) infinite; }
-.webqq-space-agent-cursor-float { display: flex; align-items: flex-start; animation: webqq-space-agent-float 2s ease-in-out infinite; }
-.webqq-space-agent-cursor-float svg { flex: none; color: var(--webqq-accent); filter: drop-shadow(0 1px 2px rgb(15 23 42 / 35%)); }
-.webqq-space-agent-cursor-label { margin-top: 11px; margin-left: -2px; padding: 2px 7px; border-radius: 999px; color: #fff; background: var(--webqq-accent); font-size: 10px; font-weight: 600; line-height: 14px; box-shadow: 0 4px 10px var(--webqq-accent-shadow); }
-@keyframes webqq-space-agent-roam {
-  0%, 12% { top: 34%; left: 56%; }
-  22%, 36% { top: 60%; left: 34%; }
-  46%, 60% { top: 42%; left: 68%; }
-  70%, 86% { top: 66%; left: 50%; }
-  100% { top: 34%; left: 56%; }
+/* ==== ego lite agent 视觉复刻（参数取自 ego lite 应用资源；颜色映射到主题 accent，原版为 #0880f7）==== */
+
+/* agent 光标：JS 每 5.2-9s 随机跳位，移动由 0.9s transition 完成；内层做悬浮呼吸，两层拆开避免 transform 互相覆盖。 */
+.webqq-agent-cursor { position: absolute; top: 38%; left: 55%; z-index: 26; pointer-events: none; transition: top 0.9s cubic-bezier(0.22, 1, 0.36, 1), left 0.9s cubic-bezier(0.22, 1, 0.36, 1); }
+.webqq-agent-cursor-float { display: flex; align-items: flex-start; animation: webqq-agent-float 2s ease-in-out infinite; }
+.webqq-agent-cursor-float svg { flex: none; color: var(--webqq-accent); }
+.webqq-agent-cursor-label { margin-top: 14px; margin-left: -4px; max-width: 240px; overflow: hidden; padding: 3px 10px; border-radius: 999px; color: var(--webqq-text); background: rgb(255 255 255 / 42%); box-shadow: 0 0 0 1px rgb(0 0 0 / 6%), 0 16px 48px rgb(0 0 0 / 35%); backdrop-filter: blur(10px); font-size: 12px; font-weight: 600; line-height: 16px; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes webqq-agent-float { 0%, 100% { transform: translateY(-3px); } 50% { transform: translateY(4px); } }
+
+/* running 脉冲点：8px 圆点 + 呼吸光晕（4px@16% → 7px@4%，1.6s）。 */
+.webqq-agent-pulse-dot { display: inline-block; flex: none; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--webqq-accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--webqq-accent) 16%, transparent); animation: webqq-agent-pulse 1.6s cubic-bezier(0.34, 0.69, 0.1, 1) infinite; }
+@keyframes webqq-agent-pulse { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--webqq-accent) 4%, transparent); } }
+
+/* 观察被控空间的覆盖层：横跨工作区网格所有列（行未显式定义，用 row 1 即唯一一行），自身不拦截交互，仅控制条可点。 */
+.webqq-agent-observe { position: relative; z-index: 25; grid-column: 1 / -1; grid-row: 1; min-width: 0; min-height: 0; pointer-events: none; }
+.webqq-agent-observe-glow { position: absolute; inset: 0; box-shadow: inset 0 0 40px 0 color-mix(in srgb, var(--webqq-accent) 50%, transparent); }
+.webqq-agent-observe-dots { position: absolute; inset: 0; opacity: 0.5; background-image: radial-gradient(circle, rgb(55 55 55 / 10%) 1px, transparent 1px); background-size: 6px 6px; }
+.webqq-agent-observe-bar { position: absolute; top: 14px; left: 50%; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 16px; border-radius: 999px; color: #fff; background: rgb(0 0 0 / 60%); box-shadow: 0 0 0 1px rgb(0 0 0 / 6%), 0 16px 48px rgb(0 0 0 / 35%); backdrop-filter: blur(10px); pointer-events: auto; transform: translateX(-50%); }
+.webqq-agent-observe-bar-text { font-size: 13px; font-weight: 600; line-height: 18px; white-space: nowrap; }
+.webqq-agent-observe .webqq-agent-cursor { z-index: 1; }
+
+.webqq-workspace[data-color-mode="dark"] .webqq-agent-cursor-label { color: rgb(255 255 255 / 90%); background: rgb(56 56 56 / 42%); }
+.webqq-workspace[data-color-mode="dark"] .webqq-agent-observe-dots { background-image: radial-gradient(circle, rgb(255 255 255 / 15%) 1px, transparent 1px); }
+@media (prefers-color-scheme: dark) {
+  .webqq-workspace[data-color-mode="auto"] .webqq-agent-cursor-label { color: rgb(255 255 255 / 90%); background: rgb(56 56 56 / 42%); }
+  .webqq-workspace[data-color-mode="auto"] .webqq-agent-observe-dots { background-image: radial-gradient(circle, rgb(255 255 255 / 15%) 1px, transparent 1px); }
 }
-@keyframes webqq-space-agent-float { 0%, 100% { transform: translateY(-3px); } 50% { transform: translateY(4px); } }
-@media (prefers-reduced-motion: reduce) { .webqq-space-card { transition: none; } .webqq-space-agent-cursor, .webqq-space-agent-cursor-float { animation: none; } }
+
+@media (prefers-reduced-motion: reduce) { .webqq-space-card { transition: none; } .webqq-agent-cursor { transition: none; } .webqq-agent-cursor-float, .webqq-agent-pulse-dot { animation: none; } }
 @media (max-width: 720px) { .webqq-space-overview { padding: 16px; } .webqq-space-toolbar { align-items: flex-start; flex-direction: column; } .webqq-space-grid { grid-template-columns: 1fr; } }

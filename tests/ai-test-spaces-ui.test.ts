@@ -13,10 +13,10 @@ describe('AI 测试空间总览', () => {
     expect(overview).toContain('filteredSpaces')
     expect(overview).toContain('创建测试空间')
     expect(overview).toContain("space.status === 'running'")
-    // AI 控制中卡片：ego 式边框光晕 + 游走的 AI 光标
+    // AI 控制中卡片：ego 式边框光晕 + 脉冲点 + 游走的 agent 光标
     expect(styles).toContain('.webqq-space-card.is-running')
-    expect(styles).toContain('@keyframes webqq-space-agent-roam')
-    expect(styles).toContain('@keyframes webqq-space-agent-float')
+    expect(styles).toContain('@keyframes webqq-agent-pulse')
+    expect(styles).toContain('@keyframes webqq-agent-float')
     expect(styles).toContain('@media (prefers-reduced-motion: reduce)')
   })
 
@@ -44,5 +44,22 @@ describe('AI 测试空间总览', () => {
     expect(thumbnail).toContain('WebqqAvatar')
     expect(thumbnail).toContain('webqq-message-bubble')
     expect(preview).toContain('resolveWorkspaceSelection')
+  })
+
+  it('复刻 ego lite 的 agent 光标与被控空间观察覆盖层', () => {
+    const cursor = readFileSync(resolve('client/agent-cursor.vue'), 'utf8')
+    const overlay = readFileSync(resolve('client/agent-observe-overlay.vue'), 'utf8')
+    const page = readFileSync(resolve('client/page.vue'), 'utf8')
+    const styles = readFileSync(resolve('client/styles/webqq-spaces.css'), 'utf8')
+    // ego lite 官方光标 path 与随机跳位节奏（5.2-9s）
+    expect(cursor).toContain('M6.465 15.647')
+    expect(cursor).toContain('5200 + Math.random() * 3800')
+    expect(styles).toContain('cubic-bezier(0.22, 1, 0.36, 1)')
+    // 观察覆盖层：内发光 + 点阵 + 控制条接管
+    expect(overlay).toContain('webqq-agent-observe-glow')
+    expect(overlay).toContain('webqq-agent-observe-dots')
+    expect(overlay).toContain('接管')
+    expect(page).toContain('AgentObserveOverlay')
+    expect(page).toContain("space.status === 'running'")
   })
 })

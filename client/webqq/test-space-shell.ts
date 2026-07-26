@@ -91,7 +91,8 @@ export function createAiTestSpaceShell(
   onMounted(() => {
     void loadTestSpaces()
     refreshTimer = setInterval(() => {
-      if (currentView.value === 'spaces') void loadTestSpaces()
+      // 除总览外，进入测试空间观察时也要轮询：AI 完成或失败后被控覆盖层要实时消失。
+      if (currentView.value === 'spaces' || activeSpaceId.value) void loadTestSpaces()
     }, 1500)
   })
   onBeforeUnmount(() => {
