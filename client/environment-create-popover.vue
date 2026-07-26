@@ -21,13 +21,13 @@
           <Select v-model="participantType">
             <SelectTrigger
               id="environment-create-type"
-              class="w-full border-slate-200 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700"
+              class="w-full"
             >
               <SelectValue />
             </SelectTrigger>
-            <SelectContent :portal-to="selectPortalTarget" class="z-[120] w-[var(--reka-select-trigger-width)] border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
-              <SelectItem value="user" class="focus:bg-slate-100 dark:focus:bg-slate-800">普通用户</SelectItem>
-              <SelectItem value="bot" class="focus:bg-slate-100 dark:focus:bg-slate-800">机器人</SelectItem>
+            <SelectContent :portal-to="selectPortalTarget" class="z-[120] w-[var(--reka-select-trigger-width)]">
+              <SelectItem value="user">普通用户</SelectItem>
+              <SelectItem value="bot">机器人</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -37,7 +37,7 @@
           <Input
             id="environment-create-id"
             v-model="draft.id"
-            class="border-slate-200 text-sm focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700"
+            class="text-sm"
             inputmode="numeric"
             pattern="[0-9]+"
             required
@@ -49,7 +49,7 @@
           <Input
             id="environment-create-name"
             v-model="draft.name"
-            class="border-slate-200 text-sm focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700"
+            class="text-sm"
             required
           />
         </div>
@@ -60,13 +60,13 @@
             <Select v-model="botImplementation">
               <SelectTrigger
                 id="environment-create-implementation"
-                class="w-full border-slate-200 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700"
+                class="w-full"
               >
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent :portal-to="selectPortalTarget" class="z-[120] w-[var(--reka-select-trigger-width)] border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
-                <SelectItem value="napcat" class="focus:bg-slate-100 dark:focus:bg-slate-800">NapCat</SelectItem>
-                <SelectItem value="llbot" class="focus:bg-slate-100 dark:focus:bg-slate-800">LLBot</SelectItem>
+              <SelectContent :portal-to="selectPortalTarget" class="z-[120] w-[var(--reka-select-trigger-width)]">
+                <SelectItem value="napcat">NapCat</SelectItem>
+                <SelectItem value="llbot">LLBot</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -74,7 +74,6 @@
             <Checkbox
               id="environment-create-enabled"
               v-model="botEnabled"
-              class="border-slate-300 data-[state=checked]:border-[var(--webqq-accent)] data-[state=checked]:bg-[var(--webqq-accent)] data-[state=checked]:text-white dark:border-slate-600"
             />
             <Label for="environment-create-enabled">启用机器人</Label>
           </div>
@@ -86,7 +85,7 @@
 
         <Button
           type="submit"
-          class="inline-flex h-9 items-center justify-center rounded-lg bg-[var(--webqq-accent)] px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+          class="w-full"
           :disabled="busy || (effectiveType === 'group' && !canCreateGroup)"
         >
           {{ busy ? '创建中...' : submitLabel }}

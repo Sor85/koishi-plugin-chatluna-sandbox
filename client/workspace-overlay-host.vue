@@ -18,13 +18,12 @@
       </DialogHeader>
       <Input
         v-model="remarkInput"
-        class="border-slate-200 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700"
         placeholder="留空可删除备注"
         @keydown.enter="submitRemark"
       />
       <DialogFooter>
-        <Button variant="outline" class="border-slate-200 bg-white hover:bg-slate-100 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800" @click="remarkOpen = false">取消</Button>
-        <Button class="bg-[var(--webqq-accent)] text-white hover:opacity-90" @click="submitRemark">保存</Button>
+        <Button variant="outline" @click="remarkOpen = false">取消</Button>
+        <Button @click="submitRemark">保存</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>
@@ -38,13 +37,12 @@
       </DialogHeader>
       <Input
         v-model="groupActionInput"
-        class="border-slate-200 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700"
         :placeholder="groupActionMode === 'name' ? '输入群名称' : '输入群名片'"
         @keydown.enter="submitGroupAction"
       />
       <DialogFooter>
-        <Button variant="outline" class="border-slate-200 bg-white hover:bg-slate-100 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800" @click="groupActionOpen = false">取消</Button>
-        <Button class="bg-[var(--webqq-accent)] text-white hover:opacity-90" @click="submitGroupAction">保存</Button>
+        <Button variant="outline" @click="groupActionOpen = false">取消</Button>
+        <Button @click="submitGroupAction">保存</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

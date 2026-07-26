@@ -6,7 +6,7 @@
         <p>{{ spaces.length }} 个隔离测试空间，按创建时间从旧到新排列</p>
       </div>
       <Select v-model="filter">
-        <SelectTrigger class="w-36 border-slate-200 bg-white"><SelectValue /></SelectTrigger>
+        <SelectTrigger class="webqq-space-filter"><SelectValue /></SelectTrigger>
         <SelectContent><SelectItem v-for="item in filters" :key="item.value" :value="item.value">{{ item.label }}</SelectItem></SelectContent>
       </Select>
     </header>

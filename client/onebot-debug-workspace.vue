@@ -6,7 +6,7 @@
         <p>查看最近的 action、原始事件和错误。调试记录仅保存在内存中，不能重放。</p>
       </div>
       <div class="webqq-debug-actions">
-        <Button variant="outline" class="webqq-debug-button" :disabled="loading" @click="applyFilters">
+        <Button variant="outline" :disabled="loading" @click="applyFilters">
           <IconRefresh :size="16" aria-hidden="true" />
           刷新
         </Button>
@@ -24,7 +24,7 @@
           <SelectTrigger class="webqq-debug-control" aria-label="按机器人筛选">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent class="w-[var(--reka-select-trigger-width)] border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+          <SelectContent class="w-[var(--reka-select-trigger-width)]">
             <SelectItem value="all">全部机器人</SelectItem>
             <SelectItem v-for="bot in bots" :key="bot.id" :value="bot.id">{{ bot.name }} · {{ bot.id }}</SelectItem>
           </SelectContent>
@@ -36,7 +36,7 @@
           <SelectTrigger class="webqq-debug-control" aria-label="按方向筛选">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent class="w-[var(--reka-select-trigger-width)] border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+          <SelectContent class="w-[var(--reka-select-trigger-width)]">
             <SelectItem value="all">全部方向</SelectItem>
             <SelectItem value="action">Action 调用</SelectItem>
             <SelectItem value="event">原始事件</SelectItem>
@@ -48,7 +48,7 @@
         <Input v-model="type" class="webqq-debug-control" placeholder="例如 get_login_info" @keyup.enter="applyFilters" />
       </label>
       <label class="webqq-debug-error-filter">
-        <Checkbox v-model="errorsOnly" class="border-slate-300 data-[state=checked]:border-[var(--webqq-accent)] data-[state=checked]:bg-[var(--webqq-accent)] data-[state=checked]:text-white" />
+        <Checkbox v-model="errorsOnly" />
         <span>仅显示错误</span>
       </label>
     </section>

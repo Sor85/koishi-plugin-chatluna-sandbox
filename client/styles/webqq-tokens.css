@@ -33,3 +33,32 @@
     --webqq-hover: #273247;
   }
 }
+
+/* Dialog/Popover/Select 面板 teleport 到 body，取不到 .webqq-workspace 上的令牌，这里镜像一份；
+   面板拿不到 data-color-mode，暗色只能跟随系统偏好。--webqq-accent 由使用方内联传入时优先于此处默认值。 */
+.sandbox-dialog-content,
+.sandbox-popover-content,
+.sandbox-select-content {
+  --webqq-accent: #2563eb;
+  --webqq-bg: #fff;
+  --webqq-surface: #f8fafc;
+  --webqq-surface-muted: #f5f7fb;
+  --webqq-border: #dfe5ee;
+  --webqq-text: #202938;
+  --webqq-muted: #7a8494;
+  --webqq-hover: #edf2f8;
+  --webqq-accent-shadow: color-mix(in srgb, var(--webqq-accent) 28%, transparent);
+}
+
+/* Koishi 控制台的暗色模式通过根节点 .dark 类切换（与 prefers-color-scheme 无关）。 */
+.dark .sandbox-dialog-content,
+.dark .sandbox-popover-content,
+.dark .sandbox-select-content {
+  --webqq-bg: #162032;
+  --webqq-surface: #0f172a;
+  --webqq-surface-muted: #1b2740;
+  --webqq-border: #2f3a4d;
+  --webqq-text: #edf2f7;
+  --webqq-muted: #9ba7b8;
+  --webqq-hover: #273247;
+}

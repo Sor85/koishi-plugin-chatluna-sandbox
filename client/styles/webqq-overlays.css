@@ -1,75 +1,10 @@
+/* Portal 面板的控件颜色统一由 webqq-primitives.css 的 shadcn 控件基线提供（令牌镜像见 webqq-tokens.css），
+   这里只保留二级菜单的间距令牌。 */
 [data-slot='dialog-content'],
 [data-slot='popover-content'] {
-  /* Portal 脱离 .webqq-workspace 后不会继承 Tailwind/shadcn 颜色变量；缺失时边框会回退成 currentColor。 */
-  --color-background: #ffffff;
-  --color-foreground: #0f172a;
-  --color-primary: var(--webqq-accent, var(--primary, #2563eb));
-  --color-primary-foreground: #ffffff;
-  --color-secondary: #f1f5f9;
-  --color-secondary-foreground: #0f172a;
-  --color-muted: #f1f5f9;
-  --color-muted-foreground: #64748b;
-  --color-accent: #f1f5f9;
-  --color-accent-foreground: #0f172a;
-  --color-destructive: #dc2626;
-  --color-border: #e2e8f0;
-  --color-input: #dbe3ee;
-  --color-ring: var(--webqq-accent, var(--primary, #2563eb));
   --webqq-secondary-title-gap: 4px;
   --webqq-secondary-row-gap: 8px;
   --webqq-secondary-section-gap: 16px;
-}
-
-.dark [data-slot='dialog-content'],
-.dark [data-slot='popover-content'] {
-  --color-background: #0f172a;
-  --color-foreground: #f8fafc;
-  --color-secondary: #1e293b;
-  --color-secondary-foreground: #f8fafc;
-  --color-muted: #1e293b;
-  --color-muted-foreground: #94a3b8;
-  --color-accent: #1e293b;
-  --color-accent-foreground: #f8fafc;
-  --color-border: #334155;
-  --color-input: #334155;
-}
-
-:where([data-slot='dialog-content'], [data-slot='popover-content'])
-  :is([data-slot='input'], [data-slot='select-trigger'], [data-slot='checkbox']) {
-  border-color: var(--color-input);
-}
-
-:where([data-slot='dialog-content'], [data-slot='popover-content'])
-  :is([data-slot='input'], [data-slot='select-trigger'], [data-slot='checkbox']):focus-visible {
-  border-color: var(--color-ring);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-ring) 18%, transparent);
-}
-
-:where([data-slot='dialog-content'], [data-slot='popover-content'])
-  [data-slot='checkbox'][data-state='checked'] {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
-  color: var(--color-primary-foreground);
-}
-
-:where([data-slot='dialog-content'], [data-slot='popover-content'])
-  [data-slot='button'][data-variant='outline'] {
-  border-color: var(--color-input);
-  background: var(--color-background);
-  color: var(--color-foreground);
-}
-
-:where([data-slot='dialog-content'], [data-slot='popover-content'])
-  [data-slot='button'][data-variant='outline']:hover {
-  background: var(--color-accent);
-  color: var(--color-accent-foreground);
-}
-
-:where([data-slot='dialog-content'], [data-slot='popover-content'])
-  [data-slot='button']:not([data-variant]) {
-  border-color: transparent;
-  background: var(--color-primary);
-  color: var(--color-primary-foreground);
 }
 
 .webqq-secondary-form {

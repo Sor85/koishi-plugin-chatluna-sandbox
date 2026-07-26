@@ -12,7 +12,6 @@
           <Input
             :id="`${fieldPrefix}-id`"
             :model-value="draft.id"
-            class="border-slate-200 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700"
             disabled
           />
         </div>
@@ -21,7 +20,6 @@
           <Input
             :id="`${fieldPrefix}-name`"
             v-model="draft.name"
-            class="border-slate-200 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700"
             required
           />
         </div>
@@ -32,11 +30,11 @@
             <Select v-model="draft.implementation">
               <SelectTrigger
                 :id="`${fieldPrefix}-implementation`"
-                class="w-full border-slate-200 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700"
+                class="w-full"
               >
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent :portal-to="selectPortalTarget" class="w-[var(--reka-select-trigger-width)] border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+              <SelectContent :portal-to="selectPortalTarget" class="w-[var(--reka-select-trigger-width)]">
                 <SelectItem value="napcat">NapCat</SelectItem>
                 <SelectItem value="llbot">LLBot</SelectItem>
               </SelectContent>
@@ -52,7 +50,7 @@
               </span>
               <Input
                 v-model="capabilitySearch"
-                class="border-slate-200 pl-9 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700"
+                class="pl-9"
                 placeholder="搜索 action、别名或作用"
                 aria-label="搜索能力覆盖"
               />
@@ -66,7 +64,7 @@
                 <Checkbox
                   :model-value="capability.supported && !draft.disabledCapabilities.includes(capability.id)"
                   :disabled="!capability.supported"
-                  class="mt-0.5 border-slate-300 data-[state=checked]:border-[var(--webqq-accent)] data-[state=checked]:bg-[var(--webqq-accent)] data-[state=checked]:text-white dark:border-slate-600"
+                  class="mt-0.5"
                   @update:model-value="setCapabilityEnabled(capability.id, $event === true)"
                 />
                 <span class="grid min-w-0 gap-0.5">
@@ -93,7 +91,6 @@
             <Checkbox
               :id="`${fieldPrefix}-enabled`"
               v-model="draft.enabled"
-              class="data-[state=checked]:border-[var(--webqq-accent)] data-[state=checked]:bg-[var(--webqq-accent)] data-[state=checked]:text-white"
             />
             <Label :for="`${fieldPrefix}-enabled`">启用机器人</Label>
           </div>
@@ -108,20 +105,20 @@
           </div>
           <div v-for="(member, index) in draft.members" :key="`${member.participantId}:${index}`" class="grid grid-cols-[minmax(0,1fr)_110px_32px] gap-2">
             <Select v-model="member.participantId">
-              <SelectTrigger :aria-label="`第 ${index + 1} 位群成员`" class="w-full border-slate-200 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700">
+              <SelectTrigger :aria-label="`第 ${index + 1} 位群成员`" class="w-full">
                 <SelectValue placeholder="选择参与者" />
               </SelectTrigger>
-              <SelectContent :portal-to="selectPortalTarget" class="w-[var(--reka-select-trigger-width)] border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+              <SelectContent :portal-to="selectPortalTarget" class="w-[var(--reka-select-trigger-width)]">
                 <SelectItem v-for="participant in participants" :key="participant.id" :value="participant.id">
                   {{ participant.name }}（{{ participant.id }}）
                 </SelectItem>
               </SelectContent>
             </Select>
             <Select v-model="member.role">
-              <SelectTrigger :aria-label="`第 ${index + 1} 位群角色`" class="w-full border-slate-200 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700">
+              <SelectTrigger :aria-label="`第 ${index + 1} 位群角色`" class="w-full">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent :portal-to="selectPortalTarget" class="w-[var(--reka-select-trigger-width)] border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+              <SelectContent :portal-to="selectPortalTarget" class="w-[var(--reka-select-trigger-width)]">
                 <SelectItem value="owner">群主</SelectItem>
                 <SelectItem value="admin">管理员</SelectItem>
                 <SelectItem value="member">成员</SelectItem>
@@ -132,7 +129,7 @@
             </Button>
             <Input
               v-model="member.card"
-              class="col-span-3 border-slate-200 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700"
+              class="col-span-3"
               :aria-label="`第 ${index + 1} 位群名片`"
               placeholder="群名片"
             />
@@ -144,8 +141,8 @@
           {{ errorMessage }}
         </p>
         <DialogFooter>
-          <Button type="button" variant="outline" class="border-slate-200 bg-white hover:bg-slate-100 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800" @click="emit('update:open', false)">取消</Button>
-          <Button type="submit" class="bg-[var(--webqq-accent)] text-white hover:opacity-90" :disabled="busy">{{ busy ? '保存中...' : '保存' }}</Button>
+          <Button type="button" variant="outline" @click="emit('update:open', false)">取消</Button>
+          <Button type="submit" :disabled="busy">{{ busy ? '保存中...' : '保存' }}</Button>
         </DialogFooter>
       </form>
 
@@ -155,7 +152,7 @@
           {{ errorMessage }}
         </p>
         <DialogFooter>
-          <Button type="button" variant="outline" class="border-slate-200 bg-white hover:bg-slate-100 focus-visible:border-[var(--webqq-accent)] focus-visible:ring-[color-mix(in_srgb,var(--webqq-accent)_18%,transparent)] dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800" @click="emit('update:open', false)">取消</Button>
+          <Button type="button" variant="outline" @click="emit('update:open', false)">取消</Button>
           <Button type="button" variant="destructive" :disabled="busy" @click="submitDelete">{{ busy ? '删除中...' : '确认删除' }}</Button>
         </DialogFooter>
       </div>

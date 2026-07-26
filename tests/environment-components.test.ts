@@ -66,38 +66,27 @@ describe('环境管理组件传输边界', () => {
     expect(createPopover).toContain('<form class="webqq-secondary-form"')
   })
 
-  it('危险按钮和下拉浮层使用全局显式主题，避免 Portal 中样式退化', () => {
+  it('危险按钮和下拉浮层使用统一控件基线，避免 Portal 中样式退化', () => {
     const entityDialog = readFileSync(resolve('client/environment-entity-dialog.vue'), 'utf8')
-    const buttonVariants = readFileSync(resolve('client/components/ui/button/index.ts'), 'utf8')
     const selectContent = readFileSync(resolve('client/components/ui/select/SelectContent.vue'), 'utf8')
+    const primitives = readFileSync(resolve('client/styles/webqq-primitives.css'), 'utf8')
 
     expect(entityDialog).toContain('variant="destructive"')
-    expect(buttonVariants).toContain('bg-red-600 text-white shadow-xs')
     expect(selectContent).toContain('z-[200]')
-    expect(selectContent).toContain('border-slate-200 bg-white text-slate-900')
+    expect(selectContent).toContain('sandbox-select-content')
+    expect(primitives).toContain('.sandbox-select-content')
   })
 
-  it('Portal 二级菜单提供完整的 shadcn 颜色变量，避免控件回退为黑色描边', () => {
-    const overlayStyles = readFileSync(resolve('client/styles/webqq-overlays.css'), 'utf8')
+  it('Portal 二级菜单提供完整的控件令牌，避免控件回退为黑色描边', () => {
+    const tokens = readFileSync(resolve('client/styles/webqq-tokens.css'), 'utf8')
+    const primitives = readFileSync(resolve('client/styles/webqq-primitives.css'), 'utf8')
 
-    for (const token of [
-      '--color-background',
-      '--color-primary',
-      '--color-primary-foreground',
-      '--color-accent',
-      '--color-accent-foreground',
-      '--color-border',
-      '--color-input',
-      '--color-ring',
-    ]) {
-      expect(overlayStyles).toContain(token)
-    }
-
-    expect(overlayStyles).toContain("[data-slot='input']")
-    expect(overlayStyles).toContain("[data-slot='checkbox']")
-    expect(overlayStyles).toContain("[data-slot='button'][data-variant='outline']")
-    expect(overlayStyles).toContain("[data-slot='button']:not([data-variant])")
-    expect(overlayStyles).toContain('border-color: var(--color-input)')
-    expect(overlayStyles).toContain('background: var(--color-primary)')
+    // teleport 面板拿不到 .webqq-workspace 上的令牌，必须有镜像定义（含 .dark 暗色）
+    expect(tokens).toContain('.sandbox-dialog-content')
+    expect(tokens).toContain('.dark .sandbox-dialog-content')
+    expect(primitives).toContain('[data-slot="input"]')
+    expect(primitives).toContain('[data-slot="checkbox"]')
+    expect(primitives).toContain('[data-slot="button"][data-variant="outline"]')
+    expect(primitives).toContain('[data-slot="button"]:not([data-variant])')
   })
 })
