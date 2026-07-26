@@ -3,7 +3,7 @@ import type {} from '@koishijs/console'
 import type { SandboxControlService } from './control-service'
 import type { SandboxMcpService } from './mcp/service'
 import type { SandboxMcpScope } from './mcp/types'
-import type { SandboxTestSpaceService, SandboxTestSpaceSummary } from './test-spaces'
+import { trimSnapshotMessages, type SandboxTestSpaceService, type SandboxTestSpaceSummary } from './test-spaces'
 import type {
   DeleteGroupAnnouncementInput,
   ClearSandboxOneBotDebugRecordsResult,
@@ -196,7 +196,8 @@ export function registerConsole(
     console.addListener('onebot-sandbox/revoke-mcp-credential', (input) => mcp.revokeCredential(input.id), { authority: 4 })
   }
   if (testSpaces) {
-    console.addListener('onebot-sandbox/test-spaces', () => testSpaces.listSpaces(), { authority: 4 })
+    console.addListener('onebot-sandbox/test-spaces', () => testSpaces.listSpaces()
+      .map((space) => ({ ...space, snapshot: trimSnapshotMessages(space.snapshot, 10) })), { authority: 4 })
     console.addListener('onebot-sandbox/create-test-space', ({ name }) => {
       const space = testSpaces.createSpace({ controllerId: 'console', name })
       return testSpaces.takeOver(space.id)

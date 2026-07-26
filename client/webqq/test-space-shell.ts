@@ -1,10 +1,10 @@
 import { send } from '@koishijs/client'
-import { createLayout } from 'animejs'
 import { nextTick, onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
 import type { SandboxTestSpaceSummary } from '../../src/test-spaces'
 import type { SandboxSnapshot } from '../../src/types'
 import { createWorkspaceController } from './workspace-controller'
 import type { SandboxWorkspaceView } from './workspace-state'
+import { captureZoomRect, staggerCardsIn, zoomCardFromRect, zoomWorkspaceFromRect } from './workspace-zoom'
 
 const emptySnapshot: SandboxSnapshot = {
   revision: 0,
@@ -40,41 +40,37 @@ export function createAiTestSpaceShell(
       selectWorkspaceNavigation(view)
       return
     }
-    const layout = createWorkspaceLayout()
-    layout?.record()
-    selectWorkspaceNavigation(view)
+    // 已在总览时重复点击导航只刷新数据，不能再做"卡片从全屏缩回"动画。
+    if (currentView.value === 'spaces') {
+      await loadTestSpaces()
+      return
+    }
+    // 记录工作区当前位置，切换视图后让活动空间的卡片从这里缩回网格位。
+    const fromRect = captureZoomRect(document.querySelector('.webqq-workspace'))
+    // 先取数据再切视图：nextTick 发生在浏览器绘制前，卡片的初始 transform 能赶在首帧写入；
+    // 若先切视图再等待网络加载，网格会以常态先绘制若干帧，缩放起点随后才写入，视觉上产生跳变。
     await loadTestSpaces()
+    selectWorkspaceNavigation(view)
     await nextTick()
-    animateWorkspaceLayout(layout)
-  }
-
-  function createWorkspaceLayout() {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    const workspace = document.querySelector<HTMLElement>('.webqq-workspace')
-    const layoutRoot = workspace?.parentElement
-    // 只让共享空间 ID 参与布局匹配；Anime.js 仍会生成内部 node-* ID，动画结束后会单独清理。
-    return layoutRoot ? createLayout(layoutRoot, { children: '[data-layout-id^="webqq-space-"]' }) : undefined
-  }
-
-  function animateWorkspaceLayout(layout: ReturnType<typeof createLayout> | undefined) {
-    if (!layout) return
-    const timeline = layout.animate({ duration: 560, ease: 'out(4)' })
-    timeline.then(() => {
-      window.setTimeout(() => {
-        document.querySelectorAll('[data-layout-id^="node-"]').forEach((node) => node.removeAttribute('data-layout-id'))
-      }, 0)
-    })
+    if (!fromRect) return
+    const overview = document.querySelector<HTMLElement>('.webqq-space-overview')
+    const activeCard = overview?.querySelector<HTMLElement>(`[data-space-id="${activeSpaceId.value ?? 'main'}"]`)
+    const cards = [...overview?.querySelectorAll<HTMLElement>('.webqq-space-card') ?? []].filter((card) => card !== activeCard)
+    if (overview && activeCard) zoomCardFromRect(activeCard, overview, fromRect)
+    staggerCardsIn(cards)
   }
 
   async function enterTestSpace(spaceId?: string) {
-    const layout = createWorkspaceLayout()
-    layout?.record()
+    // 记录被点击卡片的位置，让真实工作区从卡片处连续放大；新建空间无卡片时从创建卡起步。
+    const fromRect = captureZoomRect(
+      document.querySelector(`[data-space-id="${spaceId ?? 'main'}"]`) ?? document.querySelector('.webqq-space-create'),
+    )
     activeSpaceId.value = spaceId
     await controller.load()
     selectWorkspaceNavigation('messages')
     await nextTick()
-    // 共享 layout id 让 Anime.js 在空间卡片和真实 WebQQ 之间变形，不再维护手写坐标与快照克隆。
-    animateWorkspaceLayout(layout)
+    const workspace = document.querySelector<HTMLElement>('.webqq-workspace')
+    if (workspace && fromRect) zoomWorkspaceFromRect(workspace, fromRect)
   }
 
   async function createTestSpace() {

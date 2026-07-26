@@ -23,6 +23,21 @@ export interface CreateSandboxTestSpaceInput {
   name?: string
 }
 
+// Console 每 1.5s 轮询全部空间快照，裁掉历史消息避免带宽随消息量线性增长；MCP 契约仍返回完整快照，不走此函数。
+export function trimSnapshotMessages(snapshot: SandboxSnapshot, limit: number): SandboxSnapshot {
+  const conversations = snapshot.conversations.map((conversation) => ({
+    ...conversation,
+    messageIds: conversation.messageIds.slice(-limit),
+    hasMoreMessages: conversation.hasMoreMessages || conversation.messageIds.length > limit,
+  }))
+  const visibleMessageIds = new Set(conversations.flatMap(({ messageIds }) => messageIds))
+  return {
+    ...snapshot,
+    conversations,
+    messages: snapshot.messages.filter(({ id }) => visibleMessageIds.has(id)),
+  }
+}
+
 interface SandboxTestSpaceRecord extends Omit<SandboxTestSpaceSummary, 'snapshot'> {
   control: SandboxControlService
 }

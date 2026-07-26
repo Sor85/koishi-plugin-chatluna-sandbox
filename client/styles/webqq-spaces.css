@@ -1,4 +1,7 @@
 .webqq-space-overview { min-width: 0; overflow: auto; padding: 32px; background: var(--webqq-surface); color: var(--webqq-text); }
+/* 退出空间的缩放动画期间放开裁剪，让活动卡片能越过总览边界覆盖整个工作区再缩回网格位。 */
+.webqq-space-overview.is-zooming { overflow: visible; }
+.webqq-space-overview.is-zooming .webqq-space-card { content-visibility: visible; }
 .webqq-space-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
 .webqq-space-toolbar h1, .webqq-space-toolbar p { margin: 0; }
 .webqq-space-toolbar h1 { font-size: 24px; }
@@ -16,14 +19,18 @@
 .webqq-space-card footer small { margin-top: 3px; color: var(--webqq-muted); font-size: 12px; }
 .webqq-space-card-actions { display: flex; align-items: center; gap: 6px; }
 .webqq-space-create { place-items: center; place-content: center; gap: 10px; border-style: dashed; color: var(--webqq-muted); }
-.webqq-space-thumbnail { display: grid; grid-template-columns: 22px 30% 1fr 24%; min-height: 190px; background: var(--webqq-surface-muted); }
-.webqq-space-thumbnail-rail { border-right: 1px solid var(--webqq-border); background: var(--webqq-bg); }
-.webqq-space-thumbnail-list { display: flex; flex-direction: column; gap: 8px; padding: 18px 8px; border-right: 1px solid var(--webqq-border); }
-.webqq-space-thumbnail-list i { height: 18px; border-radius: 9px; background: var(--webqq-border); }
-.webqq-space-thumbnail-chat { display: flex; flex-direction: column; justify-content: center; gap: 10px; padding: 18px; }
-.webqq-space-thumbnail-chat span { width: 62%; height: 20px; border-radius: 10px; background: #fff; box-shadow: 0 4px 10px rgb(15 23 42 / 6%); }
-.webqq-space-thumbnail-chat span.is-self { align-self: flex-end; background: var(--webqq-accent); }
-.webqq-space-thumbnail-details { display: flex; flex-direction: column; gap: 10px; padding: 18px 10px; border-left: 1px solid var(--webqq-border); }
-.webqq-space-thumbnail-details i { height: 10px; border-radius: 5px; background: var(--webqq-border); }
+/* 迷你工作区以 4 倍卡片尺寸渲染后 scale(0.25)，字号与真实工作区保持同比例，无需 JS 测量。 */
+.webqq-space-thumbnail { position: relative; min-height: 190px; overflow: hidden; background: var(--webqq-surface-muted); pointer-events: none; }
+.webqq-space-mini { position: absolute; top: 0; left: 0; display: grid; grid-template-columns: 72px 230px minmax(0, 1fr); width: 400%; height: 400%; background: var(--webqq-bg); transform: scale(0.25); transform-origin: 0 0; }
+.webqq-space-mini-rail { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px 8px; border-right: 1px solid var(--webqq-border); background: var(--webqq-rail); }
+.webqq-space-mini-sessions { display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; overflow: hidden; border-right: 1px solid var(--webqq-border); }
+.webqq-space-mini-session { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 12px; align-items: center; flex: none; padding: 10px 12px; border-radius: 10px; }
+.webqq-space-mini-session.is-active { background: color-mix(in srgb, var(--webqq-accent) 14%, transparent); }
+.webqq-space-mini-session-copy { min-width: 0; }
+.webqq-space-mini-session-copy strong, .webqq-space-mini-session-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.webqq-space-mini-session-copy strong { font-size: 13px; line-height: 18px; font-weight: 600; }
+.webqq-space-mini-session-copy small { margin-top: 1px; color: var(--webqq-muted); font-size: 12px; line-height: 16px; }
+.webqq-space-mini-chat { display: flex; flex-direction: column; justify-content: flex-end; padding: 20px 22px; overflow: hidden; background: var(--webqq-surface-muted); }
+.webqq-space-mini-empty { align-self: center; margin: auto; color: var(--webqq-muted); font-size: 13px; }
 @media (prefers-reduced-motion: reduce) { .webqq-space-card.is-running { border-color: var(--webqq-accent); } .webqq-space-card.is-running::before, .webqq-space-card.is-running::after { display: none; } .webqq-space-card { transition: none; } }
 @media (max-width: 720px) { .webqq-space-overview { padding: 16px; } .webqq-space-toolbar { align-items: flex-start; flex-direction: column; } .webqq-space-grid { grid-template-columns: 1fr; } }

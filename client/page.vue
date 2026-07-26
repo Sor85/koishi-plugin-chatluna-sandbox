@@ -10,7 +10,6 @@
           'is-details-closed': !detailsVisible || !isWebqqView,
           'is-standalone-view': !isWebqqView,
         }"
-        :data-layout-id="isWebqqView ? activeSpaceLayoutId : undefined"
         :data-chat-style="appearance.webQQChatStyle"
         :data-color-mode="appearance.webQQColorMode"
         :data-mobile-view="currentView"
@@ -111,10 +110,8 @@ import { createWorkspaceController } from './webqq/workspace-controller'
 import { createWorkspaceLayout } from './webqq/workspace-layout'
 import { createWebqqWorkspaceShell } from './webqq/workspace-shell'
 import { createAiTestSpaceShell } from './webqq/test-space-shell'
-import { createWorkspaceLayoutId } from './webqq/workspace-transition'
 
 const activeSpaceId = ref<string>()
-const activeSpaceLayoutId = computed(() => createWorkspaceLayoutId(activeSpaceId.value))
 const workspaceController = createWorkspaceController(createKoishiWorkspacePort(() => activeSpaceId.value), window.localStorage)
 const workspaceLayout = createWorkspaceLayout()
 const overlayHostRef = ref<InstanceType<typeof WorkspaceOverlayHost>>()

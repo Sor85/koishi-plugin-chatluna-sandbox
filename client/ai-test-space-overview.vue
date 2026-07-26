@@ -12,7 +12,7 @@
     </header>
 
     <div class="webqq-space-grid">
-      <article class="webqq-space-card is-main" data-space-id="main" :data-layout-id="createWorkspaceLayoutId()" tabindex="0" @click="openCard(undefined)" @keydown.enter="openCard(undefined)">
+      <article class="webqq-space-card is-main" data-space-id="main" tabindex="0" @click="openCard(undefined)" @keydown.enter="openCard(undefined)">
         <WorkspaceThumbnail :snapshot="mainSnapshot" />
         <footer><div><strong>主模拟 QQ 环境</strong><small>固定空间 · 不可删除</small></div><Badge variant="secondary">主环境</Badge></footer>
       </article>
@@ -23,7 +23,6 @@
         class="webqq-space-card"
         :class="{ 'is-running': space.status === 'running' }"
         :data-space-id="space.id"
-        :data-layout-id="createWorkspaceLayoutId(space.id)"
         tabindex="0"
         @click="openCard(space.id)"
         @keydown.enter="openCard(space.id)"
@@ -55,7 +54,6 @@ import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
 import WorkspaceThumbnail from './workspace-thumbnail.vue'
-import { createWorkspaceLayoutId } from './webqq/workspace-transition'
 import type { SandboxSnapshot } from '../src/types'
 import type { SandboxTestSpaceStatus, SandboxTestSpaceSummary } from '../src/test-spaces'
 
