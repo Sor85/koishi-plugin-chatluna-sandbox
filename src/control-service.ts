@@ -167,6 +167,7 @@ export class SandboxControlService {
   private runtimeOwner = {}
   private botDeliveries: SandboxBotDelivery[] = []
   private chatLunaState: SandboxChatLunaStateStore
+  private initialScene: SandboxSnapshot
   private oneBotDebug: SandboxOneBotDebugStore
   private mediaStorage: SandboxMediaStorage
   private persistence?: SandboxScenePersistence
@@ -176,7 +177,8 @@ export class SandboxControlService {
   private disposePromise?: Promise<void>
 
   constructor(private ctx: Context, options: SandboxControlServiceOptions = {}) {
-    this.scene = structuredClone(options.initialScene ?? createDefaultScene())
+    this.initialScene = structuredClone(options.initialScene ?? createDefaultScene())
+    this.scene = structuredClone(this.initialScene)
     this.runtimeBotsActive = options.runtimeActive ?? true
     this.runtimeBotRegistry = options.runtimeBots ?? new SandboxRuntimeBotRegistry()
     this.persistence = options.persistence
@@ -266,9 +268,22 @@ export class SandboxControlService {
     return this.mediaStorage.save(input)
   }
 
+  storeMediaBatch(inputs: Array<{ fileName: string; mimeType: string; dataBase64: string }>): SandboxMedia[] {
+    const media: SandboxMedia[] = []
+    try {
+      for (const input of inputs) media.push(this.mediaStorage.save(input))
+      return media
+    } catch (error) {
+      for (const item of media) this.mediaStorage.remove(item)
+      throw error
+    }
+  }
+
   async sendStoredMediaMessage(input: Pick<SendMessageInput, 'operatorId' | 'conversationId' | 'content' | 'replyToMessageId'> & { media: SandboxMedia[] }): Promise<SendMessageResult> {
     const context = this.getMessageContext(input)
-    const message = this.appendMessage(input.operatorId, context.conversation.id, input.content.trim(), input.replyToMessageId, input.media)
+    const text = input.content.trim()
+    const content = text || input.media.map((item) => `[${this.getMediaLabel(item)}] ${item.name}`).join(' ')
+    const message = this.appendMessage(input.operatorId, context.conversation.id, content, input.replyToMessageId, input.media)
     const elements = input.media.map((media) => h(media.type === 'image' ? 'img' : media.type, {
       src: media.reference,
       file: media.reference,
@@ -276,14 +291,14 @@ export class SandboxControlService {
       mime: media.mimeType,
       size: media.size,
     }))
-    if (input.content.trim()) elements.push(h.text(input.content.trim()))
+    if (text) elements.push(h.text(text))
     const onebotMessage: Array<{ type: string; data: Record<string, string> }> = input.media.map((media) => ({
       type: media.type === 'audio' ? 'record' : media.type,
       data: { file: media.reference },
     }))
     if (context.reply) onebotMessage.unshift({ type: 'reply', data: { id: context.reply.id } })
-    if (input.content.trim()) onebotMessage.push({ type: 'text', data: { text: input.content.trim() } })
-    const rawMessage = `${context.reply ? `[CQ:reply,id=${context.reply.id}]` : ''}${input.media.map((media) => `[CQ:${media.type === 'audio' ? 'record' : media.type},file=${media.reference}]`).join('')}${input.content.trim()}`
+    if (text) onebotMessage.push({ type: 'text', data: { text } })
+    const rawMessage = `${context.reply ? `[CQ:reply,id=${context.reply.id}]` : ''}${input.media.map((media) => `[CQ:${media.type === 'audio' ? 'record' : media.type},file=${media.reference}]`).join('')}${text}`
     await this.dispatchMessageToBots(context, message, elements, onebotMessage, rawMessage)
     return { messageId: message.id, revision: this.scene.revision }
   }
@@ -337,7 +352,10 @@ export class SandboxControlService {
     this.chatLunaState.clear()
     this.oneBotDebug.clear()
     this.botDeliveries = []
-    this.scene = createDefaultScene()
+    // 恢复到本实例的初始场景而非全局默认场景：测试空间的初始场景是空白，
+    // 直接 createDefaultScene() 会引入默认机器人 20001，与主场景在全局
+    // 运行时注册表中的同 ID 机器人冲突，导致空间内 reset 必定失败。
+    this.scene = structuredClone(this.initialScene)
     this.syncRuntimeBots()
     this.queueScenePersistence()
   }
@@ -896,10 +914,22 @@ export class SandboxControlService {
   | { action: 'set-admin'; groupId: string; targetId: string; enabled: boolean }
   | { action: 'transfer-owner'; groupId: string; targetId: string }
   | { action: 'set-card'; groupId: string; targetId: string; card: string }
-  | { action: 'set-name'; groupId: string; name: string }) {
+  | { action: 'set-name'; groupId: string; name: string }
+  | { action: 'leave'; groupId: string }) {
     const group = this.scene.groups.find(({ id }) => id === input.groupId)
     if (!group) throw new Error(`群组不存在：${input.groupId}`)
     const actor = this.requireGroupMember(group, botId)
+
+    if (input.action === 'leave') {
+      if (actor.role === 'owner') throw new Error('群主不能直接退出群组')
+      await this.dispatchGroupNotice(group, 'group_decrease', {
+        sub_type: 'leave',
+        operator_id: Number(botId),
+        user_id: Number(botId),
+      })
+      this.removeGroupMember(group, botId)
+      return { status: 'ok', retcode: 0, data: null }
+    }
 
     if (input.action === 'set-name') {
       if (actor.role === 'member') throw new Error('只有群主或管理员可以修改群名称')

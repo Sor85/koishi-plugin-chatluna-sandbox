@@ -48,6 +48,8 @@ describe('OneBot 实现配置', () => {
       expect.objectContaining({ action: 'get_version_info', description: expect.any(String), surface: 'standard', supported: true }),
       expect.objectContaining({ action: 'set_qq_avatar', description: expect.any(String), surface: 'native', supported: true }),
       expect.objectContaining({ action: 'send_poke', aliases: ['friend_poke', 'group_poke'], description: expect.stringContaining('戳一戳') }),
+      expect.objectContaining({ action: 'set_group_leave', surface: 'standard', supported: true }),
+      expect.objectContaining({ action: 'send_forward_msg', aliases: ['send_group_forward_msg', 'send_private_forward_msg'], supported: true }),
     ]))
     expect(napcat.capabilities).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'group.notice.delete', action: '_del_group_notice', handler: 'delete_group_notice', supported: true }),

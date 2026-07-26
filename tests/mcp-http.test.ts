@@ -1,16 +1,20 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { App } from '@koishijs/core'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SandboxControlService } from '../src/control-service'
 import { SandboxMcpHttpServer, sourceMatches } from '../src/mcp/server'
 import { SandboxMcpService } from '../src/mcp/service'
 
 const cleanups: Array<() => Promise<void>> = []
-afterEach(async () => Promise.all(cleanups.splice(0).map((cleanup) => cleanup())))
+afterEach(async () => {
+  vi.restoreAllMocks()
+  await Promise.all(cleanups.splice(0).map((cleanup) => cleanup()))
+})
 
 describe('MCP Streamable HTTP', () => {
   it('按凭证权限发现 32 个工具并拒绝不受信 Origin', async () => {
@@ -68,6 +72,38 @@ describe('MCP Streamable HTTP', () => {
     expect(sourceMatches('127.0.0.1', '127.0.0.0/8')).toBe(true)
     expect(sourceMatches('::1', '::1/128')).toBe(true)
     expect(sourceMatches('10.0.0.1', '127.0.0.0/8')).toBe(false)
+  })
+
+  it('等待旧版 SDK 异步写完 initialize 响应后再关闭 transport', async () => {
+    const original = StreamableHTTPServerTransport.prototype.handleRequest
+    vi.spyOn(StreamableHTTPServerTransport.prototype, 'handleRequest').mockImplementation(function (this: StreamableHTTPServerTransport, ...args) {
+      setTimeout(() => void original.apply(this, args), 0)
+      return Promise.resolve()
+    })
+
+    const app = new App()
+    const directory = mkdtempSync(join(tmpdir(), 'onebot-sandbox-mcp-legacy-'))
+    const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media') })
+    const service = new SandboxMcpService(control, { dataDirectory: directory })
+    const credential = service.createCredential('旧版 SDK 凭证', ['read'])
+    const server = new SandboxMcpHttpServer(app, service, {
+      enabled: true, host: '127.0.0.1', port: 0, path: '/mcp', allowedSources: ['127.0.0.1'], allowedOrigins: [], allowInsecureRemote: false,
+      readPerMinute: 120, mutationPerMinute: 60, waitPerMinute: 120, uploadPerMinute: 30,
+      maxConcurrentMutations: 4, maxConcurrentWaits: 8, maxConcurrentUploads: 2,
+    })
+    await server.start()
+    cleanups.push(async () => { await server.stop(); await app.stop() })
+    const address = server.getAddress()
+    if (!address) throw new Error('MCP 监听地址不存在')
+
+    const response = await fetch(`http://127.0.0.1:${address.port}/mcp`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${credential.token}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'legacy-test', version: '1' } } }),
+    })
+
+    expect(response.headers.get('content-type')).toContain('application/json')
+    expect(await response.json()).toMatchObject({ result: { serverInfo: { name: 'koishi-plugin-onebot-sandbox' } } })
   })
 
   it('非回环监听缺少 TLS 时拒绝启动', async () => {

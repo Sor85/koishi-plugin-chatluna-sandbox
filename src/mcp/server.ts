@@ -1,11 +1,11 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
+import { CallToolRequestSchema, ListResourcesRequestSchema, ListToolsRequestSchema, ReadResourceRequestSchema } from '@modelcontextprotocol/sdk/types.js'
 import { createServer, type IncomingMessage, type Server as HttpServer, type ServerResponse } from 'node:http'
 import { createServer as createHttpsServer } from 'node:https'
 import { BlockList, isIP } from 'node:net'
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import * as z from 'zod'
 import type { Context } from 'koishi'
 import { SandboxMcpError } from './types'
 import { SandboxMcpService, TOOL_DEFINITIONS } from './service'
@@ -59,7 +59,25 @@ function sourceMatches(address: string, rule: string): boolean {
 }
 
 function jsonContent(value: unknown) {
-  return { content: [{ type: 'text' as const, text: JSON.stringify(value) }], structuredContent: value as Record<string, unknown> }
+  // MCP 协议要求 structuredContent 必须是 object；数组或原始值会被 SDK 以
+  // -32602 拒绝（表现为 list_* 等返回数组的工具无法调用），因此仅对普通对象附带。
+  const structured = value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : undefined
+  return { content: [{ type: 'text' as const, text: JSON.stringify(value) }], ...(structured ? { structuredContent: structured } : {}) }
+}
+
+function waitForResponseCompletion(response: ServerResponse): Promise<void> {
+  if (response.writableEnded || response.destroyed) return Promise.resolve()
+  return new Promise((resolve) => {
+    const finish = () => {
+      response.off('finish', finish)
+      response.off('close', finish)
+      response.off('error', finish)
+      resolve()
+    }
+    response.once('finish', finish)
+    response.once('close', finish)
+    response.once('error', finish)
+  })
 }
 
 export class SandboxMcpHttpServer {
@@ -116,6 +134,9 @@ export class SandboxMcpHttpServer {
     try {
       await mcp.connect(transport)
       await transport.handleRequest(request, response)
+      // MCP SDK 1.23.x 会在 JSON-RPC 响应真正写入前提前结束 handleRequest。
+      // 若此时立即关闭 transport，客户端只能收到无正文、无 Content-Type 的 200。
+      await waitForResponseCompletion(response)
     } catch (error) {
       this.ctx.logger('onebot-sandbox').error('MCP 请求处理失败', error)
       if (!response.headersSent) this.writeJson(response, 500, { jsonrpc: '2.0', error: { code: -32603, message: 'Internal server error' }, id: null })
@@ -125,24 +146,29 @@ export class SandboxMcpHttpServer {
     }
   }
 
-  private createMcpServer(token: string, sourceIp: string): McpServer {
-    const server = new McpServer({ name: 'koishi-plugin-onebot-sandbox', version: '0.0.1' })
-    for (const tool of this.service.listTools(token)) {
-      server.registerTool(tool.name, {
-        description: tool.description,
-        inputSchema: z.record(z.string(), z.unknown()).default({}),
-      }, async (args) => {
-        try {
-          return jsonContent(await this.service.callTool(token, tool.name, args, { sourceIp }))
-        } catch (error) {
-          const normalized = error instanceof SandboxMcpError ? error : new SandboxMcpError('internal_error', '工具调用失败')
-          return { ...jsonContent({ code: normalized.code, message: normalized.message, retryable: normalized.retryable, recovery: normalized.recovery, details: normalized.details, retryAfterMs: normalized.retryAfterMs, revision: this.service.getRevision(), traceId: randomUUID() }), isError: true }
-        }
-      })
-    }
-    for (const resource of this.service.listResources(token)) {
-      server.registerResource(resource.name, resource.uri, { mimeType: 'application/json' }, async () => ({ contents: [{ uri: resource.uri, mimeType: 'application/json', text: JSON.stringify(this.service.readResource(token, resource.uri)) }] }))
-    }
+  // 使用低层 Server 而非 McpServer.registerTool：后者要求 zod schema 才能生成
+  // tools/list 的 inputSchema（通配 record 会序列化为空 properties，客户端将无从
+  // 得知参数契约）。参数校验本就在 service.executeTool 内完成，这里只需把
+  // TOOL_DEFINITIONS 携带的 JSON Schema 原样暴露。
+  private createMcpServer(token: string, sourceIp: string): Server {
+    const server = new Server({ name: 'koishi-plugin-onebot-sandbox', version: '0.0.1' }, { capabilities: { tools: {}, resources: {} } })
+    server.setRequestHandler(ListToolsRequestSchema, async () => ({
+      tools: this.service.listTools(token).map(({ name, description, inputSchema }) => ({ name, description, inputSchema })),
+    }))
+    server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      try {
+        return jsonContent(await this.service.callTool(token, request.params.name, request.params.arguments ?? {}, { sourceIp }))
+      } catch (error) {
+        const normalized = error instanceof SandboxMcpError ? error : new SandboxMcpError('internal_error', '工具调用失败')
+        return { ...jsonContent({ code: normalized.code, message: normalized.message, retryable: normalized.retryable, recovery: normalized.recovery, details: normalized.details, retryAfterMs: normalized.retryAfterMs, revision: this.service.getRevision(), traceId: randomUUID() }), isError: true }
+      }
+    })
+    server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+      resources: this.service.listResources(token).map(({ uri, name }) => ({ uri, name, mimeType: 'application/json' })),
+    }))
+    server.setRequestHandler(ReadResourceRequestSchema, async (request) => ({
+      contents: [{ uri: request.params.uri, mimeType: 'application/json', text: JSON.stringify(this.service.readResource(token, request.params.uri)) }],
+    }))
     return server
   }
 

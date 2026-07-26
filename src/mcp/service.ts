@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import type { SandboxControlService } from '../control-service'
 import type { SandboxTestSpaceService } from '../test-spaces'
 import type { SandboxMedia, SandboxSnapshot } from '../types'
-import { createDirectConversationId } from '../types'
+import { createDirectConversationId, createGroupConversationId } from '../types'
 import { getOneBotCapabilityMatrix } from '../onebot-profiles'
 import { SandboxMcpError, type SandboxMcpCallRecord, type SandboxMcpCreatedCredential, type SandboxMcpCredential, type SandboxMcpEvent, type SandboxMcpEventCursor, type SandboxMcpExport, type SandboxMcpScope } from './types'
 
@@ -26,6 +26,242 @@ interface ToolDefinition {
   name: string
   scope: SandboxMcpScope
   description: string
+  inputSchema: Record<string, unknown>
+}
+
+// —— 工具参数 JSON Schema ——
+// MCP 客户端只能从 tools/list 的 inputSchema 学习参数契约（实际校验在 executeTool
+// 内部完成），因此这里的 schema 是给 AI 消费者的文档，必须与实现保持一致。
+const SPACE_REQUIRED = { type: 'string', description: 'AI 测试空间 ID，由 create_test_space 返回；修改与等待类操作必填' }
+const SPACE_OPTIONAL = { type: 'string', description: 'AI 测试空间 ID；省略时读取主场景' }
+const IDEMPOTENCY_KEY = { type: 'string', description: '幂等键；使用相同键重放时参数必须逐字段一致' }
+const CURSOR = {
+  type: 'object',
+  properties: { epoch: { type: 'string' }, sequence: { type: 'number' } },
+  required: ['epoch', 'sequence'],
+  description: '事件游标，取自 get_server_info 或先前调用返回的 cursor；破坏性操作后游标失效需重新获取',
+}
+const TIMEOUT_SECONDS = { type: 'number', minimum: 1, maximum: 120, description: '等待超时秒数，默认 30' }
+const OPERATOR_ID = { type: 'string', description: '操作者参与者 ID（十进制数字字符串）' }
+
+const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
+  get_server_info: { type: 'object', properties: {} },
+  list_test_spaces: { type: 'object', properties: {} },
+  get_test_space: { type: 'object', properties: { spaceId: SPACE_REQUIRED }, required: ['spaceId'] },
+  get_scene_snapshot: { type: 'object', properties: { spaceId: SPACE_OPTIONAL } },
+  list_conversations: {
+    type: 'object',
+    properties: {
+      spaceId: SPACE_OPTIONAL,
+      operatorId: OPERATOR_ID,
+      limit: { type: 'number', minimum: 1, maximum: 200, description: '返回条数，默认 50' },
+      offset: { type: 'number', minimum: 0 },
+    },
+    required: ['operatorId'],
+  },
+  get_conversation: {
+    type: 'object',
+    properties: {
+      spaceId: SPACE_OPTIONAL,
+      operatorId: OPERATOR_ID,
+      conversationId: { type: 'string', description: '会话 ID，如 private:10001:20001 或 group:30001' },
+      messageLimit: { type: 'number', minimum: 1, maximum: 100, description: '消息条数，默认 50' },
+    },
+    required: ['operatorId', 'conversationId'],
+  },
+  list_pending_requests: { type: 'object', properties: { spaceId: SPACE_OPTIONAL } },
+  get_capability_matrix: {
+    type: 'object',
+    properties: {
+      spaceId: SPACE_OPTIONAL,
+      implementation: { type: 'string', enum: ['napcat', 'llbot'], description: '默认 napcat' },
+    },
+  },
+  export_scene: { type: 'object', properties: { spaceId: SPACE_OPTIONAL } },
+  upload_media: {
+    type: 'object',
+    properties: {
+      spaceId: SPACE_REQUIRED,
+      fileName: { type: 'string' },
+      mimeType: { type: 'string' },
+      dataBase64: { type: 'string', description: '文件内容的 Base64 编码' },
+      sha256: { type: 'string', description: '可选内容摘要；不匹配时拒绝上传' },
+    },
+    required: ['spaceId', 'fileName', 'mimeType', 'dataBase64'],
+  },
+  send_message: {
+    type: 'object',
+    properties: {
+      spaceId: SPACE_REQUIRED,
+      operatorId: OPERATOR_ID,
+      conversationId: { type: 'string' },
+      content: { type: 'string', description: '消息文本；支持 <at id="参与者ID"/> 元素（群聊中触发命令通常需要 at 机器人）' },
+      mediaIds: { type: 'array', items: { type: 'string' }, description: 'upload_media 返回的媒体 ID 列表' },
+      externalMediaUrls: { type: 'array', items: { type: 'string' }, description: '外部媒体 URL，仅允许 HTTPS' },
+      replyToMessageId: { type: 'string' },
+      idempotencyKey: IDEMPOTENCY_KEY,
+    },
+    required: ['spaceId', 'operatorId', 'conversationId', 'idempotencyKey'],
+    description: '等待机器人回复的正确模式：先记录发送前 cursor，发送后用 wait_for_message({ cursor: 发送前游标, authorId: 机器人ID }) 等待；同步回复在本调用返回前即已进入事件流，用返回的 cursor 会错过。',
+  },
+  perform_friend_action: {
+    type: 'object',
+    properties: {
+      spaceId: SPACE_REQUIRED,
+      operatorId: OPERATOR_ID,
+      action: { type: 'string', enum: ['request', 'handle-request', 'delete', 'set-remark', 'poke'] },
+      targetId: { type: 'string', description: 'request/delete/set-remark/poke 的目标参与者 ID' },
+      requestId: { type: 'string', description: 'handle-request 的申请 ID' },
+      approve: { type: 'boolean', description: 'handle-request 是否批准' },
+      comment: { type: 'string', description: 'request 附言' },
+      remark: { type: 'string', description: 'set-remark 的备注' },
+      conversationId: { type: 'string', description: 'poke 可选会话' },
+      idempotencyKey: IDEMPOTENCY_KEY,
+    },
+    required: ['spaceId', 'operatorId', 'action', 'idempotencyKey'],
+  },
+  perform_group_action: {
+    type: 'object',
+    properties: {
+      spaceId: SPACE_REQUIRED,
+      operatorId: OPERATOR_ID,
+      action: { type: 'string', enum: ['request-join', 'invite', 'handle-request', 'leave', 'kick', 'set-admin', 'transfer-owner', 'set-card', 'set-name', 'poke'] },
+      groupId: { type: 'string' },
+      targetId: { type: 'string' },
+      requestId: { type: 'string', description: 'handle-request 的申请 ID' },
+      approve: { type: 'boolean' },
+      comment: { type: 'string' },
+      enabled: { type: 'boolean', description: 'set-admin 是否授予' },
+      card: { type: 'string', description: 'set-card 的群名片' },
+      name: { type: 'string', description: 'set-name 的群名' },
+      conversationId: { type: 'string' },
+      idempotencyKey: IDEMPOTENCY_KEY,
+    },
+    required: ['spaceId', 'operatorId', 'action', 'idempotencyKey'],
+  },
+  handle_request: {
+    type: 'object',
+    properties: {
+      spaceId: SPACE_REQUIRED,
+      operatorId: OPERATOR_ID,
+      requestId: { type: 'string' },
+      approve: { type: 'boolean' },
+      idempotencyKey: IDEMPOTENCY_KEY,
+    },
+    required: ['spaceId', 'operatorId', 'requestId', 'approve', 'idempotencyKey'],
+  },
+  wait_for_event: {
+    type: 'object',
+    properties: {
+      spaceId: SPACE_REQUIRED,
+      cursor: CURSOR,
+      type: { type: 'string', description: '事件类型过滤，如 message.created、scene.changed、friend.action' },
+      timeoutSeconds: TIMEOUT_SECONDS,
+    },
+    required: ['spaceId', 'cursor'],
+  },
+  wait_for_message: {
+    type: 'object',
+    properties: {
+      spaceId: SPACE_REQUIRED,
+      cursor: CURSOR,
+      conversationId: { type: 'string' },
+      authorId: { type: 'string', description: '按消息作者过滤；等待机器人回复时传机器人 ID' },
+      recipientBotId: { type: 'string', description: '按投递目标机器人过滤（仅 send_message 的投递事件携带）' },
+      timeoutSeconds: TIMEOUT_SECONDS,
+    },
+    required: ['spaceId', 'cursor'],
+  },
+  wait_for_chatluna_state: {
+    type: 'object',
+    description: '等待 ChatLuna 思考或完成状态；观察 thinking=true 时必须先启动等待，再并发调用 send_message，因为 send_message 会等待同步回复完成。',
+    properties: {
+      spaceId: SPACE_REQUIRED,
+      cursor: CURSOR,
+      botParticipantId: { type: 'string' },
+      conversationId: { type: 'string' },
+      thinking: { type: 'boolean' },
+      timeoutSeconds: TIMEOUT_SECONDS,
+    },
+    required: ['spaceId', 'cursor'],
+  },
+  apply_environment_changes: {
+    type: 'object',
+    properties: {
+      spaceId: SPACE_REQUIRED,
+      expectedRevision: { type: 'number', description: '当前场景 revision（从 get_scene_snapshot 获取）；不一致时拒绝' },
+      changes: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            action: { type: 'string', enum: ['create-user', 'create-bot', 'create-group', 'update-user', 'update-bot', 'set-capabilities', 'update-group', 'set-friendship'] },
+            data: { type: 'object', description: 'create-user/update-user: {id,name,avatar?}；create-bot/update-bot: {id,name,implementation?,enabled?}；create-group/update-group: {id,name,members?:[{participantId,role,card?}]}；set-friendship: {firstId,secondId,enabled?}；set-capabilities: {id,disabledCapabilities?}。参与者 ID 必须是十进制数字字符串，且机器人 ID 不得与其他活动场景冲突（主场景默认机器人为 20001）' },
+          },
+          required: ['action', 'data'],
+        },
+      },
+    },
+    required: ['spaceId', 'expectedRevision', 'changes'],
+  },
+  create_test_space: {
+    type: 'object',
+    properties: { name: { type: 'string' }, idempotencyKey: IDEMPOTENCY_KEY },
+    required: ['idempotencyKey'],
+  },
+  complete_test_space: { type: 'object', properties: { spaceId: SPACE_REQUIRED, idempotencyKey: IDEMPOTENCY_KEY }, required: ['spaceId', 'idempotencyKey'] },
+  fail_test_space: { type: 'object', properties: { spaceId: SPACE_REQUIRED, idempotencyKey: IDEMPOTENCY_KEY }, required: ['spaceId', 'idempotencyKey'] },
+  reactivate_test_space: { type: 'object', properties: { spaceId: SPACE_REQUIRED, idempotencyKey: IDEMPOTENCY_KEY }, required: ['spaceId', 'idempotencyKey'] },
+  delete_test_space: { type: 'object', properties: { spaceId: SPACE_REQUIRED, idempotencyKey: IDEMPOTENCY_KEY }, required: ['spaceId', 'idempotencyKey'] },
+  prepare_destructive_action: {
+    type: 'object',
+    properties: {
+      spaceId: SPACE_REQUIRED,
+      expectedRevision: { type: 'number' },
+      tool: { type: 'string', enum: ['delete_environment_entity', 'reset_scene', 'clear_scene', 'import_scene'] },
+      arguments: { type: 'object', description: '必须与随后实际调用去除 confirmationToken 后的参数逐字段一致（含 spaceId），否则确认失败' },
+    },
+    required: ['spaceId', 'expectedRevision', 'tool', 'arguments'],
+  },
+  delete_environment_entity: {
+    type: 'object',
+    properties: {
+      spaceId: SPACE_REQUIRED,
+      kind: { type: 'string', enum: ['user', 'bot', 'group'] },
+      id: { type: 'string' },
+      confirmationToken: { type: 'string', description: 'prepare_destructive_action 返回的一次性令牌，60 秒内有效' },
+    },
+    required: ['spaceId', 'kind', 'id', 'confirmationToken'],
+  },
+  reset_scene: { type: 'object', properties: { spaceId: SPACE_REQUIRED, confirmationToken: { type: 'string' } }, required: ['spaceId', 'confirmationToken'] },
+  clear_scene: { type: 'object', properties: { spaceId: SPACE_REQUIRED, confirmationToken: { type: 'string' } }, required: ['spaceId', 'confirmationToken'] },
+  import_scene: {
+    type: 'object',
+    properties: {
+      spaceId: SPACE_REQUIRED,
+      document: {
+        type: 'object',
+        properties: { testApiVersion: { type: 'number', enum: [1] }, scene: { type: 'object' } },
+        required: ['testApiVersion', 'scene'],
+        description: 'export_scene 导出的文档；scene.revision 须与当前 revision 一致',
+      },
+      confirmationToken: { type: 'string' },
+    },
+    required: ['spaceId', 'document', 'confirmationToken'],
+  },
+  list_onebot_debug_records: {
+    type: 'object',
+    properties: {
+      spaceId: SPACE_OPTIONAL,
+      botId: { type: 'string' },
+      direction: { type: 'string', enum: ['event', 'action'] },
+      type: { type: 'string' },
+      errorsOnly: { type: 'boolean' },
+    },
+  },
+  clear_onebot_debug_records: { type: 'object', properties: { spaceId: SPACE_REQUIRED }, required: ['spaceId'] },
+  list_mcp_call_records: { type: 'object', properties: { spaceId: SPACE_REQUIRED }, required: ['spaceId'] },
+  clear_mcp_call_records: { type: 'object', properties: { spaceId: SPACE_REQUIRED }, required: ['spaceId'] },
 }
 
 const TOOL_DEFINITIONS: ToolDefinition[] = [
@@ -54,14 +290,14 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   ['delete_test_space', 'manage', '删除当前凭证创建的 AI 测试空间；除非用户明确要求，否则测试完成后应默认保留'],
   ['prepare_destructive_action', 'manage', '准备一次性破坏性操作确认令牌'],
   ['delete_environment_entity', 'manage', '删除现有环境实体'],
-  ['reset_scene', 'manage', '恢复默认场景'],
+  ['reset_scene', 'manage', '恢复初始场景（主场景为默认场景，测试空间为创建时的空白场景）'],
   ['clear_scene', 'manage', '清空当前场景'],
   ['import_scene', 'manage', '导入版本化 JSON 场景'],
   ['list_onebot_debug_records', 'debug', '读取 OneBot 调试记录'],
   ['clear_onebot_debug_records', 'debug', '清理 OneBot 调试记录'],
   ['list_mcp_call_records', 'debug', '读取 MCP 调用记录'],
   ['clear_mcp_call_records', 'debug', '清理 MCP 调用记录'],
-].map(([name, scope, description]) => ({ name, scope, description }) as ToolDefinition)
+].map(([name, scope, description]) => ({ name, scope, description, inputSchema: TOOL_SCHEMAS[name as string] ?? { type: 'object', properties: {} } }) as ToolDefinition)
 
 const READ_RESOURCES = [
   { uri: 'onebot-sandbox://guide', name: 'MCP 测试指南' },
@@ -134,8 +370,19 @@ export class SandboxMcpService {
   }
 
   private observeControl(control: SandboxControlService, spaceId?: string): void {
+    // 消息事件统一在此处从场景 diff 产生：被测机器人经 Koishi 适配器主动回复的
+    // 消息不会经过 MCP 的 send_message，只有场景变更回调可见；若只发 scene.changed，
+    // wait_for_message（匹配 message.created）将永远等不到机器人回复。
+    const seenMessageIds = new Set(control.getSnapshot().messages.map(({ id }) => id))
     control.onSceneMutation((snapshot) => {
       this.appendEvent('scene.changed', { revision: snapshot.revision }, spaceId)
+      for (const message of snapshot.messages) {
+        if (seenMessageIds.has(message.id)) continue
+        seenMessageIds.add(message.id)
+        // 此处不查投递记录：投递在 middleware 完成后才登记，场景通知时必然拿不到；
+        // 带 recipientBotId 的投递事件由 send_message 等待投递完成后单独补发。
+        this.appendEvent('message.created', message, spaceId)
+      }
     })
   }
 
@@ -201,12 +448,40 @@ export class SandboxMcpService {
         name: '退群公告测试',
         idempotencyKey: 'example-space-1',
       },
+      apply_environment_changes: {
+        spaceId: '<create_test_space.spaceId>',
+        expectedRevision: 0,
+        changes: [
+          { action: 'create-user', data: { id: '10001', name: '测试用户' } },
+          { action: 'create-bot', data: { id: '20002', name: '被测机器人', implementation: 'napcat' } },
+          { action: 'set-friendship', data: { firstId: '10001', secondId: '20002' } },
+        ],
+      },
       send_message: {
         spaceId: '<create_test_space.spaceId>',
         operatorId: '10001',
-        conversationId: 'private:10001:20001',
+        conversationId: 'private:10001:20002',
         content: '你好',
         idempotencyKey: 'example-message-1',
+      },
+      等待机器人回复: {
+        说明: 'send_message 会等待被测机器人的同步处理完成才返回，回复可能在返回前已进入事件流；必须用发送前的 cursor 加 authorId 过滤等待，用 send_message 返回的 cursor 会错过同步回复。',
+        步骤: [
+          { tool: 'get_server_info', 得到: 'cursor（发送前）' },
+          { tool: 'send_message', arguments: { spaceId: '<spaceId>', operatorId: '10001', conversationId: 'private:10001:20002', content: 'help', idempotencyKey: 'example-message-2' } },
+          { tool: 'wait_for_message', arguments: { spaceId: '<spaceId>', cursor: '<发送前 cursor>', conversationId: 'private:10001:20002', authorId: '20002', timeoutSeconds: 30 } },
+        ],
+      },
+      等待ChatLuna思考状态: {
+        说明: 'thinking=true 是瞬时状态；先用发送前 cursor 启动 wait_for_chatluna_state，再并发调用 send_message。发送完成后可直接等待或读取 thinking=false。',
+        并发调用: [
+          { tool: 'wait_for_chatluna_state', arguments: { spaceId: '<spaceId>', cursor: '<发送前 cursor>', botParticipantId: '20002', conversationId: 'private:10001:20002', thinking: true, timeoutSeconds: 30 } },
+          { tool: 'send_message', arguments: { spaceId: '<spaceId>', operatorId: '10001', conversationId: 'private:10001:20002', content: 'chatluna.chat 你好', idempotencyKey: 'example-chatluna-1' } },
+        ],
+      },
+      群聊触发命令: {
+        说明: '群聊中触发 Koishi 命令通常需要 at 机器人；content 支持 <at id="参与者ID"/> 元素。',
+        send_message: { spaceId: '<spaceId>', operatorId: '10001', conversationId: 'group:30001', content: '<at id="20002"/> help', idempotencyKey: 'example-message-3' },
       },
     }
     throw new SandboxMcpError('resource_not_found', `资源不存在：${uri}`)
@@ -271,8 +546,12 @@ export class SandboxMcpService {
     if (tool === 'perform_group_action') return this.withIdempotency(credential, tool, args, async () => this.performGroupAction(activeControl, args))
     if (tool === 'handle_request') return this.withIdempotency(credential, tool, args, async () => this.handleRequest(activeControl, args))
     if (tool === 'wait_for_event') return this.waitFor(args, (event) => !args.type || event.type === args.type)
+    // authorId 过滤是「等待机器人回复」的关键：沙盒 send_message 会等待 middleware
+    // 完成才返回，同步命令的回复在返回前已入事件流，消费者只能用「发送前 cursor +
+    // authorId=机器人」的组合等待回复，否则会匹配到自己刚发的消息或错过回复。
     if (tool === 'wait_for_message') return this.waitFor(args, (event) => event.type === 'message.created'
       && (!args.conversationId || Reflect.get(event.data as object, 'conversationId') === args.conversationId)
+      && (!args.authorId || Reflect.get(event.data as object, 'authorId') === args.authorId)
       && (!args.recipientBotId || Reflect.get(event.data as object, 'recipientBotId') === args.recipientBotId))
     if (tool === 'wait_for_chatluna_state') return this.waitForChatLuna(activeControl, args)
     if (tool === 'apply_environment_changes') return this.applyEnvironmentChanges(activeControl, args)
@@ -290,7 +569,8 @@ export class SandboxMcpService {
 
   private listConversations(control: SandboxControlService, args: Record<string, unknown>) {
     const operatorId = requireString(args.operatorId, 'operatorId')
-    const snapshot = control.getVisibleSnapshot(operatorId, 200)
+    // control 层消息分页上限为 100（control-service.ts assertMessageLimit），超出会直接抛错。
+    const snapshot = control.getVisibleSnapshot(operatorId, 100)
     const limit = Math.min(Math.max(Number(args.limit ?? 50), 1), 200)
     const offset = Math.max(Number(args.offset ?? 0), 0)
     return { items: snapshot.conversations.slice(offset, offset + limit), nextOffset: offset + limit < snapshot.conversations.length ? offset + limit : undefined }
@@ -299,7 +579,7 @@ export class SandboxMcpService {
   private getConversation(control: SandboxControlService, args: Record<string, unknown>) {
     const operatorId = requireString(args.operatorId, 'operatorId')
     const conversationId = requireString(args.conversationId, 'conversationId')
-    const snapshot = control.getVisibleSnapshot(operatorId, Math.min(Math.max(Number(args.messageLimit ?? 50), 1), 200))
+    const snapshot = control.getVisibleSnapshot(operatorId, Math.min(Math.max(Number(args.messageLimit ?? 50), 1), 100))
     const conversation = snapshot.conversations.find(({ id }) => id === conversationId)
     if (!conversation) throw new SandboxMcpError('conversation_not_found', `会话不存在或不可见：${conversationId}`)
     const messageIds = new Set(conversation.messageIds)
@@ -341,10 +621,12 @@ export class SandboxMcpService {
       ? await control.sendStoredMediaMessage({ operatorId, conversationId, content, replyToMessageId: typeof args.replyToMessageId === 'string' ? args.replyToMessageId : undefined, media })
       : await control.sendMessage({ operatorId, conversationId, content: requireString(content, 'content'), replyToMessageId: typeof args.replyToMessageId === 'string' ? args.replyToMessageId : undefined })
     const spaceId = typeof args.spaceId === 'string' ? args.spaceId : undefined
+    // 消息创建事件已由场景变更监听统一产生（observeControl）；此处只补发
+    // 投递完成事件（带 recipientBotId），供 wait_for_message 按接收机器人过滤。
     for (const message of control.getSnapshot().messages.filter(({ id }) => !previousMessageIds.has(id))) {
-      const deliveries = control.getBotDeliveries({ messageId: message.id })
-      if (!deliveries.length) this.appendEvent('message.created', message, spaceId)
-      for (const delivery of deliveries) this.appendEvent('message.created', { ...message, recipientBotId: delivery.recipientBotId }, spaceId)
+      for (const delivery of control.getBotDeliveries({ messageId: message.id })) {
+        this.appendEvent('message.created', { ...message, recipientBotId: delivery.recipientBotId }, spaceId)
+      }
     }
     return { ...result, cursor: this.currentCursor() }
   }
@@ -449,7 +731,14 @@ export class SandboxMcpService {
       const data = asRecord(change.data)
       if (action === 'create-user') snapshot.participants.push({ kind: 'user', id: requireString(data.id, 'id'), name: requireString(data.name, 'name') })
       else if (action === 'create-bot') snapshot.participants.push({ kind: 'bot', id: requireString(data.id, 'id'), name: requireString(data.name, 'name'), implementation: data.implementation === 'llbot' ? 'llbot' : 'napcat', enabled: data.enabled !== false })
-      else if (action === 'create-group') snapshot.groups.push({ id: requireString(data.id, 'id'), name: requireString(data.name, 'name'), members: Array.isArray(data.members) ? data.members as never : [], announcements: [] })
+      else if (action === 'create-group') {
+        const groupId = requireString(data.id, 'id')
+        snapshot.groups.push({ id: groupId, name: requireString(data.name, 'name'), members: Array.isArray(data.members) ? data.members as never : [], announcements: [] })
+        // 与 set-friendship 自动创建私聊会话保持一致：建群即建群会话，
+        // 否则 AI 需要先执行一次群操作才能拿到可发消息的会话。
+        const conversationId = createGroupConversationId(groupId)
+        if (!snapshot.conversations.some(({ id }) => id === conversationId)) snapshot.conversations.push({ id: conversationId, type: 'group', groupId, messageIds: [] })
+      }
       else if (action === 'update-user') {
         const participant = snapshot.participants.find(({ id, kind }) => id === data.id && kind === 'user')
         if (!participant) throw new SandboxMcpError('participant_not_found', `用户不存在：${String(data.id)}`)

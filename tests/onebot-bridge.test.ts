@@ -40,7 +40,17 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     expect(messages[1]).toMatchObject({
       authorId: '20001',
       conversationId: 'private:10001:20001',
-      content: expect.stringContaining('<img'),
+      content: '[图片] image.png',
+      media: [expect.objectContaining({
+        type: 'image',
+        name: 'image.png',
+        mimeType: 'image/png',
+        reference: expect.stringMatching(/^sandbox-media:\/\//),
+      })],
+    })
+    expect(control.getMediaContent({ operatorId: '10001', mediaId: messages[1].media![0].id })).toMatchObject({
+      mimeType: 'image/png',
+      dataBase64: Buffer.from('reply-image').toString('base64'),
     })
     await expect(control.bot.internal._request('get_friend_msg_history', {
       user_id: 10001,
@@ -50,7 +60,7 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
       data: {
         messages: [
           expect.objectContaining({ message: [{ type: 'text', data: { text: '触发机器人回复' } }] }),
-          expect.objectContaining({ message: [{ type: 'image', data: expect.objectContaining({ url: imageSource }) }] }),
+          expect.objectContaining({ message: [{ type: 'image', data: expect.objectContaining({ url: expect.stringMatching(/^sandbox-media:\/\//) }) }] }),
         ],
       },
     })
@@ -169,6 +179,14 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
       retcode: 0,
       data: { group_id: 30001, user_id: 10002, nickname: '测试用户2', card: '测试用户2', role: 'admin' },
     })
+    await expect(bot.internal.getGroupMemberList('group:30001')).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ group_id: 30001, user_id: 10002, role: 'admin' }),
+    ]))
+    await expect(bot.internal.getGroupMemberInfo('group:30001', 10002)).resolves.toMatchObject({
+      group_id: 30001,
+      user_id: 10002,
+      role: 'admin',
+    })
     await expect(bot.internal._request('get_version_info', {})).resolves.toEqual({
       status: 'ok',
       retcode: 0,
@@ -274,5 +292,30 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
       expect.objectContaining({ type: 'guild-member-removed', userId: '10003', guildId: '30001', rawType: 'group_decrease' }),
     ]))
     expect(rawNotices).toEqual(expect.arrayContaining(['group_increase', 'group_card', 'group_name', 'group_decrease']))
+  })
+
+  it('NapCat 扩展群管理与合并转发 action 走沙盒域逻辑', async () => {
+    const { control } = await createControl()
+    const bot = control.bot
+    control.createGroup({ id: '30002', name: '扩展测试群', members: [
+      { participantId: '10001', role: 'owner' },
+      { participantId: '20001', role: 'admin' },
+      { participantId: '10003', role: 'member' },
+    ] })
+
+    await expect(bot.internal._request('set_group_ban', { group_id: 30002, user_id: 10003, duration: 600 })).resolves.toMatchObject({ status: 'ok' })
+    await expect(bot.internal._request('set_group_special_title', { group_id: 30002, user_id: 10003, special_title: '头衔' })).rejects.toThrow('只有群主可以设置专属头衔')
+
+    const sent = await bot.internal._request('send_group_msg', { group_id: 30002, message: '表情回应目标' }) as { data: { message_id: string } }
+    await expect(bot.internal._request('set_msg_emoji_like', { message_id: sent.data.message_id, emoji_id: '128077' })).resolves.toMatchObject({ status: 'ok' })
+
+    await bot.internal._request('send_forward_msg', { group_id: 30002, messages: [
+      { type: 'node', data: { user_id: 20001, nickname: 'Koishi', content: '第一段' } },
+      { type: 'node', data: { user_id: 20001, nickname: 'Koishi', content: [{ type: 'text', data: { text: '第二段' } }] } },
+    ] })
+    expect(control.getSnapshot().messages.at(-1)).toMatchObject({ authorId: '20001', content: '第一段\n第二段' })
+
+    await expect(bot.internal._request('set_group_leave', { group_id: 30002 })).resolves.toMatchObject({ status: 'ok' })
+    expect(control.getSnapshot().groups.find(({ id }) => id === '30002')!.members.some(({ participantId }) => participantId === '20001')).toBe(false)
   })
 })
