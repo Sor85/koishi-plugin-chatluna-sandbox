@@ -12,7 +12,7 @@
     </header>
 
     <div class="webqq-space-grid">
-      <article class="webqq-space-card is-main" data-space-id="main" tabindex="0" @click="openCard(undefined, $event)" @keydown.enter="openCard(undefined, $event)">
+      <article class="webqq-space-card is-main" data-space-id="main" :data-layout-id="createWorkspaceLayoutId()" tabindex="0" @click="openCard(undefined)" @keydown.enter="openCard(undefined)">
         <WorkspaceThumbnail :snapshot="mainSnapshot" />
         <footer><div><strong>主模拟 QQ 环境</strong><small>固定空间 · 不可删除</small></div><Badge variant="secondary">主环境</Badge></footer>
       </article>
@@ -23,9 +23,10 @@
         class="webqq-space-card"
         :class="{ 'is-running': space.status === 'running' }"
         :data-space-id="space.id"
+        :data-layout-id="createWorkspaceLayoutId(space.id)"
         tabindex="0"
-        @click="openCard(space.id, $event)"
-        @keydown.enter="openCard(space.id, $event)"
+        @click="openCard(space.id)"
+        @keydown.enter="openCard(space.id)"
       >
         <WorkspaceThumbnail :snapshot="space.snapshot" />
         <footer>
@@ -54,6 +55,7 @@ import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
 import WorkspaceThumbnail from './workspace-thumbnail.vue'
+import { createWorkspaceLayoutId } from './webqq/workspace-transition'
 import type { SandboxSnapshot } from '../src/types'
 import type { SandboxTestSpaceStatus, SandboxTestSpaceSummary } from '../src/test-spaces'
 
@@ -77,17 +79,5 @@ function statusLabel(status: SandboxTestSpaceStatus) {
   return status === 'running' ? 'AI 控制中' : status === 'taken-over' ? '用户已接管' : status === 'completed' ? '已完成' : '已失败'
 }
 function formatTime(value: string) { return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(value)) }
-async function openCard(spaceId: string | undefined, event: Event) {
-  const card = event.currentTarget as HTMLElement
-  const rect = card.getBoundingClientRect()
-  const clone = card.cloneNode(true) as HTMLElement
-  Object.assign(clone.style, { position: 'fixed', zIndex: '300', margin: '0', left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px`, pointerEvents: 'none' })
-  document.body.append(clone)
-  await clone.animate([
-    { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px`, borderRadius: '18px' },
-    { left: '72px', top: '0', width: 'calc(100vw - 72px)', height: '100vh', borderRadius: '0' },
-  ], { duration: 260, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' }).finished.catch(() => undefined)
-  emit('enter', spaceId)
-  clone.remove()
-}
+function openCard(spaceId?: string) { emit('enter', spaceId) }
 </script>

@@ -2956,10 +2956,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"animejs@npm:4.4.1":
-  version: 4.4.1
-  resolution: "animejs@npm:4.4.1"
-  checksum: 10c0/fed82adea748494d261378564eaeebfbe95987366671ddd4f06522174358bbf2c09d06facaa5ac9b3e7b004410b1ea69d5abf7a292be7bb448f4df03b0a0fae8
+"animejs@npm:4.5.0":
+  version: 4.5.0
+  resolution: "animejs@npm:4.5.0"
+  peerDependencies:
+    "@types/three": ">=0.150.0"
+    three: ">=0.150.0"
+  peerDependenciesMeta:
+    "@types/three":
+      optional: true
+    three:
+      optional: true
+  checksum: 10c0/2e8c282bb5a7f6c7303ff113822e742d38c426e93046527598b3372630600a295dca47537db513eb32daba4d81a6b77996935826cea10d1e6b441da78598431e
   languageName: node
   linkType: hard
 
@@ -4840,7 +4848,7 @@ __metadata:
     "@types/node": "npm:^24.0.0"
     "@vitejs/plugin-vue": "npm:^6.0.2"
     "@vueuse/core": "npm:^14.3.0"
-    animejs: "npm:4.4.1"
+    animejs: "npm:4.5.0"
     class-variance-authority: "npm:^0.7.1"
     koishi: "npm:^4.18.10"
     reka-ui: "npm:^2.10.1"

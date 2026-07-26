@@ -1,4 +1,5 @@
 import { send } from '@koishijs/client'
+import { createLayout } from 'animejs'
 import { nextTick, onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
 import type { SandboxTestSpaceSummary } from '../../src/test-spaces'
 import type { SandboxSnapshot } from '../../src/types'
@@ -39,38 +40,41 @@ export function createAiTestSpaceShell(
       selectWorkspaceNavigation(view)
       return
     }
+    const layout = createWorkspaceLayout()
+    layout?.record()
+    selectWorkspaceNavigation(view)
+    await loadTestSpaces()
+    await nextTick()
+    animateWorkspaceLayout(layout)
+  }
+
+  function createWorkspaceLayout() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     const workspace = document.querySelector<HTMLElement>('.webqq-workspace')
-    const clone = workspace?.cloneNode(true) as HTMLElement | undefined
-    const start = workspace?.getBoundingClientRect()
-    if (clone && start) {
-      Object.assign(clone.style, {
-        position: 'fixed', zIndex: '300', margin: '0', left: `${start.left}px`, top: `${start.top}px`,
-        width: `${start.width}px`, height: `${start.height}px`, pointerEvents: 'none', transformOrigin: 'top left',
-      })
-      document.body.append(clone)
-    }
-    try {
-      selectWorkspaceNavigation(view)
-      await loadTestSpaces()
-      await nextTick()
-      const targetId = activeSpaceId.value ?? 'main'
-      const target = document.querySelector<HTMLElement>(`[data-space-id="${targetId.replaceAll('"', '\\"')}"]`)
-      if (clone && start && target) {
-        const end = target.getBoundingClientRect()
-        await clone.animate([
-          { left: `${start.left}px`, top: `${start.top}px`, width: `${start.width}px`, height: `${start.height}px`, borderRadius: '0' },
-          { left: `${end.left}px`, top: `${end.top}px`, width: `${end.width}px`, height: `${end.height}px`, borderRadius: '18px' },
-        ], { duration: 260, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' }).finished.catch(() => undefined)
-      }
-    } finally {
-      clone?.remove()
-    }
+    const layoutRoot = workspace?.parentElement
+    // 只让共享空间 ID 参与布局匹配；Anime.js 仍会生成内部 node-* ID，动画结束后会单独清理。
+    return layoutRoot ? createLayout(layoutRoot, { children: '[data-layout-id^="webqq-space-"]' }) : undefined
+  }
+
+  function animateWorkspaceLayout(layout: ReturnType<typeof createLayout> | undefined) {
+    if (!layout) return
+    const timeline = layout.animate({ duration: 560, ease: 'out(4)' })
+    timeline.then(() => {
+      window.setTimeout(() => {
+        document.querySelectorAll('[data-layout-id^="node-"]').forEach((node) => node.removeAttribute('data-layout-id'))
+      }, 0)
+    })
   }
 
   async function enterTestSpace(spaceId?: string) {
+    const layout = createWorkspaceLayout()
+    layout?.record()
     activeSpaceId.value = spaceId
     await controller.load()
     selectWorkspaceNavigation('messages')
+    await nextTick()
+    // 共享 layout id 让 Anime.js 在空间卡片和真实 WebQQ 之间变形，不再维护手写坐标与快照克隆。
+    animateWorkspaceLayout(layout)
   }
 
   async function createTestSpace() {
