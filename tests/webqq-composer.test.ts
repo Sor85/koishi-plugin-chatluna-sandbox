@@ -12,7 +12,7 @@ describe('WebQQ 发送控件', () => {
     expect(composerSource).toContain('selectOperator: [participantId: string')
     expect(composerSource).toContain('manageEnvironment: [input: ManageSandboxEnvironmentInput')
     expect(composerSource).toContain("const input = ref('')")
-    expect(composerSource).toContain('const selectedMediaFile = ref<File>()')
+    expect(composerSource).toContain('const sendFiles = ref<ComposerSendFile[]>([])')
     expect(composerSource).toContain('const sending = ref(false)')
     expect(chatPaneSource).toContain('<WebqqComposer')
     expect(chatPaneSource).not.toContain('class="webqq-composer"')

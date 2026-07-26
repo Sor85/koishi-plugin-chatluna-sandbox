@@ -213,7 +213,7 @@ describe('WebQQ 工作区控制模块', () => {
     await controller.selectOperator('20001')
 
     await controller.sendMessage({ conversationId: 'private:10001:20001', content: '机器人消息' })
-    await controller.sendMediaMessage({ conversationId: 'private:10001:20001', fileName: 'bot.txt', mimeType: 'text/plain', dataBase64: '' })
+    await controller.sendMediaMessage({ conversationId: 'private:10001:20001', media: [{ fileName: 'bot.txt', mimeType: 'text/plain', dataBase64: '' }] })
     await controller.getMediaContent('media-1')
     await controller.loadMessageHistory({ conversationId: 'private:10001:20001', limit: 10 })
     await controller.setGroupAnnouncement({ groupId: '30001', content: '机器人公告' })
@@ -512,9 +512,7 @@ describe('WebQQ 工作区控制模块', () => {
 
     await expect(controller.sendMediaMessage({
       conversationId: 'private:10001:20001',
-      fileName: 'fixture.png',
-      mimeType: 'image/png',
-      dataBase64: 'ZmFrZQ==',
+      media: [{ fileName: 'fixture.png', mimeType: 'image/png', dataBase64: 'ZmFrZQ==' }],
     })).rejects.toMatchObject({
       name: 'WorkspaceControllerError',
       message: '媒体发送被拒绝',
@@ -525,9 +523,7 @@ describe('WebQQ 工作区控制模块', () => {
       input: {
         operatorId: '10001',
         conversationId: 'private:10001:20001',
-        fileName: 'fixture.png',
-        mimeType: 'image/png',
-        dataBase64: 'ZmFrZQ==',
+        media: [{ fileName: 'fixture.png', mimeType: 'image/png', dataBase64: 'ZmFrZQ==' }],
       },
     })
     expect(controller.chat.value.revision).toBe(revisionBeforeFailure)

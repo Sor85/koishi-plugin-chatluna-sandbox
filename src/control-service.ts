@@ -969,25 +969,35 @@ export class SandboxControlService {
   }
 
   async sendMediaMessage(input: SendMediaMessageInput): Promise<SendMessageResult> {
+    if (!input.media.length) throw new Error('至少需要一个媒体文件')
+    // 先校验会话与操作者，再落盘媒体；中途任一文件校验失败时清理已写入的文件，避免留下孤儿媒体。
     const context = this.getMessageContext(input)
-    const media = this.mediaStorage.save(input)
-    const content = input.content?.trim() || `[${this.getMediaLabel(media)}] ${media.name}`
-    const message = this.appendMessage(input.operatorId, context.conversation.id, content, input.replyToMessageId, [media])
-    const elementType = media.type === 'image' ? 'img' : media.type
-    const mediaElement = h(elementType, {
-      src: media.reference,
-      file: media.reference,
-      title: media.name,
-      mime: media.mimeType,
-      size: media.size,
-    })
-    const elements = [mediaElement, ...(input.content?.trim() ? [h.text(input.content.trim())] : [])]
-    const onebotType = media.type === 'audio' ? 'record' : media.type
-    await this.dispatchMessageToBots(context, message, elements, [
+    const media: SandboxMedia[] = []
+    try {
+      for (const file of input.media) media.push(this.mediaStorage.save(file))
+    } catch (error) {
+      for (const saved of media) this.mediaStorage.remove(saved)
+      throw error
+    }
+    const text = input.content?.trim() ?? ''
+    // 占位 content 仅用于会话预览与历史可读性，派发给机器人的消息只携带媒体段与用户真实文本。
+    const content = text || media.map((item) => `[${this.getMediaLabel(item)}] ${item.name}`).join(' ')
+    const message = this.appendMessage(input.operatorId, context.conversation.id, content, input.replyToMessageId, media)
+    const elements = media.map((item) => h(item.type === 'image' ? 'img' : item.type, {
+      src: item.reference,
+      file: item.reference,
+      title: item.name,
+      mime: item.mimeType,
+      size: item.size,
+    }))
+    if (text) elements.push(h.text(text))
+    const onebotMessage: Array<{ type: string; data: Record<string, string> }> = [
       ...(context.reply ? [{ type: 'reply', data: { id: context.reply.id } }] : []),
-      { type: onebotType, data: { file: media.reference } },
-      ...(input.content?.trim() ? [{ type: 'text', data: { text: input.content.trim() } }] : []),
-    ], `${context.reply ? `[CQ:reply,id=${context.reply.id}]` : ''}[CQ:${onebotType},file=${media.reference}]${input.content?.trim() ?? ''}`)
+      ...media.map((item) => ({ type: item.type === 'audio' ? 'record' : item.type, data: { file: item.reference } })),
+      ...(text ? [{ type: 'text', data: { text } }] : []),
+    ]
+    const rawMessage = `${context.reply ? `[CQ:reply,id=${context.reply.id}]` : ''}${media.map((item) => `[CQ:${item.type === 'audio' ? 'record' : item.type},file=${item.reference}]`).join('')}${text}`
+    await this.dispatchMessageToBots(context, message, elements, onebotMessage, rawMessage)
     return { messageId: message.id, revision: this.scene.revision }
   }
 

@@ -425,12 +425,10 @@ export function createWebqqWorkspaceShell(
 
   async function sendComposerMessage(input: WebqqComposerSendIntent, resolve: Resolve, reject: Reject) {
     try {
-      if (input.media) {
+      if (input.media?.length) {
         await workspaceController.sendMediaMessage({
           conversationId: input.conversationId,
-          fileName: input.media.fileName,
-          mimeType: input.media.mimeType,
-          dataBase64: input.media.dataBase64,
+          media: input.media,
           content: input.content || undefined,
           replyToMessageId: input.replyToMessageId,
         })

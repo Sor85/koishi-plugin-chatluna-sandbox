@@ -8,12 +8,26 @@
           <IconX :size="15" aria-hidden="true" />
         </button>
       </div>
-      <div v-if="selectedMediaFile" :class="['webqq-composer-media', { 'has-reply': model.replyingTo }]">
-        <IconPaperclip :size="16" aria-hidden="true" />
-        <span>{{ selectedMediaFile.name }} · {{ formatMediaSize(selectedMediaFile.size) }}</span>
-        <button type="button" aria-label="移除待发送媒体" @click="clearSelectedMedia">
-          <IconX :size="15" aria-hidden="true" />
-        </button>
+      <div v-if="sendFiles.length" :class="['webqq-composer-attachments', { 'has-reply': model.replyingTo }]">
+        <template v-for="file in sendFiles" :key="file.id">
+          <span v-if="!file.previewUrl" class="webqq-composer-attachment-file">
+            <IconFile :size="14" stroke-width="2" aria-hidden="true" />
+            <span class="webqq-composer-attachment-name">
+              <span class="webqq-composer-attachment-base">{{ file.baseName }}</span><span>{{ file.extension }}</span>
+            </span>
+            <button type="button" :aria-label="`移除 ${file.file.name}`" @click="removeSendFile(file.id)">
+              <IconX :size="14" aria-hidden="true" />
+            </button>
+          </span>
+          <span v-else class="webqq-composer-attachment-image">
+            <button type="button" class="webqq-composer-attachment-preview" :aria-label="`预览 ${file.file.name}`" @click="previewImageUrl = file.previewUrl">
+              <img :src="file.previewUrl" :alt="file.file.name">
+            </button>
+            <button type="button" class="webqq-composer-attachment-remove" :aria-label="`移除 ${file.file.name}`" @click="removeSendFile(file.id)">
+              <IconX :size="12" aria-hidden="true" />
+            </button>
+          </span>
+        </template>
       </div>
       <div ref="userStackLayoutRef" class="webqq-composer-user-layout-root" :style="userLayoutStyle">
         <div
@@ -130,33 +144,37 @@
           placeholder="发送消息"
           :disabled="sending || !model.conversationId"
           @keydown.enter.exact.prevent="sendMessage"
+          @paste="handleSendPaste"
         />
       </div>
       <input
         ref="mediaInputRef"
         class="sr-only"
         type="file"
+        multiple
         accept="image/png,image/jpeg,image/gif,image/webp,audio/*,video/mp4,video/webm,video/quicktime,.txt,.csv,.json,.pdf,.zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
-        @change="selectMediaFile"
+        @change="handleSendFileSelect"
       >
       <button class="webqq-composer-action" type="button" aria-label="选择文件" :disabled="sending || !model.conversationId" @click="mediaInputRef?.click()">
         <IconPaperclip :size="19" stroke-width="2" aria-hidden="true" />
       </button>
-      <button class="webqq-composer-action is-primary" type="submit" aria-label="发送" :disabled="sending || (!input.trim() && !selectedMediaFile) || !model.conversationId">
+      <button class="webqq-composer-action is-primary" type="submit" aria-label="发送" :disabled="sending || (!input.trim() && !sendFiles.length) || !model.conversationId">
         <IconSend :size="19" stroke-width="2" aria-hidden="true" />
       </button>
     </form>
+    <WebqqImagePreview v-if="previewImageUrl" :url="previewImageUrl" @close="previewImageUrl = ''" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { createLayout, type AutoLayout } from 'animejs'
-import { IconEdit, IconPaperclip, IconPlus, IconSend, IconTrash, IconX } from '@tabler/icons-vue'
+import { IconEdit, IconFile, IconPaperclip, IconPlus, IconSend, IconTrash, IconX } from '@tabler/icons-vue'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from './components/ui/context-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip'
 import EnvironmentCreatePopover from './environment-create-popover.vue'
 import WebqqAvatar from './webqq-avatar.vue'
+import WebqqImagePreview from './webqq-image-preview.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import {
   getUserStackLayoutMetrics,
@@ -188,7 +206,7 @@ export interface WebqqComposerSendIntent {
   conversationId: string
   content: string
   replyToMessageId?: string
-  media?: { fileName: string, mimeType: string, dataBase64: string }
+  media?: Array<{ fileName: string, mimeType: string, dataBase64: string }>
 }
 
 const props = defineProps<{ model: WebqqComposerModel }>()
@@ -203,9 +221,20 @@ const emit = defineEmits<{
 }>()
 
 type UserStackOverflowMotion = 'idle' | 'expanding' | 'collapsing'
+
+// 与 onebot-webqq 一致的附件结构：图片带 objectURL 缩略图，文件名拆 baseName/extension 便于截断。
+interface ComposerSendFile {
+  id: string
+  file: File
+  previewUrl?: string
+  baseName: string
+  extension: string
+}
+
 const input = ref('')
 const mediaInputRef = ref<HTMLInputElement>()
-const selectedMediaFile = ref<File>()
+const sendFiles = ref<ComposerSendFile[]>([])
+const previewImageUrl = ref('')
 const sending = ref(false)
 const localError = ref('')
 const composerLayoutRef = ref<HTMLElement>()
@@ -382,21 +411,52 @@ function forwardManageEnvironment(input: ManageSandboxEnvironmentInput, resolve:
   emit('manageEnvironment', input, resolve, reject)
 }
 
-function selectMediaFile(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
-  if (!file) return
-  if (file.size > 10 * 1024 * 1024) {
-    localError.value = '媒体大小不能超过 10 MB'
-    clearSelectedMedia()
-    return
-  }
-  selectedMediaFile.value = file
-  localError.value = ''
+function getSendFileNameParts(name: string) {
+  const dotIndex = name.lastIndexOf('.')
+  if (dotIndex <= 0) return { baseName: name, extension: '' }
+  return { baseName: name.slice(0, dotIndex), extension: name.slice(dotIndex) }
 }
 
-function clearSelectedMedia() {
-  selectedMediaFile.value = undefined
-  if (mediaInputRef.value) mediaInputRef.value.value = ''
+function addSendFiles(files: Iterable<File>) {
+  for (const file of files) {
+    // 服务端 MAX_MEDIA_SIZE 硬校验 10 MB，前端预检避免白传大文件后才报错。
+    if (file.size > 10 * 1024 * 1024) {
+      localError.value = '媒体大小不能超过 10 MB'
+      continue
+    }
+    sendFiles.value.push({
+      id: `${file.name}:${file.size}:${file.lastModified}:${sendFiles.value.length}`,
+      file,
+      previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
+      ...getSendFileNameParts(file.name),
+    })
+  }
+}
+
+function removeSendFile(id: string) {
+  const file = sendFiles.value.find((file) => file.id === id)
+  if (file?.previewUrl) URL.revokeObjectURL(file.previewUrl)
+  sendFiles.value = sendFiles.value.filter((file) => file.id !== id)
+}
+
+function clearSendFiles() {
+  for (const file of sendFiles.value) {
+    if (file.previewUrl) URL.revokeObjectURL(file.previewUrl)
+  }
+  sendFiles.value = []
+}
+
+function handleSendFileSelect(event: Event) {
+  const input = event.currentTarget as HTMLInputElement
+  if (input.files) addSendFiles(input.files)
+  input.value = ''
+}
+
+function handleSendPaste(event: ClipboardEvent) {
+  const files = Array.from(event.clipboardData?.files ?? [])
+  if (!files.length) return
+  event.preventDefault()
+  addSendFiles(files)
 }
 
 function readFileBase64(file: File) {
@@ -413,23 +473,20 @@ function readFileBase64(file: File) {
   })
 }
 
-function formatMediaSize(size: number) {
-  if (size < 1024) return `${size} B`
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
-  return `${(size / 1024 / 1024).toFixed(1)} MB`
-}
-
 async function sendMessage() {
   const content = input.value.trim()
-  const mediaFile = selectedMediaFile.value
   const { currentOperatorId, conversationId } = props.model
-  if ((!content && !mediaFile) || !currentOperatorId || !conversationId || sending.value) return
+  if ((!content && !sendFiles.value.length) || !currentOperatorId || !conversationId || sending.value) return
 
   sending.value = true
   localError.value = ''
   try {
-    const media = mediaFile
-      ? { fileName: mediaFile.name, mimeType: mediaFile.type, dataBase64: await readFileBase64(mediaFile) }
+    const media = sendFiles.value.length
+      ? await Promise.all(sendFiles.value.map(async ({ file }) => ({
+          fileName: file.name,
+          mimeType: file.type,
+          dataBase64: await readFileBase64(file),
+        })))
       : undefined
     await new Promise<void>((resolve, reject) => emit('send', {
       conversationId,
@@ -438,7 +495,7 @@ async function sendMessage() {
       media,
     }, resolve, reject))
     input.value = ''
-    clearSelectedMedia()
+    clearSendFiles()
     emit('clearReply')
   } catch (error) {
     localError.value = error instanceof Error ? error.message : '发送失败'
@@ -468,7 +525,7 @@ function updateComposerSpace() {
   if (!form) return
   updateCompactUserStack(form)
   const formHeight = Math.ceil(form.getBoundingClientRect().height)
-  const overlays = form.querySelectorAll('.webqq-composer-reply, .webqq-composer-media')
+  const overlays = form.querySelectorAll('.webqq-composer-reply, .webqq-composer-attachments')
   let overlayHeight = 0
   overlays.forEach((overlay) => {
     overlayHeight += Math.ceil(overlay.getBoundingClientRect().height) + 8
@@ -484,7 +541,7 @@ watch(composerFormRef, (form) => {
   updateComposerSpace()
 }, { immediate: true })
 
-watch([() => props.model.replyingTo?.id, () => selectedMediaFile.value?.name], () => {
+watch([() => props.model.replyingTo?.id, () => sendFiles.value.length], () => {
   void nextTick(() => updateComposerSpace())
 })
 
@@ -494,6 +551,7 @@ watch(() => orderedSenders.value.length, () => {
 })
 
 onBeforeUnmount(() => {
+  clearSendFiles()
   composerSpaceObserver?.disconnect()
   userStackLayout?.revert()
   if (suppressUserStackCollapseTimer) clearTimeout(suppressUserStackCollapseTimer)

@@ -39,3 +39,44 @@ body[data-sandbox-color-scheme="dark"] .webqq-form-error {
   color: #fca5a5;
   background: rgb(127 29 29 / 42%);
 }
+
+/* 图片全屏预览：teleport 到 body，与工作区令牌隔离，遮罩固定深色（亮暗通用）。 */
+.webqq-image-preview {
+  position: fixed;
+  inset: 0;
+  z-index: 10002;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(15 23 42 / 78%);
+}
+
+.webqq-image-preview img {
+  max-width: min(92vw, 1080px);
+  max-height: 88vh;
+  border-radius: 12px;
+  object-fit: contain;
+}
+
+.webqq-image-preview-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 35%);
+  border-radius: 50%;
+  color: #fff;
+  background: rgb(15 23 42 / 55%);
+  cursor: pointer;
+}
+
+.webqq-image-preview-close:hover,
+.webqq-image-preview-close:focus-visible {
+  outline: none;
+  background: rgb(15 23 42 / 78%);
+}

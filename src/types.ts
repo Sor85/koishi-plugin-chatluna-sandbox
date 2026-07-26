@@ -344,12 +344,16 @@ export interface SendMessageResult {
   revision: number
 }
 
-export interface SendMediaMessageInput {
-  operatorId: string
-  conversationId: string
+export interface SendMediaFileInput {
   fileName: string
   mimeType: string
   dataBase64: string
+}
+
+export interface SendMediaMessageInput {
+  operatorId: string
+  conversationId: string
+  media: SendMediaFileInput[]
   content?: string
   replyToMessageId?: string
 }

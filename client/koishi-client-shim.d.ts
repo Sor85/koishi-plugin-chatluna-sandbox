@@ -34,6 +34,10 @@ declare module '@koishijs/client' {
     }): unknown
   }
 
+  export const icons: {
+    register(name: string, component: Component): void
+  }
+
   export function send(event: 'onebot-sandbox/workspace', input?: SpaceScoped<GetSandboxWorkspaceInput>): Promise<SandboxWorkspaceState>
   export function send(event: 'onebot-sandbox/message-history', input: SpaceScoped<GetMessageHistoryInput>): Promise<SandboxMessageHistory>
   export function send(event: 'onebot-sandbox/send-message', input: SpaceScoped<SendMessageInput>): Promise<SandboxWorkspaceState>

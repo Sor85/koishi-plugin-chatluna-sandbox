@@ -145,9 +145,7 @@ describe('Koishi 控制台适配器', () => {
     const mediaWorkspace = await sendMediaMessageListener({
       operatorId: '10001',
       conversationId: 'private:10001:20001',
-      fileName: '控制台图片.png',
-      mimeType: 'image/png',
-      dataBase64: Buffer.from('console-image').toString('base64'),
+      media: [{ fileName: '控制台图片.png', mimeType: 'image/png', dataBase64: Buffer.from('console-image').toString('base64') }],
     })
     const media = mediaWorkspace.snapshot.messages.find(({ media }: { media?: unknown[] }) => media?.length)?.media?.[0]
     expect(media).toEqual(expect.objectContaining({ name: '控制台图片.png', type: 'image' }))
