@@ -13,7 +13,10 @@ describe('AI 测试空间总览', () => {
     expect(overview).toContain('filteredSpaces')
     expect(overview).toContain('创建测试空间')
     expect(overview).toContain("space.status === 'running'")
-    expect(styles).toContain('@keyframes webqq-space-running')
+    // AI 控制中卡片：ego 式边框光晕 + 游走的 AI 光标
+    expect(styles).toContain('.webqq-space-card.is-running')
+    expect(styles).toContain('@keyframes webqq-space-agent-roam')
+    expect(styles).toContain('@keyframes webqq-space-agent-float')
     expect(styles).toContain('@media (prefers-reduced-motion: reduce)')
   })
 

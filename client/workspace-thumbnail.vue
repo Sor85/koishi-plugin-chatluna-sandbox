@@ -36,15 +36,22 @@
         <p v-if="!preview.messages.length" class="webqq-space-mini-empty">发送消息，验证插件行为</p>
       </main>
     </div>
+    <!-- AI 控制中的游走光标放在 scale 层之外，保持真实尺寸覆盖在迷你界面上。 -->
+    <div v-if="running" class="webqq-space-agent-cursor">
+      <span class="webqq-space-agent-cursor-float">
+        <IconPointerFilled :size="16" aria-hidden="true" />
+        <span class="webqq-space-agent-cursor-label">AI</span>
+      </span>
+    </div>
   </div>
 </template>
 <script setup lang="ts">
-import { IconBug, IconLayoutGrid, IconMessageCircle, IconUserCircle } from '@tabler/icons-vue'
+import { IconBug, IconLayoutGrid, IconMessageCircle, IconPointerFilled, IconUserCircle } from '@tabler/icons-vue'
 import { computed } from 'vue'
 import WebqqAvatar from './webqq-avatar.vue'
 import { buildWorkspacePreview } from './webqq/workspace-preview'
 import type { SandboxSnapshot } from '../src/types'
 
-const props = defineProps<{ snapshot: SandboxSnapshot }>()
+const props = defineProps<{ snapshot: SandboxSnapshot; running?: boolean }>()
 const preview = computed(() => buildWorkspacePreview(props.snapshot))
 </script>

@@ -27,7 +27,7 @@
         @click="openCard(space.id)"
         @keydown.enter="openCard(space.id)"
       >
-        <WorkspaceThumbnail :snapshot="space.snapshot" />
+        <WorkspaceThumbnail :snapshot="space.snapshot" :running="space.status === 'running'" />
         <footer>
           <div><strong>{{ space.name }}</strong><small>{{ statusLabel(space.status) }} · {{ formatTime(space.createdAt) }}</small></div>
           <div class="webqq-space-card-actions" @click.stop>
