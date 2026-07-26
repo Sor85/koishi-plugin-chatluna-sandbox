@@ -83,7 +83,7 @@ describe('环境管理组件传输边界', () => {
 
     // teleport 面板拿不到 .webqq-workspace 上的令牌，必须有镜像定义（含 .dark 暗色）
     expect(tokens).toContain('.sandbox-dialog-content')
-    expect(tokens).toContain('.dark .sandbox-dialog-content')
+    expect(tokens).toContain('body[data-sandbox-color-scheme="dark"] .sandbox-dialog-content')
     expect(primitives).toContain('[data-slot="input"]')
     expect(primitives).toContain('[data-slot="checkbox"]')
     expect(primitives).toContain('[data-slot="button"][data-variant="outline"]')

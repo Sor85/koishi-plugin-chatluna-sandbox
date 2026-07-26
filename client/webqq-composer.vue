@@ -1,6 +1,6 @@
 <template>
   <div ref="composerLayoutRef" class="webqq-composer-layout-root">
-    <form class="webqq-composer" :style="composerStyle" @submit.prevent="sendMessage">
+    <form ref="composerFormRef" class="webqq-composer" :style="composerStyle" @submit.prevent="sendMessage">
       <span v-if="displayError" class="webqq-composer-error" role="alert">{{ displayError }}</span>
       <div v-if="model.replyingTo" class="webqq-composer-reply">
         <span>回复 {{ model.replyingTo.authorName }}：{{ model.replyingTo.content }}</span>
@@ -199,6 +199,7 @@ const emit = defineEmits<{
   editParticipant: [entity: { type: 'user' | 'bot', id: string }]
   deleteParticipant: [entity: { type: 'user' | 'bot', id: string }]
   clearReply: []
+  spaceChange: [space: number]
 }>()
 
 type UserStackOverflowMotion = 'idle' | 'expanding' | 'collapsing'
@@ -208,6 +209,7 @@ const selectedMediaFile = ref<File>()
 const sending = ref(false)
 const localError = ref('')
 const composerLayoutRef = ref<HTMLElement>()
+const composerFormRef = ref<HTMLFormElement>()
 const userStackLayoutRef = ref<HTMLElement>()
 const userStackExpanded = ref(false)
 const userStackHovered = ref(false)
@@ -221,9 +223,10 @@ let userStackLayout: AutoLayout | undefined
 let userStackTransitionUntil = 0
 
 const displayError = computed(() => localError.value || props.model.externalError || '')
+const compactUserStack = ref(false)
 const orderedSenders = computed(() => orderUsersByActive(props.model.senders, props.model.currentOperatorId))
-const userStackMetrics = computed(() => getUserStackMetrics(orderedSenders.value.length))
-const userStackLayoutMetrics = computed(() => getUserStackLayoutMetrics(orderedSenders.value.length))
+const userStackMetrics = computed(() => getUserStackMetrics(orderedSenders.value.length, compactUserStack.value))
+const userStackLayoutMetrics = computed(() => getUserStackLayoutMetrics(orderedSenders.value.length, compactUserStack.value))
 const hasUserStackOverflow = computed(() => userStackMetrics.value.overflowCount > 0)
 const userStackVisualExpanded = computed(() => userStackExpanded.value || !hasUserStackOverflow.value)
 const userOverflowPreview = computed(() => orderedSenders.value[userStackMetrics.value.collapsedVisibleCount])
@@ -444,7 +447,54 @@ async function sendMessage() {
   }
 }
 
+// 胶囊内 padding(8) + 三个 gap(12) + 附件按钮(32) + 发送按钮(36)。
+const COMPOSER_FIXED_WIDTH = 88
+// 输入区可压缩到 0（min-width: 0），低于这个宽度就该省略头像而不是压扁输入框。
+const COMPOSER_MIN_INPUT_WIDTH = 100
+
+// 极限窄屏：胶囊被 max-width 钳住后头像堆叠（flex: none）会把附件、发送图标挤出胶囊背景，
+// 宽度不足时折叠态只留当前操作者 + "+N" 省略。判定阈值恒按完整（非 compact）堆叠宽度计算，
+// 且胶囊内联宽度（460 + 堆叠附加宽）恒大于该阈值，因此 compact 与否不影响判定结果，无反馈循环。
+function updateCompactUserStack(form: HTMLElement) {
+  const fullWidth = getUserStackLayoutMetrics(orderedSenders.value.length).collapsedWidth
+  compactUserStack.value = form.clientWidth < fullWidth + COMPOSER_FIXED_WIDTH + COMPOSER_MIN_INPUT_WIDTH
+}
+
+// 回复/附件浮条挂在输入胶囊上方、多行输入会撑高胶囊，消息区底部留白必须跟随实际高度，
+// 否则窄屏或浮条出现时最后几条消息会被输入区盖住。
+let composerSpaceObserver: ResizeObserver | undefined
+function updateComposerSpace() {
+  const form = composerFormRef.value
+  if (!form) return
+  updateCompactUserStack(form)
+  const formHeight = Math.ceil(form.getBoundingClientRect().height)
+  const overlays = form.querySelectorAll('.webqq-composer-reply, .webqq-composer-media')
+  let overlayHeight = 0
+  overlays.forEach((overlay) => {
+    overlayHeight += Math.ceil(overlay.getBoundingClientRect().height) + 8
+  })
+  emit('spaceChange', formHeight + overlayHeight + 36)
+}
+
+watch(composerFormRef, (form) => {
+  composerSpaceObserver?.disconnect()
+  if (!form) return
+  composerSpaceObserver = new ResizeObserver(() => updateComposerSpace())
+  composerSpaceObserver.observe(form)
+  updateComposerSpace()
+}, { immediate: true })
+
+watch([() => props.model.replyingTo?.id, () => selectedMediaFile.value?.name], () => {
+  void nextTick(() => updateComposerSpace())
+})
+
+// 人数变化会改变 compact 阈值，但胶囊被 max-width 钳住时宽度不变、ResizeObserver 不触发，需主动重判。
+watch(() => orderedSenders.value.length, () => {
+  if (composerFormRef.value) updateCompactUserStack(composerFormRef.value)
+})
+
 onBeforeUnmount(() => {
+  composerSpaceObserver?.disconnect()
   userStackLayout?.revert()
   if (suppressUserStackCollapseTimer) clearTimeout(suppressUserStackCollapseTimer)
   if (userStackOverflowMotionTimer) clearTimeout(userStackOverflowMotionTimer)

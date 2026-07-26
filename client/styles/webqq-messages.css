@@ -1,41 +1,10 @@
-@media (prefers-color-scheme: dark) {
-  .webqq-workspace[data-color-mode="auto"] .webqq-message-bubble,
-  .webqq-workspace[data-color-mode="auto"] .webqq-composer {
-    color: #e5edf7;
-  }
-
-  .webqq-workspace[data-color-mode="auto"] .webqq-message-bubble,
-  .webqq-workspace[data-color-mode="auto"] .webqq-composer::before {
-    border-color: rgb(148 163 184 / 24%);
-    background: rgb(30 41 59 / 90%);
-  }
-
-  .webqq-workspace[data-color-mode="auto"] .webqq-message-quote {
-    border-left-color: rgb(147 197 253 / 56%);
-    color: #cbd5e1;
-    background: rgb(15 23 42 / 42%);
-  }
-
-  .webqq-workspace[data-color-mode="auto"] .webqq-message-quote-title {
-    color: #dbeafe;
-  }
-
-  .webqq-workspace[data-color-mode="auto"] .webqq-message-row.is-outgoing .webqq-message-quote {
-    border-left-color: rgb(255 255 255 / 62%);
-    color: rgb(255 255 255 / 82%);
-    background: rgb(255 255 255 / 16%);
-  }
-
-  .webqq-workspace[data-color-mode="auto"] .webqq-message-row.is-outgoing .webqq-message-quote-title {
-    color: #fff;
-  }
-}
 
 .webqq-messages {
   min-height: 0;
   overflow-y: auto;
-  padding: 20px 22px 80px;
-  scroll-padding-bottom: 80px;
+  /* 底部留白跟随输入区实际高度（含回复/附件浮条与多行输入），由 composer 通过变量上报。 */
+  padding: 20px 22px var(--webqq-composer-space, 80px);
+  scroll-padding-bottom: var(--webqq-composer-space, 80px);
 }
 
 .webqq-messages ol {

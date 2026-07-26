@@ -16,3 +16,26 @@
   display: grid;
   gap: var(--webqq-secondary-row-gap, 8px);
 }
+
+/* 二级菜单的辅助文字/容器语义类：颜色统一走令牌（面板镜像见 webqq-tokens.css），不再散写 slate 工具类。 */
+.webqq-secondary-hint {
+  color: var(--webqq-muted);
+}
+
+.webqq-secondary-panel {
+  background: var(--webqq-surface-muted);
+}
+
+.webqq-secondary-divider {
+  border-top: 1px solid var(--webqq-border);
+}
+
+.webqq-form-error {
+  color: #b91c1c;
+  background: rgb(254 226 226 / 92%);
+}
+
+body[data-sandbox-color-scheme="dark"] .webqq-form-error {
+  color: #fca5a5;
+  background: rgb(127 29 29 / 42%);
+}

@@ -112,7 +112,6 @@
 
 .webqq-icon-button.is-active {
   color: var(--webqq-accent);
-  background: color-mix(in srgb, var(--webqq-accent) 14%, transparent);
 }
 
 .webqq-menu-avatar {
@@ -306,6 +305,9 @@
 }
 
 .sandbox-select-content {
+  /* 下拉面板统一与触发器同宽（reka popper 提供触发器宽度变量）。 */
+  width: var(--reka-select-trigger-width);
+  min-width: var(--reka-select-trigger-width);
   border-color: var(--webqq-border);
   border-radius: 12px;
   color: var(--webqq-text);
@@ -321,6 +323,12 @@
 .sandbox-select-content [data-slot="select-item"][data-highlighted] {
   color: var(--webqq-text);
   background: var(--webqq-hover);
+}
+
+/* 键盘选中项已有 data-highlighted 底色反馈，去掉工具类蹭来的 focus 蓝色描边。 */
+.sandbox-select-content [data-slot="select-item"]:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 
 .webqq-workspace [data-slot="badge"][data-variant="default"] {

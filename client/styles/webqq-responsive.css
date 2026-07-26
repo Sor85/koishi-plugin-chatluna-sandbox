@@ -32,10 +32,10 @@
     width: calc(100% - var(--activity-width, 3.5rem));
   }
 
-  .webqq-workspace {
-    grid-template-columns: 60px minmax(0, 1fr);
-  }
-
+  /* 补上 is-details-closed / is-standalone-view 两个高特异度变体，
+     否则基线的三列 grid 定义会压过这里，产生溢出视口的幽灵列。 */
+  .webqq-workspace,
+  .webqq-workspace.is-details-closed,
   .webqq-workspace.is-standalone-view {
     grid-template-columns: 60px minmax(0, 1fr);
   }
@@ -46,9 +46,25 @@
     padding: 10px 8px;
   }
 
+  /* 触控目标不低于 44px（列宽 60 = 44 按钮 + 两侧 8px 内边距）。 */
   .webqq-rail-button {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
+  }
+
+  /* 单栏互切时会话列表被隐藏，聊天头部显示返回入口。 */
+  .webqq-chat-back {
+    display: inline-flex;
+  }
+
+  .webqq-chat-header {
+    gap: 8px;
+    justify-content: flex-start;
+  }
+
+  .webqq-chat-header .webqq-chat-title {
+    flex: 1;
+    min-width: 0;
   }
 
   .webqq-conversations,
@@ -79,6 +95,12 @@
     justify-self: stretch;
   }
 
+  /* 兜底：1180 断点的 is-details-open 放行规则特异度更高，非消息视图下会让详情栏
+     在两栏网格里长出隐式第三列，这里显式压回去。 */
+  .webqq-workspace.is-details-open:not([data-mobile-view="messages"]) .webqq-profile {
+    display: none;
+  }
+
   .webqq-workspace[data-mobile-view="messages"] .webqq-chat {
     display: grid;
   }
@@ -104,10 +126,13 @@
     padding-left: 16px;
   }
 
+  /* 内联 width（460 + 堆叠附加宽）优先级高于这里，收窄只能靠 max-width；
+     left/right 同时指定后配合 margin auto 让被钳住的胶囊保持水平居中。 */
   .webqq-composer {
     right: 12px;
     left: 12px;
-    width: calc(100% - 24px);
+    margin: 0 auto;
+    max-width: calc(100% - 24px);
   }
 
   .webqq-composer-layout-root {

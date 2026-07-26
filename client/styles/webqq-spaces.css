@@ -17,6 +17,9 @@
 .webqq-space-card footer strong, .webqq-space-card footer small { display: block; }
 .webqq-space-card footer small { margin-top: 3px; color: var(--webqq-muted); font-size: 12px; }
 .webqq-space-card-actions { display: flex; align-items: center; gap: 6px; }
+/* 卡片操作（接管/归还/重新激活）与"主环境"徽章同一视觉语言：无边框浅底胶囊。 */
+.webqq-space-card-actions [data-slot="button"][data-variant="outline"] { height: 22px; padding: 0 10px; border: 0; border-radius: 999px; color: var(--webqq-muted); background: var(--webqq-hover); font-size: 12px; font-weight: 500; }
+.webqq-space-card-actions [data-slot="button"][data-variant="outline"]:hover:not(:disabled) { color: var(--webqq-text); background: color-mix(in srgb, var(--webqq-hover) 70%, var(--webqq-border)); }
 .webqq-space-create { place-items: center; place-content: center; gap: 10px; border-style: dashed; color: var(--webqq-muted); }
 /* 迷你工作区以 4 倍卡片尺寸渲染后 scale(0.25)，字号与真实工作区保持同比例，无需 JS 测量。 */
 .webqq-space-thumbnail { position: relative; min-height: 190px; overflow: hidden; background: var(--webqq-surface-muted); pointer-events: none; }
@@ -55,10 +58,5 @@
 
 .webqq-workspace[data-color-mode="dark"] .webqq-agent-cursor-label { color: rgb(255 255 255 / 90%); background: rgb(56 56 56 / 42%); }
 .webqq-workspace[data-color-mode="dark"] .webqq-agent-observe-dots { background-image: radial-gradient(circle, rgb(255 255 255 / 15%) 1px, transparent 1px); }
-@media (prefers-color-scheme: dark) {
-  .webqq-workspace[data-color-mode="auto"] .webqq-agent-cursor-label { color: rgb(255 255 255 / 90%); background: rgb(56 56 56 / 42%); }
-  .webqq-workspace[data-color-mode="auto"] .webqq-agent-observe-dots { background-image: radial-gradient(circle, rgb(255 255 255 / 15%) 1px, transparent 1px); }
-}
-
 @media (prefers-reduced-motion: reduce) { .webqq-space-card { transition: none; } .webqq-agent-cursor { transition: none; } .webqq-agent-cursor-float, .webqq-agent-pulse-dot { animation: none; } }
 @media (max-width: 720px) { .webqq-space-overview { padding: 16px; } .webqq-space-toolbar { align-items: flex-start; flex-direction: column; } .webqq-space-grid { grid-template-columns: 1fr; } }

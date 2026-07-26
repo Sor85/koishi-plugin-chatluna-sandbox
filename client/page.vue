@@ -11,7 +11,7 @@
           'is-standalone-view': !isWebqqView,
         }"
         :data-chat-style="appearance.webQQChatStyle"
-        :data-color-mode="appearance.webQQColorMode"
+        :data-color-mode="resolvedColorMode"
         :data-mobile-view="currentView"
         :style="{ '--webqq-accent': appearance.webQQAccentColor }"
       >
@@ -51,6 +51,7 @@
         <WebqqChatPane
           v-else
           :model="chatPaneModel"
+          @back="selectNavigation('contacts')"
           @toggle-details="toggleDetails"
           @send="sendComposerMessage"
           @select-operator="selectComposerOperator"
@@ -111,6 +112,7 @@ import WebqqChatPane from './webqq-chat-pane.vue'
 import WebqqDetailsPanel from './webqq-details-panel.vue'
 import WebqqSidebar from './webqq-sidebar.vue'
 import WorkspaceOverlayHost from './workspace-overlay-host.vue'
+import { useResolvedColorMode } from './webqq/color-scheme'
 import { createKoishiWorkspacePort } from './webqq/koishi-workspace-port'
 import { createWorkspaceController } from './webqq/workspace-controller'
 import { createWorkspaceLayout } from './webqq/workspace-layout'
@@ -168,6 +170,7 @@ const { createTestSpace, enterTestSpace, handleTestSpaceAction, mainSnapshot, se
   selectWorkspaceNavigation,
 )
 const isWebqqView = computed(() => currentView.value === 'messages' || currentView.value === 'contacts')
+const resolvedColorMode = useResolvedColorMode(appearance)
 // 正在观察一个仍由 AI 控制的测试空间时，叠加 ego 式被控覆盖层（发光边缘 + 控制条 + agent 光标）。
 const observingSpace = computed(() => isWebqqView.value
   ? testSpaces.value.find((space) => space.id === activeSpaceId.value && space.status === 'running')

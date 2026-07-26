@@ -1,6 +1,10 @@
 <template>
-  <main class="webqq-chat">
+  <main class="webqq-chat" :style="{ '--webqq-composer-space': composerSpace ? `${composerSpace}px` : undefined }">
     <header class="webqq-chat-header">
+      <!-- 窄屏为单栏互切布局，会话列表被隐藏，必须提供返回入口；宽屏下此按钮不显示。 -->
+      <button type="button" class="webqq-icon-button webqq-chat-back" aria-label="返回会话列表" @click="emit('back')">
+        <IconChevronLeft :size="22" aria-hidden="true" />
+      </button>
       <div class="webqq-chat-title">
         <WebqqAvatar class="webqq-avatar" :kind="model.avatarKind" :name="model.title" :avatar="model.avatar" />
         <div>
@@ -36,12 +40,13 @@
       @edit-participant="emit('editParticipant', $event)"
       @delete-participant="emit('deleteParticipant', $event)"
       @clear-reply="replyingToMessageId = ''"
+      @space-change="composerSpace = $event"
     />
   </main>
 </template>
 
 <script setup lang="ts">
-import { IconDots } from '@tabler/icons-vue'
+import { IconChevronLeft, IconDots } from '@tabler/icons-vue'
 import { computed, ref, watch } from 'vue'
 import WebqqAvatar from './webqq-avatar.vue'
 import WebqqComposer, { type WebqqComposerModel, type WebqqComposerSendIntent } from './webqq-composer.vue'
@@ -62,6 +67,7 @@ export interface WebqqChatPaneModel {
 
 const props = defineProps<{ model: WebqqChatPaneModel }>()
 const emit = defineEmits<{
+  back: []
   toggleDetails: []
   send: [input: WebqqComposerSendIntent, resolve: () => void, reject: (error: unknown) => void]
   selectOperator: [participantId: string, resolve: () => void, reject: (error: unknown) => void]
@@ -81,6 +87,7 @@ const emit = defineEmits<{
 }>()
 
 const replyingToMessageId = ref('')
+const composerSpace = ref(0)
 const replyingToMessage = computed(() => props.model.messageList.messages.find(({ id }) => id === replyingToMessageId.value))
 const composerModel = computed<WebqqComposerModel>(() => ({
   ...props.model.composer,

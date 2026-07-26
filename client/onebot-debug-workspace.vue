@@ -24,7 +24,7 @@
           <SelectTrigger class="webqq-debug-control" aria-label="按机器人筛选">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent class="w-[var(--reka-select-trigger-width)]">
+          <SelectContent>
             <SelectItem value="all">全部机器人</SelectItem>
             <SelectItem v-for="bot in bots" :key="bot.id" :value="bot.id">{{ bot.name }} · {{ bot.id }}</SelectItem>
           </SelectContent>
@@ -36,7 +36,7 @@
           <SelectTrigger class="webqq-debug-control" aria-label="按方向筛选">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent class="w-[var(--reka-select-trigger-width)]">
+          <SelectContent>
             <SelectItem value="all">全部方向</SelectItem>
             <SelectItem value="action">Action 调用</SelectItem>
             <SelectItem value="event">原始事件</SelectItem>

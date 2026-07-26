@@ -11,6 +11,11 @@ body,
   background: #f8fafc;
 }
 
+/* 页面容器在 .webqq-workspace 之外拿不到 data-color-mode，跟随 body 上的解析配色。 */
+body[data-sandbox-color-scheme="dark"] .onebot-sandbox-page {
+  background: #0f172a;
+}
+
 .onebot-sandbox-layout .layout-header {
   display: none;
 }
@@ -80,6 +85,18 @@ body,
   backdrop-filter: saturate(180%) blur(20px);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
 }
+
+/* 毛玻璃在暗色下沿用深色半透明面，特异度需压过上方 is-frosted 的亮色定义。 */
+.webqq-workspace.is-frosted[data-color-mode="dark"] {
+  background: rgb(15 23 42 / 78%);
+}
+
+.webqq-workspace.is-frosted[data-color-mode="dark"] .webqq-rail,
+.webqq-workspace.is-frosted[data-color-mode="dark"] .webqq-conversations,
+.webqq-workspace.is-frosted[data-color-mode="dark"] .webqq-chat,
+.webqq-workspace.is-frosted[data-color-mode="dark"] .webqq-profile {
+  background: rgb(15 23 42 / 42%);
+}
 .webqq-conversations,
 .webqq-profile {
   display: flex;
@@ -91,13 +108,4 @@ body,
 .webqq-workspace[data-color-mode="dark"] .webqq-chat,
 .webqq-workspace[data-color-mode="dark"] .webqq-profile {
   background: rgb(15 23 42 / 88%);
-}
-
-@media (prefers-color-scheme: dark) {
-  .webqq-workspace[data-color-mode="auto"] .webqq-rail,
-  .webqq-workspace[data-color-mode="auto"] .webqq-conversations,
-  .webqq-workspace[data-color-mode="auto"] .webqq-chat,
-  .webqq-workspace[data-color-mode="auto"] .webqq-profile {
-    background: rgb(15 23 42 / 88%);
-  }
 }

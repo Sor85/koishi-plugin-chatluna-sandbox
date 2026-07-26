@@ -13,7 +13,7 @@
       <form class="webqq-secondary-form" @submit.prevent="submit">
         <header class="grid gap-1">
           <strong class="text-sm">{{ title }}</strong>
-          <p class="m-0 text-xs leading-5 text-slate-500 dark:text-slate-400">{{ description }}</p>
+          <p class="webqq-secondary-hint m-0 text-xs leading-5">{{ description }}</p>
         </header>
 
         <div v-if="type === 'participant'" class="webqq-secondary-field">
@@ -25,7 +25,7 @@
             >
               <SelectValue />
             </SelectTrigger>
-            <SelectContent :portal-to="selectPortalTarget" class="z-[120] w-[var(--reka-select-trigger-width)]">
+            <SelectContent :portal-to="selectPortalTarget" class="z-[120]">
               <SelectItem value="user">普通用户</SelectItem>
               <SelectItem value="bot">机器人</SelectItem>
             </SelectContent>
@@ -64,7 +64,7 @@
               >
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent :portal-to="selectPortalTarget" class="z-[120] w-[var(--reka-select-trigger-width)]">
+              <SelectContent :portal-to="selectPortalTarget" class="z-[120]">
                 <SelectItem value="napcat">NapCat</SelectItem>
                 <SelectItem value="llbot">LLBot</SelectItem>
               </SelectContent>
@@ -79,7 +79,7 @@
           </div>
         </template>
 
-        <p v-if="errorMessage" class="m-0 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/50 dark:text-red-300" role="alert">
+        <p v-if="errorMessage" class="webqq-form-error m-0 rounded-lg px-3 py-2 text-xs" role="alert">
           {{ errorMessage }}
         </p>
 

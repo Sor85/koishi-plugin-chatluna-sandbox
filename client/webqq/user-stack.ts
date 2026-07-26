@@ -23,8 +23,10 @@ export function orderUsersByActive<User extends { id: string }>(users: User[], a
     : users
 }
 
-export function getUserStackMetrics(userCount: number): UserStackMetrics {
-  const collapsedVisibleCount = Math.min(userCount, 3)
+// compact：极限窄屏下折叠态只保留当前操作者头像，其余全部并入 +N 省略，
+// 保证胶囊剩余宽度足够包住输入框与附件、发送图标。
+export function getUserStackMetrics(userCount: number, compact = false): UserStackMetrics {
+  const collapsedVisibleCount = Math.min(userCount, compact ? 1 : 3)
   const overflowCount = Math.max(0, userCount - collapsedVisibleCount)
   return {
     collapsedVisibleCount,
@@ -36,8 +38,8 @@ export function getUserStackMetrics(userCount: number): UserStackMetrics {
   }
 }
 
-export function getUserStackLayoutMetrics(userCount: number): UserStackLayoutMetrics {
-  const metrics = getUserStackMetrics(userCount)
+export function getUserStackLayoutMetrics(userCount: number, compact = false): UserStackLayoutMetrics {
+  const metrics = getUserStackMetrics(userCount, compact)
   const addCollapsedRight = metrics.overflowCount
     ? metrics.collapsedWidth - USER_AVATAR_SIZE
     : userCount * USER_STACK_COLLAPSED_STEP

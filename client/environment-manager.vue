@@ -185,7 +185,8 @@ const sections = computed(() => [
   justify-content: center;
   border-radius: 50%;
   color: #fff;
-  background: #64748b;
+  /* 普通用户与 WebQQ 会话列表同用主题色；机器人/群组由 is-bot、is-group 覆盖。 */
+  background: var(--webqq-accent);
   font-size: 12px;
   font-weight: 700;
 }
