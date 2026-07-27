@@ -91,6 +91,9 @@
           </ContextMenuTrigger>
           <ContextMenuContent style="z-index: 140">
             <ContextMenuItem @select="emit('reply', message.id)"><IconMessageReply :size="16" aria-hidden="true" /> 回复</ContextMenuItem>
+            <ContextMenuItem v-if="canRecallMessage(message)" class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="emit('recallMessage', message.id)">
+              <IconArrowBackUp :size="16" aria-hidden="true" /> 撤回
+            </ContextMenuItem>
           </ContextMenuContent>
         </ContextMenu>
       </template>
@@ -127,7 +130,7 @@
 </template>
 
 <script setup lang="ts">
-import { IconArrowDown, IconArrowUp, IconBell, IconClock, IconHandClick, IconMessageReply, IconPaperclip, IconTag, IconUserMinus, IconUserPlus, IconUsers } from '@tabler/icons-vue'
+import { IconArrowBackUp, IconArrowDown, IconArrowUp, IconBell, IconClock, IconHandClick, IconMessageReply, IconPaperclip, IconTag, IconUserMinus, IconUserPlus, IconUsers } from '@tabler/icons-vue'
 import { onBeforeUnmount, ref } from 'vue'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from './components/ui/context-menu'
 import { getFriendMenuActions, type FriendMenuState } from './webqq/friend-menu'
@@ -164,6 +167,7 @@ export interface WebqqMessageListModel {
 const props = defineProps<{ model: WebqqMessageListModel }>()
 const emit = defineEmits<{
   reply: [messageId: string]
+  recallMessage: [messageId: string]
   loadHistory: [resolve: () => void, reject: (error: unknown) => void]
   requestFriend: [targetId: string]
   pokeFriend: [targetId: string]
@@ -207,6 +211,18 @@ function getChatFriendActions(targetId: string) {
 
 function getReplyMessage(message: SandboxMessage) {
   return message.replyToMessageId ? props.model.replyMessages[message.replyToMessageId] : undefined
+}
+
+// 与服务端撤回权限一致：自己的消息随时可撤；群内群主/管理员可撤成员消息，但不能动群主或同级管理员。
+function canRecallMessage(message: SandboxMessage) {
+  const operatorId = props.model.currentOperatorId
+  if (!operatorId || message.event) return false
+  if (message.authorId === operatorId) return true
+  if (!props.model.currentGroup) return false
+  const actor = getCurrentGroupMember(operatorId)
+  const target = getCurrentGroupMember(message.authorId)
+  if (!actor || !target || actor.role === 'member') return false
+  return target.role !== 'owner' && !(actor.role === 'admin' && target.role === 'admin')
 }
 
 function getMediaLabel(media: SandboxMedia) {

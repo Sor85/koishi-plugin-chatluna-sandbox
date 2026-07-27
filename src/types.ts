@@ -146,6 +146,9 @@ export interface SandboxMessage {
   event?: {
     type: 'poke'
     targetId: string
+  } | {
+    type: 'recall'
+    operatorId: string
   }
 }
 
@@ -342,6 +345,12 @@ export interface SendMessageInput {
 export interface SendMessageResult {
   messageId: string
   revision: number
+}
+
+export interface RecallMessageInput {
+  operatorId: string
+  conversationId?: string
+  messageId: string
 }
 
 export interface SendMediaFileInput {

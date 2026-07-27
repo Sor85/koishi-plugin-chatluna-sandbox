@@ -50,7 +50,7 @@
               </span>
               <Input
                 v-model="capabilitySearch"
-                class="pl-9"
+                class="webqq-capability-search"
                 placeholder="搜索 action、别名或作用"
                 aria-label="搜索能力覆盖"
               />

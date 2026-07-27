@@ -8,6 +8,7 @@ import type {
   ManageSandboxEnvironmentInput,
   PerformFriendActionInput,
   PerformGroupActionInput,
+  RecallMessageInput,
   SandboxMediaContent,
   SandboxMessageHistory,
   SandboxOneBotDebugRecord,
@@ -72,6 +73,10 @@ export class FakeWorkspacePort implements WorkspacePort {
 
   sendMediaMessage(input: SendMediaMessageInput) {
     return this.invoke('sendMediaMessage', input, this.workspaceResult)
+  }
+
+  recallMessage(input: RecallMessageInput) {
+    return this.invoke('recallMessage', input, this.workspaceResult)
   }
 
   getMediaContent(input: GetMediaContentInput) {

@@ -85,14 +85,15 @@ export function apply(ctx: Context, config: Config) {
     if (config.persistenceMode === 'database') {
       registerSandboxSceneModel(inner)
       registerSandboxTestSpaceModel(inner)
-      persistence = new KoishiDatabaseScenePersistence(inner.database)
+      // database 是可选注入，可能在本插件之后加载；必须传 getter 延迟解析，不能在此刻取值。
+      persistence = new KoishiDatabaseScenePersistence(() => inner.database)
     }
     const runtimeBots = new SandboxRuntimeBotRegistry()
     const control = new SandboxControlService(inner, { persistence, runtimeBots })
     const testSpaces = new SandboxTestSpaceService(
       inner,
       runtimeBots,
-      config.persistenceMode === 'database' ? new KoishiDatabaseTestSpacePersistence(inner.database) : undefined,
+      config.persistenceMode === 'database' ? new KoishiDatabaseTestSpacePersistence(() => inner.database) : undefined,
     )
     inner.provide('onebotSandbox', control, true)
     try {

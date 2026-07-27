@@ -220,9 +220,14 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     expect(control.getSnapshot().messages.filter(({ content }) => content === '群广播')).toHaveLength(1)
 
     await bot.internal._request('delete_msg', { message_id: groupResult.data.message_id })
-    expect(control.getSnapshot().messages.some(({ content }) => content === '群广播')).toBe(false)
+    expect(control.getSnapshot().messages.find(({ id }) => id === groupResult.data.message_id)).toEqual(expect.objectContaining({
+      content: 'Koishi 撤回了一条消息',
+      event: { type: 'recall', operatorId: '20001' },
+    }))
     await bot.deleteMessage('private:10001:20001', standardMessageId)
-    expect(control.getSnapshot().messages.some(({ id }) => id === standardMessageId)).toBe(false)
+    expect(control.getSnapshot().messages.find(({ id }) => id === standardMessageId)).toEqual(expect.objectContaining({
+      event: { type: 'recall', operatorId: '20001' },
+    }))
   })
 
   it('机器人通过标准方法和 OneBot action 处理申请与群管理', async () => {

@@ -2,7 +2,7 @@ import { App, Universal } from '@koishijs/core'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { registerConsole, type SandboxConsoleRegistrar } from '../src/console'
 import { SandboxControlService } from '../src/control-service'
 import type { SandboxAppearance } from '../src/types'
@@ -44,12 +44,16 @@ describe('Koishi 控制台适配器', () => {
 
     const entries: Array<{ dev: string; prod: string }> = []
     const listeners = new Map<string, unknown>()
+    const broadcasts: Array<{ type: string; body: unknown }> = []
     const consoleRegistrar: SandboxConsoleRegistrar = {
       addEntry(entry) {
         entries.push(entry)
       },
       addListener(event, callback) {
         listeners.set(event, callback)
+      },
+      broadcast(type, body) {
+        broadcasts.push({ type, body })
       },
     }
 
@@ -130,10 +134,17 @@ describe('Koishi 控制台适配器', () => {
       conversationId: 'private:10001:20001',
       content: '控制台消息',
     })
+    // 发送 RPC 即时返回，此刻只包含用户消息本体；机器人回复在后台派发完成后经场景广播刷新。
     expect(snapshot.snapshot.messages.map(({ content }: { content: string }) => content)).toEqual([
       '控制台消息',
-      '回复：控制台消息',
     ])
+    await vi.waitFor(() => {
+      expect(control!.getSnapshot().messages.map(({ content }) => content)).toEqual([
+        '控制台消息',
+        '回复：控制台消息',
+      ])
+    })
+    expect(broadcasts.filter(({ type }) => type === 'onebot-sandbox/scene-mutated').length).toBeGreaterThan(0)
     expect(snapshot.snapshot.messages.every((message: Record<string, unknown>) => !('botId' in message))).toBe(true)
     expect(snapshot.snapshot.conversations.every((conversation: Record<string, unknown>) => !('userId' in conversation) && !('botId' in conversation))).toBe(true)
     const messageId = snapshot.snapshot.messages.find(({ content }: { content: string }) => content === '控制台消息')?.id
@@ -230,7 +241,7 @@ describe('Koishi 控制台适配器', () => {
 
     expect(() => snapshotListener({ operatorId: '99999' })).toThrow('参与者不存在：99999')
     expect(() => snapshotListener({ userId: '10001' })).toThrow('不支持旧 RPC 字段：userId')
-    await expect(sendMessageListener({
+    await expect(async () => sendMessageListener({
       operatorId: '10002',
       senderId: '10003',
       botId: '20001',

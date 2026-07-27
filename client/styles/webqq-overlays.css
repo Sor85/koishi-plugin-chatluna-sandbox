@@ -30,6 +30,13 @@
   border-top: 1px solid var(--webqq-border);
 }
 
+/* 能力覆盖搜索框：控制台可能同时加载多个带 Tailwind 构建的插件样式表，后加载者的 .px-3
+   会在层叠顺序上盖过本插件的 .pl-9，把左内边距压回 12px 导致图标与文字重叠。
+   用更高优先级的专用类固定左内边距，不依赖工具类在样式表中的相对顺序。 */
+[data-slot='dialog-content'] .webqq-capability-search[data-slot='input'] {
+  padding-left: 36px;
+}
+
 .webqq-form-error {
   color: #b91c1c;
   background: rgb(254 226 226 / 92%);

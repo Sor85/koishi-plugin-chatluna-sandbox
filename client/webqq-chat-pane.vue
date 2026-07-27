@@ -20,6 +20,7 @@
     <WebqqMessageList
       :model="model.messageList"
       @reply="replyingToMessageId = $event"
+      @recall-message="emit('recallMessage', $event)"
       @load-history="forwardLoadHistory"
       @request-friend="emit('requestFriend', $event)"
       @poke-friend="emit('pokeFriend', $event)"
@@ -75,6 +76,7 @@ const emit = defineEmits<{
   editParticipant: [entity: { type: 'user' | 'bot', id: string }]
   deleteParticipant: [entity: { type: 'user' | 'bot', id: string }]
   loadHistory: [resolve: () => void, reject: (error: unknown) => void]
+  recallMessage: [messageId: string]
   requestFriend: [targetId: string]
   pokeFriend: [targetId: string]
   setRemark: [targetId: string]

@@ -32,25 +32,27 @@ export interface SandboxTestSpacePersistence {
 
 declare module '@koishijs/core' {
   interface Tables {
-    onebotSandboxScene: SandboxSceneRecord
-    onebotSandboxTestSpace: SandboxTestSpacePersistenceRecord
+    'onebot-sandbox.scene': SandboxSceneRecord
+    'onebot-sandbox.test-space': SandboxTestSpacePersistenceRecord
   }
 }
 
 interface SandboxSceneDatabase {
-  get(table: 'onebotSandboxScene', query: { id: string }): Promise<SandboxSceneRecord[]>
-  upsert(table: 'onebotSandboxScene', rows: SandboxSceneRecord[]): Promise<unknown>
+  get(table: 'onebot-sandbox.scene', query: { id: string }): Promise<SandboxSceneRecord[]>
+  upsert(table: 'onebot-sandbox.scene', rows: SandboxSceneRecord[]): Promise<unknown>
 }
 
 interface SandboxTestSpaceDatabase {
-  get(table: 'onebotSandboxTestSpace', query: { id?: string }): Promise<SandboxTestSpacePersistenceRecord[]>
-  upsert(table: 'onebotSandboxTestSpace', rows: SandboxTestSpacePersistenceRecord[]): Promise<unknown>
-  remove(table: 'onebotSandboxTestSpace', query: { id: string }): Promise<unknown>
+  get(table: 'onebot-sandbox.test-space', query: { id?: string }): Promise<SandboxTestSpacePersistenceRecord[]>
+  upsert(table: 'onebot-sandbox.test-space', rows: SandboxTestSpacePersistenceRecord[]): Promise<unknown>
+  remove(table: 'onebot-sandbox.test-space', query: { id: string }): Promise<unknown>
 }
 
-const SCENE_TABLE = 'onebotSandboxScene'
+// 表名使用 "onebot-sandbox." 前缀：dataview-next 等工具按点号前缀归属插件；
+// ctx.inject 回调里的 model.extend 拿不到插件运行时名称，仅靠上下文会被归为未知来源。
+const SCENE_TABLE = 'onebot-sandbox.scene'
 const SCENE_ID = 'main'
-const TEST_SPACE_TABLE = 'onebotSandboxTestSpace'
+const TEST_SPACE_TABLE = 'onebot-sandbox.test-space'
 
 export function registerSandboxSceneModel(ctx: Context): void {
   ctx.model.extend(SCENE_TABLE, {
@@ -73,64 +75,70 @@ export function registerSandboxTestSpaceModel(ctx: Context): void {
   }, { primary: 'id' })
 }
 
+// database 是可选服务，可能在本插件之后才加载；构造时缓存服务实例会让持久化永远不可用，
+// 必须通过 getter 在每次调用时解析当前服务。
 export class KoishiDatabaseTestSpacePersistence implements SandboxTestSpacePersistence {
-  constructor(private database?: SandboxTestSpaceDatabase) {}
+  constructor(private getDatabase: () => SandboxTestSpaceDatabase | undefined) {}
 
   async loadAll(): Promise<SandboxTestSpacePersistenceRecord[]> {
-    if (!this.database) return []
-    const records = await this.database.get(TEST_SPACE_TABLE, {})
+    const database = this.getDatabase()
+    if (!database) return []
+    const records = await database.get(TEST_SPACE_TABLE, {})
     return records.map((record) => structuredClone(record))
   }
 
   async save(record: SandboxTestSpacePersistenceRecord): Promise<void> {
-    if (!this.database) return
-    await this.database.upsert(TEST_SPACE_TABLE, [structuredClone(record)])
+    const database = this.getDatabase()
+    if (!database) return
+    await database.upsert(TEST_SPACE_TABLE, [structuredClone(record)])
   }
 
   async delete(id: string): Promise<void> {
-    if (!this.database) return
-    await this.database.remove(TEST_SPACE_TABLE, { id })
+    const database = this.getDatabase()
+    if (!database) return
+    await database.remove(TEST_SPACE_TABLE, { id })
   }
 }
 
 export class KoishiDatabaseScenePersistence implements SandboxScenePersistence {
-  private status: SandboxPersistenceStatus
+  private persisted = false
+  private lastError?: unknown
 
-  constructor(private database?: SandboxSceneDatabase) {
-    this.status = database ? {
-      mode: 'database',
-      available: true,
-      persisted: false,
-    } : this.createUnavailableStatus()
-  }
+  constructor(private getDatabase: () => SandboxSceneDatabase | undefined) {}
 
   getStatus(): SandboxPersistenceStatus {
-    return { ...this.status }
+    if (!this.getDatabase()) return this.createUnavailableStatus()
+    if (this.lastError !== undefined) return this.createUnavailableStatus(this.lastError)
+    return { mode: 'database', available: true, persisted: this.persisted }
   }
 
   async load(): Promise<SandboxSnapshot | undefined> {
-    if (!this.database) return
+    const database = this.getDatabase()
+    if (!database) return
     try {
-      const [record] = await this.database.get(SCENE_TABLE, { id: SCENE_ID })
+      const [record] = await database.get(SCENE_TABLE, { id: SCENE_ID })
+      this.lastError = undefined
       if (!record) return
-      this.status = { mode: 'database', available: true, persisted: true }
+      this.persisted = true
       return structuredClone(record.scene)
     } catch (error) {
-      this.status = this.createUnavailableStatus(error)
+      this.lastError = error
     }
   }
 
   async save(scene: SandboxSnapshot): Promise<void> {
-    if (!this.database) return
+    const database = this.getDatabase()
+    if (!database) return
     try {
-      await this.database.upsert(SCENE_TABLE, [{
+      await database.upsert(SCENE_TABLE, [{
         id: SCENE_ID,
         scene: structuredClone(scene),
         updatedAt: new Date(),
       }])
-      this.status = { mode: 'database', available: true, persisted: true }
+      this.lastError = undefined
+      this.persisted = true
     } catch (error) {
-      this.status = this.createUnavailableStatus(error)
+      this.lastError = error
     }
   }
 

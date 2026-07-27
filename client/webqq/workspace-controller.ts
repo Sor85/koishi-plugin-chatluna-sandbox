@@ -4,6 +4,7 @@ import type {
   GetMessageHistoryInput,
   GetSandboxOneBotDebugRecordsInput,
   ManageSandboxEnvironmentInput,
+  RecallMessageInput,
   SandboxAppearance,
   SandboxBotProfile,
   SandboxChatLunaState,
@@ -270,6 +271,44 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     }
   }
 
+  async function recallMessage(input: Omit<RecallMessageInput, 'operatorId'>) {
+    const operatorId = getCurrentOperatorId()
+    try {
+      replaceWorkspace(await port.recallMessage({ ...input, operatorId }))
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '撤回失败')
+    }
+  }
+
+  // 服务端场景变更广播的落地点：发送 RPC 已即时返回，机器人稍后写入的回复靠这里刷新。
+  // 只在收到比当前更新的 revision 时拉取，串行执行并在追平后停止，避免广播风暴导致的并发请求。
+  let mutationRefreshTask: Promise<void> | undefined
+  let latestMutationRevision = 0
+  function notifySceneRevision(revision: number) {
+    latestMutationRevision = Math.max(latestMutationRevision, revision)
+    if (mutationRefreshTask) return
+    mutationRefreshTask = (async () => {
+      try {
+        while (latestMutationRevision > snapshot.value.revision) {
+          const target = latestMutationRevision
+          const operatorId = currentOperatorIdState.value
+          try {
+            const nextWorkspace = operatorId
+              ? await port.getWorkspace({ operatorId })
+              : await port.getWorkspace()
+            // 并发的用户操作 RPC 可能已带回更新的工作区，旧响应不能回退状态。
+            if (nextWorkspace.snapshot.revision >= snapshot.value.revision) replaceWorkspace(nextWorkspace)
+          } catch {
+            // 刷新失败保持现状，下一次场景变更广播会再次触发。
+          }
+          if (snapshot.value.revision < target) break
+        }
+      } finally {
+        mutationRefreshTask = undefined
+      }
+    })()
+  }
+
   async function getMediaContent(mediaId: string) {
     const operatorId = getCurrentOperatorId()
     try {
@@ -392,9 +431,11 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     loadMessageHistory,
     loadOneBotDebugRecords,
     manageEnvironment,
+    notifySceneRevision,
     performFriendAction,
     performGroupAction,
     clearOneBotDebugRecords,
+    recallMessage,
     replaceWorkspace,
     selectConversation,
     selectOperator,

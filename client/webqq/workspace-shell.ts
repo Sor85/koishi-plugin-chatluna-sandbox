@@ -324,6 +324,17 @@ export function createWebqqWorkspaceShell(
     if (conversationId) return performFriendAction({ action: 'poke', targetId, conversationId })
   }
 
+  async function recallMessage(messageId: string) {
+    const conversationId = currentConversation.value?.id
+    if (!conversationId) return
+    errorMessage.value = ''
+    try {
+      await workspaceController.recallMessage({ conversationId, messageId })
+    } catch (error) {
+      errorMessage.value = error instanceof Error ? error.message : '撤回失败'
+    }
+  }
+
   function deleteFriend(targetId: string) {
     return performFriendAction({ action: 'delete', targetId })
   }
@@ -508,6 +519,7 @@ export function createWebqqWorkspaceShell(
     pokeFriend,
     pokeGroupMember,
     publishAnnouncement,
+    recallMessage,
     requestFriend,
     saveFriendRemark,
     saveGroupAction,

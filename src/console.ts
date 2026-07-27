@@ -15,6 +15,7 @@ import type {
   ManageSandboxEnvironmentInput,
   PerformFriendActionInput,
   PerformGroupActionInput,
+  RecallMessageInput,
   SandboxAppearance,
   SandboxBotDelivery,
   SandboxMediaContent,
@@ -32,8 +33,9 @@ type SpaceScoped<Input> = Input & { spaceId?: string }
 interface ConsoleEventMap {
   'onebot-sandbox/workspace': (input?: SpaceScoped<GetSandboxWorkspaceInput>) => SandboxWorkspaceState
   'onebot-sandbox/message-history': (input: SpaceScoped<GetMessageHistoryInput>) => SandboxMessageHistory
-  'onebot-sandbox/send-message': (input: SpaceScoped<SendMessageInput>) => Promise<SandboxWorkspaceState>
-  'onebot-sandbox/send-media-message': (input: SpaceScoped<SendMediaMessageInput>) => Promise<SandboxWorkspaceState>
+  'onebot-sandbox/send-message': (input: SpaceScoped<SendMessageInput>) => SandboxWorkspaceState
+  'onebot-sandbox/send-media-message': (input: SpaceScoped<SendMediaMessageInput>) => SandboxWorkspaceState
+  'onebot-sandbox/recall-message': (input: SpaceScoped<RecallMessageInput>) => Promise<SandboxWorkspaceState>
   'onebot-sandbox/media-content': (input: SpaceScoped<GetMediaContentInput>) => SandboxMediaContent
   'onebot-sandbox/set-group-announcement': (input: SpaceScoped<SetGroupAnnouncementInput>) => SandboxWorkspaceState
   'onebot-sandbox/delete-group-announcement': (input: SpaceScoped<DeleteGroupAnnouncementInput>) => SandboxWorkspaceState
@@ -84,6 +86,7 @@ export interface SandboxConsoleRegistrar {
     callback: ConsoleEventMap[Event],
     options: { authority: number },
   ): unknown
+  broadcast(type: string, body: unknown): unknown
 }
 
 export function registerConsole(
@@ -96,6 +99,16 @@ export function registerConsole(
   console.addEntry({
     dev: resolve(__dirname, '../client/index.ts'),
     prod: resolve(__dirname, '../dist'),
+  })
+
+  // 场景变更实时广播给 WebQQ：发送消息不再等待机器人处理完成，机器人回复靠此通知前端刷新。
+  control.onSceneMutation(({ revision }) => {
+    void console.broadcast('onebot-sandbox/scene-mutated', { revision })
+  })
+  testSpaces?.onSpaceCreated((spaceId, spaceControl) => {
+    spaceControl.onSceneMutation(({ revision }) => {
+      void console.broadcast('onebot-sandbox/scene-mutated', { spaceId, revision })
+    })
   })
 
   const resolveControl = (input: { spaceId?: string } | undefined, mutation: boolean) => {
@@ -127,12 +140,19 @@ export function registerConsole(
 
   console.addListener('onebot-sandbox/workspace', (input) => getWorkspace(input), { authority: 4 })
   console.addListener('onebot-sandbox/message-history', (input) => resolveControl(input, false).getMessageHistory(assertInteractionInput(withoutSpaceId(input)) as GetMessageHistoryInput), { authority: 4 })
-  console.addListener('onebot-sandbox/send-message', async (input) => {
-    await resolveControl(input, true).sendMessage(assertInteractionInput(withoutSpaceId(input)) as SendMessageInput)
+  console.addListener('onebot-sandbox/send-message', (input) => {
+    // 消息同步落库后立即返回，机器人投递在后台继续；派发失败已写入调试记录与日志。
+    const { delivery } = resolveControl(input, true).startMessageSend(assertInteractionInput(withoutSpaceId(input)) as SendMessageInput)
+    delivery.catch(() => {})
     return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
-  console.addListener('onebot-sandbox/send-media-message', async (input) => {
-    await resolveControl(input, true).sendMediaMessage(assertInteractionInput(withoutSpaceId(input)) as SendMediaMessageInput)
+  console.addListener('onebot-sandbox/send-media-message', (input) => {
+    const { delivery } = resolveControl(input, true).startMediaMessageSend(assertInteractionInput(withoutSpaceId(input)) as SendMediaMessageInput)
+    delivery.catch(() => {})
+    return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
+  }, { authority: 4 })
+  console.addListener('onebot-sandbox/recall-message', async (input) => {
+    await resolveControl(input, true).recallMessage(assertInteractionInput(withoutSpaceId(input)) as RecallMessageInput)
     return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
   console.addListener('onebot-sandbox/media-content', (input) => resolveControl(input, false).getMediaContent(assertInteractionInput(withoutSpaceId(input)) as GetMediaContentInput), { authority: 4 })
@@ -213,8 +233,9 @@ declare module '@koishijs/console' {
   interface Events {
     'onebot-sandbox/workspace'(input?: SpaceScoped<GetSandboxWorkspaceInput>): SandboxWorkspaceState
     'onebot-sandbox/message-history'(input: SpaceScoped<GetMessageHistoryInput>): SandboxMessageHistory
-    'onebot-sandbox/send-message'(input: SpaceScoped<SendMessageInput>): Promise<SandboxWorkspaceState>
-    'onebot-sandbox/send-media-message'(input: SpaceScoped<SendMediaMessageInput>): Promise<SandboxWorkspaceState>
+    'onebot-sandbox/send-message'(input: SpaceScoped<SendMessageInput>): SandboxWorkspaceState
+    'onebot-sandbox/send-media-message'(input: SpaceScoped<SendMediaMessageInput>): SandboxWorkspaceState
+    'onebot-sandbox/recall-message'(input: SpaceScoped<RecallMessageInput>): Promise<SandboxWorkspaceState>
     'onebot-sandbox/media-content'(input: SpaceScoped<GetMediaContentInput>): SandboxMediaContent
     'onebot-sandbox/set-group-announcement'(input: SpaceScoped<SetGroupAnnouncementInput>): SandboxWorkspaceState
     'onebot-sandbox/delete-group-announcement'(input: SpaceScoped<DeleteGroupAnnouncementInput>): SandboxWorkspaceState

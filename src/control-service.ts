@@ -6,7 +6,7 @@ import { SandboxMediaStorage } from './media-storage'
 import { SandboxOneBotDebugStore, type AppendOneBotDebugRecordInput } from './onebot-debug'
 import { toOneBotMessageSegments, toOneBotRawMessage } from './onebot-message'
 import type { SandboxScenePersistence } from './persistence'
-import { getOneBotCapabilityMatrix, getOneBotMessageEventFields, normalizeDisabledCapabilities, type SandboxOneBotCapability } from './onebot-profiles'
+import { getOneBotCapabilityMatrix, getOneBotMessageEventFields, getOneBotMessageSequence, normalizeDisabledCapabilities, type SandboxOneBotCapability } from './onebot-profiles'
 import {
   createDirectConversationId,
   createGroupConversationId,
@@ -26,10 +26,12 @@ import {
   type PerformFriendActionResult,
   type PerformGroupActionInput,
   type PerformGroupActionResult,
+  type RecallMessageInput,
   type SandboxBotDelivery,
   type SandboxBotProfile,
   type SandboxChatLunaState,
   type SandboxConversation,
+  type SandboxDirectConversation,
   type SandboxFriendship,
   type SandboxGroup,
   type SandboxGroupMember,
@@ -184,7 +186,8 @@ export class SandboxControlService {
     this.persistence = options.persistence
     this.oneBotDebug = new SandboxOneBotDebugStore(options.debugRecordLimit)
     this.mediaStorage = new SandboxMediaStorage(options.mediaDirectory ?? resolve(ctx.baseDir, 'data/onebot-sandbox/media'))
-    if (!this.persistence || !this.persistence.getStatus().available) this.mediaStorage.clear()
+    // database 服务可能晚于本插件加载，构造时的可用性不可信；数据库模式的清理决策移到 ready 读取场景之后。
+    if (!this.persistence) this.mediaStorage.clear()
     this.chatLunaState = new SandboxChatLunaStateStore(ctx, (botParticipantId, conversationId) => {
       const participant = this.scene.participants.find(({ id }) => id === botParticipantId)
       const conversation = this.scene.conversations.find(({ id }) => id === conversationId)
@@ -986,6 +989,14 @@ export class SandboxControlService {
   }
 
   async sendMessage(input: SendMessageInput): Promise<SendMessageResult> {
+    const { result, delivery } = this.startMessageSend(input)
+    await delivery
+    return { ...result, revision: this.scene.revision }
+  }
+
+  // 同步完成校验与消息落库并立即返回，机器人投递在后台继续；
+  // WebQQ 依赖此方法让用户消息即时显示，不被插件处理时长（如图片渲染）阻塞。
+  startMessageSend(input: SendMessageInput): { result: SendMessageResult; delivery: Promise<void> } {
     if (!input.content.trim()) throw new Error('消息内容不能为空')
     const context = this.getMessageContext(input)
     const message = this.appendMessage(input.operatorId, context.conversation.id, input.content.trim(), input.replyToMessageId)
@@ -994,11 +1005,17 @@ export class SandboxControlService {
       ...(context.reply ? [{ type: 'reply', data: { id: context.reply.id } }] : []),
       ...toOneBotMessageSegments(message.content),
     ]
-    await this.dispatchMessageToBots(context, message, elements, onebotMessage, toOneBotRawMessage(onebotMessage))
-    return { messageId: message.id, revision: this.scene.revision }
+    const delivery = this.dispatchMessageToBots(context, message, elements, onebotMessage, toOneBotRawMessage(onebotMessage))
+    return { result: { messageId: message.id, revision: this.scene.revision }, delivery }
   }
 
   async sendMediaMessage(input: SendMediaMessageInput): Promise<SendMessageResult> {
+    const { result, delivery } = this.startMediaMessageSend(input)
+    await delivery
+    return { ...result, revision: this.scene.revision }
+  }
+
+  startMediaMessageSend(input: SendMediaMessageInput): { result: SendMessageResult; delivery: Promise<void> } {
     if (!input.media.length) throw new Error('至少需要一个媒体文件')
     // 先校验会话与操作者，再落盘媒体；中途任一文件校验失败时清理已写入的文件，避免留下孤儿媒体。
     const context = this.getMessageContext(input)
@@ -1027,8 +1044,8 @@ export class SandboxControlService {
       ...(text ? [{ type: 'text', data: { text } }] : []),
     ]
     const rawMessage = `${context.reply ? `[CQ:reply,id=${context.reply.id}]` : ''}${media.map((item) => `[CQ:${item.type === 'audio' ? 'record' : item.type},file=${item.reference}]`).join('')}${text}`
-    await this.dispatchMessageToBots(context, message, elements, onebotMessage, rawMessage)
-    return { messageId: message.id, revision: this.scene.revision }
+    const delivery = this.dispatchMessageToBots(context, message, elements, onebotMessage, rawMessage)
+    return { result: { messageId: message.id, revision: this.scene.revision }, delivery }
   }
 
   getMediaContent(input: GetMediaContentInput): SandboxMediaContent {
@@ -1163,24 +1180,96 @@ export class SandboxControlService {
     this.commitSceneMutation()
   }
 
-  deleteBotMessage(botId: string, messageId: string, conversationId?: string): void {
-    const visibleConversationIds = new Set(this.scene.conversations
-      .filter((conversation) => this.isConversationVisible(botId, conversation))
-      .map(({ id }) => id))
-    const index = this.scene.messages.findIndex(({ id, conversationId: messageConversationId }) => id === messageId
-      && visibleConversationIds.has(messageConversationId) && (!conversationId || messageConversationId === conversationId))
-    if (index < 0) throw new Error(`消息不存在：${messageId}`)
-    const target = this.scene.messages[index]
-    const removed = this.scene.messages.filter(({ id, broadcastId }) => id === target.id
-      || (!!target.broadcastId && broadcastId === target.broadcastId))
-    const removedIds = new Set(removed.map(({ id }) => id))
-    this.scene.messages = this.scene.messages.filter(({ id }) => !removedIds.has(id))
-    for (const conversation of this.scene.conversations) {
-      conversation.messageIds = conversation.messageIds.filter((id) => !removedIds.has(id))
+  async recallMessage(input: RecallMessageInput): Promise<{ revision: number }> {
+    if (this.isBot(input.operatorId)) {
+      const bot = this.getBots().find(({ id }) => id === input.operatorId)!
+      if (!bot.enabled) throw new Error(`机器人已停用：${bot.id}`)
+      // 机器人操作者必须走自身 OneBot action（操作通道约束），保持能力校验与调试记录一致。
+      await this.getRuntimeBot(bot.id).internal._request('delete_msg', { message_id: input.messageId })
+      return { revision: this.scene.revision }
     }
-    this.botDeliveries = this.botDeliveries.filter(({ messageId }) => !removedIds.has(messageId))
-    for (const media of removed.flatMap(({ media }) => media ?? [])) this.mediaStorage.remove(media)
+    this.getParticipant(input.operatorId)
+    await this.recallVisibleMessage(input.operatorId, input.messageId, input.conversationId)
+    return { revision: this.scene.revision }
+  }
+
+  async recallBotMessage(botId: string, rawMessageId: string, conversationId?: string): Promise<void> {
+    // OneBot 事件里的 message_id 是数字 sequence，插件回传时兼容沙盒消息 ID 与 sequence 两种形态。
+    const message = this.scene.messages.find(({ id }) => id === rawMessageId)
+      ?? (/^\d+$/.test(rawMessageId)
+        ? this.scene.messages.find(({ id }) => String(getOneBotMessageSequence(id)) === rawMessageId)
+        : undefined)
+    await this.recallVisibleMessage(botId, message?.id ?? rawMessageId, conversationId)
+  }
+
+  // 撤回与真实 QQ 一致：消息就地替换为灰条提示，保留会话位置，并向相关机器人派发撤回通知。
+  private async recallVisibleMessage(operatorId: string, messageId: string, conversationId?: string): Promise<void> {
+    const message = this.scene.messages.find(({ id }) => id === messageId)
+    if (!message || (conversationId && message.conversationId !== conversationId)) throw new Error(`消息不存在：${messageId}`)
+    const conversation = this.scene.conversations.find(({ id }) => id === message.conversationId)
+    if (!conversation || !this.isConversationVisible(operatorId, conversation)) throw new Error(`消息不存在：${messageId}`)
+    if (message.event) throw new Error('该消息不支持撤回')
+    const group = conversation.type === 'group'
+      ? this.scene.groups.find(({ id }) => id === conversation.groupId)
+      : undefined
+    if (message.authorId !== operatorId) {
+      if (!group) throw new Error('只能撤回自己发送的消息')
+      const actor = this.requireGroupMember(group, operatorId)
+      const target = this.requireGroupMember(group, message.authorId)
+      this.assertCanManageMember(actor, target, '撤回成员消息')
+    }
+    const operatorName = group?.members.find(({ participantId }) => participantId === operatorId)?.card
+      || this.getParticipant(operatorId).name
+    const recalled = this.scene.messages.filter(({ id, broadcastId }) => id === message.id
+      || (!!message.broadcastId && broadcastId === message.broadcastId))
+    for (const target of recalled) {
+      for (const media of target.media ?? []) this.mediaStorage.remove(media)
+      delete target.media
+      delete target.replyToMessageId
+      target.content = `${operatorName} 撤回了一条消息`
+      target.event = { type: 'recall', operatorId }
+    }
     this.commitSceneMutation()
+    if (group) {
+      await this.dispatchGroupNotice(group, 'group_recall', {
+        user_id: Number(message.authorId),
+        operator_id: Number(operatorId),
+        message_id: getOneBotMessageSequence(message.id),
+      }, { messageId: message.id })
+      return
+    }
+    if (conversation.type !== 'direct') return
+    await Promise.all(conversation.participantIds.map(async (participantId) => {
+      const bot = this.getBots().find(({ id }) => id === participantId)
+      if (!bot?.enabled) return
+      await this.dispatchFriendRecallNotice(bot.id, conversation, message.id)
+    }))
+  }
+
+  private async dispatchFriendRecallNotice(botId: string, conversation: SandboxDirectConversation, messageId: string): Promise<void> {
+    const bot = this.runtimeBots.get(botId)
+    if (!bot) return
+    const peerId = getDirectConversationPeerId(conversation, botId)
+    const session = bot.session({
+      type: 'message-deleted',
+      timestamp: Date.now(),
+      user: { id: peerId, name: this.getParticipant(peerId).name },
+      channel: { id: conversation.id, type: Universal.Channel.Type.DIRECT },
+      message: { id: messageId, messageId },
+    })
+    Object.assign(session, {
+      onebot: {
+        time: Math.floor(Date.now() / 1000),
+        self_id: Number(botId),
+        post_type: 'notice',
+        notice_type: 'friend_recall',
+        user_id: Number(peerId),
+        message_id: getOneBotMessageSequence(messageId),
+      },
+    })
+    await this.dispatchOneBotEvent(bot, session)
+    // 与群通知路径一致：OneBot 插件监听原始 notice，标准事件与原始事件复用同一个 Session。
+    ;(this.ctx.emit as unknown as (session: unknown, name: string, payload: unknown) => void)(session, 'notice', session)
   }
 
   private appendMessage(
@@ -1526,7 +1615,15 @@ export class SandboxControlService {
       type: 'notice',
       timestamp: Date.now(),
       user: { id: userId, name: this.getUser(userId).name },
+      // channelId 使用沙盒私聊会话 ID 而非 adapter-onebot 的 `private:QQ号`，
+      // 插件收到事件后 session.send() 才能直接回落到同一会话。
+      channel: { id: createDirectConversationId(userId, botId), type: Universal.Channel.Type.DIRECT },
     })
+    if (noticeType === 'notify') {
+      // adapter-onebot 把 notify/poke 映射为 type=notice、subtype=poke 并附带 targetId；
+      // 插件靠这些字段过滤戳一戳，缺失会导致监听器永远不匹配（如"被戳后回复"类插件）。
+      Object.assign(session, { subtype: 'poke', targetId: botId })
+    }
     Object.assign(session, {
       onebot: {
         time: Math.floor(Date.now() / 1000),
@@ -1575,7 +1672,8 @@ export class SandboxControlService {
     group: SandboxGroup,
     noticeType: string,
     data: Record<string, unknown> | ((botId: string) => Record<string, unknown>),
-  ) {
+    options: { messageId?: string } = {},
+  ): Promise<void> {
     const botIds = group.members.flatMap(({ participantId }) => this.isBot(participantId) ? [participantId] : [])
     await Promise.all(botIds.map(async (botId) => {
       const bot = this.getRuntimeBot(botId)
@@ -1593,11 +1691,15 @@ export class SandboxControlService {
             ? 'guild-updated'
             : noticeType === 'group_admin' || noticeType === 'group_card' || noticeType === 'group_owner'
               ? 'guild-member-updated'
-              : 'notice'
+              : noticeType === 'group_recall'
+                ? 'message-deleted'
+                : 'notice'
       const session = bot.session({
         type: standardType,
         timestamp: Date.now(),
         guild: { id: group.id, name: group.name },
+        // channelId 与消息事件一致使用沙盒群会话 ID，插件在通知回调里 session.send() 才能落回本群。
+        channel: { id: createGroupConversationId(group.id), type: Universal.Channel.Type.TEXT },
         user: user ? { id: user.id, name: user.name, avatar: user.avatar, isBot: this.isBot(user.id) } : undefined,
         operator: operator ? { id: operator.id, name: operator.name, avatar: operator.avatar, isBot: this.isBot(operator.id) } : undefined,
         member: member && user ? {
@@ -1606,7 +1708,15 @@ export class SandboxControlService {
           nick: member.card ?? user.name,
           roles: [{ id: member.role }],
         } : undefined,
+        message: options.messageId ? { id: options.messageId, messageId: options.messageId } : undefined,
       })
+      if (noticeType === 'notify' && noticeData.sub_type === 'poke') {
+        // 与 adapter-onebot 对齐：群戳一戳的 session 需要 subtype=poke 与 targetId，插件靠它们过滤事件。
+        Object.assign(session, {
+          subtype: 'poke',
+          targetId: noticeData.target_id === undefined ? undefined : String(noticeData.target_id),
+        })
+      }
       Object.assign(session, {
         onebot: {
           time: Math.floor(Date.now() / 1000),

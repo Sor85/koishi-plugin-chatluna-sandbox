@@ -10,6 +10,7 @@ declare module '@koishijs/client' {
     ManageSandboxEnvironmentInput,
     PerformFriendActionInput,
     PerformGroupActionInput,
+    RecallMessageInput,
     SandboxMediaContent,
     SandboxMessageHistory,
     SandboxOneBotDebugRecord,
@@ -42,6 +43,7 @@ declare module '@koishijs/client' {
   export function send(event: 'onebot-sandbox/message-history', input: SpaceScoped<GetMessageHistoryInput>): Promise<SandboxMessageHistory>
   export function send(event: 'onebot-sandbox/send-message', input: SpaceScoped<SendMessageInput>): Promise<SandboxWorkspaceState>
   export function send(event: 'onebot-sandbox/send-media-message', input: SpaceScoped<SendMediaMessageInput>): Promise<SandboxWorkspaceState>
+  export function send(event: 'onebot-sandbox/recall-message', input: SpaceScoped<RecallMessageInput>): Promise<SandboxWorkspaceState>
   export function send(event: 'onebot-sandbox/media-content', input: SpaceScoped<GetMediaContentInput>): Promise<SandboxMediaContent>
   export function send(event: 'onebot-sandbox/set-group-announcement', input: SpaceScoped<SetGroupAnnouncementInput>): Promise<SandboxWorkspaceState>
   export function send(event: 'onebot-sandbox/delete-group-announcement', input: SpaceScoped<DeleteGroupAnnouncementInput>): Promise<SandboxWorkspaceState>
@@ -60,4 +62,5 @@ declare module '@koishijs/client' {
   export function send(event: 'onebot-sandbox/return-test-space', input: { spaceId: string }): Promise<SandboxTestSpaceSummary>
   export function send(event: 'onebot-sandbox/reactivate-test-space', input: { spaceId: string }): Promise<SandboxTestSpaceSummary>
   export function send(event: 'onebot-sandbox/delete-test-space', input: { spaceId: string }): Promise<void>
+  export function receive<T = unknown>(event: string, listener: (data: T) => void): void
 }

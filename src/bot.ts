@@ -254,7 +254,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           return this.getOneBotMessageHistory(createGroupConversationId(normalizeOneBotGroupId(params.group_id)), params)
         }
         if (action === 'delete_msg') {
-          this.control.deleteBotMessage(this.selfId, String(params.message_id ?? ''))
+          await this.control.recallBotMessage(this.selfId, String(params.message_id ?? ''))
           return { status: 'ok', retcode: 0, data: null }
         }
         if (action === 'delete_friend') {
@@ -565,7 +565,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
 
   async deleteMessage(channelId: string, messageId: string): Promise<void> {
     this.getVisibleConversation(channelId)
-    this.control.deleteBotMessage(this.selfId, messageId, channelId)
+    await this.control.recallBotMessage(this.selfId, messageId, channelId)
   }
 
   async deleteFriend(userId: string): Promise<void> {

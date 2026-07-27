@@ -193,7 +193,7 @@ describe('沙盒场景持久化', () => {
     temporaryDirectories.push(mediaDirectory)
     await writeFile(join(mediaDirectory, 'orphan'), 'orphan')
 
-    const persistence = new KoishiDatabaseScenePersistence()
+    const persistence = new KoishiDatabaseScenePersistence(() => undefined)
     const { control } = await createControl(persistence, mediaDirectory)
 
     expect(control.getPersistenceStatus()).toEqual({

@@ -36,6 +36,7 @@ describe('OneBot 调试 Console 协议', () => {
       addListener(event, callback) {
         listeners.set(event, callback)
       },
+      broadcast() {},
     }
     registerConsole(consoleRegistrar, control, appearance)
 
