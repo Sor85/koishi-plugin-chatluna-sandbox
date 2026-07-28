@@ -41,6 +41,11 @@
   margin-bottom: 16px;
 }
 
+/* 与 onebot-webqq 对齐：置底时末条消息不再叠加 16px 行距，避免与输入区间隙翻倍。 */
+.webqq-message-row:last-child {
+  margin-bottom: 0;
+}
+
 .webqq-message-row.is-outgoing {
   margin-left: auto;
   flex-direction: row-reverse;

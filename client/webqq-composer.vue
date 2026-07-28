@@ -530,7 +530,9 @@ function updateComposerSpace() {
   overlays.forEach((overlay) => {
     overlayHeight += Math.ceil(overlay.getBoundingClientRect().height) + 8
   })
-  emit('spaceChange', formHeight + overlayHeight + 36)
+  // 常量 28 = 胶囊底部偏移 20px + 置底时末条消息与输入区的可视间隙 8px，与 onebot-webqq 一致；
+  // 浮条自身的 8px 间隔已在上面按条累加，这里不再重复计入。
+  emit('spaceChange', formHeight + overlayHeight + 28)
 }
 
 watch(composerFormRef, (form) => {
