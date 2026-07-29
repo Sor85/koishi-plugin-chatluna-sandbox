@@ -89,11 +89,14 @@ const VERTEX = `attribute vec2 a_Position;
 void main() { gl_Position = vec4(a_Position, 0.0, 1.0); }
 `
 
-// 内外两层光晕（CSS px 单位，运行时乘 dpr）。向内扩散 ≈ stroke/2 + blur，对齐 ego 实机的
-// 120-160 CSS px 雾带 [实测]；相位错半圈保证任意时刻整圈都有光带，反向滚动制造流动纵深 [推断]。
+// 内外两层光晕（CSS px 单位，运行时乘 dpr）。向内扩散 ≈ stroke/2 + blur；相位错半圈保证任意时刻
+// 整圈都有光带，反向滚动制造流动纵深 [推断]。
 const GLOW_PRESETS = [
-  { stroke: 110, blur: 80, radius: 14, fade: 1, accent: [0.27, 0.42, 0.85, 1], scrollSpeed: 1 / 7, scrollPhase: 0 },
-  { stroke: 50, blur: 130, radius: 14, fade: 0.85, accent: [0.27, 0.42, 0.85, 1], scrollSpeed: -1 / 9, scrollPhase: 0.5 },
+  { stroke: 160, blur: 115, radius: 14, fade: 1, accent: [0.27, 0.42, 0.85, 1], scrollSpeed: 1 / 7, scrollPhase: 0 },
+  { stroke: 76, blur: 185, radius: 14, fade: 1, accent: [0.27, 0.42, 0.85, 1], scrollSpeed: -1 / 9, scrollPhase: 0.5 },
+  // 这是原本的数据（按 ego 实机截屏标定的初版参数，后应需求加宽扩散后弃用，保留备查）：
+  // { stroke: 110, blur: 80, radius: 14, fade: 1, accent: [0.27, 0.42, 0.85, 1], scrollSpeed: 1 / 7, scrollPhase: 0 },
+  // { stroke: 50, blur: 130, radius: 14, fade: 0.85, accent: [0.27, 0.42, 0.85, 1], scrollSpeed: -1 / 9, scrollPhase: 0.5 },
 ]
 
 interface GlProgram {

@@ -1,3 +1,6 @@
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { App, h, Universal } from '@koishijs/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SandboxControlService } from '../src/control-service'
@@ -12,7 +15,9 @@ async function createControl() {
   const app = new App()
   let control: SandboxControlService | undefined
   app.plugin((ctx) => {
-    control = new SandboxControlService(ctx)
+    // 不传 mediaDirectory 时所有测试进程共享仓库内同一媒体目录，而控制服务构造/销毁都会 clear()
+    // 该目录，vitest 并行跑测试文件时会互相删掉对方刚写入的媒体文件，造成偶发 ENOENT。
+    control = new SandboxControlService(ctx, { mediaDirectory: mkdtempSync(join(tmpdir(), 'onebot-bridge-media-')) })
   })
   runningApps.push(app)
   await app.start()
