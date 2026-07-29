@@ -133,6 +133,19 @@ export class SandboxTestSpaceService {
     return this.setStatus(spaceId, 'running')
   }
 
+  // WebUI 空间内任务栏的"终止任务"：用户不持有测试凭证，因此不校验 controllerId；
+  // 终止是用户主动结束而非 AI 报告失败，落到 completed 而不是 failed。
+  terminateSpace(spaceId: string): SandboxTestSpaceSummary {
+    const space = this.requireSpace(spaceId)
+    if (space.status === 'completed' || space.status === 'failed') throw new Error('空间已结束')
+    space.status = 'completed'
+    space.completedAt = new Date().toISOString()
+    space.updatedAt = space.completedAt
+    space.control.setRuntimeActive(false)
+    this.queuePersistence(space)
+    return this.toSummary(space)
+  }
+
   completeSpace(spaceId: string, controllerId: string): SandboxTestSpaceSummary {
     const space = this.requireRunningAiSpace(spaceId, controllerId)
     space.status = 'completed'

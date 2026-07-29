@@ -30,5 +30,8 @@ describe('AI 测试空间 Console 适配器', () => {
     expect(workspace.snapshot.participants).toContainEqual({ kind: 'user', id: '11001', name: '用户' })
     listeners.get('onebot-sandbox/return-test-space')?.({ spaceId: space.id })
     expect(spaces.getSpace(space.id).status).toBe('running')
+
+    expect(listeners.get('onebot-sandbox/terminate-test-space')?.({ spaceId: space.id })).toMatchObject({ status: 'completed' })
+    expect(spaces.getSpace(space.id).status).toBe('completed')
   })
 })

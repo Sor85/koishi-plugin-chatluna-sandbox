@@ -53,6 +53,7 @@ interface ConsoleEventMap {
   'onebot-sandbox/create-test-space': (input: { name?: string }) => SandboxTestSpaceSummary
   'onebot-sandbox/take-over-test-space': (input: { spaceId: string }) => SandboxTestSpaceSummary
   'onebot-sandbox/return-test-space': (input: { spaceId: string }) => SandboxTestSpaceSummary
+  'onebot-sandbox/terminate-test-space': (input: { spaceId: string }) => SandboxTestSpaceSummary
   'onebot-sandbox/reactivate-test-space': (input: { spaceId: string }) => SandboxTestSpaceSummary
   'onebot-sandbox/delete-test-space': (input: { spaceId: string }) => void
 }
@@ -224,6 +225,7 @@ export function registerConsole(
     }, { authority: 4 })
     console.addListener('onebot-sandbox/take-over-test-space', ({ spaceId }) => testSpaces.takeOver(spaceId), { authority: 4 })
     console.addListener('onebot-sandbox/return-test-space', ({ spaceId }) => testSpaces.returnControl(spaceId), { authority: 4 })
+    console.addListener('onebot-sandbox/terminate-test-space', ({ spaceId }) => testSpaces.terminateSpace(spaceId), { authority: 4 })
     console.addListener('onebot-sandbox/reactivate-test-space', ({ spaceId }) => testSpaces.reactivateSpace(spaceId), { authority: 4 })
     console.addListener('onebot-sandbox/delete-test-space', ({ spaceId }) => testSpaces.deleteSpace(spaceId), { authority: 4 })
   }
@@ -253,6 +255,7 @@ declare module '@koishijs/console' {
     'onebot-sandbox/create-test-space'(input: { name?: string }): SandboxTestSpaceSummary
     'onebot-sandbox/take-over-test-space'(input: { spaceId: string }): SandboxTestSpaceSummary
     'onebot-sandbox/return-test-space'(input: { spaceId: string }): SandboxTestSpaceSummary
+    'onebot-sandbox/terminate-test-space'(input: { spaceId: string }): SandboxTestSpaceSummary
     'onebot-sandbox/reactivate-test-space'(input: { spaceId: string }): SandboxTestSpaceSummary
     'onebot-sandbox/delete-test-space'(input: { spaceId: string }): void
   }

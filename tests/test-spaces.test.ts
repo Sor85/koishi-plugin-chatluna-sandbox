@@ -46,6 +46,16 @@ describe('AI 测试空间', () => {
     expect(spaces.requireAiControl(space.id, 'credential-a')).toBe(space.control)
   })
 
+  it('用户终止任务后空间结束为已完成，AI 不能再修改', () => {
+    const { spaces } = createServices()
+    const space = spaces.createSpace({ controllerId: 'credential-a' })
+
+    expect(spaces.terminateSpace(space.id).status).toBe('completed')
+    expect(spaces.getSpace(space.id).completedAt).toBeTruthy()
+    expect(() => spaces.requireAiControl(space.id, 'credential-a')).toThrow('空间当前不可修改：completed')
+    expect(() => spaces.terminateSpace(space.id)).toThrow('空间已结束')
+  })
+
   it('AI 重新激活后恢复 AI 控制，用户重新激活后保持接管', () => {
     const { spaces } = createServices()
     const aiSpace = spaces.createSpace({ controllerId: 'credential-a' })

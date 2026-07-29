@@ -35,28 +35,51 @@
 .webqq-space-mini-chat { display: flex; flex-direction: column; justify-content: flex-end; padding: 20px 22px; overflow: hidden; background: var(--webqq-surface-muted); }
 .webqq-space-mini-empty { align-self: center; margin: auto; color: var(--webqq-muted); font-size: 13px; }
 
-/* ==== ego lite agent 视觉复刻（参数取自 ego lite 应用资源；颜色映射到主题 accent，原版为 #0880f7）==== */
+/* ==== ego lite agent 视觉复刻（边缘效果与光标动画 1:1 取自 ego lite resources.pak 内 Actor Overlay 源码；任务栏按实机截图与 --bg-agent-task-bar: #0009 令牌复刻）==== */
 
-/* agent 光标：JS 每 5.2-9s 随机跳位，移动由 0.9s transition 完成；内层做悬浮呼吸，两层拆开避免 transform 互相覆盖。 */
-.webqq-agent-cursor { position: absolute; top: 38%; left: 55%; z-index: 26; pointer-events: none; transition: top 0.9s cubic-bezier(0.22, 1, 0.36, 1), left 0.9s cubic-bezier(0.22, 1, 0.36, 1); }
-.webqq-agent-cursor-float { display: flex; align-items: flex-start; animation: webqq-agent-float 2s ease-in-out infinite; }
-.webqq-agent-cursor-float svg { flex: none; color: var(--webqq-accent); }
+/* agent 光标：JS 每 5.2-9s 随机跳位，移动 easing 与 ego 魔法光标一致；到位后播放 400ms 点击挤压，静止后进入 loading 浮动。 */
+.webqq-agent-cursor { position: absolute; top: 38%; left: 55%; z-index: 26; pointer-events: none; transition: top 0.9s cubic-bezier(0.6, 0, 0.4, 1), left 0.9s cubic-bezier(0.6, 0, 0.4, 1); }
+.webqq-agent-cursor-float { display: flex; align-items: flex-start; }
+/* ego #cursorImage 的双层光晕投影；transform-origin 50% 100% 让点击挤压向笔尖下压。 */
+.webqq-agent-cursor-float svg { flex: none; color: var(--webqq-accent); transform-origin: 50% 100%; filter: drop-shadow(2px 3px 5px rgb(79 161 255 / 100%)) drop-shadow(-1px -1px 2px rgb(52 107 241 / 100%)); }
 .webqq-agent-cursor-label { margin-top: 14px; margin-left: -4px; max-width: 240px; overflow: hidden; padding: 3px 10px; border-radius: 999px; color: var(--webqq-text); background: rgb(255 255 255 / 42%); box-shadow: 0 0 0 1px rgb(0 0 0 / 6%), 0 16px 48px rgb(0 0 0 / 35%); backdrop-filter: blur(10px); font-size: 12px; font-weight: 600; line-height: 16px; text-overflow: ellipsis; white-space: nowrap; }
-@keyframes webqq-agent-float { 0%, 100% { transform: translateY(-3px); } 50% { transform: translateY(4px); } }
+/* ego cursor-click：400ms ease-out 挤压（scale 0.85 + 下压 2px），即点击涟漪反馈。 */
+@keyframes webqq-agent-cursor-click { 0% { transform: scale(1); } 40% { transform: scale(0.85) translateY(2px); } 100% { transform: scale(1); } }
+.webqq-agent-cursor.is-clicking .webqq-agent-cursor-float svg { animation: webqq-agent-cursor-click 400ms ease-out; }
+/* ego loading-intro / loading-loop：闲置时 ±4px 浮动，750ms 进场后 3.2s 循环。 */
+@keyframes webqq-agent-loading-intro { from { transform: translateY(0); animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); } to { transform: translateY(-4px); } }
+@keyframes webqq-agent-loading-loop { 0%, 3.125% { transform: translateY(-4px); animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); } 50% { transform: translateY(4px); animation-timing-function: linear; } 53.125% { transform: translateY(4px); animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); } 100% { transform: translateY(-4px); } }
+@media (prefers-reduced-motion: no-preference) { .webqq-agent-cursor.is-loading .webqq-agent-cursor-float { animation: webqq-agent-loading-intro 750ms forwards, webqq-agent-loading-loop 3200ms infinite 750ms; } }
 
 /* running 脉冲点：8px 圆点 + 呼吸光晕（4px@16% → 7px@4%，1.6s）。 */
 .webqq-agent-pulse-dot { display: inline-block; flex: none; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--webqq-accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--webqq-accent) 16%, transparent); animation: webqq-agent-pulse 1.6s cubic-bezier(0.34, 0.69, 0.1, 1) infinite; }
 @keyframes webqq-agent-pulse { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--webqq-accent) 4%, transparent); } }
 
-/* 观察被控空间的覆盖层：横跨工作区网格所有列（行未显式定义，用 row 1 即唯一一行），自身不拦截交互，仅控制条可点。 */
-.webqq-agent-observe { position: relative; z-index: 25; grid-column: 1 / -1; grid-row: 1; min-width: 0; min-height: 0; pointer-events: none; }
-.webqq-agent-observe-glow { position: absolute; inset: 0; box-shadow: inset 0 0 40px 0 color-mix(in srgb, var(--webqq-accent) 50%, transparent); }
+/* 观察被控空间的覆盖层（ego Actor Overlay）：scrim 渐变 + 点阵 + 描边环 + 呼吸光晕，自身不拦截交互，仅任务栏可点。 */
+.webqq-agent-observe { position: relative; z-index: 25; grid-column: 1 / -1; grid-row: 1; min-width: 0; min-height: 0; pointer-events: none; background: linear-gradient(77deg, rgb(124 172 248 / 24%) 6.99%, rgb(11 87 208 / 24%) 45.46%, rgb(27 110 243 / 24%) 88.2%); }
 .webqq-agent-observe-dots { position: absolute; inset: 0; opacity: 0.5; background-image: radial-gradient(circle, rgb(55 55 55 / 10%) 1px, transparent 1px); background-size: 6px 6px; }
-.webqq-agent-observe-bar { position: absolute; top: 14px; left: 50%; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 16px; border-radius: 999px; color: #fff; background: rgb(0 0 0 / 60%); box-shadow: 0 0 0 1px rgb(0 0 0 / 6%), 0 16px 48px rgb(0 0 0 / 35%); backdrop-filter: blur(10px); pointer-events: auto; transform: translateX(-50%); }
-.webqq-agent-observe-bar-text { font-size: 13px; font-weight: 600; line-height: 18px; white-space: nowrap; }
-.webqq-agent-observe .webqq-agent-cursor { z-index: 1; }
+/* ego #border-stroke：跑马灯描边环。双层 mask 相减抠出 3px 环形，内缘 6px 圆角。 */
+.webqq-agent-observe-stroke { position: absolute; inset: 0; z-index: 15; box-sizing: border-box; background: #1b6ef3; pointer-events: none; mask-image: linear-gradient(white, white), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100%25' height='100%25' rx='6px' ry='6px' fill='white'/%3E%3C/svg%3E"); mask-composite: subtract; mask-size: 100% 100%, calc(100% - 6px) calc(100% - 6px); mask-position: 0 0, center; mask-repeat: no-repeat, no-repeat; }
+/* ego #border-glow：35px/12px 内光晕做 4s 呼吸（0.6 → 0 → 0.6），涟漪式波动。 */
+.webqq-agent-observe-glow { position: absolute; inset: 0; z-index: 10; box-shadow: inset 0 0 35px 12px #4c8df6; animation: webqq-agent-pulse-opacity 4000ms infinite; pointer-events: none; }
+@keyframes webqq-agent-pulse-opacity { 0% { opacity: 0.6; animation-timing-function: cubic-bezier(0.33, 0, 0.67, 1); } 33.33% { opacity: 0; animation-timing-function: linear; } 66.66% { opacity: 0; animation-timing-function: cubic-bezier(0.33, 0, 0.67, 1); } 100% { opacity: 0.6; } }
+.webqq-agent-observe .webqq-agent-cursor { z-index: 20; }
+
+/* ego 空间内任务栏 1:1（ego 在底部，本项目置顶）：#0009 深色胶囊，白字标题 + 灰字副标题 + 白色接管 + 红字终止任务。 */
+.webqq-agent-taskbar { position: absolute; top: 14px; left: 50%; z-index: 25; display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 12px; border-radius: 999px; color: #fff; background: rgb(0 0 0 / 60%); box-shadow: 0 16px 48px rgb(0 0 0 / 35%); backdrop-filter: blur(10px); pointer-events: auto; transform: translateX(-50%); }
+.webqq-agent-taskbar-pause { display: inline-flex; flex: none; color: rgb(255 255 255 / 55%); }
+.webqq-agent-taskbar-spinner { display: inline-flex; flex: none; color: #fff; animation: webqq-agent-spinner 0.9s steps(8) infinite; }
+@keyframes webqq-agent-spinner { to { transform: rotate(360deg); } }
+.webqq-agent-taskbar-text { display: flex; min-width: 0; flex-direction: column; margin-right: 4px; text-align: left; }
+.webqq-agent-taskbar-title { overflow: hidden; max-width: 220px; font-size: 13px; font-weight: 600; line-height: 17px; text-overflow: ellipsis; white-space: nowrap; }
+.webqq-agent-taskbar-subtitle { color: rgb(255 255 255 / 64%); font-size: 12px; line-height: 16px; white-space: nowrap; }
+.webqq-agent-taskbar button { flex: none; padding: 6px 14px; border: 0; border-radius: 999px; font-size: 13px; font-weight: 600; line-height: 18px; cursor: pointer; }
+.webqq-agent-taskbar-takeover { color: #1f2328; background: #fff; }
+.webqq-agent-taskbar-takeover:hover { background: rgb(255 255 255 / 86%); }
+.webqq-agent-taskbar-terminate { color: #ff5449; background: rgb(255 255 255 / 14%); }
+.webqq-agent-taskbar-terminate:hover { background: rgb(255 255 255 / 22%); }
 
 .webqq-workspace[data-color-mode="dark"] .webqq-agent-cursor-label { color: rgb(255 255 255 / 90%); background: rgb(56 56 56 / 42%); }
 .webqq-workspace[data-color-mode="dark"] .webqq-agent-observe-dots { background-image: radial-gradient(circle, rgb(255 255 255 / 15%) 1px, transparent 1px); }
-@media (prefers-reduced-motion: reduce) { .webqq-space-card { transition: none; } .webqq-agent-cursor { transition: none; } .webqq-agent-cursor-float, .webqq-agent-pulse-dot { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .webqq-space-card { transition: none; } .webqq-agent-cursor { transition: none; } .webqq-agent-cursor-float svg, .webqq-agent-pulse-dot, .webqq-agent-observe-glow, .webqq-agent-taskbar-spinner { animation: none; } }
 @media (max-width: 720px) { .webqq-space-overview { padding: 16px; } .webqq-space-toolbar { align-items: flex-start; flex-direction: column; } .webqq-space-grid { grid-template-columns: 1fr; } }

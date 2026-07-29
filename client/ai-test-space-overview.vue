@@ -31,9 +31,9 @@
         <footer>
           <div><strong>{{ space.name }}</strong><small><span v-if="space.status === 'running'" class="webqq-agent-pulse-dot" aria-hidden="true" />{{ statusLabel(space.status) }} · {{ formatTime(space.createdAt) }}</small></div>
           <div class="webqq-space-card-actions" @click.stop>
-            <Button v-if="space.status === 'running'" size="xs" variant="outline" @click="$emit('action', 'take-over', space.id)">接管</Button>
-            <Button v-else-if="space.status === 'taken-over'" size="xs" variant="outline" @click="$emit('action', 'return', space.id)">归还</Button>
-            <Button v-else size="xs" variant="outline" @click="$emit('action', 'reactivate', space.id)">重新激活</Button>
+            <!-- "接管"已移入空间内部的任务栏（AgentObserveOverlay），运行中卡片不再提供接管入口。 -->
+            <Button v-if="space.status === 'taken-over'" size="xs" variant="outline" @click="$emit('action', 'return', space.id)">归还</Button>
+            <Button v-else-if="space.status === 'completed' || space.status === 'failed'" size="xs" variant="outline" @click="$emit('action', 'reactivate', space.id)">重新激活</Button>
             <Button size="icon-xs" variant="ghost" aria-label="删除空间" @click="$emit('action', 'delete', space.id)"><IconTrash :size="14" /></Button>
           </div>
         </footer>
@@ -61,7 +61,7 @@ const props = defineProps<{ spaces: SandboxTestSpaceSummary[]; mainSnapshot: San
 const emit = defineEmits<{
   enter: [spaceId?: string]
   create: []
-  action: [action: 'take-over' | 'return' | 'reactivate' | 'delete', spaceId: string]
+  action: [action: 'return' | 'reactivate' | 'delete', spaceId: string]
 }>()
 const filter = ref<'all' | SandboxTestSpaceStatus>('all')
 const filters = [

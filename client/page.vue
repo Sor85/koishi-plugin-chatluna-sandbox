@@ -97,6 +97,7 @@
           v-if="observingSpace"
           :space-name="observingSpace.name"
           @take-over="handleTestSpaceAction('take-over', observingSpace.id)"
+          @terminate="handleTestSpaceAction('terminate', observingSpace.id)"
         />
       </div>
     </k-content>

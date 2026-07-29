@@ -13,10 +13,12 @@ describe('AI 测试空间总览', () => {
     expect(overview).toContain('filteredSpaces')
     expect(overview).toContain('创建测试空间')
     expect(overview).toContain("space.status === 'running'")
+    // "接管"入口已移入空间内部任务栏，总览卡片不再提供 take-over 动作
+    expect(overview).not.toContain("'take-over'")
     // AI 控制中卡片：ego 式边框光晕 + 脉冲点 + 游走的 agent 光标
     expect(styles).toContain('.webqq-space-card.is-running')
     expect(styles).toContain('@keyframes webqq-agent-pulse')
-    expect(styles).toContain('@keyframes webqq-agent-float')
+    expect(styles).toContain('@keyframes webqq-agent-loading-loop')
     expect(styles).toContain('@media (prefers-reduced-motion: reduce)')
   })
 
@@ -51,15 +53,24 @@ describe('AI 测试空间总览', () => {
     const overlay = readFileSync(resolve('client/agent-observe-overlay.vue'), 'utf8')
     const page = readFileSync(resolve('client/page.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-spaces.css'), 'utf8')
-    // ego lite 官方光标 path 与随机跳位节奏（5.2-9s）
+    // ego lite 官方光标 path 与随机跳位节奏（5.2-9s），到位后 400ms 点击挤压 + 闲置 loading 浮动
     expect(cursor).toContain('M6.465 15.647')
     expect(cursor).toContain('5200 + Math.random() * 3800')
-    expect(styles).toContain('cubic-bezier(0.22, 1, 0.36, 1)')
-    // 观察覆盖层：内发光 + 点阵 + 控制条接管
+    expect(styles).toContain('cubic-bezier(0.6, 0, 0.4, 1)')
+    expect(styles).toContain('@keyframes webqq-agent-cursor-click')
+    // 观察覆盖层（ego Actor Overlay 1:1）：scrim 渐变 + 点阵 + 跑马灯描边环 + 呼吸光晕
+    expect(overlay).toContain('webqq-agent-observe-stroke')
     expect(overlay).toContain('webqq-agent-observe-glow')
     expect(overlay).toContain('webqq-agent-observe-dots')
+    expect(styles).toContain('@keyframes webqq-agent-pulse-opacity')
+    expect(styles).toContain('mask-composite: subtract')
+    // 空间内任务栏：接管 + 终止任务置于空间内部（ego 底栏置顶复刻）
+    expect(overlay).toContain('webqq-agent-taskbar')
+    expect(overlay).toContain('Agent 正在控制')
     expect(overlay).toContain('接管')
+    expect(overlay).toContain('终止任务')
     expect(page).toContain('AgentObserveOverlay')
     expect(page).toContain("space.status === 'running'")
+    expect(page).toContain("handleTestSpaceAction('terminate'")
   })
 })

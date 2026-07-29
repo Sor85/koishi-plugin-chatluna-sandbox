@@ -79,9 +79,10 @@ export function createAiTestSpaceShell(
     await enterTestSpace(space.id)
   }
 
-  async function handleTestSpaceAction(action: 'take-over' | 'return' | 'reactivate' | 'delete', spaceId: string) {
+  async function handleTestSpaceAction(action: 'take-over' | 'return' | 'terminate' | 'reactivate' | 'delete', spaceId: string) {
     if (action === 'take-over') await send('onebot-sandbox/take-over-test-space', { spaceId })
     if (action === 'return') await send('onebot-sandbox/return-test-space', { spaceId })
+    if (action === 'terminate') await send('onebot-sandbox/terminate-test-space', { spaceId })
     if (action === 'reactivate') await send('onebot-sandbox/reactivate-test-space', { spaceId })
     if (action === 'delete') await send('onebot-sandbox/delete-test-space', { spaceId })
     if (action === 'delete' && activeSpaceId.value === spaceId) await enterTestSpace()
