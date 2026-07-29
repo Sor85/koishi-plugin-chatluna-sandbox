@@ -62,14 +62,13 @@
 .webqq-agent-observe-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .webqq-agent-observe .webqq-agent-cursor { z-index: 20; }
 
-/* ego 空间内任务栏 1:1（ego 在底部，本项目置顶）：#0009 深色胶囊，白字标题 + 灰字副标题 + 白色接管 + 红字终止任务。 */
+/* ego 空间内任务栏（ego 在底部，本项目置顶）：#0009 深色胶囊，白字标题 + 浅蓝状态 + 白色接管 + 红字终止任务。 */
 .webqq-agent-taskbar { position: absolute; top: 14px; left: 50%; z-index: 25; display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 12px; border-radius: 999px; color: #fff; background: rgb(0 0 0 / 60%); box-shadow: 0 16px 48px rgb(0 0 0 / 35%); backdrop-filter: blur(10px); pointer-events: auto; transform: translateX(-50%); }
 .webqq-agent-taskbar-pause { display: inline-flex; flex: none; color: rgb(255 255 255 / 55%); }
-.webqq-agent-taskbar-spinner { display: inline-flex; flex: none; color: #fff; animation: webqq-agent-spinner 0.9s steps(8) infinite; }
-@keyframes webqq-agent-spinner { to { transform: rotate(360deg); } }
+.webqq-agent-taskbar-control-icon { display: inline-flex; flex: none; color: #fff; }
 .webqq-agent-taskbar-text { display: flex; min-width: 0; flex-direction: column; margin-right: 4px; text-align: left; }
-.webqq-agent-taskbar-title { overflow: hidden; max-width: 220px; font-size: 13px; font-weight: 600; line-height: 17px; text-overflow: ellipsis; white-space: nowrap; }
-.webqq-agent-taskbar-subtitle { color: rgb(255 255 255 / 64%); font-size: 12px; line-height: 16px; white-space: nowrap; }
+.webqq-agent-taskbar-title { overflow: hidden; max-width: 220px; font-size: 12px; font-weight: 600; line-height: 15px; text-overflow: ellipsis; white-space: nowrap; }
+.webqq-agent-taskbar-subtitle { color: rgb(193 217 244); font-size: 11px; line-height: 15px; white-space: nowrap; }
 .webqq-agent-taskbar button { flex: none; padding: 6px 14px; border: 0; border-radius: 999px; font-size: 13px; font-weight: 600; line-height: 18px; cursor: pointer; }
 .webqq-agent-taskbar-takeover { color: #fff; background: rgb(54 50 49); }
 .webqq-agent-taskbar-takeover:hover { background: rgb(70 65 64); }
@@ -78,5 +77,5 @@
 
 .webqq-workspace[data-color-mode="dark"] .webqq-agent-cursor-label { color: rgb(255 255 255 / 90%); background: rgb(56 56 56 / 42%); }
 .webqq-workspace[data-color-mode="dark"] .webqq-agent-observe-dots { background-image: radial-gradient(circle, rgb(255 255 255 / 15%) 1px, transparent 1px); }
-@media (prefers-reduced-motion: reduce) { .webqq-space-card { transition: none; } .webqq-agent-cursor { transition: none; } .webqq-agent-cursor-float svg, .webqq-agent-pulse-dot, .webqq-agent-taskbar-spinner { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .webqq-space-card { transition: none; } .webqq-agent-cursor { transition: none; } .webqq-agent-cursor-float svg, .webqq-agent-pulse-dot { animation: none; } }
 @media (max-width: 720px) { .webqq-space-overview { padding: 16px; } .webqq-space-toolbar { align-items: flex-start; flex-direction: column; } .webqq-space-grid { grid-template-columns: 1fr; } }

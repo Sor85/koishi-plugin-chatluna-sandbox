@@ -13,16 +13,12 @@
           <rect x="14" y="5" width="3" height="14" rx="1.2" />
         </svg>
       </span>
-      <span class="webqq-agent-taskbar-spinner" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
-          <line x1="12" y1="3" x2="12" y2="7" />
-          <line x1="12" y1="17" x2="12" y2="21" />
-          <line x1="3" y1="12" x2="7" y2="12" />
-          <line x1="17" y1="12" x2="21" y2="12" />
-          <line x1="5.64" y1="5.64" x2="8.46" y2="8.46" />
-          <line x1="15.54" y1="15.54" x2="18.36" y2="18.36" />
-          <line x1="5.64" y1="18.36" x2="8.46" y2="15.54" />
-          <line x1="15.54" y1="8.46" x2="18.36" y2="5.64" />
+      <span class="webqq-agent-taskbar-control-icon" aria-hidden="true">
+        <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <g transform="translate(1.6 1)">
+            <path d="M8.4 1.4v2.5M3.68 3.68l1.77 1.77M1.7 8.4h2.5M3.68 13.12l1.77-1.77M13.12 3.68l-1.77 1.77M12.6 8.4h2.5" />
+            <path d="M9.3 16.3 8.08 9.53a.63.63 0 0 1 .85-.69L15 11.35a.63.63 0 0 1-.03 1.18l-2.93 1a.63.63 0 0 0-.37.34l-1.18 2.6a.63.63 0 0 1-1.19-.17Z" fill="currentColor" stroke="none" />
+          </g>
         </svg>
       </span>
       <span class="webqq-agent-taskbar-text">
