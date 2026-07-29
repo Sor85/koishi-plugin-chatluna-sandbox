@@ -55,14 +55,11 @@
 .webqq-agent-pulse-dot { display: inline-block; flex: none; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--webqq-accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--webqq-accent) 16%, transparent); animation: webqq-agent-pulse 1.6s cubic-bezier(0.34, 0.69, 0.1, 1) infinite; }
 @keyframes webqq-agent-pulse { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--webqq-accent) 4%, transparent); } }
 
-/* 观察被控空间的覆盖层（ego Actor Overlay）：scrim 渐变 + 点阵 + 描边环 + 呼吸光晕，自身不拦截交互，仅任务栏可点。 */
+/* 观察被控空间的覆盖层：ego 同源的 scrim 渐变 + 点阵纹理为背景，边缘跑马灯由 WebGL canvas 绘制
+   （shader 取自 ego lite 资源），覆盖层自身不拦截交互，仅任务栏可点。 */
 .webqq-agent-observe { position: relative; z-index: 25; grid-column: 1 / -1; grid-row: 1; min-width: 0; min-height: 0; pointer-events: none; background: linear-gradient(77deg, rgb(124 172 248 / 24%) 6.99%, rgb(11 87 208 / 24%) 45.46%, rgb(27 110 243 / 24%) 88.2%); }
 .webqq-agent-observe-dots { position: absolute; inset: 0; opacity: 0.5; background-image: radial-gradient(circle, rgb(55 55 55 / 10%) 1px, transparent 1px); background-size: 6px 6px; }
-/* ego #border-stroke：跑马灯描边环。双层 mask 相减抠出 3px 环形，内缘 6px 圆角。 */
-.webqq-agent-observe-stroke { position: absolute; inset: 0; z-index: 15; box-sizing: border-box; background: #1b6ef3; pointer-events: none; mask-image: linear-gradient(white, white), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100%25' height='100%25' rx='6px' ry='6px' fill='white'/%3E%3C/svg%3E"); mask-composite: subtract; mask-size: 100% 100%, calc(100% - 6px) calc(100% - 6px); mask-position: 0 0, center; mask-repeat: no-repeat, no-repeat; }
-/* ego #border-glow：35px/12px 内光晕做 4s 呼吸（0.6 → 0 → 0.6），涟漪式波动。 */
-.webqq-agent-observe-glow { position: absolute; inset: 0; z-index: 10; box-shadow: inset 0 0 35px 12px #4c8df6; animation: webqq-agent-pulse-opacity 4000ms infinite; pointer-events: none; }
-@keyframes webqq-agent-pulse-opacity { 0% { opacity: 0.6; animation-timing-function: cubic-bezier(0.33, 0, 0.67, 1); } 33.33% { opacity: 0; animation-timing-function: linear; } 66.66% { opacity: 0; animation-timing-function: cubic-bezier(0.33, 0, 0.67, 1); } 100% { opacity: 0.6; } }
+.webqq-agent-observe-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .webqq-agent-observe .webqq-agent-cursor { z-index: 20; }
 
 /* ego 空间内任务栏 1:1（ego 在底部，本项目置顶）：#0009 深色胶囊，白字标题 + 灰字副标题 + 白色接管 + 红字终止任务。 */
@@ -81,5 +78,5 @@
 
 .webqq-workspace[data-color-mode="dark"] .webqq-agent-cursor-label { color: rgb(255 255 255 / 90%); background: rgb(56 56 56 / 42%); }
 .webqq-workspace[data-color-mode="dark"] .webqq-agent-observe-dots { background-image: radial-gradient(circle, rgb(255 255 255 / 15%) 1px, transparent 1px); }
-@media (prefers-reduced-motion: reduce) { .webqq-space-card { transition: none; } .webqq-agent-cursor { transition: none; } .webqq-agent-cursor-float svg, .webqq-agent-pulse-dot, .webqq-agent-observe-glow, .webqq-agent-taskbar-spinner { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .webqq-space-card { transition: none; } .webqq-agent-cursor { transition: none; } .webqq-agent-cursor-float svg, .webqq-agent-pulse-dot, .webqq-agent-taskbar-spinner { animation: none; } }
 @media (max-width: 720px) { .webqq-space-overview { padding: 16px; } .webqq-space-toolbar { align-items: flex-start; flex-direction: column; } .webqq-space-grid { grid-template-columns: 1fr; } }

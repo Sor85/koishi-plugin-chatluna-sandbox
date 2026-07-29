@@ -1,9 +1,9 @@
 <template>
-  <!-- ego lite Actor Overlay 的 Web 复刻：scrim 渐变 + 点阵纹理 + 跑马灯描边环 + 呼吸光晕 + agent 光标 + 任务栏 -->
+  <!-- ego lite 被控空间覆盖层的 Web 复刻：scrim 渐变 + 点阵纹理 + WebGL 边缘跑马灯 + agent 光标 + 任务栏。
+       跑马灯 shader 逐字取自 ego lite 应用资源；WebGL 不可用时仅保留 scrim 与点阵。 -->
   <div class="webqq-agent-observe" aria-live="polite">
     <div class="webqq-agent-observe-dots" aria-hidden="true" />
-    <div class="webqq-agent-observe-stroke" aria-hidden="true" />
-    <div class="webqq-agent-observe-glow" aria-hidden="true" />
+    <canvas ref="canvasRef" class="webqq-agent-observe-canvas" aria-hidden="true" />
     <AgentCursor label="AI" />
     <!-- ego lite 空间内任务栏的 1:1 复刻；ego 放在底部，本项目按需求置于顶部。 -->
     <div class="webqq-agent-taskbar">
@@ -35,8 +35,22 @@
   </div>
 </template>
 <script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import AgentCursor from './agent-cursor.vue'
+import { mountAgentOverlayEffect } from './webqq/agent-overlay-effect'
 
 defineProps<{ spaceName: string }>()
 defineEmits<{ takeOver: []; terminate: [] }>()
+
+const canvasRef = ref<HTMLCanvasElement | null>(null)
+let dispose: (() => void) | null = null
+
+onMounted(() => {
+  if (!canvasRef.value) return
+  dispose = mountAgentOverlayEffect(canvasRef.value)
+})
+onBeforeUnmount(() => {
+  dispose?.()
+  dispose = null
+})
 </script>

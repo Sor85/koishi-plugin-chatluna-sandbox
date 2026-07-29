@@ -51,6 +51,7 @@ describe('AI 测试空间总览', () => {
   it('复刻 ego lite 的 agent 光标与被控空间观察覆盖层', () => {
     const cursor = readFileSync(resolve('client/agent-cursor.vue'), 'utf8')
     const overlay = readFileSync(resolve('client/agent-observe-overlay.vue'), 'utf8')
+    const effect = readFileSync(resolve('client/webqq/agent-overlay-effect.ts'), 'utf8')
     const page = readFileSync(resolve('client/page.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-spaces.css'), 'utf8')
     // ego lite 官方光标 path 与随机跳位节奏（5.2-9s），到位后 400ms 点击挤压 + 闲置 loading 浮动
@@ -58,12 +59,14 @@ describe('AI 测试空间总览', () => {
     expect(cursor).toContain('5200 + Math.random() * 3800')
     expect(styles).toContain('cubic-bezier(0.6, 0, 0.4, 1)')
     expect(styles).toContain('@keyframes webqq-agent-cursor-click')
-    // 观察覆盖层（ego Actor Overlay 1:1）：scrim 渐变 + 点阵 + 跑马灯描边环 + 呼吸光晕
-    expect(overlay).toContain('webqq-agent-observe-stroke')
-    expect(overlay).toContain('webqq-agent-observe-glow')
+    // 覆盖层：scrim 渐变 + 点阵背景，边缘跑马灯为 WebGL 移植的 ego lite 光晕 shader（ramp 沿边滚动）
     expect(overlay).toContain('webqq-agent-observe-dots')
-    expect(styles).toContain('@keyframes webqq-agent-pulse-opacity')
-    expect(styles).toContain('mask-composite: subtract')
+    expect(overlay).toContain('webqq-agent-observe-canvas')
+    expect(overlay).toContain('mountAgentOverlayEffect')
+    expect(effect).toContain('uScrollOffset')
+    expect(effect).toContain('rampColor')
+    expect(effect).toContain('uAccent')
+    expect(styles).toContain('.webqq-agent-observe-dots')
     // 空间内任务栏：接管 + 终止任务置于空间内部（ego 底栏置顶复刻）
     expect(overlay).toContain('webqq-agent-taskbar')
     expect(overlay).toContain('Agent 正在控制')
