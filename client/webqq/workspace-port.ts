@@ -9,9 +9,9 @@ import type {
   PerformFriendActionInput,
   PerformGroupActionInput,
   RecallMessageInput,
+  SandboxConsoleOneBotDebugRecord,
   SandboxMediaContent,
   SandboxMessageHistory,
-  SandboxOneBotDebugRecord,
   SandboxWorkspaceState,
   SendMediaMessageInput,
   SendMessageInput,
@@ -30,6 +30,6 @@ export interface WorkspacePort {
   manageEnvironment(input: ManageSandboxEnvironmentInput): Promise<SandboxWorkspaceState>
   performFriendAction(input: PerformFriendActionInput): Promise<SandboxWorkspaceState>
   performGroupAction(input: PerformGroupActionInput): Promise<SandboxWorkspaceState>
-  getOneBotDebugRecords(input?: GetSandboxOneBotDebugRecordsInput): Promise<SandboxOneBotDebugRecord[]>
+  getOneBotDebugRecords(input?: GetSandboxOneBotDebugRecordsInput): Promise<SandboxConsoleOneBotDebugRecord[]>
   clearOneBotDebugRecords(): Promise<ClearSandboxOneBotDebugRecordsResult>
 }

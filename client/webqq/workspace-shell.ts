@@ -206,7 +206,6 @@ export function createWebqqWorkspaceShell(
   const environmentModel = computed(() => snapshot.value)
   const debugWorkspaceModel = computed(() => ({
     records: workspaceController.oneBotDebugRecords.value,
-    bots: bots.value,
     loading: debugLoading.value,
     error: debugError.value,
   }))

@@ -30,12 +30,13 @@
     </div>
 
     <div v-else-if="section === 'bots'" v-webqq-scrollbar class="directory-list">
-      <article v-for="bot in bots" :key="bot.id" class="directory-card">
+      <article v-for="bot in bots" :key="getBotKey(bot)" class="directory-card is-bot-row">
         <WebqqAvatar class="directory-avatar" kind="bot" :name="bot.name" :avatar="bot.avatar" />
         <span class="directory-copy">
           <strong>{{ bot.name }}</strong>
           <small>{{ bot.id }} · {{ bot.implementation === 'napcat' ? 'NapCat' : 'LLBot' }}</small>
         </span>
+        <span class="directory-source">{{ bot.source.name }}</span>
         <span :class="['status-pill', bot.enabled ? 'is-online' : 'is-offline']">
           {{ bot.enabled ? '已启用' : '已停用' }}
         </span>
@@ -59,11 +60,24 @@ import { computed, ref } from 'vue'
 import WebqqAvatar from './webqq-avatar.vue'
 import McpCredentialManager from './mcp-credential-manager.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
-import { getSandboxBots, getSandboxUsers, type SandboxSnapshot } from '../src/types'
+import { getSandboxBots, getSandboxUsers, type SandboxDirectoryBot, type SandboxSnapshot } from '../src/types'
+import type { SandboxTestSpaceSummary } from '../src/test-spaces'
 
-const props = defineProps<{ snapshot: SandboxSnapshot }>()
+const props = defineProps<{
+  snapshot: SandboxSnapshot
+  testSpaces?: readonly SandboxTestSpaceSummary[]
+}>()
 const users = computed(() => getSandboxUsers(props.snapshot))
-const bots = computed(() => getSandboxBots(props.snapshot))
+const bots = computed<SandboxDirectoryBot[]>(() => [
+  ...getSandboxBots(props.snapshot).map((bot) => ({
+    ...bot,
+    source: { type: 'main' as const, name: '主环境' },
+  })),
+  ...(props.testSpaces ?? []).flatMap((space) => getSandboxBots(space.snapshot).map((bot) => ({
+    ...bot,
+    source: { type: 'test-space' as const, spaceId: space.id, name: space.name },
+  }))),
+])
 
 type EnvironmentSection = 'users' | 'bots' | 'groups' | 'credentials'
 const section = ref<EnvironmentSection>('users')
@@ -74,6 +88,10 @@ const sections = computed(() => [
   { id: 'groups' as const, label: '群组', icon: IconUsers, count: props.snapshot.groups.length },
   { id: 'credentials' as const, label: 'MCP 凭证', icon: IconKey, count: undefined },
 ])
+
+function getBotKey(bot: SandboxDirectoryBot) {
+  return bot.source.type === 'main' ? `main:${bot.id}` : `space:${bot.source.spaceId}:${bot.id}`
+}
 
 </script>
 
@@ -172,6 +190,22 @@ const sections = computed(() => [
   background: color-mix(in srgb, var(--webqq-bg) 84%, transparent);
 }
 
+.directory-card.is-bot-row {
+  grid-template-columns: 38px minmax(0, 1fr) auto auto;
+}
+
+.directory-source {
+  max-width: 180px;
+  overflow: hidden;
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: var(--webqq-accent);
+  background: color-mix(in srgb, var(--webqq-accent) 12%, transparent);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .directory-avatar {
   --webqq-avatar-size: 36px;
   --webqq-bot-badge-size: 15px;
@@ -249,6 +283,20 @@ const sections = computed(() => [
 
   .environment-tabs {
     flex-wrap: wrap;
+  }
+
+  .directory-card.is-bot-row {
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+  }
+
+  .directory-card.is-bot-row .directory-source {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .directory-card.is-bot-row .status-pill {
+    grid-column: 3;
+    grid-row: 1 / span 2;
   }
 }
 </style>

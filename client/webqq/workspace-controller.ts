@@ -8,12 +8,12 @@ import type {
   SandboxAppearance,
   SandboxBotProfile,
   SandboxChatLunaState,
+  SandboxConsoleOneBotDebugRecord,
   SandboxConversation,
   SandboxFriendAction,
   SandboxGroup,
   SandboxGroupAction,
   SandboxMessage,
-  SandboxOneBotDebugRecord,
   SandboxParticipant,
   SandboxSnapshot,
   SandboxWorkspaceState,
@@ -106,7 +106,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   const currentOperatorIdState = ref<string>()
   const activeConversationIdState = ref<string>()
   const currentViewState = ref<SandboxWorkspaceView>('messages')
-  const oneBotDebugRecordsState = ref<SandboxOneBotDebugRecord[]>([])
+  const oneBotDebugRecordsState = ref<SandboxConsoleOneBotDebugRecord[]>([])
 
   const snapshot = computed(() => workspaceState.value.snapshot)
   const currentOperator = computed<WorkspaceParticipant | undefined>(() => {

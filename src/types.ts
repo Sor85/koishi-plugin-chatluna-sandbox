@@ -4,6 +4,10 @@ interface SandboxParticipantBase {
   avatar?: string
 }
 
+export type SandboxEntitySource =
+  | { type: 'main', name: string }
+  | { type: 'test-space', spaceId: string, name: string }
+
 export interface SandboxUser extends SandboxParticipantBase {
   kind: 'user'
 }
@@ -31,6 +35,8 @@ export interface SandboxBotProfile {
 export type CreateSandboxBotInput = Omit<SandboxBotProfile, 'kind'>
 
 export type UpdateSandboxBotInput = CreateSandboxBotInput
+
+export type SandboxDirectoryBot = SandboxBotProfile & { source: SandboxEntitySource }
 
 export type SandboxParticipant = SandboxUser | SandboxBotProfile
 
@@ -209,6 +215,8 @@ export interface SandboxOneBotDebugRecord {
     traceId: string
   }
 }
+
+export type SandboxConsoleOneBotDebugRecord = SandboxOneBotDebugRecord & { source: SandboxEntitySource }
 
 export interface GetSandboxOneBotDebugRecordsInput {
   botId?: string

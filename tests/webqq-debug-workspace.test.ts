@@ -20,6 +20,9 @@ describe('WebQQ OneBot 调试工作台', () => {
     expect(debugSource).toContain("record.direction === 'action' ? '输入' : '事件数据'")
     expect(debugSource).toContain("record.direction === 'action' ? '输出' : '处理结果'")
     expect(debugSource).toContain('不能重放')
+    expect(debugSource).toContain('record.source.name')
+    expect(debugSource).toContain('getRecordKey(record)')
+    expect(debugSource).toContain('SandboxDirectoryBot')
     expect(debugSource).not.toContain("emit('replay'")
   })
 

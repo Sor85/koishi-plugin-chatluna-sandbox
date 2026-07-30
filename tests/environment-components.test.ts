@@ -16,6 +16,20 @@ describe('环境管理组件传输边界', () => {
     }
   })
 
+  it('资料页联邦展示主环境和测试空间机器人，并保留用户与群组的主环境边界', () => {
+    const source = readFileSync(resolve('client/environment-manager.vue'), 'utf8')
+    const page = readFileSync(resolve('client/page.vue'), 'utf8')
+
+    expect(page).toContain('<EnvironmentManager :snapshot="environmentModel" :test-spaces="testSpaces" />')
+    expect(source).toContain('SandboxDirectoryBot')
+    expect(source).toContain("source: { type: 'main' as const, name: '主环境' }")
+    expect(source).toContain("source: { type: 'test-space' as const, spaceId: space.id, name: space.name }")
+    expect(source).toContain('getSandboxBots(space.snapshot)')
+    expect(source).toContain('{{ bot.source.name }}')
+    expect(source).toContain('getSandboxUsers(props.snapshot)')
+    expect(source).toContain('props.snapshot.groups')
+  })
+
   it('跨区域 Dialog 由窄输入 OverlayHost 统一渲染', () => {
     const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
     const overlaySource = readFileSync(resolve('client/workspace-overlay-host.vue'), 'utf8')

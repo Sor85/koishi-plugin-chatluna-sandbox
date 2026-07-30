@@ -9,6 +9,8 @@ describe('AI 测试空间总览', () => {
     const styles = readFileSync(resolve('client/styles/webqq-spaces.css'), 'utf8')
 
     expect(sidebar).toContain("label: 'AI 测试空间'")
+    expect(sidebar).toContain('visibleNavigationItems')
+    expect(sidebar).toContain("'is-rail-pin-bottom': item.id === 'spaces'")
     expect(overview).toContain('主模拟 QQ 环境')
     expect(overview).toContain('filteredSpaces')
     expect(overview).toContain('创建测试空间')
@@ -85,6 +87,8 @@ describe('AI 测试空间总览', () => {
     expect(styles).toContain('font-size: 12px; font-weight: 600; line-height: 15px')
     expect(styles).toContain('font-size: 11px; line-height: 15px')
     expect(page).toContain('AgentObserveOverlay')
+    expect(page).toContain(':active-space-id="activeSpaceId"')
+    expect(page).toContain(':test-spaces="testSpaces"')
     expect(page).toContain("space.status === 'running'")
     expect(page).toContain("handleTestSpaceAction('terminate'")
   })

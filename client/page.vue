@@ -17,6 +17,7 @@
       >
         <WebqqSidebar
           :model="sidebarModel"
+          :active-space-id="activeSpaceId"
           @select-view="selectNavigation"
           @select-conversation="selectConversation"
           @manage-environment="manageEnvironment"
@@ -37,12 +38,12 @@
           @action="handleTestSpaceAction"
         />
         <main v-else-if="currentView === 'profile'" class="webqq-chat is-environment">
-          <EnvironmentManager :snapshot="environmentModel" />
+          <EnvironmentManager :snapshot="environmentModel" :test-spaces="testSpaces" />
         </main>
         <OneBotDebugWorkspace
           v-else-if="currentView === 'debug'"
           :records="debugWorkspaceModel.records"
-          :bots="debugWorkspaceModel.bots"
+          :bots="debugBots"
           :loading="debugWorkspaceModel.loading"
           :error="debugWorkspaceModel.error"
           @query="loadOneBotDebugRecords"
@@ -121,6 +122,7 @@ import { createWorkspaceController } from './webqq/workspace-controller'
 import { createWorkspaceLayout } from './webqq/workspace-layout'
 import { createWebqqWorkspaceShell } from './webqq/workspace-shell'
 import { createAiTestSpaceShell } from './webqq/test-space-shell'
+import { getSandboxBots, type SandboxDirectoryBot } from '../src/types'
 
 const activeSpaceId = ref<string>()
 const workspaceController = createWorkspaceController(createKoishiWorkspacePort(() => activeSpaceId.value), window.localStorage)
@@ -174,6 +176,16 @@ const { createTestSpace, enterTestSpace, handleTestSpaceAction, mainSnapshot, se
   selectWorkspaceNavigation,
 )
 const isWebqqView = computed(() => currentView.value === 'messages' || currentView.value === 'contacts')
+const debugBots = computed<SandboxDirectoryBot[]>(() => [
+  ...getSandboxBots(mainSnapshot.value).map((bot) => ({
+    ...bot,
+    source: { type: 'main' as const, name: '主环境' },
+  })),
+  ...testSpaces.value.flatMap((space) => getSandboxBots(space.snapshot).map((bot) => ({
+    ...bot,
+    source: { type: 'test-space' as const, spaceId: space.id, name: space.name },
+  }))),
+])
 const resolvedColorMode = useResolvedColorMode(appearance)
 const disposeSceneMutationSync = createSceneMutationSync(workspaceController, () => activeSpaceId.value)
 onBeforeUnmount(disposeSceneMutationSync)

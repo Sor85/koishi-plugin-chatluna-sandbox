@@ -19,6 +19,10 @@
   display: flex;
 }
 
+.webqq-rail-tooltip-trigger.is-rail-pin-bottom {
+  margin-top: auto;
+}
+
 .webqq-rail-button.is-active {
   color: #fff;
   background: var(--webqq-accent);
