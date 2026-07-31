@@ -1,8 +1,9 @@
 import type { Context } from 'koishi'
 import { parseThinkContent, readChatLunaResponseText } from './chatluna-thinking'
-import type { SandboxChatLunaState } from './types'
+import type { SandboxChatLunaState, SandboxMessageChatLuna } from './types'
 
 type ValidateTarget = (botParticipantId: string, conversationId: string) => boolean
+type ArchiveResult = (botParticipantId: string, conversationId: string, result: SandboxMessageChatLuna) => void
 
 interface ChatLunaModelUsagePayload {
   context?: {
@@ -79,7 +80,12 @@ export class SandboxChatLunaStateStore {
   private thinkingStartedAt = new Map<string, number>()
   private disposers: Array<() => void> = []
 
-  constructor(ctx: Context, private validateTarget: ValidateTarget, private onChange: () => void = () => {}) {
+  constructor(
+    ctx: Context,
+    private validateTarget: ValidateTarget,
+    private onChange: () => void = () => {},
+    private archiveResult: ArchiveResult = () => {},
+  ) {
     const on = ctx.on.bind(ctx) as unknown as ChatLunaEventRegistrar
     this.disposers.push(on('chatluna/before-chat', (conversationId, _message, _variables, _chatInterface, session) => {
       this.begin(session, conversationId)
@@ -133,6 +139,9 @@ export class SandboxChatLunaStateStore {
     // 无内部会话 ID 的补充事件不能清掉核心事件已经建立的 Token 归属映射。
     if (!chatLunaConversationId && current?.thinking) {
       current.updatedAt = new Date().toISOString()
+      // 上一轮如果因为上游报错没收到结束事件，thinking 会一直挂着，
+      // 此时不刷新起点会把上一轮的等待时间算进这一轮的思考时长。
+      this.thinkingStartedAt.set(key, Date.now())
       return
     }
     this.detachStateKey(key)
@@ -207,9 +216,13 @@ export class SandboxChatLunaStateStore {
     state.thinking = false
     state.updatedAt = new Date().toISOString()
     const thought = payload ? parseThinkContent(readChatLunaResponseText(payload)) : ''
-    if (thought) {
-      state.thought = thought
-      if (startedAt !== undefined) state.thoughtDurationMs = Math.max(0, Date.now() - startedAt)
+    // 思考内容与本轮用量归档到机器人消息上，下一轮对话开始后仍然可以展开查看历史。
+    if (thought || state.usage) {
+      this.archiveResult(state.botParticipantId, state.conversationId, {
+        thought,
+        ...(thought && startedAt !== undefined ? { thoughtDurationMs: Math.max(0, Date.now() - startedAt) } : {}),
+        ...(state.usage ? { usage: { ...state.usage } } : {}),
+      })
     }
     this.detachStateKey(key)
     return true

@@ -140,6 +140,12 @@ export function getDirectConversationPeerId(conversation: SandboxDirectConversat
   return peerId
 }
 
+export interface SandboxMessageChatLuna {
+  thought: string
+  thoughtDurationMs?: number
+  usage?: SandboxChatLunaTokenUsage
+}
+
 export interface SandboxMessage {
   id: string
   authorId: string
@@ -149,6 +155,8 @@ export interface SandboxMessage {
   replyToMessageId?: string
   broadcastId?: string
   media?: SandboxMedia[]
+  // 本轮 ChatLuna 思考内容随消息一起落场景快照，多轮对话后仍能查看历史思考。
+  chatLuna?: SandboxMessageChatLuna
   event?: {
     type: 'poke'
     targetId: string
@@ -176,8 +184,6 @@ export interface SandboxChatLunaState {
   botParticipantId: string
   conversationId: string
   thinking: boolean
-  thought?: string
-  thoughtDurationMs?: number
   usage?: SandboxChatLunaTokenUsage
   updatedAt: string
 }

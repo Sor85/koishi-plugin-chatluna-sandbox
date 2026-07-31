@@ -98,7 +98,7 @@
           </ContextMenuContent>
         </ContextMenu>
         <li
-          v-if="getMessageThinking(message, messageIndex)"
+          v-if="getMessageThinking(message)"
           :key="`${message.id}:thinking`"
           class="webqq-thinking-row"
           :class="message.authorId === model.currentOperatorId ? 'is-outgoing' : 'is-incoming'"
@@ -106,11 +106,11 @@
           <button
             type="button"
             class="webqq-thinking-toggle"
-            :aria-expanded="isThinkingExpanded(getMessageThinking(message, messageIndex)!)"
-            @click="toggleThinking(getMessageThinking(message, messageIndex)!)"
+            :aria-expanded="isThinkingExpanded(message)"
+            @click="toggleThinking(message)"
           >
             <span
-              v-if="getMessageThinking(message, messageIndex)!.usage"
+              v-if="getMessageThinking(message)!.usage"
               class="webqq-thinking-usage"
               aria-label="本次 ChatLuna 调用指标"
             >
@@ -120,19 +120,19 @@
                   <path d="m7 13 5-5 5 5" />
                   <path d="M5 4h14" />
                 </svg>
-                <span>{{ getMessageThinking(message, messageIndex)!.usage!.inputTokens }}</span>
+                <span>{{ getMessageThinking(message)!.usage!.inputTokens }}</span>
                 <svg class="webqq-thinking-usage-icon is-output" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M12 4v12" />
                   <path d="m7 11 5 5 5-5" />
                   <path d="M5 20h14" />
                 </svg>
-                <span>{{ getMessageThinking(message, messageIndex)!.usage!.outputTokens }}</span>
+                <span>{{ getMessageThinking(message)!.usage!.outputTokens }}</span>
               </span>
             </span>
-            <span class="webqq-thinking-duration">{{ formatThinkingDuration(getMessageThinking(message, messageIndex)!.thoughtDurationMs) }}</span>
+            <span class="webqq-thinking-duration">{{ formatThinkingDuration(getMessageThinking(message)!.thoughtDurationMs) }}</span>
             <svg
               class="webqq-thinking-chevron"
-              :class="{ 'is-expanded': isThinkingExpanded(getMessageThinking(message, messageIndex)!) }"
+              :class="{ 'is-expanded': isThinkingExpanded(message) }"
               viewBox="0 0 16 16"
               aria-hidden="true"
             >
@@ -140,13 +140,13 @@
             </svg>
           </button>
           <Transition name="webqq-thinking" @before-leave="prepareThinkingPanelLeave">
-            <div v-if="isThinkingExpanded(getMessageThinking(message, messageIndex)!)" class="webqq-thinking-panel">
-              <div class="webqq-thinking-content">{{ getMessageThinking(message, messageIndex)!.thought }}</div>
+            <div v-if="isThinkingExpanded(message)" class="webqq-thinking-panel">
+              <div class="webqq-thinking-content">{{ getMessageThinking(message)!.thought }}</div>
             </div>
           </Transition>
         </li>
         <li
-          v-else-if="getMessageUsage(message, messageIndex)"
+          v-else-if="getMessageUsage(message)"
           :key="`${message.id}:usage`"
           class="webqq-thinking-row is-usage-only"
           :class="message.authorId === model.currentOperatorId ? 'is-outgoing' : 'is-incoming'"
@@ -158,13 +158,13 @@
                 <path d="m7 13 5-5 5 5" />
                 <path d="M5 4h14" />
               </svg>
-              <span>{{ getMessageUsage(message, messageIndex)!.usage!.inputTokens }}</span>
+              <span>{{ getMessageUsage(message)!.usage!.inputTokens }}</span>
               <svg class="webqq-thinking-usage-icon is-output" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M12 4v12" />
                 <path d="m7 11 5 5 5-5" />
                 <path d="M5 20h14" />
               </svg>
-              <span>{{ getMessageUsage(message, messageIndex)!.usage!.outputTokens }}</span>
+              <span>{{ getMessageUsage(message)!.usage!.outputTokens }}</span>
             </span>
           </div>
         </li>
@@ -258,42 +258,25 @@ const participantNames = computed(() => Object.fromEntries(
 ))
 let quoteHighlightTimer: ReturnType<typeof setTimeout> | undefined
 
-function getThinkingKey(state: SandboxChatLunaState) {
-  return `${state.botParticipantId}:${state.conversationId}:${state.updatedAt}`
-}
-
-// 本轮指标跟在该机器人最后一条消息下方；不新起头像行，避免看起来像一条独立消息。
-function getMessageChatLunaState(message: SandboxMessage, index: number) {
-  if (message.event) return
-  const state = props.model.chatLunaStates.find(({ botParticipantId }) => botParticipantId === message.authorId)
-  if (!state) return
-  const messages = props.model.messages
-  for (let cursor = messages.length - 1; cursor > index; cursor--) {
-    if (!messages[cursor].event && messages[cursor].authorId === message.authorId) return
-  }
-  return state
-}
-
-function getMessageThinking(message: SandboxMessage, index: number) {
-  const state = getMessageChatLunaState(message, index)
-  return state?.thought ? state : undefined
+// 思考与用量归档在消息上，因此多轮对话后每条机器人消息都保留自己的指标。
+function getMessageThinking(message: SandboxMessage) {
+  return message.chatLuna?.thought ? message.chatLuna : undefined
 }
 
 // 没有思考内容但拿到了 Token 用量时单独常显指标，与 onebot-webqq 的 is-usage-only 行为一致。
-function getMessageUsage(message: SandboxMessage, index: number) {
-  const state = getMessageChatLunaState(message, index)
-  return state && !state.thought && state.usage ? state : undefined
+function getMessageUsage(message: SandboxMessage) {
+  const chatLuna = message.chatLuna
+  return chatLuna && !chatLuna.thought && chatLuna.usage ? chatLuna : undefined
 }
 
-function isThinkingExpanded(state: SandboxChatLunaState) {
-  return !!expandedThinking.value[getThinkingKey(state)]
+function isThinkingExpanded(message: SandboxMessage) {
+  return !!expandedThinking.value[message.id]
 }
 
-function toggleThinking(state: SandboxChatLunaState) {
-  const key = getThinkingKey(state)
+function toggleThinking(message: SandboxMessage) {
   const next = { ...expandedThinking.value }
-  if (next[key]) delete next[key]
-  else next[key] = true
+  if (next[message.id]) delete next[message.id]
+  else next[message.id] = true
   expandedThinking.value = next
 }
 

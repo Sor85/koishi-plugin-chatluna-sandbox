@@ -44,9 +44,11 @@ describe('WebQQ 消息列表', () => {
     const styles = readFileSync(resolve('client/styles/webqq-messages.css'), 'utf8')
 
     expect(source).toContain('class="webqq-thinking-row"')
-    expect(source).toContain('getMessageThinking(message, messageIndex)')
+    expect(source).toContain('getMessageThinking(message)')
     expect(source).toContain('class="webqq-thinking-row is-usage-only"')
-    expect(source).toContain('getMessageUsage(message, messageIndex)')
+    expect(source).toContain('getMessageUsage(message)')
+    // 思考归档在消息上，多轮对话后每条机器人消息各自保留指标。
+    expect(source).toContain('message.chatLuna?.thought')
     expect(source).toContain('<Transition name="webqq-thinking" @before-leave="prepareThinkingPanelLeave">')
     expect(source).toContain('class="webqq-thinking-content"')
     expect(source).toContain('webqq-thinking-usage-icon is-input')

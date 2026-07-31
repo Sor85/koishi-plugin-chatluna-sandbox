@@ -38,6 +38,7 @@ import {
   type SandboxMedia,
   type SandboxMediaContent,
   type SandboxMessage,
+  type SandboxMessageChatLuna,
   type SandboxMessageHistory,
   type SandboxOneBotDebugRecord,
   type SandboxPersistenceStatus,
@@ -192,7 +193,9 @@ export class SandboxControlService {
       const participant = this.scene.participants.find(({ id }) => id === botParticipantId)
       const conversation = this.scene.conversations.find(({ id }) => id === conversationId)
       return participant?.kind === 'bot' && !!conversation && this.isConversationVisible(botParticipantId, conversation)
-    }, () => this.notifySceneMutation())
+    }, () => this.notifySceneMutation(), (botParticipantId, conversationId, result) => {
+      this.archiveChatLunaResult(botParticipantId, conversationId, result)
+    })
     this.syncRuntimeBots()
     this.contextDisposers.push(ctx.on('ready', async () => {
       if (!this.persistence) return
@@ -1299,6 +1302,22 @@ export class SandboxControlService {
     conversation.messageIds.push(message.id)
     this.commitSceneMutation()
     return message
+  }
+
+  // 把本轮 ChatLuna 思考与用量写到该机器人最后一条消息上，让结果随场景快照持久化并覆盖多轮历史。
+  private archiveChatLunaResult(botParticipantId: string, conversationId: string, result: SandboxMessageChatLuna): void {
+    for (let index = this.scene.messages.length - 1; index >= 0; index--) {
+      const message = this.scene.messages[index]
+      if (message.event || message.authorId !== botParticipantId || message.conversationId !== conversationId) continue
+      message.chatLuna = {
+        ...(result.thought ? { thought: result.thought } : { thought: message.chatLuna?.thought ?? '' }),
+        ...(result.thoughtDurationMs === undefined ? {} : { thoughtDurationMs: result.thoughtDurationMs }),
+        ...(result.usage ? { usage: result.usage } : {}),
+      }
+      if (!message.chatLuna.thought && !message.chatLuna.usage) delete message.chatLuna
+      this.commitSceneMutation()
+      return
+    }
   }
 
   private commitSceneMutation(): void {
