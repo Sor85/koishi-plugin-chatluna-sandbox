@@ -60,6 +60,7 @@
             <GroupMemberMenu
               :actor="getCurrentGroupMember(model.currentOperatorId ?? '')"
               :target="member"
+              @mention="emit('mentionGroupMember', member.participantId)"
               @poke="emit('pokeGroupMember', member.participantId)"
               @set-card="emit('setGroupCard', member.participantId)"
               @set-admin="emit('setGroupAdmin', member.participantId, $event)"
@@ -122,6 +123,7 @@ const emit = defineEmits<{
   close: []
   publishAnnouncement: [content: string, resolve: () => void, reject: (error: unknown) => void]
   deleteAnnouncement: [announcementId: string, resolve: () => void, reject: (error: unknown) => void]
+  mentionGroupMember: [targetId: string]
   pokeGroupMember: [targetId: string]
   setGroupCard: [targetId: string]
   setGroupAdmin: [targetId: string, enabled: boolean]

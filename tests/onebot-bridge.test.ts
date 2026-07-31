@@ -71,6 +71,81 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     })
   })
 
+  it('机器人发送的 execute 组件先执行命令再写入图片结果', async () => {
+    const { app, control } = await createControl()
+    const imageSource = `data:image/png;base64,${Buffer.from('execute-image').toString('base64')}`
+    app.command('sandbox.execute-test').action(() => h.image(imageSource))
+    app.middleware((session) => {
+      if (session.content === '触发 execute') return '<execute>sandbox.execute-test</execute>'
+    })
+
+    await control.sendMessage({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      content: '触发 execute',
+    })
+
+    expect(control.getSnapshot().messages).toEqual([
+      expect.objectContaining({ content: '触发 execute', authorId: '10001' }),
+      expect.objectContaining({
+        content: '[图片] image.png',
+        authorId: '20001',
+        media: [expect.objectContaining({
+          type: 'image',
+          mimeType: 'image/png',
+          reference: expect.stringMatching(/^sandbox-media:\/\//),
+        })],
+      }),
+    ])
+  })
+
+  it('群聊消息提供昵称唤醒所需的标准 Session 字段', async () => {
+    const { app, control } = await createControl()
+    let captured: {
+      guildId?: string
+      channelId?: string
+      isDirect?: boolean
+      selfId?: string
+      userId?: string
+      content?: string
+      text?: string
+    } | undefined
+    app.middleware((session) => {
+      if (session.channelId !== 'group:30001') return
+      captured = {
+        guildId: session.guildId,
+        channelId: session.channelId,
+        isDirect: session.isDirect,
+        selfId: session.selfId,
+        userId: session.userId,
+        content: session.content,
+        text: (session.elements ?? []).filter(({ type }) => type === 'text').map(({ attrs }) => attrs.content ?? '').join(''),
+      }
+      if (captured.text?.startsWith('宁宁')) return '群聊昵称回复'
+    })
+
+    await control.sendMessage({
+      operatorId: '10001',
+      conversationId: 'group:30001',
+      content: '宁宁你好',
+    })
+
+    expect(captured).toEqual({
+      guildId: '30001',
+      channelId: 'group:30001',
+      isDirect: false,
+      selfId: '20001',
+      userId: '10001',
+      content: '宁宁你好',
+      text: '宁宁你好',
+    })
+    expect(control.getSnapshot().messages.at(-1)).toMatchObject({
+      authorId: '20001',
+      conversationId: 'group:30001',
+      content: '群聊昵称回复',
+    })
+  })
+
   it('多个机器人始终使用各自真实 selfId 处理协议事件与 action', async () => {
     const { app, control } = await createControl()
     control.createBot({ id: '20002', name: '第二机器人', implementation: 'llbot', enabled: true })

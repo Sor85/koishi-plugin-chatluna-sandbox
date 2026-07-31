@@ -176,6 +176,8 @@ export interface SandboxChatLunaState {
   botParticipantId: string
   conversationId: string
   thinking: boolean
+  thought?: string
+  thoughtDurationMs?: number
   usage?: SandboxChatLunaTokenUsage
   updatedAt: string
 }

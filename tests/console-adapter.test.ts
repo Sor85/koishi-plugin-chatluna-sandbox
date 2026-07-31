@@ -144,7 +144,17 @@ describe('Koishi 控制台适配器', () => {
         '回复：控制台消息',
       ])
     })
-    expect(broadcasts.filter(({ type }) => type === 'onebot-sandbox/scene-mutated').length).toBeGreaterThan(0)
+    const replyRevision = control.getSnapshot().revision
+    expect(broadcasts).toContainEqual({
+      type: 'onebot-sandbox/scene-mutated',
+      body: { revision: replyRevision },
+    })
+    const refreshedWorkspace = snapshotListener({ operatorId: '10001' })
+    expect(refreshedWorkspace.snapshot.revision).toBe(replyRevision)
+    expect(refreshedWorkspace.snapshot.messages.map(({ content }: { content: string }) => content)).toEqual([
+      '控制台消息',
+      '回复：控制台消息',
+    ])
     expect(snapshot.snapshot.messages.every((message: Record<string, unknown>) => !('botId' in message))).toBe(true)
     expect(snapshot.snapshot.conversations.every((conversation: Record<string, unknown>) => !('userId' in conversation) && !('botId' in conversation))).toBe(true)
     const messageId = snapshot.snapshot.messages.find(({ content }: { content: string }) => content === '控制台消息')?.id
@@ -164,6 +174,10 @@ describe('Koishi 控制台适配器', () => {
       id: media.id,
       dataBase64: 'Y29uc29sZS1pbWFnZQ==',
     }))
+    // 发送 RPC 故意即时返回；删除参与者前等待媒体消息的后台投递结束，避免测试清理会话时留下异步回复。
+    await vi.waitFor(() => {
+      expect(control!.getBotDeliveries()).toHaveLength(2)
+    })
 
     const otherWorkspace = snapshotListener({ operatorId: '10002' })
     expect(otherWorkspace.snapshot.conversations.every((conversation: { type: string; participantIds?: readonly string[]; groupId?: string }) => conversation.type === 'direct'

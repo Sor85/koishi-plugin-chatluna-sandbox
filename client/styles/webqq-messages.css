@@ -137,20 +137,171 @@
   animation-delay: 0.28s;
 }
 
-.webqq-chatluna-usage {
+/* 以下思考指标区 1:1 移植自 onebot-webqq 的 __thinking-* 规则，仅补充 sandbox 需要的 incoming 镜像方向。
+   思考行跟在机器人最后一条消息下方，负上边距抵消消息行的 16px 间距，并让开 40px 头像列。 */
+.webqq-thinking-row {
+  position: relative;
+  max-width: 74%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin: -12px 40px 16px auto;
+  text-align: right;
+}
+
+.webqq-thinking-row.is-incoming {
+  align-items: flex-start;
+  margin-right: auto;
+  margin-left: 40px;
+  text-align: left;
+}
+
+.webqq-thinking-toggle {
+  max-width: 100%;
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  padding: 0;
+  border: 0;
+  margin-top: 4px;
+  background: transparent;
   color: var(--webqq-muted);
-  font-size: 11px;
-  line-height: 16px;
+  cursor: pointer;
+  font-size: 12px;
+  gap: 2px;
+  line-height: 18px;
+  /* 指标行必须始终单行：容器变窄时换行会把箭头挤到第二行，看起来像凭空多了一行。 */
+  white-space: nowrap;
 }
 
-.webqq-chatluna-usage span {
+/* 机器人在左侧时整体靠左并镜像 Token 位置，但箭头始终紧跟在思考时长右侧：
+   箭头贴到行首会被误读成换行符，也不便点击。 */
+.webqq-thinking-row.is-incoming .webqq-thinking-toggle {
+  justify-content: flex-start;
+}
+
+.webqq-thinking-row.is-incoming .webqq-thinking-duration {
+  order: 1;
+}
+
+.webqq-thinking-row.is-incoming .webqq-thinking-chevron {
+  order: 2;
+}
+
+.webqq-thinking-row.is-incoming .webqq-thinking-usage {
+  order: 3;
+}
+
+/* Token 指标默认隐藏，悬停或键盘聚焦折叠按钮时淡入，避免常态下与思考时长争抢注意力。 */
+.webqq-thinking-usage {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-right: 8px;
+  font-size: 12px;
+  gap: 6px;
+  line-height: 18px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease, visibility 0.16s ease;
+  visibility: hidden;
+  white-space: nowrap;
+}
+
+/* row 的 Token 排在最右，间距要跟着换边。 */
+.webqq-thinking-row.is-incoming .webqq-thinking-usage {
+  margin-right: 0;
+  margin-left: 8px;
+}
+
+.webqq-thinking-usage-group {
   display: inline-flex;
   align-items: center;
   gap: 2px;
+  white-space: nowrap;
+}
+
+.webqq-thinking-toggle:hover .webqq-thinking-usage,
+.webqq-thinking-toggle:focus-visible .webqq-thinking-usage {
+  opacity: 1;
+  visibility: visible;
+}
+
+.webqq-thinking-row.is-usage-only .webqq-thinking-usage {
+  margin-right: 0;
+  opacity: 1;
+  visibility: visible;
+}
+
+.webqq-thinking-row.is-usage-only.is-incoming .webqq-thinking-usage {
+  margin-left: 0;
+}
+
+.webqq-thinking-usage-icon {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.webqq-thinking-usage-icon.is-output {
+  margin-left: 4px;
+}
+
+.webqq-thinking-chevron {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  flex-shrink: 0;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  transition: transform 0.16s ease;
+}
+
+/* 箭头紧跟时长，两侧朝向一致：折叠指右，展开朝下。 */
+.webqq-thinking-row .webqq-thinking-chevron.is-expanded {
+  transform: rotate(90deg);
+}
+
+.webqq-thinking-panel {
+  max-width: min(360px, 100%);
+  margin-top: 4px;
+  transform-origin: top right;
+}
+
+.webqq-thinking-row.is-incoming .webqq-thinking-panel {
+  transform-origin: top left;
+}
+
+.webqq-thinking-content {
+  min-height: 0;
+  padding: 8px 10px;
+  border-left: 2px solid rgb(148 163 184 / 54%);
+  border-radius: 6px;
+  background: rgb(255 255 255 / 72%);
+  color: var(--webqq-muted);
+  font-size: 12px;
+  line-height: 18px;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  text-align: left;
+  white-space: pre-wrap;
+}
+
+.webqq-thinking-enter-active,
+.webqq-thinking-leave-active {
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.webqq-thinking-enter-from,
+.webqq-thinking-leave-to {
+  opacity: 0;
+  transform: translateY(-4px) scaleY(0.98);
 }
 
 @keyframes webqq-chatluna-thinking-dot {

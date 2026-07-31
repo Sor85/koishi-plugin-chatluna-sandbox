@@ -1,4 +1,5 @@
 import type { Context } from 'koishi'
+import { parseThinkContent, readChatLunaResponseText } from './chatluna-thinking'
 import type { SandboxChatLunaState } from './types'
 
 type ValidateTarget = (botParticipantId: string, conversationId: string) => boolean
@@ -16,6 +17,9 @@ interface ChatLunaModelUsagePayload {
 
 interface ChatLunaCharacterPayload {
   session?: unknown
+  lastResponseMessage?: unknown
+  completionMessages?: unknown
+  text?: unknown
 }
 
 interface ChatLunaEventRegistrar {
@@ -72,15 +76,16 @@ function createStateKey(botParticipantId: string, conversationId: string) {
 export class SandboxChatLunaStateStore {
   private states = new Map<string, SandboxChatLunaState>()
   private activeStateKeys = new Map<string, Set<string>>()
+  private thinkingStartedAt = new Map<string, number>()
   private disposers: Array<() => void> = []
 
-  constructor(ctx: Context, private validateTarget: ValidateTarget) {
+  constructor(ctx: Context, private validateTarget: ValidateTarget, private onChange: () => void = () => {}) {
     const on = ctx.on.bind(ctx) as unknown as ChatLunaEventRegistrar
     this.disposers.push(on('chatluna/before-chat', (conversationId, _message, _variables, _chatInterface, session) => {
       this.begin(session, conversationId)
     }))
-    this.disposers.push(on('chatluna/after-chat', (conversationId, _sourceMessage, _responseMessage, _variables, _chatInterface, session) => {
-      this.finish(conversationId, session)
+    this.disposers.push(on('chatluna/after-chat', (conversationId, _sourceMessage, responseMessage, _variables, _chatInterface, session) => {
+      this.finish(conversationId, session, { lastResponseMessage: responseMessage })
     }))
     this.disposers.push(on('chatluna/after-chat-error', (_error, conversationId) => {
       this.finish(conversationId)
@@ -92,7 +97,7 @@ export class SandboxChatLunaStateStore {
       this.begin(session)
     }))
     this.disposers.push(on('chatluna_character/after-chat', (payload) => {
-      this.finish(undefined, payload?.session)
+      this.finish(undefined, payload?.session, payload)
     }))
   }
 
@@ -103,6 +108,7 @@ export class SandboxChatLunaStateStore {
   clear(): void {
     this.states.clear()
     this.activeStateKeys.clear()
+    this.thinkingStartedAt.clear()
   }
 
   dispose(): void {
@@ -135,35 +141,41 @@ export class SandboxChatLunaStateStore {
       thinking: true,
       updatedAt: new Date().toISOString(),
     })
-    if (!chatLunaConversationId) return
-    const keys = this.activeStateKeys.get(chatLunaConversationId) ?? new Set<string>()
-    keys.add(key)
-    this.activeStateKeys.set(chatLunaConversationId, keys)
+    // updatedAt 会被 Token 用量事件刷新，思考时长必须独立记录起点。
+    this.thinkingStartedAt.set(key, Date.now())
+    if (chatLunaConversationId) {
+      const keys = this.activeStateKeys.get(chatLunaConversationId) ?? new Set<string>()
+      keys.add(key)
+      this.activeStateKeys.set(chatLunaConversationId, keys)
+    }
+    // 等待态是不落场景快照的瞬时状态，必须单独广播，否则聊天页面要等下一条消息才刷新，届时思考早已结束。
+    this.onChange()
   }
 
-  private finish(chatLunaConversationId?: string, session?: unknown): void {
+  private finish(chatLunaConversationId?: string, session?: unknown, payload?: ChatLunaCharacterPayload): void {
     const target = readSessionTarget(session)
     const targetKey = target && this.validateTarget(target.botParticipantId, target.conversationId)
       ? createStateKey(target.botParticipantId, target.conversationId)
       : undefined
     const activeKeys = chatLunaConversationId ? this.activeStateKeys.get(chatLunaConversationId) : undefined
     const key = targetKey ?? (activeKeys?.size === 1 ? [...activeKeys][0] : undefined)
-    if (key) this.finishState(key)
+    let changed = false
+    if (key) changed = this.finishState(key, payload)
     if (chatLunaConversationId && activeKeys && !key) {
       // 错误事件没有 Session 且同一 ChatLuna 会话映射到多个机器人时无法判定归属；
       // 删除这些瞬时状态比把一个全局完成状态错误地串到任意机器人更安全。
-      for (const activeKey of activeKeys) this.states.delete(activeKey)
+      for (const activeKey of activeKeys) {
+        changed = this.states.delete(activeKey) || changed
+        this.thinkingStartedAt.delete(activeKey)
+      }
     }
     if (chatLunaConversationId) this.activeStateKeys.delete(chatLunaConversationId)
+    if (changed) this.onChange()
   }
 
   private recordUsage(payload: ChatLunaModelUsagePayload): void {
-    const chatLunaConversationId = readString(payload?.context?.conversationId)
-    if (!chatLunaConversationId) return
-    const activeKeys = this.activeStateKeys.get(chatLunaConversationId)
-    // model-usage 本身没有机器人 selfId；只有唯一活动映射时才能安全归属。
-    if (activeKeys?.size !== 1) return
-    const key = [...activeKeys][0]
+    const key = this.resolveUsageKey(readString(payload?.context?.conversationId))
+    if (!key) return
     const state = this.states.get(key)
     if (!state) return
     const inputTokens = readNumber(payload.usageMetadata?.input_tokens)
@@ -177,12 +189,30 @@ export class SandboxChatLunaStateStore {
     state.updatedAt = new Date().toISOString()
   }
 
-  private finishState(key: string): void {
+  // model-usage 本身没有机器人 selfId，只能靠唯一性归属：
+  // 核心链路用内部会话 ID 的活动映射，chatluna-character 链路没有该 ID，退回到全局唯一思考状态。
+  // 两种情况下只要无法唯一确定就丢弃，避免把 Token 串到其他机器人。
+  private resolveUsageKey(chatLunaConversationId?: string): string | undefined {
+    const activeKeys = chatLunaConversationId ? this.activeStateKeys.get(chatLunaConversationId) : undefined
+    if (activeKeys) return activeKeys.size === 1 ? [...activeKeys][0] : undefined
+    const thinkingKeys = [...this.states].filter(([, state]) => state.thinking).map(([key]) => key)
+    return thinkingKeys.length === 1 ? thinkingKeys[0] : undefined
+  }
+
+  private finishState(key: string, payload?: ChatLunaCharacterPayload): boolean {
     const state = this.states.get(key)
-    if (!state) return
+    const startedAt = this.thinkingStartedAt.get(key)
+    this.thinkingStartedAt.delete(key)
+    if (!state) return false
     state.thinking = false
     state.updatedAt = new Date().toISOString()
+    const thought = payload ? parseThinkContent(readChatLunaResponseText(payload)) : ''
+    if (thought) {
+      state.thought = thought
+      if (startedAt !== undefined) state.thoughtDurationMs = Math.max(0, Date.now() - startedAt)
+    }
     this.detachStateKey(key)
+    return true
   }
 
   private detachStateKey(key: string): void {
@@ -196,6 +226,7 @@ export class SandboxChatLunaStateStore {
     for (const [key, state] of this.states) {
       if (!predicate(state)) continue
       this.states.delete(key)
+      this.thinkingStartedAt.delete(key)
       this.detachStateKey(key)
     }
   }

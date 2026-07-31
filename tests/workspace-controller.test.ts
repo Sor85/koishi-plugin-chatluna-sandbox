@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { SandboxSnapshot, SandboxWorkspaceState } from '../src/types'
 import { createFakeWorkspacePort } from '../client/webqq/fake-workspace-port'
 import { createWorkspaceController } from '../client/webqq/workspace-controller'
@@ -285,6 +285,120 @@ describe('WebQQ 工作区控制模块', () => {
       { operation: 'getWorkspace', input: undefined },
     ])
     expect(controller.sidebar.value.revision).toBe(7)
+  })
+
+  it('收到机器人异步回复修订后主动刷新当前会话', async () => {
+    const port = createFakeWorkspacePort(workspace)
+    const controller = createWorkspaceController(port, createStorage(JSON.stringify({
+      currentOperatorId: '10001',
+      activeConversationId: 'private:10001:20001',
+      currentView: 'messages',
+    })))
+    await controller.load()
+    port.calls.length = 0
+    port.workspaceResult = {
+      ...workspace,
+      snapshot: {
+        ...workspace.snapshot,
+        revision: 8,
+        messages: [...workspace.snapshot.messages, {
+          id: 'message-bot-reply',
+          authorId: '20001',
+          conversationId: 'private:10001:20001',
+          content: '异步机器人回复',
+          createdAt: '2026-07-23T00:00:02.000Z',
+        }],
+        conversations: workspace.snapshot.conversations.map((conversation) => conversation.id === 'private:10001:20001'
+          ? { ...conversation, messageIds: [...conversation.messageIds, 'message-bot-reply'] }
+          : conversation),
+      },
+    }
+
+    controller.notifySceneRevision(8)
+
+    await vi.waitFor(() => {
+      expect(controller.chat.value.messages.map(({ content }) => content)).toEqual(['基准消息', '异步机器人回复'])
+    })
+    expect(port.calls).toEqual([{
+      operation: 'getWorkspace',
+      input: { operatorId: '10001' },
+    }])
+    expect([
+      controller.sidebar.value.revision,
+      controller.chat.value.revision,
+      controller.composer.value.revision,
+      controller.details.value.revision,
+    ]).toEqual([8, 8, 8, 8])
+  })
+
+  it('等待态广播不改变场景修订时仍刷新聊天区域', async () => {
+    const port = createFakeWorkspacePort(workspace)
+    const controller = createWorkspaceController(port, createStorage(JSON.stringify({
+      currentOperatorId: '10001',
+      activeConversationId: 'private:10001:20001',
+      currentView: 'messages',
+    })))
+    await controller.load()
+    port.calls.length = 0
+    port.workspaceResult = {
+      ...workspace,
+      chatLunaStates: [{
+        botParticipantId: '20001',
+        conversationId: 'private:10001:20001',
+        thinking: true,
+        updatedAt: '2026-07-23T00:00:03.000Z',
+      }],
+    }
+
+    controller.notifySceneRevision(workspace.snapshot.revision)
+
+    await vi.waitFor(() => {
+      expect(controller.chat.value.chatLunaStates).toEqual([
+        expect.objectContaining({ conversationId: 'private:10001:20001', thinking: true }),
+      ])
+    })
+    expect(port.calls).toEqual([{
+      operation: 'getWorkspace',
+      input: { operatorId: '10001' },
+    }])
+  })
+
+  it('刷新期间到达的等待态广播合并成一次后续刷新', async () => {
+    const port = createFakeWorkspacePort(workspace)
+    const controller = createWorkspaceController(port, createStorage(JSON.stringify({
+      currentOperatorId: '10001',
+      activeConversationId: 'private:10001:20001',
+      currentView: 'messages',
+    })))
+    await controller.load()
+    port.calls.length = 0
+
+    // 拉取挂起期间到达的多次广播必须合并成一次后续拉取，而不是每条广播一次请求。
+    let releaseFirst = () => {}
+    const firstPending = new Promise<void>((resolve) => {
+      releaseFirst = resolve
+    })
+    const getWorkspace = port.getWorkspace.bind(port)
+    let calls = 0
+    port.getWorkspace = async (input?: Parameters<typeof getWorkspace>[0]) => {
+      calls += 1
+      if (calls === 1) await firstPending
+      return getWorkspace(input)
+    }
+
+    controller.notifySceneRevision(workspace.snapshot.revision)
+    await vi.waitFor(() => {
+      expect(calls).toBe(1)
+    })
+    controller.notifySceneRevision(workspace.snapshot.revision)
+    controller.notifySceneRevision(workspace.snapshot.revision)
+    releaseFirst()
+
+    await vi.waitFor(() => {
+      expect(calls).toBe(2)
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(calls).toBe(2)
   })
 
   it('替换工作区时四个区域模型原子观察同一修订', async () => {

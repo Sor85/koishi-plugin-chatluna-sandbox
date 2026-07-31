@@ -609,9 +609,19 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     return super.dispose()
   }
 
-  async sendMessage(channelId: string, fragment: Fragment) {
+  async sendMessage(channelId: string, fragment: Fragment, _referrer?: unknown, options: Universal.SendOptions = {}) {
     if (this.status !== Universal.Status.ONLINE) throw new Error(`机器人已离线：${this.selfId}`)
-    const { content, mediaInputs } = splitBotFragment(fragment)
+    // 覆盖 Bot.sendMessage 后不会再经过 MessageEncoder；必须在原始消息 Session 上执行组件转换，
+    // 否则 poke 等插件发送的 <execute> 会被当作字面文本，命令永远不会执行。
+    const renderSession = options.session ?? this.session({
+      type: 'send',
+      channel: {
+        id: channelId,
+        type: channelId.startsWith('group:') ? Universal.Channel.Type.TEXT : Universal.Channel.Type.DIRECT,
+      },
+    })
+    const transformed = await renderSession.transform(h.normalize(fragment))
+    const { content, mediaInputs } = splitBotFragment(transformed)
     if (!content && !mediaInputs.length) return []
     const result = mediaInputs.length
       ? await this.control.sendStoredMediaMessage({

@@ -280,17 +280,19 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     }
   }
 
-  // 服务端场景变更广播的落地点：发送 RPC 已即时返回，机器人稍后写入的回复靠这里刷新。
-  // 只在收到比当前更新的 revision 时拉取，串行执行并在追平后停止，避免广播风暴导致的并发请求。
+  // 服务端场景变更广播的落地点：发送 RPC 已即时返回，机器人稍后写入的回复和等待态靠这里刷新。
+  // 等待态不写入场景快照，广播修订会等于当前修订，因此不能按修订大小决定是否拉取；
+  // 改为每次广播都标记一次待刷新，并把刷新期间到达的广播合并成一次后续拉取，避免广播风暴导致并发请求。
   let mutationRefreshTask: Promise<void> | undefined
-  let latestMutationRevision = 0
-  function notifySceneRevision(revision: number) {
-    latestMutationRevision = Math.max(latestMutationRevision, revision)
+  let pendingRefresh = false
+  function notifySceneRevision(_revision: number) {
+    pendingRefresh = true
     if (mutationRefreshTask) return
-    mutationRefreshTask = (async () => {
+    // 异步任务体可能同步结束；先完成变量赋值再执行，避免已完成的 Promise 被写回后永久阻塞后续广播。
+    mutationRefreshTask = Promise.resolve().then(async () => {
       try {
-        while (latestMutationRevision > snapshot.value.revision) {
-          const target = latestMutationRevision
+        while (pendingRefresh) {
+          pendingRefresh = false
           const operatorId = currentOperatorIdState.value
           try {
             const nextWorkspace = operatorId
@@ -301,12 +303,11 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
           } catch {
             // 刷新失败保持现状，下一次场景变更广播会再次触发。
           }
-          if (snapshot.value.revision < target) break
         }
       } finally {
         mutationRefreshTask = undefined
       }
-    })()
+    })
   }
 
   async function getMediaContent(mediaId: string) {

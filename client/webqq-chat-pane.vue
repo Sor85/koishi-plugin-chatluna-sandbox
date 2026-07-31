@@ -26,6 +26,7 @@
       @poke-friend="emit('pokeFriend', $event)"
       @set-remark="emit('setRemark', $event)"
       @delete-friend="emit('deleteFriend', $event)"
+      @mention-group-member="emit('mentionGroupMember', $event)"
       @poke-group-member="emit('pokeGroupMember', $event)"
       @set-group-card="emit('setGroupCard', $event)"
       @set-group-admin="forwardSetGroupAdmin"
@@ -81,6 +82,7 @@ const emit = defineEmits<{
   pokeFriend: [targetId: string]
   setRemark: [targetId: string]
   deleteFriend: [targetId: string]
+  mentionGroupMember: [targetId: string]
   pokeGroupMember: [targetId: string]
   setGroupCard: [targetId: string]
   setGroupAdmin: [targetId: string, enabled: boolean]

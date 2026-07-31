@@ -192,7 +192,7 @@ export class SandboxControlService {
       const participant = this.scene.participants.find(({ id }) => id === botParticipantId)
       const conversation = this.scene.conversations.find(({ id }) => id === conversationId)
       return participant?.kind === 'bot' && !!conversation && this.isConversationVisible(botParticipantId, conversation)
-    })
+    }, () => this.notifySceneMutation())
     this.syncRuntimeBots()
     this.contextDisposers.push(ctx.on('ready', async () => {
       if (!this.persistence) return

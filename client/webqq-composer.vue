@@ -2,13 +2,17 @@
   <div ref="composerLayoutRef" class="webqq-composer-layout-root">
     <form ref="composerFormRef" class="webqq-composer" :style="composerStyle" @submit.prevent="sendMessage">
       <span v-if="displayError" class="webqq-composer-error" role="alert">{{ displayError }}</span>
-      <div v-if="model.replyingTo" class="webqq-composer-reply">
-        <span>回复 {{ model.replyingTo.authorName }}：{{ model.replyingTo.content }}</span>
-        <button type="button" aria-label="取消回复" @click="emit('clearReply')">
+      <div v-if="model.replyingTo || mentions.length" class="webqq-composer-reply">
+        <span>
+          <template v-if="model.replyingTo">回复 {{ model.replyingTo.authorName }}：{{ model.replyingTo.content }}</template>
+          <template v-if="model.replyingTo && mentions.length"> · </template>
+          <template v-if="mentions.length">提及 {{ mentions.map(({ name }) => `@${name}`).join('、') }}</template>
+        </span>
+        <button type="button" aria-label="清除回复与提及" @click="clearComposerContext">
           <IconX :size="15" aria-hidden="true" />
         </button>
       </div>
-      <div v-if="sendFiles.length" :class="['webqq-composer-attachments', { 'has-reply': model.replyingTo }]">
+      <div v-if="sendFiles.length" :class="['webqq-composer-attachments', { 'has-reply': model.replyingTo || mentions.length }]">
         <template v-for="file in sendFiles" :key="file.id">
           <span v-if="!file.previewUrl" class="webqq-composer-attachment-file">
             <IconFile :size="14" stroke-width="2" aria-hidden="true" />
@@ -158,7 +162,7 @@
       <button class="webqq-composer-action" type="button" aria-label="选择文件" :disabled="sending || !model.conversationId" @click="mediaInputRef?.click()">
         <IconPaperclip :size="19" stroke-width="2" aria-hidden="true" />
       </button>
-      <button class="webqq-composer-action is-primary" type="submit" aria-label="发送" :disabled="sending || (!input.trim() && !sendFiles.length) || !model.conversationId">
+      <button class="webqq-composer-action is-primary" type="submit" aria-label="发送" :disabled="sending || (!input.trim() && !mentions.length && !sendFiles.length) || !model.conversationId">
         <IconSend :size="19" stroke-width="2" aria-hidden="true" />
       </button>
     </form>
@@ -176,6 +180,7 @@ import EnvironmentCreatePopover from './environment-create-popover.vue'
 import WebqqAvatar from './webqq-avatar.vue'
 import WebqqImagePreview from './webqq-image-preview.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
+import { addComposerMention, buildMentionContent, type ComposerMention } from './webqq/mention'
 import {
   getUserStackLayoutMetrics,
   getUserStackMetrics,
@@ -198,6 +203,7 @@ export interface WebqqComposerModel {
   currentOperatorId?: string
   conversationId?: string
   replyingTo?: { id: string, authorName: string, content: string }
+  mentionRequest?: ComposerMention & { requestId: number }
   accentColor: string
   externalError?: string
 }
@@ -232,6 +238,7 @@ interface ComposerSendFile {
 }
 
 const input = ref('')
+const mentions = ref<ComposerMention[]>([])
 const mediaInputRef = ref<HTMLInputElement>()
 const sendFiles = ref<ComposerSendFile[]>([])
 const previewImageUrl = ref('')
@@ -288,6 +295,16 @@ const userOverflowStyle = computed(() => {
     '--webqq-user-overflow-expanded-right': `${expandedRight}px`,
     '--webqq-user-overflow-z-index': `${orderedSenders.value.length - userStackMetrics.value.collapsedVisibleCount - (coveredByExpandedAvatar ? 1 : 0)}`,
   }
+})
+
+watch(() => props.model.mentionRequest?.requestId, () => {
+  const mention = props.model.mentionRequest
+  if (!mention) return
+  mentions.value = addComposerMention(mentions.value, mention)
+})
+
+watch(() => props.model.conversationId, () => {
+  mentions.value = []
 })
 
 watch(hasUserStackOverflow, (hasOverflow) => {
@@ -384,6 +401,11 @@ function blurUserStack(event: FocusEvent) {
   syncUserStackExpanded()
 }
 
+function clearComposerContext() {
+  mentions.value = []
+  emit('clearReply')
+}
+
 async function selectComposerUser(sender: WebqqComposerSender) {
   if (sender.id === props.model.currentOperatorId) return
   suppressUserStackCollapse = true
@@ -393,6 +415,7 @@ async function selectComposerUser(sender: WebqqComposerSender) {
   try {
     await new Promise<void>((resolve, reject) => emit('selectOperator', sender.id, resolve, reject))
     input.value = ''
+    mentions.value = []
     localError.value = ''
     await animateUserStackLayout(layout)
   } catch (error) {
@@ -474,7 +497,7 @@ function readFileBase64(file: File) {
 }
 
 async function sendMessage() {
-  const content = input.value.trim()
+  const content = buildMentionContent(mentions.value, input.value)
   const { currentOperatorId, conversationId } = props.model
   if ((!content && !sendFiles.value.length) || !currentOperatorId || !conversationId || sending.value) return
 
@@ -495,6 +518,7 @@ async function sendMessage() {
       media,
     }, resolve, reject))
     input.value = ''
+    mentions.value = []
     clearSendFiles()
     emit('clearReply')
   } catch (error) {
@@ -543,7 +567,7 @@ watch(composerFormRef, (form) => {
   updateComposerSpace()
 }, { immediate: true })
 
-watch([() => props.model.replyingTo?.id, () => sendFiles.value.length], () => {
+watch([() => props.model.replyingTo?.id, () => mentions.value.length, () => sendFiles.value.length], () => {
   void nextTick(() => updateComposerSpace())
 })
 

@@ -1,4 +1,5 @@
 import type { SandboxConversation, SandboxSnapshot } from '../../src/types'
+import { formatMentionContent } from './mention'
 import { getConversationPeerId } from './relationship-directory'
 import { resolveWorkspaceSelection } from './workspace-state'
 
@@ -31,6 +32,7 @@ export interface SandboxWorkspacePreview {
 export function buildWorkspacePreview(snapshot: SandboxSnapshot, sessionLimit = 8, messageLimit = 6): SandboxWorkspacePreview {
   const { currentOperatorId, activeConversationId } = resolveWorkspaceSelection(snapshot, { currentView: 'messages' })
   const participants = new Map(snapshot.participants.map((participant) => [participant.id, participant]))
+  const participantNames = Object.fromEntries(snapshot.participants.map(({ id, name }) => [id, name]))
   const messagesById = new Map(snapshot.messages.map((message) => [message.id, message]))
 
   const describe = (conversation: SandboxConversation) => {
@@ -51,7 +53,7 @@ export function buildWorkspacePreview(snapshot: SandboxSnapshot, sessionLimit = 
     return {
       id: conversation.id,
       ...describe(conversation),
-      preview: latest?.content ?? '开始一段新对话',
+      preview: latest ? formatMentionContent(latest.content, participantNames) : '开始一段新对话',
       active: conversation.id === activeConversationId,
     }
   })
@@ -63,7 +65,7 @@ export function buildWorkspacePreview(snapshot: SandboxSnapshot, sessionLimit = 
     const author = participants.get(message.authorId)
     return [{
       id: message.id,
-      text: message.content,
+      text: formatMentionContent(message.content, participantNames),
       outgoing: message.authorId === currentOperatorId,
       event: !!message.event,
       authorName: author?.name ?? message.authorId,

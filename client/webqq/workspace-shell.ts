@@ -14,6 +14,7 @@ import type {
 import { getSandboxBots, getSandboxUsers } from '../../src/types'
 import type { SandboxWorkspaceView } from './workspace-state'
 import type { FriendMenuState } from './friend-menu'
+import { formatMentionContent } from './mention'
 import { getIncomingNotificationRequests } from './notification-requests'
 import { getConversationPeerId, getFriendDirectory, getGroupDirectory, getVisibleRecentConversations } from './relationship-directory'
 import type { createWorkspaceController } from './workspace-controller'
@@ -171,7 +172,7 @@ export function createWebqqWorkspaceShell(
       title: group?.name ?? peer?.name ?? conversation.id,
       avatar: group ? undefined : peer?.avatar,
       avatarKind: group ? 'group' as const : bot ? 'bot' as const : 'user' as const,
-      preview: latestMessage?.content ?? '开始一段新对话',
+      preview: latestMessage ? formatMentionContent(latestMessage.content, participantNames.value) : '开始一段新对话',
       time: latestMessage?.createdAt
         ? new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(new Date(latestMessage.createdAt))
         : '',

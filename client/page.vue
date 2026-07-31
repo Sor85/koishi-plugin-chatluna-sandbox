@@ -51,7 +51,7 @@
         />
         <WebqqChatPane
           v-else
-          :model="chatPaneModel"
+          :model="chatPaneViewModel"
           @back="selectNavigation('contacts')"
           @toggle-details="toggleDetails"
           @send="sendComposerMessage"
@@ -65,6 +65,7 @@
           @poke-friend="pokeFriend"
           @set-remark="openRemarkDialog"
           @delete-friend="deleteFriend"
+          @mention-group-member="mentionGroupMember"
           @poke-group-member="pokeGroupMember"
           @set-group-card="openGroupActionDialog('card', $event)"
           @set-group-admin="setGroupAdmin"
@@ -78,6 +79,7 @@
           @close="closeDetails"
           @publish-announcement="publishAnnouncement"
           @delete-announcement="deleteAnnouncement"
+          @mention-group-member="mentionGroupMember"
           @poke-group-member="pokeGroupMember"
           @set-group-card="openGroupActionDialog('card', $event)"
           @set-group-admin="setGroupAdmin"
@@ -168,6 +170,23 @@ const {
   toggleDetails,
   transferGroupOwner,
 } = createWebqqWorkspaceShell(workspaceController, workspaceLayout, () => overlayHostRef.value)
+
+const mentionRequest = ref<{ id: string, name: string, requestId: number }>()
+const chatPaneViewModel = computed(() => ({
+  ...chatPaneModel.value,
+  composer: {
+    ...chatPaneModel.value.composer,
+    mentionRequest: mentionRequest.value,
+  },
+}))
+
+function mentionGroupMember(targetId: string) {
+  mentionRequest.value = {
+    id: targetId,
+    name: chatPaneModel.value.participantNames[targetId] ?? targetId,
+    requestId: (mentionRequest.value?.requestId ?? 0) + 1,
+  }
+}
 
 const { createTestSpace, enterTestSpace, handleTestSpaceAction, mainSnapshot, selectNavigation, testSpaces } = createAiTestSpaceShell(
   workspaceController,
