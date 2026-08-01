@@ -1,58 +1,26 @@
 import { Bot, Context, Fragment, h, Random, Universal } from 'koishi'
 import type { SandboxControlService } from './control-service'
-import { toOneBotMessageSegments, toOneBotRawMessage } from './onebot-message'
-import { getOneBotMessageSequence, getOneBotProfileBaseline, resolveOneBotAction } from './onebot-profiles'
+import {
+  parseKoishiOutboundMessage,
+  parseOneBotOutboundMessage,
+  toOneBotMessageSegments,
+  toOneBotRawMessage,
+  type SandboxOutboundMediaSource,
+  type SandboxOutboundMessage,
+} from './onebot-message'
+import {
+  getOneBotMessageSequence,
+  getOneBotProfileBaseline,
+  resolveOneBotAction,
+  resolveOneBotMessageId,
+} from './onebot-profiles'
+import { MAX_MEDIA_SIZE } from './media-storage'
 import { createDirectConversationId, createGroupConversationId, getDirectConversationPeerId, type SandboxImplementationProfile } from './types'
-
-interface EmbeddedMediaInput {
-  fileName: string
-  mimeType: string
-  dataBase64: string
-}
 
 function normalizeOneBotGroupId(value: unknown): string {
   const groupId = String(value ?? '')
   // Koishi 的 channelId 在群聊中可能是沙盒逻辑会话 ID；OneBot action 只接受真实群号。
   return groupId.startsWith('group:') ? groupId.slice('group:'.length) : groupId
-}
-
-function splitBotFragment(fragment: Fragment): { content: string; mediaInputs: EmbeddedMediaInput[] } {
-  const mediaInputs: EmbeddedMediaInput[] = []
-  const content = h.normalize(fragment).map((element) => {
-    const media = readEmbeddedMedia(element)
-    if (!media) return element.toString()
-    mediaInputs.push(media)
-    return ''
-  }).join('').trim()
-  return { content, mediaInputs }
-}
-
-function readEmbeddedMedia(element: ReturnType<typeof h>): EmbeddedMediaInput | undefined {
-  if (!['img', 'image', 'audio', 'record', 'video', 'file'].includes(element.type)) return
-  const source = readElementAttribute(element, 'src', 'url', 'file')
-  const match = /^data:([^;,]+);base64,(.+)$/s.exec(source)
-  if (!match) return
-  const mimeType = match[1].toLowerCase()
-  const baseName = element.type === 'img' || element.type === 'image'
-    ? 'image'
-    : element.type === 'audio' || element.type === 'record'
-      ? 'audio'
-      : element.type
-  const fileName = readElementAttribute(element, 'title', 'name') || `${baseName}.${getMimeExtension(mimeType)}`
-  return { fileName, mimeType, dataBase64: match[2] }
-}
-
-function readElementAttribute(element: ReturnType<typeof h>, ...keys: string[]): string {
-  for (const key of keys) {
-    const value = element.attrs[key]
-    if (typeof value === 'string' && value) return value
-  }
-  return ''
-}
-
-function getMimeExtension(mimeType: string): string {
-  const subtype = mimeType.split('/')[1] ?? 'bin'
-  return subtype === 'jpeg' ? 'jpg' : subtype.replace(/^x-/, '')
 }
 
 export namespace SandboxBot {
@@ -219,20 +187,15 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           return { status: 'ok', retcode: 0, data: members.data.map((member) => this.toOneBotGuildMember(groupId, member)) }
         }
         if (action === 'send_private_msg') {
-          const userId = String(params.user_id ?? '')
-          const [messageId] = await this.sendPrivateMessage(userId, this.normalizeOneBotMessage(params.message))
-          return { status: 'ok', retcode: 0, data: { message_id: messageId } }
+          const conversationId = createDirectConversationId(this.selfId, String(params.user_id ?? ''))
+          const messageId = await this.deliverOutboundMessage(conversationId, parseOneBotOutboundMessage(params.message))
+          return { status: 'ok', retcode: 0, data: { message_id: getOneBotMessageSequence(messageId) } }
         }
         if (action === 'send_group_msg') {
           const groupId = normalizeOneBotGroupId(params.group_id)
           await this.getGuild(groupId)
-          const content = this.normalizeOneBotMessage(params.message)
-          const result = await this.control.sendMessage({
-            operatorId: this.selfId,
-            conversationId: createGroupConversationId(groupId),
-            content,
-          })
-          return { status: 'ok', retcode: 0, data: { message_id: result.messageId } }
+          const messageId = await this.deliverOutboundMessage(createGroupConversationId(groupId), parseOneBotOutboundMessage(params.message))
+          return { status: 'ok', retcode: 0, data: { message_id: getOneBotMessageSequence(messageId) } }
         }
         if (action === 'send_msg') {
           const targetAction = params.message_type === 'group' || params.group_id !== undefined
@@ -385,12 +348,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           return { status: 'ok', retcode: 0, data: null }
         }
         if (action === 'set_msg_emoji_like') {
-          // 真实消费者从 OneBot 事件拿到的是数字 message_id（sequence），
-          // 兼容沙盒消息 ID 与 sequence 两种形态。
-          const rawId = String(params.message_id ?? '')
-          const found = this.control.getVisibleSnapshot(this.selfId).messages
-            .some(({ id }) => id === rawId || String(getOneBotMessageSequence(id)) === rawId)
-          if (!found) throw new Error(`消息不存在：${rawId}`)
+          this.findVisibleMessage(String(params.message_id ?? ''))
           return { status: 'ok', retcode: 0, data: null }
         }
         if (action === 'send_forward_msg') {
@@ -401,23 +359,16 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           const content = nodes.map((node) => {
             const data = node && typeof node === 'object' ? Reflect.get(node, 'data') as Record<string, unknown> | undefined : undefined
             if (!data) return ''
-            if (data.content !== undefined) return this.normalizeOneBotMessage(data.content)
+            if (data.content !== undefined) return this.getOutboundMessageSummary(parseOneBotOutboundMessage(data.content))
             if (data.id !== undefined) return this.findVisibleMessage(String(data.id)).content
             return ''
           }).filter(Boolean).join('\n')
           if (!content) throw new Error('send_forward_msg 的消息节点不能全部为空')
-          if (params.group_id !== undefined) {
-            const groupId = normalizeOneBotGroupId(params.group_id)
-            await this.getGuild(groupId)
-            const result = await this.control.sendMessage({
-              operatorId: this.selfId,
-              conversationId: createGroupConversationId(groupId),
-              content,
-            })
-            return { status: 'ok', retcode: 0, data: { message_id: result.messageId } }
-          }
-          const [messageId] = await this.sendPrivateMessage(String(params.user_id ?? ''), content)
-          return { status: 'ok', retcode: 0, data: { message_id: messageId } }
+          const conversationId = params.group_id !== undefined
+            ? createGroupConversationId(normalizeOneBotGroupId(params.group_id))
+            : createDirectConversationId(this.selfId, String(params.user_id ?? ''))
+          const messageId = await this.deliverOutboundMessage(conversationId, { content, mediaSources: [] })
+          return { status: 'ok', retcode: 0, data: { message_id: getOneBotMessageSequence(messageId) } }
         }
         throw new Error(`OneBot action 已声明但未接入处理器：${capability.action}`)
     }
@@ -621,17 +572,128 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
       },
     })
     const transformed = await renderSession.transform(h.normalize(fragment))
-    const { content, mediaInputs } = splitBotFragment(transformed)
-    if (!content && !mediaInputs.length) return []
+    const message = parseKoishiOutboundMessage(transformed)
+    if (!message.content && !message.mediaSources.length) return []
+    return [await this.deliverOutboundMessage(channelId, message)]
+  }
+
+  private async deliverOutboundMessage(conversationId: string, message: SandboxOutboundMessage): Promise<string> {
+    // 先校验机器人确实能看到目标会话，再落盘媒体；否则无效 action 会留下孤儿文件。
+    this.getVisibleConversation(conversationId)
+    const replyToMessageId = message.replyToRawId
+      ? this.findVisibleMessage(message.replyToRawId, conversationId).id
+      : undefined
+    const mediaInputs = await Promise.all(message.mediaSources.map((media) => this.resolveOutboundMedia(media)))
+    if (!message.content && !mediaInputs.length) throw new Error('消息内容不能为空')
     const result = mediaInputs.length
       ? await this.control.sendStoredMediaMessage({
           operatorId: this.selfId,
-          conversationId: channelId,
-          content,
+          conversationId,
+          content: message.content,
+          replyToMessageId,
           media: this.control.storeMediaBatch(mediaInputs),
         })
-      : await this.control.sendMessage({ operatorId: this.selfId, conversationId: channelId, content })
-    return [result.messageId]
+      : await this.control.sendMessage({
+          operatorId: this.selfId,
+          conversationId,
+          content: message.content,
+          replyToMessageId,
+        })
+    return result.messageId
+  }
+
+  private async resolveOutboundMedia(media: SandboxOutboundMediaSource) {
+    const source = media.source.trim()
+    const dataUri = /^data:([^;,]+);base64,(.+)$/s.exec(source)
+    if (dataUri) {
+      const mimeType = dataUri[1].toLowerCase()
+      return {
+        fileName: media.fileName || this.getOutboundMediaFileName(media.type, mimeType),
+        mimeType,
+        dataBase64: dataUri[2],
+      }
+    }
+    if (source.startsWith('base64://')) {
+      const mimeType = media.mimeType?.toLowerCase() || this.getDefaultMediaMimeType(media.type)
+      return {
+        fileName: media.fileName || this.getOutboundMediaFileName(media.type, mimeType),
+        mimeType,
+        dataBase64: source.slice('base64://'.length),
+      }
+    }
+    const storedMedia = /^sandbox-media:\/\/([a-f0-9]{32})$/.exec(source)
+    if (storedMedia) {
+      const content = this.control.getMediaContent({ operatorId: this.selfId, mediaId: storedMedia[1] })
+      return { fileName: media.fileName || content.name, mimeType: content.mimeType, dataBase64: content.dataBase64 }
+    }
+    if (!source) throw new Error('媒体来源不能为空')
+    if (/^https?:\/\//i.test(source)) return this.downloadOutboundMedia(media, source)
+    // 只允许网络 URL 或沙盒受控媒体，不读取机器人传入的任意本地文件路径。
+    throw new Error(`不支持的媒体来源：${source}`)
+  }
+
+  private async downloadOutboundMedia(media: SandboxOutboundMediaSource, source: string) {
+    let response: Response
+    try {
+      response = await fetch(source, { signal: AbortSignal.timeout(10_000) })
+    } catch (error) {
+      throw new Error(`下载远程媒体失败：${source}（${error instanceof Error ? error.message : String(error)}）`)
+    }
+    if (!response.ok) throw new Error(`下载远程媒体失败：${response.status} ${response.statusText || source}`)
+
+    const declaredSize = Number(response.headers.get('content-length'))
+    if (Number.isFinite(declaredSize) && declaredSize > MAX_MEDIA_SIZE) throw new Error('媒体大小不能超过 10 MB')
+    const responseMimeType = response.headers.get('content-type')?.split(';')[0].trim().toLowerCase()
+    const mimeType = responseMimeType || media.mimeType?.toLowerCase() || this.getDefaultMediaMimeType(media.type)
+    this.assertOutboundMediaType(media.type, mimeType)
+    if (!response.body) throw new Error(`下载远程媒体失败：响应内容为空（${source}）`)
+
+    const chunks: Buffer[] = []
+    const reader = response.body.getReader()
+    let size = 0
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        size += value.byteLength
+        if (size > MAX_MEDIA_SIZE) {
+          await reader.cancel().catch(() => {})
+          throw new Error('媒体大小不能超过 10 MB')
+        }
+        chunks.push(Buffer.from(value))
+      }
+    } finally {
+      reader.releaseLock()
+    }
+    if (!size) throw new Error('媒体内容不能为空')
+    return {
+      fileName: media.fileName || this.getOutboundMediaFileName(media.type, mimeType),
+      mimeType,
+      dataBase64: Buffer.concat(chunks, size).toString('base64'),
+    }
+  }
+
+  private assertOutboundMediaType(type: SandboxOutboundMediaSource['type'], mimeType: string): void {
+    if (type !== 'file' && !mimeType.startsWith(`${type}/`)) {
+      throw new Error(`媒体类型不匹配：${type} 段收到 ${mimeType || '未知类型'}`)
+    }
+  }
+
+  private getDefaultMediaMimeType(type: SandboxOutboundMediaSource['type']): string {
+    if (type === 'image') return 'image/png'
+    if (type === 'audio') return 'audio/mpeg'
+    if (type === 'video') return 'video/mp4'
+    throw new Error('文件消息必须提供 MIME 类型')
+  }
+
+  private getOutboundMediaFileName(type: SandboxOutboundMediaSource['type'], mimeType: string): string {
+    const extension = (mimeType.split('/')[1] ?? 'bin').replace(/^x-/, '').replace('jpeg', 'jpg')
+    return `${type}.${extension}`
+  }
+
+  private getOutboundMessageSummary(message: SandboxOutboundMessage): string {
+    const media = message.mediaSources.map(({ type, fileName }) => `[${type === 'image' ? '图片' : type === 'audio' ? '语音' : type === 'video' ? '视频' : '文件'}]${fileName ? ` ${fileName}` : ''}`)
+    return [message.content, ...media].filter(Boolean).join(' ')
   }
 
   private toOneBotUser(user?: Universal.User) {
@@ -658,11 +720,14 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     return conversation
   }
 
-  private findVisibleMessage(messageId: string, channelId?: string) {
+  private findVisibleMessage(rawMessageId: string, channelId?: string) {
     const snapshot = this.control.getVisibleSnapshot(this.selfId)
-    const message = snapshot.messages.find(({ id, conversationId }) => id === messageId
-      && (!channelId || conversationId === channelId))
-    if (!message) throw new Error(`消息不存在：${messageId}`)
+    const visibleMessages = channelId
+      ? snapshot.messages.filter(({ conversationId }) => conversationId === channelId)
+      : snapshot.messages
+    const messageId = resolveOneBotMessageId(rawMessageId, visibleMessages.map(({ id }) => id))
+    const message = visibleMessages.find(({ id }) => id === messageId)
+    if (!message) throw new Error(`消息不存在：${rawMessageId}`)
     return message
   }
 
@@ -690,6 +755,9 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     const snapshot = this.control.getSnapshot()
     const conversation = snapshot.conversations.find(({ id }) => id === message.conversationId)
     const user = await this.getUser(message.authorId)
+    const reply = message.replyToMessageId
+      ? snapshot.messages.find(({ id }) => id === message.replyToMessageId)
+      : undefined
     return {
       id: message.id,
       messageId: message.id,
@@ -698,23 +766,15 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
       user,
       content: message.content,
       elements: h.parse(message.content),
+      quote: reply ? {
+        id: reply.id,
+        messageId: reply.id,
+        content: reply.content,
+        user: await this.getUser(reply.authorId),
+      } : undefined,
       timestamp: new Date(message.createdAt).getTime(),
       createdAt: new Date(message.createdAt).getTime(),
     }
-  }
-
-  private normalizeOneBotMessage(message: unknown): string {
-    if (typeof message === 'string') return message.trim()
-    if (!Array.isArray(message)) throw new Error('OneBot 消息不能为空')
-    const content = message.map((segment) => {
-      if (!segment || typeof segment !== 'object') return ''
-      const type = Reflect.get(segment, 'type')
-      const data = Reflect.get(segment, 'data')
-      if (type === 'text' && data && typeof data === 'object') return String(Reflect.get(data, 'text') ?? '')
-      return `[CQ:${String(type ?? 'unknown')}]`
-    }).join('').trim()
-    if (!content) throw new Error('OneBot 消息不能为空')
-    return content
   }
 
   private toOneBotMessage(message: ReturnType<SandboxControlService['getSnapshot']>['messages'][number]) {
@@ -728,11 +788,14 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     const groupMember = conversation?.groupId
       ? snapshot.groups.find(({ id }) => id === conversation.groupId)?.members.find(({ participantId }) => participantId === message.authorId)
       : undefined
-    const onebotMessage = toOneBotMessageSegments(message.content, message.media)
+    const onebotMessage: Array<{ type: string; data: Record<string, string> }> = [
+      ...(message.replyToMessageId ? [{ type: 'reply', data: { id: String(getOneBotMessageSequence(message.replyToMessageId)) } }] : []),
+      ...toOneBotMessageSegments(message.content, message.media),
+    ]
     return {
       time: Math.floor(new Date(message.createdAt).getTime() / 1000),
       message_type: conversation?.type === 'group' ? 'group' : 'private',
-      message_id: message.id,
+      message_id: sequence,
       message_seq: sequence,
       real_id: sequence,
       sender: {

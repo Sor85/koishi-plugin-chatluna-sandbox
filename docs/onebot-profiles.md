@@ -36,3 +36,7 @@ NapCat 与 LLBot 都提供 `send_poke`、`friend_poke` 和 `group_poke`。沙盒
 能力覆盖界面同时展示每项能力的作用说明、已支持能力和暂未实现能力。暂未实现项不可勾选，并直接显示缺少的沙盒领域模型，避免把上游存在的 action 误报为可用。
 
 消息事件按接收机器人的实现配置生成原始字段。两种配置都提供数字 `message_id`、`message_seq`、`message_format` 和 `font`；NapCat 消息事件额外提供 `real_id`，LLBot 仅在 `get_msg` 返回中提供 `real_id`。
+
+OneBot 协议层统一向插件返回数字 `message_id`：消息事件、`send_*` action、`get_msg`、消息历史和 `reply` 段使用同一 sequence。接收 MessageId 的 action 同时接受数字 sequence 和沙盒领域消息 ID，便于调试与内部控制；`SandboxMessage.id`、Koishi Session `messageId`、WebQQ 和 MCP 仍使用沙盒领域消息 ID，不额外保存重复序号字段。
+
+机器人出站图片会在写入逻辑会话前转换为沙盒受控媒体。当前支持 data URI、`base64://`、机器人可见的 `sandbox-media://` 引用以及 HTTP/HTTPS 地址；远程媒体下载受 10 秒超时、10 MB 大小限制和媒体 MIME 白名单约束。`sticker` 按图片处理，本地文件路径仍不会被沙盒读取。

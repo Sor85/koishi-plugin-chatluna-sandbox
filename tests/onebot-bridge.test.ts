@@ -1,15 +1,62 @@
 import { mkdtempSync } from 'node:fs'
+import { createServer, type Server } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { App, h, Universal } from '@koishijs/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SandboxControlService } from '../src/control-service'
+import { MAX_MEDIA_SIZE } from '../src/media-storage'
+import { getOneBotMessageSequence } from '../src/onebot-profiles'
 
 const runningApps: App[] = []
+const runningServers: Server[] = []
 
 afterEach(async () => {
   await Promise.all(runningApps.splice(0).map((app) => app.stop()))
+  await Promise.all(runningServers.splice(0).map((server) => new Promise<void>((resolve, reject) => {
+    server.close((error) => error ? reject(error) : resolve())
+  })))
 })
+
+async function createMediaServer(): Promise<string> {
+  const server = createServer((request, response) => {
+    if (request.url === '/sticker') {
+      const content = Buffer.from('remote-sticker')
+      response.writeHead(200, {
+        'content-type': 'image/png; charset=binary',
+        'content-length': String(content.length),
+      })
+      response.end(content)
+      return
+    }
+    if (request.url === '/text') {
+      response.writeHead(200, { 'content-type': 'text/plain' })
+      response.end('not an image')
+      return
+    }
+    if (request.url === '/too-large') {
+      response.writeHead(200, {
+        'content-type': 'image/png',
+        'content-length': String(MAX_MEDIA_SIZE + 1),
+      })
+      response.end()
+      return
+    }
+    response.writeHead(404)
+    response.end()
+  })
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', () => {
+      server.off('error', reject)
+      resolve()
+    })
+  })
+  runningServers.push(server)
+  const address = server.address() as AddressInfo
+  return `http://127.0.0.1:${address.port}`
+}
 
 async function createControl() {
   const app = new App()
@@ -182,9 +229,9 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     expect(control.getSnapshot().participants.find(({ id }) => id === '20001')).toMatchObject({ name: 'Koishi' })
 
     const privateResult = await secondBot.internal._request('send_private_msg', { user_id: 10001, message: '机器人主动私聊' }) as {
-      data: { message_id: string }
+      data: { message_id: number }
     }
-    expect(control.getSnapshot().messages.find(({ id }) => id === privateResult.data.message_id)).toMatchObject({
+    expect(control.getSnapshot().messages.find(({ id }) => getOneBotMessageSequence(id) === privateResult.data.message_id)).toMatchObject({
       authorId: '20002',
       conversationId: 'private:10001:20002',
     })
@@ -286,7 +333,7 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     })
 
     const privateResult = await bot.internal._request('send_private_msg', { user_id: 10001, message: '原始私聊消息' }) as {
-      data: { message_id: string }
+      data: { message_id: number }
     }
     await expect(bot.internal._request('get_msg', { message_id: privateResult.data.message_id })).resolves.toMatchObject({
       status: 'ok',
@@ -295,12 +342,12 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     })
 
     const groupResult = await bot.internal._request('send_group_msg', { group_id: 30001, message: [{ type: 'text', data: { text: '群广播' } }] }) as {
-      data: { message_id: string }
+      data: { message_id: number }
     }
     expect(control.getSnapshot().messages.filter(({ content }) => content === '群广播')).toHaveLength(1)
 
     await bot.internal._request('delete_msg', { message_id: groupResult.data.message_id })
-    expect(control.getSnapshot().messages.find(({ id }) => id === groupResult.data.message_id)).toEqual(expect.objectContaining({
+    expect(control.getSnapshot().messages.find(({ id }) => getOneBotMessageSequence(id) === groupResult.data.message_id)).toEqual(expect.objectContaining({
       content: 'Koishi 撤回了一条消息',
       event: { type: 'recall', operatorId: '20001' },
     }))
@@ -308,6 +355,116 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     expect(control.getSnapshot().messages.find(({ id }) => id === standardMessageId)).toEqual(expect.objectContaining({
       event: { type: 'recall', operatorId: '20001' },
     }))
+  })
+
+  it('OneBot 数字 MessageId 支持查询、引用与图片消息闭环', async () => {
+    const { control } = await createControl()
+    const bot = control.bot
+    const imageBase64 = Buffer.from('onebot-image').toString('base64')
+    const quoted = await control.sendMessage({
+      operatorId: '10001',
+      conversationId: 'group:30001',
+      content: '需要引用的消息',
+    })
+    const quotedSequence = getOneBotMessageSequence(quoted.messageId)
+
+    await expect(bot.internal._request('get_msg', { message_id: quotedSequence })).resolves.toMatchObject({
+      status: 'ok',
+      data: { message_id: quotedSequence, raw_message: '需要引用的消息' },
+    })
+
+    const groupResult = await bot.internal._request('send_group_msg', {
+      group_id: 30001,
+      message: [
+        { type: 'reply', data: { id: String(quotedSequence) } },
+        { type: 'text', data: { text: '带图片的引用回复' } },
+        { type: 'image', data: { file: `data:image/png;base64,${imageBase64}` } },
+      ],
+    }) as { data: { message_id: number } }
+    const groupMessage = control.getSnapshot().messages.find(({ id }) => getOneBotMessageSequence(id) === groupResult.data.message_id)
+    expect(groupMessage).toMatchObject({
+      authorId: '20001',
+      conversationId: 'group:30001',
+      content: '带图片的引用回复',
+      replyToMessageId: quoted.messageId,
+      media: [expect.objectContaining({ type: 'image', mimeType: 'image/png' })],
+    })
+    expect(groupMessage?.content).not.toContain('[CQ:image]')
+    await expect(bot.internal._request('get_msg', { message_id: groupResult.data.message_id })).resolves.toMatchObject({
+      data: {
+        message_id: groupResult.data.message_id,
+        message: [
+          { type: 'reply', data: { id: String(quotedSequence) } },
+          { type: 'image', data: expect.objectContaining({ file: expect.stringMatching(/^sandbox-media:\/\//) }) },
+          { type: 'text', data: { text: '带图片的引用回复' } },
+        ],
+      },
+    })
+
+    const privateResult = await bot.internal._request('send_private_msg', {
+      user_id: 10001,
+      message: [{ type: 'image', data: { file: `base64://${imageBase64}` } }],
+    }) as { data: { message_id: number } }
+    const privateMessage = control.getSnapshot().messages.find(({ id }) => getOneBotMessageSequence(id) === privateResult.data.message_id)
+    expect(privateMessage).toMatchObject({
+      authorId: '20001',
+      conversationId: 'private:10001:20001',
+      content: '[图片] image.png',
+      media: [expect.objectContaining({ type: 'image', mimeType: 'image/png' })],
+    })
+
+    const sourceReference = groupMessage?.media?.[0].reference
+    expect(sourceReference).toMatch(/^sandbox-media:\/\//)
+    const copyResult = await bot.internal._request('send_group_msg', {
+      group_id: 30001,
+      message: [{ type: 'image', data: { file: sourceReference } }],
+    }) as { data: { message_id: number } }
+    const copiedMessage = control.getSnapshot().messages.find(({ id }) => getOneBotMessageSequence(id) === copyResult.data.message_id)
+    expect(copiedMessage?.media?.[0]).toMatchObject({ type: 'image', mimeType: 'image/png' })
+    expect(copiedMessage?.media?.[0].id).not.toBe(groupMessage?.media?.[0].id)
+
+    const [quotedReplyId] = await bot.sendMessage('group:30001', [
+      h('quote', { id: quoted.messageId }),
+      h.text('标准 Koishi 引用'),
+    ])
+    expect(control.getSnapshot().messages.find(({ id }) => id === quotedReplyId)).toMatchObject({
+      replyToMessageId: quoted.messageId,
+      content: '标准 Koishi 引用',
+    })
+
+    const mediaServer = await createMediaServer()
+    const remoteResult = await bot.internal._request('send_group_msg', {
+      group_id: 30001,
+      message: [{ type: 'sticker', data: { url: `${mediaServer}/sticker` } }],
+    }) as { data: { message_id: number } }
+    const remoteMessage = control.getSnapshot().messages.find(({ id }) => getOneBotMessageSequence(id) === remoteResult.data.message_id)
+    expect(remoteMessage).toMatchObject({
+      content: '[图片] image.png',
+      media: [expect.objectContaining({ type: 'image', mimeType: 'image/png', size: 14 })],
+    })
+    expect(remoteMessage?.content).not.toContain('[CQ:sticker]')
+    const remoteMedia = remoteMessage?.media?.[0]
+    if (!remoteMedia) throw new Error('远程表情未写入媒体')
+    expect(Buffer.from(control.getMediaContent({ operatorId: '20001', mediaId: remoteMedia.id }).dataBase64, 'base64').toString()).toBe('remote-sticker')
+    await expect(bot.internal._request('get_msg', { message_id: remoteResult.data.message_id })).resolves.toMatchObject({
+      data: {
+        message_id: remoteResult.data.message_id,
+        message: [{ type: 'image', data: expect.objectContaining({ file: remoteMedia.reference }) }],
+      },
+    })
+
+    const beforeFailure = control.getSnapshot().messages.length
+    for (const [path, error] of [
+      ['/missing', '下载远程媒体失败'],
+      ['/text', '媒体类型不匹配'],
+      ['/too-large', '媒体大小不能超过 10 MB'],
+    ] as const) {
+      await expect(bot.internal._request('send_group_msg', {
+        group_id: 30001,
+        message: [{ type: 'image', data: { file: `${mediaServer}${path}` } }],
+      })).rejects.toThrow(error)
+      expect(control.getSnapshot().messages).toHaveLength(beforeFailure)
+    }
   })
 
   it('机器人通过标准方法和 OneBot action 处理申请与群管理', async () => {
@@ -391,7 +548,7 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     await expect(bot.internal._request('set_group_ban', { group_id: 30002, user_id: 10003, duration: 600 })).resolves.toMatchObject({ status: 'ok' })
     await expect(bot.internal._request('set_group_special_title', { group_id: 30002, user_id: 10003, special_title: '头衔' })).rejects.toThrow('只有群主可以设置专属头衔')
 
-    const sent = await bot.internal._request('send_group_msg', { group_id: 30002, message: '表情回应目标' }) as { data: { message_id: string } }
+    const sent = await bot.internal._request('send_group_msg', { group_id: 30002, message: '表情回应目标' }) as { data: { message_id: number } }
     await expect(bot.internal._request('set_msg_emoji_like', { message_id: sent.data.message_id, emoji_id: '128077' })).resolves.toMatchObject({ status: 'ok' })
 
     await bot.internal._request('send_forward_msg', { group_id: 30002, messages: [

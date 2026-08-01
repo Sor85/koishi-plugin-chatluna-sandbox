@@ -250,6 +250,17 @@ export function getOneBotMessageSequence(messageId: string): number {
   return Number.parseInt(messageId, 16)
 }
 
+export function resolveOneBotMessageId(rawMessageId: unknown, messageIds: Iterable<string>): string | undefined {
+  const value = String(rawMessageId ?? '').trim()
+  if (!value) return
+  const ids = [...messageIds]
+  if (ids.includes(value)) return value
+  if (!/^\d+$/.test(value)) return
+  const sequence = Number(value)
+  if (!Number.isSafeInteger(sequence)) return
+  return ids.find((id) => getOneBotMessageSequence(id) === sequence)
+}
+
 export function getOneBotMessageEventFields(
   profile: SandboxImplementationProfile,
   messageId: string,

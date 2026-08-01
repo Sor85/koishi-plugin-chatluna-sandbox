@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SandboxControlService } from '../src/control-service'
+import { getOneBotMessageSequence } from '../src/onebot-profiles'
 
 const runningApps: App[] = []
 const temporaryDirectories: string[] = []
@@ -347,7 +348,7 @@ describe('模拟 QQ 环境消息闭环', () => {
         rawUserId: 10001,
         rawMessageType: 'private',
         rawMessage: [
-          { type: 'reply', data: { id: first.messageId } },
+          { type: 'reply', data: { id: String(getOneBotMessageSequence(first.messageId)) } },
           { type: 'text', data: { text: '引用回复' } },
         ],
       }),

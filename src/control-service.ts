@@ -6,7 +6,7 @@ import { SandboxMediaStorage } from './media-storage'
 import { SandboxOneBotDebugStore, type AppendOneBotDebugRecordInput } from './onebot-debug'
 import { toOneBotMessageSegments, toOneBotRawMessage } from './onebot-message'
 import type { SandboxScenePersistence } from './persistence'
-import { getOneBotCapabilityMatrix, getOneBotMessageEventFields, getOneBotMessageSequence, normalizeDisabledCapabilities, type SandboxOneBotCapability } from './onebot-profiles'
+import { getOneBotCapabilityMatrix, getOneBotMessageEventFields, getOneBotMessageSequence, normalizeDisabledCapabilities, resolveOneBotMessageId, type SandboxOneBotCapability } from './onebot-profiles'
 import {
   createDirectConversationId,
   createGroupConversationId,
@@ -302,9 +302,9 @@ export class SandboxControlService {
       type: media.type === 'audio' ? 'record' : media.type,
       data: { file: media.reference },
     }))
-    if (context.reply) onebotMessage.unshift({ type: 'reply', data: { id: context.reply.id } })
+    if (context.reply) onebotMessage.unshift({ type: 'reply', data: { id: String(getOneBotMessageSequence(context.reply.id)) } })
     if (text) onebotMessage.push({ type: 'text', data: { text } })
-    const rawMessage = `${context.reply ? `[CQ:reply,id=${context.reply.id}]` : ''}${input.media.map((media) => `[CQ:${media.type === 'audio' ? 'record' : media.type},file=${media.reference}]`).join('')}${text}`
+    const rawMessage = `${context.reply ? `[CQ:reply,id=${getOneBotMessageSequence(context.reply.id)}]` : ''}${input.media.map((media) => `[CQ:${media.type === 'audio' ? 'record' : media.type},file=${media.reference}]`).join('')}${text}`
     await this.dispatchMessageToBots(context, message, elements, onebotMessage, rawMessage)
     return { messageId: message.id, revision: this.scene.revision }
   }
@@ -1005,7 +1005,7 @@ export class SandboxControlService {
     const message = this.appendMessage(input.operatorId, context.conversation.id, input.content.trim(), input.replyToMessageId)
     const elements = h.parse(message.content)
     const onebotMessage = [
-      ...(context.reply ? [{ type: 'reply', data: { id: context.reply.id } }] : []),
+      ...(context.reply ? [{ type: 'reply', data: { id: String(getOneBotMessageSequence(context.reply.id)) } }] : []),
       ...toOneBotMessageSegments(message.content),
     ]
     const delivery = this.dispatchMessageToBots(context, message, elements, onebotMessage, toOneBotRawMessage(onebotMessage))
@@ -1042,11 +1042,11 @@ export class SandboxControlService {
     }))
     if (text) elements.push(h.text(text))
     const onebotMessage: Array<{ type: string; data: Record<string, string> }> = [
-      ...(context.reply ? [{ type: 'reply', data: { id: context.reply.id } }] : []),
+      ...(context.reply ? [{ type: 'reply', data: { id: String(getOneBotMessageSequence(context.reply.id)) } }] : []),
       ...media.map((item) => ({ type: item.type === 'audio' ? 'record' : item.type, data: { file: item.reference } })),
       ...(text ? [{ type: 'text', data: { text } }] : []),
     ]
-    const rawMessage = `${context.reply ? `[CQ:reply,id=${context.reply.id}]` : ''}${media.map((item) => `[CQ:${item.type === 'audio' ? 'record' : item.type},file=${item.reference}]`).join('')}${text}`
+    const rawMessage = `${context.reply ? `[CQ:reply,id=${getOneBotMessageSequence(context.reply.id)}]` : ''}${media.map((item) => `[CQ:${item.type === 'audio' ? 'record' : item.type},file=${item.reference}]`).join('')}${text}`
     const delivery = this.dispatchMessageToBots(context, message, elements, onebotMessage, rawMessage)
     return { result: { messageId: message.id, revision: this.scene.revision }, delivery }
   }
@@ -1197,12 +1197,8 @@ export class SandboxControlService {
   }
 
   async recallBotMessage(botId: string, rawMessageId: string, conversationId?: string): Promise<void> {
-    // OneBot 事件里的 message_id 是数字 sequence，插件回传时兼容沙盒消息 ID 与 sequence 两种形态。
-    const message = this.scene.messages.find(({ id }) => id === rawMessageId)
-      ?? (/^\d+$/.test(rawMessageId)
-        ? this.scene.messages.find(({ id }) => String(getOneBotMessageSequence(id)) === rawMessageId)
-        : undefined)
-    await this.recallVisibleMessage(botId, message?.id ?? rawMessageId, conversationId)
+    const messageId = resolveOneBotMessageId(rawMessageId, this.scene.messages.map(({ id }) => id))
+    await this.recallVisibleMessage(botId, messageId ?? rawMessageId, conversationId)
   }
 
   // 撤回与真实 QQ 一致：消息就地替换为灰条提示，保留会话位置，并向相关机器人派发撤回通知。
