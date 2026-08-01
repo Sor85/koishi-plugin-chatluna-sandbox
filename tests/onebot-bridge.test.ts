@@ -560,4 +560,75 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     await expect(bot.internal._request('set_group_leave', { group_id: 30002 })).resolves.toMatchObject({ status: 'ok' })
     expect(control.getSnapshot().groups.find(({ id }) => id === '30002')!.members.some(({ participantId }) => participantId === '20001')).toBe(false)
   })
+
+  it('群头衔、禁言与表情回应写入沙盒领域状态', async () => {
+    const { control } = await createControl()
+    const bot = control.bot
+    control.createGroup({ id: '30003', name: '状态测试群', members: [
+      { participantId: '20001', role: 'owner' },
+      { participantId: '10001', role: 'admin' },
+      { participantId: '10003', role: 'member' },
+    ] })
+    const getMember = (participantId: string) => control.getSnapshot().groups
+      .find(({ id }) => id === '30003')!.members.find((member) => member.participantId === participantId)!
+
+    await expect(bot.internal._request('set_group_special_title', { group_id: 30003, user_id: 10003, special_title: '荣誉成员' }))
+      .resolves.toMatchObject({ status: 'ok' })
+    expect(getMember('10003').title).toBe('荣誉成员')
+    await expect(bot.internal._request('get_group_member_info', { group_id: 30003, user_id: 10003 }))
+      .resolves.toMatchObject({ data: { title: '荣誉成员', shut_up_timestamp: 0 } })
+    await bot.internal._request('set_group_special_title', { group_id: 30003, user_id: 10003, special_title: '' })
+    expect(getMember('10003').title).toBeUndefined()
+
+    await bot.internal._request('set_group_ban', { group_id: 30003, user_id: 10003, duration: 600 })
+    const shutList = await bot.internal._request('get_group_shut_list', { group_id: 30003 }) as {
+      data: Array<{ user_id: number; shut_up_timestamp: number }>
+    }
+    expect(shutList.data).toHaveLength(1)
+    expect(shutList.data[0].user_id).toBe(10003)
+    expect(shutList.data[0].shut_up_timestamp).toBeGreaterThan(Math.floor(Date.now() / 1000))
+    await bot.internal._request('set_group_ban', { group_id: 30003, user_id: 10003, duration: 0 })
+    await expect(bot.internal._request('get_group_shut_list', { group_id: 30003 })).resolves.toMatchObject({ data: [] })
+
+    const sent = await bot.internal._request('send_group_msg', { group_id: 30003, message: '回应目标' }) as { data: { message_id: number } }
+    await bot.internal._request('set_msg_emoji_like', { message_id: sent.data.message_id, emoji_id: '128077' })
+    expect(control.getSnapshot().messages.at(-1)!.reactions).toEqual([{ emojiId: '128077', participantIds: ['20001'] }])
+    await bot.internal._request('set_msg_emoji_like', { message_id: sent.data.message_id, emoji_id: '128077', set: false })
+    expect(control.getSnapshot().messages.at(-1)!.reactions).toBeUndefined()
+  })
+
+  it('专属头衔只有群主可以授予且随场景替换保留', async () => {
+    const { control } = await createControl()
+    control.createGroup({ id: '30004', name: '头衔权限群', members: [
+      { participantId: '10001', role: 'owner' },
+      { participantId: '20001', role: 'admin' },
+      { participantId: '10003', role: 'member' },
+    ] })
+
+    await expect(control.bot.internal._request('set_group_special_title', { group_id: 30004, user_id: 10003, special_title: '头衔' }))
+      .rejects.toThrow('只有群主可以设置专属头衔')
+
+    await control.performGroupAction({ action: 'set-title', operatorId: '10001', groupId: '30004', targetId: '10003', title: ' 元老 ' })
+    const snapshot = control.getSnapshot()
+    expect(snapshot.groups.find(({ id }) => id === '30004')!.members
+      .find(({ participantId }) => participantId === '10003')!.title).toBe('元老')
+
+    control.replaceScene(snapshot)
+    expect(control.getSnapshot().groups.find(({ id }) => id === '30004')!.members
+      .find(({ participantId }) => participantId === '10003')!.title).toBe('元老')
+  })
+
+  it('camelCase 便捷方法映射到真实 OneBot action 而不是未知 action', async () => {
+    const { control } = await createControl()
+
+    await expect(control.bot.internal.getGroupInfo(30001)).resolves.toMatchObject({
+      group_id: 30001,
+      group_name: '测试群',
+    })
+    expect(control.getOneBotDebugRecords({ direction: 'action' })[0]).toMatchObject({
+      type: 'get_group_info',
+      resolvedType: 'get_group_info',
+      status: 'success',
+    })
+  })
 })

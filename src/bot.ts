@@ -15,12 +15,17 @@ import {
   resolveOneBotMessageId,
 } from './onebot-profiles'
 import { MAX_MEDIA_SIZE } from './media-storage'
-import { createDirectConversationId, createGroupConversationId, getDirectConversationPeerId, type SandboxImplementationProfile } from './types'
+import { createDirectConversationId, createGroupConversationId, getDirectConversationPeerId, isSandboxGroupMemberMuted, type SandboxGroupMember, type SandboxImplementationProfile } from './types'
 
 function normalizeOneBotGroupId(value: unknown): string {
   const groupId = String(value ?? '')
   // Koishi 的 channelId 在群聊中可能是沙盒逻辑会话 ID；OneBot action 只接受真实群号。
   return groupId.startsWith('group:') ? groupId.slice('group:'.length) : groupId
+}
+
+// OneBot 用秒级到期时间戳表示禁言，未禁言固定为 0。
+function getGroupMemberMuteTimestamp(member: SandboxGroupMember): number {
+  return isSandboxGroupMemberMuted(member) ? Math.floor(new Date(member.mutedUntil!).getTime() / 1000) : 0
 }
 
 export namespace SandboxBot {
@@ -34,6 +39,7 @@ export namespace SandboxBot {
 
   export interface Internal {
     _request(action: string, params: Record<string, unknown>): Promise<unknown>
+    getGroupInfo(groupId: string | number, noCache?: boolean): Promise<unknown>
     getGroupMemberList(groupId: string | number): Promise<unknown[]>
     getGroupMemberInfo(groupId: string | number, userId: string | number, noCache?: boolean): Promise<unknown>
     set_friend_add_request(input: { flag: string; approve: boolean; remark?: string }): Promise<unknown>
@@ -330,25 +336,49 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
             groupId: normalizeOneBotGroupId(params.group_id),
           })
         }
-        // set_group_ban / set_group_special_title / set_msg_emoji_like：场景模型
-        // 不维护禁言、头衔、表情回应状态，仅执行与真实实现一致的存在性与权限
-        // 校验后确认调用，供插件验证调用链路（参数在调试记录中完整可见）。
+        // set_group_ban、set_group_special_title 与 set_msg_emoji_like 现在都写入
+        // 沙盒领域状态，插件可以从群成员资料、禁言列表和场景快照复查执行结果。
         if (action === 'set_group_ban') {
-          const groupId = normalizeOneBotGroupId(params.group_id)
-          const actor = await this.getGuildMember(groupId, this.selfId)
-          if (actor.roles?.[0]?.id === 'member') throw new Error('只有群主或管理员可以禁言成员')
-          await this.getGuildMember(groupId, String(params.user_id ?? ''))
-          return { status: 'ok', retcode: 0, data: null }
+          return this.control.performBotGroupAction(this.selfId, {
+            action: 'set-ban',
+            groupId: normalizeOneBotGroupId(params.group_id),
+            targetId: String(params.user_id ?? ''),
+            durationSeconds: Number(params.duration ?? 0),
+          })
         }
         if (action === 'set_group_special_title') {
+          return this.control.performBotGroupAction(this.selfId, {
+            action: 'set-title',
+            groupId: normalizeOneBotGroupId(params.group_id),
+            targetId: String(params.user_id ?? ''),
+            title: typeof params.special_title === 'string' ? params.special_title : '',
+          })
+        }
+        if (action === 'get_group_shut_list') {
           const groupId = normalizeOneBotGroupId(params.group_id)
-          const actor = await this.getGuildMember(groupId, this.selfId)
-          if (actor.roles?.[0]?.id !== 'owner') throw new Error('只有群主可以设置专属头衔')
-          await this.getGuildMember(groupId, String(params.user_id ?? ''))
-          return { status: 'ok', retcode: 0, data: null }
+          await this.getGuild(groupId)
+          const group = this.control.getSnapshot().groups.find(({ id }) => id === groupId)!
+          return {
+            status: 'ok',
+            retcode: 0,
+            data: group.members.filter((member) => isSandboxGroupMemberMuted(member)).map((member) => ({
+              group_id: Number(groupId),
+              user_id: Number(member.participantId),
+              nickname: this.control.getSnapshot().participants.find(({ id }) => id === member.participantId)?.name ?? member.participantId,
+              card: member.card ?? '',
+              role: member.role,
+              shut_up_timestamp: getGroupMemberMuteTimestamp(member),
+            })),
+          }
         }
         if (action === 'set_msg_emoji_like') {
-          this.findVisibleMessage(String(params.message_id ?? ''))
+          const message = this.findVisibleMessage(String(params.message_id ?? ''))
+          this.control.setMessageReaction({
+            operatorId: this.selfId,
+            messageId: message.id,
+            emojiId: String(params.emoji_id ?? ''),
+            enabled: params.set !== false,
+          })
           return { status: 'ok', retcode: 0, data: null }
         }
         if (action === 'send_forward_msg') {
@@ -413,6 +443,15 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     }
     const internal: SandboxBot.Internal = {
       _request: request,
+      // Koishi 的 OneBot 适配器提供 camelCase 便捷方法；不显式声明时会被下方 Proxy
+      // 当作原始 action 名转发，导致 getGroupInfo 这类调用报「不支持的 action」。
+      getGroupInfo: async (groupId, noCache = false) => {
+        const result = await request('get_group_info', {
+          group_id: normalizeOneBotGroupId(groupId),
+          no_cache: noCache,
+        }) as { data?: unknown }
+        return result.data
+      },
       getGroupMemberList: async (groupId) => {
         const result = await request('get_group_member_list', {
           group_id: normalizeOneBotGroupId(groupId),
@@ -705,12 +744,17 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
 
   private toOneBotGuildMember(groupId: string, member: Universal.GuildMember) {
     const role = member.roles?.[0]?.id ?? 'member'
+    const userId = member.user?.id ?? ''
+    const groupMember = this.control.getSnapshot().groups.find(({ id }) => id === groupId)
+      ?.members.find(({ participantId }) => participantId === userId)
     return {
       group_id: Number(groupId),
-      user_id: Number(member.user?.id ?? 0),
-      nickname: member.user?.name ?? member.user?.id ?? '',
+      user_id: Number(userId || 0),
+      nickname: member.user?.name ?? userId,
       card: member.nick ?? '',
       role,
+      title: groupMember?.title ?? '',
+      shut_up_timestamp: groupMember ? getGroupMemberMuteTimestamp(groupMember) : 0,
     }
   }
 
@@ -801,7 +845,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
       sender: {
         user_id: Number(message.authorId),
         nickname: participant?.name ?? this.user?.name ?? message.authorId,
-        ...(groupMember ? { card: groupMember.card ?? '', role: groupMember.role } : {}),
+        ...(groupMember ? { card: groupMember.card ?? '', role: groupMember.role, title: groupMember.title ?? '' } : {}),
       },
       user_id: Number(conversation?.type === 'group' ? message.authorId : directPeerId ?? message.authorId),
       group_id: conversation?.groupId ? Number(conversation.groupId) : undefined,

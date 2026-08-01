@@ -290,4 +290,158 @@ describe('SandboxMcpService', () => {
       },
     })
   })
+
+  it('update-bot 只更新显式提供的字段', async () => {
+    const { service, credential, testSpaces } = createService(['read', 'manage'], true)
+    const created = await service.callTool(credential.token, 'create_test_space', {
+      idempotencyKey: 'space-update-bot-1',
+    }) as { spaceId: string; revision: number }
+    await service.callTool(credential.token, 'apply_environment_changes', {
+      spaceId: created.spaceId,
+      expectedRevision: created.revision,
+      changes: [{
+        action: 'create-bot',
+        data: { id: '21001', name: '被测机器人', implementation: 'llbot', enabled: false, avatar: 'https://example.com/a.png', disabledCapabilities: ['set_qq_profile'] },
+      }],
+    })
+    const control = testSpaces.getControl(created.spaceId)
+
+    await service.callTool(credential.token, 'apply_environment_changes', {
+      spaceId: created.spaceId,
+      expectedRevision: control.getSnapshot().revision,
+      changes: [{ action: 'update-bot', data: { id: '21001', name: 'koishi' } }],
+    })
+    expect(control.getSnapshot().participants[0]).toEqual({
+      kind: 'bot',
+      id: '21001',
+      name: 'koishi',
+      implementation: 'llbot',
+      enabled: false,
+      avatar: 'https://example.com/a.png',
+      disabledCapabilities: ['set_qq_profile'],
+    })
+
+    await service.callTool(credential.token, 'apply_environment_changes', {
+      spaceId: created.spaceId,
+      expectedRevision: control.getSnapshot().revision,
+      changes: [{ action: 'update-bot', data: { id: '21001', implementation: 'napcat', enabled: true } }],
+    })
+    expect(control.getSnapshot().participants[0]).toMatchObject({ name: 'koishi', implementation: 'napcat', enabled: true })
+
+    await expect(service.callTool(credential.token, 'apply_environment_changes', {
+      spaceId: created.spaceId,
+      expectedRevision: control.getSnapshot().revision,
+      changes: [{ action: 'update-bot', data: { id: '21001', implementation: 'gocq' } }],
+    })).rejects.toMatchObject({ code: 'invalid_arguments' })
+  })
+
+  it('环境变更 schema 按 action 判别并声明各自必填字段', () => {
+    const { service, credential } = createService(['manage'], true)
+    const schema = service.listTools(credential.token)
+      .find(({ name }) => name === 'apply_environment_changes')!.inputSchema as {
+        properties: { changes: { items: { oneOf: Array<{ title: string; properties: Record<string, unknown>; required: string[] }> } } }
+      }
+    const variants = schema.properties.changes.items.oneOf
+
+    expect(variants.map(({ title }) => title)).toEqual([
+      'create-user', 'update-user', 'create-bot', 'update-bot',
+      'set-capabilities', 'create-group', 'update-group', 'set-friendship',
+    ])
+    expect(variants.every(({ required }) => required.includes('action') && required.includes('data'))).toBe(true)
+    const updateBot = variants.find(({ title }) => title === 'update-bot')!
+    expect(updateBot.properties.action).toEqual({ const: 'update-bot' })
+    expect(updateBot.properties.data).toMatchObject({ required: ['id'] })
+    expect(variants.find(({ title }) => title === 'create-bot')!.properties.data).toMatchObject({ required: ['id', 'name'] })
+  })
+
+  it('静默期等待收集完整回复序列并返回最终消息', async () => {
+    const { app, service, credential, testSpaces } = createService(['read', 'interact', 'manage'], true)
+    app.middleware(async (session, next) => {
+      if (session.userId !== '11001') return next()
+      await session.send('稍等，正在处理')
+      setTimeout(() => { void session.send('最终结果') }, 30)
+    })
+    await app.start()
+    const created = await service.callTool(credential.token, 'create_test_space', {
+      idempotencyKey: 'space-settle-1',
+    }) as { spaceId: string }
+    const control = testSpaces.getControl(created.spaceId)
+    control.createUser({ id: '11001', name: '测试成员' })
+    control.createBot({ id: '21001', name: '测试机器人', implementation: 'napcat', enabled: true })
+    const cursor = service.currentCursor()
+
+    await service.callTool(credential.token, 'send_message', {
+      spaceId: created.spaceId,
+      operatorId: '11001',
+      conversationId: 'private:11001:21001',
+      content: '触发多段回复',
+      idempotencyKey: 'space-settle-send-1',
+    })
+
+    const settled = await service.callTool(credential.token, 'wait_for_message', {
+      spaceId: created.spaceId,
+      cursor,
+      conversationId: 'private:11001:21001',
+      authorId: '21001',
+      settleSeconds: 1,
+      timeoutSeconds: 5,
+    }) as { matched: boolean; event: { data: { content: string } }; events: Array<{ data: { content: string } }> }
+
+    expect(settled.matched).toBe(true)
+    expect(settled.events.map(({ data }) => data.content)).toEqual(['稍等，正在处理', '最终结果'])
+    expect(settled.event.data.content).toBe('最终结果')
+  })
+
+  it('等待插件真实发起的 OneBot action 并按结果过滤', async () => {
+    const { app, service, credential, testSpaces } = createService(['read', 'interact', 'manage', 'debug'], true)
+    app.middleware(async (session, next) => {
+      if (session.userId !== '11001') return next()
+      // 机器人是普通成员，踢人必定失败：验证等待工具能拿到真实失败结果，
+      // 而不是只看机器人回复的自述文本。
+      await session.bot.internal._request('set_group_kick', { group_id: 31001, user_id: 11002 }).catch(() => {})
+    })
+    await app.start()
+    const created = await service.callTool(credential.token, 'create_test_space', {
+      idempotencyKey: 'space-action-1',
+    }) as { spaceId: string }
+    const control = testSpaces.getControl(created.spaceId)
+    control.createUser({ id: '11001', name: '测试成员' })
+    control.createUser({ id: '11002', name: '目标成员' })
+    control.createBot({ id: '21001', name: '测试机器人', implementation: 'napcat', enabled: true })
+    control.createGroup({ id: '31001', name: '权限群', members: [
+      { participantId: '11001', role: 'owner' },
+      { participantId: '11002', role: 'admin' },
+      { participantId: '21001', role: 'member' },
+    ] })
+    const cursor = service.currentCursor()
+
+    await service.callTool(credential.token, 'send_message', {
+      spaceId: created.spaceId,
+      operatorId: '11001',
+      conversationId: 'group:31001',
+      content: '踢掉他',
+      idempotencyKey: 'space-action-send-1',
+    })
+
+    await expect(service.callTool(credential.token, 'wait_for_onebot_action', {
+      spaceId: created.spaceId,
+      cursor,
+      botId: '21001',
+      action: 'set_group_kick',
+      timeoutSeconds: 5,
+    })).resolves.toMatchObject({
+      matched: true,
+      event: {
+        type: 'onebot.action',
+        data: { botId: '21001', type: 'set_group_kick', status: 'error' },
+      },
+    })
+    await expect(service.callTool(credential.token, 'wait_for_onebot_action', {
+      spaceId: created.spaceId,
+      cursor,
+      action: 'set_group_kick',
+      status: 'success',
+      timeoutSeconds: 1,
+    })).resolves.toMatchObject({ matched: false, reason: 'timeout' })
+  })
 })

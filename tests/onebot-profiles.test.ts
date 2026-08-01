@@ -59,6 +59,11 @@ describe('OneBot 实现配置', () => {
       expect.objectContaining({ id: 'group.notice.delete', action: '_delete_group_notice', handler: 'delete_group_notice', supported: true }),
       expect.objectContaining({ id: 'group.member.kick-batch', action: 'batch_delete_group_member', handler: 'batch_kick_group_members', supported: true }),
     ]))
+    for (const baseline of [napcat, llbot]) {
+      expect(baseline.capabilities).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: 'group.member.shut-list', action: 'get_group_shut_list', aliases: ['getGroupShutList'], supported: true }),
+      ]))
+    }
     expect(napcat.capabilities.filter(({ supported }) => supported).map(({ action }) => action))
       .not.toEqual(llbot.capabilities.filter(({ supported }) => supported).map(({ action }) => action))
   })
@@ -93,6 +98,28 @@ describe('OneBot 实现配置', () => {
     expect(updatedGroup.announcements).toHaveLength(0)
     expect(updatedGroup.members.map(({ participantId }) => participantId)).not.toContain('10004')
     expect(updatedGroup.members.map(({ participantId }) => participantId)).not.toContain('10005')
+  })
+
+  it('两种实现都提供群禁言列表和 camelCase 群资料查询', async () => {
+    const control = await createControl()
+    control.createBot({ id: '20002', name: 'LLBot 机器人', implementation: 'llbot', enabled: true })
+    const group = control.getSnapshot().groups[0]
+    control.updateGroup({
+      id: group.id,
+      name: group.name,
+      members: group.members.map((member) => member.participantId === '20001'
+        ? { ...member, role: 'owner' as const }
+        : member.participantId === '10001' ? { ...member, role: 'member' as const } : member)
+        .concat({ participantId: '20002', role: 'admin' }),
+    })
+
+    await control.bot.internal._request('set_group_ban', { group_id: 30001, user_id: 10003, duration: 300 })
+    for (const botId of ['20001', '20002']) {
+      await expect(control.getRuntimeBot(botId).internal._request('get_group_shut_list', { group_id: '30001' }))
+        .resolves.toMatchObject({ status: 'ok', data: [expect.objectContaining({ user_id: 10003 })] })
+      await expect(control.getRuntimeBot(botId).internal.getGroupInfo('30001'))
+        .resolves.toMatchObject({ group_id: 30001 })
+    }
   })
 
   it('提供 WebQQ 使用的好友分组，并只为 NapCat 提供最近会话', async () => {

@@ -54,7 +54,10 @@
               <article class="webqq-group-member">
                 <WebqqAvatar class="webqq-menu-avatar" :kind="getParticipant(member.participantId).isBot ? 'bot' : 'user'" :name="getGroupMemberName(member)" :avatar="getParticipant(member.participantId).avatar" />
                 <span><strong>{{ getGroupMemberName(member) }}</strong><small>{{ member.participantId }}</small></span>
-                <em>{{ getGroupRoleLabel(member.role) }}</em>
+                <span class="webqq-group-member-badges">
+                  <em v-if="member.title" class="is-title">{{ member.title }}</em>
+                  <em>{{ getGroupRoleLabel(member.role) }}</em>
+                </span>
               </article>
             </ContextMenuTrigger>
             <GroupMemberMenu
@@ -63,6 +66,7 @@
               @mention="emit('mentionGroupMember', member.participantId)"
               @poke="emit('pokeGroupMember', member.participantId)"
               @set-card="emit('setGroupCard', member.participantId)"
+              @set-title="emit('setGroupTitle', member.participantId)"
               @set-admin="emit('setGroupAdmin', member.participantId, $event)"
               @transfer-owner="emit('transferGroupOwner', member.participantId)"
               @kick="emit('kickGroupMember', member.participantId)"
@@ -127,6 +131,7 @@ const emit = defineEmits<{
   mentionGroupMember: [targetId: string]
   pokeGroupMember: [targetId: string]
   setGroupCard: [targetId: string]
+  setGroupTitle: [targetId: string]
   setGroupAdmin: [targetId: string, enabled: boolean]
   transferGroupOwner: [targetId: string]
   kickGroupMember: [targetId: string]

@@ -41,6 +41,7 @@
                       @mention="emit('mentionGroupMember', message.authorId)"
                       @poke="emit('pokeGroupMember', message.authorId)"
                       @set-card="emit('setGroupCard', message.authorId)"
+                      @set-title="emit('setGroupTitle', message.authorId)"
                       @set-admin="emit('setGroupAdmin', message.authorId, $event)"
                       @transfer-owner="emit('transferGroupOwner', message.authorId)"
                       @kick="emit('kickGroupMember', message.authorId)"
@@ -215,7 +216,7 @@ import { IconArrowBackUp, IconBell, IconClock, IconHandClick, IconMessageReply, 
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from './components/ui/context-menu'
 import { getFriendMenuActions, type FriendMenuState } from './webqq/friend-menu'
-import { getGroupMemberDisplayName, getGroupRoleBadge } from './webqq/group-display'
+import { getGroupAuthorityBadge, getGroupMemberDisplayName } from './webqq/group-display'
 import GroupMemberMenu from './group-member-menu.vue'
 import { getMessageClusterClass, isMergedMessage } from './webqq/message-cluster'
 import { formatMentionContent } from './webqq/mention'
@@ -258,6 +259,7 @@ const emit = defineEmits<{
   mentionGroupMember: [targetId: string]
   pokeGroupMember: [targetId: string]
   setGroupCard: [targetId: string]
+  setGroupTitle: [targetId: string]
   setGroupAdmin: [targetId: string, enabled: boolean]
   transferGroupOwner: [targetId: string]
   kickGroupMember: [targetId: string]
@@ -341,8 +343,7 @@ function getMessageAuthorName(participantId: string) {
 }
 
 function getMessageRoleBadge(participantId: string) {
-  const member = getCurrentGroupMember(participantId)
-  return member ? getGroupRoleBadge(member.role) : undefined
+  return getGroupAuthorityBadge(getCurrentGroupMember(participantId))
 }
 
 function formatMessageTime(createdAt: string) {

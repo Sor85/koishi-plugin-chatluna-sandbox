@@ -105,4 +105,25 @@ describe('WebQQ 消息列表', () => {
     expect(styles).toContain('.webqq-role-badge.is-admin')
     expect(styles).not.toContain('data-chat-style')
   })
+
+  it('专属头衔复用群身份徽标位置并提供设置入口', () => {
+    const source = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
+    const styles = readFileSync(resolve('client/styles/webqq-messages.css'), 'utf8')
+    const menuSource = readFileSync(resolve('client/group-member-menu.vue'), 'utf8')
+    const detailsSource = readFileSync(resolve('client/webqq-details-panel.vue'), 'utf8')
+    const overlaySource = readFileSync(resolve('client/workspace-overlay-host.vue'), 'utf8')
+    const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
+
+    expect(source).toContain('getGroupAuthorityBadge')
+    expect(source).toContain("emit('setGroupTitle', message.authorId)")
+    // 头衔沿用同一个徽标槽位，不新增第二个徽标元素。
+    expect(source).toContain('class="webqq-role-badge"')
+    expect(styles).toContain('.webqq-role-badge.is-title')
+    expect(menuSource).toContain("actions.includes('set-title')")
+    expect(menuSource).toContain('设置专属头衔')
+    expect(detailsSource).toContain('class="webqq-group-member-badges"')
+    expect(detailsSource).toContain('<em v-if="member.title" class="is-title">')
+    expect(overlaySource).toContain("title: { title: '设置专属头衔'")
+    expect(pageSource).toContain("@set-group-title=\"openGroupActionDialog('title', $event)\"")
+  })
 })

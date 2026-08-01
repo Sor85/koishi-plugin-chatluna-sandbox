@@ -253,6 +253,13 @@
   line-height: 16px;
 }
 
+.webqq-group-member-badges {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+
 .webqq-group-member em {
   padding: 1px 5px;
   border-radius: 5px;
@@ -261,6 +268,15 @@
   font-size: 11px;
   font-style: normal;
   line-height: 16px;
+}
+
+.webqq-group-member em.is-title {
+  max-width: 96px;
+  overflow: hidden;
+  color: #0b7fab;
+  background: rgb(18 183 245 / 10%);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .webqq-group-empty {

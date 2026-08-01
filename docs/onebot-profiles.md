@@ -24,6 +24,7 @@ NapCat 与 LLBot 都提供 `send_poke`、`friend_poke` 和 `group_poke`。沙盒
 | 获取私聊历史 | `get_friend_msg_history` | `get_friend_msg_history` |
 | 获取群聊历史 | `get_group_msg_history` | `get_group_msg_history` |
 | 获取好友分组 | `get_friends_with_category` | `get_friends_with_category` |
+| 获取群禁言列表 | `get_group_shut_list` | `get_group_shut_list` |
 | 获取最近会话 | `get_recent_contact` | 不提供此 action |
 | 删除群公告 | `_del_group_notice` | `_delete_group_notice` |
 | 批量踢出群成员 | `set_group_kick_members`，参数 `user_id` | `batch_delete_group_member`，参数 `user_ids` |
@@ -40,3 +41,13 @@ NapCat 与 LLBot 都提供 `send_poke`、`friend_poke` 和 `group_poke`。沙盒
 OneBot 协议层统一向插件返回数字 `message_id`：消息事件、`send_*` action、`get_msg`、消息历史和 `reply` 段使用同一 sequence。接收 MessageId 的 action 同时接受数字 sequence 和沙盒领域消息 ID，便于调试与内部控制；`SandboxMessage.id`、Koishi Session `messageId`、WebQQ 和 MCP 仍使用沙盒领域消息 ID，不额外保存重复序号字段。
 
 机器人出站图片会在写入逻辑会话前转换为沙盒受控媒体。当前支持 data URI、`base64://`、机器人可见的 `sandbox-media://` 引用以及 HTTP/HTTPS 地址；远程媒体下载受 10 秒超时、10 MB 大小限制和媒体 MIME 白名单约束。`sticker` 按图片处理，本地文件路径仍不会被沙盒读取。
+
+## 有状态 action 与可观测结果
+
+声明为支持的有状态 action 必须把结果写入沙盒场景，插件和外部测试控制器可以从领域状态复查执行结果，而不是只能相信 action 返回了 `status: ok`：
+
+- `set_group_special_title` 写入群成员专属头衔，`get_group_member_info`、`get_group_member_list` 与群消息事件的 `sender.title` 返回同一份头衔；与真实 QQ 一致只有群主可以授予，传空字符串表示清除。
+- `set_group_ban` 写入群成员禁言到期时间，`get_group_shut_list` 返回当前仍在禁言中的成员，`get_group_member_info` 的 `shut_up_timestamp` 返回秒级到期时间戳；`duration` 为 0 表示解除禁言，禁言时长上限为 30 天。
+- `set_msg_emoji_like` 按 emoji 聚合表情回应参与者并写入消息，`set` 为 `false` 时移除当前机器人的回应。
+
+Koishi 的 OneBot 适配器同时提供 camelCase 便捷方法，沙盒显式实现 `getGroupInfo`、`getGroupMemberInfo` 和 `getGroupMemberList`，避免它们被当作原始 action 名转发而报「不支持的 action」。未显式声明的名称仍按原始 action 解析，不会伪造成功。

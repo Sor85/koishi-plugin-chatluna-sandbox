@@ -30,14 +30,12 @@
   <Dialog v-model:open="groupActionOpen">
     <DialogContent :style="{ '--webqq-accent': accentColor }">
       <DialogHeader>
-        <DialogTitle>{{ groupActionMode === 'name' ? '修改群名称' : '修改群名片' }}</DialogTitle>
-        <DialogDescription>
-          {{ groupActionMode === 'name' ? '新的群名称会对所有群成员和机器人可见。' : '留空可以清除当前群名片。' }}
-        </DialogDescription>
+        <DialogTitle>{{ groupActionCopy.title }}</DialogTitle>
+        <DialogDescription>{{ groupActionCopy.description }}</DialogDescription>
       </DialogHeader>
       <Input
         v-model="groupActionInput"
-        :placeholder="groupActionMode === 'name' ? '输入群名称' : '输入群名片'"
+        :placeholder="groupActionCopy.placeholder"
         @keydown.enter="submitGroupAction"
       />
       <DialogFooter>
@@ -49,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Button } from './components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './components/ui/dialog'
 import { Input } from './components/ui/input'
@@ -63,7 +61,13 @@ import type {
 
 type EntityType = 'user' | 'bot' | 'group'
 type EntityMode = 'edit' | 'delete'
-type GroupActionMode = 'card' | 'name'
+type GroupActionMode = 'card' | 'name' | 'title'
+
+const GROUP_ACTION_COPY: Record<GroupActionMode, { title: string, description: string, placeholder: string }> = {
+  card: { title: '修改群名片', description: '留空可以清除当前群名片。', placeholder: '输入群名片' },
+  name: { title: '修改群名称', description: '新的群名称会对所有群成员和机器人可见。', placeholder: '输入群名称' },
+  title: { title: '设置专属头衔', description: '专属头衔只能由群主授予，留空可以清除当前头衔。', placeholder: '输入专属头衔' },
+}
 type Resolve = () => void
 type Reject = (error: unknown) => void
 
@@ -90,6 +94,7 @@ const groupActionMode = ref<GroupActionMode>('card')
 const groupActionTargetId = ref('')
 const groupActionGroupId = ref('')
 const groupActionInput = ref('')
+const groupActionCopy = computed(() => GROUP_ACTION_COPY[groupActionMode.value])
 
 function openEntity(mode: EntityMode, target: { type: EntityType, id: string }) {
   entityMode.value = mode

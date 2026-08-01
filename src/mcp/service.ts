@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { SandboxControlService } from '../control-service'
 import type { SandboxTestSpaceService } from '../test-spaces'
-import type { SandboxMedia, SandboxSnapshot } from '../types'
+import type { SandboxMedia, SandboxImplementationProfile, SandboxSnapshot } from '../types'
 import { createDirectConversationId, createGroupConversationId } from '../types'
 import { getOneBotCapabilityMatrix } from '../onebot-profiles'
 import { SandboxMcpError, type SandboxMcpCallRecord, type SandboxMcpCreatedCredential, type SandboxMcpCredential, type SandboxMcpEvent, type SandboxMcpEventCursor, type SandboxMcpExport, type SandboxMcpScope } from './types'
@@ -29,6 +29,13 @@ interface ToolDefinition {
   inputSchema: Record<string, unknown>
 }
 
+interface SandboxMcpWaitResult {
+  matched: boolean
+  reason?: string
+  event?: SandboxMcpEvent
+  cursor: SandboxMcpEventCursor
+}
+
 // —— 工具参数 JSON Schema ——
 // MCP 客户端只能从 tools/list 的 inputSchema 学习参数契约（实际校验在 executeTool
 // 内部完成），因此这里的 schema 是给 AI 消费者的文档，必须与实现保持一致。
@@ -43,6 +50,140 @@ const CURSOR = {
 }
 const TIMEOUT_SECONDS = { type: 'number', minimum: 1, maximum: 120, description: '等待超时秒数，默认 30' }
 const OPERATOR_ID = { type: 'string', description: '操作者参与者 ID（十进制数字字符串）' }
+const PARTICIPANT_ID = { type: 'string', description: '参与者 ID（十进制数字字符串）' }
+const IMPLEMENTATION = { type: 'string', enum: ['napcat', 'llbot'] }
+const GROUP_MEMBERS = {
+  type: 'array',
+  description: '完整成员列表，必须且只能包含一个 owner',
+  items: {
+    type: 'object',
+    properties: {
+      participantId: PARTICIPANT_ID,
+      role: { type: 'string', enum: ['owner', 'admin', 'member'] },
+      card: { type: 'string', description: '群名片' },
+      title: { type: 'string', description: '专属头衔' },
+    },
+    required: ['participantId', 'role'],
+  },
+}
+
+// 判别联合：每种环境变更各自声明必填字段，MCP 客户端不必从一段散文描述里猜参数。
+const ENVIRONMENT_CHANGE_SCHEMAS = [
+  {
+    title: 'create-user',
+    description: '创建普通用户',
+    properties: {
+      action: { const: 'create-user' },
+      data: {
+        type: 'object',
+        properties: { id: PARTICIPANT_ID, name: { type: 'string' }, avatar: { type: 'string' } },
+        required: ['id', 'name'],
+      },
+    },
+  },
+  {
+    title: 'update-user',
+    description: '整体替换用户资料；省略 avatar 表示清除头像',
+    properties: {
+      action: { const: 'update-user' },
+      data: {
+        type: 'object',
+        properties: { id: PARTICIPANT_ID, name: { type: 'string' }, avatar: { type: 'string' } },
+        required: ['id', 'name'],
+      },
+    },
+  },
+  {
+    title: 'create-bot',
+    description: '创建虚拟 OneBot 机器人；机器人 ID 不得与其他活动场景冲突（主场景默认机器人为 20001）',
+    properties: {
+      action: { const: 'create-bot' },
+      data: {
+        type: 'object',
+        properties: {
+          id: PARTICIPANT_ID,
+          name: { type: 'string' },
+          implementation: { ...IMPLEMENTATION, description: '协议实现，默认 napcat' },
+          enabled: { type: 'boolean', description: '默认 true' },
+          avatar: { type: 'string' },
+          disabledCapabilities: { type: 'array', items: { type: 'string' }, description: '禁用的能力 ID' },
+        },
+        required: ['id', 'name'],
+      },
+    },
+  },
+  {
+    title: 'update-bot',
+    description: '局部更新机器人资料；只有显式提供的字段会被修改，省略 implementation 不会改变协议实现',
+    properties: {
+      action: { const: 'update-bot' },
+      data: {
+        type: 'object',
+        properties: {
+          id: PARTICIPANT_ID,
+          name: { type: 'string' },
+          implementation: IMPLEMENTATION,
+          enabled: { type: 'boolean' },
+          avatar: { type: 'string' },
+          disabledCapabilities: { type: 'array', items: { type: 'string' } },
+        },
+        required: ['id'],
+      },
+    },
+  },
+  {
+    title: 'set-capabilities',
+    description: '整体替换机器人的能力禁用列表，不修改其他机器人资料',
+    properties: {
+      action: { const: 'set-capabilities' },
+      data: {
+        type: 'object',
+        properties: { id: PARTICIPANT_ID, disabledCapabilities: { type: 'array', items: { type: 'string' } } },
+        required: ['id'],
+      },
+    },
+  },
+  {
+    title: 'create-group',
+    description: '创建群组并自动建立群会话',
+    properties: {
+      action: { const: 'create-group' },
+      data: {
+        type: 'object',
+        properties: { id: PARTICIPANT_ID, name: { type: 'string' }, members: GROUP_MEMBERS },
+        required: ['id', 'name'],
+      },
+    },
+  },
+  {
+    title: 'update-group',
+    description: '更新群名称；提供 members 时整体替换成员列表',
+    properties: {
+      action: { const: 'update-group' },
+      data: {
+        type: 'object',
+        properties: { id: PARTICIPANT_ID, name: { type: 'string' }, members: GROUP_MEMBERS },
+        required: ['id', 'name'],
+      },
+    },
+  },
+  {
+    title: 'set-friendship',
+    description: '建立或解除好友关系；建立时自动创建私聊会话',
+    properties: {
+      action: { const: 'set-friendship' },
+      data: {
+        type: 'object',
+        properties: {
+          firstId: PARTICIPANT_ID,
+          secondId: PARTICIPANT_ID,
+          enabled: { type: 'boolean', description: '默认 true；false 表示解除好友关系' },
+        },
+        required: ['firstId', 'secondId'],
+      },
+    },
+  },
+].map((schema) => ({ type: 'object', ...schema, required: ['action', 'data'] }))
 
 const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
   get_server_info: { type: 'object', properties: {} },
@@ -125,7 +266,7 @@ const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
     properties: {
       spaceId: SPACE_REQUIRED,
       operatorId: OPERATOR_ID,
-      action: { type: 'string', enum: ['request-join', 'invite', 'handle-request', 'leave', 'kick', 'set-admin', 'transfer-owner', 'set-card', 'set-name', 'poke'] },
+      action: { type: 'string', enum: ['request-join', 'invite', 'handle-request', 'leave', 'kick', 'set-admin', 'transfer-owner', 'set-card', 'set-title', 'set-name', 'poke'] },
       groupId: { type: 'string' },
       targetId: { type: 'string' },
       requestId: { type: 'string', description: 'handle-request 的申请 ID' },
@@ -133,6 +274,7 @@ const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
       comment: { type: 'string' },
       enabled: { type: 'boolean', description: 'set-admin 是否授予' },
       card: { type: 'string', description: 'set-card 的群名片' },
+      title: { type: 'string', description: 'set-title 的专属头衔，仅群主可设置；传空字符串清除' },
       name: { type: 'string', description: 'set-name 的群名' },
       conversationId: { type: 'string' },
       idempotencyKey: IDEMPOTENCY_KEY,
@@ -162,12 +304,32 @@ const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
   },
   wait_for_message: {
     type: 'object',
+    description: '等待消息事件；机器人常先回一条中间消息再给最终结果，需要最终回复时传 settleSeconds。',
     properties: {
       spaceId: SPACE_REQUIRED,
       cursor: CURSOR,
       conversationId: { type: 'string' },
       authorId: { type: 'string', description: '按消息作者过滤；等待机器人回复时传机器人 ID' },
       recipientBotId: { type: 'string', description: '按投递目标机器人过滤（仅 send_message 的投递事件携带）' },
+      settleSeconds: {
+        type: 'number',
+        minimum: 1,
+        maximum: 30,
+        description: '静默期秒数；匹配到消息后继续收集同条件消息，直到静默期内不再出现新消息。返回 event 为最后一条，events 为完整序列。省略则匹配到第一条即返回',
+      },
+      timeoutSeconds: TIMEOUT_SECONDS,
+    },
+    required: ['spaceId', 'cursor'],
+  },
+  wait_for_onebot_action: {
+    type: 'object',
+    description: '等待被测插件真实发起的 OneBot action 调用记录，用于断言某条消息是否触发了预期 action 及其成败。',
+    properties: {
+      spaceId: SPACE_REQUIRED,
+      cursor: CURSOR,
+      botId: { type: 'string', description: '按发起机器人过滤' },
+      action: { type: 'string', description: '按请求 action 名或解析后的处理器名过滤，如 set_group_kick' },
+      status: { type: 'string', enum: ['success', 'error'], description: '按调用结果过滤' },
       timeoutSeconds: TIMEOUT_SECONDS,
     },
     required: ['spaceId', 'cursor'],
@@ -192,14 +354,8 @@ const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
       expectedRevision: { type: 'number', description: '当前场景 revision（从 get_scene_snapshot 获取）；不一致时拒绝' },
       changes: {
         type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            action: { type: 'string', enum: ['create-user', 'create-bot', 'create-group', 'update-user', 'update-bot', 'set-capabilities', 'update-group', 'set-friendship'] },
-            data: { type: 'object', description: 'create-user/update-user: {id,name,avatar?}；create-bot/update-bot: {id,name,implementation?,enabled?}；create-group/update-group: {id,name,members?:[{participantId,role,card?}]}；set-friendship: {firstId,secondId,enabled?}；set-capabilities: {id,disabledCapabilities?}。参与者 ID 必须是十进制数字字符串，且机器人 ID 不得与其他活动场景冲突（主场景默认机器人为 20001）' },
-          },
-          required: ['action', 'data'],
-        },
+        description: '按顺序原子应用的环境变更；任一项失败则整体不生效',
+        items: { oneOf: ENVIRONMENT_CHANGE_SCHEMAS },
       },
     },
     required: ['spaceId', 'expectedRevision', 'changes'],
@@ -280,8 +436,9 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   ['perform_group_action', 'interact', '执行入群、邀请、退群、管理或戳一戳'],
   ['handle_request', 'interact', '处理普通用户有权审批的申请'],
   ['wait_for_event', 'interact', '从事件游标等待匹配事件'],
-  ['wait_for_message', 'interact', '从事件游标等待消息'],
+  ['wait_for_message', 'interact', '从事件游标等待消息，可按静默期等待最终回复'],
   ['wait_for_chatluna_state', 'interact', '从事件游标等待 ChatLuna 状态'],
+  ['wait_for_onebot_action', 'debug', '从事件游标等待插件发起的 OneBot action 调用'],
   ['apply_environment_changes', 'manage', '原子应用测试环境变更'],
   ['create_test_space', 'manage', '创建空白且隔离的 AI 测试空间'],
   ['complete_test_space', 'manage', '将 AI 测试空间标记为已完成并停止机器人'],
@@ -326,6 +483,18 @@ function requireString(value: unknown, name: string): string {
 function asRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new SandboxMcpError('invalid_arguments', '工具参数必须是对象')
   return value as Record<string, unknown>
+}
+
+function requireImplementation(value: unknown): SandboxImplementationProfile {
+  // 非法值必须显式失败：静默回落到 napcat 会让测试控制器以为自己在测另一个协议。
+  if (value === 'napcat' || value === 'llbot') return value
+  throw new SandboxMcpError('invalid_arguments', `implementation 必须是 napcat 或 llbot：${String(value)}`)
+}
+
+function requireCapabilityList(value: unknown): string[] | undefined {
+  if (value === undefined) return undefined
+  if (!Array.isArray(value)) throw new SandboxMcpError('invalid_arguments', 'disabledCapabilities 必须是字符串数组')
+  return value.map(String)
 }
 
 export class SandboxMcpService {
@@ -384,6 +553,9 @@ export class SandboxMcpService {
         this.appendEvent('message.created', message, spaceId)
       }
     })
+    // OneBot 调试记录并入事件流，wait_for_onebot_action 才能等待插件真实发起的调用，
+    // 而不必轮询 list_onebot_debug_records。
+    control.onOneBotDebugRecord((record) => this.appendEvent(`onebot.${record.direction}`, record, spaceId))
   }
 
   createCredential(name: string, scopes: SandboxMcpScope[] = ['read']): SandboxMcpCreatedCredential {
@@ -479,6 +651,14 @@ export class SandboxMcpService {
           { tool: 'send_message', arguments: { spaceId: '<spaceId>', operatorId: '10001', conversationId: 'private:10001:20002', content: 'chatluna.chat 你好', idempotencyKey: 'example-chatluna-1' } },
         ],
       },
+      等待机器人最终回复: {
+        说明: '机器人常先回一条「稍等」再给最终结果。传 settleSeconds 后会持续收集同条件消息，直到静默期内不再出现新消息；返回的 event 是最后一条，events 是完整序列。',
+        wait_for_message: { spaceId: '<spaceId>', cursor: '<发送前 cursor>', conversationId: 'private:10001:20002', authorId: '20002', settleSeconds: 5, timeoutSeconds: 60 },
+      },
+      断言插件发起的_OneBot_action: {
+        说明: '机器人回复文本可能与实际执行结果不一致；要确认某次交互是否真的调用了 action 及其成败，用发送前 cursor 等待 onebot.action 事件。',
+        wait_for_onebot_action: { spaceId: '<spaceId>', cursor: '<发送前 cursor>', botId: '20002', action: 'set_group_kick', timeoutSeconds: 30 },
+      },
       群聊触发命令: {
         说明: '群聊中触发 Koishi 命令通常需要 at 机器人；content 支持 <at id="参与者ID"/> 元素。',
         send_message: { spaceId: '<spaceId>', operatorId: '10001', conversationId: 'group:30001', content: '<at id="20002"/> help', idempotencyKey: 'example-message-3' },
@@ -549,10 +729,15 @@ export class SandboxMcpService {
     // authorId 过滤是「等待机器人回复」的关键：沙盒 send_message 会等待 middleware
     // 完成才返回，同步命令的回复在返回前已入事件流，消费者只能用「发送前 cursor +
     // authorId=机器人」的组合等待回复，否则会匹配到自己刚发的消息或错过回复。
-    if (tool === 'wait_for_message') return this.waitFor(args, (event) => event.type === 'message.created'
+    if (tool === 'wait_for_message') return this.waitForMessage(args, (event) => event.type === 'message.created'
       && (!args.conversationId || Reflect.get(event.data as object, 'conversationId') === args.conversationId)
       && (!args.authorId || Reflect.get(event.data as object, 'authorId') === args.authorId)
       && (!args.recipientBotId || Reflect.get(event.data as object, 'recipientBotId') === args.recipientBotId))
+    if (tool === 'wait_for_onebot_action') return this.waitFor(args, (event) => event.type === 'onebot.action'
+      && (!args.botId || Reflect.get(event.data as object, 'botId') === args.botId)
+      && (!args.status || Reflect.get(event.data as object, 'status') === args.status)
+      && (!args.action || Reflect.get(event.data as object, 'type') === args.action
+        || Reflect.get(event.data as object, 'resolvedType') === args.action))
     if (tool === 'wait_for_chatluna_state') return this.waitForChatLuna(activeControl, args)
     if (tool === 'apply_environment_changes') return this.applyEnvironmentChanges(activeControl, args)
     if (tool === 'prepare_destructive_action') return this.prepareDestructiveAction(activeControl, credential, args)
@@ -658,8 +843,24 @@ export class SandboxMcpService {
     return this.performGroupAction(control, { operatorId, action: 'handle-request', requestId, approve: args.approve, idempotencyKey: args.idempotencyKey })
   }
 
-  private async waitFor(args: Record<string, unknown>, predicate: (event: SandboxMcpEvent) => boolean) {
-    const cursor = asRecord(args.cursor)
+  // 机器人常先回一条「稍等」再给最终结果。静默期内继续收集同条件消息，
+  // 返回最后一条与完整序列，避免消费者把中间回复当成最终回复。
+  private async waitForMessage(args: Record<string, unknown>, predicate: (event: SandboxMcpEvent) => boolean) {
+    const first = await this.waitFor(args, predicate) as SandboxMcpWaitResult
+    const settleSeconds = Math.min(Math.max(Number(args.settleSeconds ?? 0), 0), 30)
+    if (settleSeconds < 1 || !first.matched || !first.event) return first
+    const events = [first.event]
+    let cursor = first.cursor
+    for (;;) {
+      const next = await this.waitFor({ ...args, cursor, timeoutSeconds: settleSeconds }, predicate) as SandboxMcpWaitResult
+      if (!next.matched || !next.event) break
+      events.push(next.event)
+      cursor = next.cursor
+    }
+    return { matched: true, event: events[events.length - 1], events, cursor }
+  }
+
+  private async waitFor(args: Record<string, unknown>, predicate: (event: SandboxMcpEvent) => boolean) {    const cursor = asRecord(args.cursor)
     if (cursor.epoch !== this.epoch) throw new SandboxMcpError('cursor_expired', '事件游标已过期', false, '请重新读取当前游标。')
     const sequence = Number(cursor.sequence)
     if (this.events.length && sequence < this.events[0].cursor.sequence - 1) throw new SandboxMcpError('cursor_expired', '事件游标已离开缓冲区')
@@ -730,7 +931,7 @@ export class SandboxMcpService {
       const action = requireString(change.action, 'change.action')
       const data = asRecord(change.data)
       if (action === 'create-user') snapshot.participants.push({ kind: 'user', id: requireString(data.id, 'id'), name: requireString(data.name, 'name') })
-      else if (action === 'create-bot') snapshot.participants.push({ kind: 'bot', id: requireString(data.id, 'id'), name: requireString(data.name, 'name'), implementation: data.implementation === 'llbot' ? 'llbot' : 'napcat', enabled: data.enabled !== false })
+      else if (action === 'create-bot') snapshot.participants.push({ kind: 'bot', id: requireString(data.id, 'id'), name: requireString(data.name, 'name'), implementation: data.implementation === undefined ? 'napcat' : requireImplementation(data.implementation), enabled: data.enabled !== false, avatar: typeof data.avatar === 'string' ? data.avatar : undefined, disabledCapabilities: requireCapabilityList(data.disabledCapabilities) })
       else if (action === 'create-group') {
         const groupId = requireString(data.id, 'id')
         snapshot.groups.push({ id: groupId, name: requireString(data.name, 'name'), members: Array.isArray(data.members) ? data.members as never : [], announcements: [] })
@@ -748,11 +949,16 @@ export class SandboxMcpService {
         const participant = snapshot.participants.find(({ id, kind }) => id === data.id && kind === 'bot')
         if (!participant || participant.kind !== 'bot') throw new SandboxMcpError('participant_not_found', `机器人不存在：${String(data.id)}`)
         if (action === 'update-bot') {
-          participant.name = requireString(data.name, 'name')
-          participant.implementation = data.implementation === 'llbot' ? 'llbot' : 'napcat'
-          participant.enabled = data.enabled !== false
+          // 局部补丁语义：只改显式提供的字段。旧实现把省略的 implementation 回落成
+          // napcat，导致「只改昵称」会静默把 LLBot 重置为 NapCat。
+          if (data.name !== undefined) participant.name = requireString(data.name, 'name')
+          if (data.avatar !== undefined) participant.avatar = typeof data.avatar === 'string' ? data.avatar : undefined
+          if (data.implementation !== undefined) participant.implementation = requireImplementation(data.implementation)
+          if (data.enabled !== undefined) participant.enabled = data.enabled !== false
+          if (data.disabledCapabilities !== undefined) participant.disabledCapabilities = requireCapabilityList(data.disabledCapabilities)
+        } else {
+          participant.disabledCapabilities = requireCapabilityList(data.disabledCapabilities)
         }
-        participant.disabledCapabilities = Array.isArray(data.disabledCapabilities) ? data.disabledCapabilities.map(String) : undefined
       } else if (action === 'update-group') {
         const group = snapshot.groups.find(({ id }) => id === data.id)
         if (!group) throw new SandboxMcpError('group_not_found', `群组不存在：${String(data.id)}`)

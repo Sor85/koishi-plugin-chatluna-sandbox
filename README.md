@@ -12,7 +12,9 @@ WebQQ 的毛玻璃、气泡尾部、颜色模式和强调色由 Koishi 插件全
 
 WebQQ 最左侧导航提供测试空间总览：主环境固定在首位，AI 空间按创建时间从旧到新排列。用户可以实时观察空间、接管或归还控制权、复盘已完成空间，以及按需重新激活或删除。数据库持久化模式会同时保存主环境和测试空间场景。
 
-完整权限的 MCP 凭证可发现 32 个工具，其中 7 个用于测试空间生命周期：`list_test_spaces`、`get_test_space`、`create_test_space`、`complete_test_space`、`fail_test_space`、`reactivate_test_space` 和 `delete_test_space`。
+完整权限的 MCP 凭证可发现 33 个工具，其中 7 个用于测试空间生命周期：`list_test_spaces`、`get_test_space`、`create_test_space`、`complete_test_space`、`fail_test_space`、`reactivate_test_space` 和 `delete_test_space`。
+
+断言插件行为时不要只看机器人回复的文本：`wait_for_onebot_action` 可以等待插件真实发起的 OneBot action 及其成败，`wait_for_message` 的 `settleSeconds` 可以跳过「稍等」这类中间回复并拿到最终结果，专属头衔、群禁言和表情回应等有状态 action 的结果都能从场景快照复查。
 
 ## OneBot 基线
 

@@ -11,6 +11,7 @@ import {
   createDirectConversationId,
   createGroupConversationId,
   getDirectConversationPeerId,
+  isSandboxGroupMemberMuted,
   type CreateSandboxBotInput,
   type CreateSandboxGroupInput,
   type CreateSandboxUserInput,
@@ -94,6 +95,8 @@ const SECONDARY_USER_ID = '10002'
 const ADMIN_USER_ID = '10003'
 const DEFAULT_BOT_ID = '20001'
 const DEFAULT_GROUP_ID = '30001'
+// 与真实 QQ 群禁言上限一致，避免插件写入不可能的到期时间。
+const MAX_GROUP_MUTE_SECONDS = 30 * 24 * 60 * 60
 
 export function createEmptyScene(): SandboxSnapshot {
   return { revision: 0, participants: [], groups: [], conversations: [], messages: [], friendships: [], requests: [] }
@@ -176,6 +179,7 @@ export class SandboxControlService {
   private persistence?: SandboxScenePersistence
   private persistenceQueue = Promise.resolve()
   private sceneMutationListeners = new Set<(snapshot: SandboxSnapshot) => void>()
+  private debugRecordListeners = new Set<(record: SandboxOneBotDebugRecord) => void>()
   private contextDisposers: Array<() => void> = []
   private disposePromise?: Promise<void>
 
@@ -219,6 +223,13 @@ export class SandboxControlService {
   onSceneMutation(listener: (snapshot: SandboxSnapshot) => void): () => void {
     this.sceneMutationListeners.add(listener)
     return () => this.sceneMutationListeners.delete(listener)
+  }
+
+  // OneBot 调试记录是外部测试控制器判断「插件是否真的调用了某个 action」的唯一事实来源；
+  // 广播出去后 MCP 才能把它并入事件流，供 wait_for_onebot_action 等待而不必轮询。
+  onOneBotDebugRecord(listener: (record: SandboxOneBotDebugRecord) => void): () => void {
+    this.debugRecordListeners.add(listener)
+    return () => this.debugRecordListeners.delete(listener)
   }
 
   setRuntimeActive(active: boolean): void {
@@ -332,7 +343,9 @@ export class SandboxControlService {
   }
 
   recordOneBotDebug(input: AppendOneBotDebugRecordInput): SandboxOneBotDebugRecord {
-    return this.oneBotDebug.append(input)
+    const record = this.oneBotDebug.append(input)
+    for (const listener of this.debugRecordListeners) listener(record)
+    return record
   }
 
   waitForPersistence(): Promise<void> {
@@ -345,6 +358,7 @@ export class SandboxControlService {
       for (const dispose of this.contextDisposers.splice(0)) dispose()
       this.chatLunaState.dispose()
       this.sceneMutationListeners.clear()
+      this.debugRecordListeners.clear()
       this.runtimeBotsActive = false
       const runtimeDisposal = this.disposeRuntimeBots()
       await this.waitForPersistence()
@@ -721,6 +735,10 @@ export class SandboxControlService {
         await runtime.internal._request('set_group_card', { group_id: input.groupId, user_id: input.targetId, card: input.card })
         return { revision: this.scene.revision }
       }
+      if (input.action === 'set-title') {
+        await runtime.internal._request('set_group_special_title', { group_id: input.groupId, user_id: input.targetId, special_title: input.title })
+        return { revision: this.scene.revision }
+      }
       if (input.action === 'set-name') {
         await runtime.internal._request('set_group_name', { group_id: input.groupId, group_name: input.name })
         return { revision: this.scene.revision }
@@ -845,6 +863,11 @@ export class SandboxControlService {
       return { revision: this.scene.revision }
     }
 
+    if (input.action === 'set-title') {
+      this.setGroupMemberTitle(actor, target, input.title)
+      return { revision: this.scene.revision }
+    }
+
     if (input.action !== 'poke') throw new Error(`不支持的群组操作：${Reflect.get(input, 'action') ?? 'unknown'}`)
     const conversation = input.conversationId
       ? this.getVisibleConversation(input.operatorId, input.conversationId)
@@ -920,6 +943,8 @@ export class SandboxControlService {
   | { action: 'set-admin'; groupId: string; targetId: string; enabled: boolean }
   | { action: 'transfer-owner'; groupId: string; targetId: string }
   | { action: 'set-card'; groupId: string; targetId: string; card: string }
+  | { action: 'set-title'; groupId: string; targetId: string; title: string }
+  | { action: 'set-ban'; groupId: string; targetId: string; durationSeconds: number }
   | { action: 'set-name'; groupId: string; name: string }
   | { action: 'leave'; groupId: string }) {
     const group = this.scene.groups.find(({ id }) => id === input.groupId)
@@ -976,6 +1001,16 @@ export class SandboxControlService {
 
     if (input.action === 'transfer-owner') {
       await this.transferGroupOwner(group, actor, target)
+      return { status: 'ok', retcode: 0, data: null }
+    }
+
+    if (input.action === 'set-title') {
+      this.setGroupMemberTitle(actor, target, input.title)
+      return { status: 'ok', retcode: 0, data: null }
+    }
+
+    if (input.action === 'set-ban') {
+      this.setGroupMemberMute(actor, target, input.durationSeconds)
       return { status: 'ok', retcode: 0, data: null }
     }
 
@@ -1180,6 +1215,32 @@ export class SandboxControlService {
     const index = group.announcements.findIndex(({ id }) => id === input.announcementId)
     if (index < 0) throw new Error(`群公告不存在：${input.announcementId}`)
     group.announcements.splice(index, 1)
+    this.commitSceneMutation()
+  }
+
+  // 表情回应过去只校验消息可见后确认调用；现在写入消息状态，使 get_msg、场景快照
+  // 和消息历史都能读回同一份回应事实。
+  setMessageReaction(input: { operatorId: string; messageId: string; emojiId: string; enabled: boolean }): void {
+    const emojiId = input.emojiId.trim()
+    if (!emojiId) throw new Error('表情 ID 不能为空')
+    const message = this.scene.messages.find(({ id }) => id === input.messageId)
+    if (!message) throw new Error(`消息不存在：${input.messageId}`)
+    // 与撤回一致地覆盖同一广播组，避免同一条逻辑消息的副本之间回应不一致。
+    for (const target of this.scene.messages.filter(({ id, broadcastId }) => id === message.id
+      || (!!message.broadcastId && broadcastId === message.broadcastId))) {
+      const reactions = target.reactions ?? []
+      const reaction = reactions.find((item) => item.emojiId === emojiId)
+      if (!input.enabled) {
+        if (reaction) reaction.participantIds = reaction.participantIds.filter((id) => id !== input.operatorId)
+      } else if (!reaction) {
+        reactions.push({ emojiId, participantIds: [input.operatorId] })
+      } else if (!reaction.participantIds.includes(input.operatorId)) {
+        reaction.participantIds.push(input.operatorId)
+      }
+      const remaining = reactions.filter(({ participantIds }) => participantIds.length)
+      if (remaining.length) target.reactions = remaining
+      else delete target.reactions
+    }
     this.commitSceneMutation()
   }
 
@@ -1532,8 +1593,32 @@ export class SandboxControlService {
     if (actor.participantId === target.participantId) throw new Error(`不能对自己执行${action}`)
   }
 
-  private async transferGroupOwner(group: SandboxGroup, actor: SandboxGroupMember, target: SandboxGroupMember) {
-    if (actor.role !== 'owner') throw new Error('只有群主可以转让群主身份')
+  // 专属头衔与禁言过去只做权限校验后确认调用，插件无法验证结果；两者现在都写入
+  // 群成员状态，使 WebQQ、场景快照和 OneBot 查询读到同一份事实。
+  private setGroupMemberTitle(actor: SandboxGroupMember, target: SandboxGroupMember, title: string): void {
+    if (actor.role !== 'owner') throw new Error('只有群主可以设置专属头衔')
+    target.title = this.validateOptionalName(title, '专属头衔')
+    this.commitSceneMutation()
+  }
+
+  private setGroupMemberMute(actor: SandboxGroupMember, target: SandboxGroupMember, durationSeconds: number): void {
+    if (!Number.isFinite(durationSeconds) || durationSeconds < 0) throw new Error('禁言时长不能为负数')
+    if (durationSeconds > MAX_GROUP_MUTE_SECONDS) throw new Error('禁言时长不能超过 30 天')
+    this.assertCanManageMember(actor, target, durationSeconds > 0 ? '禁言成员' : '解除禁言')
+    target.mutedUntil = durationSeconds > 0
+      ? new Date(Date.now() + durationSeconds * 1000).toISOString()
+      : undefined
+    this.commitSceneMutation()
+  }
+
+  private validateOptionalName(value: string, label: string): string | undefined {
+    const trimmed = value.trim()
+    if (!trimmed) return undefined
+    if (trimmed.length > 64) throw new Error(`${label}不能超过 64 个字符`)
+    return trimmed
+  }
+
+  private async transferGroupOwner(group: SandboxGroup, actor: SandboxGroupMember, target: SandboxGroupMember) {    if (actor.role !== 'owner') throw new Error('只有群主可以转让群主身份')
     if (actor.participantId === target.participantId) throw new Error('不能把群主身份转让给自己')
     actor.role = 'member'
     target.role = 'owner'
@@ -1830,6 +1915,8 @@ export class SandboxControlService {
         participantId: member.participantId,
         card: member.card?.trim() || undefined,
         role: member.role,
+        title: member.title?.trim() || undefined,
+        mutedUntil: isSandboxGroupMemberMuted(member) ? member.mutedUntil : undefined,
       }
     })
     if (!ownerId) throw new Error('群组必须有一个群主')

@@ -9,6 +9,9 @@
     <ContextMenuItem v-if="actions.includes('set-card')" @select="emit('set-card')">
       <IconTag :size="16" aria-hidden="true" /> 修改群名片
     </ContextMenuItem>
+    <ContextMenuItem v-if="actions.includes('set-title')" @select="emit('set-title')">
+      <IconAward :size="16" aria-hidden="true" /> 设置专属头衔
+    </ContextMenuItem>
     <ContextMenuItem v-if="actions.includes('set-admin')" @select="emit('set-admin', true)">
       <IconUserPlus :size="16" aria-hidden="true" /> 设为管理员
     </ContextMenuItem>
@@ -33,7 +36,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { IconAt, IconCrown, IconHandClick, IconTag, IconUserMinus, IconUserPlus } from '@tabler/icons-vue'
+import { IconAt, IconAward, IconCrown, IconHandClick, IconTag, IconUserMinus, IconUserPlus } from '@tabler/icons-vue'
 import { ContextMenuContent, ContextMenuItem, ContextMenuSubContent } from './components/ui/context-menu'
 import { getGroupMemberMenuActions } from './webqq/group-menu'
 import type { SandboxGroupMember } from '../src/types'
@@ -48,6 +51,7 @@ const emit = defineEmits<{
   mention: []
   poke: []
   'set-card': []
+  'set-title': []
   'set-admin': [enabled: boolean]
   'transfer-owner': []
   kick: []

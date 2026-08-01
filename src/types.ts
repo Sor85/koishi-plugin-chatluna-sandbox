@@ -66,10 +66,18 @@ export interface SandboxGroupMember {
   participantId: string
   card?: string
   role: SandboxGroupRole
+  // 专属头衔由群主授予，与群名片相互独立，同一参与者在不同群组各自持有。
+  title?: string
+  // 禁言到期时间；仅在未到期时表示成员处于禁言状态，过期条目由读取方按当前时间判断。
+  mutedUntil?: string
 }
 
-export interface SandboxGroupAnnouncement {
-  id: string
+// 禁言状态按到期时间保存，读取方统一在此判断是否仍然生效，避免各处重复比较时间。
+export function isSandboxGroupMemberMuted(member: Pick<SandboxGroupMember, 'mutedUntil'>, now = Date.now()): boolean {
+  return !!member.mutedUntil && new Date(member.mutedUntil).getTime() > now
+}
+
+export interface SandboxGroupAnnouncement {  id: string
   authorId: string
   content: string
   createdAt: string
@@ -146,6 +154,11 @@ export interface SandboxMessageChatLuna {
   usage?: SandboxChatLunaTokenUsage
 }
 
+export interface SandboxMessageReaction {
+  emojiId: string
+  participantIds: string[]
+}
+
 export interface SandboxMessage {
   id: string
   authorId: string
@@ -155,6 +168,8 @@ export interface SandboxMessage {
   replyToMessageId?: string
   broadcastId?: string
   media?: SandboxMedia[]
+  // 表情回应按 emoji 聚合参与者，与真实 QQ 一致：同一人对同一 emoji 只计一次。
+  reactions?: SandboxMessageReaction[]
   // 本轮 ChatLuna 思考内容随消息一起落场景快照，多轮对话后仍能查看历史思考。
   chatLuna?: SandboxMessageChatLuna
   event?: {
@@ -302,6 +317,7 @@ export type SandboxGroupAction =
   | { action: 'set-admin'; groupId: string; targetId: string; enabled: boolean }
   | { action: 'transfer-owner'; groupId: string; targetId: string }
   | { action: 'set-card'; groupId: string; targetId: string; card: string }
+  | { action: 'set-title'; groupId: string; targetId: string; title: string }
   | { action: 'set-name'; groupId: string; name: string }
   | { action: 'poke'; groupId: string; targetId: string; conversationId?: string }
 

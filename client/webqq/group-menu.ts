@@ -1,6 +1,6 @@
 import type { SandboxGroupMember } from '../../src/types'
 
-export type GroupMemberMenuAction = 'mention' | 'poke' | 'set-card' | 'kick' | 'set-admin' | 'unset-admin' | 'transfer-owner'
+export type GroupMemberMenuAction = 'mention' | 'poke' | 'set-card' | 'set-title' | 'kick' | 'set-admin' | 'unset-admin' | 'transfer-owner'
 
 export function getGroupMemberMenuActions(
   actor: SandboxGroupMember | undefined,
@@ -12,6 +12,8 @@ export function getGroupMemberMenuActions(
   if (actor.participantId === target.participantId
     || actor.role === 'owner'
     || (actor.role === 'admin' && target.role === 'member')) actions.push('set-card')
+  // 与真实 QQ 一致：专属头衔只有群主可以授予，且可以授予给自己。
+  if (actor.role === 'owner') actions.push('set-title')
   if (actor.role === 'owner' && target.role !== 'owner') {
     actions.push(target.role === 'admin' ? 'unset-admin' : 'set-admin')
   }

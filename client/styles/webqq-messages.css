@@ -386,6 +386,11 @@
   background: #e9f8ef;
 }
 
+.webqq-role-badge.is-title {
+  color: #0b7fab;
+  background: rgb(18 183 245 / 10%);
+}
+
 .webqq-message-bubble {
   position: relative;
   display: flex;

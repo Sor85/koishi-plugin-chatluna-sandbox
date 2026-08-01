@@ -24,12 +24,13 @@ type WorkspaceController = ReturnType<typeof createWorkspaceController>
 type WorkspaceLayout = ReturnType<typeof createWorkspaceLayout>
 type EnvironmentEntityType = 'user' | 'bot' | 'group'
 type EnvironmentDialogMode = 'edit' | 'delete'
+export type GroupActionMode = 'card' | 'name' | 'title'
 type Resolve = () => void
 type Reject = (error: unknown) => void
 
 export interface WebqqWorkspaceOverlayHost {
   openEntity(mode: EnvironmentDialogMode, target: { type: EnvironmentEntityType, id: string }): void
-  openGroupAction(mode: 'card' | 'name', targetId: string, groupId: string, value: string): void
+  openGroupAction(mode: GroupActionMode, targetId: string, groupId: string, value: string): void
   openRemark(targetId: string, value: string): void
 }
 
@@ -292,15 +293,16 @@ export function createWebqqWorkspaceShell(
     if (groupId) return performGroupAction({ action: 'transfer-owner', groupId, targetId })
   }
 
-  function openGroupActionDialog(mode: 'card' | 'name', targetId = '', groupId = currentGroup.value?.id ?? '') {
+  function openGroupActionDialog(mode: GroupActionMode, targetId = '', groupId = currentGroup.value?.id ?? '') {
+    const member = getCurrentGroupMember(targetId)
     const value = mode === 'name'
       ? snapshot.value.groups.find(({ id }) => id === groupId)?.name ?? ''
-      : getCurrentGroupMember(targetId)?.card ?? ''
+      : mode === 'title' ? member?.title ?? '' : member?.card ?? ''
     getOverlayHost()?.openGroupAction(mode, targetId, groupId, value)
   }
 
   async function saveGroupAction(
-    input: { mode: 'card' | 'name', targetId: string, groupId: string, value: string },
+    input: { mode: GroupActionMode, targetId: string, groupId: string, value: string },
     resolve: Resolve,
     reject: Reject,
   ) {
@@ -308,6 +310,8 @@ export function createWebqqWorkspaceShell(
     try {
       if (input.mode === 'name') {
         await workspaceController.performGroupAction({ action: 'set-name', groupId: input.groupId, name: input.value })
+      } else if (input.targetId && input.mode === 'title') {
+        await workspaceController.performGroupAction({ action: 'set-title', groupId: input.groupId, targetId: input.targetId, title: input.value })
       } else if (input.targetId) {
         await workspaceController.performGroupAction({ action: 'set-card', groupId: input.groupId, targetId: input.targetId, card: input.value })
       }

@@ -52,8 +52,8 @@ const standardActions = {
   set_friend_add_request: '同意或拒绝好友申请',
   set_group_add_request: '同意或拒绝加群申请或群邀请',
   set_group_leave: '退出指定群聊（群主不可直接退出）',
-  set_group_ban: '禁言指定群成员；沙盒校验群身份后确认调用，不维护禁言状态',
-  set_group_special_title: '设置群成员专属头衔；沙盒校验群主身份后确认调用，不保存头衔',
+  set_group_ban: '禁言或解除禁言指定群成员；沙盒保存禁言到期时间',
+  set_group_special_title: '设置或清除群成员专属头衔；沙盒保存头衔并在群成员资料中返回',
 } as const
 
 const nativeActions: SandboxOneBotCapability[] = [
@@ -74,10 +74,19 @@ const nativeActions: SandboxOneBotCapability[] = [
     supported: true,
   },
   {
+    id: 'group.member.shut-list',
+    action: 'get_group_shut_list',
+    handler: 'get_group_shut_list',
+    description: '获取指定群当前处于禁言状态的成员列表',
+    aliases: ['getGroupShutList'],
+    surface: 'native',
+    supported: true,
+  },
+  {
     id: 'message.emoji-like',
     action: 'set_msg_emoji_like',
     handler: 'set_msg_emoji_like',
-    description: '给消息贴表情回应；沙盒校验消息可见后确认调用，不保存回应',
+    description: '给消息贴表情回应；沙盒按 emoji 保存回应参与者',
     surface: 'native',
     supported: true,
   },
