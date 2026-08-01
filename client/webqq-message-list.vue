@@ -185,11 +185,18 @@
           />
         </span>
         <div class="webqq-message-content">
-          <span class="webqq-message-author">{{ getParticipantName(state.botParticipantId) }}</span>
-          <div class="webqq-message-bubble" aria-label="机器人正在思考">
-            <span class="webqq-chatluna-thinking-dots">
-              <span v-for="dot in 3" :key="dot" class="webqq-chatluna-thinking-dot" />
-            </span>
+          <!-- 等待气泡必须复用普通消息的 sender-line + message-body 结构：
+               少了包裹层会丢掉 .webqq-sender-line + .webqq-message-body 的 6px 间距，
+               等待气泡会比真实消息更贴近名字，被替换成真实消息时还会整体下跳。 -->
+          <div class="webqq-sender-line">
+            <span class="webqq-message-author">{{ getParticipantName(state.botParticipantId) }}</span>
+          </div>
+          <div class="webqq-message-body">
+            <div class="webqq-message-bubble" aria-label="机器人正在思考">
+              <span class="webqq-chatluna-thinking-dots">
+                <span v-for="dot in 3" :key="dot" class="webqq-chatluna-thinking-dot" />
+              </span>
+            </div>
           </div>
         </div>
       </li>
@@ -289,12 +296,21 @@ function formatThinkingDuration(durationMs?: number) {
 // 这里把离场面板冻结在原视觉位置，让消息位移和面板离场同步开始。
 function prepareThinkingPanelLeave(element: Element) {
   if (!(element instanceof HTMLElement) || !element.parentElement) return
-  const parentRect = element.parentElement.getBoundingClientRect()
+  const row = element.parentElement
+  const parentRect = row.getBoundingClientRect()
   const panelRect = element.getBoundingClientRect()
   element.style.position = 'absolute'
   element.style.top = `${panelRect.top - parentRect.top}px`
-  element.style.right = `${parentRect.right - panelRect.right}px`
+  // 面板脱流后思考行宽度立刻收缩成指标行宽度，水平锚点必须选收缩后位置不变的一侧
+  // （入向行左缘固定、出向行右缘固定），否则面板会在离场瞬间水平跳位。
+  if (row.classList.contains('is-incoming')) {
+    element.style.left = `${panelRect.left - parentRect.left}px`
+  } else {
+    element.style.right = `${parentRect.right - panelRect.right}px`
+  }
   element.style.width = `${panelRect.width}px`
+  // max-width 里的 100% 同样按收缩后的行宽重算，会把冻结宽度压小、迫使单行思考内容先换行再淡出。
+  element.style.maxWidth = 'none'
   element.style.marginTop = '0'
 }
 
