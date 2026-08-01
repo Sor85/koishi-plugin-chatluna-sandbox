@@ -58,9 +58,7 @@ describe('沙盒场景持久化', () => {
     await first.sendMediaMessage({
       operatorId: '10001',
       conversationId: 'private:10001:20001',
-      fileName: 'memory.png',
-      mimeType: 'image/png',
-      dataBase64: Buffer.from('memory').toString('base64'),
+      media: [{ fileName: 'memory.png', mimeType: 'image/png', dataBase64: Buffer.from('memory').toString('base64') }],
     })
     expect(await readdir(mediaDirectory)).toHaveLength(1)
     expect(first.getSnapshot().participants.some(({ id }) => id === '10099')).toBe(true)
@@ -106,9 +104,7 @@ describe('沙盒场景持久化', () => {
     await first.sendMediaMessage({
       operatorId: '10099',
       conversationId: 'group:30099',
-      fileName: 'database.png',
-      mimeType: 'image/png',
-      dataBase64: Buffer.from('database').toString('base64'),
+      media: [{ fileName: 'database.png', mimeType: 'image/png', dataBase64: Buffer.from('database').toString('base64') }],
     })
     await first.bot.internal._request('get_status', {})
     expect(first.getOneBotDebugRecords()).not.toEqual([])
@@ -197,7 +193,7 @@ describe('沙盒场景持久化', () => {
     temporaryDirectories.push(mediaDirectory)
     await writeFile(join(mediaDirectory, 'orphan'), 'orphan')
 
-    const persistence = new KoishiDatabaseScenePersistence()
+    const persistence = new KoishiDatabaseScenePersistence(() => undefined)
     const { control } = await createControl(persistence, mediaDirectory)
 
     expect(control.getPersistenceStatus()).toEqual({

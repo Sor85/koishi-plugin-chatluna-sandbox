@@ -1,29 +1,81 @@
 .webqq-space-overview { min-width: 0; overflow: auto; padding: 32px; background: var(--webqq-surface); color: var(--webqq-text); }
+/* 退出空间的缩放动画期间放开裁剪，让活动卡片能越过总览边界覆盖整个工作区再缩回网格位。 */
+.webqq-space-overview.is-zooming { overflow: visible; }
+.webqq-space-overview.is-zooming .webqq-space-card { content-visibility: visible; }
 .webqq-space-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
 .webqq-space-toolbar h1, .webqq-space-toolbar p { margin: 0; }
 .webqq-space-toolbar h1 { font-size: 24px; }
 .webqq-space-toolbar p { margin-top: 4px; color: var(--webqq-muted); font-size: 13px; }
+.webqq-space-filter { width: 144px; }
 .webqq-space-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; }
 .webqq-space-card { position: relative; display: grid; min-height: 250px; overflow: hidden; border: 1px solid var(--webqq-border); border-radius: 18px; background: var(--webqq-bg); color: inherit; text-align: left; box-shadow: 0 12px 30px rgb(15 23 42 / 8%); cursor: pointer; transition: transform 180ms ease, box-shadow 180ms ease; content-visibility: auto; contain-intrinsic-size: 250px; }
 .webqq-space-card:hover { transform: translateY(-2px); box-shadow: 0 16px 36px rgb(15 23 42 / 12%); }
-.webqq-space-card.is-running { border-color: transparent; }
-.webqq-space-card.is-running::before { content: ''; position: absolute; inset: -70%; z-index: 0; background: conic-gradient(transparent 0 58%, var(--webqq-accent) 72%, #8b5cf6 80%, transparent 92%); pointer-events: none; animation: webqq-space-running 2.4s linear infinite; }
-.webqq-space-card.is-running::after { content: ''; position: absolute; inset: 2px; z-index: 0; border-radius: 15px; background: var(--webqq-bg); pointer-events: none; }
-.webqq-space-card.is-running > * { position: relative; z-index: 1; }
-@keyframes webqq-space-running { to { transform: rotate(360deg); } }
+/* AI 控制中：ego 式 accent 边框 + 光晕，替代跑马灯，切换时沿用卡片自身 180ms 过渡。 */
+.webqq-space-card.is-running { border-color: var(--webqq-accent); box-shadow: 0 20px 54px var(--webqq-accent-shadow); }
+.webqq-space-card.is-running:hover { box-shadow: 0 24px 60px var(--webqq-accent-shadow); }
 .webqq-space-card footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-top: 1px solid var(--webqq-border); }
 .webqq-space-card footer strong, .webqq-space-card footer small { display: block; }
 .webqq-space-card footer small { margin-top: 3px; color: var(--webqq-muted); font-size: 12px; }
 .webqq-space-card-actions { display: flex; align-items: center; gap: 6px; }
+/* 卡片操作（接管/归还/重新激活）与"主环境"徽章同一视觉语言：无边框浅底胶囊。 */
+.webqq-space-card-actions [data-slot="button"][data-variant="outline"] { height: 22px; padding: 0 10px; border: 0; border-radius: 999px; color: var(--webqq-muted); background: var(--webqq-hover); font-size: 12px; font-weight: 500; }
+.webqq-space-card-actions [data-slot="button"][data-variant="outline"]:hover:not(:disabled) { color: var(--webqq-text); background: color-mix(in srgb, var(--webqq-hover) 70%, var(--webqq-border)); }
 .webqq-space-create { place-items: center; place-content: center; gap: 10px; border-style: dashed; color: var(--webqq-muted); }
-.webqq-space-thumbnail { display: grid; grid-template-columns: 22px 30% 1fr 24%; min-height: 190px; background: var(--webqq-surface-muted); }
-.webqq-space-thumbnail-rail { border-right: 1px solid var(--webqq-border); background: var(--webqq-bg); }
-.webqq-space-thumbnail-list { display: flex; flex-direction: column; gap: 8px; padding: 18px 8px; border-right: 1px solid var(--webqq-border); }
-.webqq-space-thumbnail-list i { height: 18px; border-radius: 9px; background: var(--webqq-border); }
-.webqq-space-thumbnail-chat { display: flex; flex-direction: column; justify-content: center; gap: 10px; padding: 18px; }
-.webqq-space-thumbnail-chat span { width: 62%; height: 20px; border-radius: 10px; background: #fff; box-shadow: 0 4px 10px rgb(15 23 42 / 6%); }
-.webqq-space-thumbnail-chat span.is-self { align-self: flex-end; background: var(--webqq-accent); }
-.webqq-space-thumbnail-details { display: flex; flex-direction: column; gap: 10px; padding: 18px 10px; border-left: 1px solid var(--webqq-border); }
-.webqq-space-thumbnail-details i { height: 10px; border-radius: 5px; background: var(--webqq-border); }
-@media (prefers-reduced-motion: reduce) { .webqq-space-card.is-running { border-color: var(--webqq-accent); } .webqq-space-card.is-running::before, .webqq-space-card.is-running::after { display: none; } .webqq-space-card { transition: none; } }
+/* 迷你工作区以 4 倍卡片尺寸渲染后 scale(0.25)，字号与真实工作区保持同比例，无需 JS 测量。 */
+.webqq-space-thumbnail { position: relative; min-height: 190px; overflow: hidden; background: var(--webqq-surface-muted); pointer-events: none; }
+.webqq-space-mini { position: absolute; top: 0; left: 0; display: grid; grid-template-columns: 72px 230px minmax(0, 1fr); width: 400%; height: 400%; background: var(--webqq-bg); transform: scale(0.25); transform-origin: 0 0; }
+.webqq-space-mini-rail { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px 8px; border-right: 1px solid var(--webqq-border); background: var(--webqq-rail); }
+.webqq-space-mini-sessions { display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; overflow: hidden; border-right: 1px solid var(--webqq-border); }
+.webqq-space-mini-session { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 12px; align-items: center; flex: none; padding: 10px 12px; border-radius: 10px; }
+.webqq-space-mini-session.is-active { background: color-mix(in srgb, var(--webqq-accent) 14%, transparent); }
+.webqq-space-mini-session-copy { min-width: 0; }
+.webqq-space-mini-session-copy strong, .webqq-space-mini-session-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.webqq-space-mini-session-copy strong { font-size: 13px; line-height: 18px; font-weight: 600; }
+.webqq-space-mini-session-copy small { margin-top: 1px; color: var(--webqq-muted); font-size: 12px; line-height: 16px; }
+.webqq-space-mini-chat { display: flex; flex-direction: column; justify-content: flex-end; padding: 20px 22px; overflow: hidden; background: var(--webqq-surface-muted); }
+.webqq-space-mini-empty { align-self: center; margin: auto; color: var(--webqq-muted); font-size: 13px; }
+
+/* ==== ego lite agent 视觉复刻（边缘效果与光标动画 1:1 取自 ego lite resources.pak 内 Actor Overlay 源码；任务栏按实机截图与 --bg-agent-task-bar: #0009 令牌复刻）==== */
+
+/* agent 光标：JS 每 5.2-9s 随机跳位，移动 easing 与 ego 魔法光标一致；到位后播放 400ms 点击挤压，静止后进入 loading 浮动。 */
+.webqq-agent-cursor { position: absolute; top: 38%; left: 55%; z-index: 26; pointer-events: none; transition: top 0.9s cubic-bezier(0.6, 0, 0.4, 1), left 0.9s cubic-bezier(0.6, 0, 0.4, 1); }
+.webqq-agent-cursor-float { display: flex; align-items: flex-start; }
+/* ego #cursorImage 的双层光晕投影；transform-origin 50% 100% 让点击挤压向笔尖下压。 */
+.webqq-agent-cursor-float svg { flex: none; color: var(--webqq-accent); transform-origin: 50% 100%; filter: drop-shadow(2px 3px 5px rgb(79 161 255 / 100%)) drop-shadow(-1px -1px 2px rgb(52 107 241 / 100%)); }
+.webqq-agent-cursor-label { margin-top: 14px; margin-left: -4px; max-width: 240px; overflow: hidden; padding: 3px 10px; border-radius: 999px; color: var(--webqq-text); background: rgb(255 255 255 / 42%); box-shadow: 0 0 0 1px rgb(0 0 0 / 6%), 0 16px 48px rgb(0 0 0 / 35%); backdrop-filter: blur(10px); font-size: 12px; font-weight: 600; line-height: 16px; text-overflow: ellipsis; white-space: nowrap; }
+/* ego cursor-click：400ms ease-out 挤压（scale 0.85 + 下压 2px），即点击涟漪反馈。 */
+@keyframes webqq-agent-cursor-click { 0% { transform: scale(1); } 40% { transform: scale(0.85) translateY(2px); } 100% { transform: scale(1); } }
+.webqq-agent-cursor.is-clicking .webqq-agent-cursor-float svg { animation: webqq-agent-cursor-click 400ms ease-out; }
+/* ego loading-intro / loading-loop：闲置时 ±4px 浮动，750ms 进场后 3.2s 循环。 */
+@keyframes webqq-agent-loading-intro { from { transform: translateY(0); animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); } to { transform: translateY(-4px); } }
+@keyframes webqq-agent-loading-loop { 0%, 3.125% { transform: translateY(-4px); animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); } 50% { transform: translateY(4px); animation-timing-function: linear; } 53.125% { transform: translateY(4px); animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); } 100% { transform: translateY(-4px); } }
+@media (prefers-reduced-motion: no-preference) { .webqq-agent-cursor.is-loading .webqq-agent-cursor-float { animation: webqq-agent-loading-intro 750ms forwards, webqq-agent-loading-loop 3200ms infinite 750ms; } }
+
+/* running 脉冲点：8px 圆点 + 呼吸光晕（4px@16% → 7px@4%，1.6s）。 */
+.webqq-agent-pulse-dot { display: inline-block; flex: none; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--webqq-accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--webqq-accent) 16%, transparent); animation: webqq-agent-pulse 1.6s cubic-bezier(0.34, 0.69, 0.1, 1) infinite; }
+@keyframes webqq-agent-pulse { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--webqq-accent) 4%, transparent); } }
+
+/* 观察被控空间的覆盖层：ego 同源的 scrim 渐变 + 点阵纹理为背景，边缘跑马灯由 WebGL canvas 绘制
+   （shader 取自 ego lite 资源），覆盖层自身不拦截交互，仅任务栏可点。 */
+.webqq-agent-observe { position: relative; z-index: 25; grid-column: 1 / -1; grid-row: 1; min-width: 0; min-height: 0; pointer-events: none; background: linear-gradient(77deg, rgb(124 172 248 / 24%) 6.99%, rgb(11 87 208 / 24%) 45.46%, rgb(27 110 243 / 24%) 88.2%); }
+.webqq-agent-observe-dots { position: absolute; inset: 0; opacity: 0.5; background-image: radial-gradient(circle, rgb(55 55 55 / 10%) 1px, transparent 1px); background-size: 6px 6px; }
+.webqq-agent-observe-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.webqq-agent-observe .webqq-agent-cursor { z-index: 20; }
+
+/* ego 空间内任务栏（ego 在底部，本项目置顶）：#0009 深色胶囊，白字标题 + 浅蓝状态 + 白色接管 + 红字终止任务。 */
+.webqq-agent-taskbar { position: absolute; top: 14px; left: 50%; z-index: 25; display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 12px; border-radius: 999px; color: #fff; background: rgb(0 0 0 / 60%); box-shadow: 0 16px 48px rgb(0 0 0 / 35%); backdrop-filter: blur(10px); pointer-events: auto; transform: translateX(-50%); }
+.webqq-agent-taskbar-pause { display: inline-flex; flex: none; color: rgb(255 255 255 / 55%); }
+.webqq-agent-taskbar-control-icon { display: inline-flex; flex: none; color: #fff; }
+.webqq-agent-taskbar-text { display: flex; min-width: 0; flex-direction: column; margin-right: 4px; text-align: left; }
+.webqq-agent-taskbar-title { overflow: hidden; max-width: 220px; font-size: 12px; font-weight: 600; line-height: 15px; text-overflow: ellipsis; white-space: nowrap; }
+.webqq-agent-taskbar-subtitle { color: rgb(193 217 244); font-size: 11px; line-height: 15px; white-space: nowrap; }
+.webqq-agent-taskbar button { flex: none; padding: 6px 14px; border: 0; border-radius: 999px; font-size: 13px; font-weight: 600; line-height: 18px; cursor: pointer; }
+.webqq-agent-taskbar-takeover { color: #fff; background: rgb(54 50 49); }
+.webqq-agent-taskbar-takeover:hover { background: rgb(70 65 64); }
+.webqq-agent-taskbar-terminate { color: #ff5449; background: rgb(54 50 49); }
+.webqq-agent-taskbar-terminate:hover { background: rgb(70 65 64); }
+
+.webqq-workspace[data-color-mode="dark"] .webqq-agent-cursor-label { color: rgb(255 255 255 / 90%); background: rgb(56 56 56 / 42%); }
+.webqq-workspace[data-color-mode="dark"] .webqq-agent-observe-dots { background-image: radial-gradient(circle, rgb(255 255 255 / 15%) 1px, transparent 1px); }
+@media (prefers-reduced-motion: reduce) { .webqq-space-card { transition: none; } .webqq-agent-cursor { transition: none; } .webqq-agent-cursor-float svg, .webqq-agent-pulse-dot { animation: none; } }
 @media (max-width: 720px) { .webqq-space-overview { padding: 16px; } .webqq-space-toolbar { align-items: flex-start; flex-direction: column; } .webqq-space-grid { grid-template-columns: 1fr; } }

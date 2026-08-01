@@ -1,41 +1,10 @@
-@media (prefers-color-scheme: dark) {
-  .webqq-workspace[data-color-mode="auto"] .webqq-message-bubble,
-  .webqq-workspace[data-color-mode="auto"] .webqq-composer {
-    color: #e5edf7;
-  }
-
-  .webqq-workspace[data-color-mode="auto"] .webqq-message-bubble,
-  .webqq-workspace[data-color-mode="auto"] .webqq-composer::before {
-    border-color: rgb(148 163 184 / 24%);
-    background: rgb(30 41 59 / 90%);
-  }
-
-  .webqq-workspace[data-color-mode="auto"] .webqq-message-quote {
-    border-left-color: rgb(147 197 253 / 56%);
-    color: #cbd5e1;
-    background: rgb(15 23 42 / 42%);
-  }
-
-  .webqq-workspace[data-color-mode="auto"] .webqq-message-quote-title {
-    color: #dbeafe;
-  }
-
-  .webqq-workspace[data-color-mode="auto"] .webqq-message-row.is-outgoing .webqq-message-quote {
-    border-left-color: rgb(255 255 255 / 62%);
-    color: rgb(255 255 255 / 82%);
-    background: rgb(255 255 255 / 16%);
-  }
-
-  .webqq-workspace[data-color-mode="auto"] .webqq-message-row.is-outgoing .webqq-message-quote-title {
-    color: #fff;
-  }
-}
 
 .webqq-messages {
   min-height: 0;
   overflow-y: auto;
-  padding: 20px 22px 80px;
-  scroll-padding-bottom: 80px;
+  /* 底部留白跟随输入区实际高度（含回复/附件浮条与多行输入），由 composer 通过变量上报。 */
+  padding: 20px 22px var(--webqq-composer-space, 80px);
+  scroll-padding-bottom: var(--webqq-composer-space, 80px);
 }
 
 .webqq-messages ol {
@@ -72,13 +41,18 @@
   margin-bottom: 16px;
 }
 
+/* 与 onebot-webqq 对齐：置底时末条消息不再叠加 16px 行距，避免与输入区间隙翻倍。 */
+.webqq-message-row:last-child {
+  margin-bottom: 0;
+}
+
 .webqq-message-row.is-outgoing {
   margin-left: auto;
   flex-direction: row-reverse;
   text-align: right;
 }
 
-.webqq-workspace[data-chat-style="tim"] .webqq-message-row.is-merged {
+.webqq-message-row.is-merged {
   margin-top: -14px;
 }
 
@@ -115,12 +89,11 @@
   font-weight: 700;
 }
 
-.webqq-workspace[data-chat-style="tim"] .webqq-message-row.is-merged .webqq-message-avatar-wrap {
+.webqq-message-row.is-merged .webqq-message-avatar-wrap {
   visibility: hidden;
 }
 
-.webqq-message-content,
-.webqq-message-body {
+.webqq-message-content {
   display: flex;
   min-width: 0;
   max-width: 100%;
@@ -128,19 +101,32 @@
   align-items: flex-start;
 }
 
-.webqq-message-row.is-outgoing .webqq-message-content,
-.webqq-message-row.is-outgoing .webqq-message-body {
+.webqq-message-body {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-direction: row;
   align-items: flex-end;
+  gap: 6px;
+}
+
+.webqq-message-row.is-outgoing .webqq-message-content {
+  align-items: flex-end;
+}
+
+.webqq-message-row.is-outgoing .webqq-message-body {
+  flex-direction: row-reverse;
 }
 
 .webqq-chatluna-state {
   margin-top: 0;
 }
 
+/* 高度对齐气泡的 line-height，让思考中气泡与单行文字气泡一样高。 */
 .webqq-chatluna-thinking-dots {
   display: flex;
   width: 44px;
-  min-height: 18px;
+  min-height: 19px;
   align-items: center;
   justify-content: center;
   gap: 5px;
@@ -163,20 +149,172 @@
   animation-delay: 0.28s;
 }
 
-.webqq-chatluna-usage {
+/* 以下思考指标区 1:1 移植自 onebot-webqq 的 __thinking-* 规则，仅补充 sandbox 需要的 incoming 方向。
+   思考行跟在机器人最后一条消息下方，负上边距抵消消息行的 16px 间距，并让开 40px 头像列。
+   宽度上限不用 webqq 的 74%：折叠态下整行宽度只由指标行决定，74% 在窄聊天区会小于指标行宽度并把它压到换行。 */
+.webqq-thinking-row {
+  position: relative;
+  max-width: calc(100% - 40px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin: -12px 40px 16px auto;
+  text-align: right;
+}
+
+.webqq-thinking-row.is-incoming {
+  align-items: flex-start;
+  margin-right: auto;
+  margin-left: 40px;
+  text-align: left;
+}
+
+.webqq-thinking-toggle {
+  max-width: 100%;
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  padding: 0;
+  border: 0;
+  margin-top: 4px;
+  background: transparent;
   color: var(--webqq-muted);
-  font-size: 11px;
-  line-height: 16px;
+  cursor: pointer;
+  font-size: 12px;
+  gap: 2px;
+  line-height: 18px;
+  /* 指标行必须始终单行：容器变窄时换行会把箭头挤到第二行，看起来像凭空多了一行。 */
+  white-space: nowrap;
 }
 
-.webqq-chatluna-usage span {
+/* 机器人在左侧时整体靠左并镜像 Token 位置，但箭头始终紧跟在思考时长右侧：
+   箭头贴到行首会被误读成换行符，也不便点击。 */
+.webqq-thinking-row.is-incoming .webqq-thinking-toggle {
+  justify-content: flex-start;
+}
+
+.webqq-thinking-row.is-incoming .webqq-thinking-duration {
+  order: 1;
+}
+
+.webqq-thinking-row.is-incoming .webqq-thinking-chevron {
+  order: 2;
+}
+
+.webqq-thinking-row.is-incoming .webqq-thinking-usage {
+  order: 3;
+}
+
+/* Token 指标默认隐藏，悬停或键盘聚焦折叠按钮时淡入，避免常态下与思考时长争抢注意力。 */
+.webqq-thinking-usage {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-right: 8px;
+  font-size: 12px;
+  gap: 6px;
+  line-height: 18px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease, visibility 0.16s ease;
+  visibility: hidden;
+  white-space: nowrap;
+}
+
+/* row 的 Token 排在最右，间距要跟着换边。 */
+.webqq-thinking-row.is-incoming .webqq-thinking-usage {
+  margin-right: 0;
+  margin-left: 8px;
+}
+
+.webqq-thinking-usage-group {
   display: inline-flex;
   align-items: center;
   gap: 2px;
+  white-space: nowrap;
+}
+
+.webqq-thinking-toggle:hover .webqq-thinking-usage,
+.webqq-thinking-toggle:focus-visible .webqq-thinking-usage {
+  opacity: 1;
+  visibility: visible;
+}
+
+.webqq-thinking-row.is-usage-only .webqq-thinking-usage {
+  margin-right: 0;
+  opacity: 1;
+  visibility: visible;
+}
+
+.webqq-thinking-row.is-usage-only.is-incoming .webqq-thinking-usage {
+  margin-left: 0;
+}
+
+.webqq-thinking-usage-icon {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.webqq-thinking-usage-icon.is-output {
+  margin-left: 4px;
+}
+
+.webqq-thinking-chevron {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  flex-shrink: 0;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  transition: transform 0.16s ease;
+}
+
+/* 箭头紧跟时长，两侧朝向一致：折叠指右，展开朝下。 */
+.webqq-thinking-row .webqq-thinking-chevron.is-expanded {
+  transform: rotate(90deg);
+}
+
+.webqq-thinking-panel {
+  max-width: min(360px, 100%);
+  margin-top: 4px;
+  transform-origin: top right;
+}
+
+.webqq-thinking-row.is-incoming .webqq-thinking-panel {
+  transform-origin: top left;
+}
+
+.webqq-thinking-content {
+  min-height: 0;
+  padding: 8px 10px;
+  border-left: 2px solid rgb(148 163 184 / 54%);
+  border-radius: 6px;
+  background: rgb(255 255 255 / 72%);
+  color: var(--webqq-muted);
+  font-size: 12px;
+  line-height: 18px;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  text-align: left;
+  white-space: pre-wrap;
+}
+
+.webqq-thinking-enter-active,
+.webqq-thinking-leave-active {
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.webqq-thinking-enter-from,
+.webqq-thinking-leave-to {
+  opacity: 0;
+  transform: translateY(-4px) scaleY(0.98);
 }
 
 @keyframes webqq-chatluna-thinking-dot {
@@ -203,16 +341,49 @@
 
 .webqq-message-row.is-outgoing .webqq-sender-line {
   justify-content: flex-end;
+  flex-direction: row-reverse;
 }
 
 .webqq-sender-line + .webqq-message-body {
   margin-top: 6px;
 }
 
-.webqq-message-author {
+.webqq-message-time {
+  flex: 0 0 auto;
+  align-self: flex-end;
   color: var(--webqq-muted);
   font-size: 11px;
   line-height: 16px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+
+.webqq-message-row:hover .webqq-message-time {
+  opacity: 1;
+}
+
+.webqq-role-badge {
+  max-width: 120px;
+  overflow: hidden;
+  padding: 1px 6px;
+  border-radius: 5px;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.webqq-role-badge.is-owner {
+  color: #9a5b00;
+  background: #fff3cf;
+}
+
+.webqq-role-badge.is-admin {
+  color: #237343;
+  background: #e9f8ef;
 }
 
 .webqq-message-bubble {
@@ -220,11 +391,11 @@
   display: flex;
   max-width: 100%;
   flex-direction: column;
-  gap: 4px;
-  margin: 3px 0;
+  gap: 2px;
+  margin: 1px 0;
   padding: 9px 11px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 18px;
   color: var(--webqq-text);
   background: rgb(255 255 255 / 90%);
   box-shadow: 0 2px 8px rgb(15 23 42 / 8%);
@@ -400,49 +571,39 @@
   box-shadow: 0 8px 18px var(--webqq-accent-shadow);
 }
 
-.webqq-workspace[data-chat-style="qq"] .webqq-message-bubble {
-  border-radius: 10px;
-}
-
-.webqq-workspace[data-chat-style="tim"] .webqq-message-bubble {
-  gap: 2px;
-  margin: 1px 0;
-  border-radius: 18px;
-}
-
-.webqq-workspace[data-chat-style="tim"] .webqq-message-row.is-cluster-first:not(.is-outgoing) .webqq-message-bubble {
+.webqq-message-row.is-cluster-first:not(.is-outgoing) .webqq-message-bubble {
   border-bottom-left-radius: 3px;
 }
 
-.webqq-workspace[data-chat-style="tim"] .webqq-message-row.is-cluster-middle:not(.is-outgoing) .webqq-message-bubble {
+.webqq-message-row.is-cluster-middle:not(.is-outgoing) .webqq-message-bubble {
   border-radius: 3px 18px 18px 3px;
 }
 
-.webqq-workspace[data-chat-style="tim"] .webqq-message-row.is-cluster-last:not(.is-outgoing) .webqq-message-bubble {
+.webqq-message-row.is-cluster-last:not(.is-outgoing) .webqq-message-bubble {
   border-top-left-radius: 3px;
 }
 
-.webqq-workspace[data-chat-style="tim"] .webqq-message-row.is-outgoing.is-cluster-first .webqq-message-bubble {
+.webqq-message-row.is-outgoing.is-cluster-first .webqq-message-bubble {
   border-bottom-right-radius: 3px;
 }
 
-.webqq-workspace[data-chat-style="tim"] .webqq-message-row.is-outgoing.is-cluster-middle .webqq-message-bubble {
+.webqq-message-row.is-outgoing.is-cluster-middle .webqq-message-bubble {
   border-radius: 18px 3px 3px 18px;
 }
 
-.webqq-workspace[data-chat-style="tim"] .webqq-message-row.is-outgoing.is-cluster-last .webqq-message-bubble {
+.webqq-message-row.is-outgoing.is-cluster-last .webqq-message-bubble {
   border-top-right-radius: 3px;
 }
 
-.webqq-workspace[data-chat-style="tim"].has-tim-tail .webqq-message-row:not(.is-outgoing):not(.is-merged) .webqq-message-bubble {
+.webqq-workspace.has-tim-tail .webqq-message-row:not(.is-outgoing):not(.is-merged) .webqq-message-bubble {
   border-top-left-radius: 0;
 }
 
-.webqq-workspace[data-chat-style="tim"].has-tim-tail .webqq-message-row.is-outgoing:not(.is-merged) .webqq-message-bubble {
+.webqq-workspace.has-tim-tail .webqq-message-row.is-outgoing:not(.is-merged) .webqq-message-bubble {
   border-top-right-radius: 0;
 }
 
-.webqq-workspace[data-chat-style="tim"].has-tim-tail .webqq-message-row:not(.is-merged) .webqq-message-bubble::before {
+.webqq-workspace.has-tim-tail .webqq-message-row:not(.is-merged) .webqq-message-bubble::before {
   position: absolute;
   top: 0;
   width: 8px;
@@ -451,12 +612,12 @@
   content: "";
 }
 
-.webqq-workspace[data-chat-style="tim"].has-tim-tail .webqq-message-row:not(.is-outgoing):not(.is-merged) .webqq-message-bubble::before {
+.webqq-workspace.has-tim-tail .webqq-message-row:not(.is-outgoing):not(.is-merged) .webqq-message-bubble::before {
   left: -8px;
   clip-path: path("M 0 0 L 8 0 L 8 14 Q 8 3 0 0 Z");
 }
 
-.webqq-workspace[data-chat-style="tim"].has-tim-tail .webqq-message-row.is-outgoing:not(.is-merged) .webqq-message-bubble::before {
+.webqq-workspace.has-tim-tail .webqq-message-row.is-outgoing:not(.is-merged) .webqq-message-bubble::before {
   right: -8px;
   clip-path: path("M 8 0 L 0 0 L 0 14 Q 0 3 8 0 Z");
 }

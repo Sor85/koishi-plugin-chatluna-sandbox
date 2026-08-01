@@ -142,10 +142,13 @@ describe('模拟 QQ 环境群权限操作', () => {
 
   it('群内戳一戳写入事件消息并向群内机器人派发通知', async () => {
     const { app, control } = await createControl()
-    const notices: Array<{ noticeType?: string; subType?: string; groupId?: number; userId?: number; targetId?: number }> = []
+    const notices: Array<{ sessionSubtype?: string; channelId?: string; sessionTargetId?: string; noticeType?: string; subType?: string; groupId?: number; userId?: number; targetId?: number }> = []
     ;(app.on as unknown as (name: string, listener: (session: unknown) => void) => void)('notice', (session) => {
-      const value = session as { onebot?: Record<string, unknown> }
+      const value = session as { subtype?: string; channelId?: string; targetId?: string; onebot?: Record<string, unknown> }
       notices.push({
+        sessionSubtype: value.subtype,
+        channelId: value.channelId,
+        sessionTargetId: value.targetId,
         noticeType: value.onebot?.notice_type as string | undefined,
         subType: value.onebot?.sub_type as string | undefined,
         groupId: value.onebot?.group_id as number | undefined,
@@ -171,6 +174,10 @@ describe('模拟 QQ 环境群权限操作', () => {
     }))
     expect(pokeMessage).not.toHaveProperty('botId')
     expect(notices).toContainEqual({
+      // 与 adapter-onebot 对齐：群戳一戳会话需要 subtype=poke、targetId 与群会话 channelId。
+      sessionSubtype: 'poke',
+      channelId: 'group:30001',
+      sessionTargetId: '10001',
       noticeType: 'notify',
       subType: 'poke',
       groupId: 30001,

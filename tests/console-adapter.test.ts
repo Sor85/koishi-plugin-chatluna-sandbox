@@ -2,14 +2,13 @@ import { App, Universal } from '@koishijs/core'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { registerConsole, type SandboxConsoleRegistrar } from '../src/console'
 import { SandboxControlService } from '../src/control-service'
 import type { SandboxAppearance } from '../src/types'
 
 const appearance: SandboxAppearance = {
   enableWebQQFrostedGlass: true,
-  webQQChatStyle: 'tim',
   webQQTimBubbleTail: true,
   webQQColorMode: 'auto',
   webQQAccentColor: '#2563eb',
@@ -44,12 +43,16 @@ describe('Koishi 控制台适配器', () => {
 
     const entries: Array<{ dev: string; prod: string }> = []
     const listeners = new Map<string, unknown>()
+    const broadcasts: Array<{ type: string; body: unknown }> = []
     const consoleRegistrar: SandboxConsoleRegistrar = {
       addEntry(entry) {
         entries.push(entry)
       },
       addListener(event, callback) {
         listeners.set(event, callback)
+      },
+      broadcast(type, body) {
+        broadcasts.push({ type, body })
       },
     }
 
@@ -130,7 +133,24 @@ describe('Koishi 控制台适配器', () => {
       conversationId: 'private:10001:20001',
       content: '控制台消息',
     })
+    // 发送 RPC 即时返回，此刻只包含用户消息本体；机器人回复在后台派发完成后经场景广播刷新。
     expect(snapshot.snapshot.messages.map(({ content }: { content: string }) => content)).toEqual([
+      '控制台消息',
+    ])
+    await vi.waitFor(() => {
+      expect(control!.getSnapshot().messages.map(({ content }) => content)).toEqual([
+        '控制台消息',
+        '回复：控制台消息',
+      ])
+    })
+    const replyRevision = control.getSnapshot().revision
+    expect(broadcasts).toContainEqual({
+      type: 'onebot-sandbox/scene-mutated',
+      body: { revision: replyRevision },
+    })
+    const refreshedWorkspace = snapshotListener({ operatorId: '10001' })
+    expect(refreshedWorkspace.snapshot.revision).toBe(replyRevision)
+    expect(refreshedWorkspace.snapshot.messages.map(({ content }: { content: string }) => content)).toEqual([
       '控制台消息',
       '回复：控制台消息',
     ])
@@ -145,9 +165,7 @@ describe('Koishi 控制台适配器', () => {
     const mediaWorkspace = await sendMediaMessageListener({
       operatorId: '10001',
       conversationId: 'private:10001:20001',
-      fileName: '控制台图片.png',
-      mimeType: 'image/png',
-      dataBase64: Buffer.from('console-image').toString('base64'),
+      media: [{ fileName: '控制台图片.png', mimeType: 'image/png', dataBase64: Buffer.from('console-image').toString('base64') }],
     })
     const media = mediaWorkspace.snapshot.messages.find(({ media }: { media?: unknown[] }) => media?.length)?.media?.[0]
     expect(media).toEqual(expect.objectContaining({ name: '控制台图片.png', type: 'image' }))
@@ -155,6 +173,10 @@ describe('Koishi 控制台适配器', () => {
       id: media.id,
       dataBase64: 'Y29uc29sZS1pbWFnZQ==',
     }))
+    // 发送 RPC 故意即时返回；删除参与者前等待媒体消息的后台投递结束，避免测试清理会话时留下异步回复。
+    await vi.waitFor(() => {
+      expect(control!.getBotDeliveries()).toHaveLength(2)
+    })
 
     const otherWorkspace = snapshotListener({ operatorId: '10002' })
     expect(otherWorkspace.snapshot.conversations.every((conversation: { type: string; participantIds?: readonly string[]; groupId?: string }) => conversation.type === 'direct'
@@ -232,7 +254,7 @@ describe('Koishi 控制台适配器', () => {
 
     expect(() => snapshotListener({ operatorId: '99999' })).toThrow('参与者不存在：99999')
     expect(() => snapshotListener({ userId: '10001' })).toThrow('不支持旧 RPC 字段：userId')
-    await expect(sendMessageListener({
+    await expect(async () => sendMessageListener({
       operatorId: '10002',
       senderId: '10003',
       botId: '20001',

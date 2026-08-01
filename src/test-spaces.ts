@@ -23,6 +23,21 @@ export interface CreateSandboxTestSpaceInput {
   name?: string
 }
 
+// Console 每 1.5s 轮询全部空间快照，裁掉历史消息避免带宽随消息量线性增长；MCP 契约仍返回完整快照，不走此函数。
+export function trimSnapshotMessages(snapshot: SandboxSnapshot, limit: number): SandboxSnapshot {
+  const conversations = snapshot.conversations.map((conversation) => ({
+    ...conversation,
+    messageIds: conversation.messageIds.slice(-limit),
+    hasMoreMessages: conversation.hasMoreMessages || conversation.messageIds.length > limit,
+  }))
+  const visibleMessageIds = new Set(conversations.flatMap(({ messageIds }) => messageIds))
+  return {
+    ...snapshot,
+    conversations,
+    messages: snapshot.messages.filter(({ id }) => visibleMessageIds.has(id)),
+  }
+}
+
 interface SandboxTestSpaceRecord extends Omit<SandboxTestSpaceSummary, 'snapshot'> {
   control: SandboxControlService
 }
@@ -116,6 +131,19 @@ export class SandboxTestSpaceService {
 
   returnControl(spaceId: string): SandboxTestSpaceSummary {
     return this.setStatus(spaceId, 'running')
+  }
+
+  // WebUI 空间内任务栏的"终止任务"：用户不持有测试凭证，因此不校验 controllerId；
+  // 终止是用户主动结束而非 AI 报告失败，落到 completed 而不是 failed。
+  terminateSpace(spaceId: string): SandboxTestSpaceSummary {
+    const space = this.requireSpace(spaceId)
+    if (space.status === 'completed' || space.status === 'failed') throw new Error('空间已结束')
+    space.status = 'completed'
+    space.completedAt = new Date().toISOString()
+    space.updatedAt = space.completedAt
+    space.control.setRuntimeActive(false)
+    this.queuePersistence(space)
+    return this.toSummary(space)
   }
 
   completeSpace(spaceId: string, controllerId: string): SandboxTestSpaceSummary {

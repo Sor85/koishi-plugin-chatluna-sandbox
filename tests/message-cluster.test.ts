@@ -20,18 +20,18 @@ describe('TIM 消息簇', () => {
   it('连续同发送者消息标记首中尾并隐藏后续头像', () => {
     const messages = [message('1', '10001'), message('2', '10001'), message('3', '10001')]
 
-    expect(messages.map((_, index) => getMessageClusterClass(messages, index, 'tim', '10001')))
+    expect(messages.map((_, index) => getMessageClusterClass(messages, index, '10001')))
       .toEqual(['is-cluster-first', 'is-cluster-middle', 'is-cluster-last'])
-    expect(messages.map((_, index) => isMergedMessage(messages, index, 'tim', '10001')))
+    expect(messages.map((_, index) => isMergedMessage(messages, index, '10001')))
       .toEqual([false, true, true])
   })
 
-  it('QQ 模式和发送者变化不会合并', () => {
+  it('发送者变化不会合并', () => {
     const messages = [message('1', '10001'), message('2', '20001')]
 
-    expect(getMessageClusterClass(messages, 0, 'tim', '10001')).toBe('')
-    expect(isMergedMessage(messages, 1, 'tim', '10001')).toBe(false)
-    expect(getMessageClusterClass([message('1', '10001'), message('2', '10001')], 0, 'qq', '10001')).toBe('')
+    expect(getMessageClusterClass(messages, 0, '10001')).toBe('')
+    expect(isMergedMessage(messages, 1, '10001')).toBe(false)
+    expect(getMessageClusterClass([message('1', '10001'), message('2', '10001')], 0, '10001')).toBe('is-cluster-first')
   })
 
   it('纯图片消息不打断前后文本气泡的连续圆角', () => {
@@ -49,8 +49,8 @@ describe('TIM 消息簇', () => {
     const messages = [message('1', '20001'), image, message('2', '20001')]
 
     expect(isImageOnlyMessage(image)).toBe(true)
-    expect(getMessageClusterClass(messages, 0, 'tim', '10001')).toBe('is-cluster-first')
-    expect(getMessageClusterClass(messages, 2, 'tim', '10001')).toBe('is-cluster-last')
+    expect(getMessageClusterClass(messages, 0, '10001')).toBe('is-cluster-first')
+    expect(getMessageClusterClass(messages, 2, '10001')).toBe('is-cluster-last')
   })
 
   it('戳一戳事件会中断连续消息合并', () => {
@@ -60,7 +60,7 @@ describe('TIM 消息簇', () => {
     }
     const messages = [message('1', '20001'), event, message('2', '20001')]
 
-    expect(messages.map((_, index) => getMessageClusterClass(messages, index, 'tim', '10001')))
+    expect(messages.map((_, index) => getMessageClusterClass(messages, index, '10001')))
       .toEqual(['', '', ''])
   })
 })

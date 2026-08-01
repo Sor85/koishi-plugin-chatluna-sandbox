@@ -1,7 +1,7 @@
 import { App } from 'koishi'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createEmptyScene, SandboxControlService, SandboxRuntimeBotRegistry } from '../src/control-service'
-import { SandboxTestSpaceService } from '../src/test-spaces'
+import { SandboxTestSpaceService, trimSnapshotMessages } from '../src/test-spaces'
 import type { SandboxTestSpacePersistence, SandboxTestSpacePersistenceRecord } from '../src/persistence'
 
 const apps: App[] = []
@@ -44,6 +44,16 @@ describe('AI 测试空间', () => {
     expect(spaces.requireUserControl(space.id)).toBe(space.control)
     spaces.returnControl(space.id)
     expect(spaces.requireAiControl(space.id, 'credential-a')).toBe(space.control)
+  })
+
+  it('用户终止任务后空间结束为已完成，AI 不能再修改', () => {
+    const { spaces } = createServices()
+    const space = spaces.createSpace({ controllerId: 'credential-a' })
+
+    expect(spaces.terminateSpace(space.id).status).toBe('completed')
+    expect(spaces.getSpace(space.id).completedAt).toBeTruthy()
+    expect(() => spaces.requireAiControl(space.id, 'credential-a')).toThrow('空间当前不可修改：completed')
+    expect(() => spaces.terminateSpace(space.id)).toThrow('空间已结束')
   })
 
   it('AI 重新激活后恢复 AI 控制，用户重新激活后保持接管', () => {
@@ -108,5 +118,28 @@ describe('AI 测试空间', () => {
     expect(restoredSpaces.getSpace(created.id).snapshot.participants).toEqual([
       expect.objectContaining({ id: '11001', name: '测试成员' }),
     ])
+  })
+
+  it('trimSnapshotMessages 按会话保留末尾消息并标记更多消息', () => {
+    const messages = ['m1', 'm2', 'm3', 'm4', 'm5']
+    const snapshot = {
+      ...createEmptyScene(),
+      conversations: [{
+        id: 'private:11001:11002',
+        type: 'direct' as const,
+        participantIds: ['11001', '11002'] as [string, string],
+        messageIds: [...messages],
+      }],
+      messages: messages.map((id) => ({ id, authorId: '11001', conversationId: 'private:11001:11002', content: `内容 ${id}`, createdAt: '2026-01-01T00:00:00.000Z' })),
+    }
+
+    const trimmed = trimSnapshotMessages(snapshot, 2)
+    expect(trimmed.conversations[0].messageIds).toEqual(['m4', 'm5'])
+    expect(trimmed.conversations[0].hasMoreMessages).toBe(true)
+    expect(trimmed.messages.map(({ id }) => id)).toEqual(['m4', 'm5'])
+
+    const untrimmed = trimSnapshotMessages(snapshot, 10)
+    expect(untrimmed.conversations[0].messageIds).toHaveLength(5)
+    expect(untrimmed.conversations[0].hasMoreMessages).toBe(false)
   })
 })

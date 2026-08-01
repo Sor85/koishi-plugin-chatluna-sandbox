@@ -1,9 +1,12 @@
 <template>
         <nav class="webqq-rail" aria-label="WebQQ 主导航">
           <TooltipProvider>
-            <Tooltip v-for="item in navigationItems" :key="item.id">
+            <Tooltip v-for="item in visibleNavigationItems" :key="item.id">
               <TooltipTrigger as-child>
-                <span class="webqq-rail-tooltip-trigger">
+                <span
+                  class="webqq-rail-tooltip-trigger"
+                  :class="{ 'is-rail-pin-bottom': item.id === 'spaces' }"
+                >
                   <button
                     type="button"
                     class="webqq-rail-button"
@@ -284,6 +287,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip'
 import EnvironmentCreatePopover from './environment-create-popover.vue'
 import NotificationMenu from './notification-menu.vue'
+import { getGroupRoleLabel } from './webqq/group-display'
 import WebqqAvatar from './webqq-avatar.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type {
@@ -350,7 +354,7 @@ export interface WebqqSidebarModel {
   groupNames: Record<string, string>
 }
 
-const props = defineProps<{ model: WebqqSidebarModel }>()
+const props = defineProps<{ model: WebqqSidebarModel, activeSpaceId?: string }>()
 const emit = defineEmits<{
   selectView: [view: WebqqSidebarModel['currentView']]
   selectConversation: [conversationId: string]
@@ -375,10 +379,13 @@ const handlingRequestId = ref('')
 const notificationErrorMessage = ref('')
 const navigationItems = [
   { id: 'messages' as const, label: '消息', icon: IconMessageCircle },
-  { id: 'spaces' as const, label: 'AI 测试空间', icon: IconLayoutGrid },
   { id: 'debug' as const, label: '调试', icon: IconBug },
   { id: 'profile' as const, label: '资料', icon: IconUserCircle },
+  { id: 'spaces' as const, label: 'AI 测试空间', icon: IconLayoutGrid },
 ]
+const visibleNavigationItems = computed(() => props.activeSpaceId
+  ? navigationItems.filter(({ id }) => id === 'messages' || id === 'spaces')
+  : navigationItems)
 const sidebarTabs = [
   { id: 'recent' as const, label: '最近', icon: IconClock },
   { id: 'friends' as const, label: '好友', icon: IconUser },
@@ -464,9 +471,5 @@ function openGroupActionDialog(mode: 'card' | 'name', targetId: string, groupId?
 
 function openRemarkDialog(targetId: string) {
   emit('openRemarkDialog', targetId)
-}
-
-function getGroupRoleLabel(role: SandboxGroupMember['role']) {
-  return role === 'owner' ? '群主' : role === 'admin' ? '管理员' : '成员'
 }
 </script>

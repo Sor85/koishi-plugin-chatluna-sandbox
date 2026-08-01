@@ -4,6 +4,10 @@ interface SandboxParticipantBase {
   avatar?: string
 }
 
+export type SandboxEntitySource =
+  | { type: 'main', name: string }
+  | { type: 'test-space', spaceId: string, name: string }
+
 export interface SandboxUser extends SandboxParticipantBase {
   kind: 'user'
 }
@@ -31,6 +35,8 @@ export interface SandboxBotProfile {
 export type CreateSandboxBotInput = Omit<SandboxBotProfile, 'kind'>
 
 export type UpdateSandboxBotInput = CreateSandboxBotInput
+
+export type SandboxDirectoryBot = SandboxBotProfile & { source: SandboxEntitySource }
 
 export type SandboxParticipant = SandboxUser | SandboxBotProfile
 
@@ -134,6 +140,12 @@ export function getDirectConversationPeerId(conversation: SandboxDirectConversat
   return peerId
 }
 
+export interface SandboxMessageChatLuna {
+  thought: string
+  thoughtDurationMs?: number
+  usage?: SandboxChatLunaTokenUsage
+}
+
 export interface SandboxMessage {
   id: string
   authorId: string
@@ -143,9 +155,14 @@ export interface SandboxMessage {
   replyToMessageId?: string
   broadcastId?: string
   media?: SandboxMedia[]
+  // 本轮 ChatLuna 思考内容随消息一起落场景快照，多轮对话后仍能查看历史思考。
+  chatLuna?: SandboxMessageChatLuna
   event?: {
     type: 'poke'
     targetId: string
+  } | {
+    type: 'recall'
+    operatorId: string
   }
 }
 
@@ -206,6 +223,8 @@ export interface SandboxOneBotDebugRecord {
     traceId: string
   }
 }
+
+export type SandboxConsoleOneBotDebugRecord = SandboxOneBotDebugRecord & { source: SandboxEntitySource }
 
 export interface GetSandboxOneBotDebugRecordsInput {
   botId?: string
@@ -297,7 +316,6 @@ export interface PerformGroupActionResult {
 
 export interface SandboxAppearance {
   enableWebQQFrostedGlass: boolean
-  webQQChatStyle: 'tim' | 'qq'
   webQQTimBubbleTail: boolean
   webQQColorMode: 'auto' | 'light' | 'dark'
   webQQAccentColor: string
@@ -344,12 +362,22 @@ export interface SendMessageResult {
   revision: number
 }
 
-export interface SendMediaMessageInput {
+export interface RecallMessageInput {
   operatorId: string
-  conversationId: string
+  conversationId?: string
+  messageId: string
+}
+
+export interface SendMediaFileInput {
   fileName: string
   mimeType: string
   dataBase64: string
+}
+
+export interface SendMediaMessageInput {
+  operatorId: string
+  conversationId: string
+  media: SendMediaFileInput[]
   content?: string
   replyToMessageId?: string
 }

@@ -47,9 +47,11 @@ describe('模拟 QQ 环境消息闭环', () => {
     const result = await control.sendMediaMessage({
       operatorId: '10001',
       conversationId: 'private:10001:20001',
-      fileName: '测试图片.png',
-      mimeType: 'image/png',
-      dataBase64: Buffer.from('image-content').toString('base64'),
+      media: [{
+        fileName: '测试图片.png',
+        mimeType: 'image/png',
+        dataBase64: Buffer.from('image-content').toString('base64'),
+      }],
     })
 
     const message = control.getSnapshot().messages.find(({ id }) => id === result.messageId)
@@ -84,6 +86,41 @@ describe('模拟 QQ 环境消息闭环', () => {
     })).toThrow('媒体文件不存在')
   })
 
+  it('一条消息携带多个附件与文本，按附件在前文本在后派发', async () => {
+    const app = new App()
+    const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-media-'))
+    temporaryDirectories.push(mediaDirectory)
+    let control: SandboxControlService | undefined
+    app.plugin((ctx) => {
+      control = new SandboxControlService(ctx, { mediaDirectory })
+    })
+    runningApps.push(app)
+
+    let rawMessage: Array<{ type: string, data: Record<string, string> }> | undefined
+    app.middleware((session) => {
+      rawMessage = (session as typeof session & {
+        onebot?: { message?: Array<{ type: string, data: Record<string, string> }> }
+      }).onebot?.message
+    })
+    await app.start()
+    if (!control) throw new Error('沙盒控制服务未注册')
+
+    const result = await control.sendMediaMessage({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      content: '两个附件',
+      media: [
+        { fileName: '图.png', mimeType: 'image/png', dataBase64: Buffer.from('a').toString('base64') },
+        { fileName: '档.txt', mimeType: 'text/plain', dataBase64: Buffer.from('b').toString('base64') },
+      ],
+    })
+
+    const message = control.getSnapshot().messages.find(({ id }) => id === result.messageId)
+    expect(message?.content).toBe('两个附件')
+    expect(message?.media?.map(({ type }) => type)).toEqual(['image', 'file'])
+    expect(rawMessage?.map(({ type }) => type)).toEqual(['image', 'file', 'text'])
+  })
+
   it('拒绝不支持或超限的媒体内容', async () => {
     const app = new App()
     const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-media-'))
@@ -96,16 +133,23 @@ describe('模拟 QQ 环境消息闭环', () => {
     await app.start()
     if (!control) throw new Error('沙盒控制服务未注册')
 
-    const baseInput = {
-      operatorId: '10001',
-      conversationId: 'private:10001:20001',
+    const baseTarget = { operatorId: '10001', conversationId: 'private:10001:20001' }
+    const baseFile = {
       fileName: '测试文件.exe',
       dataBase64: Buffer.alloc(10 * 1024 * 1024 + 1).toString('base64'),
     }
-    await expect(control.sendMediaMessage({ ...baseInput, mimeType: 'application/x-msdownload' }))
+    await expect(control.sendMediaMessage({ ...baseTarget, media: [{ ...baseFile, mimeType: 'application/x-msdownload' }] }))
       .rejects.toThrow('不支持的媒体类型')
-    await expect(control.sendMediaMessage({ ...baseInput, fileName: '测试文件.txt', mimeType: 'text/plain' }))
+    await expect(control.sendMediaMessage({ ...baseTarget, media: [{ ...baseFile, fileName: '测试文件.txt', mimeType: 'text/plain' }] }))
       .rejects.toThrow('媒体大小不能超过')
+    // 多媒体中任一文件校验失败时，整条消息拒绝且已落盘的文件被回滚清理。
+    await expect(control.sendMediaMessage({
+      ...baseTarget,
+      media: [
+        { fileName: '合法图片.png', mimeType: 'image/png', dataBase64: Buffer.from('valid').toString('base64') },
+        { ...baseFile, mimeType: 'application/x-msdownload' },
+      ],
+    })).rejects.toThrow('不支持的媒体类型')
     expect(control.getSnapshot().messages).toEqual([])
     expect(await readdir(mediaDirectory)).toEqual([])
   })
@@ -141,8 +185,7 @@ describe('模拟 QQ 环境消息闭环', () => {
       await control.sendMediaMessage({
         operatorId: '10001',
         conversationId: 'private:10001:20001',
-        ...media,
-        dataBase64: Buffer.from(media.fileName).toString('base64'),
+        media: [{ ...media, dataBase64: Buffer.from(media.fileName).toString('base64') }],
       })
     }
 
@@ -168,9 +211,7 @@ describe('模拟 QQ 环境消息闭环', () => {
     await control.sendMediaMessage({
       operatorId: '10001',
       conversationId: 'private:10001:20001',
-      fileName: '待清理图片.png',
-      mimeType: 'image/png',
-      dataBase64: Buffer.from('orphan-image').toString('base64'),
+      media: [{ fileName: '待清理图片.png', mimeType: 'image/png', dataBase64: Buffer.from('orphan-image').toString('base64') }],
     })
     expect(await readdir(mediaDirectory)).toHaveLength(1)
     control.deleteUser({ id: '10001' })
@@ -179,9 +220,7 @@ describe('模拟 QQ 环境消息闭环', () => {
     await control.sendMediaMessage({
       operatorId: '10002',
       conversationId: 'private:10002:20001',
-      fileName: '重启前图片.png',
-      mimeType: 'image/png',
-      dataBase64: Buffer.from('restart-image').toString('base64'),
+      media: [{ fileName: '重启前图片.png', mimeType: 'image/png', dataBase64: Buffer.from('restart-image').toString('base64') }],
     })
     expect(await readdir(mediaDirectory)).toHaveLength(1)
 

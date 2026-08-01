@@ -1,3 +1,9 @@
+/* 返回会话列表按钮只在窄屏单栏布局下显形（见 webqq-responsive.css）。 */
+.webqq-chat-back {
+  display: none;
+  flex: none;
+}
+
 .webqq-chat-header {
   display: flex;
   align-items: center;

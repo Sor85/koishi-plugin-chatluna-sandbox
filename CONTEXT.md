@@ -113,7 +113,7 @@ _Avoid_: 群昵称, 群名片, 会话名称
 _Avoid_: WebQQ 观察窗, 胶囊窗口, 弹窗
 
 **ChatLuna 对话状态**:
-WebQQ 工作台中用于验证 ChatLuna 对话生命周期的状态信息，仅包含思考状态和模型 Token 用量。
+WebQQ 工作台中用于验证 ChatLuna 对话生命周期的状态信息，仅包含思考状态、模型回复中的思考内容和模型 Token 用量。
 _Avoid_: ChatLuna 完整联动, 好感度状态, 关系状态, 日程状态
 
 **沙盒场景**:

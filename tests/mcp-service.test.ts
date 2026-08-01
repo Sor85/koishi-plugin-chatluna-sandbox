@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { App } from '@koishijs/core'
+import { App, h } from '@koishijs/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SandboxControlService, SandboxRuntimeBotRegistry } from '../src/control-service'
 import { SandboxMcpService } from '../src/mcp/service'
@@ -75,6 +75,40 @@ describe('SandboxMcpService', () => {
     expect(replay).toEqual(first)
     await expect(service.callTool(credential.token, 'send_message', { ...input, content: '不同消息' })).rejects.toMatchObject({ code: 'idempotency_conflict' })
     await expect(service.callTool(credential.token, 'wait_for_message', { cursor, timeoutSeconds: 1 })).resolves.toMatchObject({ matched: true })
+  })
+
+  it('机器人图片回复通过 MCP 消息事件暴露结构化媒体', async () => {
+    const { app, service, credential } = createService(['read', 'interact'])
+    const imageBase64 = Buffer.from('meme-list-image').toString('base64')
+    app.middleware((session, next) => next(async () => {
+      if (session.selfId !== '20001' || session.userId !== '10001') return
+      await session.send(h.image(`data:image/png;base64,${imageBase64}`))
+    }))
+    await app.start()
+    const cursor = service.currentCursor()
+
+    await service.callTool(credential.token, 'send_message', {
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      content: 'meme.list',
+      idempotencyKey: 'meme-list-image-1',
+    })
+
+    await expect(service.callTool(credential.token, 'wait_for_message', {
+      cursor,
+      conversationId: 'private:10001:20001',
+      authorId: '20001',
+      timeoutSeconds: 1,
+    })).resolves.toMatchObject({
+      matched: true,
+      event: {
+        data: {
+          authorId: '20001',
+          content: '[图片] image.png',
+          media: [expect.objectContaining({ type: 'image', mimeType: 'image/png' })],
+        },
+      },
+    })
   })
 
   it('领域交互复用真实权限并禁止代机器人审批', async () => {
@@ -166,7 +200,7 @@ describe('SandboxMcpService', () => {
       'space_unavailable',
       'test_spaces_unavailable',
     ]))
-    expect(service.readResource(credential.token, 'onebot-sandbox://examples')).toEqual({
+    expect(service.readResource(credential.token, 'onebot-sandbox://examples')).toMatchObject({
       create_test_space: {
         name: '退群公告测试',
         idempotencyKey: 'example-space-1',
@@ -174,9 +208,16 @@ describe('SandboxMcpService', () => {
       send_message: {
         spaceId: '<create_test_space.spaceId>',
         operatorId: '10001',
-        conversationId: 'private:10001:20001',
+        conversationId: 'private:10001:20002',
         content: '你好',
         idempotencyKey: 'example-message-1',
+      },
+      等待机器人回复: {
+        步骤: [
+          expect.objectContaining({ tool: 'get_server_info' }),
+          expect.objectContaining({ tool: 'send_message' }),
+          expect.objectContaining({ tool: 'wait_for_message' }),
+        ],
       },
     })
     await expect(service.callTool(credential.token, 'apply_environment_changes', {

@@ -6,13 +6,13 @@
         <p>{{ spaces.length }} 个隔离测试空间，按创建时间从旧到新排列</p>
       </div>
       <Select v-model="filter">
-        <SelectTrigger class="w-36 border-slate-200 bg-white"><SelectValue /></SelectTrigger>
+        <SelectTrigger class="webqq-space-filter"><SelectValue /></SelectTrigger>
         <SelectContent><SelectItem v-for="item in filters" :key="item.value" :value="item.value">{{ item.label }}</SelectItem></SelectContent>
       </Select>
     </header>
 
     <div class="webqq-space-grid">
-      <article class="webqq-space-card is-main" data-space-id="main" tabindex="0" @click="openCard(undefined, $event)" @keydown.enter="openCard(undefined, $event)">
+      <article class="webqq-space-card is-main" data-space-id="main" tabindex="0" @click="openCard(undefined)" @keydown.enter="openCard(undefined)">
         <WorkspaceThumbnail :snapshot="mainSnapshot" />
         <footer><div><strong>主模拟 QQ 环境</strong><small>固定空间 · 不可删除</small></div><Badge variant="secondary">主环境</Badge></footer>
       </article>
@@ -24,16 +24,16 @@
         :class="{ 'is-running': space.status === 'running' }"
         :data-space-id="space.id"
         tabindex="0"
-        @click="openCard(space.id, $event)"
-        @keydown.enter="openCard(space.id, $event)"
+        @click="openCard(space.id)"
+        @keydown.enter="openCard(space.id)"
       >
-        <WorkspaceThumbnail :snapshot="space.snapshot" />
+        <WorkspaceThumbnail :snapshot="space.snapshot" :running="space.status === 'running'" />
         <footer>
-          <div><strong>{{ space.name }}</strong><small>{{ statusLabel(space.status) }} · {{ formatTime(space.createdAt) }}</small></div>
+          <div><strong>{{ space.name }}</strong><small><span v-if="space.status === 'running'" class="webqq-agent-pulse-dot" aria-hidden="true" />{{ statusLabel(space.status) }} · {{ formatTime(space.createdAt) }}</small></div>
           <div class="webqq-space-card-actions" @click.stop>
-            <Button v-if="space.status === 'running'" size="xs" variant="outline" @click="$emit('action', 'take-over', space.id)">接管</Button>
-            <Button v-else-if="space.status === 'taken-over'" size="xs" variant="outline" @click="$emit('action', 'return', space.id)">归还</Button>
-            <Button v-else size="xs" variant="outline" @click="$emit('action', 'reactivate', space.id)">重新激活</Button>
+            <!-- "接管"已移入空间内部的任务栏（AgentObserveOverlay），运行中卡片不再提供接管入口。 -->
+            <Button v-if="space.status === 'taken-over'" size="xs" variant="outline" @click="$emit('action', 'return', space.id)">归还</Button>
+            <Button v-else-if="space.status === 'completed' || space.status === 'failed'" size="xs" variant="outline" @click="$emit('action', 'reactivate', space.id)">重新激活</Button>
             <Button size="icon-xs" variant="ghost" aria-label="删除空间" @click="$emit('action', 'delete', space.id)"><IconTrash :size="14" /></Button>
           </div>
         </footer>
@@ -61,7 +61,7 @@ const props = defineProps<{ spaces: SandboxTestSpaceSummary[]; mainSnapshot: San
 const emit = defineEmits<{
   enter: [spaceId?: string]
   create: []
-  action: [action: 'take-over' | 'return' | 'reactivate' | 'delete', spaceId: string]
+  action: [action: 'return' | 'reactivate' | 'delete', spaceId: string]
 }>()
 const filter = ref<'all' | SandboxTestSpaceStatus>('all')
 const filters = [
@@ -77,17 +77,5 @@ function statusLabel(status: SandboxTestSpaceStatus) {
   return status === 'running' ? 'AI 控制中' : status === 'taken-over' ? '用户已接管' : status === 'completed' ? '已完成' : '已失败'
 }
 function formatTime(value: string) { return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(value)) }
-async function openCard(spaceId: string | undefined, event: Event) {
-  const card = event.currentTarget as HTMLElement
-  const rect = card.getBoundingClientRect()
-  const clone = card.cloneNode(true) as HTMLElement
-  Object.assign(clone.style, { position: 'fixed', zIndex: '300', margin: '0', left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px`, pointerEvents: 'none' })
-  document.body.append(clone)
-  await clone.animate([
-    { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px`, borderRadius: '18px' },
-    { left: '72px', top: '0', width: 'calc(100vw - 72px)', height: '100vh', borderRadius: '0' },
-  ], { duration: 260, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' }).finished.catch(() => undefined)
-  emit('enter', spaceId)
-  clone.remove()
-}
+function openCard(spaceId?: string) { emit('enter', spaceId) }
 </script>

@@ -28,8 +28,7 @@
   pointer-events: auto;
 }
 
-.webqq-composer-reply,
-.webqq-composer-media {
+.webqq-composer-reply {
   position: absolute;
   right: 14px;
   bottom: calc(100% + 8px);
@@ -47,8 +46,7 @@
   font-size: 12px;
 }
 
-.webqq-composer-reply span,
-.webqq-composer-media span {
+.webqq-composer-reply span {
   min-width: 0;
   flex: 1;
   overflow: hidden;
@@ -56,8 +54,7 @@
   white-space: nowrap;
 }
 
-.webqq-composer-reply button,
-.webqq-composer-media button {
+.webqq-composer-reply button {
   display: inline-flex;
   width: 24px;
   height: 24px;
@@ -71,20 +68,136 @@
 }
 
 .webqq-composer-reply button:hover,
-.webqq-composer-reply button:focus-visible,
-.webqq-composer-media button:hover,
-.webqq-composer-media button:focus-visible {
+.webqq-composer-reply button:focus-visible {
   color: var(--webqq-text);
   outline: none;
   background: var(--webqq-hover);
 }
 
-.webqq-composer-media {
+/* 待发附件浮条：复刻 onebot-webqq 的 wrap 布局，图片方卡与文件胶囊底对齐。 */
+.webqq-composer-attachments {
+  position: absolute;
+  right: 14px;
   bottom: calc(100% + 8px);
+  left: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 6px;
 }
 
-.webqq-composer-media.has-reply {
+.webqq-composer-attachments.has-reply {
   bottom: calc(100% + 54px);
+}
+
+.webqq-composer-attachment-file {
+  display: inline-flex;
+  min-width: 96px;
+  max-width: 180px;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border: 1px solid var(--webqq-border);
+  border-radius: 999px;
+  color: var(--webqq-text);
+  background: var(--webqq-panel);
+  box-shadow: 0 8px 18px rgb(15 23 42 / 8%);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.webqq-composer-attachment-file > svg {
+  flex: none;
+}
+
+/* baseName 弹性截断、扩展名永不截断，长文件名显示为 "很长的名字….zip"。 */
+.webqq-composer-attachment-name {
+  display: inline-flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.webqq-composer-attachment-base {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.webqq-composer-attachment-name span:last-child {
+  flex: none;
+}
+
+.webqq-composer-attachment-file button {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.webqq-composer-attachment-file button:hover,
+.webqq-composer-attachment-file button:focus-visible {
+  outline: none;
+  background: var(--webqq-hover);
+}
+
+.webqq-composer-attachment-image {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  padding: 4px;
+  border: 1px solid var(--webqq-border);
+  border-radius: 14px;
+  background: var(--webqq-panel);
+  box-shadow: 0 8px 18px rgb(15 23 42 / 8%);
+}
+
+.webqq-composer-attachment-preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: var(--webqq-hover);
+  cursor: pointer;
+}
+
+.webqq-composer-attachment-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.webqq-composer-attachment-remove {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 90%);
+  border-radius: 50%;
+  color: #fff;
+  background: rgb(15 23 42 / 72%);
+  cursor: pointer;
 }
 
 .webqq-composer::before {
@@ -95,9 +208,9 @@
   left: calc(-1px - var(--webqq-composer-visual-extension, 0px));
   z-index: -1;
   box-sizing: border-box;
-  border: 1px solid rgb(255 255 255 / 66%);
+  border: 1px solid color-mix(in srgb, var(--webqq-panel) 66%, transparent);
   border-radius: 999px;
-  background: rgb(255 255 255 / 94%);
+  background: color-mix(in srgb, var(--webqq-panel) 94%, transparent);
   box-shadow: 0 8px 18px rgb(15 23 42 / 8%);
   content: "";
   pointer-events: none;
@@ -105,7 +218,7 @@
 }
 
 .webqq-workspace.is-frosted .webqq-composer::before {
-  background: rgb(255 255 255 / 62%);
+  background: color-mix(in srgb, var(--webqq-panel) 62%, transparent);
   backdrop-filter: saturate(180%) blur(22px);
 }
 
@@ -153,7 +266,7 @@
   border-radius: 50%;
   color: #fff;
   background: var(--webqq-accent);
-  box-shadow: 0 0 0 2px #fff;
+  box-shadow: 0 0 0 2px var(--webqq-panel);
   font-size: 12px;
   font-weight: 700;
 }
@@ -263,8 +376,8 @@
   border: 1px dashed color-mix(in srgb, var(--webqq-accent) 52%, transparent);
   border-radius: 50%;
   color: var(--webqq-accent);
-  background: color-mix(in srgb, var(--webqq-accent) 11%, #fff);
-  box-shadow: 0 0 0 2px #fff;
+  background: color-mix(in srgb, var(--webqq-accent) 11%, var(--webqq-panel));
+  box-shadow: 0 0 0 2px var(--webqq-panel);
   cursor: pointer;
   pointer-events: auto;
   transition: right 0.18s ease, opacity 0.12s ease, background-color 0.15s ease;
@@ -277,7 +390,7 @@
 }
 
 .webqq-composer-user-add:hover {
-  background: color-mix(in srgb, var(--webqq-accent) 18%, #fff);
+  background: color-mix(in srgb, var(--webqq-accent) 18%, var(--webqq-panel));
 }
 
 .webqq-composer-user-add:focus-visible {
@@ -306,8 +419,8 @@
   box-sizing: border-box;
   border-radius: 50%;
   color: var(--webqq-text);
-  background: color-mix(in srgb, var(--webqq-accent) 16%, #fff 84%);
-  box-shadow: 0 0 0 2px #fff;
+  background: color-mix(in srgb, var(--webqq-accent) 16%, var(--webqq-panel) 84%);
+  box-shadow: 0 0 0 2px var(--webqq-panel);
   font-size: 10px;
   font-weight: 700;
   line-height: 1;

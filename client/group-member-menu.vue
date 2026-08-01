@@ -1,5 +1,8 @@
 <template>
   <component :is="sub ? ContextMenuSubContent : ContextMenuContent" style="z-index: 140">
+    <ContextMenuItem v-if="actions.includes('mention')" @select="emit('mention')">
+      <IconAt :size="16" aria-hidden="true" /> @ 用户
+    </ContextMenuItem>
     <ContextMenuItem v-if="actions.includes('poke')" @select="emit('poke')">
       <IconHandClick :size="16" aria-hidden="true" /> 戳一戳
     </ContextMenuItem>
@@ -30,7 +33,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { IconCrown, IconHandClick, IconTag, IconUserMinus, IconUserPlus } from '@tabler/icons-vue'
+import { IconAt, IconCrown, IconHandClick, IconTag, IconUserMinus, IconUserPlus } from '@tabler/icons-vue'
 import { ContextMenuContent, ContextMenuItem, ContextMenuSubContent } from './components/ui/context-menu'
 import { getGroupMemberMenuActions } from './webqq/group-menu'
 import type { SandboxGroupMember } from '../src/types'
@@ -42,6 +45,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
+  mention: []
   poke: []
   'set-card': []
   'set-admin': [enabled: boolean]

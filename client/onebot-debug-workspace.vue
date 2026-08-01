@@ -6,7 +6,7 @@
         <p>查看最近的 action、原始事件和错误。调试记录仅保存在内存中，不能重放。</p>
       </div>
       <div class="webqq-debug-actions">
-        <Button variant="outline" class="webqq-debug-button" :disabled="loading" @click="applyFilters">
+        <Button variant="outline" :disabled="loading" @click="applyFilters">
           <IconRefresh :size="16" aria-hidden="true" />
           刷新
         </Button>
@@ -24,9 +24,11 @@
           <SelectTrigger class="webqq-debug-control" aria-label="按机器人筛选">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent class="w-[var(--reka-select-trigger-width)] border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+          <SelectContent>
             <SelectItem value="all">全部机器人</SelectItem>
-            <SelectItem v-for="bot in bots" :key="bot.id" :value="bot.id">{{ bot.name }} · {{ bot.id }}</SelectItem>
+            <SelectItem v-for="bot in bots" :key="getBotKey(bot)" :value="getBotKey(bot)">
+              {{ bot.name }} · {{ bot.id }} · {{ bot.source.name }}
+            </SelectItem>
           </SelectContent>
         </Select>
       </label>
@@ -36,7 +38,7 @@
           <SelectTrigger class="webqq-debug-control" aria-label="按方向筛选">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent class="w-[var(--reka-select-trigger-width)] border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+          <SelectContent>
             <SelectItem value="all">全部方向</SelectItem>
             <SelectItem value="action">Action 调用</SelectItem>
             <SelectItem value="event">原始事件</SelectItem>
@@ -48,7 +50,7 @@
         <Input v-model="type" class="webqq-debug-control" placeholder="例如 get_login_info" @keyup.enter="applyFilters" />
       </label>
       <label class="webqq-debug-error-filter">
-        <Checkbox v-model="errorsOnly" class="border-slate-300 data-[state=checked]:border-[var(--webqq-accent)] data-[state=checked]:bg-[var(--webqq-accent)] data-[state=checked]:text-white" />
+        <Checkbox v-model="errorsOnly" />
         <span>仅显示错误</span>
       </label>
     </section>
@@ -57,12 +59,13 @@
     <div v-if="loading" class="webqq-debug-empty">正在读取调试记录…</div>
     <div v-else-if="!records.length" class="webqq-debug-empty">暂无符合条件的 OneBot 调试记录</div>
     <div v-else v-webqq-scrollbar class="webqq-debug-records">
-      <article v-for="record in records" :key="record.id" class="webqq-debug-record">
+      <article v-for="record in records" :key="getRecordKey(record)" class="webqq-debug-record">
         <header>
           <div class="webqq-debug-record-title">
             <strong>{{ record.type }}</strong>
             <Badge variant="secondary">{{ record.direction === 'action' ? 'ACTION' : 'EVENT' }}</Badge>
             <Badge variant="secondary">{{ record.implementation === 'napcat' ? 'NapCat' : 'LLBot' }}</Badge>
+            <Badge variant="secondary">{{ record.source.name }}</Badge>
             <Badge :class="record.status === 'error' ? 'webqq-debug-status-error' : 'webqq-debug-status-success'">
               {{ record.status === 'error' ? '错误' : '成功' }}
             </Badge>
@@ -70,7 +73,7 @@
           <time>{{ formatTime(record.createdAt) }} · {{ record.durationMs }} ms</time>
         </header>
         <p v-if="record.resolvedType && record.resolvedType !== record.type" class="webqq-debug-resolved">实际处理：{{ record.resolvedType }}</p>
-        <p class="webqq-debug-entities">机器人 {{ getBotName(record.botId) }} · {{ formatEntities(record) }}</p>
+        <p class="webqq-debug-entities">机器人 {{ getBotName(record) }} · {{ formatEntities(record) }}</p>
         <p v-if="record.error" class="webqq-debug-trace">{{ record.error.message }} · trace {{ record.error.traceId }}</p>
         <div class="webqq-debug-payloads">
           <section v-if="record.payload !== undefined">
@@ -98,13 +101,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type {
   GetSandboxOneBotDebugRecordsInput,
-  SandboxBotProfile,
-  SandboxOneBotDebugRecord,
+  SandboxConsoleOneBotDebugRecord,
+  SandboxDirectoryBot,
 } from '../src/types'
 
 const props = defineProps<{
-  records: readonly SandboxOneBotDebugRecord[]
-  bots: readonly Pick<SandboxBotProfile, 'id' | 'name'>[]
+  records: readonly SandboxConsoleOneBotDebugRecord[]
+  bots: readonly SandboxDirectoryBot[]
   loading: boolean
   error: string
 }>()
@@ -120,15 +123,28 @@ const errorsOnly = ref(false)
 
 function applyFilters() {
   emit('query', {
-    botId: botId.value === 'all' ? undefined : botId.value,
+    botId: botId.value === 'all' ? undefined : props.bots.find((bot) => getBotKey(bot) === botId.value)?.id,
     direction: direction.value === 'action' || direction.value === 'event' ? direction.value : undefined,
     type: type.value.trim() || undefined,
     errorsOnly: errorsOnly.value || undefined,
   })
 }
 
-function getBotName(id: string) {
-  return props.bots.find((bot) => bot.id === id)?.name ?? id
+function getSourceKey(source: SandboxConsoleOneBotDebugRecord['source']) {
+  return source.type === 'main' ? 'main' : `space:${source.spaceId}`
+}
+
+function getBotKey(bot: SandboxDirectoryBot) {
+  return `${getSourceKey(bot.source)}:${bot.id}`
+}
+
+function getRecordKey(record: SandboxConsoleOneBotDebugRecord) {
+  return `${getSourceKey(record.source)}:${record.id}`
+}
+
+function getBotName(record: SandboxConsoleOneBotDebugRecord) {
+  const sourceKey = getSourceKey(record.source)
+  return props.bots.find((bot) => bot.id === record.botId && getSourceKey(bot.source) === sourceKey)?.name ?? record.botId
 }
 
 function formatTime(value: string) {
@@ -141,7 +157,7 @@ function formatTime(value: string) {
   }).format(new Date(value))
 }
 
-function formatEntities(record: SandboxOneBotDebugRecord) {
+function formatEntities(record: SandboxConsoleOneBotDebugRecord) {
   const entries = Object.entries(record.entities).filter((entry) => entry[1])
   return entries.length ? entries.map(([key, value]) => `${key}=${value}`).join(' · ') : '无关联实体'
 }

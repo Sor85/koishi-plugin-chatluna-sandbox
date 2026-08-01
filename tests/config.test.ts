@@ -10,5 +10,7 @@ describe('插件持久化配置', () => {
     if (!Config.dict) throw new Error('配置 Schema 缺少字段定义')
     expect(Config.dict.persistenceMode.meta.default).toBe('memory')
     expect(Config.dict.persistenceMode.meta.description).toBe('模拟 QQ 环境状态存储方式')
+    expect(Config.dict.webQQTimBubbleTail.meta.description).toBe('显示气泡小尖角')
+    expect(Config.dict.webQQChatStyle).toBeUndefined()
   })
 })

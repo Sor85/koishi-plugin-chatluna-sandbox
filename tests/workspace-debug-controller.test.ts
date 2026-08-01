@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createFakeWorkspacePort } from '../client/webqq/fake-workspace-port'
 import { createWorkspaceController } from '../client/webqq/workspace-controller'
-import type { SandboxOneBotDebugRecord, SandboxWorkspaceState } from '../src/types'
+import type { SandboxConsoleOneBotDebugRecord, SandboxWorkspaceState } from '../src/types'
 
 const workspace: SandboxWorkspaceState = {
   snapshot: {
@@ -19,7 +19,6 @@ const workspace: SandboxWorkspaceState = {
   chatLunaStates: [],
   appearance: {
     enableWebQQFrostedGlass: true,
-    webQQChatStyle: 'tim',
     webQQTimBubbleTail: true,
     webQQColorMode: 'auto',
     webQQAccentColor: '#2563eb',
@@ -27,7 +26,7 @@ const workspace: SandboxWorkspaceState = {
   persistence: { mode: 'memory', available: true, persisted: false },
 }
 
-const record: SandboxOneBotDebugRecord = {
+const record: SandboxConsoleOneBotDebugRecord = {
   id: 'debug-1',
   createdAt: '2026-07-25T12:00:00.000Z',
   botId: '20001',
@@ -40,6 +39,7 @@ const record: SandboxOneBotDebugRecord = {
   payload: {},
   result: { status: 'ok' },
   entities: {},
+  source: { type: 'main', name: '主环境' },
 }
 
 describe('WebQQ OneBot 调试控制器', () => {

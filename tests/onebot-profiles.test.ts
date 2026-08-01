@@ -48,6 +48,8 @@ describe('OneBot 实现配置', () => {
       expect.objectContaining({ action: 'get_version_info', description: expect.any(String), surface: 'standard', supported: true }),
       expect.objectContaining({ action: 'set_qq_avatar', description: expect.any(String), surface: 'native', supported: true }),
       expect.objectContaining({ action: 'send_poke', aliases: ['friend_poke', 'group_poke'], description: expect.stringContaining('戳一戳') }),
+      expect.objectContaining({ action: 'set_group_leave', surface: 'standard', supported: true }),
+      expect.objectContaining({ action: 'send_forward_msg', aliases: ['send_group_forward_msg', 'send_private_forward_msg'], supported: true }),
     ]))
     expect(napcat.capabilities).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'group.notice.delete', action: '_del_group_notice', handler: 'delete_group_notice', supported: true }),
@@ -91,6 +93,88 @@ describe('OneBot 实现配置', () => {
     expect(updatedGroup.announcements).toHaveLength(0)
     expect(updatedGroup.members.map(({ participantId }) => participantId)).not.toContain('10004')
     expect(updatedGroup.members.map(({ participantId }) => participantId)).not.toContain('10005')
+  })
+
+  it('提供 WebQQ 使用的好友分组，并只为 NapCat 提供最近会话', async () => {
+    const control = await createControl()
+    control.createBot({ id: '20002', name: 'LLBot 机器人', implementation: 'llbot', enabled: true })
+
+    await expect(control.bot.internal._request('get_friends_with_category', {})).resolves.toMatchObject({
+      data: [{
+        categoryId: 0,
+        categoryName: '我的好友',
+        categoryMbCount: expect.any(Number),
+        buddyList: expect.arrayContaining([
+          expect.objectContaining({ user_id: 10001, nickname: '测试用户1' }),
+        ]),
+      }],
+    })
+    await expect(control.getRuntimeBot('20002').internal._request('get_friends_with_category', {})).resolves.toMatchObject({
+      data: [expect.objectContaining({ categoryName: '我的好友', categoryMbCount: expect.any(Number) })],
+    })
+
+    await control.sendMessage({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      content: '最近会话测试',
+    })
+    await control.sendMessage({
+      operatorId: '10002',
+      conversationId: 'group:30001',
+      content: '最近群聊测试',
+    })
+    await expect(control.bot.internal._request('get_recent_contact', { count: 50 })).resolves.toMatchObject({
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          chatType: 1,
+          peerUin: '10001',
+          peerName: '测试用户1',
+          lastestMsg: expect.objectContaining({ raw_message: '最近会话测试' }),
+        }),
+        expect.objectContaining({
+          chatType: 2,
+          peerUin: '30001',
+          peerName: '测试群',
+          lastestMsg: expect.objectContaining({ raw_message: '最近群聊测试' }),
+        }),
+      ]),
+    })
+    await expect(control.getRuntimeBot('20002').internal._request('get_recent_contact', { count: 50 }))
+      .rejects.toThrow('LLBot 基线不支持 OneBot action：get_recent_contact')
+  })
+
+  it('NapCat 与 LLBot 都提供私聊和群聊历史消息', async () => {
+    const control = await createControl()
+    control.createBot({ id: '20002', name: 'LLBot 机器人', implementation: 'llbot', enabled: true })
+    const group = control.getSnapshot().groups[0]
+    control.updateGroup({
+      id: group.id,
+      name: group.name,
+      members: [...group.members, { participantId: '20002', role: 'admin' }],
+    })
+    await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content: 'NapCat 私聊历史' })
+    await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20002', content: 'LLBot 私聊历史' })
+    await control.sendMessage({ operatorId: '10002', conversationId: 'group:30001', content: '群聊历史' })
+
+    await expect(control.bot.internal._request('get_friend_msg_history', {
+      user_id: 10001,
+      message_seq: 0,
+      count: 30,
+    })).resolves.toMatchObject({ data: { messages: [expect.objectContaining({ raw_message: 'NapCat 私聊历史' })] } })
+    await expect(control.getRuntimeBot('20002').internal._request('get_friend_msg_history', {
+      user_id: 10001,
+      message_seq: 0,
+      count: 30,
+      reverseOrder: false,
+    })).resolves.toMatchObject({ data: { messages: [expect.objectContaining({ raw_message: 'LLBot 私聊历史' })] } })
+    for (const botId of ['20001', '20002']) {
+      await expect(control.getRuntimeBot(botId).internal._request('get_group_msg_history', {
+        group_id: 30001,
+        message_seq: 0,
+        count: 30,
+        ...(botId === '20002' ? { reverseOrder: false } : {}),
+      })).resolves.toMatchObject({ data: { messages: [expect.objectContaining({ raw_message: '群聊历史' })] } })
+    }
   })
 
   it('按机器人实现配置生成版本返回并隔离能力覆盖', async () => {

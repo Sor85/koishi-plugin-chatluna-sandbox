@@ -8,9 +8,10 @@ import type {
   ManageSandboxEnvironmentInput,
   PerformFriendActionInput,
   PerformGroupActionInput,
+  RecallMessageInput,
+  SandboxConsoleOneBotDebugRecord,
   SandboxMediaContent,
   SandboxMessageHistory,
-  SandboxOneBotDebugRecord,
   SandboxWorkspaceState,
   SendMediaMessageInput,
   SendMessageInput,
@@ -38,7 +39,7 @@ export class FakeWorkspacePort implements WorkspacePort {
     reference: 'sandbox-media://media-1',
     dataBase64: '',
   }
-  debugRecordsResult: SandboxOneBotDebugRecord[] = []
+  debugRecordsResult: SandboxConsoleOneBotDebugRecord[] = []
   clearDebugRecordsResult: ClearSandboxOneBotDebugRecordsResult = { cleared: 0 }
   private readonly failures = new Map<WorkspacePortOperation, Error[]>()
 
@@ -72,6 +73,10 @@ export class FakeWorkspacePort implements WorkspacePort {
 
   sendMediaMessage(input: SendMediaMessageInput) {
     return this.invoke('sendMediaMessage', input, this.workspaceResult)
+  }
+
+  recallMessage(input: RecallMessageInput) {
+    return this.invoke('recallMessage', input, this.workspaceResult)
   }
 
   getMediaContent(input: GetMediaContentInput) {

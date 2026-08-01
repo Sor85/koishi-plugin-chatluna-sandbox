@@ -112,7 +112,6 @@
 
 .webqq-icon-button.is-active {
   color: var(--webqq-accent);
-  background: color-mix(in srgb, var(--webqq-accent) 14%, transparent);
 }
 
 .webqq-menu-avatar {
@@ -195,4 +194,157 @@
   border: 1px dashed color-mix(in srgb, var(--webqq-accent) 46%, transparent);
   color: var(--webqq-accent);
   background: color-mix(in srgb, var(--webqq-accent) 9%, var(--webqq-bg));
+}
+
+/* ==== shadcn 控件 webqq 基线 ====
+   Koishi console 的 devMode 不执行本插件的 Tailwind 编译，按需颜色类（bg-red-600、bg-white、
+   bg-background 等）只能"蹭"同环境其他插件产物里恰好存在的规则，控件底色随环境漂移甚至消失。
+   这里用组件自带的 data-slot / data-variant 属性把控件观感固定到 webqq 令牌上；
+   本文件不在 @layer 内，天然优先于 @layer utilities 里的工具类，两种模式下观感一致。 */
+
+:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) [data-slot="button"] {
+  border: 1px solid transparent;
+}
+
+:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) [data-slot="button"]:disabled {
+  opacity: 0.5;
+}
+
+:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) :is([data-slot="button"]:not([data-variant]), [data-slot="button"][data-variant="default"]) {
+  color: #fff;
+  background: var(--webqq-accent);
+}
+
+:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) :is([data-slot="button"]:not([data-variant]), [data-slot="button"][data-variant="default"]):hover:not(:disabled) {
+  background: color-mix(in srgb, var(--webqq-accent) 88%, #000);
+}
+
+:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) [data-slot="button"][data-variant="outline"] {
+  border-color: var(--webqq-border);
+  color: var(--webqq-text);
+  background: var(--webqq-bg);
+  box-shadow: none;
+}
+
+:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) [data-slot="button"][data-variant="outline"]:hover:not(:disabled) {
+  color: var(--webqq-text);
+  background: var(--webqq-hover);
+}
+
+:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) [data-slot="button"][data-variant="secondary"] {
+  color: var(--webqq-text);
+  background: var(--webqq-hover);
+}
+
+:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) [data-slot="button"][data-variant="secondary"]:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--webqq-hover) 70%, var(--webqq-border));
+}
+
+:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) [data-slot="button"][data-variant="ghost"] {
+  color: var(--webqq-muted);
+  background: transparent;
+}
+
+:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) [data-slot="button"][data-variant="ghost"]:hover:not(:disabled) {
+  color: var(--webqq-text);
+  background: var(--webqq-hover);
+}
+
+:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) [data-slot="button"][data-variant="destructive"] {
+  color: #fff;
+  background: #dc2626;
+}
+
+:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) [data-slot="button"][data-variant="destructive"]:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) :is([data-slot="input"], [data-slot="select-trigger"]) {
+  border-color: var(--webqq-border);
+  color: var(--webqq-text);
+  background: var(--webqq-bg);
+  box-shadow: none;
+}
+
+:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) :is([data-slot="input"], [data-slot="select-trigger"])::placeholder {
+  color: var(--webqq-muted);
+}
+
+:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) :is([data-slot="input"], [data-slot="select-trigger"]):focus-visible {
+  border-color: var(--webqq-accent);
+  box-shadow: 0 0 0 3px var(--webqq-accent-shadow);
+  outline: none;
+}
+
+:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) [data-slot="checkbox"] {
+  border-color: var(--webqq-border);
+  background: var(--webqq-bg);
+}
+
+:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) [data-slot="checkbox"][data-state="checked"] {
+  border-color: var(--webqq-accent);
+  color: #fff;
+  background: var(--webqq-accent);
+}
+
+/* Dialog / Popover / Select 面板本体（teleport 到 body，颜色取自 tokens 的面板镜像变量）。 */
+.sandbox-dialog-content,
+.sandbox-popover-content {
+  border-color: var(--webqq-border);
+  color: var(--webqq-text);
+  background: var(--webqq-bg);
+}
+
+.sandbox-dialog-close {
+  color: var(--webqq-muted);
+}
+
+.sandbox-dialog-close:hover {
+  color: var(--webqq-text);
+  background: var(--webqq-hover);
+}
+
+.sandbox-select-content {
+  /* 下拉面板统一与触发器同宽（reka popper 提供触发器宽度变量）。 */
+  width: var(--reka-select-trigger-width);
+  min-width: var(--reka-select-trigger-width);
+  border-color: var(--webqq-border);
+  border-radius: 12px;
+  color: var(--webqq-text);
+  background: var(--webqq-bg);
+  box-shadow: 0 12px 32px rgb(15 23 42 / 16%);
+}
+
+.sandbox-select-content [data-slot="select-item"] {
+  border-radius: 8px;
+  color: var(--webqq-text);
+}
+
+.sandbox-select-content [data-slot="select-item"][data-highlighted] {
+  color: var(--webqq-text);
+  background: var(--webqq-hover);
+}
+
+/* 键盘选中项已有 data-highlighted 底色反馈，去掉工具类蹭来的 focus 蓝色描边。 */
+.sandbox-select-content [data-slot="select-item"]:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.webqq-workspace [data-slot="badge"][data-variant="default"] {
+  border-color: transparent;
+  color: #fff;
+  background: var(--webqq-accent);
+}
+
+.webqq-workspace [data-slot="badge"][data-variant="secondary"] {
+  border-color: transparent;
+  color: var(--webqq-muted);
+  background: var(--webqq-hover);
+}
+
+.webqq-workspace [data-slot="badge"][data-variant="outline"] {
+  border-color: var(--webqq-border);
+  color: var(--webqq-muted);
+  background: transparent;
 }

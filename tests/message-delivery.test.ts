@@ -113,17 +113,33 @@ describe('消息单份存储与机器人事件投递', () => {
       .toEqual([expect.objectContaining({ recipientBotId: '20002' })])
   })
 
-  it('删除消息时同步清理对应的机器人投递记录', async () => {
+  it('机器人撤回自己的消息后原消息就地变为撤回灰条', async () => {
+    const { control } = await createControl()
+    const result = await control.sendMessage({
+      operatorId: '20001',
+      conversationId: 'private:10001:20001',
+      content: '待撤回消息',
+    })
+
+    await control.recallBotMessage('20001', result.messageId)
+
+    const recalled = control.getSnapshot().messages.find(({ id }) => id === result.messageId)
+    expect(recalled).toEqual(expect.objectContaining({
+      content: 'Koishi 撤回了一条消息',
+      event: { type: 'recall', operatorId: '20001' },
+    }))
+    expect(control.getSnapshot().conversations.find(({ id }) => id === 'private:10001:20001')?.messageIds)
+      .toContain(result.messageId)
+  })
+
+  it('机器人不能撤回私聊中用户发送的消息', async () => {
     const { control } = await createControl()
     const result = await control.sendMessage({
       operatorId: '10001',
       conversationId: 'private:10001:20001',
-      content: '待删除消息',
+      content: '用户消息',
     })
 
-    control.deleteBotMessage('20001', result.messageId)
-
-    expect(control.getSnapshot().messages).toEqual([])
-    expect(control.getBotDeliveries()).toEqual([])
+    await expect(control.recallBotMessage('20001', result.messageId)).rejects.toThrow('只能撤回自己发送的消息')
   })
 })

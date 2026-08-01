@@ -163,4 +163,149 @@ describe('ChatLuna 多机器人对话状态', () => {
       expect.objectContaining({ botParticipantId: '20001', conversationId: 'group:30001', thinking: false }),
     ])
   })
+
+  it('思考开始与结束都广播场景变更，让聊天页面实时显示等待态', async () => {
+    const { app, control } = await createControl()
+    const session = createGroupSession(control, '20001')
+    const notifications: boolean[] = []
+    control.onSceneMutation(() => {
+      notifications.push(control.getChatLunaStates().some(({ thinking }) => thinking))
+    })
+
+    await emit(app, 'chatluna/before-chat', 'chatluna:group', {}, {}, {}, session)
+    await emit(app, 'chatluna/after-chat', 'chatluna:group', {}, {}, {}, {}, session)
+
+    expect(notifications).toEqual([true, false])
+  })
+
+  it('无法归属的思考事件不产生场景变更广播', async () => {
+    const { app, control } = await createControl()
+    let notifications = 0
+    control.onSceneMutation(() => {
+      notifications += 1
+    })
+
+    await emit(app, 'chatluna/before-chat', 'chatluna:invalid', {}, {}, {}, {
+      selfId: '10001',
+      channelId: 'group:30001',
+    })
+
+    expect(notifications).toBe(0)
+  })
+
+  it('把 chatluna-character 的思考内容与用量归档到机器人消息上', async () => {
+    const { app, control } = await createControl()
+    const session = createGroupSession(control, '20001')
+
+    await emit(app, 'chatluna_character/message_collect', session, [])
+    await emit(app, 'chatluna/model-usage', {
+      context: { conversationId: 'chatluna:character' },
+      usageMetadata: { input_tokens: 12, output_tokens: 5, total_tokens: 17 },
+    })
+    await control.sendMessage({ operatorId: '20001', conversationId: 'group:30001', content: '好的' })
+    await emit(app, 'chatluna_character/after-chat', {
+      session,
+      lastResponseMessage: { content: '已清理的回复' },
+      completionMessages: [{
+        id: ['langchain_core', 'messages', 'AIMessage'],
+        kwargs: { content: '<think>先确认用户意图</think>好的' },
+      }],
+    })
+
+    const message = control.getSnapshot().messages.at(-1)
+    expect(message).toMatchObject({
+      authorId: '20001',
+      chatLuna: {
+        thought: '先确认用户意图',
+        usage: { inputTokens: 12, outputTokens: 5, totalTokens: 17 },
+      },
+    })
+    expect(message?.chatLuna?.thoughtDurationMs).toBeGreaterThanOrEqual(0)
+    expect(control.getChatLunaStates()).toEqual([
+      expect.objectContaining({ botParticipantId: '20001', thinking: false }),
+    ])
+  })
+
+  it('多轮对话时每条机器人消息各自保留思考内容', async () => {
+    const { app, control } = await createControl()
+    const session = createGroupSession(control, '20001')
+
+    for (const round of ['第一轮想法', '第二轮想法']) {
+      await emit(app, 'chatluna_character/message_collect', session, [])
+      await control.sendMessage({ operatorId: '20001', conversationId: 'group:30001', content: `回复 ${round}` })
+      await emit(app, 'chatluna_character/after-chat', {
+        session,
+        lastResponseMessage: { content: `<think>${round}</think>回复` },
+      })
+    }
+
+    expect(control.getSnapshot().messages.map(({ chatLuna }) => chatLuna?.thought)).toEqual(['第一轮想法', '第二轮想法'])
+  })
+
+  it('把核心 ChatLuna 的思考内容归档到机器人消息上', async () => {
+    const { app, control } = await createControl()
+    const session = createGroupSession(control, '20001')
+
+    await emit(app, 'chatluna/before-chat', 'chatluna:group', {}, {}, {}, session)
+    await control.sendMessage({ operatorId: '20001', conversationId: 'group:30001', content: '回复正文' })
+    await emit(app, 'chatluna/after-chat', 'chatluna:group', {}, {
+      content: '<think>核心链路思考</think>回复正文',
+    }, {}, {}, session)
+
+    expect(control.getSnapshot().messages.at(-1)?.chatLuna?.thought).toBe('核心链路思考')
+  })
+
+  it('回复不含思考内容时不写入空的思考字段', async () => {
+    const { app, control } = await createControl()
+    const session = createGroupSession(control, '20001')
+
+    await emit(app, 'chatluna_character/message_collect', session, [])
+    await control.sendMessage({ operatorId: '20001', conversationId: 'group:30001', content: '没有思考标签的回复' })
+    await emit(app, 'chatluna_character/after-chat', {
+      session,
+      lastResponseMessage: { content: '没有思考标签的回复' },
+    })
+
+    expect(control.getChatLunaStates()).toEqual([
+      expect.objectContaining({ botParticipantId: '20001', thinking: false }),
+    ])
+    expect(control.getSnapshot().messages.at(-1)?.chatLuna).toBeUndefined()
+  })
+
+  it('上一轮思考因上游报错未结束时不把等待时间算进这一轮', async () => {
+    const { app, control } = await createControl()
+    const session = createGroupSession(control, '20001')
+
+    // 第一轮只开始不结束，模拟 chatluna-character 遇到上游错误后不发结束事件。
+    await emit(app, 'chatluna_character/message_collect', session, [])
+    await new Promise((resolve) => setTimeout(resolve, 60))
+    await emit(app, 'chatluna_character/message_collect', session, [])
+    await control.sendMessage({ operatorId: '20001', conversationId: 'group:30001', content: '第二轮回复' })
+    await emit(app, 'chatluna_character/after-chat', {
+      session,
+      lastResponseMessage: { content: '<think>第二轮想法</think>回复' },
+    })
+
+    const chatLuna = control.getSnapshot().messages.at(-1)?.chatLuna
+    expect(chatLuna?.thought).toBe('第二轮想法')
+    expect(chatLuna?.thoughtDurationMs).toBeLessThan(60)
+  })
+
+  it('chatluna-character 链路没有内部会话 ID 时仍按唯一思考状态归属 Token', async () => {
+    const { app, control } = await createControl()
+    const session = createGroupSession(control, '20001')
+
+    await emit(app, 'chatluna_character/message_collect', session, [])
+    await emit(app, 'chatluna/model-usage', {
+      context: { conversationId: 'chatluna:character-internal' },
+      usageMetadata: { input_tokens: 1197, output_tokens: 938, total_tokens: 4304 },
+    })
+
+    expect(control.getChatLunaStates()).toEqual([
+      expect.objectContaining({
+        botParticipantId: '20001',
+        usage: { inputTokens: 1197, outputTokens: 938, totalTokens: 4304 },
+      }),
+    ])
+  })
 })

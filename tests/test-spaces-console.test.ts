@@ -6,7 +6,7 @@ import { SandboxTestSpaceService } from '../src/test-spaces'
 import type { SandboxAppearance } from '../src/types'
 
 const apps: App[] = []
-const appearance: SandboxAppearance = { enableWebQQFrostedGlass: true, webQQChatStyle: 'tim', webQQTimBubbleTail: true, webQQColorMode: 'auto', webQQAccentColor: '#2563eb' }
+const appearance: SandboxAppearance = { enableWebQQFrostedGlass: true, webQQTimBubbleTail: true, webQQColorMode: 'auto', webQQAccentColor: '#2563eb' }
 afterEach(async () => Promise.all(apps.splice(0).map((app) => app.stop())))
 
 describe('AI 测试空间 Console 适配器', () => {
@@ -18,7 +18,7 @@ describe('AI 测试空间 Console 适配器', () => {
     const spaces = new SandboxTestSpaceService(app, runtimeBots)
     const space = spaces.createSpace({ controllerId: 'credential-a', name: 'Console 空间' })
     const listeners = new Map<string, (...args: any[]) => any>()
-    const registrar: SandboxConsoleRegistrar = { addEntry() {}, addListener(event, callback) { listeners.set(event, callback as never) } }
+    const registrar: SandboxConsoleRegistrar = { addEntry() {}, addListener(event, callback) { listeners.set(event, callback as never) }, broadcast() {} }
     registerConsole(registrar, control, appearance, undefined, spaces)
 
     expect(listeners.get('onebot-sandbox/test-spaces')?.()).toMatchObject([{ id: space.id, status: 'running' }])
@@ -30,5 +30,8 @@ describe('AI 测试空间 Console 适配器', () => {
     expect(workspace.snapshot.participants).toContainEqual({ kind: 'user', id: '11001', name: '用户' })
     listeners.get('onebot-sandbox/return-test-space')?.({ spaceId: space.id })
     expect(spaces.getSpace(space.id).status).toBe('running')
+
+    expect(listeners.get('onebot-sandbox/terminate-test-space')?.({ spaceId: space.id })).toMatchObject({ status: 'completed' })
+    expect(spaces.getSpace(space.id).status).toBe('completed')
   })
 })

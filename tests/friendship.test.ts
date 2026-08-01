@@ -130,11 +130,14 @@ describe('模拟 QQ 环境好友关系', () => {
     await control.performFriendAction({ action: 'delete', operatorId: '10004', targetId: '20001' })
     const request = await control.performFriendAction({ action: 'request', operatorId: '10004', targetId: '20001' })
     if (!request.requestId) throw new Error('机器人好友申请未创建')
-    const notices: Array<{ type?: string; noticeType?: string; userId?: number; targetId?: number }> = []
+    const notices: Array<{ type?: string; subtype?: string; channelId?: string; sessionTargetId?: string; noticeType?: string; userId?: number; targetId?: number }> = []
     ;(app.on as unknown as (name: string, listener: (session: unknown) => void) => void)('notice', (session) => {
-      const value = session as { type?: string; onebot?: { notice_type?: string; user_id?: number; target_id?: number } }
+      const value = session as { type?: string; subtype?: string; channelId?: string; targetId?: string; onebot?: { notice_type?: string; user_id?: number; target_id?: number } }
       notices.push({
         type: value.type,
+        subtype: value.subtype,
+        channelId: value.channelId,
+        sessionTargetId: value.targetId,
         noticeType: value.onebot?.notice_type,
         userId: value.onebot?.user_id,
         targetId: value.onebot?.target_id,
@@ -159,8 +162,25 @@ describe('模拟 QQ 环境好友关系', () => {
     expect(pokeMessage).not.toHaveProperty('botId')
     await control.performFriendAction({ action: 'delete', operatorId: '10004', targetId: '20001' })
     expect(notices).toEqual([
-      { type: 'notice', noticeType: 'notify', userId: 10004, targetId: 20001 },
-      { type: 'notice', noticeType: 'friend_del', userId: 10004, targetId: 20001 },
+      // 与 adapter-onebot 对齐：poke 需要 subtype/targetId/channelId，插件靠这些字段过滤戳一戳。
+      {
+        type: 'notice',
+        subtype: 'poke',
+        channelId: 'private:10004:20001',
+        sessionTargetId: '20001',
+        noticeType: 'notify',
+        userId: 10004,
+        targetId: 20001,
+      },
+      {
+        type: 'notice',
+        subtype: undefined,
+        channelId: 'private:10004:20001',
+        sessionTargetId: undefined,
+        noticeType: 'friend_del',
+        userId: 10004,
+        targetId: 20001,
+      },
     ])
   })
 

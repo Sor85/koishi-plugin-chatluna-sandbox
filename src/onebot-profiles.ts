@@ -51,10 +51,16 @@ const standardActions = {
   set_group_name: '修改指定群的群名称',
   set_friend_add_request: '同意或拒绝好友申请',
   set_group_add_request: '同意或拒绝加群申请或群邀请',
+  set_group_leave: '退出指定群聊（群主不可直接退出）',
+  set_group_ban: '禁言指定群成员；沙盒校验群身份后确认调用，不维护禁言状态',
+  set_group_special_title: '设置群成员专属头衔；沙盒校验群主身份后确认调用，不保存头衔',
 } as const
 
 const nativeActions: SandboxOneBotCapability[] = [
   { id: 'get_stranger_info', action: 'get_stranger_info', handler: 'get_stranger_info', description: '获取指定 QQ 用户的基础资料', surface: 'native', supported: true },
+  { id: 'message.history.friend', action: 'get_friend_msg_history', handler: 'get_friend_msg_history', description: '获取指定好友的私聊历史消息', surface: 'native', supported: true },
+  { id: 'message.history.group', action: 'get_group_msg_history', handler: 'get_group_msg_history', description: '获取指定群的群聊历史消息', surface: 'native', supported: true },
+  { id: 'friend.category.list', action: 'get_friends_with_category', handler: 'get_friends_with_category', description: '获取按 QQ 好友分组整理的好友列表', surface: 'native', supported: true },
   { id: 'delete_friend', action: 'delete_friend', handler: 'delete_friend', description: '删除当前机器人的指定好友', surface: 'native', supported: true },
   { id: 'set_qq_profile', action: 'set_qq_profile', handler: 'set_qq_profile', description: '修改当前机器人的昵称资料', surface: 'native', supported: true },
   { id: 'set_qq_avatar', action: 'set_qq_avatar', handler: 'set_qq_avatar', description: '修改当前机器人的头像', surface: 'native', supported: true },
@@ -64,6 +70,23 @@ const nativeActions: SandboxOneBotCapability[] = [
     handler: 'send_poke',
     description: '向好友或群成员发送戳一戳',
     aliases: ['friend_poke', 'group_poke'],
+    surface: 'native',
+    supported: true,
+  },
+  {
+    id: 'message.emoji-like',
+    action: 'set_msg_emoji_like',
+    handler: 'set_msg_emoji_like',
+    description: '给消息贴表情回应；沙盒校验消息可见后确认调用，不保存回应',
+    surface: 'native',
+    supported: true,
+  },
+  {
+    id: 'message.forward.send',
+    action: 'send_forward_msg',
+    handler: 'send_forward_msg',
+    description: '发送合并转发消息；沙盒将各节点展平为一条消息写入会话',
+    aliases: ['send_group_forward_msg', 'send_private_forward_msg'],
     surface: 'native',
     supported: true,
   },
@@ -93,6 +116,14 @@ const baselines: Record<SandboxImplementationProfile, SandboxOneBotProfileBaseli
     appName: 'NapCat.Onebot',
     appVersion: 'sandbox-2026.07.24',
     capabilities: createCapabilities([
+      {
+        id: 'contact.recent.list',
+        action: 'get_recent_contact',
+        handler: 'get_recent_contact',
+        description: '获取当前机器人的最近私聊和群聊会话',
+        surface: 'native',
+        supported: true,
+      },
       {
         id: 'group.notice.delete',
         action: '_del_group_notice',

@@ -1,4 +1,7 @@
-import { App, Universal } from '@koishijs/core'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { App, h, Universal } from '@koishijs/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SandboxControlService } from '../src/control-service'
 
@@ -12,7 +15,9 @@ async function createControl() {
   const app = new App()
   let control: SandboxControlService | undefined
   app.plugin((ctx) => {
-    control = new SandboxControlService(ctx)
+    // 不传 mediaDirectory 时所有测试进程共享仓库内同一媒体目录，而控制服务构造/销毁都会 clear()
+    // 该目录，vitest 并行跑测试文件时会互相删掉对方刚写入的媒体文件，造成偶发 ENOENT。
+    control = new SandboxControlService(ctx, { mediaDirectory: mkdtempSync(join(tmpdir(), 'onebot-bridge-media-')) })
   })
   runningApps.push(app)
   await app.start()
@@ -21,6 +26,126 @@ async function createControl() {
 }
 
 describe('Koishi 与 OneBot 机器人桥接', () => {
+  it('后置中间件回复会写回原会话，并保留图片消息段', async () => {
+    const { app, control } = await createControl()
+    const imageSource = `data:image/png;base64,${Buffer.from('reply-image').toString('base64')}`
+    app.middleware((session, next) => next(async (nextMiddleware) => {
+      if (session.selfId !== '20001' || session.userId !== '10001') return nextMiddleware?.()
+      await session.sendQueued(h.image(imageSource), 0)
+    }))
+
+    await control.sendMessage({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      content: '触发机器人回复',
+    })
+
+    const messages = control.getSnapshot().messages
+    expect(messages).toHaveLength(2)
+    expect(messages[1]).toMatchObject({
+      authorId: '20001',
+      conversationId: 'private:10001:20001',
+      content: '[图片] image.png',
+      media: [expect.objectContaining({
+        type: 'image',
+        name: 'image.png',
+        mimeType: 'image/png',
+        reference: expect.stringMatching(/^sandbox-media:\/\//),
+      })],
+    })
+    expect(control.getMediaContent({ operatorId: '10001', mediaId: messages[1].media![0].id })).toMatchObject({
+      mimeType: 'image/png',
+      dataBase64: Buffer.from('reply-image').toString('base64'),
+    })
+    await expect(control.bot.internal._request('get_friend_msg_history', {
+      user_id: 10001,
+      message_seq: 0,
+      count: 30,
+    })).resolves.toMatchObject({
+      data: {
+        messages: [
+          expect.objectContaining({ message: [{ type: 'text', data: { text: '触发机器人回复' } }] }),
+          expect.objectContaining({ message: [{ type: 'image', data: expect.objectContaining({ url: expect.stringMatching(/^sandbox-media:\/\//) }) }] }),
+        ],
+      },
+    })
+  })
+
+  it('机器人发送的 execute 组件先执行命令再写入图片结果', async () => {
+    const { app, control } = await createControl()
+    const imageSource = `data:image/png;base64,${Buffer.from('execute-image').toString('base64')}`
+    app.command('sandbox.execute-test').action(() => h.image(imageSource))
+    app.middleware((session) => {
+      if (session.content === '触发 execute') return '<execute>sandbox.execute-test</execute>'
+    })
+
+    await control.sendMessage({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      content: '触发 execute',
+    })
+
+    expect(control.getSnapshot().messages).toEqual([
+      expect.objectContaining({ content: '触发 execute', authorId: '10001' }),
+      expect.objectContaining({
+        content: '[图片] image.png',
+        authorId: '20001',
+        media: [expect.objectContaining({
+          type: 'image',
+          mimeType: 'image/png',
+          reference: expect.stringMatching(/^sandbox-media:\/\//),
+        })],
+      }),
+    ])
+  })
+
+  it('群聊消息提供昵称唤醒所需的标准 Session 字段', async () => {
+    const { app, control } = await createControl()
+    let captured: {
+      guildId?: string
+      channelId?: string
+      isDirect?: boolean
+      selfId?: string
+      userId?: string
+      content?: string
+      text?: string
+    } | undefined
+    app.middleware((session) => {
+      if (session.channelId !== 'group:30001') return
+      captured = {
+        guildId: session.guildId,
+        channelId: session.channelId,
+        isDirect: session.isDirect,
+        selfId: session.selfId,
+        userId: session.userId,
+        content: session.content,
+        text: (session.elements ?? []).filter(({ type }) => type === 'text').map(({ attrs }) => attrs.content ?? '').join(''),
+      }
+      if (captured.text?.startsWith('宁宁')) return '群聊昵称回复'
+    })
+
+    await control.sendMessage({
+      operatorId: '10001',
+      conversationId: 'group:30001',
+      content: '宁宁你好',
+    })
+
+    expect(captured).toEqual({
+      guildId: '30001',
+      channelId: 'group:30001',
+      isDirect: false,
+      selfId: '20001',
+      userId: '10001',
+      content: '宁宁你好',
+      text: '宁宁你好',
+    })
+    expect(control.getSnapshot().messages.at(-1)).toMatchObject({
+      authorId: '20001',
+      conversationId: 'group:30001',
+      content: '群聊昵称回复',
+    })
+  })
+
   it('多个机器人始终使用各自真实 selfId 处理协议事件与 action', async () => {
     const { app, control } = await createControl()
     control.createBot({ id: '20002', name: '第二机器人', implementation: 'llbot', enabled: true })
@@ -134,6 +259,14 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
       retcode: 0,
       data: { group_id: 30001, user_id: 10002, nickname: '测试用户2', card: '测试用户2', role: 'admin' },
     })
+    await expect(bot.internal.getGroupMemberList('group:30001')).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ group_id: 30001, user_id: 10002, role: 'admin' }),
+    ]))
+    await expect(bot.internal.getGroupMemberInfo('group:30001', 10002)).resolves.toMatchObject({
+      group_id: 30001,
+      user_id: 10002,
+      role: 'admin',
+    })
     await expect(bot.internal._request('get_version_info', {})).resolves.toEqual({
       status: 'ok',
       retcode: 0,
@@ -167,9 +300,14 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     expect(control.getSnapshot().messages.filter(({ content }) => content === '群广播')).toHaveLength(1)
 
     await bot.internal._request('delete_msg', { message_id: groupResult.data.message_id })
-    expect(control.getSnapshot().messages.some(({ content }) => content === '群广播')).toBe(false)
+    expect(control.getSnapshot().messages.find(({ id }) => id === groupResult.data.message_id)).toEqual(expect.objectContaining({
+      content: 'Koishi 撤回了一条消息',
+      event: { type: 'recall', operatorId: '20001' },
+    }))
     await bot.deleteMessage('private:10001:20001', standardMessageId)
-    expect(control.getSnapshot().messages.some(({ id }) => id === standardMessageId)).toBe(false)
+    expect(control.getSnapshot().messages.find(({ id }) => id === standardMessageId)).toEqual(expect.objectContaining({
+      event: { type: 'recall', operatorId: '20001' },
+    }))
   })
 
   it('机器人通过标准方法和 OneBot action 处理申请与群管理', async () => {
@@ -239,5 +377,30 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
       expect.objectContaining({ type: 'guild-member-removed', userId: '10003', guildId: '30001', rawType: 'group_decrease' }),
     ]))
     expect(rawNotices).toEqual(expect.arrayContaining(['group_increase', 'group_card', 'group_name', 'group_decrease']))
+  })
+
+  it('NapCat 扩展群管理与合并转发 action 走沙盒域逻辑', async () => {
+    const { control } = await createControl()
+    const bot = control.bot
+    control.createGroup({ id: '30002', name: '扩展测试群', members: [
+      { participantId: '10001', role: 'owner' },
+      { participantId: '20001', role: 'admin' },
+      { participantId: '10003', role: 'member' },
+    ] })
+
+    await expect(bot.internal._request('set_group_ban', { group_id: 30002, user_id: 10003, duration: 600 })).resolves.toMatchObject({ status: 'ok' })
+    await expect(bot.internal._request('set_group_special_title', { group_id: 30002, user_id: 10003, special_title: '头衔' })).rejects.toThrow('只有群主可以设置专属头衔')
+
+    const sent = await bot.internal._request('send_group_msg', { group_id: 30002, message: '表情回应目标' }) as { data: { message_id: string } }
+    await expect(bot.internal._request('set_msg_emoji_like', { message_id: sent.data.message_id, emoji_id: '128077' })).resolves.toMatchObject({ status: 'ok' })
+
+    await bot.internal._request('send_forward_msg', { group_id: 30002, messages: [
+      { type: 'node', data: { user_id: 20001, nickname: 'Koishi', content: '第一段' } },
+      { type: 'node', data: { user_id: 20001, nickname: 'Koishi', content: [{ type: 'text', data: { text: '第二段' } }] } },
+    ] })
+    expect(control.getSnapshot().messages.at(-1)).toMatchObject({ authorId: '20001', content: '第一段\n第二段' })
+
+    await expect(bot.internal._request('set_group_leave', { group_id: 30002 })).resolves.toMatchObject({ status: 'ok' })
+    expect(control.getSnapshot().groups.find(({ id }) => id === '30002')!.members.some(({ participantId }) => participantId === '20001')).toBe(false)
   })
 })

@@ -19,6 +19,10 @@
   display: flex;
 }
 
+.webqq-rail-tooltip-trigger.is-rail-pin-bottom {
+  margin-top: auto;
+}
+
 .webqq-rail-button.is-active {
   color: #fff;
   background: var(--webqq-accent);
@@ -331,11 +335,11 @@
   min-width: 0;
   min-height: 34px;
   padding: 0 12px 0 34px;
-  border: 1px solid rgb(255 255 255 / 48%);
+  border: 1px solid color-mix(in srgb, var(--webqq-panel) 48%, transparent);
   border-radius: 9px;
   outline: none;
   color: var(--webqq-text);
-  background: rgb(255 255 255 / 46%);
+  background: color-mix(in srgb, var(--webqq-panel) 46%, transparent);
   font-size: 13px;
 }
 

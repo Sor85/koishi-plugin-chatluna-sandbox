@@ -282,16 +282,6 @@
   border-color: rgb(148 163 184 / 24%);
   background: rgb(15 23 42 / 62%);
 }
-
-@media (prefers-color-scheme: dark) {
-  .webqq-workspace[data-color-mode="auto"] .webqq-announcement-editor,
-  .webqq-workspace[data-color-mode="auto"] .webqq-group-announcement,
-  .webqq-workspace[data-color-mode="auto"] .webqq-group-members > input {
-    border-color: rgb(148 163 184 / 24%);
-    background: rgb(15 23 42 / 62%);
-  }
-}
-
 .webqq-profile-hero {
   display: flex;
   flex-direction: column;

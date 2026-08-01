@@ -78,9 +78,9 @@ describe('Koishi Database 场景仓库', () => {
     const app = new App()
     const extend = vi.spyOn(app.model, 'extend')
     registerSandboxSceneModel(app)
-    const persistence = new KoishiDatabaseScenePersistence(context.database)
+    const persistence = new KoishiDatabaseScenePersistence(() => context.database)
 
-    expect(extend).toHaveBeenCalledWith('onebotSandboxScene', expect.objectContaining({
+    expect(extend).toHaveBeenCalledWith('onebot-sandbox.scene', expect.objectContaining({
       id: expect.anything(),
       scene: 'json',
       updatedAt: 'timestamp',
@@ -89,7 +89,7 @@ describe('Koishi Database 场景仓库', () => {
 
     await persistence.save(snapshot)
     expect(await persistence.load()).toEqual(snapshot)
-    expect(context.database.upsert).toHaveBeenCalledWith('onebotSandboxScene', [expect.objectContaining({
+    expect(context.database.upsert).toHaveBeenCalledWith('onebot-sandbox.scene', [expect.objectContaining({
       id: 'main',
       scene: snapshot,
     })])
@@ -102,7 +102,7 @@ describe('Koishi Database 场景仓库', () => {
   })
 
   it('数据库服务缺失时明确报告不可用且不误报已持久化', async () => {
-    const persistence = new KoishiDatabaseScenePersistence()
+    const persistence = new KoishiDatabaseScenePersistence(() => undefined)
 
     expect(await persistence.load()).toBeUndefined()
     await persistence.save(snapshot)
@@ -119,7 +119,7 @@ describe('Koishi Database 场景仓库', () => {
     const app = new App()
     const extend = vi.spyOn(app.model, 'extend')
     registerSandboxTestSpaceModel(app)
-    const persistence = new KoishiDatabaseTestSpacePersistence(context.database)
+    const persistence = new KoishiDatabaseTestSpacePersistence(() => context.database)
     const record = {
       id: 'space-1',
       name: '退群公告测试',
@@ -131,7 +131,7 @@ describe('Koishi Database 场景仓库', () => {
       scene: snapshot,
     }
 
-    expect(extend).toHaveBeenCalledWith('onebotSandboxTestSpace', expect.objectContaining({
+    expect(extend).toHaveBeenCalledWith('onebot-sandbox.test-space', expect.objectContaining({
       id: expect.anything(),
       scene: 'json',
     }), { primary: 'id' })

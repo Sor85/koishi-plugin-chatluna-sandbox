@@ -60,6 +60,7 @@
             <GroupMemberMenu
               :actor="getCurrentGroupMember(model.currentOperatorId ?? '')"
               :target="member"
+              @mention="emit('mentionGroupMember', member.participantId)"
               @poke="emit('pokeGroupMember', member.participantId)"
               @set-card="emit('setGroupCard', member.participantId)"
               @set-admin="emit('setGroupAdmin', member.participantId, $event)"
@@ -93,6 +94,7 @@ import { IconDatabase, IconDots, IconPlus, IconTrash } from '@tabler/icons-vue'
 import { computed, ref, watch } from 'vue'
 import { ContextMenu, ContextMenuTrigger } from './components/ui/context-menu'
 import GroupMemberMenu from './group-member-menu.vue'
+import { getGroupMemberDisplayName, getGroupRoleLabel } from './webqq/group-display'
 import WebqqAvatar from './webqq-avatar.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type { SandboxBotProfile, SandboxGroup, SandboxGroupMember, SandboxPersistenceStatus } from '../src/types'
@@ -122,6 +124,7 @@ const emit = defineEmits<{
   close: []
   publishAnnouncement: [content: string, resolve: () => void, reject: (error: unknown) => void]
   deleteAnnouncement: [announcementId: string, resolve: () => void, reject: (error: unknown) => void]
+  mentionGroupMember: [targetId: string]
   pokeGroupMember: [targetId: string]
   setGroupCard: [targetId: string]
   setGroupAdmin: [targetId: string, enabled: boolean]
@@ -163,13 +166,7 @@ function getParticipant(id: string): WebqqDetailsParticipant {
 }
 
 function getGroupMemberName(member: SandboxGroupMember) {
-  return member.card?.trim() || getParticipant(member.participantId).name
-}
-
-function getGroupRoleLabel(role: SandboxGroupMember['role']) {
-  if (role === 'owner') return '群主'
-  if (role === 'admin') return '管理员'
-  return '成员'
+  return getGroupMemberDisplayName(member, getParticipant(member.participantId).name)
 }
 
 function getCurrentGroupMember(participantId: string) {

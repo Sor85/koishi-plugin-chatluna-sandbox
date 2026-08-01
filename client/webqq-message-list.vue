@@ -1,6 +1,6 @@
 <template>
   <section v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-messages" aria-label="消息记录">
-    <div v-if="!model.messages.length && !model.chatLunaStates.some((state) => state.thinking || state.usage)" class="webqq-welcome">
+    <div v-if="!model.messages.length && !model.chatLunaStates.some((state) => state.thinking)" class="webqq-welcome">
       <WebqqAvatar class="webqq-avatar webqq-avatar-large" :kind="model.avatarKind" :name="model.title" :avatar="model.avatar" />
       <strong>{{ model.title }}</strong>
       <p>发送消息，验证插件在模拟 QQ 环境中的响应</p>
@@ -19,16 +19,16 @@
               class="webqq-message-row"
               :class="[
                 message.authorId === model.currentOperatorId ? 'is-outgoing' : 'is-incoming',
-                getMessageClusterClass(model.messages, messageIndex, model.chatStyle, model.currentOperatorId),
-                { 'is-merged': isMergedMessage(model.messages, messageIndex, model.chatStyle, model.currentOperatorId) },
+                getMessageClusterClass(model.messages, messageIndex, model.currentOperatorId),
+                { 'is-merged': isMergedMessage(model.messages, messageIndex, model.currentOperatorId) },
                 { 'is-quote-target': highlightedMessageId === message.id },
               ]"
               :data-message-id="message.id"
             >
               <ContextMenu v-if="message.authorId !== model.currentOperatorId">
                 <ContextMenuTrigger as-child>
-                  <button type="button" class="webqq-message-avatar-wrap webqq-message-avatar-trigger" :aria-label="`打开 ${getParticipantName(message.authorId)} 的操作菜单`" @contextmenu.stop>
-                    <WebqqAvatar class="webqq-message-avatar" :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'" :name="getParticipantName(message.authorId)" :avatar="getParticipantAvatar(message.authorId)" />
+                  <button type="button" class="webqq-message-avatar-wrap webqq-message-avatar-trigger" :aria-label="`打开 ${getMessageAuthorName(message.authorId)} 的操作菜单`" @contextmenu.stop>
+                    <WebqqAvatar class="webqq-message-avatar" :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'" :name="getMessageAuthorName(message.authorId)" :avatar="getParticipantAvatar(message.authorId)" />
                   </button>
                 </ContextMenuTrigger>
                 <ContextMenuContent style="z-index: 140">
@@ -38,6 +38,7 @@
                       sub
                       :actor="getCurrentGroupMember(model.currentOperatorId ?? '')"
                       :target="getCurrentGroupMember(message.authorId)!"
+                      @mention="emit('mentionGroupMember', message.authorId)"
                       @poke="emit('pokeGroupMember', message.authorId)"
                       @set-card="emit('setGroupCard', message.authorId)"
                       @set-admin="emit('setGroupAdmin', message.authorId, $event)"
@@ -61,17 +62,22 @@
                 </ContextMenuContent>
               </ContextMenu>
               <span v-else class="webqq-message-avatar-wrap">
-                <WebqqAvatar class="webqq-message-avatar" :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'" :name="getParticipantName(message.authorId)" :avatar="getParticipantAvatar(message.authorId)" />
+                <WebqqAvatar class="webqq-message-avatar" :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'" :name="getMessageAuthorName(message.authorId)" :avatar="getParticipantAvatar(message.authorId)" />
               </span>
               <div class="webqq-message-content">
-                <div v-if="!isMergedMessage(model.messages, messageIndex, model.chatStyle, model.currentOperatorId)" class="webqq-sender-line">
-                  <span class="webqq-message-author">{{ getParticipantName(message.authorId) }}</span>
+                <div v-if="!isMergedMessage(model.messages, messageIndex, model.currentOperatorId)" class="webqq-sender-line">
+                  <span class="webqq-message-author">{{ getMessageAuthorName(message.authorId) }}</span>
+                  <span
+                    v-if="getMessageRoleBadge(message.authorId)"
+                    class="webqq-role-badge"
+                    :class="`is-${getMessageRoleBadge(message.authorId)!.kind}`"
+                  >{{ getMessageRoleBadge(message.authorId)!.text }}</span>
                 </div>
                 <div class="webqq-message-body">
                   <div class="webqq-message-bubble">
                     <button v-if="getReplyMessage(message)" class="webqq-message-quote is-clickable" type="button" aria-label="跳转到引用消息" @click.stop="scrollToQuotedMessage(getReplyMessage(message)!.id)">
-                      <strong class="webqq-message-quote-title">{{ getParticipantName(getReplyMessage(message)!.authorId) }}</strong>
-                      <span>{{ getReplyMessage(message)!.content }}</span>
+                      <strong class="webqq-message-quote-title">{{ getMessageAuthorName(getReplyMessage(message)!.authorId) }}</strong>
+                      <span>{{ getMessageText(getReplyMessage(message)!) }}</span>
                     </button>
                     <div v-for="media in message.media" :key="media.id" class="webqq-message-media">
                       <img v-if="media.type === 'image' && getMediaSource(media.id)" :src="getMediaSource(media.id)" :alt="media.name">
@@ -85,18 +91,93 @@
                     </div>
                     <span v-if="getMessageText(message)">{{ getMessageText(message) }}</span>
                   </div>
+                  <time class="webqq-message-time">{{ formatMessageTime(message.createdAt) }}</time>
                 </div>
               </div>
             </li>
           </ContextMenuTrigger>
           <ContextMenuContent style="z-index: 140">
             <ContextMenuItem @select="emit('reply', message.id)"><IconMessageReply :size="16" aria-hidden="true" /> 回复</ContextMenuItem>
+            <ContextMenuItem v-if="canRecallMessage(message)" class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="emit('recallMessage', message.id)">
+              <IconArrowBackUp :size="16" aria-hidden="true" /> 撤回
+            </ContextMenuItem>
           </ContextMenuContent>
         </ContextMenu>
+        <li
+          v-if="getMessageThinking(message)"
+          :key="`${message.id}:thinking`"
+          class="webqq-thinking-row"
+          :class="message.authorId === model.currentOperatorId ? 'is-outgoing' : 'is-incoming'"
+        >
+          <button
+            type="button"
+            class="webqq-thinking-toggle"
+            :aria-expanded="isThinkingExpanded(message)"
+            @click="toggleThinking(message)"
+          >
+            <span
+              v-if="getMessageThinking(message)!.usage"
+              class="webqq-thinking-usage"
+              aria-label="本次 ChatLuna 调用指标"
+            >
+              <span class="webqq-thinking-usage-group">
+                <svg class="webqq-thinking-usage-icon is-input" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 20V8" />
+                  <path d="m7 13 5-5 5 5" />
+                  <path d="M5 4h14" />
+                </svg>
+                <span>{{ getMessageThinking(message)!.usage!.inputTokens }}</span>
+                <svg class="webqq-thinking-usage-icon is-output" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 4v12" />
+                  <path d="m7 11 5 5 5-5" />
+                  <path d="M5 20h14" />
+                </svg>
+                <span>{{ getMessageThinking(message)!.usage!.outputTokens }}</span>
+              </span>
+            </span>
+            <span class="webqq-thinking-duration">{{ formatThinkingDuration(getMessageThinking(message)!.thoughtDurationMs) }}</span>
+            <svg
+              class="webqq-thinking-chevron"
+              :class="{ 'is-expanded': isThinkingExpanded(message) }"
+              viewBox="0 0 16 16"
+              aria-hidden="true"
+            >
+              <path d="M6 3.5 10.5 8 6 12.5" />
+            </svg>
+          </button>
+          <Transition name="webqq-thinking" @before-leave="prepareThinkingPanelLeave">
+            <div v-if="isThinkingExpanded(message)" class="webqq-thinking-panel">
+              <div class="webqq-thinking-content">{{ getMessageThinking(message)!.thought }}</div>
+            </div>
+          </Transition>
+        </li>
+        <li
+          v-else-if="getMessageUsage(message)"
+          :key="`${message.id}:usage`"
+          class="webqq-thinking-row is-usage-only"
+          :class="message.authorId === model.currentOperatorId ? 'is-outgoing' : 'is-incoming'"
+        >
+          <div class="webqq-thinking-usage" aria-label="本次 ChatLuna 调用指标">
+            <span class="webqq-thinking-usage-group">
+              <svg class="webqq-thinking-usage-icon is-input" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 20V8" />
+                <path d="m7 13 5-5 5 5" />
+                <path d="M5 4h14" />
+              </svg>
+              <span>{{ getMessageUsage(message)!.usage!.inputTokens }}</span>
+              <svg class="webqq-thinking-usage-icon is-output" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 4v12" />
+                <path d="m7 11 5 5 5-5" />
+                <path d="M5 20h14" />
+              </svg>
+              <span>{{ getMessageUsage(message)!.usage!.outputTokens }}</span>
+            </span>
+          </div>
+        </li>
       </template>
       <li
         v-for="state in model.chatLunaStates"
-        v-show="state.thinking || state.usage"
+        v-show="state.thinking"
         :key="`${state.botParticipantId}:${state.conversationId}`"
         class="webqq-message-row webqq-chatluna-state"
         :class="state.botParticipantId === model.currentOperatorId ? 'is-outgoing' : 'is-incoming'"
@@ -110,15 +191,18 @@
           />
         </span>
         <div class="webqq-message-content">
-          <span class="webqq-message-author">{{ getParticipantName(state.botParticipantId) }}</span>
-          <div v-if="state.thinking" class="webqq-message-bubble" aria-label="机器人正在思考">
-            <span class="webqq-chatluna-thinking-dots">
-              <span v-for="dot in 3" :key="dot" class="webqq-chatluna-thinking-dot" />
-            </span>
+          <!-- 等待气泡必须复用普通消息的 sender-line + message-body 结构：
+               少了包裹层会丢掉 .webqq-sender-line + .webqq-message-body 的 6px 间距，
+               等待气泡会比真实消息更贴近名字，被替换成真实消息时还会整体下跳。 -->
+          <div class="webqq-sender-line">
+            <span class="webqq-message-author">{{ getParticipantName(state.botParticipantId) }}</span>
           </div>
-          <div v-if="state.usage" class="webqq-chatluna-usage" :aria-label="`Token：输入 ${state.usage.inputTokens}，输出 ${state.usage.outputTokens}，总计 ${state.usage.totalTokens}`">
-            <span><IconArrowUp :size="13" aria-hidden="true" /> {{ state.usage.inputTokens }}</span>
-            <span><IconArrowDown :size="13" aria-hidden="true" /> {{ state.usage.outputTokens }}</span>
+          <div class="webqq-message-body">
+            <div class="webqq-message-bubble" aria-label="机器人正在思考">
+              <span class="webqq-chatluna-thinking-dots">
+                <span v-for="dot in 3" :key="dot" class="webqq-chatluna-thinking-dot" />
+              </span>
+            </div>
           </div>
         </div>
       </li>
@@ -127,12 +211,14 @@
 </template>
 
 <script setup lang="ts">
-import { IconArrowDown, IconArrowUp, IconBell, IconClock, IconHandClick, IconMessageReply, IconPaperclip, IconTag, IconUserMinus, IconUserPlus, IconUsers } from '@tabler/icons-vue'
-import { onBeforeUnmount, ref } from 'vue'
+import { IconArrowBackUp, IconBell, IconClock, IconHandClick, IconMessageReply, IconPaperclip, IconTag, IconUserMinus, IconUserPlus, IconUsers } from '@tabler/icons-vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from './components/ui/context-menu'
 import { getFriendMenuActions, type FriendMenuState } from './webqq/friend-menu'
+import { getGroupMemberDisplayName, getGroupRoleBadge } from './webqq/group-display'
 import GroupMemberMenu from './group-member-menu.vue'
 import { getMessageClusterClass, isMergedMessage } from './webqq/message-cluster'
+import { formatMentionContent } from './webqq/mention'
 import WebqqAvatar from './webqq-avatar.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type { SandboxChatLunaState, SandboxConversation, SandboxGroup, SandboxMedia, SandboxMessage } from '../src/types'
@@ -155,7 +241,6 @@ export interface WebqqMessageListModel {
   title: string
   avatar: string
   avatarKind: 'user' | 'bot' | 'group'
-  chatStyle: 'tim' | 'qq'
   hasMoreMessages: boolean
   mediaSources: Record<string, string>
   mediaLoadFailures: Record<string, true>
@@ -164,11 +249,13 @@ export interface WebqqMessageListModel {
 const props = defineProps<{ model: WebqqMessageListModel }>()
 const emit = defineEmits<{
   reply: [messageId: string]
+  recallMessage: [messageId: string]
   loadHistory: [resolve: () => void, reject: (error: unknown) => void]
   requestFriend: [targetId: string]
   pokeFriend: [targetId: string]
   setRemark: [targetId: string]
   deleteFriend: [targetId: string]
+  mentionGroupMember: [targetId: string]
   pokeGroupMember: [targetId: string]
   setGroupCard: [targetId: string]
   setGroupAdmin: [targetId: string, enabled: boolean]
@@ -178,7 +265,60 @@ const emit = defineEmits<{
 
 const historyLoading = ref(false)
 const highlightedMessageId = ref('')
+const expandedThinking = ref<Record<string, true>>({})
+const participantNames = computed(() => Object.fromEntries(
+  Object.entries(props.model.participants).map(([id, participant]) => [id, participant.name]),
+))
 let quoteHighlightTimer: ReturnType<typeof setTimeout> | undefined
+
+// 思考与用量归档在消息上，因此多轮对话后每条机器人消息都保留自己的指标。
+function getMessageThinking(message: SandboxMessage) {
+  return message.chatLuna?.thought ? message.chatLuna : undefined
+}
+
+// 没有思考内容但拿到了 Token 用量时单独常显指标，与 onebot-webqq 的 is-usage-only 行为一致。
+function getMessageUsage(message: SandboxMessage) {
+  const chatLuna = message.chatLuna
+  return chatLuna && !chatLuna.thought && chatLuna.usage ? chatLuna : undefined
+}
+
+function isThinkingExpanded(message: SandboxMessage) {
+  return !!expandedThinking.value[message.id]
+}
+
+function toggleThinking(message: SandboxMessage) {
+  const next = { ...expandedThinking.value }
+  if (next[message.id]) delete next[message.id]
+  else next[message.id] = true
+  expandedThinking.value = next
+}
+
+function formatThinkingDuration(durationMs?: number) {
+  if (durationMs === undefined) return '思考过程'
+  return `已思考 ${Math.max(0, Math.round(durationMs / 1000))}s`
+}
+
+// Vue 离场节点默认会继续占住文档流，导致后续消息只能等思考面板淡出结束后才上移；
+// 这里把离场面板冻结在原视觉位置，让消息位移和面板离场同步开始。
+function prepareThinkingPanelLeave(element: Element) {
+  if (!(element instanceof HTMLElement) || !element.parentElement) return
+  const row = element.parentElement
+  const parentRect = row.getBoundingClientRect()
+  const panelRect = element.getBoundingClientRect()
+  element.style.position = 'absolute'
+  element.style.top = `${panelRect.top - parentRect.top}px`
+  // 面板脱流后思考行宽度立刻收缩成指标行宽度，水平锚点必须选收缩后位置不变的一侧
+  // （入向行左缘固定、出向行右缘固定），否则面板会在离场瞬间水平跳位。
+  if (row.classList.contains('is-incoming')) {
+    element.style.left = `${panelRect.left - parentRect.left}px`
+  } else {
+    element.style.right = `${parentRect.right - panelRect.right}px`
+  }
+  element.style.width = `${panelRect.width}px`
+  // max-width 里的 100% 同样按收缩后的行宽重算，会把冻结宽度压小、迫使单行思考内容先换行再淡出。
+  element.style.maxWidth = 'none'
+  element.style.marginTop = '0'
+}
 
 function getParticipantName(id: string) {
   return props.model.participants[id]?.name ?? id
@@ -196,6 +336,22 @@ function getCurrentGroupMember(participantId: string) {
   return props.model.currentGroup?.members.find((member) => member.participantId === participantId)
 }
 
+function getMessageAuthorName(participantId: string) {
+  return getGroupMemberDisplayName(getCurrentGroupMember(participantId), getParticipantName(participantId))
+}
+
+function getMessageRoleBadge(participantId: string) {
+  const member = getCurrentGroupMember(participantId)
+  return member ? getGroupRoleBadge(member.role) : undefined
+}
+
+function formatMessageTime(createdAt: string) {
+  return new Date(createdAt).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 function getFriendMenuState(targetId: string): FriendMenuState {
   return props.model.friendMenuStates[targetId]
     ?? { isFriend: false, pendingOutgoing: false, pendingIncoming: false }
@@ -209,13 +365,25 @@ function getReplyMessage(message: SandboxMessage) {
   return message.replyToMessageId ? props.model.replyMessages[message.replyToMessageId] : undefined
 }
 
+// 与服务端撤回权限一致：自己的消息随时可撤；群内群主/管理员可撤成员消息，但不能动群主或同级管理员。
+function canRecallMessage(message: SandboxMessage) {
+  const operatorId = props.model.currentOperatorId
+  if (!operatorId || message.event) return false
+  if (message.authorId === operatorId) return true
+  if (!props.model.currentGroup) return false
+  const actor = getCurrentGroupMember(operatorId)
+  const target = getCurrentGroupMember(message.authorId)
+  if (!actor || !target || actor.role === 'member') return false
+  return target.role !== 'owner' && !(actor.role === 'admin' && target.role === 'admin')
+}
+
 function getMediaLabel(media: SandboxMedia) {
   return media.type === 'image' ? '图片' : media.type === 'audio' ? '语音' : media.type === 'video' ? '视频' : '文件'
 }
 
 function getMessageText(message: SandboxMessage) {
   if (message.media?.length === 1 && message.content === `[${getMediaLabel(message.media[0])}] ${message.media[0].name}`) return ''
-  return message.content
+  return formatMentionContent(message.content, participantNames.value)
 }
 
 function getMediaSource(mediaId: string) {

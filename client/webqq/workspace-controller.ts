@@ -4,15 +4,16 @@ import type {
   GetMessageHistoryInput,
   GetSandboxOneBotDebugRecordsInput,
   ManageSandboxEnvironmentInput,
+  RecallMessageInput,
   SandboxAppearance,
   SandboxBotProfile,
   SandboxChatLunaState,
+  SandboxConsoleOneBotDebugRecord,
   SandboxConversation,
   SandboxFriendAction,
   SandboxGroup,
   SandboxGroupAction,
   SandboxMessage,
-  SandboxOneBotDebugRecord,
   SandboxParticipant,
   SandboxSnapshot,
   SandboxWorkspaceState,
@@ -79,7 +80,6 @@ export interface DetailsWorkspaceModel {
 
 const defaultAppearance: SandboxAppearance = {
   enableWebQQFrostedGlass: true,
-  webQQChatStyle: 'tim',
   webQQTimBubbleTail: true,
   webQQColorMode: 'auto',
   webQQAccentColor: '#2563eb',
@@ -105,7 +105,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   const currentOperatorIdState = ref<string>()
   const activeConversationIdState = ref<string>()
   const currentViewState = ref<SandboxWorkspaceView>('messages')
-  const oneBotDebugRecordsState = ref<SandboxOneBotDebugRecord[]>([])
+  const oneBotDebugRecordsState = ref<SandboxConsoleOneBotDebugRecord[]>([])
 
   const snapshot = computed(() => workspaceState.value.snapshot)
   const currentOperator = computed<WorkspaceParticipant | undefined>(() => {
@@ -270,6 +270,45 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     }
   }
 
+  async function recallMessage(input: Omit<RecallMessageInput, 'operatorId'>) {
+    const operatorId = getCurrentOperatorId()
+    try {
+      replaceWorkspace(await port.recallMessage({ ...input, operatorId }))
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '撤回失败')
+    }
+  }
+
+  // 服务端场景变更广播的落地点：发送 RPC 已即时返回，机器人稍后写入的回复和等待态靠这里刷新。
+  // 等待态不写入场景快照，广播修订会等于当前修订，因此不能按修订大小决定是否拉取；
+  // 改为每次广播都标记一次待刷新，并把刷新期间到达的广播合并成一次后续拉取，避免广播风暴导致并发请求。
+  let mutationRefreshTask: Promise<void> | undefined
+  let pendingRefresh = false
+  function notifySceneRevision(_revision: number) {
+    pendingRefresh = true
+    if (mutationRefreshTask) return
+    // 异步任务体可能同步结束；先完成变量赋值再执行，避免已完成的 Promise 被写回后永久阻塞后续广播。
+    mutationRefreshTask = Promise.resolve().then(async () => {
+      try {
+        while (pendingRefresh) {
+          pendingRefresh = false
+          const operatorId = currentOperatorIdState.value
+          try {
+            const nextWorkspace = operatorId
+              ? await port.getWorkspace({ operatorId })
+              : await port.getWorkspace()
+            // 并发的用户操作 RPC 可能已带回更新的工作区，旧响应不能回退状态。
+            if (nextWorkspace.snapshot.revision >= snapshot.value.revision) replaceWorkspace(nextWorkspace)
+          } catch {
+            // 刷新失败保持现状，下一次场景变更广播会再次触发。
+          }
+        }
+      } finally {
+        mutationRefreshTask = undefined
+      }
+    })
+  }
+
   async function getMediaContent(mediaId: string) {
     const operatorId = getCurrentOperatorId()
     try {
@@ -392,9 +431,11 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     loadMessageHistory,
     loadOneBotDebugRecords,
     manageEnvironment,
+    notifySceneRevision,
     performFriendAction,
     performGroupAction,
     clearOneBotDebugRecords,
+    recallMessage,
     replaceWorkspace,
     selectConversation,
     selectOperator,

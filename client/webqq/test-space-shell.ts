@@ -4,6 +4,7 @@ import type { SandboxTestSpaceSummary } from '../../src/test-spaces'
 import type { SandboxSnapshot } from '../../src/types'
 import { createWorkspaceController } from './workspace-controller'
 import type { SandboxWorkspaceView } from './workspace-state'
+import { captureZoomRect, staggerCardsIn, zoomCardFromRect, zoomWorkspaceFromRect } from './workspace-zoom'
 
 const emptySnapshot: SandboxSnapshot = {
   revision: 0,
@@ -39,38 +40,37 @@ export function createAiTestSpaceShell(
       selectWorkspaceNavigation(view)
       return
     }
-    const workspace = document.querySelector<HTMLElement>('.webqq-workspace')
-    const clone = workspace?.cloneNode(true) as HTMLElement | undefined
-    const start = workspace?.getBoundingClientRect()
-    if (clone && start) {
-      Object.assign(clone.style, {
-        position: 'fixed', zIndex: '300', margin: '0', left: `${start.left}px`, top: `${start.top}px`,
-        width: `${start.width}px`, height: `${start.height}px`, pointerEvents: 'none', transformOrigin: 'top left',
-      })
-      document.body.append(clone)
-    }
-    try {
-      selectWorkspaceNavigation(view)
+    // 已在总览时重复点击导航只刷新数据，不能再做"卡片从全屏缩回"动画。
+    if (currentView.value === 'spaces') {
       await loadTestSpaces()
-      await nextTick()
-      const targetId = activeSpaceId.value ?? 'main'
-      const target = document.querySelector<HTMLElement>(`[data-space-id="${targetId.replaceAll('"', '\\"')}"]`)
-      if (clone && start && target) {
-        const end = target.getBoundingClientRect()
-        await clone.animate([
-          { left: `${start.left}px`, top: `${start.top}px`, width: `${start.width}px`, height: `${start.height}px`, borderRadius: '0' },
-          { left: `${end.left}px`, top: `${end.top}px`, width: `${end.width}px`, height: `${end.height}px`, borderRadius: '18px' },
-        ], { duration: 260, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' }).finished.catch(() => undefined)
-      }
-    } finally {
-      clone?.remove()
+      return
     }
+    // 记录工作区当前位置，切换视图后让活动空间的卡片从这里缩回网格位。
+    const fromRect = captureZoomRect(document.querySelector('.webqq-workspace'))
+    // 先取数据再切视图：nextTick 发生在浏览器绘制前，卡片的初始 transform 能赶在首帧写入；
+    // 若先切视图再等待网络加载，网格会以常态先绘制若干帧，缩放起点随后才写入，视觉上产生跳变。
+    await loadTestSpaces()
+    selectWorkspaceNavigation(view)
+    await nextTick()
+    if (!fromRect) return
+    const overview = document.querySelector<HTMLElement>('.webqq-space-overview')
+    const activeCard = overview?.querySelector<HTMLElement>(`[data-space-id="${activeSpaceId.value ?? 'main'}"]`)
+    const cards = [...overview?.querySelectorAll<HTMLElement>('.webqq-space-card') ?? []].filter((card) => card !== activeCard)
+    if (overview && activeCard) zoomCardFromRect(activeCard, overview, fromRect)
+    staggerCardsIn(cards)
   }
 
   async function enterTestSpace(spaceId?: string) {
+    // 记录被点击卡片的位置，让真实工作区从卡片处连续放大；新建空间无卡片时从创建卡起步。
+    const fromRect = captureZoomRect(
+      document.querySelector(`[data-space-id="${spaceId ?? 'main'}"]`) ?? document.querySelector('.webqq-space-create'),
+    )
     activeSpaceId.value = spaceId
     await controller.load()
     selectWorkspaceNavigation('messages')
+    await nextTick()
+    const workspace = document.querySelector<HTMLElement>('.webqq-workspace')
+    if (workspace && fromRect) zoomWorkspaceFromRect(workspace, fromRect)
   }
 
   async function createTestSpace() {
@@ -79,9 +79,10 @@ export function createAiTestSpaceShell(
     await enterTestSpace(space.id)
   }
 
-  async function handleTestSpaceAction(action: 'take-over' | 'return' | 'reactivate' | 'delete', spaceId: string) {
+  async function handleTestSpaceAction(action: 'take-over' | 'return' | 'terminate' | 'reactivate' | 'delete', spaceId: string) {
     if (action === 'take-over') await send('onebot-sandbox/take-over-test-space', { spaceId })
     if (action === 'return') await send('onebot-sandbox/return-test-space', { spaceId })
+    if (action === 'terminate') await send('onebot-sandbox/terminate-test-space', { spaceId })
     if (action === 'reactivate') await send('onebot-sandbox/reactivate-test-space', { spaceId })
     if (action === 'delete') await send('onebot-sandbox/delete-test-space', { spaceId })
     if (action === 'delete' && activeSpaceId.value === spaceId) await enterTestSpace()
@@ -91,7 +92,10 @@ export function createAiTestSpaceShell(
   onMounted(() => {
     void loadTestSpaces()
     refreshTimer = setInterval(() => {
-      if (currentView.value === 'spaces') void loadTestSpaces()
+      // 除总览外，进入测试空间观察时也要轮询：AI 完成或失败后被控覆盖层要实时消失。
+      if (currentView.value === 'spaces' || currentView.value === 'profile' || currentView.value === 'debug' || activeSpaceId.value) {
+        void loadTestSpaces()
+      }
     }, 1500)
   })
   onBeforeUnmount(() => {

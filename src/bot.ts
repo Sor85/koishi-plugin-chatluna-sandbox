@@ -1,7 +1,59 @@
 import { Bot, Context, Fragment, h, Random, Universal } from 'koishi'
 import type { SandboxControlService } from './control-service'
+import { toOneBotMessageSegments, toOneBotRawMessage } from './onebot-message'
 import { getOneBotMessageSequence, getOneBotProfileBaseline, resolveOneBotAction } from './onebot-profiles'
 import { createDirectConversationId, createGroupConversationId, getDirectConversationPeerId, type SandboxImplementationProfile } from './types'
+
+interface EmbeddedMediaInput {
+  fileName: string
+  mimeType: string
+  dataBase64: string
+}
+
+function normalizeOneBotGroupId(value: unknown): string {
+  const groupId = String(value ?? '')
+  // Koishi 的 channelId 在群聊中可能是沙盒逻辑会话 ID；OneBot action 只接受真实群号。
+  return groupId.startsWith('group:') ? groupId.slice('group:'.length) : groupId
+}
+
+function splitBotFragment(fragment: Fragment): { content: string; mediaInputs: EmbeddedMediaInput[] } {
+  const mediaInputs: EmbeddedMediaInput[] = []
+  const content = h.normalize(fragment).map((element) => {
+    const media = readEmbeddedMedia(element)
+    if (!media) return element.toString()
+    mediaInputs.push(media)
+    return ''
+  }).join('').trim()
+  return { content, mediaInputs }
+}
+
+function readEmbeddedMedia(element: ReturnType<typeof h>): EmbeddedMediaInput | undefined {
+  if (!['img', 'image', 'audio', 'record', 'video', 'file'].includes(element.type)) return
+  const source = readElementAttribute(element, 'src', 'url', 'file')
+  const match = /^data:([^;,]+);base64,(.+)$/s.exec(source)
+  if (!match) return
+  const mimeType = match[1].toLowerCase()
+  const baseName = element.type === 'img' || element.type === 'image'
+    ? 'image'
+    : element.type === 'audio' || element.type === 'record'
+      ? 'audio'
+      : element.type
+  const fileName = readElementAttribute(element, 'title', 'name') || `${baseName}.${getMimeExtension(mimeType)}`
+  return { fileName, mimeType, dataBase64: match[2] }
+}
+
+function readElementAttribute(element: ReturnType<typeof h>, ...keys: string[]): string {
+  for (const key of keys) {
+    const value = element.attrs[key]
+    if (typeof value === 'string' && value) return value
+  }
+  return ''
+}
+
+function getMimeExtension(mimeType: string): string {
+  const subtype = mimeType.split('/')[1] ?? 'bin'
+  return subtype === 'jpeg' ? 'jpg' : subtype.replace(/^x-/, '')
+}
 
 export namespace SandboxBot {
   export interface Config {
@@ -14,6 +66,8 @@ export namespace SandboxBot {
 
   export interface Internal {
     _request(action: string, params: Record<string, unknown>): Promise<unknown>
+    getGroupMemberList(groupId: string | number): Promise<unknown[]>
+    getGroupMemberInfo(groupId: string | number, userId: string | number, noCache?: boolean): Promise<unknown>
     set_friend_add_request(input: { flag: string; approve: boolean; remark?: string }): Promise<unknown>
     set_group_add_request(input: { flag: string; sub_type: 'add' | 'invite'; approve: boolean; reason?: string }): Promise<unknown>
   }
@@ -76,6 +130,24 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
             })),
           }
         }
+        if (action === 'get_friends_with_category') {
+          const friends = await this.getFriendList()
+          const buddyList = friends.data.map(({ user, nick }) => ({
+            ...this.toOneBotUser(user),
+            remark: nick ?? '',
+          }))
+          return {
+            status: 'ok',
+            retcode: 0,
+            data: [{
+              categoryId: 0,
+              categoryName: '我的好友',
+              categoryMbCount: buddyList.length,
+              buddyList,
+              ...(this.implementation === 'llbot' ? { categorySortId: 0, onlineCount: buddyList.length } : {}),
+            }],
+          }
+        }
         if (action === 'get_group_list') {
           const groups = await this.getGuildList()
           const snapshot = this.control.getSnapshot()
@@ -88,8 +160,47 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
             }),
           }
         }
+        if (action === 'get_recent_contact') {
+          const count = Number(params.count)
+          const limit = Number.isFinite(count) && count > 0 ? Math.floor(count) : 10
+          const snapshot = this.control.getVisibleSnapshot(this.selfId, 1)
+          const participants = new Map(snapshot.participants.map((participant) => [participant.id, participant]))
+          const groups = new Map(snapshot.groups.map((group) => [group.id, group]))
+          const messages = new Map(snapshot.messages.map((message) => [message.id, message]))
+          const recentContacts = snapshot.conversations.flatMap((conversation) => {
+            const latestMessage = messages.get(conversation.messageIds.at(-1) ?? '')
+            if (!latestMessage) return []
+            const peerId = conversation.type === 'group'
+              ? conversation.groupId
+              : getDirectConversationPeerId(conversation, this.selfId)
+            const peerName = conversation.type === 'group'
+              ? groups.get(peerId)?.name ?? peerId
+              : participants.get(peerId)?.name ?? peerId
+            const senderName = participants.get(latestMessage.authorId)?.name ?? latestMessage.authorId
+            const sendMemberName = conversation.type === 'group'
+              ? groups.get(peerId)?.members.find(({ participantId }) => participantId === latestMessage.authorId)?.card ?? ''
+              : ''
+            return [{
+              createdAt: new Date(latestMessage.createdAt).getTime(),
+              contact: {
+                lastestMsg: this.toOneBotMessage(latestMessage),
+                peerUin: peerId,
+                remark: conversation.type === 'direct'
+                  ? snapshot.friendships.find(({ participantIds }) => participantIds.includes(this.selfId) && participantIds.includes(peerId))?.remarks[this.selfId] ?? ''
+                  : '',
+                msgTime: String(Math.floor(new Date(latestMessage.createdAt).getTime() / 1000)),
+                chatType: conversation.type === 'group' ? 2 : 1,
+                msgId: latestMessage.id,
+                sendNickName: senderName,
+                sendMemberName,
+                peerName,
+              },
+            }]
+          }).sort((left, right) => right.createdAt - left.createdAt).slice(0, limit).map(({ contact }) => contact)
+          return { status: 'ok', retcode: 0, data: recentContacts }
+        }
         if (action === 'get_group_info') {
-          const group = await this.getGuild(String(params.group_id ?? ''))
+          const group = await this.getGuild(normalizeOneBotGroupId(params.group_id))
           const memberCount = this.control.getSnapshot().groups.find(({ id }) => id === group.id)?.members.length ?? 0
           return {
             status: 'ok',
@@ -98,11 +209,12 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           }
         }
         if (action === 'get_group_member_info') {
-          const member = await this.getGuildMember(String(params.group_id ?? ''), String(params.user_id ?? ''))
-          return { status: 'ok', retcode: 0, data: this.toOneBotGuildMember(String(params.group_id ?? ''), member) }
+          const groupId = normalizeOneBotGroupId(params.group_id)
+          const member = await this.getGuildMember(groupId, String(params.user_id ?? ''))
+          return { status: 'ok', retcode: 0, data: this.toOneBotGuildMember(groupId, member) }
         }
         if (action === 'get_group_member_list') {
-          const groupId = String(params.group_id ?? '')
+          const groupId = normalizeOneBotGroupId(params.group_id)
           const members = await this.getGuildMemberList(groupId)
           return { status: 'ok', retcode: 0, data: members.data.map((member) => this.toOneBotGuildMember(groupId, member)) }
         }
@@ -112,7 +224,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           return { status: 'ok', retcode: 0, data: { message_id: messageId } }
         }
         if (action === 'send_group_msg') {
-          const groupId = String(params.group_id ?? '')
+          const groupId = normalizeOneBotGroupId(params.group_id)
           await this.getGuild(groupId)
           const content = this.normalizeOneBotMessage(params.message)
           const result = await this.control.sendMessage({
@@ -135,8 +247,14 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           const message = this.findVisibleMessage(String(params.message_id ?? ''))
           return { status: 'ok', retcode: 0, data: this.toOneBotMessage(message) }
         }
+        if (action === 'get_friend_msg_history') {
+          return this.getOneBotMessageHistory(createDirectConversationId(this.selfId, String(params.user_id ?? '')), params)
+        }
+        if (action === 'get_group_msg_history') {
+          return this.getOneBotMessageHistory(createGroupConversationId(normalizeOneBotGroupId(params.group_id)), params)
+        }
         if (action === 'delete_msg') {
-          this.control.deleteBotMessage(this.selfId, String(params.message_id ?? ''))
+          await this.control.recallBotMessage(this.selfId, String(params.message_id ?? ''))
           return { status: 'ok', retcode: 0, data: null }
         }
         if (action === 'delete_friend') {
@@ -146,14 +264,14 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
         if (action === 'set_group_kick') {
           return this.control.performBotGroupAction(this.selfId, {
             action: 'kick',
-            groupId: String(params.group_id ?? ''),
+            groupId: normalizeOneBotGroupId(params.group_id),
             targetId: String(params.user_id ?? ''),
           })
         }
         if (action === 'set_group_admin') {
           return this.control.performBotGroupAction(this.selfId, {
             action: 'set-admin',
-            groupId: String(params.group_id ?? ''),
+            groupId: normalizeOneBotGroupId(params.group_id),
             targetId: String(params.user_id ?? ''),
             enabled: params.enable === true,
           })
@@ -166,7 +284,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           for (const userId of rawUserIds) {
             await this.control.performBotGroupAction(this.selfId, {
               action: 'kick',
-              groupId: String(params.group_id ?? ''),
+              groupId: normalizeOneBotGroupId(params.group_id),
               targetId: String(userId),
             })
           }
@@ -175,7 +293,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
         if (action === 'set_group_card') {
           return this.control.performBotGroupAction(this.selfId, {
             action: 'set-card',
-            groupId: String(params.group_id ?? ''),
+            groupId: normalizeOneBotGroupId(params.group_id),
             targetId: String(params.user_id ?? ''),
             card: typeof params.card === 'string' ? params.card : '',
           })
@@ -183,7 +301,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
         if (action === 'set_group_name') {
           return this.control.performBotGroupAction(this.selfId, {
             action: 'set-name',
-            groupId: String(params.group_id ?? ''),
+            groupId: normalizeOneBotGroupId(params.group_id),
             name: typeof params.group_name === 'string' ? params.group_name : '',
           })
         }
@@ -192,7 +310,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           if (!noticeId) throw new Error(`${capability.action} 缺少 notice_id`)
           this.control.deleteGroupAnnouncement({
             operatorId: this.selfId,
-            groupId: String(params.group_id ?? ''),
+            groupId: normalizeOneBotGroupId(params.group_id),
             announcementId: noticeId,
           })
           return { status: 'ok', retcode: 0, data: null }
@@ -227,7 +345,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
         if (action === 'send_poke') {
           const targetId = String(params.target_id ?? params.user_id ?? '')
           if (params.group_id !== undefined) {
-            const groupId = String(params.group_id)
+            const groupId = normalizeOneBotGroupId(params.group_id)
             return this.control.performGroupAction({
               action: 'poke',
               operatorId: this.selfId,
@@ -242,6 +360,64 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
             targetId,
             conversationId: createDirectConversationId(this.selfId, targetId),
           })
+        }
+        if (action === 'set_group_leave') {
+          return this.control.performBotGroupAction(this.selfId, {
+            action: 'leave',
+            groupId: normalizeOneBotGroupId(params.group_id),
+          })
+        }
+        // set_group_ban / set_group_special_title / set_msg_emoji_like：场景模型
+        // 不维护禁言、头衔、表情回应状态，仅执行与真实实现一致的存在性与权限
+        // 校验后确认调用，供插件验证调用链路（参数在调试记录中完整可见）。
+        if (action === 'set_group_ban') {
+          const groupId = normalizeOneBotGroupId(params.group_id)
+          const actor = await this.getGuildMember(groupId, this.selfId)
+          if (actor.roles?.[0]?.id === 'member') throw new Error('只有群主或管理员可以禁言成员')
+          await this.getGuildMember(groupId, String(params.user_id ?? ''))
+          return { status: 'ok', retcode: 0, data: null }
+        }
+        if (action === 'set_group_special_title') {
+          const groupId = normalizeOneBotGroupId(params.group_id)
+          const actor = await this.getGuildMember(groupId, this.selfId)
+          if (actor.roles?.[0]?.id !== 'owner') throw new Error('只有群主可以设置专属头衔')
+          await this.getGuildMember(groupId, String(params.user_id ?? ''))
+          return { status: 'ok', retcode: 0, data: null }
+        }
+        if (action === 'set_msg_emoji_like') {
+          // 真实消费者从 OneBot 事件拿到的是数字 message_id（sequence），
+          // 兼容沙盒消息 ID 与 sequence 两种形态。
+          const rawId = String(params.message_id ?? '')
+          const found = this.control.getVisibleSnapshot(this.selfId).messages
+            .some(({ id }) => id === rawId || String(getOneBotMessageSequence(id)) === rawId)
+          if (!found) throw new Error(`消息不存在：${rawId}`)
+          return { status: 'ok', retcode: 0, data: null }
+        }
+        if (action === 'send_forward_msg') {
+          const nodes = Array.isArray(params.messages) ? params.messages : []
+          if (!nodes.length) throw new Error('send_forward_msg 需要至少一个消息节点')
+          // 沙盒不模拟合并转发卡片：把各节点内容展平为一条多行消息写入会话，
+          // 节点支持内联 content 与引用已有消息 ID 两种真实形态。
+          const content = nodes.map((node) => {
+            const data = node && typeof node === 'object' ? Reflect.get(node, 'data') as Record<string, unknown> | undefined : undefined
+            if (!data) return ''
+            if (data.content !== undefined) return this.normalizeOneBotMessage(data.content)
+            if (data.id !== undefined) return this.findVisibleMessage(String(data.id)).content
+            return ''
+          }).filter(Boolean).join('\n')
+          if (!content) throw new Error('send_forward_msg 的消息节点不能全部为空')
+          if (params.group_id !== undefined) {
+            const groupId = normalizeOneBotGroupId(params.group_id)
+            await this.getGuild(groupId)
+            const result = await this.control.sendMessage({
+              operatorId: this.selfId,
+              conversationId: createGroupConversationId(groupId),
+              content,
+            })
+            return { status: 'ok', retcode: 0, data: { message_id: result.messageId } }
+          }
+          const [messageId] = await this.sendPrivateMessage(String(params.user_id ?? ''), content)
+          return { status: 'ok', retcode: 0, data: { message_id: messageId } }
         }
         throw new Error(`OneBot action 已声明但未接入处理器：${capability.action}`)
     }
@@ -286,6 +462,20 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     }
     const internal: SandboxBot.Internal = {
       _request: request,
+      getGroupMemberList: async (groupId) => {
+        const result = await request('get_group_member_list', {
+          group_id: normalizeOneBotGroupId(groupId),
+        }) as { data?: unknown }
+        return Array.isArray(result.data) ? result.data : []
+      },
+      getGroupMemberInfo: async (groupId, userId, noCache = false) => {
+        const result = await request('get_group_member_info', {
+          group_id: normalizeOneBotGroupId(groupId),
+          user_id: userId,
+          no_cache: noCache,
+        }) as { data?: unknown }
+        return result.data
+      },
       set_friend_add_request: (input) => request('set_friend_add_request', input),
       set_group_add_request: (input) => request('set_group_add_request', input),
     }
@@ -375,7 +565,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
 
   async deleteMessage(channelId: string, messageId: string): Promise<void> {
     this.getVisibleConversation(channelId)
-    this.control.deleteBotMessage(this.selfId, messageId, channelId)
+    await this.control.recallBotMessage(this.selfId, messageId, channelId)
   }
 
   async deleteFriend(userId: string): Promise<void> {
@@ -419,11 +609,28 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     return super.dispose()
   }
 
-  async sendMessage(channelId: string, fragment: Fragment) {
+  async sendMessage(channelId: string, fragment: Fragment, _referrer?: unknown, options: Universal.SendOptions = {}) {
     if (this.status !== Universal.Status.ONLINE) throw new Error(`机器人已离线：${this.selfId}`)
-    const content = h.normalize(fragment).join('').trim()
-    if (!content) return []
-    const result = await this.control.sendMessage({ operatorId: this.selfId, conversationId: channelId, content })
+    // 覆盖 Bot.sendMessage 后不会再经过 MessageEncoder；必须在原始消息 Session 上执行组件转换，
+    // 否则 poke 等插件发送的 <execute> 会被当作字面文本，命令永远不会执行。
+    const renderSession = options.session ?? this.session({
+      type: 'send',
+      channel: {
+        id: channelId,
+        type: channelId.startsWith('group:') ? Universal.Channel.Type.TEXT : Universal.Channel.Type.DIRECT,
+      },
+    })
+    const transformed = await renderSession.transform(h.normalize(fragment))
+    const { content, mediaInputs } = splitBotFragment(transformed)
+    if (!content && !mediaInputs.length) return []
+    const result = mediaInputs.length
+      ? await this.control.sendStoredMediaMessage({
+          operatorId: this.selfId,
+          conversationId: channelId,
+          content,
+          media: this.control.storeMediaBatch(mediaInputs),
+        })
+      : await this.control.sendMessage({ operatorId: this.selfId, conversationId: channelId, content })
     return [result.messageId]
   }
 
@@ -459,6 +666,26 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     return message
   }
 
+  private getOneBotMessageHistory(conversationId: string, params: Record<string, unknown>) {
+    const count = Number(params.count ?? 20)
+    const limit = Number.isInteger(count) && count > 0 ? Math.min(count, 100) : 20
+    const messageSequence = Number(params.message_seq)
+    let beforeMessageId: string | undefined
+    if (Number.isFinite(messageSequence) && messageSequence > 0) {
+      const conversation = this.getVisibleConversation(conversationId)
+      beforeMessageId = conversation.messageIds.find((messageId) => getOneBotMessageSequence(messageId) === messageSequence)
+      if (!beforeMessageId) throw new Error(`消息不存在：${params.message_seq}`)
+    }
+    const messages = this.control.getMessageHistory({
+      operatorId: this.selfId,
+      conversationId,
+      limit,
+      beforeMessageId,
+    }).messages.map((message) => this.toOneBotMessage(message))
+    if (params.reverseOrder === true || params.reverse_order === true) messages.reverse()
+    return { status: 'ok', retcode: 0, data: { messages } }
+  }
+
   private async toUniversalMessage(message: ReturnType<SandboxControlService['getSnapshot']>['messages'][number]): Promise<Universal.Message> {
     const snapshot = this.control.getSnapshot()
     const conversation = snapshot.conversations.find(({ id }) => id === message.conversationId)
@@ -491,24 +718,34 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
   }
 
   private toOneBotMessage(message: ReturnType<SandboxControlService['getSnapshot']>['messages'][number]) {
-    const conversation = this.control.getSnapshot().conversations.find(({ id }) => id === message.conversationId)
+    const snapshot = this.control.getSnapshot()
+    const conversation = snapshot.conversations.find(({ id }) => id === message.conversationId)
     const directPeerId = conversation?.type === 'direct'
       ? getDirectConversationPeerId(conversation, this.selfId)
       : undefined
     const sequence = getOneBotMessageSequence(message.id)
+    const participant = snapshot.participants.find(({ id }) => id === message.authorId)
+    const groupMember = conversation?.groupId
+      ? snapshot.groups.find(({ id }) => id === conversation.groupId)?.members.find(({ participantId }) => participantId === message.authorId)
+      : undefined
+    const onebotMessage = toOneBotMessageSegments(message.content, message.media)
     return {
       time: Math.floor(new Date(message.createdAt).getTime() / 1000),
       message_type: conversation?.type === 'group' ? 'group' : 'private',
       message_id: message.id,
       message_seq: sequence,
       real_id: sequence,
-      sender: { user_id: Number(message.authorId), nickname: this.control.getSnapshot().participants.find(({ id }) => id === message.authorId)?.name ?? this.user?.name ?? message.authorId },
+      sender: {
+        user_id: Number(message.authorId),
+        nickname: participant?.name ?? this.user?.name ?? message.authorId,
+        ...(groupMember ? { card: groupMember.card ?? '', role: groupMember.role } : {}),
+      },
       user_id: Number(conversation?.type === 'group' ? message.authorId : directPeerId ?? message.authorId),
       group_id: conversation?.groupId ? Number(conversation.groupId) : undefined,
-      message: [{ type: 'text', data: { text: message.content } }],
+      message: onebotMessage,
       message_format: 'array',
       font: 0,
-      raw_message: message.content,
+      raw_message: toOneBotRawMessage(onebotMessage),
     }
   }
 }
