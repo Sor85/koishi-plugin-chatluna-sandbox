@@ -52,7 +52,7 @@
   text-align: right;
 }
 
-.webqq-workspace[data-chat-style="tim"] .webqq-message-row.is-merged {
+.webqq-message-row.is-merged {
   margin-top: -14px;
 }
 
@@ -89,12 +89,11 @@
   font-weight: 700;
 }
 
-.webqq-workspace[data-chat-style="tim"] .webqq-message-row.is-merged .webqq-message-avatar-wrap {
+.webqq-message-row.is-merged .webqq-message-avatar-wrap {
   visibility: hidden;
 }
 
-.webqq-message-content,
-.webqq-message-body {
+.webqq-message-content {
   display: flex;
   min-width: 0;
   max-width: 100%;
@@ -102,9 +101,21 @@
   align-items: flex-start;
 }
 
-.webqq-message-row.is-outgoing .webqq-message-content,
-.webqq-message-row.is-outgoing .webqq-message-body {
+.webqq-message-body {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-direction: row;
   align-items: flex-end;
+  gap: 6px;
+}
+
+.webqq-message-row.is-outgoing .webqq-message-content {
+  align-items: flex-end;
+}
+
+.webqq-message-row.is-outgoing .webqq-message-body {
+  flex-direction: row-reverse;
 }
 
 .webqq-chatluna-state {
@@ -330,16 +341,49 @@
 
 .webqq-message-row.is-outgoing .webqq-sender-line {
   justify-content: flex-end;
+  flex-direction: row-reverse;
 }
 
 .webqq-sender-line + .webqq-message-body {
   margin-top: 6px;
 }
 
-.webqq-message-author {
+.webqq-message-time {
+  flex: 0 0 auto;
+  align-self: flex-end;
   color: var(--webqq-muted);
   font-size: 11px;
   line-height: 16px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+
+.webqq-message-row:hover .webqq-message-time {
+  opacity: 1;
+}
+
+.webqq-role-badge {
+  max-width: 120px;
+  overflow: hidden;
+  padding: 1px 6px;
+  border-radius: 5px;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.webqq-role-badge.is-owner {
+  color: #9a5b00;
+  background: #fff3cf;
+}
+
+.webqq-role-badge.is-admin {
+  color: #237343;
+  background: #e9f8ef;
 }
 
 .webqq-message-bubble {
@@ -347,11 +391,11 @@
   display: flex;
   max-width: 100%;
   flex-direction: column;
-  gap: 4px;
-  margin: 3px 0;
+  gap: 2px;
+  margin: 1px 0;
   padding: 9px 11px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 18px;
   color: var(--webqq-text);
   background: rgb(255 255 255 / 90%);
   box-shadow: 0 2px 8px rgb(15 23 42 / 8%);
@@ -527,49 +571,39 @@
   box-shadow: 0 8px 18px var(--webqq-accent-shadow);
 }
 
-.webqq-workspace[data-chat-style="qq"] .webqq-message-bubble {
-  border-radius: 10px;
-}
-
-.webqq-workspace[data-chat-style="tim"] .webqq-message-bubble {
-  gap: 2px;
-  margin: 1px 0;
-  border-radius: 18px;
-}
-
-.webqq-workspace[data-chat-style="tim"] .webqq-message-row.is-cluster-first:not(.is-outgoing) .webqq-message-bubble {
+.webqq-message-row.is-cluster-first:not(.is-outgoing) .webqq-message-bubble {
   border-bottom-left-radius: 3px;
 }
 
-.webqq-workspace[data-chat-style="tim"] .webqq-message-row.is-cluster-middle:not(.is-outgoing) .webqq-message-bubble {
+.webqq-message-row.is-cluster-middle:not(.is-outgoing) .webqq-message-bubble {
   border-radius: 3px 18px 18px 3px;
 }
 
-.webqq-workspace[data-chat-style="tim"] .webqq-message-row.is-cluster-last:not(.is-outgoing) .webqq-message-bubble {
+.webqq-message-row.is-cluster-last:not(.is-outgoing) .webqq-message-bubble {
   border-top-left-radius: 3px;
 }
 
-.webqq-workspace[data-chat-style="tim"] .webqq-message-row.is-outgoing.is-cluster-first .webqq-message-bubble {
+.webqq-message-row.is-outgoing.is-cluster-first .webqq-message-bubble {
   border-bottom-right-radius: 3px;
 }
 
-.webqq-workspace[data-chat-style="tim"] .webqq-message-row.is-outgoing.is-cluster-middle .webqq-message-bubble {
+.webqq-message-row.is-outgoing.is-cluster-middle .webqq-message-bubble {
   border-radius: 18px 3px 3px 18px;
 }
 
-.webqq-workspace[data-chat-style="tim"] .webqq-message-row.is-outgoing.is-cluster-last .webqq-message-bubble {
+.webqq-message-row.is-outgoing.is-cluster-last .webqq-message-bubble {
   border-top-right-radius: 3px;
 }
 
-.webqq-workspace[data-chat-style="tim"].has-tim-tail .webqq-message-row:not(.is-outgoing):not(.is-merged) .webqq-message-bubble {
+.webqq-workspace.has-tim-tail .webqq-message-row:not(.is-outgoing):not(.is-merged) .webqq-message-bubble {
   border-top-left-radius: 0;
 }
 
-.webqq-workspace[data-chat-style="tim"].has-tim-tail .webqq-message-row.is-outgoing:not(.is-merged) .webqq-message-bubble {
+.webqq-workspace.has-tim-tail .webqq-message-row.is-outgoing:not(.is-merged) .webqq-message-bubble {
   border-top-right-radius: 0;
 }
 
-.webqq-workspace[data-chat-style="tim"].has-tim-tail .webqq-message-row:not(.is-merged) .webqq-message-bubble::before {
+.webqq-workspace.has-tim-tail .webqq-message-row:not(.is-merged) .webqq-message-bubble::before {
   position: absolute;
   top: 0;
   width: 8px;
@@ -578,12 +612,12 @@
   content: "";
 }
 
-.webqq-workspace[data-chat-style="tim"].has-tim-tail .webqq-message-row:not(.is-outgoing):not(.is-merged) .webqq-message-bubble::before {
+.webqq-workspace.has-tim-tail .webqq-message-row:not(.is-outgoing):not(.is-merged) .webqq-message-bubble::before {
   left: -8px;
   clip-path: path("M 0 0 L 8 0 L 8 14 Q 8 3 0 0 Z");
 }
 
-.webqq-workspace[data-chat-style="tim"].has-tim-tail .webqq-message-row.is-outgoing:not(.is-merged) .webqq-message-bubble::before {
+.webqq-workspace.has-tim-tail .webqq-message-row.is-outgoing:not(.is-merged) .webqq-message-bubble::before {
   right: -8px;
   clip-path: path("M 8 0 L 0 0 L 0 14 Q 0 3 8 0 Z");
 }

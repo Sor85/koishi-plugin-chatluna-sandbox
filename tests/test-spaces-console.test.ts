@@ -6,7 +6,7 @@ import { SandboxTestSpaceService } from '../src/test-spaces'
 import type { SandboxAppearance } from '../src/types'
 
 const apps: App[] = []
-const appearance: SandboxAppearance = { enableWebQQFrostedGlass: true, webQQChatStyle: 'tim', webQQTimBubbleTail: true, webQQColorMode: 'auto', webQQAccentColor: '#2563eb' }
+const appearance: SandboxAppearance = { enableWebQQFrostedGlass: true, webQQTimBubbleTail: true, webQQColorMode: 'auto', webQQAccentColor: '#2563eb' }
 afterEach(async () => Promise.all(apps.splice(0).map((app) => app.stop())))
 
 describe('AI 测试空间 Console 适配器', () => {

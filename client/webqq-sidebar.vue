@@ -287,6 +287,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip'
 import EnvironmentCreatePopover from './environment-create-popover.vue'
 import NotificationMenu from './notification-menu.vue'
+import { getGroupRoleLabel } from './webqq/group-display'
 import WebqqAvatar from './webqq-avatar.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type {
@@ -470,9 +471,5 @@ function openGroupActionDialog(mode: 'card' | 'name', targetId: string, groupId?
 
 function openRemarkDialog(targetId: string) {
   emit('openRemarkDialog', targetId)
-}
-
-function getGroupRoleLabel(role: SandboxGroupMember['role']) {
-  return role === 'owner' ? '群主' : role === 'admin' ? '管理员' : '成员'
 }
 </script>

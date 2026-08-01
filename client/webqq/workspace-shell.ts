@@ -105,7 +105,6 @@ export function createWebqqWorkspaceShell(
     title: currentConversationTitle.value,
     avatar: currentGroup.value ? '' : currentPeer.value?.avatar ?? '',
     avatarKind: currentGroup.value ? 'group' : currentBot.value ? 'bot' : 'user',
-    chatStyle: appearance.value.webQQChatStyle,
     hasMoreMessages: !!currentConversation.value?.hasMoreMessages,
     mediaSources: mediaSources.value,
     mediaLoadFailures: mediaLoadFailures.value,

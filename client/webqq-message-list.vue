@@ -19,16 +19,16 @@
               class="webqq-message-row"
               :class="[
                 message.authorId === model.currentOperatorId ? 'is-outgoing' : 'is-incoming',
-                getMessageClusterClass(model.messages, messageIndex, model.chatStyle, model.currentOperatorId),
-                { 'is-merged': isMergedMessage(model.messages, messageIndex, model.chatStyle, model.currentOperatorId) },
+                getMessageClusterClass(model.messages, messageIndex, model.currentOperatorId),
+                { 'is-merged': isMergedMessage(model.messages, messageIndex, model.currentOperatorId) },
                 { 'is-quote-target': highlightedMessageId === message.id },
               ]"
               :data-message-id="message.id"
             >
               <ContextMenu v-if="message.authorId !== model.currentOperatorId">
                 <ContextMenuTrigger as-child>
-                  <button type="button" class="webqq-message-avatar-wrap webqq-message-avatar-trigger" :aria-label="`打开 ${getParticipantName(message.authorId)} 的操作菜单`" @contextmenu.stop>
-                    <WebqqAvatar class="webqq-message-avatar" :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'" :name="getParticipantName(message.authorId)" :avatar="getParticipantAvatar(message.authorId)" />
+                  <button type="button" class="webqq-message-avatar-wrap webqq-message-avatar-trigger" :aria-label="`打开 ${getMessageAuthorName(message.authorId)} 的操作菜单`" @contextmenu.stop>
+                    <WebqqAvatar class="webqq-message-avatar" :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'" :name="getMessageAuthorName(message.authorId)" :avatar="getParticipantAvatar(message.authorId)" />
                   </button>
                 </ContextMenuTrigger>
                 <ContextMenuContent style="z-index: 140">
@@ -62,16 +62,21 @@
                 </ContextMenuContent>
               </ContextMenu>
               <span v-else class="webqq-message-avatar-wrap">
-                <WebqqAvatar class="webqq-message-avatar" :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'" :name="getParticipantName(message.authorId)" :avatar="getParticipantAvatar(message.authorId)" />
+                <WebqqAvatar class="webqq-message-avatar" :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'" :name="getMessageAuthorName(message.authorId)" :avatar="getParticipantAvatar(message.authorId)" />
               </span>
               <div class="webqq-message-content">
-                <div v-if="!isMergedMessage(model.messages, messageIndex, model.chatStyle, model.currentOperatorId)" class="webqq-sender-line">
-                  <span class="webqq-message-author">{{ getParticipantName(message.authorId) }}</span>
+                <div v-if="!isMergedMessage(model.messages, messageIndex, model.currentOperatorId)" class="webqq-sender-line">
+                  <span class="webqq-message-author">{{ getMessageAuthorName(message.authorId) }}</span>
+                  <span
+                    v-if="getMessageRoleBadge(message.authorId)"
+                    class="webqq-role-badge"
+                    :class="`is-${getMessageRoleBadge(message.authorId)!.kind}`"
+                  >{{ getMessageRoleBadge(message.authorId)!.text }}</span>
                 </div>
                 <div class="webqq-message-body">
                   <div class="webqq-message-bubble">
                     <button v-if="getReplyMessage(message)" class="webqq-message-quote is-clickable" type="button" aria-label="跳转到引用消息" @click.stop="scrollToQuotedMessage(getReplyMessage(message)!.id)">
-                      <strong class="webqq-message-quote-title">{{ getParticipantName(getReplyMessage(message)!.authorId) }}</strong>
+                      <strong class="webqq-message-quote-title">{{ getMessageAuthorName(getReplyMessage(message)!.authorId) }}</strong>
                       <span>{{ getMessageText(getReplyMessage(message)!) }}</span>
                     </button>
                     <div v-for="media in message.media" :key="media.id" class="webqq-message-media">
@@ -86,6 +91,7 @@
                     </div>
                     <span v-if="getMessageText(message)">{{ getMessageText(message) }}</span>
                   </div>
+                  <time class="webqq-message-time">{{ formatMessageTime(message.createdAt) }}</time>
                 </div>
               </div>
             </li>
@@ -209,6 +215,7 @@ import { IconArrowBackUp, IconBell, IconClock, IconHandClick, IconMessageReply, 
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from './components/ui/context-menu'
 import { getFriendMenuActions, type FriendMenuState } from './webqq/friend-menu'
+import { getGroupMemberDisplayName, getGroupRoleBadge } from './webqq/group-display'
 import GroupMemberMenu from './group-member-menu.vue'
 import { getMessageClusterClass, isMergedMessage } from './webqq/message-cluster'
 import { formatMentionContent } from './webqq/mention'
@@ -234,7 +241,6 @@ export interface WebqqMessageListModel {
   title: string
   avatar: string
   avatarKind: 'user' | 'bot' | 'group'
-  chatStyle: 'tim' | 'qq'
   hasMoreMessages: boolean
   mediaSources: Record<string, string>
   mediaLoadFailures: Record<string, true>
@@ -328,6 +334,22 @@ function isBotParticipant(id: string) {
 
 function getCurrentGroupMember(participantId: string) {
   return props.model.currentGroup?.members.find((member) => member.participantId === participantId)
+}
+
+function getMessageAuthorName(participantId: string) {
+  return getGroupMemberDisplayName(getCurrentGroupMember(participantId), getParticipantName(participantId))
+}
+
+function getMessageRoleBadge(participantId: string) {
+  const member = getCurrentGroupMember(participantId)
+  return member ? getGroupRoleBadge(member.role) : undefined
+}
+
+function formatMessageTime(createdAt: string) {
+  return new Date(createdAt).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 function getFriendMenuState(targetId: string): FriendMenuState {

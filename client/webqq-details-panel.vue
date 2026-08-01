@@ -94,6 +94,7 @@ import { IconDatabase, IconDots, IconPlus, IconTrash } from '@tabler/icons-vue'
 import { computed, ref, watch } from 'vue'
 import { ContextMenu, ContextMenuTrigger } from './components/ui/context-menu'
 import GroupMemberMenu from './group-member-menu.vue'
+import { getGroupMemberDisplayName, getGroupRoleLabel } from './webqq/group-display'
 import WebqqAvatar from './webqq-avatar.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type { SandboxBotProfile, SandboxGroup, SandboxGroupMember, SandboxPersistenceStatus } from '../src/types'
@@ -165,13 +166,7 @@ function getParticipant(id: string): WebqqDetailsParticipant {
 }
 
 function getGroupMemberName(member: SandboxGroupMember) {
-  return member.card?.trim() || getParticipant(member.participantId).name
-}
-
-function getGroupRoleLabel(role: SandboxGroupMember['role']) {
-  if (role === 'owner') return '群主'
-  if (role === 'admin') return '管理员'
-  return '成员'
+  return getGroupMemberDisplayName(member, getParticipant(member.participantId).name)
 }
 
 function getCurrentGroupMember(participantId: string) {

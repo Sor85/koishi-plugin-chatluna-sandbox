@@ -80,7 +80,6 @@ export interface DetailsWorkspaceModel {
 
 const defaultAppearance: SandboxAppearance = {
   enableWebQQFrostedGlass: true,
-  webQQChatStyle: 'tim',
   webQQTimBubbleTail: true,
   webQQColorMode: 'auto',
   webQQAccentColor: '#2563eb',

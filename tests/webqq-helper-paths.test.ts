@@ -10,6 +10,7 @@ const helperFiles = [
   'notification-requests.ts',
   'friend-menu.ts',
   'group-menu.ts',
+  'group-display.ts',
 ]
 
 describe('WebQQ 辅助模块路径', () => {

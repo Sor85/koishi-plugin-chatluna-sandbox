@@ -7,7 +7,6 @@ import type { SandboxAppearance } from '../src/types'
 
 const appearance: SandboxAppearance = {
   enableWebQQFrostedGlass: true,
-  webQQChatStyle: 'tim',
   webQQTimBubbleTail: true,
   webQQColorMode: 'auto',
   webQQAccentColor: '#2563eb',

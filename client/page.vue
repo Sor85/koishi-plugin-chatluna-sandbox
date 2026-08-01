@@ -10,7 +10,6 @@
           'is-details-closed': !detailsVisible || !isWebqqView,
           'is-standalone-view': !isWebqqView,
         }"
-        :data-chat-style="appearance.webQQChatStyle"
         :data-color-mode="resolvedColorMode"
         :data-mobile-view="currentView"
         :style="{ '--webqq-accent': appearance.webQQAccentColor }"

@@ -1,7 +1,5 @@
 import type { SandboxMessage } from '../../src/types'
 
-type ChatStyle = 'tim' | 'qq'
-
 export function isImageOnlyMessage(message: SandboxMessage | undefined) {
   const media = message?.media
   return !!message
@@ -46,20 +44,17 @@ function getClusterBubbleMessage(
 export function isMergedMessage(
   messages: SandboxMessage[],
   index: number,
-  chatStyle: ChatStyle,
   currentOperatorId: string | undefined,
 ) {
-  return chatStyle === 'tim'
-    && isSameClusterSender(messages[index - 1], messages[index], currentOperatorId)
+  return isSameClusterSender(messages[index - 1], messages[index], currentOperatorId)
 }
 
 export function getMessageClusterClass(
   messages: SandboxMessage[],
   index: number,
-  chatStyle: ChatStyle,
   currentOperatorId: string | undefined,
 ) {
-  if (chatStyle !== 'tim' || !messages[index]) return ''
+  if (!messages[index]) return ''
   const hasPrevious = !!getClusterBubbleMessage(messages, index, -1, currentOperatorId)
   const hasNext = !!getClusterBubbleMessage(messages, index, 1, currentOperatorId)
   if (hasPrevious && hasNext) return 'is-cluster-middle'

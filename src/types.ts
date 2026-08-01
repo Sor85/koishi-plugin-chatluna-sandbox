@@ -316,7 +316,6 @@ export interface PerformGroupActionResult {
 
 export interface SandboxAppearance {
   enableWebQQFrostedGlass: boolean
-  webQQChatStyle: 'tim' | 'qq'
   webQQTimBubbleTail: boolean
   webQQColorMode: 'auto' | 'light' | 'dark'
   webQQAccentColor: string

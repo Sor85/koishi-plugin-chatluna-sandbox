@@ -39,11 +39,7 @@ export const Config: Schema<Config> = Schema.object({
     Schema.const('database').description('Koishi Database'),
   ]).default('memory').role('radio').description('模拟 QQ 环境状态存储方式'),
   enableWebQQFrostedGlass: Schema.boolean().default(true).description('启用 WebQQ 毛玻璃效果'),
-  webQQChatStyle: Schema.union([
-    Schema.const('tim').description('TIM'),
-    Schema.const('qq').description('QQ'),
-  ]).default('tim').role('radio').description('WebQQ 聊天气泡样式'),
-  webQQTimBubbleTail: Schema.boolean().default(true).description('显示 TIM 气泡小尖角'),
+  webQQTimBubbleTail: Schema.boolean().default(true).description('显示气泡小尖角'),
   webQQColorMode: Schema.union([
     Schema.const('auto').description('自动'),
     Schema.const('light').description('明亮'),
