@@ -5,7 +5,7 @@ import { parseAccountProfileFromUnknown } from '../account-profile'
 import type { SandboxControlService } from '../control-service'
 import type { SandboxTestSpaceService } from '../test-spaces'
 import type { SandboxMedia, SandboxImplementationProfile, SandboxSnapshot } from '../types'
-import { createDirectConversationId, createGroupConversationId, isRecalledMessage } from '../types'
+import { createDirectConversationId, createGroupConversationId, isRecalledMessage, SandboxOneBotDebugCursorExpiredError } from '../types'
 import { getOneBotCapabilityMatrix } from '../onebot-profiles'
 import { SandboxMcpError, type SandboxMcpCallRecord, type SandboxMcpCreatedCredential, type SandboxMcpCredential, type SandboxMcpEvent, type SandboxMcpEventCursor, type SandboxMcpExport, type SandboxMcpScope } from './types'
 
@@ -416,6 +416,8 @@ const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
       action: { type: 'string', description: '匹配规范 action，并覆盖能力矩阵声明的全部别名' },
       requestedAction: { type: 'string', description: '仅精确匹配插件实际请求名' },
       errorsOnly: { type: 'boolean' },
+      limit: { type: 'number', description: '每页条数，默认 50，最大 200' },
+      beforeSequence: { type: 'number', description: '新到旧分页游标：仅返回 sequence 更小的记录' },
     },
   },
   clear_onebot_debug_records: { type: 'object', properties: { spaceId: SPACE_REQUIRED }, required: ['spaceId'] },
@@ -753,13 +755,26 @@ export class SandboxMcpService {
     if (tool === 'reset_scene') return this.runDestructive(activeControl, credential, tool, args, () => activeControl.resetScene())
     if (tool === 'clear_scene') return this.runDestructive(activeControl, credential, tool, args, () => activeControl.replaceScene({ revision: activeControl.getSnapshot().revision, participants: [], groups: [], conversations: [], messages: [], friendships: [], requests: [] }))
     if (tool === 'import_scene') return this.runDestructive(activeControl, credential, tool, args, () => this.importScene(activeControl, args))
-    if (tool === 'list_onebot_debug_records') return activeControl.getOneBotDebugRecords({
-      botId: typeof args.botId === 'string' ? args.botId : undefined,
-      direction: args.direction === 'action' || args.direction === 'event' ? args.direction : undefined,
-      action: typeof args.action === 'string' ? args.action : undefined,
-      requestedAction: typeof args.requestedAction === 'string' ? args.requestedAction : undefined,
-      errorsOnly: args.errorsOnly === true ? true : undefined,
-    })
+    if (tool === 'list_onebot_debug_records') {
+      try {
+        return activeControl.getOneBotDebugRecords({
+          botId: typeof args.botId === 'string' ? args.botId : undefined,
+          direction: args.direction === 'action' || args.direction === 'event' ? args.direction : undefined,
+          action: typeof args.action === 'string' ? args.action : undefined,
+          requestedAction: typeof args.requestedAction === 'string' ? args.requestedAction : undefined,
+          errorsOnly: args.errorsOnly === true ? true : undefined,
+          limit: typeof args.limit === 'number' ? args.limit : undefined,
+          beforeSequence: typeof args.beforeSequence === 'number' ? args.beforeSequence : undefined,
+        })
+      } catch (error) {
+        if (error instanceof SandboxOneBotDebugCursorExpiredError) {
+          throw new SandboxMcpError('cursor_expired', error.message, false, error.earliestCursor === undefined
+            ? '请重新从最新页开始读取。'
+            : `请使用 earliestCursor=${error.earliestCursor} 恢复分页。`)
+        }
+        throw error
+      }
+    }
     if (tool === 'clear_onebot_debug_records') return { cleared: activeControl.clearOneBotDebugRecords() }
     if (tool === 'list_mcp_call_records') return structuredClone(this.callRecords).reverse()
     if (tool === 'clear_mcp_call_records') { const cleared = this.callRecords.length; this.callRecords = []; return { cleared } }

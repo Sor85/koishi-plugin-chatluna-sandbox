@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { SandboxBot } from './bot'
 import { SandboxChatLunaStateStore } from './chatluna-state'
 import { SandboxMediaStorage, MAX_MEDIA_SIZE } from './media-storage'
-import { SandboxOneBotDebugStore, createOneBotDebugError, type AppendOneBotDebugRecordInput } from './onebot-debug'
+import { SandboxOneBotDebugStore, createOneBotDebugError, type AppendOneBotDebugRecordInput, type SandboxOneBotDebugPersistence } from './onebot-debug'
 import { toOneBotMessageSegments, toOneBotRawMessage } from './onebot-message'
 import type { SandboxScenePersistence } from './persistence'
 import { mergeAccountProfile, normalizeAccountProfile } from './account-profile'
@@ -25,6 +25,7 @@ import {
   type GetSandboxBotDeliveriesInput,
   type GetMessageHistoryInput,
   type GetSandboxOneBotDebugRecordsInput,
+  type SandboxOneBotDebugRecordsPage,
   type PerformFriendActionInput,
   type PerformFriendActionResult,
   type PerformGroupActionInput,
@@ -63,7 +64,9 @@ import {
 export interface SandboxControlServiceOptions {
   mediaDirectory?: string
   persistence?: SandboxScenePersistence
+  debugPersistence?: SandboxOneBotDebugPersistence
   debugRecordLimit?: number
+  debugRecordMaxBytes?: number
   initialScene?: SandboxSnapshot
   runtimeBots?: SandboxRuntimeBotRegistry
   runtimeActive?: boolean
@@ -194,7 +197,11 @@ export class SandboxControlService {
     this.runtimeBotsActive = options.runtimeActive ?? true
     this.runtimeBotRegistry = options.runtimeBots ?? new SandboxRuntimeBotRegistry()
     this.persistence = options.persistence
-    this.oneBotDebug = new SandboxOneBotDebugStore(options.debugRecordLimit)
+    this.oneBotDebug = new SandboxOneBotDebugStore({
+      maxRecords: options.debugRecordLimit,
+      maxBytes: options.debugRecordMaxBytes,
+      persistence: options.debugPersistence,
+    })
     // 内存模式默认使用实例级媒体目录，避免并行测试/多实例共享默认目录时互相 clear 与写冲突。
     // Database 模式仍使用共享目录，以便场景引用在重启后继续命中同一媒体文件。
     this.mediaStorage = new SandboxMediaStorage(options.mediaDirectory ?? (
@@ -217,6 +224,7 @@ export class SandboxControlService {
     })
     this.syncRuntimeBots()
     this.contextDisposers.push(ctx.on('ready', async () => {
+      await this.oneBotDebug.waitForReady()
       if (!this.persistence) return
       const scene = await this.persistence.load()
       if (scene) {
@@ -429,7 +437,7 @@ export class SandboxControlService {
     }
   }
 
-  getOneBotDebugRecords(input: GetSandboxOneBotDebugRecordsInput = {}): SandboxOneBotDebugRecord[] {
+  getOneBotDebugRecords(input: GetSandboxOneBotDebugRecordsInput = {}): SandboxOneBotDebugRecordsPage {
     return this.oneBotDebug.getRecords(input)
   }
 
@@ -444,7 +452,11 @@ export class SandboxControlService {
   }
 
   waitForPersistence(): Promise<void> {
-    return this.persistenceQueue
+    return Promise.all([
+      this.oneBotDebug.waitForReady(),
+      this.persistenceQueue,
+      this.oneBotDebug.waitForPersistence(),
+    ]).then(() => undefined)
   }
 
   dispose(): Promise<void> {

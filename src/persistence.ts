@@ -1,5 +1,6 @@
 import type { Context } from 'koishi'
-import type { SandboxPersistenceStatus, SandboxSnapshot } from './types'
+import type { SandboxOneBotDebugRecord, SandboxPersistenceStatus, SandboxSnapshot } from './types'
+import type { SandboxOneBotDebugPersistence } from './onebot-debug'
 
 export interface SandboxScenePersistence {
   getStatus(): SandboxPersistenceStatus
@@ -29,10 +30,18 @@ export interface SandboxTestSpacePersistence {
   delete(id: string): Promise<void>
 }
 
+export interface SandboxOneBotDebugPersistenceRecord {
+  scopeId: string
+  nextSequence: number
+  records: SandboxOneBotDebugRecord[]
+  updatedAt: Date
+}
+
 declare module '@koishijs/core' {
   interface Tables {
     'onebot-sandbox.scene': SandboxSceneRecord
     'onebot-sandbox.test-space': SandboxTestSpacePersistenceRecord
+    'onebot-sandbox.debug-records': SandboxOneBotDebugPersistenceRecord
   }
 }
 
@@ -47,11 +56,18 @@ interface SandboxTestSpaceDatabase {
   remove(table: 'onebot-sandbox.test-space', query: { id: string }): Promise<unknown>
 }
 
+interface SandboxOneBotDebugDatabase {
+  get(table: 'onebot-sandbox.debug-records', query: { scopeId: string }): Promise<SandboxOneBotDebugPersistenceRecord[]>
+  upsert(table: 'onebot-sandbox.debug-records', rows: SandboxOneBotDebugPersistenceRecord[]): Promise<unknown>
+  remove(table: 'onebot-sandbox.debug-records', query: { scopeId: string }): Promise<unknown>
+}
+
 // 表名使用 "onebot-sandbox." 前缀：dataview-next 等工具按点号前缀归属插件；
 // ctx.inject 回调里的 model.extend 拿不到插件运行时名称，仅靠上下文会被归为未知来源。
 const SCENE_TABLE = 'onebot-sandbox.scene'
 const SCENE_ID = 'main'
 const TEST_SPACE_TABLE = 'onebot-sandbox.test-space'
+const DEBUG_TABLE = 'onebot-sandbox.debug-records'
 
 export function registerSandboxSceneModel(ctx: Context): void {
   ctx.model.extend(SCENE_TABLE, {
@@ -71,6 +87,74 @@ export function registerSandboxTestSpaceModel(ctx: Context): void {
     completedAt: 'string(64)',
     scene: 'json',
   }, { primary: 'id' })
+}
+
+export function registerSandboxOneBotDebugModel(ctx: Context): void {
+  ctx.model.extend(DEBUG_TABLE, {
+    scopeId: 'string(64)',
+    nextSequence: 'unsigned',
+    records: 'json',
+    updatedAt: 'timestamp',
+  }, { primary: 'scopeId' })
+}
+
+export class MemoryOneBotDebugPersistence implements SandboxOneBotDebugPersistence {
+  private store = new Map<string, { nextSequence: number, records: SandboxOneBotDebugRecord[] }>()
+
+  constructor(private scopeId: string) {}
+
+  async load() {
+    const current = this.store.get(this.scopeId)
+    return current
+      ? { nextSequence: current.nextSequence, records: structuredClone(current.records) }
+      : { nextSequence: 1, records: [] }
+  }
+
+  async replaceAll(nextSequence: number, records: SandboxOneBotDebugRecord[]) {
+    this.store.set(this.scopeId, {
+      nextSequence,
+      records: structuredClone(records),
+    })
+  }
+
+  async clear() {
+    this.store.delete(this.scopeId)
+  }
+}
+
+export class KoishiDatabaseOneBotDebugPersistence implements SandboxOneBotDebugPersistence {
+  constructor(
+    private scopeId: string,
+    private getDatabase: () => SandboxOneBotDebugDatabase | undefined,
+  ) {}
+
+  async load() {
+    const database = this.getDatabase()
+    if (!database) return { nextSequence: 1, records: [] }
+    const [record] = await database.get(DEBUG_TABLE, { scopeId: this.scopeId })
+    if (!record) return { nextSequence: 1, records: [] }
+    return {
+      nextSequence: Math.max(1, Number(record.nextSequence) || 1),
+      records: structuredClone(record.records ?? []),
+    }
+  }
+
+  async replaceAll(nextSequence: number, records: SandboxOneBotDebugRecord[]) {
+    const database = this.getDatabase()
+    if (!database) return
+    await database.upsert(DEBUG_TABLE, [{
+      scopeId: this.scopeId,
+      nextSequence,
+      records: structuredClone(records),
+      updatedAt: new Date(),
+    }])
+  }
+
+  async clear() {
+    const database = this.getDatabase()
+    if (!database) return
+    await database.remove(DEBUG_TABLE, { scopeId: this.scopeId })
+  }
 }
 
 // database 是可选服务，可能在本插件之后才加载；构造时缓存服务实例会让持久化永远不可用，

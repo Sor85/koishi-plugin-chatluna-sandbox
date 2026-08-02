@@ -283,6 +283,8 @@ export interface SandboxOneBotDebugError {
 
 export interface SandboxOneBotDebugRecord {
   id: string
+  /** 空间内单调递增、回收后也不复用的序号。 */
+  sequence: number
   createdAt: string
   botId: string
   implementation: SandboxImplementationProfile
@@ -316,10 +318,35 @@ export interface GetSandboxOneBotDebugRecordsInput {
   /** 仅精确匹配插件实际请求名。 */
   requestedAction?: string
   errorsOnly?: boolean
+  /** 每页条数，默认 50，最大 200。 */
+  limit?: number
+  /** 新到旧分页：仅返回 sequence 严格小于该值的记录。 */
+  beforeSequence?: number
+}
+
+export interface SandboxOneBotDebugRecordsPage<T extends SandboxOneBotDebugRecord = SandboxOneBotDebugRecord> {
+  records: T[]
+  hasMore: boolean
+  /** 下一页应传入的 beforeSequence。 */
+  nextCursor?: number
+  /** 当前仍保留的最早 sequence；游标过期恢复时可用。 */
+  earliestCursor?: number
 }
 
 export interface ClearSandboxOneBotDebugRecordsResult {
   cleared: number
+}
+
+export class SandboxOneBotDebugCursorExpiredError extends Error {
+  readonly code = 'cursor_expired' as const
+
+  constructor(
+    message: string,
+    readonly earliestCursor?: number,
+  ) {
+    super(message)
+    this.name = 'SandboxOneBotDebugCursorExpiredError'
+  }
 }
 
 export type SandboxMediaType = 'image' | 'file' | 'audio' | 'video'

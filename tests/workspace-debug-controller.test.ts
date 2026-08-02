@@ -29,6 +29,7 @@ const workspace: SandboxWorkspaceState = {
 
 const record: SandboxConsoleOneBotDebugRecord = {
   id: 'debug-1',
+  sequence: 1,
   createdAt: '2026-07-25T12:00:00.000Z',
   botId: '20001',
   implementation: 'napcat',
@@ -46,7 +47,7 @@ const record: SandboxConsoleOneBotDebugRecord = {
 describe('WebQQ OneBot 调试控制器', () => {
   it('通过端口加载筛选记录并清理当前缓冲区', async () => {
     const port = createFakeWorkspacePort(workspace)
-    port.debugRecordsResult = [record]
+    port.debugRecordsResult = { records: [record], hasMore: false, earliestCursor: 1 }
     const controller = createWorkspaceController(port, {
       getItem: () => null,
       setItem: () => undefined,

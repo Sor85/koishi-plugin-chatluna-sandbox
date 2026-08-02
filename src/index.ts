@@ -2,11 +2,15 @@ import { Context, Schema } from 'koishi'
 import { registerConsole } from './console'
 import { SandboxControlService, SandboxRuntimeBotRegistry } from './control-service'
 import {
+  KoishiDatabaseOneBotDebugPersistence,
   KoishiDatabaseScenePersistence,
   KoishiDatabaseTestSpacePersistence,
+  MemoryOneBotDebugPersistence,
+  registerSandboxOneBotDebugModel,
   registerSandboxSceneModel,
   registerSandboxTestSpaceModel,
 } from './persistence'
+import type { SandboxOneBotDebugPersistence } from './onebot-debug'
 import { SandboxMcpHttpServer, type SandboxMcpServerConfig } from './mcp/server'
 import { SandboxMcpService } from './mcp/service'
 import { SandboxTestSpaceService } from './test-spaces'
@@ -79,18 +83,36 @@ export function apply(ctx: Context, config: Config) {
     database: { required: false },
   }, (inner) => {
     let persistence: KoishiDatabaseScenePersistence | undefined
+    let createDebugPersistence: (scopeId: string) => SandboxOneBotDebugPersistence
     if (config.persistenceMode === 'database') {
       registerSandboxSceneModel(inner)
       registerSandboxTestSpaceModel(inner)
+      registerSandboxOneBotDebugModel(inner)
       // database 是可选注入，可能在本插件之后加载；必须传 getter 延迟解析，不能在此刻取值。
       persistence = new KoishiDatabaseScenePersistence(() => inner.database)
+      createDebugPersistence = (scopeId) => new KoishiDatabaseOneBotDebugPersistence(scopeId, () => inner.database)
+    } else {
+      // 内存 Adapter 与数据库 Adapter 共用同一 Interface；进程内跨控制服务实例可恢复，进程退出后不保留。
+      const memoryDebug = new Map<string, MemoryOneBotDebugPersistence>()
+      createDebugPersistence = (scopeId) => {
+        const existing = memoryDebug.get(scopeId)
+        if (existing) return existing
+        const created = new MemoryOneBotDebugPersistence(scopeId)
+        memoryDebug.set(scopeId, created)
+        return created
+      }
     }
     const runtimeBots = new SandboxRuntimeBotRegistry()
-    const control = new SandboxControlService(inner, { persistence, runtimeBots })
+    const control = new SandboxControlService(inner, {
+      persistence,
+      runtimeBots,
+      debugPersistence: createDebugPersistence('main'),
+    })
     const testSpaces = new SandboxTestSpaceService(
       inner,
       runtimeBots,
       config.persistenceMode === 'database' ? new KoishiDatabaseTestSpacePersistence(() => inner.database) : undefined,
+      createDebugPersistence,
     )
     inner.provide('onebotSandbox', control, true)
     try {

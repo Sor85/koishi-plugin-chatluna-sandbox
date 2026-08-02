@@ -396,7 +396,8 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
 
   async function loadOneBotDebugRecords(input: GetSandboxOneBotDebugRecordsInput = {}) {
     try {
-      oneBotDebugRecordsState.value = await port.getOneBotDebugRecords(input)
+      const page = await port.getOneBotDebugRecords(input)
+      oneBotDebugRecordsState.value = page.records
     } catch (error) {
       throw normalizeWorkspaceError(error, '读取 OneBot 调试记录失败')
     }

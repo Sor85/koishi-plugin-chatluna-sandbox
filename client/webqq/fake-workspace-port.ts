@@ -13,6 +13,7 @@ import type {
   SandboxConsoleOneBotDebugRecord,
   SandboxMediaContent,
   SandboxMessageHistory,
+  SandboxOneBotDebugRecordsPage,
   SandboxWorkspaceState,
   SendMediaMessageInput,
   SendMessageInput,
@@ -40,7 +41,10 @@ export class FakeWorkspacePort implements WorkspacePort {
     reference: 'sandbox-media://media-1',
     dataBase64: '',
   }
-  debugRecordsResult: SandboxConsoleOneBotDebugRecord[] = []
+  debugRecordsResult: SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord> = {
+    records: [],
+    hasMore: false,
+  }
   clearDebugRecordsResult: ClearSandboxOneBotDebugRecordsResult = { cleared: 0 }
   private readonly failures = new Map<WorkspacePortOperation, Error[]>()
 

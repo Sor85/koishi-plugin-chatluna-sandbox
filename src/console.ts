@@ -24,6 +24,7 @@ import type {
   SandboxEntitySource,
   SandboxMediaContent,
   SandboxMessageHistory,
+  SandboxOneBotDebugRecordsPage,
   SandboxWorkspaceState,
   SendMediaMessageInput,
   SendMessageInput,
@@ -47,7 +48,7 @@ interface ConsoleEventMap {
   'onebot-sandbox/friend-action': (input: SpaceScoped<PerformFriendActionInput>) => Promise<SandboxWorkspaceState>
   'onebot-sandbox/group-action': (input: SpaceScoped<PerformGroupActionInput>) => Promise<SandboxWorkspaceState>
   'onebot-sandbox/bot-deliveries': (input?: SpaceScoped<GetSandboxBotDeliveriesInput>) => SandboxBotDelivery[]
-  'onebot-sandbox/debug-records': (input?: SpaceScoped<GetSandboxOneBotDebugRecordsInput>) => SandboxConsoleOneBotDebugRecord[]
+  'onebot-sandbox/debug-records': (input?: SpaceScoped<GetSandboxOneBotDebugRecordsInput>) => SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord>
   'onebot-sandbox/clear-debug-records': (input?: { spaceId?: string }) => ClearSandboxOneBotDebugRecordsResult
   'onebot-sandbox/mcp-credentials': () => Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string }>
   'onebot-sandbox/create-mcp-credential': (input: { name: string; scopes: SandboxMcpScope[] }) => { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
@@ -136,32 +137,52 @@ export function registerConsole(
     return rest
   }
   const mainSource: SandboxEntitySource = { type: 'main', name: '主环境' }
-  const getDebugRecords = (
+  const getDebugPage = (
     activeControl: SandboxControlService,
     source: SandboxEntitySource,
     input: GetSandboxOneBotDebugRecordsInput,
-  ): SandboxConsoleOneBotDebugRecord[] => activeControl.getOneBotDebugRecords(input)
-    .map((record) => ({ ...record, source }))
-  const listDebugRecords = (input: SpaceScoped<GetSandboxOneBotDebugRecordsInput> = {}): SandboxConsoleOneBotDebugRecord[] => {
+  ): SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord> => {
+    const page = activeControl.getOneBotDebugRecords(input)
+    return {
+      ...page,
+      records: page.records.map((record) => ({ ...record, source })),
+    }
+  }
+  const listDebugRecords = (
+    input: SpaceScoped<GetSandboxOneBotDebugRecordsInput> = {},
+  ): SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord> => {
     const query = withoutSpaceId(input)
     if (input.spaceId) {
       if (!testSpaces) throw new Error('AI 测试空间服务不可用')
       const space = testSpaces.getSpace(input.spaceId)
-      return getDebugRecords(testSpaces.getControl(space.id), {
+      return getDebugPage(testSpaces.getControl(space.id), {
         type: 'test-space',
         spaceId: space.id,
         name: space.name,
       }, query)
     }
-    const records = getDebugRecords(control, mainSource, query)
-    for (const space of testSpaces?.listSpaces() ?? []) {
-      records.push(...getDebugRecords(testSpaces!.getControl(space.id), {
+    // 联邦视图跨多个独立 sequence，仅聚合首页；精确游标分页必须带 spaceId。
+    const pages = [
+      getDebugPage(control, mainSource, { ...query, beforeSequence: undefined }),
+      ...(testSpaces?.listSpaces() ?? []).map((space) => getDebugPage(testSpaces!.getControl(space.id), {
         type: 'test-space',
         spaceId: space.id,
         name: space.name,
-      }, query))
+      }, { ...query, beforeSequence: undefined })),
+    ]
+    const limit = Math.min(Math.max(Number(query.limit ?? 50) || 50, 1), 200)
+    const records = pages
+      .flatMap(({ records: items }) => items)
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt) || right.sequence - left.sequence)
+      .slice(0, limit)
+    return {
+      records,
+      hasMore: pages.some(({ hasMore }) => hasMore) || pages.flatMap(({ records: items }) => items).length > limit,
+      earliestCursor: pages
+        .map(({ earliestCursor }) => earliestCursor)
+        .filter((value): value is number => typeof value === 'number')
+        .sort((left, right) => left - right)[0],
     }
-    return records.sort((left, right) => right.createdAt.localeCompare(left.createdAt))
   }
   const clearDebugRecords = (input: { spaceId?: string } = {}): ClearSandboxOneBotDebugRecordsResult => {
     if (input.spaceId) return { cleared: resolveControl(input, true).clearOneBotDebugRecords() }
@@ -301,7 +322,7 @@ declare module '@koishijs/console' {
     'onebot-sandbox/friend-action'(input: SpaceScoped<PerformFriendActionInput>): Promise<SandboxWorkspaceState>
     'onebot-sandbox/group-action'(input: SpaceScoped<PerformGroupActionInput>): Promise<SandboxWorkspaceState>
     'onebot-sandbox/bot-deliveries'(input?: SpaceScoped<GetSandboxBotDeliveriesInput>): SandboxBotDelivery[]
-    'onebot-sandbox/debug-records'(input?: SpaceScoped<GetSandboxOneBotDebugRecordsInput>): SandboxConsoleOneBotDebugRecord[]
+    'onebot-sandbox/debug-records'(input?: SpaceScoped<GetSandboxOneBotDebugRecordsInput>): SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord>
     'onebot-sandbox/clear-debug-records'(input?: { spaceId?: string }): ClearSandboxOneBotDebugRecordsResult
     'onebot-sandbox/mcp-credentials'(): Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string }>
     'onebot-sandbox/create-mcp-credential'(input: { name: string; scopes: SandboxMcpScope[] }): { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
