@@ -152,7 +152,8 @@ describe('模拟 QQ 环境消息闭环', () => {
       ],
     })).rejects.toThrow('不支持的媒体类型')
     expect(control.getSnapshot().messages).toEqual([])
-    expect(await readdir(mediaDirectory)).toEqual([])
+    // 默认用户/机器人/群组头像会预先落盘；失败回滚后只保留这些稳定头像。
+    expect(await readdir(mediaDirectory)).toHaveLength(10)
   })
 
   it('将文件、语音和视频映射为对应的 Koishi 元素与 OneBot 消息段', async () => {
@@ -214,23 +215,25 @@ describe('模拟 QQ 环境消息闭环', () => {
       conversationId: 'private:10001:20001',
       media: [{ fileName: '待清理图片.png', mimeType: 'image/png', dataBase64: Buffer.from('orphan-image').toString('base64') }],
     })
-    expect(await readdir(mediaDirectory)).toHaveLength(2)
+    expect(await readdir(mediaDirectory)).toHaveLength(12)
     control.deleteUser({ id: '10001' })
-    expect(await readdir(mediaDirectory)).toEqual([])
+    // 删除用户后只回收该用户相关消息媒体，默认实体头像仍被其他参与者/群组引用。
+    expect(await readdir(mediaDirectory)).toHaveLength(6)
 
     await control.sendMediaMessage({
       operatorId: '10002',
       conversationId: 'private:10002:20001',
       media: [{ fileName: '重启前图片.png', mimeType: 'image/png', dataBase64: Buffer.from('restart-image').toString('base64') }],
     })
-    expect(await readdir(mediaDirectory)).toHaveLength(2)
+    expect(await readdir(mediaDirectory)).toHaveLength(8)
 
     const restartedApp = new App()
     restartedApp.plugin((ctx) => {
       new SandboxControlService(ctx, { mediaDirectory })
     })
     runningApps.push(restartedApp)
-    expect(await readdir(mediaDirectory)).toEqual([])
+    // 内存模式重启后会重新生成默认头像，并回收上一个实例残留的消息媒体。
+    expect(await readdir(mediaDirectory)).toHaveLength(10)
   })
 
   it('只返回当前用户可见会话，并按会话有界读取历史', async () => {

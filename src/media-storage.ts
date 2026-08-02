@@ -1,6 +1,6 @@
-import { randomUUID } from 'node:crypto'
+import { createHash } from 'node:crypto'
 import { basename, resolve } from 'node:path'
-import { existsSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import type { SandboxMedia, SandboxMediaContent, SandboxMediaType } from './types'
 
 export const MAX_MEDIA_SIZE = 10 * 1024 * 1024
@@ -9,6 +9,7 @@ const MEDIA_TYPES = new Map<string, SandboxMediaType>([
   ['image/gif', 'image'],
   ['image/jpeg', 'image'],
   ['image/png', 'image'],
+  ['image/svg+xml', 'image'],
   ['image/webp', 'image'],
   ['audio/aac', 'audio'],
   ['audio/m4a', 'audio'],
@@ -62,7 +63,8 @@ export class SandboxMediaStorage {
     if (!content.length) throw new Error('媒体内容不能为空')
     if (content.length > MAX_MEDIA_SIZE) throw new Error('媒体大小不能超过 10 MB')
 
-    const id = randomUUID().replaceAll('-', '')
+    // 内容寻址：相同正文复用同一媒体 ID，便于头像去重与引用感知回收。
+    const id = createHash('sha256').update(content).digest('hex').slice(0, 32)
     const media: SandboxMedia = {
       id,
       type,
@@ -71,8 +73,25 @@ export class SandboxMediaStorage {
       size: content.length,
       reference: `sandbox-media://${id}`,
     }
-    writeFileSync(this.getPath(id), content, { flag: 'wx' })
-    writeFileSync(this.getMetadataPath(id), `${JSON.stringify(media)}\n`, { flag: 'wx' })
+    if (this.exists(id)) {
+      // 去重命中时只返回元数据，避免把正文 base64 泄漏进场景快照。
+      const { dataBase64: _ignored, ...existing } = this.readById(id)
+      return existing
+    }
+    try {
+      writeFileSync(this.getPath(id), content, { flag: 'wx' })
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+    }
+    try {
+      writeFileSync(this.getMetadataPath(id), `${JSON.stringify(media)}\n`, { flag: 'wx' })
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+    }
+    if (this.exists(id)) {
+      const { dataBase64: _ignored, ...existing } = this.readById(id)
+      return existing
+    }
     return media
   }
 
@@ -102,6 +121,19 @@ export class SandboxMediaStorage {
 
   exists(id: string): boolean {
     return existsSync(this.getPath(id)) && existsSync(this.getMetadataPath(id))
+  }
+
+  reclaimUnreferenced(references: ReadonlySet<string>): void {
+    if (!existsSync(this.directory)) return
+    for (const entry of readdirSync(this.directory, { withFileTypes: true })) {
+      // 只回收媒体正文与 sidecar，跳过目录与其他附属文件。
+      if (!entry.isFile()) continue
+      if (!/^[a-f0-9]{32}(?:\.meta\.json)?$/.test(entry.name)) continue
+      const id = entry.name.endsWith('.meta.json') ? entry.name.slice(0, 32) : entry.name
+      if (references.has(`sandbox-media://${id}`)) continue
+      rmSync(this.getPath(id), { force: true })
+      rmSync(this.getMetadataPath(id), { force: true })
+    }
   }
 
   remove(media: SandboxMedia): void {

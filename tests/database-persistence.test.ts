@@ -60,7 +60,8 @@ describe('沙盒场景持久化', () => {
       conversationId: 'private:10001:20001',
       media: [{ fileName: 'memory.png', mimeType: 'image/png', dataBase64: Buffer.from('memory').toString('base64') }],
     })
-    expect(await readdir(mediaDirectory)).toHaveLength(2)
+    // 默认 5 个头像 + 新建用户默认头像 + 消息图片，各带 .meta.json。
+    expect(await readdir(mediaDirectory)).toHaveLength(14)
     expect(first.getSnapshot().participants.some(({ id }) => id === '10099')).toBe(true)
     expect(first.getPersistenceStatus()).toEqual({
       mode: 'memory',
@@ -72,7 +73,8 @@ describe('沙盒场景持久化', () => {
     const { control: second } = await createControl(undefined, mediaDirectory)
     expect(second.getSnapshot().participants.some(({ id }) => id === '10099')).toBe(false)
     expect(second.getSnapshot().participants.map(({ id }) => id)).toEqual(['10001', '10002', '10003', '20001'])
-    expect(await readdir(mediaDirectory)).toEqual([])
+    // 内存模式重启后会重新生成默认头像，不再清空整个目录。
+    expect(await readdir(mediaDirectory)).toHaveLength(10)
   })
 
   it('Database 模式在控制服务重启后恢复场景', async () => {
@@ -117,14 +119,15 @@ describe('沙盒场景持久化', () => {
     const restoredAvatar = second.getSnapshot().participants.find(({ id }) => id === '10099')!.avatar!
     expect(second.getMediaContent({ operatorId: '10099', mediaId: restoredAvatar.slice('sandbox-media://'.length) }).dataBase64)
       .toBe(Buffer.from('persistent-avatar').toString('base64'))
-    expect(second.getSnapshot().participants).toContainEqual({
+    expect(second.getSnapshot().participants).toContainEqual(expect.objectContaining({
       kind: 'bot',
       id: '20099',
       name: '持久机器人',
       implementation: 'llbot',
       enabled: true,
       disabledCapabilities: ['set_group_kick'],
-    })
+      avatar: expect.stringMatching(/^sandbox-media:\/\//),
+    }))
     expect(second.getSnapshot().groups).toContainEqual(expect.objectContaining({
       id: '30099',
       name: '持久群组',
@@ -205,6 +208,7 @@ describe('沙盒场景持久化', () => {
       persisted: false,
       message: 'Koishi Database 服务未安装或不可用',
     })
-    expect(await readdir(mediaDirectory)).toEqual([])
+    // 不可用数据库会清理孤儿文件，再补齐默认实体头像。
+    expect(await readdir(mediaDirectory)).toHaveLength(10)
   })
 })

@@ -153,7 +153,12 @@ describe('SandboxMcpService', () => {
       expectedRevision: revision,
       changes: [{ action: 'create-user', data: { id: '10009', name: '临时用户' } }],
     })
-    expect(control.getSnapshot().participants).toContainEqual({ kind: 'user', id: '10009', name: '临时用户' })
+    expect(control.getSnapshot().participants).toContainEqual(expect.objectContaining({
+      kind: 'user',
+      id: '10009',
+      name: '临时用户',
+      avatar: expect.stringMatching(/^sandbox-media:\/\//),
+    }))
     await expect(service.callTool(credential.token, 'apply_environment_changes', {
       expectedRevision: revision,
       changes: [{ action: 'create-user', data: { id: '10010', name: '过期变更' } }],

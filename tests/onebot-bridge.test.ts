@@ -429,7 +429,8 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     }) as { data: { message_id: number } }
     const copiedMessage = control.getSnapshot().messages.find(({ id }) => getOneBotMessageSequence(id) === copyResult.data.message_id)
     expect(copiedMessage?.media?.[0]).toMatchObject({ type: 'image', mimeType: 'image/png' })
-    expect(copiedMessage?.media?.[0].id).not.toBe(groupMessage?.media?.[0].id)
+    // 相同图片内容按内容寻址复用同一媒体 ID，复制发送不会产生额外文件。
+    expect(copiedMessage?.media?.[0].id).toBe(groupMessage?.media?.[0].id)
 
     const [quotedReplyId] = await bot.sendMessage('group:30001', [
       h('quote', { id: quoted.messageId }),

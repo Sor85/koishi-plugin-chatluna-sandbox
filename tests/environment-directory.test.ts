@@ -32,7 +32,12 @@ describe('模拟 QQ 环境目录管理', () => {
     control.createUser({ id: '10099', name: '新用户' })
     const created = control.getSnapshot()
     expect(created.revision).toBe(initialRevision + 1)
-    expect(created.participants).toContainEqual({ kind: 'user', id: '10099', name: '新用户' })
+    expect(created.participants).toContainEqual(expect.objectContaining({
+      kind: 'user',
+      id: '10099',
+      name: '新用户',
+      avatar: expect.stringMatching(/^sandbox-media:\/\//),
+    }))
     expect(created.conversations).toContainEqual({
       id: 'private:10099:20001',
       type: 'direct',
@@ -41,11 +46,12 @@ describe('模拟 QQ 环境目录管理', () => {
     })
 
     control.updateUser({ id: '10099', name: '更新用户' })
-    expect(control.getSnapshot().participants.find(({ id }) => id === '10099')).toEqual({
+    expect(control.getSnapshot().participants.find(({ id }) => id === '10099')).toEqual(expect.objectContaining({
       kind: 'user',
       id: '10099',
       name: '更新用户',
-    })
+      avatar: expect.stringMatching(/^sandbox-media:\/\//),
+    }))
 
     control.deleteUser({ id: '10099' })
     const snapshot = control.getSnapshot()
@@ -66,13 +72,14 @@ describe('模拟 QQ 环境目录管理', () => {
       enabled: false,
     })
     const created = control.getSnapshot()
-    expect(created.participants).toContainEqual({
+    expect(created.participants).toContainEqual(expect.objectContaining({
       kind: 'bot',
       id: '20099',
       name: 'LLBot 测试机器人',
       implementation: 'llbot',
       enabled: false,
-    })
+      avatar: expect.stringMatching(/^sandbox-media:\/\//),
+    }))
     expect(created.conversations.filter((conversation) => conversation.type === 'direct' && conversation.participantIds.includes('20099')))
       .toHaveLength(created.participants.length - 1)
 
@@ -82,13 +89,14 @@ describe('模拟 QQ 环境目录管理', () => {
       implementation: 'napcat',
       enabled: true,
     })
-    expect(control.getSnapshot().participants.find(({ id }) => id === '20099')).toEqual({
+    expect(control.getSnapshot().participants.find(({ id }) => id === '20099')).toEqual(expect.objectContaining({
       kind: 'bot',
       id: '20099',
       name: 'NapCat 测试机器人',
       implementation: 'napcat',
       enabled: true,
-    })
+      avatar: expect.stringMatching(/^sandbox-media:\/\//),
+    }))
 
     control.deleteBot({ id: '20099' })
     const removed = control.getSnapshot()
