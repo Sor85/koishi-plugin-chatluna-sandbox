@@ -473,10 +473,19 @@ describe('SandboxMcpService', () => {
       timeoutSeconds: 5,
     })).resolves.toMatchObject({
       matched: true,
-      event: {
-        type: 'onebot.action',
-        data: { botId: '21001', type: 'set_group_kick', status: 'error' },
+      record: {
+        botId: '21001',
+        requestedAction: 'set_group_kick',
+        action: 'set_group_kick',
+        status: 'error',
+        error: expect.objectContaining({
+          code: expect.any(String),
+          message: expect.any(String),
+          retryable: expect.any(Boolean),
+          traceId: expect.any(String),
+        }),
       },
+      cursor: expect.objectContaining({ sequence: expect.any(Number) }),
     })
     await expect(service.callTool(credential.token, 'wait_for_onebot_action', {
       spaceId: created.spaceId,

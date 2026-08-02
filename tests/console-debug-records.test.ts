@@ -48,8 +48,8 @@ describe('OneBot 调试 Console 协议', () => {
     expect(clearRecords).toBeTypeOf('function')
     if (typeof listRecords !== 'function' || typeof clearRecords !== 'function') throw new Error('调试记录监听器未注册')
     expect(listeners.has('onebot-sandbox/replay-debug-record')).toBe(false)
-    expect(Reflect.apply(listRecords, undefined, [{ direction: 'action', type: 'get_login_info' }])).toEqual([
-      expect.objectContaining({ type: 'get_login_info', status: 'success' }),
+    expect(Reflect.apply(listRecords, undefined, [{ direction: 'action', action: 'get_login_info' }])).toEqual([
+      expect.objectContaining({ requestedAction: 'get_login_info', action: 'get_login_info', status: 'success' }),
     ])
     expect(Reflect.apply(clearRecords, undefined, [])).toEqual({ cleared: 1 })
     expect(Reflect.apply(listRecords, undefined, [{}])).toEqual([])
@@ -73,21 +73,23 @@ describe('OneBot 调试 Console 协议', () => {
 
     vi.setSystemTime(new Date('2026-07-30T10:00:00.000Z'))
     control.recordOneBotDebug({
-      botId: '20001', implementation: 'napcat', direction: 'action', type: 'main-action',
+      botId: '20001', implementation: 'napcat', direction: 'action',
+      requestedAction: 'main-action', action: 'main-action',
       status: 'success', durationMs: 1,
     })
     vi.setSystemTime(new Date('2026-07-30T10:00:01.000Z'))
     first.control.recordOneBotDebug({
-      botId: '21001', implementation: 'llbot', direction: 'event', type: 'space-event',
+      botId: '21001', implementation: 'llbot', direction: 'event',
+      requestedAction: 'space-event', action: 'space-event',
       status: 'success', durationMs: 2,
     })
 
     expect(listeners.get('onebot-sandbox/debug-records')?.({})).toMatchObject([
-      { type: 'space-event', source: { type: 'test-space', spaceId: first.id, name: '空间 A' } },
-      { type: 'main-action', source: { type: 'main', name: '主环境' } },
+      { requestedAction: 'space-event', source: { type: 'test-space', spaceId: first.id, name: '空间 A' } },
+      { requestedAction: 'main-action', source: { type: 'main', name: '主环境' } },
     ])
     expect(listeners.get('onebot-sandbox/debug-records')?.({ spaceId: first.id })).toMatchObject([
-      { type: 'space-event', source: { type: 'test-space', spaceId: first.id, name: '空间 A' } },
+      { requestedAction: 'space-event', source: { type: 'test-space', spaceId: first.id, name: '空间 A' } },
     ])
     expect(listeners.get('onebot-sandbox/clear-debug-records')?.({})).toEqual({ cleared: 2 })
     expect(control.getOneBotDebugRecords()).toEqual([])

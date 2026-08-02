@@ -274,14 +274,25 @@ export interface SandboxPersistenceStatus {
 export type SandboxOneBotDebugDirection = 'action' | 'event'
 export type SandboxOneBotDebugStatus = 'success' | 'error'
 
+export interface SandboxOneBotDebugError {
+  code: string
+  message: string
+  retryable: boolean
+  traceId: string
+}
+
 export interface SandboxOneBotDebugRecord {
   id: string
   createdAt: string
   botId: string
   implementation: SandboxImplementationProfile
   direction: SandboxOneBotDebugDirection
-  type: string
-  resolvedType?: string
+  /** 插件实际请求的 action 名；事件方向则为原始事件类型。 */
+  requestedAction: string
+  /** 能力矩阵中的规范 action；事件方向与 requestedAction 相同。 */
+  action: string
+  /** 仅当 requestedAction 通过矩阵别名命中时存在。 */
+  matchedAlias?: string
   status: SandboxOneBotDebugStatus
   durationMs: number
   payload?: unknown
@@ -292,10 +303,7 @@ export interface SandboxOneBotDebugRecord {
     conversationId?: string
     messageId?: string
   }
-  error?: {
-    message: string
-    traceId: string
-  }
+  error?: SandboxOneBotDebugError
 }
 
 export type SandboxConsoleOneBotDebugRecord = SandboxOneBotDebugRecord & { source: SandboxEntitySource }
@@ -303,7 +311,10 @@ export type SandboxConsoleOneBotDebugRecord = SandboxOneBotDebugRecord & { sourc
 export interface GetSandboxOneBotDebugRecordsInput {
   botId?: string
   direction?: SandboxOneBotDebugDirection
-  type?: string
+  /** 匹配规范 action，并自动覆盖能力矩阵声明的全部别名。 */
+  action?: string
+  /** 仅精确匹配插件实际请求名。 */
+  requestedAction?: string
   errorsOnly?: boolean
 }
 

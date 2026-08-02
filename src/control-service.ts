@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { SandboxBot } from './bot'
 import { SandboxChatLunaStateStore } from './chatluna-state'
 import { SandboxMediaStorage, MAX_MEDIA_SIZE } from './media-storage'
-import { SandboxOneBotDebugStore, type AppendOneBotDebugRecordInput } from './onebot-debug'
+import { SandboxOneBotDebugStore, createOneBotDebugError, type AppendOneBotDebugRecordInput } from './onebot-debug'
 import { toOneBotMessageSegments, toOneBotRawMessage } from './onebot-message'
 import type { SandboxScenePersistence } from './persistence'
 import { mergeAccountProfile, normalizeAccountProfile } from './account-profile'
@@ -2071,27 +2071,26 @@ export class SandboxControlService {
         botId: bot.selfId,
         implementation: profile.implementation,
         direction: 'event',
-        type,
+        requestedAction: type,
+        action: type,
         status: 'success',
         durationMs: Date.now() - startedAt,
         payload,
         result: { delivered: true },
       })
     } catch (error) {
-      const traceId = Random.id()
-      this.ctx.logger('onebot-sandbox').error(`OneBot 原始事件派发失败 [${traceId}]`, error)
+      const debugError = createOneBotDebugError(error)
+      this.ctx.logger('onebot-sandbox').error(`OneBot 原始事件派发失败 [${debugError.traceId}]`, error)
       this.recordOneBotDebug({
         botId: bot.selfId,
         implementation: profile.implementation,
         direction: 'event',
-        type,
+        requestedAction: type,
+        action: type,
         status: 'error',
         durationMs: Date.now() - startedAt,
         payload,
-        error: {
-          message: error instanceof Error ? error.message : 'OneBot 原始事件派发失败',
-          traceId,
-        },
+        error: debugError,
       })
       throw error
     }

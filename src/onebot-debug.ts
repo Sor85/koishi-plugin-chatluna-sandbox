@@ -3,9 +3,11 @@ import type {
   GetSandboxOneBotDebugRecordsInput,
   SandboxImplementationProfile,
   SandboxOneBotDebugDirection,
+  SandboxOneBotDebugError,
   SandboxOneBotDebugRecord,
   SandboxOneBotDebugStatus,
 } from './types'
+import { getOneBotProfileBaseline } from './onebot-profiles'
 
 const DEFAULT_DEBUG_RECORD_LIMIT = 500
 const SENSITIVE_KEY_PATTERN = /authorization|access[_-]?token|secret|password|cookie|private[_-]?key/i
@@ -36,17 +38,44 @@ function readEntityId(payload: unknown, ...keys: string[]): string | undefined {
   }
 }
 
+function matchesActionFilter(record: SandboxOneBotDebugRecord, action: string): boolean {
+  if (record.action === action || record.requestedAction === action || record.matchedAlias === action) return true
+  // action 过滤匹配规范 action，并覆盖能力矩阵声明的全部别名。
+  const capability = getOneBotProfileBaseline(record.implementation).capabilities
+    .find((item) => item.action === record.action)
+  return !!capability && (capability.action === action || capability.aliases?.includes(action) === true)
+}
+
+export function createOneBotDebugError(error: unknown, traceId = Random.id()): SandboxOneBotDebugError {
+  const message = error instanceof Error ? error.message : String(error ?? 'OneBot 调用失败')
+  const lower = message.toLowerCase()
+  const retryable = lower.includes('timeout')
+    || lower.includes('超时')
+    || lower.includes('temporarily')
+    || lower.includes('busy')
+    || lower.includes('rate limit')
+    || lower.includes('econnreset')
+    || lower.includes('econnrefused')
+  let code = 'onebot_error'
+  if (message.includes('能力已被禁用')) code = 'capability_disabled'
+  else if (message.includes('不支持 OneBot action') || message.includes('暂不支持')) code = 'action_unsupported'
+  else if (message.includes('已撤回')) code = 'message_recalled'
+  else if (retryable) code = 'transient_error'
+  return { code, message, retryable, traceId }
+}
+
 export interface AppendOneBotDebugRecordInput {
   botId: string
   implementation: SandboxImplementationProfile
   direction: SandboxOneBotDebugDirection
-  type: string
-  resolvedType?: string
+  requestedAction: string
+  action: string
+  matchedAlias?: string
   status: SandboxOneBotDebugStatus
   durationMs: number
   payload?: unknown
   result?: unknown
-  error?: SandboxOneBotDebugRecord['error']
+  error?: SandboxOneBotDebugError
 }
 
 export class SandboxOneBotDebugStore {
@@ -62,8 +91,9 @@ export class SandboxOneBotDebugStore {
       botId: input.botId,
       implementation: input.implementation,
       direction: input.direction,
-      type: input.type,
-      resolvedType: input.resolvedType,
+      requestedAction: input.requestedAction,
+      action: input.action,
+      ...(input.matchedAlias ? { matchedAlias: input.matchedAlias } : {}),
       status: input.status,
       durationMs: input.durationMs,
       payload,
@@ -85,7 +115,8 @@ export class SandboxOneBotDebugStore {
     return structuredClone(this.records.filter((record) => (
       (!input.botId || record.botId === input.botId)
       && (!input.direction || record.direction === input.direction)
-      && (!input.type || record.type === input.type || record.resolvedType === input.type)
+      && (!input.action || matchesActionFilter(record, input.action))
+      && (!input.requestedAction || record.requestedAction === input.requestedAction)
       && (!input.errorsOnly || record.status === 'error')
     )).reverse())
   }

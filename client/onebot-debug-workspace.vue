@@ -46,8 +46,12 @@
         </Select>
       </label>
       <label>
-        <span>类型</span>
-        <Input v-model="type" class="webqq-debug-control" placeholder="例如 get_login_info" @keyup.enter="applyFilters" />
+        <span>规范 action</span>
+        <Input v-model="action" class="webqq-debug-control" placeholder="例如 get_group_info" @keyup.enter="applyFilters" />
+      </label>
+      <label>
+        <span>请求名</span>
+        <Input v-model="requestedAction" class="webqq-debug-control" placeholder="例如 getGroupInfo" @keyup.enter="applyFilters" />
       </label>
       <label class="webqq-debug-error-filter">
         <Checkbox v-model="errorsOnly" />
@@ -62,7 +66,7 @@
       <article v-for="record in records" :key="getRecordKey(record)" class="webqq-debug-record">
         <header>
           <div class="webqq-debug-record-title">
-            <strong>{{ record.type }}</strong>
+            <strong>{{ record.requestedAction }}</strong>
             <Badge variant="secondary">{{ record.direction === 'action' ? 'ACTION' : 'EVENT' }}</Badge>
             <Badge variant="secondary">{{ record.implementation === 'napcat' ? 'NapCat' : 'LLBot' }}</Badge>
             <Badge variant="secondary">{{ record.source.name }}</Badge>
@@ -72,7 +76,8 @@
           </div>
           <time>{{ formatTime(record.createdAt) }} · {{ record.durationMs }} ms</time>
         </header>
-        <p v-if="record.resolvedType && record.resolvedType !== record.type" class="webqq-debug-resolved">实际处理：{{ record.resolvedType }}</p>
+        <p v-if="record.action !== record.requestedAction" class="webqq-debug-resolved">规范 action：{{ record.action }}</p>
+        <p v-if="record.matchedAlias" class="webqq-debug-resolved">别名命中：{{ record.matchedAlias }}</p>
         <p class="webqq-debug-entities">机器人 {{ getBotName(record) }} · {{ formatEntities(record) }}</p>
         <p v-if="record.error" class="webqq-debug-trace">{{ record.error.message }} · trace {{ record.error.traceId }}</p>
         <div class="webqq-debug-payloads">
@@ -118,14 +123,16 @@ const emit = defineEmits<{
 
 const botId = ref('all')
 const direction = ref('all')
-const type = ref('')
+const action = ref('')
+const requestedAction = ref('')
 const errorsOnly = ref(false)
 
 function applyFilters() {
   emit('query', {
     botId: botId.value === 'all' ? undefined : props.bots.find((bot) => getBotKey(bot) === botId.value)?.id,
     direction: direction.value === 'action' || direction.value === 'event' ? direction.value : undefined,
-    type: type.value.trim() || undefined,
+    action: action.value.trim() || undefined,
+    requestedAction: requestedAction.value.trim() || undefined,
     errorsOnly: errorsOnly.value || undefined,
   })
 }

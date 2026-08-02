@@ -324,12 +324,13 @@ const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
   },
   wait_for_onebot_action: {
     type: 'object',
-    description: '等待被测插件真实发起的 OneBot action 调用记录，用于断言某条消息是否触发了预期 action 及其成败。',
+    description: '等待被测插件真实发起的 OneBot action 调用记录，用于断言某条消息是否触发了预期 action 及其成败。成功时直接返回匹配记录与事件游标。',
     properties: {
       spaceId: SPACE_REQUIRED,
       cursor: CURSOR,
       botId: { type: 'string', description: '按发起机器人过滤' },
-      action: { type: 'string', description: '按请求 action 名或解析后的处理器名过滤，如 set_group_kick' },
+      action: { type: 'string', description: '按规范 action 过滤，并覆盖能力矩阵声明的全部别名' },
+      requestedAction: { type: 'string', description: '仅精确匹配插件实际请求名' },
       status: { type: 'string', enum: ['success', 'error'], description: '按调用结果过滤' },
       timeoutSeconds: TIMEOUT_SECONDS,
     },
@@ -412,7 +413,8 @@ const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
       spaceId: SPACE_OPTIONAL,
       botId: { type: 'string' },
       direction: { type: 'string', enum: ['event', 'action'] },
-      type: { type: 'string' },
+      action: { type: 'string', description: '匹配规范 action，并覆盖能力矩阵声明的全部别名' },
+      requestedAction: { type: 'string', description: '仅精确匹配插件实际请求名' },
       errorsOnly: { type: 'boolean' },
     },
   },
@@ -743,11 +745,7 @@ export class SandboxMcpService {
       && (!args.conversationId || Reflect.get(event.data as object, 'conversationId') === args.conversationId)
       && (!args.authorId || Reflect.get(event.data as object, 'authorId') === args.authorId)
       && (!args.recipientBotId || Reflect.get(event.data as object, 'recipientBotId') === args.recipientBotId))
-    if (tool === 'wait_for_onebot_action') return this.waitFor(args, (event) => event.type === 'onebot.action'
-      && (!args.botId || Reflect.get(event.data as object, 'botId') === args.botId)
-      && (!args.status || Reflect.get(event.data as object, 'status') === args.status)
-      && (!args.action || Reflect.get(event.data as object, 'type') === args.action
-        || Reflect.get(event.data as object, 'resolvedType') === args.action))
+    if (tool === 'wait_for_onebot_action') return this.waitForOneBotAction(args)
     if (tool === 'wait_for_chatluna_state') return this.waitForChatLuna(activeControl, args)
     if (tool === 'apply_environment_changes') return this.applyEnvironmentChanges(activeControl, args)
     if (tool === 'prepare_destructive_action') return this.prepareDestructiveAction(activeControl, credential, args)
@@ -755,7 +753,13 @@ export class SandboxMcpService {
     if (tool === 'reset_scene') return this.runDestructive(activeControl, credential, tool, args, () => activeControl.resetScene())
     if (tool === 'clear_scene') return this.runDestructive(activeControl, credential, tool, args, () => activeControl.replaceScene({ revision: activeControl.getSnapshot().revision, participants: [], groups: [], conversations: [], messages: [], friendships: [], requests: [] }))
     if (tool === 'import_scene') return this.runDestructive(activeControl, credential, tool, args, () => this.importScene(activeControl, args))
-    if (tool === 'list_onebot_debug_records') return activeControl.getOneBotDebugRecords(args)
+    if (tool === 'list_onebot_debug_records') return activeControl.getOneBotDebugRecords({
+      botId: typeof args.botId === 'string' ? args.botId : undefined,
+      direction: args.direction === 'action' || args.direction === 'event' ? args.direction : undefined,
+      action: typeof args.action === 'string' ? args.action : undefined,
+      requestedAction: typeof args.requestedAction === 'string' ? args.requestedAction : undefined,
+      errorsOnly: args.errorsOnly === true ? true : undefined,
+    })
     if (tool === 'clear_onebot_debug_records') return { cleared: activeControl.clearOneBotDebugRecords() }
     if (tool === 'list_mcp_call_records') return structuredClone(this.callRecords).reverse()
     if (tool === 'clear_mcp_call_records') { const cleared = this.callRecords.length; this.callRecords = []; return { cleared } }
@@ -851,6 +855,34 @@ export class SandboxMcpService {
     if (target?.kind === 'bot') throw new SandboxMcpError('robot_request_forbidden', '发给机器人的申请必须由被测机器人处理')
     if (request.type === 'friend') return this.performFriendAction(control, { operatorId, action: 'handle-request', requestId, approve: args.approve, idempotencyKey: args.idempotencyKey })
     return this.performGroupAction(control, { operatorId, action: 'handle-request', requestId, approve: args.approve, idempotencyKey: args.idempotencyKey })
+  }
+
+  private async waitForOneBotAction(args: Record<string, unknown>) {
+    const waited = await this.waitFor(args, (event) => {
+      if (event.type !== 'onebot.action') return false
+      const data = event.data as {
+        botId?: string
+        status?: string
+        action?: string
+        requestedAction?: string
+        matchedAlias?: string
+      }
+      if (args.botId && data.botId !== args.botId) return false
+      if (args.status && data.status !== args.status) return false
+      if (args.requestedAction && data.requestedAction !== args.requestedAction) return false
+      if (args.action) {
+        const action = String(args.action)
+        if (data.action !== action && data.requestedAction !== action && data.matchedAlias !== action) return false
+      }
+      return true
+    }) as SandboxMcpWaitResult
+    if (!waited.matched || !waited.event) return waited
+    // 成功时直接返回匹配记录，避免消费者再从通用 event.data 中解包旧 type 字段。
+    return {
+      matched: true,
+      record: waited.event.data,
+      cursor: waited.cursor,
+    }
   }
 
   // 机器人常先回一条「稍等」再给最终结果。静默期内继续收集同条件消息，

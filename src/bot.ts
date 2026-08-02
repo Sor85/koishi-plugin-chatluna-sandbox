@@ -20,6 +20,7 @@ import {
   resolveOneBotAction,
   resolveOneBotMessageId,
 } from './onebot-profiles'
+import { createOneBotDebugError } from './onebot-debug'
 import { MAX_MEDIA_SIZE } from './media-storage'
 import { createDirectConversationId, createGroupConversationId, getDirectConversationPeerId, isRecalledMessage, isSandboxGroupMemberMuted, type SandboxGroupMember, type SandboxImplementationProfile } from './types'
 
@@ -437,17 +438,20 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     }
     const request = async (requestedAction: string, params: Record<string, unknown>) => {
       const startedAt = Date.now()
-      let resolvedType: string | undefined
+      let action = requestedAction
+      let matchedAlias: string | undefined
       try {
         const capability = resolveOneBotAction(this.implementation, this.disabledCapabilities, requestedAction)
-        resolvedType = capability.handler
+        action = capability.action
+        matchedAlias = capability.aliases?.includes(requestedAction) ? requestedAction : undefined
         const result = await executeRequest(capability, params)
         this.control.recordOneBotDebug({
           botId: this.selfId,
           implementation: this.implementation,
           direction: 'action',
-          type: requestedAction,
-          resolvedType,
+          requestedAction,
+          action,
+          matchedAlias,
           status: 'success',
           durationMs: Date.now() - startedAt,
           payload: params,
@@ -455,21 +459,19 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
         })
         return result
       } catch (error) {
-        const traceId = Random.id()
-        this.ctx.logger('onebot-sandbox').error(`OneBot action 调用失败 [${traceId}]`, error)
+        const debugError = createOneBotDebugError(error)
+        this.ctx.logger('onebot-sandbox').error(`OneBot action 调用失败 [${debugError.traceId}]`, error)
         this.control.recordOneBotDebug({
           botId: this.selfId,
           implementation: this.implementation,
           direction: 'action',
-          type: requestedAction,
-          resolvedType,
+          requestedAction,
+          action,
+          matchedAlias,
           status: 'error',
           durationMs: Date.now() - startedAt,
           payload: params,
-          error: {
-            message: error instanceof Error ? error.message : 'OneBot action 调用失败',
-            traceId,
-          },
+          error: debugError,
         })
         throw error
       }
