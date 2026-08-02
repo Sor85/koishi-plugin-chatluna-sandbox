@@ -5,7 +5,7 @@
       :key="reaction.emojiId"
       type="button"
       class="webqq-message-reaction"
-      :class="{ 'is-mine': isMine(reaction), 'is-readonly': readonly }"
+      :class="{ 'is-readonly': readonly }"
       :disabled="readonly"
       :aria-label="reactionLabel(reaction)"
       @click.stop="emit('toggle', reaction.emojiId)"
@@ -34,7 +34,6 @@
           />
         </span>
       </span>
-      <span class="webqq-message-reaction-total" aria-hidden="true">{{ reaction.participantIds.length }}</span>
     </button>
   </div>
 </template>
@@ -61,11 +60,7 @@ function getFace(emojiId: string) {
 
 const MAX_VISIBLE_REACTION_AVATARS = 3
 
-function isMine(reaction: SandboxMessageReaction) {
-  return !!props.currentOperatorId && reaction.participantIds.includes(props.currentOperatorId)
-}
-
-// TIM 风格 chip 只叠少量头像，总人数用数字单独展示，避免窄屏被长列表撑破。
+// TIM 风格 chip 只叠少量头像，避免窄屏被长列表撑破。
 function visibleParticipants(reaction: SandboxMessageReaction) {
   return reaction.participantIds.slice(0, MAX_VISIBLE_REACTION_AVATARS)
 }
