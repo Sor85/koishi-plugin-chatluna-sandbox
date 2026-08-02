@@ -62,7 +62,7 @@ const nativeActions: SandboxOneBotCapability[] = [
   { id: 'message.history.group', action: 'get_group_msg_history', handler: 'get_group_msg_history', description: '获取指定群的群聊历史消息', surface: 'native', supported: true },
   { id: 'friend.category.list', action: 'get_friends_with_category', handler: 'get_friends_with_category', description: '获取按 QQ 好友分组整理的好友列表', surface: 'native', supported: true },
   { id: 'delete_friend', action: 'delete_friend', handler: 'delete_friend', description: '删除当前机器人的指定好友', surface: 'native', supported: true },
-  { id: 'set_qq_profile', action: 'set_qq_profile', handler: 'set_qq_profile', description: '修改当前机器人的昵称资料', surface: 'native', supported: true },
+  { id: 'set_qq_profile', action: 'set_qq_profile', handler: 'set_qq_profile', description: '修改当前机器人的昵称和个性签名', surface: 'native', supported: true },
   { id: 'set_qq_avatar', action: 'set_qq_avatar', handler: 'set_qq_avatar', description: '修改当前机器人的头像', surface: 'native', supported: true },
   {
     id: 'send_poke',

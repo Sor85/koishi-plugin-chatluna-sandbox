@@ -6,7 +6,19 @@
         <IconChevronLeft :size="22" aria-hidden="true" />
       </button>
       <div class="webqq-chat-title">
-        <WebqqAvatar class="webqq-avatar" :kind="model.avatarKind" :name="model.title" :avatar="model.avatar" />
+        <ContextMenu v-if="model.profileParticipantId">
+          <ContextMenuTrigger as-child>
+            <button type="button" class="webqq-chat-title-avatar" :aria-label="`查看 ${model.title} 的资料`">
+              <WebqqAvatar class="webqq-avatar" :kind="model.avatarKind" :name="model.title" :avatar="model.avatar" />
+            </button>
+          </ContextMenuTrigger>
+          <ContextMenuContent style="z-index: 140">
+            <ContextMenuItem @select="emit('openProfile', model.profileParticipantId!)">
+              <IconId :size="16" aria-hidden="true" /> 查看资料
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
+        <WebqqAvatar v-else class="webqq-avatar" :kind="model.avatarKind" :name="model.title" :avatar="model.avatar" />
         <div>
           <strong>{{ model.title }}</strong>
           <span>{{ model.subtitle }}</span>
@@ -21,6 +33,7 @@
       :model="model.messageList"
       @reply="replyingToMessageId = $event"
       @recall-message="emit('recallMessage', $event)"
+      @set-message-reaction="forwardSetMessageReaction"
       @load-history="forwardLoadHistory"
       @request-friend="emit('requestFriend', $event)"
       @poke-friend="emit('pokeFriend', $event)"
@@ -32,6 +45,7 @@
       @set-group-admin="forwardSetGroupAdmin"
       @transfer-group-owner="emit('transferGroupOwner', $event)"
       @kick-group-member="emit('kickGroupMember', $event)"
+      @open-profile="emit('openProfile', $event)"
     />
 
     <WebqqComposer
@@ -48,8 +62,9 @@
 </template>
 
 <script setup lang="ts">
-import { IconChevronLeft, IconDots } from '@tabler/icons-vue'
+import { IconChevronLeft, IconDots, IconId } from '@tabler/icons-vue'
 import { computed, ref, watch } from 'vue'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from './components/ui/context-menu'
 import WebqqAvatar from './webqq-avatar.vue'
 import WebqqComposer, { type WebqqComposerModel, type WebqqComposerSendIntent } from './webqq-composer.vue'
 import WebqqMessageList, { type WebqqMessageListModel } from './webqq-message-list.vue'
@@ -61,6 +76,7 @@ export interface WebqqChatPaneModel {
   subtitle: string
   avatar: string
   avatarKind: 'user' | 'bot' | 'group'
+  profileParticipantId?: string
   detailsVisible: boolean
   participantNames: Record<string, string>
   messageList: WebqqMessageListModel
@@ -78,6 +94,7 @@ const emit = defineEmits<{
   deleteParticipant: [entity: { type: 'user' | 'bot', id: string }]
   loadHistory: [resolve: () => void, reject: (error: unknown) => void]
   recallMessage: [messageId: string]
+  setMessageReaction: [messageId: string, emojiId: string, enabled: boolean]
   requestFriend: [targetId: string]
   pokeFriend: [targetId: string]
   setRemark: [targetId: string]
@@ -88,6 +105,7 @@ const emit = defineEmits<{
   setGroupAdmin: [targetId: string, enabled: boolean]
   transferGroupOwner: [targetId: string]
   kickGroupMember: [targetId: string]
+  openProfile: [participantId: string]
 }>()
 
 const replyingToMessageId = ref('')
@@ -122,6 +140,10 @@ function forwardManageEnvironment(input: ManageSandboxEnvironmentInput, resolve:
 
 function forwardLoadHistory(resolve: () => void, reject: (error: unknown) => void) {
   emit('loadHistory', resolve, reject)
+}
+
+function forwardSetMessageReaction(messageId: string, emojiId: string, enabled: boolean) {
+  emit('setMessageReaction', messageId, emojiId, enabled)
 }
 
 function forwardSetGroupAdmin(targetId: string, enabled: boolean) {

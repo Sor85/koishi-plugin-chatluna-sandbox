@@ -142,6 +142,7 @@
         <label class="sr-only" for="onebot-sandbox-input">消息内容</label>
         <textarea
           id="onebot-sandbox-input"
+          ref="inputRef"
           v-webqq-scrollbar="{ tone: 'accent' }"
           v-model="input"
           rows="1"
@@ -180,6 +181,7 @@ import EnvironmentCreatePopover from './environment-create-popover.vue'
 import WebqqAvatar from './webqq-avatar.vue'
 import WebqqImagePreview from './webqq-image-preview.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
+import { shouldRestoreComposerFocus } from './webqq/composer-focus'
 import { addComposerMention, buildMentionContent, type ComposerMention } from './webqq/mention'
 import {
   getUserStackLayoutMetrics,
@@ -239,6 +241,7 @@ interface ComposerSendFile {
 
 const input = ref('')
 const mentions = ref<ComposerMention[]>([])
+const inputRef = ref<HTMLTextAreaElement>()
 const mediaInputRef = ref<HTMLInputElement>()
 const sendFiles = ref<ComposerSendFile[]>([])
 const previewImageUrl = ref('')
@@ -501,6 +504,11 @@ async function sendMessage() {
   const { currentOperatorId, conversationId } = props.model
   if ((!content && !sendFiles.value.length) || !currentOperatorId || !conversationId || sending.value) return
 
+  // 捕获发起时的会话、操作者和 textarea，避免异步完成后读到切换后的状态。
+  const requestConversationId = conversationId
+  const requestOperatorId = currentOperatorId
+  const requestInput = inputRef.value
+
   sending.value = true
   localError.value = ''
   try {
@@ -525,6 +533,19 @@ async function sendMessage() {
     localError.value = error instanceof Error ? error.message : '发送失败'
   } finally {
     sending.value = false
+    // 等 disabled 解除后再 focus，否则浏览器会忽略对 disabled 控件的焦点请求。
+    await nextTick()
+    // 优先使用仍挂载的原节点；卸载后 ref 可能已清空，需用捕获值判断 isConnected。
+    const focusTarget = inputRef.value ?? requestInput
+    if (shouldRestoreComposerFocus({
+      requestConversationId,
+      requestOperatorId,
+      activeConversationId: props.model.conversationId,
+      activeOperatorId: props.model.currentOperatorId,
+      inputElement: focusTarget,
+    })) {
+      focusTarget?.focus()
+    }
   }
 }
 

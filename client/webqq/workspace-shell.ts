@@ -11,11 +11,12 @@ import type {
   SandboxFriendAction,
   SandboxGroupAction,
 } from '../../src/types'
-import { getSandboxBots, getSandboxUsers } from '../../src/types'
+import { formatRecalledMessageEventText, getSandboxBots, getSandboxUsers, isRecalledMessage } from '../../src/types'
 import type { SandboxWorkspaceView } from './workspace-state'
 import type { FriendMenuState } from './friend-menu'
 import { formatMentionContent } from './mention'
 import { getIncomingNotificationRequests } from './notification-requests'
+import { buildProfileCardModel } from './profile-card'
 import { getConversationPeerId, getFriendDirectory, getGroupDirectory, getVisibleRecentConversations } from './relationship-directory'
 import type { createWorkspaceController } from './workspace-controller'
 import type { createWorkspaceLayout } from './workspace-layout'
@@ -32,6 +33,7 @@ export interface WebqqWorkspaceOverlayHost {
   openEntity(mode: EnvironmentDialogMode, target: { type: EnvironmentEntityType, id: string }): void
   openGroupAction(mode: GroupActionMode, targetId: string, groupId: string, value: string): void
   openRemark(targetId: string, value: string): void
+  openProfile(card: NonNullable<ReturnType<typeof buildProfileCardModel>>): void
 }
 
 export function createWebqqWorkspaceShell(
@@ -109,6 +111,7 @@ export function createWebqqWorkspaceShell(
     hasMoreMessages: !!currentConversation.value?.hasMoreMessages,
     mediaSources: mediaSources.value,
     mediaLoadFailures: mediaLoadFailures.value,
+    markRecalledMessages: appearance.value.webQQMarkRecalledMessages,
   }))
   const composerModel = computed<WebqqComposerModel>(() => ({
     senders: composerSenders.value,
@@ -126,6 +129,7 @@ export function createWebqqWorkspaceShell(
     subtitle: currentConversationSubtitle.value,
     avatar: currentGroup.value ? '' : currentPeer.value?.avatar ?? '',
     avatarKind: currentGroup.value ? 'group' : currentBot.value ? 'bot' : 'user',
+    profileParticipantId: currentGroup.value ? undefined : currentPeer.value?.id,
     detailsVisible: detailsVisible.value,
     participantNames: participantNames.value,
     messageList: messageListModel.value,
@@ -148,6 +152,7 @@ export function createWebqqWorkspaceShell(
       name: currentPeer.value.name,
       avatar: currentPeer.value.avatar,
       isBot: !!currentBot.value,
+      personalNote: currentPeer.value.profile?.personalNote,
     } : undefined,
     currentOperatorName: currentOperator.value?.name,
     currentOperatorId: currentOperatorId.value,
@@ -166,13 +171,22 @@ export function createWebqqWorkspaceShell(
     const messageIds = new Set(conversation.messageIds)
     const latestMessage = snapshot.value.messages.filter(({ id }) => messageIds.has(id)).at(-1)
     const actorRole = group?.members.find(({ participantId }) => participantId === currentOperatorId.value)?.role
+    const latestPreview = (() => {
+      if (!latestMessage) return '开始一段新对话'
+      if (isRecalledMessage(latestMessage)) {
+        const operatorId = latestMessage.lifecycle.operatorId
+        const operatorName = participantNames.value[operatorId] ?? operatorId
+        return formatRecalledMessageEventText(latestMessage, operatorName)
+      }
+      return formatMentionContent(latestMessage.content, participantNames.value)
+    })()
     return {
       id: conversation.id,
       groupId: group?.id,
       title: group?.name ?? peer?.name ?? conversation.id,
       avatar: group ? undefined : peer?.avatar,
       avatarKind: group ? 'group' as const : bot ? 'bot' as const : 'user' as const,
-      preview: latestMessage ? formatMentionContent(latestMessage.content, participantNames.value) : '开始一段新对话',
+      preview: latestPreview,
       time: latestMessage?.createdAt
         ? new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(new Date(latestMessage.createdAt))
         : '',
@@ -338,6 +352,15 @@ export function createWebqqWorkspaceShell(
     }
   }
 
+  async function setMessageReaction(messageId: string, emojiId: string, enabled: boolean) {
+    errorMessage.value = ''
+    try {
+      await workspaceController.setMessageReaction({ messageId, emojiId, enabled })
+    } catch (error) {
+      errorMessage.value = error instanceof Error ? error.message : '贴表情失败'
+    }
+  }
+
   function deleteFriend(targetId: string) {
     return performFriendAction({ action: 'delete', targetId })
   }
@@ -361,6 +384,16 @@ export function createWebqqWorkspaceShell(
 
   function openEntityDialog(mode: EnvironmentDialogMode, target: { type: EnvironmentEntityType, id: string }) {
     getOverlayHost()?.openEntity(mode, target)
+  }
+
+  function openProfile(participantId: string) {
+    const card = buildProfileCardModel({
+      snapshot: snapshot.value,
+      participantId,
+      viewerId: currentOperatorId.value,
+      groupId: currentGroup.value?.id,
+    })
+    if (card) getOverlayHost()?.openProfile(card)
   }
 
   function selectConversation(conversationId: string) {
@@ -515,6 +548,7 @@ export function createWebqqWorkspaceShell(
     openComposerParticipantDialog,
     openEntityDialog,
     openGroupActionDialog,
+    openProfile,
     openRemarkDialog,
     overlayModel,
     performFriendAction,
@@ -523,6 +557,7 @@ export function createWebqqWorkspaceShell(
     pokeGroupMember,
     publishAnnouncement,
     recallMessage,
+    setMessageReaction,
     requestFriend,
     saveFriendRemark,
     saveGroupAction,

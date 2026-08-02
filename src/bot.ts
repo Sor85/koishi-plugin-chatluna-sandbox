@@ -9,13 +9,19 @@ import {
   type SandboxOutboundMessage,
 } from './onebot-message'
 import {
+  normalizeAccountSex,
+  toOneBotAccountProfile,
+  toOneBotGroupMemberInfo,
+  toOneBotLoginInfo,
+} from './account-profile'
+import {
   getOneBotMessageSequence,
   getOneBotProfileBaseline,
   resolveOneBotAction,
   resolveOneBotMessageId,
 } from './onebot-profiles'
 import { MAX_MEDIA_SIZE } from './media-storage'
-import { createDirectConversationId, createGroupConversationId, getDirectConversationPeerId, isSandboxGroupMemberMuted, type SandboxGroupMember, type SandboxImplementationProfile } from './types'
+import { createDirectConversationId, createGroupConversationId, getDirectConversationPeerId, isRecalledMessage, isSandboxGroupMemberMuted, type SandboxGroupMember, type SandboxImplementationProfile } from './types'
 
 function normalizeOneBotGroupId(value: unknown): string {
   const groupId = String(value ?? '')
@@ -75,10 +81,15 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           return { status: 'ok', retcode: 0, data: { online, good: online && !this.error } }
         }
         if (action === 'get_login_info') {
+          const self = this.control.getSnapshot().participants.find(({ id }) => id === this.selfId)
           return {
             status: 'ok',
             retcode: 0,
-            data: { user_id: Number(this.selfId), nickname: this.user?.name ?? this.selfId },
+            data: toOneBotLoginInfo({
+              id: this.selfId,
+              name: self?.name ?? this.user?.name ?? this.selfId,
+              profile: self?.profile,
+            }),
           }
         }
         if (action === 'get_version_info') {
@@ -90,26 +101,37 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           }
         }
         if (action === 'get_stranger_info') {
-          const user = await this.getUser(String(params.user_id ?? ''))
-          return { status: 'ok', retcode: 0, data: this.toOneBotUser(user) }
+          const participant = this.control.getSnapshot().participants.find(({ id }) => id === String(params.user_id ?? ''))
+          if (!participant) throw new Error(`参与者不存在：${params.user_id}`)
+          return { status: 'ok', retcode: 0, data: toOneBotAccountProfile(participant) }
         }
         if (action === 'get_friend_list') {
           const friends = await this.getFriendList()
+          const snapshot = this.control.getSnapshot()
           return {
             status: 'ok',
             retcode: 0,
-            data: friends.data.map(({ user, nick }) => ({
-              ...this.toOneBotUser(user),
-              remark: nick ?? '',
-            })),
+            data: friends.data.map(({ user, nick }) => {
+              const userId = user?.id ?? '0'
+              const participant = snapshot.participants.find(({ id }) => id === userId)
+              return {
+                ...toOneBotAccountProfile(participant ?? { id: userId, name: user?.name ?? userId }),
+                remark: nick ?? '',
+              }
+            }),
           }
         }
         if (action === 'get_friends_with_category') {
           const friends = await this.getFriendList()
-          const buddyList = friends.data.map(({ user, nick }) => ({
-            ...this.toOneBotUser(user),
-            remark: nick ?? '',
-          }))
+          const snapshot = this.control.getSnapshot()
+          const buddyList = friends.data.map(({ user, nick }) => {
+            const userId = user?.id ?? '0'
+            const participant = snapshot.participants.find(({ id }) => id === userId)
+            return {
+              ...toOneBotAccountProfile(participant ?? { id: userId, name: user?.name ?? userId }),
+              remark: nick ?? '',
+            }
+          })
           return {
             status: 'ok',
             retcode: 0,
@@ -142,7 +164,10 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           const groups = new Map(snapshot.groups.map((group) => [group.id, group]))
           const messages = new Map(snapshot.messages.map((message) => [message.id, message]))
           const recentContacts = snapshot.conversations.flatMap((conversation) => {
-            const latestMessage = messages.get(conversation.messageIds.at(-1) ?? '')
+            // 最近联系人摘要不得泄露撤回原文，回退到最近一条仍可读的消息。
+            const latestMessage = [...conversation.messageIds].reverse()
+              .map((messageId) => messages.get(messageId))
+              .find((message) => message && !isRecalledMessage(message))
             if (!latestMessage) return []
             const peerId = conversation.type === 'group'
               ? conversation.groupId
@@ -213,7 +238,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           return executeRequest(targetCapability, params)
         }
         if (action === 'get_msg') {
-          const message = this.findVisibleMessage(String(params.message_id ?? ''))
+          const message = this.requireReadableMessage(String(params.message_id ?? ''))
           return { status: 'ok', retcode: 0, data: this.toOneBotMessage(message) }
         }
         if (action === 'get_friend_msg_history') {
@@ -286,8 +311,15 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
         }
         if (action === 'set_qq_profile') {
           if (typeof params.nickname !== 'string' || !params.nickname.trim()) throw new Error('机器人昵称不能为空')
+          // NapCat 接受 sex，LLOneBot 只允许 nickname/personal_note；不支持时必须明确失败。
+          if (params.sex !== undefined) {
+            if (this.implementation !== 'napcat') throw new Error('当前实现配置不支持修改性别')
+            if (normalizeAccountSex(params.sex) === undefined) throw new Error('性别参数无效')
+          }
           return this.control.updateBotSelfProfile(this.selfId, {
             name: params.nickname,
+            ...(typeof params.personal_note === 'string' ? { personalNote: params.personal_note } : {}),
+            ...(params.sex !== undefined ? { sex: normalizeAccountSex(params.sex) } : {}),
           })
         }
         if (action === 'set_qq_avatar') {
@@ -372,8 +404,9 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           }
         }
         if (action === 'set_msg_emoji_like') {
-          const message = this.findVisibleMessage(String(params.message_id ?? ''))
-          this.control.setMessageReaction({
+          const message = this.findAccessibleMessage(String(params.message_id ?? ''))
+          // bot action 直接写入领域状态，避免再经 setMessageReaction 回绕到 OneBot action。
+          this.control.applyMessageReaction({
             operatorId: this.selfId,
             messageId: message.id,
             emojiId: String(params.emoji_id ?? ''),
@@ -390,7 +423,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
             const data = node && typeof node === 'object' ? Reflect.get(node, 'data') as Record<string, unknown> | undefined : undefined
             if (!data) return ''
             if (data.content !== undefined) return this.getOutboundMessageSummary(parseOneBotOutboundMessage(data.content))
-            if (data.id !== undefined) return this.findVisibleMessage(String(data.id)).content
+            if (data.id !== undefined) return this.requireReadableMessage(String(data.id)).content
             return ''
           }).filter(Boolean).join('\n')
           if (!content) throw new Error('send_forward_msg 的消息节点不能全部为空')
@@ -498,13 +531,13 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
 
   async getFriendList(): Promise<Universal.List<Universal.Friend>> {
     const snapshot = this.control.getSnapshot()
-    const friendIds = snapshot.friendships.flatMap(({ participantIds }) => participantIds.includes(this.selfId)
-      ? participantIds.filter((id) => id !== this.selfId)
-      : [])
+    const friendships = snapshot.friendships.filter(({ participantIds }) => participantIds.includes(this.selfId))
     return {
-      data: await Promise.all(friendIds.map(async (id) => {
+      data: await Promise.all(friendships.map(async ({ participantIds, remarks }) => {
+        const id = participantIds.find((participantId) => participantId !== this.selfId)!
         const user = await this.getUser(id)
-        return { user, nick: user.name }
+        // OneBot remark 只表示好友备注；缺失时返回空串，不回落到昵称。
+        return { user, nick: remarks[this.selfId] ?? '' }
       })),
     }
   }
@@ -543,13 +576,16 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
   }
 
   async getMessage(channelId: string, messageId: string): Promise<Universal.Message> {
-    const message = this.findVisibleMessage(messageId, channelId)
+    const message = this.requireReadableMessage(messageId, channelId)
     return this.toUniversalMessage(message)
   }
 
   async getMessageList(channelId: string): Promise<Universal.BidiList<Universal.Message>> {
     const conversation = this.getVisibleConversation(channelId)
-    const messages = this.control.getSnapshot().messages.filter(({ id }) => conversation.messageIds.includes(id))
+    // 与 get_msg / 历史查询一致：已撤回消息不得以原文形式暴露给机器人。
+    const messages = this.control.getSnapshot().messages
+      .filter(({ id }) => conversation.messageIds.includes(id))
+      .filter((message) => !isRecalledMessage(message))
     return { data: await Promise.all(messages.map((message) => this.toUniversalMessage(message))) }
   }
 
@@ -620,7 +656,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     // 先校验机器人确实能看到目标会话，再落盘媒体；否则无效 action 会留下孤儿文件。
     this.getVisibleConversation(conversationId)
     const replyToMessageId = message.replyToRawId
-      ? this.findVisibleMessage(message.replyToRawId, conversationId).id
+      ? this.findAccessibleMessage(message.replyToRawId, conversationId).id
       : undefined
     const mediaInputs = await Promise.all(message.mediaSources.map((media) => this.resolveOutboundMedia(media)))
     if (!message.content && !mediaInputs.length) throw new Error('消息内容不能为空')
@@ -736,26 +772,36 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
   }
 
   private toOneBotUser(user?: Universal.User) {
-    return {
-      user_id: Number(user?.id ?? 0),
-      nickname: user?.name ?? user?.id ?? '',
-    }
+    const participant = this.control.getSnapshot().participants.find(({ id }) => id === user?.id)
+    return toOneBotAccountProfile(participant ?? {
+      id: user?.id ?? '0',
+      name: user?.name ?? user?.id ?? '',
+    })
   }
 
   private toOneBotGuildMember(groupId: string, member: Universal.GuildMember) {
-    const role = member.roles?.[0]?.id ?? 'member'
     const userId = member.user?.id ?? ''
-    const groupMember = this.control.getSnapshot().groups.find(({ id }) => id === groupId)
+    const snapshot = this.control.getSnapshot()
+    const groupMember = snapshot.groups.find(({ id }) => id === groupId)
       ?.members.find(({ participantId }) => participantId === userId)
-    return {
-      group_id: Number(groupId),
-      user_id: Number(userId || 0),
-      nickname: member.user?.name ?? userId,
-      card: member.nick ?? '',
-      role,
-      title: groupMember?.title ?? '',
-      shut_up_timestamp: groupMember ? getGroupMemberMuteTimestamp(groupMember) : 0,
+    const participant = snapshot.participants.find(({ id }) => id === userId)
+    if (!groupMember || !participant) {
+      return {
+        group_id: Number(groupId),
+        user_id: Number(userId || 0),
+        nickname: member.user?.name ?? userId,
+        card: member.nick ?? '',
+        role: member.roles?.[0]?.id ?? 'member',
+        title: '',
+        shut_up_timestamp: 0,
+      }
     }
+    return toOneBotGroupMemberInfo(
+      groupId,
+      groupMember,
+      participant,
+      getGroupMemberMuteTimestamp(groupMember),
+    )
   }
 
   private getVisibleConversation(channelId: string) {
@@ -764,7 +810,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     return conversation
   }
 
-  private findVisibleMessage(rawMessageId: string, channelId?: string) {
+  private findAccessibleMessage(rawMessageId: string, channelId?: string) {
     const snapshot = this.control.getVisibleSnapshot(this.selfId)
     const visibleMessages = channelId
       ? snapshot.messages.filter(({ conversationId }) => conversationId === channelId)
@@ -772,6 +818,13 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     const messageId = resolveOneBotMessageId(rawMessageId, visibleMessages.map(({ id }) => id))
     const message = visibleMessages.find(({ id }) => id === messageId)
     if (!message) throw new Error(`消息不存在：${rawMessageId}`)
+    return message
+  }
+
+  // 普通读取路径拒绝撤回原文；写路径（如 set_msg_emoji_like）仍可定位消息后由领域层给出只读错误。
+  private requireReadableMessage(rawMessageId: string, channelId?: string) {
+    const message = this.findAccessibleMessage(rawMessageId, channelId)
+    if (isRecalledMessage(message)) throw new Error(`消息已撤回：${rawMessageId}`)
     return message
   }
 
@@ -785,12 +838,15 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
       beforeMessageId = conversation.messageIds.find((messageId) => getOneBotMessageSequence(messageId) === messageSequence)
       if (!beforeMessageId) throw new Error(`消息不存在：${params.message_seq}`)
     }
+    // 历史查询同样不得泄露撤回原文，直接隐藏已撤回消息。
     const messages = this.control.getMessageHistory({
       operatorId: this.selfId,
       conversationId,
       limit,
       beforeMessageId,
-    }).messages.map((message) => this.toOneBotMessage(message))
+    }).messages
+      .filter((message) => !isRecalledMessage(message))
+      .map((message) => this.toOneBotMessage(message))
     if (params.reverseOrder === true || params.reverse_order === true) messages.reverse()
     return { status: 'ok', retcode: 0, data: { messages } }
   }
@@ -802,6 +858,8 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     const reply = message.replyToMessageId
       ? snapshot.messages.find(({ id }) => id === message.replyToMessageId)
       : undefined
+    // 回复消息本身仍可读取，但引用目标撤回后不能通过 quote 旁路泄露原文。
+    const readableReply = reply && !isRecalledMessage(reply) ? reply : undefined
     return {
       id: message.id,
       messageId: message.id,
@@ -810,11 +868,11 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
       user,
       content: message.content,
       elements: h.parse(message.content),
-      quote: reply ? {
-        id: reply.id,
-        messageId: reply.id,
-        content: reply.content,
-        user: await this.getUser(reply.authorId),
+      quote: readableReply ? {
+        id: readableReply.id,
+        messageId: readableReply.id,
+        content: readableReply.content,
+        user: await this.getUser(readableReply.authorId),
       } : undefined,
       timestamp: new Date(message.createdAt).getTime(),
       createdAt: new Date(message.createdAt).getTime(),

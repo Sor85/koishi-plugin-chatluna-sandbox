@@ -5,6 +5,7 @@ import type {
   GetSandboxOneBotDebugRecordsInput,
   ManageSandboxEnvironmentInput,
   RecallMessageInput,
+  SetMessageReactionInput,
   SandboxAppearance,
   SandboxBotProfile,
   SandboxChatLunaState,
@@ -83,6 +84,7 @@ const defaultAppearance: SandboxAppearance = {
   webQQTimBubbleTail: true,
   webQQColorMode: 'auto',
   webQQAccentColor: '#2563eb',
+  webQQMarkRecalledMessages: true,
 }
 
 const emptySnapshot: SandboxSnapshot = {
@@ -279,6 +281,15 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     }
   }
 
+  async function setMessageReaction(input: Omit<SetMessageReactionInput, 'operatorId'>) {
+    const operatorId = getCurrentOperatorId()
+    try {
+      replaceWorkspace(await port.setMessageReaction({ ...input, operatorId }))
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '贴表情失败')
+    }
+  }
+
   // 服务端场景变更广播的落地点：发送 RPC 已即时返回，机器人稍后写入的回复和等待态靠这里刷新。
   // 等待态不写入场景快照，广播修订会等于当前修订，因此不能按修订大小决定是否拉取；
   // 改为每次广播都标记一次待刷新，并把刷新期间到达的广播合并成一次后续拉取，避免广播风暴导致并发请求。
@@ -436,6 +447,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     performGroupAction,
     clearOneBotDebugRecords,
     recallMessage,
+    setMessageReaction,
     replaceWorkspace,
     selectConversation,
     selectOperator,

@@ -13,6 +13,7 @@ export function createKoishiWorkspacePort(resolveSpaceId: () => string | undefin
   sendMessage: (input) => send('onebot-sandbox/send-message', scoped(input)),
   sendMediaMessage: (input) => send('onebot-sandbox/send-media-message', scoped(input)),
   recallMessage: (input) => send('onebot-sandbox/recall-message', scoped(input)),
+  setMessageReaction: (input) => send('onebot-sandbox/set-message-reaction', scoped(input)),
   getMediaContent: (input) => send('onebot-sandbox/media-content', scoped(input)),
   setGroupAnnouncement: (input) => send('onebot-sandbox/set-group-announcement', scoped(input)),
   deleteGroupAnnouncement: (input) => send('onebot-sandbox/delete-group-announcement', scoped(input)),

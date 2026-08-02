@@ -37,6 +37,14 @@
   gap: 12px;
 }
 
+.webqq-chat-title-avatar {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
 .webqq-chat-title > div > strong,
 .webqq-chat-title > div > span {
   display: block;

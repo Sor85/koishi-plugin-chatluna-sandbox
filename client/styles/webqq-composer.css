@@ -529,6 +529,12 @@
   line-height: 20px;
 }
 
+.webqq-composer textarea:disabled {
+  /* 发送中仍保留文本光标语义，不用 not-allowed 表达禁用。 */
+  cursor: text;
+  opacity: 0.45;
+}
+
 .webqq-composer textarea::placeholder {
   color: var(--webqq-muted);
 }
@@ -556,7 +562,8 @@
 }
 
 .webqq-composer-action:disabled {
-  cursor: not-allowed;
+  /* 禁用态靠 disabled 与透明度表达，避免禁止光标打断连续输入节奏。 */
+  cursor: default;
   opacity: 0.45;
 }
 

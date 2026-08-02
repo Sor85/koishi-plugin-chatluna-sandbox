@@ -1,4 +1,4 @@
-import type { SandboxMessage } from '../../src/types'
+import { isRecalledMessage, type SandboxMessage } from '../../src/types'
 
 export function isImageOnlyMessage(message: SandboxMessage | undefined) {
   const media = message?.media
@@ -22,6 +22,9 @@ function isSameClusterSender(
     && !!right
     && !left.event
     && !right.event
+    // 撤回消息单独成段，避免与前后气泡合并成连续簇。
+    && !isRecalledMessage(left)
+    && !isRecalledMessage(right)
     && left.authorId === right.authorId
     && getDirection(left, currentOperatorId) === getDirection(right, currentOperatorId)
 }

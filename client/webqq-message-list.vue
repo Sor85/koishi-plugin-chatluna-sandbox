@@ -12,7 +12,7 @@
         </button>
       </li>
       <template v-for="(message, messageIndex) in model.messages" :key="message.id">
-        <li v-if="message.event" class="webqq-message-event">{{ message.content }}</li>
+        <li v-if="shouldRenderAsEvent(message)" class="webqq-message-event">{{ getEventMessageText(message) }}</li>
         <ContextMenu v-else>
           <ContextMenuTrigger as-child>
             <li
@@ -22,6 +22,7 @@
                 getMessageClusterClass(model.messages, messageIndex, model.currentOperatorId),
                 { 'is-merged': isMergedMessage(model.messages, messageIndex, model.currentOperatorId) },
                 { 'is-quote-target': highlightedMessageId === message.id },
+                { 'is-recalled': isRecalledMessage(message) },
               ]"
               :data-message-id="message.id"
             >
@@ -32,12 +33,16 @@
                   </button>
                 </ContextMenuTrigger>
                 <ContextMenuContent style="z-index: 140">
+                  <ContextMenuItem @select="emit('openProfile', message.authorId)">
+                    <IconId :size="16" aria-hidden="true" /> 查看资料
+                  </ContextMenuItem>
                   <ContextMenuSub v-if="model.currentGroup && getCurrentGroupMember(message.authorId)">
                     <ContextMenuSubTrigger><IconUsers :size="16" aria-hidden="true" /> 群成员操作</ContextMenuSubTrigger>
                     <GroupMemberMenu
                       sub
                       :actor="getCurrentGroupMember(model.currentOperatorId ?? '')"
                       :target="getCurrentGroupMember(message.authorId)!"
+                      @open-profile="emit('openProfile', message.authorId)"
                       @mention="emit('mentionGroupMember', message.authorId)"
                       @poke="emit('pokeGroupMember', message.authorId)"
                       @set-card="emit('setGroupCard', message.authorId)"
@@ -62,9 +67,18 @@
                   <ContextMenuItem v-if="getChatFriendActions(message.authorId).includes('delete')" class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="emit('deleteFriend', message.authorId)"><IconUserMinus :size="16" aria-hidden="true" /> 删除好友</ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>
-              <span v-else class="webqq-message-avatar-wrap">
-                <WebqqAvatar class="webqq-message-avatar" :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'" :name="getMessageAuthorName(message.authorId)" :avatar="getParticipantAvatar(message.authorId)" />
-              </span>
+              <ContextMenu v-else>
+                <ContextMenuTrigger as-child>
+                  <button type="button" class="webqq-message-avatar-wrap webqq-message-avatar-trigger" :aria-label="`查看 ${getMessageAuthorName(message.authorId)} 的资料`" @contextmenu.stop>
+                    <WebqqAvatar class="webqq-message-avatar" :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'" :name="getMessageAuthorName(message.authorId)" :avatar="getParticipantAvatar(message.authorId)" />
+                  </button>
+                </ContextMenuTrigger>
+                <ContextMenuContent style="z-index: 140">
+                  <ContextMenuItem @select="emit('openProfile', message.authorId)">
+                    <IconId :size="16" aria-hidden="true" /> 查看资料
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
               <div class="webqq-message-content">
                 <div v-if="!isMergedMessage(model.messages, messageIndex, model.currentOperatorId)" class="webqq-sender-line">
                   <span class="webqq-message-author">{{ getMessageAuthorName(message.authorId) }}</span>
@@ -75,22 +89,32 @@
                   >{{ getMessageRoleBadge(message.authorId)!.text }}</span>
                 </div>
                 <div class="webqq-message-body">
-                  <div class="webqq-message-bubble">
-                    <button v-if="getReplyMessage(message)" class="webqq-message-quote is-clickable" type="button" aria-label="跳转到引用消息" @click.stop="scrollToQuotedMessage(getReplyMessage(message)!.id)">
-                      <strong class="webqq-message-quote-title">{{ getMessageAuthorName(getReplyMessage(message)!.authorId) }}</strong>
-                      <span>{{ getMessageText(getReplyMessage(message)!) }}</span>
-                    </button>
-                    <div v-for="media in message.media" :key="media.id" class="webqq-message-media">
-                      <img v-if="media.type === 'image' && getMediaSource(media.id)" :src="getMediaSource(media.id)" :alt="media.name">
-                      <audio v-else-if="media.type === 'audio' && getMediaSource(media.id)" :src="getMediaSource(media.id)" controls preload="metadata" />
-                      <video v-else-if="media.type === 'video' && getMediaSource(media.id)" :src="getMediaSource(media.id)" controls preload="metadata" />
-                      <a v-else-if="media.type === 'file' && getMediaSource(media.id)" :href="getMediaSource(media.id)" :download="media.name" class="webqq-message-file">
-                        <IconPaperclip :size="18" aria-hidden="true" />
-                        <span><strong>{{ media.name }}</strong><small>{{ formatMediaSize(media.size) }}</small></span>
-                      </a>
-                      <span v-else class="webqq-message-media-loading">{{ model.mediaLoadFailures[media.id] ? '媒体不可用' : '媒体加载中...' }}</span>
+                  <div class="webqq-message-stack">
+                    <div class="webqq-message-bubble">
+                      <button v-if="getReplyMessage(message)" class="webqq-message-quote is-clickable" type="button" aria-label="跳转到引用消息" @click.stop="scrollToQuotedMessage(getReplyMessage(message)!.id)">
+                        <strong class="webqq-message-quote-title">{{ getMessageAuthorName(getReplyMessage(message)!.authorId) }}</strong>
+                        <span>{{ getMessageText(getReplyMessage(message)!) }}</span>
+                      </button>
+                      <div v-for="media in message.media" :key="media.id" class="webqq-message-media">
+                        <img v-if="media.type === 'image' && getMediaSource(media.id)" :src="getMediaSource(media.id)" :alt="media.name">
+                        <audio v-else-if="media.type === 'audio' && getMediaSource(media.id)" :src="getMediaSource(media.id)" controls preload="metadata" />
+                        <video v-else-if="media.type === 'video' && getMediaSource(media.id)" :src="getMediaSource(media.id)" controls preload="metadata" />
+                        <a v-else-if="media.type === 'file' && getMediaSource(media.id)" :href="getMediaSource(media.id)" :download="media.name" class="webqq-message-file">
+                          <IconPaperclip :size="18" aria-hidden="true" />
+                          <span><strong>{{ media.name }}</strong><small>{{ formatMediaSize(media.size) }}</small></span>
+                        </a>
+                        <span v-else class="webqq-message-media-loading">{{ model.mediaLoadFailures[media.id] ? '媒体不可用' : '媒体加载中...' }}</span>
+                      </div>
+                      <span v-if="getMessageText(message)">{{ getMessageText(message) }}</span>
                     </div>
-                    <span v-if="getMessageText(message)">{{ getMessageText(message) }}</span>
+                    <WebqqMessageReactions
+                      v-if="message.reactions?.length"
+                      :reactions="message.reactions"
+                      :current-operator-id="model.currentOperatorId"
+                      :participants="model.participants"
+                      :readonly="isReactionReadonly(message)"
+                      @toggle="toggleReaction(message, $event)"
+                    />
                   </div>
                   <time class="webqq-message-time">{{ formatMessageTime(message.createdAt) }}</time>
                 </div>
@@ -99,16 +123,22 @@
           </ContextMenuTrigger>
           <ContextMenuContent style="z-index: 140">
             <ContextMenuItem @select="emit('reply', message.id)"><IconMessageReply :size="16" aria-hidden="true" /> 回复</ContextMenuItem>
+            <ContextMenuItem v-if="canReactToMessage(message)" @select="openEmojiPicker(message.id)">
+              <IconMoodSmile :size="16" aria-hidden="true" /> 贴表情
+            </ContextMenuItem>
             <ContextMenuItem v-if="canRecallMessage(message)" class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="emit('recallMessage', message.id)">
               <IconArrowBackUp :size="16" aria-hidden="true" /> 撤回
             </ContextMenuItem>
           </ContextMenuContent>
         </ContextMenu>
         <li
-          v-if="getMessageThinking(message)"
+          v-if="shouldShowThinking(message)"
           :key="`${message.id}:thinking`"
           class="webqq-thinking-row"
-          :class="message.authorId === model.currentOperatorId ? 'is-outgoing' : 'is-incoming'"
+          :class="[
+            message.authorId === model.currentOperatorId ? 'is-outgoing' : 'is-incoming',
+            { 'is-recalled': isRecalledMessage(message) },
+          ]"
         >
           <button
             type="button"
@@ -153,10 +183,13 @@
           </Transition>
         </li>
         <li
-          v-else-if="getMessageUsage(message)"
+          v-else-if="shouldShowUsage(message)"
           :key="`${message.id}:usage`"
           class="webqq-thinking-row is-usage-only"
-          :class="message.authorId === model.currentOperatorId ? 'is-outgoing' : 'is-incoming'"
+          :class="[
+            message.authorId === model.currentOperatorId ? 'is-outgoing' : 'is-incoming',
+            { 'is-recalled': isRecalledMessage(message) },
+          ]"
         >
           <div class="webqq-thinking-usage" aria-label="本次 ChatLuna 调用指标">
             <span class="webqq-thinking-usage-group">
@@ -208,11 +241,12 @@
         </div>
       </li>
     </ol>
+    <WebqqEmojiPicker v-model:open="emojiPickerOpen" @select="selectEmoji" />
   </section>
 </template>
 
 <script setup lang="ts">
-import { IconArrowBackUp, IconBell, IconClock, IconHandClick, IconMessageReply, IconPaperclip, IconTag, IconUserMinus, IconUserPlus, IconUsers } from '@tabler/icons-vue'
+import { IconArrowBackUp, IconBell, IconClock, IconHandClick, IconId, IconMessageReply, IconMoodSmile, IconPaperclip, IconTag, IconUserMinus, IconUserPlus, IconUsers } from '@tabler/icons-vue'
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from './components/ui/context-menu'
 import { getFriendMenuActions, type FriendMenuState } from './webqq/friend-menu'
@@ -221,8 +255,18 @@ import GroupMemberMenu from './group-member-menu.vue'
 import { getMessageClusterClass, isMergedMessage } from './webqq/message-cluster'
 import { formatMentionContent } from './webqq/mention'
 import WebqqAvatar from './webqq-avatar.vue'
+import WebqqEmojiPicker from './webqq-emoji-picker.vue'
+import WebqqMessageReactions from './webqq-message-reactions.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
-import type { SandboxChatLunaState, SandboxConversation, SandboxGroup, SandboxMedia, SandboxMessage } from '../src/types'
+import {
+  formatRecalledMessageEventText,
+  isRecalledMessage,
+  type SandboxChatLunaState,
+  type SandboxConversation,
+  type SandboxGroup,
+  type SandboxMedia,
+  type SandboxMessage,
+} from '../src/types'
 
 interface MessageParticipant {
   name: string
@@ -245,12 +289,15 @@ export interface WebqqMessageListModel {
   hasMoreMessages: boolean
   mediaSources: Record<string, string>
   mediaLoadFailures: Record<string, true>
+  // 默认 true：保留撤回气泡；false：隐藏原文并显示结构化撤回事件。
+  markRecalledMessages: boolean
 }
 
 const props = defineProps<{ model: WebqqMessageListModel }>()
 const emit = defineEmits<{
   reply: [messageId: string]
   recallMessage: [messageId: string]
+  setMessageReaction: [messageId: string, emojiId: string, enabled: boolean]
   loadHistory: [resolve: () => void, reject: (error: unknown) => void]
   requestFriend: [targetId: string]
   pokeFriend: [targetId: string]
@@ -263,11 +310,14 @@ const emit = defineEmits<{
   setGroupAdmin: [targetId: string, enabled: boolean]
   transferGroupOwner: [targetId: string]
   kickGroupMember: [targetId: string]
+  openProfile: [participantId: string]
 }>()
 
 const historyLoading = ref(false)
 const highlightedMessageId = ref('')
 const expandedThinking = ref<Record<string, true>>({})
+const emojiPickerOpen = ref(false)
+const emojiPickerMessageId = ref('')
 const participantNames = computed(() => Object.fromEntries(
   Object.entries(props.model.participants).map(([id, participant]) => [id, participant.name]),
 ))
@@ -366,16 +416,66 @@ function getReplyMessage(message: SandboxMessage) {
   return message.replyToMessageId ? props.model.replyMessages[message.replyToMessageId] : undefined
 }
 
+// 戳一戳始终是事件；撤回在关闭 mark 时也呈现为结构化事件，开启时仍渲染原气泡。
+function shouldRenderAsEvent(message: SandboxMessage) {
+  return !!message.event || (isRecalledMessage(message) && !props.model.markRecalledMessages)
+}
+
+function getEventMessageText(message: SandboxMessage) {
+  if (isRecalledMessage(message)) {
+    const operatorId = message.lifecycle?.operatorId ?? message.authorId
+    return formatRecalledMessageEventText(message, getMessageAuthorName(operatorId))
+  }
+  return message.content
+}
+
+function shouldShowThinking(message: SandboxMessage) {
+  // 关闭 mark 时连同思考一起隐藏；开启时思考仍可读，仅随消息弱化。
+  return !!getMessageThinking(message) && !(isRecalledMessage(message) && !props.model.markRecalledMessages)
+}
+
+function shouldShowUsage(message: SandboxMessage) {
+  return !!getMessageUsage(message) && !(isRecalledMessage(message) && !props.model.markRecalledMessages)
+}
+
 // 与服务端撤回权限一致：自己的消息随时可撤；群内群主/管理员可撤成员消息，但不能动群主或同级管理员。
 function canRecallMessage(message: SandboxMessage) {
   const operatorId = props.model.currentOperatorId
-  if (!operatorId || message.event) return false
+  if (!operatorId || message.event || isRecalledMessage(message)) return false
   if (message.authorId === operatorId) return true
   if (!props.model.currentGroup) return false
   const actor = getCurrentGroupMember(operatorId)
   const target = getCurrentGroupMember(message.authorId)
   if (!actor || !target || actor.role === 'member') return false
   return target.role !== 'owner' && !(actor.role === 'admin' && target.role === 'admin')
+}
+
+// 私聊不提供主动入口；撤回消息只读展示已有回应。
+function canReactToMessage(message: SandboxMessage) {
+  return !!props.model.currentGroup && !message.event && !isRecalledMessage(message) && !!props.model.currentOperatorId
+}
+
+function isReactionReadonly(message: SandboxMessage) {
+  return !!message.event || isRecalledMessage(message) || !props.model.currentGroup || !props.model.currentOperatorId
+}
+
+function openEmojiPicker(messageId: string) {
+  emojiPickerMessageId.value = messageId
+  emojiPickerOpen.value = true
+}
+
+function selectEmoji(emojiId: string) {
+  const messageId = emojiPickerMessageId.value
+  if (!messageId) return
+  emit('setMessageReaction', messageId, emojiId, true)
+  emojiPickerMessageId.value = ''
+}
+
+function toggleReaction(message: SandboxMessage, emojiId: string) {
+  if (isReactionReadonly(message) || !props.model.currentOperatorId) return
+  const reaction = message.reactions?.find((item) => item.emojiId === emojiId)
+  const enabled = !reaction?.participantIds.includes(props.model.currentOperatorId)
+  emit('setMessageReaction', message.id, emojiId, enabled)
 }
 
 function getMediaLabel(media: SandboxMedia) {

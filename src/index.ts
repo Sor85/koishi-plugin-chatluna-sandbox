@@ -46,6 +46,7 @@ export const Config: Schema<Config> = Schema.object({
     Schema.const('dark').description('暗色'),
   ]).default('auto').role('radio').description('WebQQ 颜色模式'),
   webQQAccentColor: Schema.string().default('#2563eb').role('color').description('WebQQ 强调色'),
+  webQQMarkRecalledMessages: Schema.boolean().default(true).description('撤回后保留原气泡并显示删除线；关闭后隐藏原消息并显示撤回事件'),
   mcp: Schema.object({
     enabled: Schema.boolean().default(false).description('启用独立 MCP Streamable HTTP 端点'),
     host: Schema.string().default('127.0.0.1').description('监听地址'),

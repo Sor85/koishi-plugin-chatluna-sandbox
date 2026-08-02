@@ -16,6 +16,7 @@ import type {
   PerformFriendActionInput,
   PerformGroupActionInput,
   RecallMessageInput,
+  SetMessageReactionInput,
   SandboxAppearance,
   SandboxBotDelivery,
   SandboxConsoleOneBotDebugRecord,
@@ -37,6 +38,7 @@ interface ConsoleEventMap {
   'onebot-sandbox/send-message': (input: SpaceScoped<SendMessageInput>) => SandboxWorkspaceState
   'onebot-sandbox/send-media-message': (input: SpaceScoped<SendMediaMessageInput>) => SandboxWorkspaceState
   'onebot-sandbox/recall-message': (input: SpaceScoped<RecallMessageInput>) => Promise<SandboxWorkspaceState>
+  'onebot-sandbox/set-message-reaction': (input: SpaceScoped<SetMessageReactionInput>) => Promise<SandboxWorkspaceState>
   'onebot-sandbox/media-content': (input: SpaceScoped<GetMediaContentInput>) => SandboxMediaContent
   'onebot-sandbox/set-group-announcement': (input: SpaceScoped<SetGroupAnnouncementInput>) => SandboxWorkspaceState
   'onebot-sandbox/delete-group-announcement': (input: SpaceScoped<DeleteGroupAnnouncementInput>) => SandboxWorkspaceState
@@ -194,6 +196,10 @@ export function registerConsole(
     await resolveControl(input, true).recallMessage(assertInteractionInput(withoutSpaceId(input)) as RecallMessageInput)
     return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
+  console.addListener('onebot-sandbox/set-message-reaction', async (input) => {
+    await resolveControl(input, true).setMessageReaction(assertInteractionInput(withoutSpaceId(input)) as SetMessageReactionInput)
+    return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
+  }, { authority: 4 })
   console.addListener('onebot-sandbox/media-content', (input) => resolveControl(input, false).getMediaContent(assertInteractionInput(withoutSpaceId(input)) as GetMediaContentInput), { authority: 4 })
   console.addListener('onebot-sandbox/set-group-announcement', (input) => {
     resolveControl(input, true).setGroupAnnouncement(assertInteractionInput(withoutSpaceId(input)) as SetGroupAnnouncementInput)
@@ -276,6 +282,7 @@ declare module '@koishijs/console' {
     'onebot-sandbox/send-message'(input: SpaceScoped<SendMessageInput>): SandboxWorkspaceState
     'onebot-sandbox/send-media-message'(input: SpaceScoped<SendMediaMessageInput>): SandboxWorkspaceState
     'onebot-sandbox/recall-message'(input: SpaceScoped<RecallMessageInput>): Promise<SandboxWorkspaceState>
+    'onebot-sandbox/set-message-reaction'(input: SpaceScoped<SetMessageReactionInput>): Promise<SandboxWorkspaceState>
     'onebot-sandbox/media-content'(input: SpaceScoped<GetMediaContentInput>): SandboxMediaContent
     'onebot-sandbox/set-group-announcement'(input: SpaceScoped<SetGroupAnnouncementInput>): SandboxWorkspaceState
     'onebot-sandbox/delete-group-announcement'(input: SpaceScoped<DeleteGroupAnnouncementInput>): SandboxWorkspaceState

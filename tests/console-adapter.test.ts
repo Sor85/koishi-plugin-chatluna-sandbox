@@ -12,6 +12,7 @@ const appearance: SandboxAppearance = {
   webQQTimBubbleTail: true,
   webQQColorMode: 'auto',
   webQQAccentColor: '#2563eb',
+  webQQMarkRecalledMessages: true,
 }
 
 const runningApps: App[] = []

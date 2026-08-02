@@ -27,5 +27,7 @@ describe('群聊右键提及成员', () => {
     expect(pageSource).toContain('@mention-group-member="mentionGroupMember"')
     expect(composerSource).toContain('buildMentionContent(mentions.value, input.value)')
     expect(shellSource).toContain('formatMentionContent(latestMessage.content, participantNames.value)')
+    // 会话列表预览复用领域格式化函数，避免硬编码文案或直接展示撤回原文。
+    expect(shellSource).toContain('formatRecalledMessageEventText(latestMessage, operatorName)')
   })
 })

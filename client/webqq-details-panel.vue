@@ -63,6 +63,7 @@
             <GroupMemberMenu
               :actor="getCurrentGroupMember(model.currentOperatorId ?? '')"
               :target="member"
+              @open-profile="emit('openProfile', member.participantId)"
               @mention="emit('mentionGroupMember', member.participantId)"
               @poke="emit('pokeGroupMember', member.participantId)"
               @set-card="emit('setGroupCard', member.participantId)"
@@ -84,6 +85,7 @@
         <span class="webqq-online"><i /> 在线</span>
       </div>
       <dl class="webqq-profile-details">
+        <div v-if="model.privateParticipant?.personalNote"><dt>个性签名</dt><dd>{{ model.privateParticipant.personalNote }}</dd></div>
         <div><dt>平台</dt><dd>OneBot</dd></div>
         <div><dt>会话类型</dt><dd>私聊</dd></div>
         <div><dt>当前操作者</dt><dd>{{ model.currentOperatorName || '未选择' }}</dd></div>
@@ -116,7 +118,7 @@ export interface WebqqDetailsPanelModel {
   counts: { users: number, bots: number, groups: number, requests: number }
   group?: SandboxGroup
   bot?: SandboxBotProfile
-  privateParticipant?: { id: string, name: string, avatar?: string, isBot: boolean }
+  privateParticipant?: { id: string, name: string, avatar?: string, isBot: boolean, personalNote?: string }
   currentOperatorName?: string
   currentOperatorId?: string
   persistence: SandboxPersistenceStatus
@@ -135,6 +137,7 @@ const emit = defineEmits<{
   setGroupAdmin: [targetId: string, enabled: boolean]
   transferGroupOwner: [targetId: string]
   kickGroupMember: [targetId: string]
+  openProfile: [participantId: string]
 }>()
 
 const announcementInput = ref('')

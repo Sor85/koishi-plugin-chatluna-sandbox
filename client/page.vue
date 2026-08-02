@@ -26,6 +26,7 @@
           @open-entity-dialog="openEntityDialog"
           @open-group-action-dialog="openGroupActionDialog"
           @open-remark-dialog="openRemarkDialog"
+          @open-profile="openProfile"
         />
 
         <AiTestSpaceOverview
@@ -60,6 +61,7 @@
           @delete-participant="openComposerParticipantDialog('delete', $event)"
           @load-history="loadEarlierMessages"
           @recall-message="recallMessage"
+          @set-message-reaction="setMessageReaction"
           @request-friend="requestFriend"
           @poke-friend="pokeFriend"
           @set-remark="openRemarkDialog"
@@ -71,6 +73,7 @@
           @set-group-admin="setGroupAdmin"
           @transfer-group-owner="transferGroupOwner"
           @kick-group-member="kickGroupMember"
+          @open-profile="openProfile"
         />
 
         <WebqqDetailsPanel
@@ -86,6 +89,7 @@
           @set-group-admin="setGroupAdmin"
           @transfer-group-owner="transferGroupOwner"
           @kick-group-member="kickGroupMember"
+          @open-profile="openProfile"
         />
         <WorkspaceOverlayHost
           ref="overlayHostRef"
@@ -151,6 +155,7 @@ const {
   openComposerParticipantDialog,
   openEntityDialog,
   openGroupActionDialog,
+  openProfile,
   openRemarkDialog,
   overlayModel,
   performFriendAction,
@@ -159,6 +164,7 @@ const {
   pokeGroupMember,
   publishAnnouncement,
   recallMessage,
+  setMessageReaction,
   requestFriend,
   saveFriendRemark,
   saveGroupAction,

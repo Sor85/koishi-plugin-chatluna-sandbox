@@ -22,6 +22,7 @@ const workspace: SandboxWorkspaceState = {
     webQQTimBubbleTail: true,
     webQQColorMode: 'auto',
     webQQAccentColor: '#2563eb',
+    webQQMarkRecalledMessages: true,
   },
   persistence: { mode: 'memory', available: true, persisted: false },
 }

@@ -113,7 +113,7 @@ describe('消息单份存储与机器人事件投递', () => {
       .toEqual([expect.objectContaining({ recipientBotId: '20002' })])
   })
 
-  it('机器人撤回自己的消息后原消息就地变为撤回灰条', async () => {
+  it('机器人撤回自己的消息后保留原文并进入生命周期状态', async () => {
     const { control } = await createControl()
     const result = await control.sendMessage({
       operatorId: '20001',
@@ -125,9 +125,14 @@ describe('消息单份存储与机器人事件投递', () => {
 
     const recalled = control.getSnapshot().messages.find(({ id }) => id === result.messageId)
     expect(recalled).toEqual(expect.objectContaining({
-      content: 'Koishi 撤回了一条消息',
-      event: { type: 'recall', operatorId: '20001' },
+      content: '待撤回消息',
+      lifecycle: expect.objectContaining({
+        status: 'recalled',
+        operatorId: '20001',
+        recalledAt: expect.any(String),
+      }),
     }))
+    expect(recalled?.event).toBeUndefined()
     expect(control.getSnapshot().conversations.find(({ id }) => id === 'private:10001:20001')?.messageIds)
       .toContain(result.messageId)
   })

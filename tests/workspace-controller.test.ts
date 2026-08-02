@@ -72,6 +72,7 @@ const workspace: SandboxWorkspaceState = {
     webQQTimBubbleTail: true,
     webQQColorMode: 'auto',
     webQQAccentColor: '#2563eb',
+    webQQMarkRecalledMessages: true,
   },
 }
 

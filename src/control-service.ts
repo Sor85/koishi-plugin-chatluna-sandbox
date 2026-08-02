@@ -6,6 +6,7 @@ import { SandboxMediaStorage } from './media-storage'
 import { SandboxOneBotDebugStore, type AppendOneBotDebugRecordInput } from './onebot-debug'
 import { toOneBotMessageSegments, toOneBotRawMessage } from './onebot-message'
 import type { SandboxScenePersistence } from './persistence'
+import { mergeAccountProfile, normalizeAccountProfile } from './account-profile'
 import { getOneBotCapabilityMatrix, getOneBotMessageEventFields, getOneBotMessageSequence, normalizeDisabledCapabilities, resolveOneBotMessageId, type SandboxOneBotCapability } from './onebot-profiles'
 import {
   createDirectConversationId,
@@ -28,7 +29,9 @@ import {
   type PerformGroupActionInput,
   type PerformGroupActionResult,
   type RecallMessageInput,
+  type SetMessageReactionInput,
   type SandboxBotDelivery,
+  type SandboxAccountSex,
   type SandboxBotProfile,
   type SandboxChatLunaState,
   type SandboxConversation,
@@ -53,6 +56,7 @@ import {
   type UpdateSandboxBotInput,
   type UpdateSandboxGroupInput,
   type UpdateSandboxUserInput,
+  isRecalledMessage,
 } from './types'
 
 export interface SandboxControlServiceOptions {
@@ -445,7 +449,14 @@ export class SandboxControlService {
       throw new Error(`参与者已存在：${id}`)
     }
 
-    this.scene.participants.push({ kind: 'user', id, name })
+    const profile = normalizeAccountProfile(input.profile)
+    this.scene.participants.push({
+      kind: 'user',
+      id,
+      name,
+      ...(input.avatar?.trim() ? { avatar: input.avatar.trim() } : {}),
+      ...(profile ? { profile } : {}),
+    })
     // 环境管理属于测试前置配置，可静默建立关系；WebQQ 用户操作仍必须走好友申请审批。
     for (const bot of this.getBots()) this.addFriendship(id, bot.id)
     this.commitSceneMutation()
@@ -455,6 +466,13 @@ export class SandboxControlService {
     const user = this.getUsers().find(({ id }) => id === input.id)
     if (!user) throw new Error(`用户不存在：${input.id}`)
     user.name = this.validateName(input.name, '用户昵称')
+    if (input.avatar !== undefined) user.avatar = input.avatar.trim() || undefined
+    // 环境管理按提交体整体替换可选资料，避免残留未声明字段掩盖缺失语义。
+    if (input.profile !== undefined) {
+      const profile = normalizeAccountProfile(input.profile)
+      if (profile) user.profile = profile
+      else delete user.profile
+    }
     this.commitSceneMutation()
   }
 
@@ -489,6 +507,7 @@ export class SandboxControlService {
     if (this.runtimeBotsActive) this.runtimeBotRegistry.assertAvailable(id, this.runtimeOwner)
 
     const disabledCapabilities = normalizeDisabledCapabilities(input.implementation, input.disabledCapabilities)
+    const profile = normalizeAccountProfile(input.profile)
     this.scene.participants.push({
       kind: 'bot',
       id,
@@ -497,6 +516,7 @@ export class SandboxControlService {
       implementation: input.implementation,
       enabled: input.enabled,
       ...(disabledCapabilities ? { disabledCapabilities } : {}),
+      ...(profile ? { profile } : {}),
     })
     this.createRuntimeBot({
       selfId: id,
@@ -521,6 +541,11 @@ export class SandboxControlService {
     bot.enabled = input.enabled
     if (disabledCapabilities) bot.disabledCapabilities = disabledCapabilities
     else delete bot.disabledCapabilities
+    if (input.profile !== undefined) {
+      const profile = normalizeAccountProfile(input.profile)
+      if (profile) bot.profile = profile
+      else delete bot.profile
+    }
     const runtime = this.runtimeBots.get(bot.id)
     if (runtime) {
       runtime.user = { id: bot.id, name: bot.name, avatar: bot.avatar }
@@ -530,11 +555,22 @@ export class SandboxControlService {
     this.commitSceneMutation()
   }
 
-  updateBotSelfProfile(botId: string, input: { name?: string; avatar?: string }) {
+  updateBotSelfProfile(botId: string, input: {
+    name?: string
+    avatar?: string
+    personalNote?: string
+    sex?: SandboxAccountSex
+  }) {
     const bot = this.getBots().find(({ id }) => id === botId)
     if (!bot) throw new Error(`机器人不存在：${botId}`)
     if (input.name !== undefined) bot.name = this.validateName(input.name, '机器人昵称')
     if (input.avatar !== undefined) bot.avatar = input.avatar.trim() || undefined
+    if (input.personalNote !== undefined || input.sex !== undefined) {
+      bot.profile = mergeAccountProfile(bot.profile, {
+        ...(input.personalNote !== undefined ? { personalNote: input.personalNote } : {}),
+        ...(input.sex !== undefined ? { sex: input.sex } : {}),
+      })
+    }
     const runtime = this.getRuntimeBot(botId)
     runtime.user = { id: bot.id, name: bot.name, avatar: bot.avatar }
     this.commitSceneMutation()
@@ -1218,13 +1254,37 @@ export class SandboxControlService {
     this.commitSceneMutation()
   }
 
-  // 表情回应过去只校验消息可见后确认调用；现在写入消息状态，使 get_msg、场景快照
-  // 和消息历史都能读回同一份回应事实。
-  setMessageReaction(input: { operatorId: string; messageId: string; emojiId: string; enabled: boolean }): void {
+  // 表情回应写入消息状态，使 get_msg、场景快照和消息历史都能读回同一份回应事实。
+  // 机器人操作者必须走 set_msg_emoji_like，以便能力禁用与调试记录和真实 OneBot 通道一致。
+  async setMessageReaction(input: SetMessageReactionInput): Promise<{ revision: number }> {
+    if (this.isBot(input.operatorId)) {
+      const bot = this.getBots().find(({ id }) => id === input.operatorId)!
+      if (!bot.enabled) throw new Error(`机器人已停用：${bot.id}`)
+      await this.getRuntimeBot(bot.id).internal._request('set_msg_emoji_like', {
+        message_id: input.messageId,
+        emoji_id: input.emojiId,
+        set: input.enabled,
+      })
+      return { revision: this.scene.revision }
+    }
+    this.applyMessageReaction(input)
+    return { revision: this.scene.revision }
+  }
+
+  // bot action 与用户交互最终都落到这里，保证场景回应事实唯一。
+  applyMessageReaction(input: SetMessageReactionInput): void {
     const emojiId = input.emojiId.trim()
     if (!emojiId) throw new Error('表情 ID 不能为空')
+    this.getParticipant(input.operatorId)
     const message = this.scene.messages.find(({ id }) => id === input.messageId)
     if (!message) throw new Error(`消息不存在：${input.messageId}`)
+    const conversation = this.scene.conversations.find(({ id }) => id === message.conversationId)
+    if (!conversation || !this.isConversationVisible(input.operatorId, conversation)) {
+      throw new Error(`消息不存在：${input.messageId}`)
+    }
+    if (conversation.type !== 'group') throw new Error('私聊消息不支持表情回应')
+    // 撤回后保留历史回应，但禁止继续新增或取消，避免把历史事实改写成当前操作。
+    if (isRecalledMessage(message)) throw new Error('已撤回消息不支持修改表情回应')
     // 与撤回一致地覆盖同一广播组，避免同一条逻辑消息的副本之间回应不一致。
     for (const target of this.scene.messages.filter(({ id, broadcastId }) => id === message.id
       || (!!message.broadcastId && broadcastId === message.broadcastId))) {
@@ -1262,13 +1322,13 @@ export class SandboxControlService {
     await this.recallVisibleMessage(botId, messageId ?? rawMessageId, conversationId)
   }
 
-  // 撤回与真实 QQ 一致：消息就地替换为灰条提示，保留会话位置，并向相关机器人派发撤回通知。
+  // 撤回是生命周期状态：权威场景保留正文/媒体/回复/回应/思考，仅标记 recalled 并向机器人派发 notice。
   private async recallVisibleMessage(operatorId: string, messageId: string, conversationId?: string): Promise<void> {
     const message = this.scene.messages.find(({ id }) => id === messageId)
     if (!message || (conversationId && message.conversationId !== conversationId)) throw new Error(`消息不存在：${messageId}`)
     const conversation = this.scene.conversations.find(({ id }) => id === message.conversationId)
     if (!conversation || !this.isConversationVisible(operatorId, conversation)) throw new Error(`消息不存在：${messageId}`)
-    if (message.event) throw new Error('该消息不支持撤回')
+    if (message.event || isRecalledMessage(message)) throw new Error('该消息不支持撤回')
     const group = conversation.type === 'group'
       ? this.scene.groups.find(({ id }) => id === conversation.groupId)
       : undefined
@@ -1278,16 +1338,15 @@ export class SandboxControlService {
       const target = this.requireGroupMember(group, message.authorId)
       this.assertCanManageMember(actor, target, '撤回成员消息')
     }
-    const operatorName = group?.members.find(({ participantId }) => participantId === operatorId)?.card
-      || this.getParticipant(operatorId).name
+    const recalledAt = new Date().toISOString()
     const recalled = this.scene.messages.filter(({ id, broadcastId }) => id === message.id
       || (!!message.broadcastId && broadcastId === message.broadcastId))
     for (const target of recalled) {
-      for (const media of target.media ?? []) this.mediaStorage.remove(media)
-      delete target.media
-      delete target.replyToMessageId
-      target.content = `${operatorName} 撤回了一条消息`
-      target.event = { type: 'recall', operatorId }
+      target.lifecycle = {
+        status: 'recalled',
+        operatorId,
+        recalledAt,
+      }
     }
     this.commitSceneMutation()
     if (group) {
@@ -1362,6 +1421,7 @@ export class SandboxControlService {
   }
 
   // 把本轮 ChatLuna 思考与用量写到该机器人最后一条消息上，让结果随场景快照持久化并覆盖多轮历史。
+  // 撤回只是生命周期状态，不能因 event 过滤把思考挂到更早的可见消息上。
   private archiveChatLunaResult(botParticipantId: string, conversationId: string, result: SandboxMessageChatLuna): void {
     for (let index = this.scene.messages.length - 1; index >= 0; index--) {
       const message = this.scene.messages[index]
@@ -1917,6 +1977,13 @@ export class SandboxControlService {
         role: member.role,
         title: member.title?.trim() || undefined,
         mutedUntil: isSandboxGroupMemberMuted(member) ? member.mutedUntil : undefined,
+        area: member.area?.trim() || undefined,
+        joinTime: typeof member.joinTime === 'number' ? Math.trunc(member.joinTime) : undefined,
+        lastSentTime: typeof member.lastSentTime === 'number' ? Math.trunc(member.lastSentTime) : undefined,
+        level: member.level?.trim() || undefined,
+        unfriendly: typeof member.unfriendly === 'boolean' ? member.unfriendly : undefined,
+        titleExpireTime: typeof member.titleExpireTime === 'number' ? Math.trunc(member.titleExpireTime) : undefined,
+        cardChangeable: typeof member.cardChangeable === 'boolean' ? member.cardChangeable : undefined,
       }
     })
     if (!ownerId) throw new Error('群组必须有一个群主')

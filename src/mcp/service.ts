@@ -1,10 +1,11 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { parseAccountProfileFromUnknown } from '../account-profile'
 import type { SandboxControlService } from '../control-service'
 import type { SandboxTestSpaceService } from '../test-spaces'
 import type { SandboxMedia, SandboxImplementationProfile, SandboxSnapshot } from '../types'
-import { createDirectConversationId, createGroupConversationId } from '../types'
+import { createDirectConversationId, createGroupConversationId, isRecalledMessage } from '../types'
 import { getOneBotCapabilityMatrix } from '../onebot-profiles'
 import { SandboxMcpError, type SandboxMcpCallRecord, type SandboxMcpCreatedCredential, type SandboxMcpCredential, type SandboxMcpEvent, type SandboxMcpEventCursor, type SandboxMcpExport, type SandboxMcpScope } from './types'
 
@@ -543,6 +544,9 @@ export class SandboxMcpService {
     // 消息不会经过 MCP 的 send_message，只有场景变更回调可见；若只发 scene.changed，
     // wait_for_message（匹配 message.created）将永远等不到机器人回复。
     const seenMessageIds = new Set(control.getSnapshot().messages.map(({ id }) => id))
+    const recalledMessageIds = new Set(
+      control.getSnapshot().messages.filter((message) => isRecalledMessage(message)).map(({ id }) => id),
+    )
     control.onSceneMutation((snapshot) => {
       this.appendEvent('scene.changed', { revision: snapshot.revision }, spaceId)
       for (const message of snapshot.messages) {
@@ -551,6 +555,12 @@ export class SandboxMcpService {
         // 此处不查投递记录：投递在 middleware 完成后才登记，场景通知时必然拿不到；
         // 带 recipientBotId 的投递事件由 send_message 等待投递完成后单独补发。
         this.appendEvent('message.created', message, spaceId)
+      }
+      // 撤回是生命周期变化：外部测试控制器可精确等待 message.recalled，并读取权威原文复盘。
+      for (const message of snapshot.messages) {
+        if (!isRecalledMessage(message) || recalledMessageIds.has(message.id)) continue
+        recalledMessageIds.add(message.id)
+        this.appendEvent('message.recalled', message, spaceId)
       }
     })
     // OneBot 调试记录并入事件流，wait_for_onebot_action 才能等待插件真实发起的调用，
@@ -930,8 +940,29 @@ export class SandboxMcpService {
       const change = asRecord(raw)
       const action = requireString(change.action, 'change.action')
       const data = asRecord(change.data)
-      if (action === 'create-user') snapshot.participants.push({ kind: 'user', id: requireString(data.id, 'id'), name: requireString(data.name, 'name') })
-      else if (action === 'create-bot') snapshot.participants.push({ kind: 'bot', id: requireString(data.id, 'id'), name: requireString(data.name, 'name'), implementation: data.implementation === undefined ? 'napcat' : requireImplementation(data.implementation), enabled: data.enabled !== false, avatar: typeof data.avatar === 'string' ? data.avatar : undefined, disabledCapabilities: requireCapabilityList(data.disabledCapabilities) })
+      if (action === 'create-user') {
+        const profile = parseAccountProfileFromUnknown(data.profile)
+        snapshot.participants.push({
+          kind: 'user',
+          id: requireString(data.id, 'id'),
+          name: requireString(data.name, 'name'),
+          avatar: typeof data.avatar === 'string' ? data.avatar : undefined,
+          ...(profile ? { profile } : {}),
+        })
+      }
+      else if (action === 'create-bot') {
+        const profile = parseAccountProfileFromUnknown(data.profile)
+        snapshot.participants.push({
+          kind: 'bot',
+          id: requireString(data.id, 'id'),
+          name: requireString(data.name, 'name'),
+          implementation: data.implementation === undefined ? 'napcat' : requireImplementation(data.implementation),
+          enabled: data.enabled !== false,
+          avatar: typeof data.avatar === 'string' ? data.avatar : undefined,
+          disabledCapabilities: requireCapabilityList(data.disabledCapabilities),
+          ...(profile ? { profile } : {}),
+        })
+      }
       else if (action === 'create-group') {
         const groupId = requireString(data.id, 'id')
         snapshot.groups.push({ id: groupId, name: requireString(data.name, 'name'), members: Array.isArray(data.members) ? data.members as never : [], announcements: [] })
@@ -945,6 +976,11 @@ export class SandboxMcpService {
         if (!participant) throw new SandboxMcpError('participant_not_found', `用户不存在：${String(data.id)}`)
         participant.name = requireString(data.name, 'name')
         participant.avatar = typeof data.avatar === 'string' ? data.avatar : undefined
+        if (data.profile !== undefined) {
+          const profile = parseAccountProfileFromUnknown(data.profile)
+          if (profile) participant.profile = profile
+          else delete participant.profile
+        }
       } else if (action === 'update-bot' || action === 'set-capabilities') {
         const participant = snapshot.participants.find(({ id, kind }) => id === data.id && kind === 'bot')
         if (!participant || participant.kind !== 'bot') throw new SandboxMcpError('participant_not_found', `机器人不存在：${String(data.id)}`)
@@ -956,6 +992,11 @@ export class SandboxMcpService {
           if (data.implementation !== undefined) participant.implementation = requireImplementation(data.implementation)
           if (data.enabled !== undefined) participant.enabled = data.enabled !== false
           if (data.disabledCapabilities !== undefined) participant.disabledCapabilities = requireCapabilityList(data.disabledCapabilities)
+          if (data.profile !== undefined) {
+            const profile = parseAccountProfileFromUnknown(data.profile)
+            if (profile) participant.profile = profile
+            else delete participant.profile
+          }
         } else {
           participant.disabledCapabilities = requireCapabilityList(data.disabledCapabilities)
         }

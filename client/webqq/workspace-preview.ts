@@ -1,4 +1,9 @@
-import type { SandboxConversation, SandboxSnapshot } from '../../src/types'
+import {
+  formatRecalledMessageEventText,
+  isRecalledMessage,
+  type SandboxConversation,
+  type SandboxSnapshot,
+} from '../../src/types'
 import { formatMentionContent } from './mention'
 import { getConversationPeerId } from './relationship-directory'
 import { resolveWorkspaceSelection } from './workspace-state'
@@ -48,12 +53,21 @@ export function buildWorkspacePreview(snapshot: SandboxSnapshot, sessionLimit = 
     }
   }
 
+  const describeMessageText = (message: NonNullable<ReturnType<typeof messagesById.get>>) => {
+    if (isRecalledMessage(message)) {
+      const operatorId = message.lifecycle?.operatorId ?? message.authorId
+      const operator = participants.get(operatorId)
+      return formatRecalledMessageEventText(message, operator?.name ?? operatorId)
+    }
+    return formatMentionContent(message.content, participantNames)
+  }
+
   const sessions = snapshot.conversations.slice(0, sessionLimit).map((conversation) => {
     const latest = messagesById.get(conversation.messageIds.at(-1) ?? '')
     return {
       id: conversation.id,
       ...describe(conversation),
-      preview: latest ? formatMentionContent(latest.content, participantNames) : '开始一段新对话',
+      preview: latest ? describeMessageText(latest) : '开始一段新对话',
       active: conversation.id === activeConversationId,
     }
   })
@@ -65,9 +79,9 @@ export function buildWorkspacePreview(snapshot: SandboxSnapshot, sessionLimit = 
     const author = participants.get(message.authorId)
     return [{
       id: message.id,
-      text: formatMentionContent(message.content, participantNames),
+      text: describeMessageText(message),
       outgoing: message.authorId === currentOperatorId,
-      event: !!message.event,
+      event: !!message.event || isRecalledMessage(message),
       authorName: author?.name ?? message.authorId,
       avatarKind: author?.kind === 'bot' ? 'bot' as const : 'user' as const,
       avatar: author?.avatar,

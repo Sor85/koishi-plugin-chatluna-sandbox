@@ -185,6 +185,9 @@
                 </button>
               </ContextMenuTrigger>
               <ContextMenuContent style="z-index: 140">
+                <ContextMenuItem @select="emit('openProfile', entry.id)">
+                  <IconId :size="16" aria-hidden="true" /> 查看资料
+                </ContextMenuItem>
                 <ContextMenuItem v-if="!entry.isFriend && !entry.pendingOutgoing && !entry.pendingIncoming" @select="requestFriend(entry.id)">
                   <IconUserPlus :size="16" aria-hidden="true" /> 发送好友申请
                 </ContextMenuItem>
@@ -278,7 +281,7 @@
 
 <script setup lang="ts">
 import {
-  IconBell, IconBug, IconClock, IconEdit, IconLayoutGrid, IconMessageCircle, IconPlus,
+  IconBell, IconBug, IconClock, IconEdit, IconId, IconLayoutGrid, IconMessageCircle, IconPlus,
   IconSearch, IconTag, IconTrash, IconUser, IconUserCircle, IconUserMinus, IconUserPlus, IconUsers,
 } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
@@ -365,6 +368,7 @@ const emit = defineEmits<{
   openEntityDialog: [mode: EnvironmentDialogMode, entity: { type: EnvironmentEntityType, id: string }]
   openGroupActionDialog: [mode: 'card' | 'name', targetId: string, groupId?: string]
   openRemarkDialog: [targetId: string]
+  openProfile: [participantId: string]
 }>()
 
 const appearance = computed(() => props.model.appearance)

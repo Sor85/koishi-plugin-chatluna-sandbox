@@ -23,6 +23,28 @@
             required
           />
         </div>
+        <div v-if="target?.type === 'user' || target?.type === 'bot'" class="webqq-secondary-field">
+          <Label :for="`${fieldPrefix}-personal-note`">个性签名</Label>
+          <Input
+            :id="`${fieldPrefix}-personal-note`"
+            v-model="draft.personalNote"
+            placeholder="可选，环境管理写入账号资料"
+          />
+        </div>
+        <div v-if="target?.type === 'user' || target?.type === 'bot'" class="webqq-secondary-field">
+          <Label :for="`${fieldPrefix}-sex`">性别</Label>
+          <Select v-model="draft.sex">
+            <SelectTrigger :id="`${fieldPrefix}-sex`" class="w-full">
+              <SelectValue placeholder="未设置" />
+            </SelectTrigger>
+            <SelectContent :portal-to="selectPortalTarget">
+              <SelectItem value="unset">未设置</SelectItem>
+              <SelectItem value="unknown">未知</SelectItem>
+              <SelectItem value="male">男</SelectItem>
+              <SelectItem value="female">女</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
         <template v-if="target?.type === 'bot'">
           <div class="webqq-secondary-field">
@@ -178,6 +200,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { getOneBotProfileBaseline } from '../src/onebot-profiles'
 import type {
   ManageSandboxEnvironmentInput,
+  SandboxAccountSex,
   SandboxBotProfile,
   SandboxGroup,
   SandboxGroupMember,
@@ -209,11 +232,13 @@ const selectPortalTarget = ref<HTMLElement | null>(null)
 const draft = reactive<{
   id: string
   name: string
+  personalNote: string
+  sex: 'unset' | SandboxAccountSex
   implementation: SandboxImplementationProfile
   enabled: boolean
   disabledCapabilities: string[]
   members: SandboxGroupMember[]
-}>({ id: '', name: '', implementation: 'napcat', enabled: true, disabledCapabilities: [], members: [] })
+}>({ id: '', name: '', personalNote: '', sex: 'unset', implementation: 'napcat', enabled: true, disabledCapabilities: [], members: [] })
 
 const entity = computed(() => {
   if (props.target?.type === 'user') return props.users.find(({ id }) => id === props.target?.id)
@@ -255,15 +280,39 @@ watch([() => props.open, () => props.target], ([open]) => {
   if (props.target?.type === 'user') {
     const value = props.users.find(({ id }) => id === props.target?.id)
     if (!value) return
-    Object.assign(draft, { id: value.id, name: value.name, implementation: 'napcat', enabled: true, disabledCapabilities: [], members: [] })
+    Object.assign(draft, {
+      id: value.id,
+      name: value.name,
+      personalNote: value.profile?.personalNote ?? '',
+      sex: value.profile?.sex ?? 'unset',
+      implementation: 'napcat',
+      enabled: true,
+      disabledCapabilities: [],
+      members: [],
+    })
   } else if (props.target?.type === 'bot') {
     const value = props.bots.find(({ id }) => id === props.target?.id)
     if (!value) return
-    Object.assign(draft, { ...value, disabledCapabilities: value.disabledCapabilities ?? [], members: [] })
+    Object.assign(draft, {
+      ...value,
+      personalNote: value.profile?.personalNote ?? '',
+      sex: value.profile?.sex ?? 'unset',
+      disabledCapabilities: value.disabledCapabilities ?? [],
+      members: [],
+    })
   } else if (props.target?.type === 'group') {
     const value = props.groups.find(({ id }) => id === props.target?.id)
     if (!value) return
-    Object.assign(draft, { id: value.id, name: value.name, implementation: 'napcat', enabled: true, disabledCapabilities: [], members: value.members.map((member) => ({ ...member })) })
+    Object.assign(draft, {
+      id: value.id,
+      name: value.name,
+      personalNote: '',
+      sex: 'unset',
+      implementation: 'napcat',
+      enabled: true,
+      disabledCapabilities: [],
+      members: value.members.map((member) => ({ ...member })),
+    })
   }
 }, { immediate: true })
 
@@ -281,9 +330,24 @@ async function runAction(input: ManageSandboxEnvironmentInput) {
   }
 }
 
+function buildAccountProfile() {
+  const profile = {
+    ...(draft.personalNote.trim() ? { personalNote: draft.personalNote.trim() } : {}),
+    ...(draft.sex !== 'unset' ? { sex: draft.sex as SandboxAccountSex } : {}),
+  }
+  return Object.keys(profile).length ? profile : undefined
+}
+
 async function submitEdit() {
   if (props.target?.type === 'user') {
-    await runAction({ action: 'update-user', data: { id: draft.id, name: draft.name } })
+    await runAction({
+      action: 'update-user',
+      data: {
+        id: draft.id,
+        name: draft.name,
+        profile: buildAccountProfile(),
+      },
+    })
   } else if (props.target?.type === 'bot') {
     await runAction({
       action: 'update-bot',
@@ -293,6 +357,7 @@ async function submitEdit() {
         implementation: draft.implementation,
         enabled: draft.enabled,
         disabledCapabilities: [...draft.disabledCapabilities],
+        profile: buildAccountProfile(),
       },
     })
   } else if (props.target?.type === 'group') {

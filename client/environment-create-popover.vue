@@ -53,6 +53,15 @@
             required
           />
         </div>
+        <div v-if="effectiveType === 'user' || effectiveType === 'bot'" class="webqq-secondary-field">
+          <Label for="environment-create-personal-note">个性签名</Label>
+          <Input
+            id="environment-create-personal-note"
+            v-model="draft.personalNote"
+            class="text-sm"
+            placeholder="可选"
+          />
+        </div>
 
         <template v-if="effectiveType === 'bot'">
           <div class="webqq-secondary-field">
@@ -137,7 +146,7 @@ const emit = defineEmits<{
 const open = ref(false)
 const busy = ref(false)
 const errorMessage = ref('')
-const draft = reactive({ id: '', name: '' })
+const draft = reactive({ id: '', name: '', personalNote: '' })
 const participantType = ref<ParticipantCreateType>('user')
 const botImplementation = ref<SandboxImplementationProfile>('napcat')
 const botEnabled = ref(true)
@@ -164,6 +173,7 @@ watch(open, (value) => {
   errorMessage.value = ''
   draft.id = ''
   draft.name = ''
+  draft.personalNote = ''
   participantType.value = 'user'
   botImplementation.value = 'napcat'
   botEnabled.value = true
@@ -186,13 +196,20 @@ async function submit() {
 }
 
 function createInput(): ManageSandboxEnvironmentInput | undefined {
+  const profile = draft.personalNote.trim() ? { personalNote: draft.personalNote.trim() } : undefined
   if (effectiveType.value === 'user') {
-    return { action: 'create-user', data: { id: draft.id, name: draft.name } }
+    return { action: 'create-user', data: { id: draft.id, name: draft.name, ...(profile ? { profile } : {}) } }
   }
   if (effectiveType.value === 'bot') {
     return {
       action: 'create-bot',
-      data: { id: draft.id, name: draft.name, implementation: botImplementation.value, enabled: botEnabled.value },
+      data: {
+        id: draft.id,
+        name: draft.name,
+        implementation: botImplementation.value,
+        enabled: botEnabled.value,
+        ...(profile ? { profile } : {}),
+      },
     }
   }
   const owner = props.currentOperator

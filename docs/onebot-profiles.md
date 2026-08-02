@@ -49,5 +49,6 @@ OneBot 协议层统一向插件返回数字 `message_id`：消息事件、`send_
 - `set_group_special_title` 写入群成员专属头衔，`get_group_member_info`、`get_group_member_list` 与群消息事件的 `sender.title` 返回同一份头衔；与真实 QQ 一致只有群主可以授予，传空字符串表示清除。
 - `set_group_ban` 写入群成员禁言到期时间，`get_group_shut_list` 返回当前仍在禁言中的成员，`get_group_member_info` 的 `shut_up_timestamp` 返回秒级到期时间戳；`duration` 为 0 表示解除禁言，禁言时长上限为 30 天。
 - `set_msg_emoji_like` 按 emoji 聚合表情回应参与者并写入消息，`set` 为 `false` 时移除当前机器人的回应。
+- `set_qq_profile` 写入机器人账号资料：NapCat 与 LLOneBot 都支持 `nickname` 和 `personal_note`，只有 NapCat 接受 `sex`（`0/1/2` 或 `unknown/male/female`）；LLOneBot 传入性别时明确失败，不静默忽略。对应 `get_login_info`、`get_stranger_info`、`get_friend_list` 与 `get_group_member_info` 只返回已建模的类型化字段，不透传 raw JSON。
 
 Koishi 的 OneBot 适配器同时提供 camelCase 便捷方法，沙盒显式实现 `getGroupInfo`、`getGroupMemberInfo` 和 `getGroupMemberList`，避免它们被当作原始 action 名转发而报「不支持的 action」。未显式声明的名称仍按原始 action 解析，不会伪造成功。

@@ -9,6 +9,7 @@ import type {
   PerformFriendActionInput,
   PerformGroupActionInput,
   RecallMessageInput,
+  SetMessageReactionInput,
   SandboxConsoleOneBotDebugRecord,
   SandboxMediaContent,
   SandboxMessageHistory,
@@ -77,6 +78,10 @@ export class FakeWorkspacePort implements WorkspacePort {
 
   recallMessage(input: RecallMessageInput) {
     return this.invoke('recallMessage', input, this.workspaceResult)
+  }
+
+  setMessageReaction(input: SetMessageReactionInput) {
+    return this.invoke('setMessageReaction', input, this.workspaceResult)
   }
 
   getMediaContent(input: GetMediaContentInput) {

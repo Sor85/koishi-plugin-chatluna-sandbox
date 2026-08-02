@@ -33,6 +33,40 @@
   margin-bottom: 0;
 }
 
+/* 开启 webQQMarkRecalledMessages 时保留原气泡：整体弱化，正文与媒体划线；思考不划线但同弱化。 */
+.webqq-message-row.is-recalled,
+.webqq-thinking-row.is-recalled {
+  opacity: 0.62;
+}
+
+.webqq-message-row.is-recalled .webqq-message-bubble > span,
+.webqq-message-row.is-recalled .webqq-message-quote {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.webqq-message-row.is-recalled .webqq-message-media {
+  position: relative;
+}
+
+.webqq-message-row.is-recalled .webqq-message-media::after {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 50%;
+  border-top: 1.5px solid color-mix(in srgb, var(--webqq-text) 55%, transparent);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.webqq-message-row.is-recalled .webqq-message-media img,
+.webqq-message-row.is-recalled .webqq-message-media video,
+.webqq-message-row.is-recalled .webqq-message-file {
+  opacity: 0.72;
+  filter: grayscale(0.15);
+}
+
 .webqq-message-row {
   max-width: 74%;
   display: flex;
@@ -662,4 +696,179 @@
   color: #fff;
   background: var(--webqq-accent);
   box-shadow: 0 8px 18px var(--webqq-accent-shadow);
+}
+
+.webqq-message-stack {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.webqq-message-row.is-outgoing .webqq-message-stack {
+  align-items: flex-end;
+}
+
+.webqq-message-reactions {
+  display: flex;
+  max-width: 100%;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 0;
+  margin-bottom: -5px;
+}
+
+.webqq-message-reaction {
+  --webqq-reaction-avatar-size: 18px;
+  --webqq-reaction-bg: color-mix(in srgb, var(--webqq-accent) 16%, #ffffff 84%);
+
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0 0 0 2px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--webqq-accent);
+  background: var(--webqq-reaction-bg);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.webqq-message-reaction:disabled,
+.webqq-message-reaction.is-readonly {
+  cursor: default;
+}
+
+.webqq-message-reaction.is-mine {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--webqq-accent) 42%, transparent);
+}
+
+.webqq-message-reaction-users {
+  display: inline-flex;
+  align-items: center;
+}
+
+.webqq-message-reaction-avatar {
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  width: var(--webqq-reaction-avatar-size);
+  height: var(--webqq-reaction-avatar-size);
+  aspect-ratio: 1 / 1;
+  flex: 0 0 var(--webqq-reaction-avatar-size);
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--webqq-reaction-bg);
+  box-shadow: 0 0 0 2px var(--webqq-reaction-bg);
+}
+
+.webqq-message-reaction-avatar + .webqq-message-reaction-avatar {
+  margin-left: -6px;
+}
+
+.webqq-message-reaction-avatar-image {
+  --webqq-avatar-size: var(--webqq-reaction-avatar-size);
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  font-size: 9px;
+}
+
+.webqq-message-reaction-emoji {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
+.webqq-message-reaction-label,
+.webqq-message-reaction-count {
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.webqq-workspace[data-color-mode="dark"] .webqq-message-reaction {
+  --webqq-reaction-bg: color-mix(in srgb, var(--webqq-accent) 24%, #0f172a 76%);
+}
+
+.webqq-emoji-picker-dialog {
+  width: min(420px, calc(100vw - 24px));
+  max-width: min(420px, calc(100vw - 24px));
+}
+
+.webqq-emoji-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.webqq-emoji-picker-search {
+  width: 100%;
+}
+
+.webqq-emoji-picker-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.webqq-emoji-picker-section > header {
+  color: var(--webqq-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.webqq-emoji-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.webqq-emoji-picker-grid.is-scrollable {
+  max-height: min(280px, 48vh);
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.webqq-emoji-picker-item {
+  display: flex;
+  aspect-ratio: 1 / 1;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--webqq-text);
+  background: color-mix(in srgb, var(--webqq-panel) 88%, transparent);
+  cursor: pointer;
+}
+
+.webqq-emoji-picker-item:hover {
+  background: color-mix(in srgb, var(--webqq-accent) 14%, transparent);
+}
+
+.webqq-emoji-picker-item img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.webqq-emoji-picker-empty {
+  grid-column: 1 / -1;
+  margin: 8px 0;
+  color: var(--webqq-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .webqq-emoji-picker-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
 }

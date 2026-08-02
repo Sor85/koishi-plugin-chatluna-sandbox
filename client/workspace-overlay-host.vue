@@ -44,6 +44,42 @@
       </DialogFooter>
     </DialogContent>
   </Dialog>
+  <Dialog v-model:open="profileOpen">
+    <DialogContent :style="{ '--webqq-accent': accentColor }" class="webqq-profile-card-dialog">
+      <DialogHeader>
+        <DialogTitle>个人信息卡</DialogTitle>
+        <DialogDescription>只读观察场景中已有资料，字段按所属范围分组。</DialogDescription>
+      </DialogHeader>
+      <div v-if="profileCard" class="webqq-profile-card">
+        <div class="webqq-profile-card-hero">
+          <WebqqAvatar
+            class="webqq-avatar webqq-avatar-profile"
+            :kind="profileCard.isBot ? 'bot' : 'user'"
+            :name="profileCard.name"
+            :avatar="profileCard.avatar"
+            :show-bot-badge="profileCard.isBot"
+          />
+          <div>
+            <h2>{{ profileCard.name }}</h2>
+            <p>{{ profileCard.participantId }}</p>
+            <p v-if="profileCard.personalNote" class="webqq-profile-card-note">{{ profileCard.personalNote }}</p>
+          </div>
+        </div>
+        <section v-for="section in profileSections" :key="section.scope" class="webqq-profile-card-section">
+          <h3>{{ section.title }}</h3>
+          <dl>
+            <div v-for="field in section.fields" :key="`${field.scope}:${field.label}`">
+              <dt>{{ field.label }}</dt>
+              <dd>{{ field.value }}</dd>
+            </div>
+          </dl>
+        </section>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" @click="profileOpen = false">关闭</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <script setup lang="ts">
@@ -52,6 +88,8 @@ import { Button } from './components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './components/ui/dialog'
 import { Input } from './components/ui/input'
 import EnvironmentEntityDialog from './environment-entity-dialog.vue'
+import WebqqAvatar from './webqq-avatar.vue'
+import type { ProfileCardField, ProfileCardModel, ProfileCardScope } from './webqq/profile-card'
 import type {
   ManageSandboxEnvironmentInput,
   SandboxBotProfile,
@@ -95,6 +133,23 @@ const groupActionTargetId = ref('')
 const groupActionGroupId = ref('')
 const groupActionInput = ref('')
 const groupActionCopy = computed(() => GROUP_ACTION_COPY[groupActionMode.value])
+const profileOpen = ref(false)
+const profileCard = ref<ProfileCardModel>()
+const PROFILE_SECTION_TITLES: Record<ProfileCardScope, string> = {
+  account: '账号资料',
+  friend: '好友关系资料',
+  'group-member': '群成员资料',
+  'bot-runtime': '机器人运行资料',
+}
+const profileSections = computed(() => {
+  const fields = profileCard.value?.fields ?? []
+  const scopes: ProfileCardScope[] = ['account', 'friend', 'group-member', 'bot-runtime']
+  return scopes.flatMap((scope) => {
+    const sectionFields = fields.filter((field) => field.scope === scope)
+    if (!sectionFields.length) return []
+    return [{ scope, title: PROFILE_SECTION_TITLES[scope], fields: sectionFields as ProfileCardField[] }]
+  })
+})
 
 function openEntity(mode: EntityMode, target: { type: EntityType, id: string }) {
   entityMode.value = mode
@@ -118,6 +173,11 @@ function openGroupAction(mode: GroupActionMode, targetId: string, groupId: strin
   groupActionGroupId.value = groupId
   groupActionInput.value = value
   groupActionOpen.value = true
+}
+
+function openProfile(card: ProfileCardModel) {
+  profileCard.value = card
+  profileOpen.value = true
 }
 
 async function submitRemark() {
@@ -144,5 +204,5 @@ async function submitGroupAction() {
   } catch {}
 }
 
-defineExpose({ openEntity, openGroupAction, openRemark })
+defineExpose({ openEntity, openGroupAction, openRemark, openProfile })
 </script>

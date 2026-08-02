@@ -1,7 +1,31 @@
+// 账号资料、好友备注、群成员资料和机器人运行资料保持独立类型，避免把备注/群名片误当成全局资料。
+export type SandboxAccountSex = 'male' | 'female' | 'unknown'
+
+export interface SandboxAccountProfile {
+  personalNote?: string
+  sex?: SandboxAccountSex
+  age?: number
+  qid?: string
+  level?: number
+  loginDays?: number
+  regTime?: number
+  city?: string
+  country?: string
+  birthdayYear?: number
+  birthdayMonth?: number
+  birthdayDay?: number
+  labels?: string[]
+  isVip?: boolean
+  isYearsVip?: boolean
+  vipLevel?: number
+}
+
 interface SandboxParticipantBase {
   id: string
   name: string
   avatar?: string
+  // 全局账号资料；好友备注和群成员资料不在这里。
+  profile?: SandboxAccountProfile
 }
 
 export type SandboxEntitySource =
@@ -22,14 +46,15 @@ export interface DeleteSandboxUserInput {
 
 export type SandboxImplementationProfile = 'napcat' | 'llbot'
 
-export interface SandboxBotProfile {
-  kind: 'bot'
-  id: string
-  name: string
-  avatar?: string
+// 机器人运行资料：实现配置、启用状态和能力覆盖，独立于账号资料。
+export interface SandboxBotRuntimeProfile {
   implementation: SandboxImplementationProfile
   enabled: boolean
   disabledCapabilities?: string[]
+}
+
+export interface SandboxBotProfile extends SandboxParticipantBase, SandboxBotRuntimeProfile {
+  kind: 'bot'
 }
 
 export type CreateSandboxBotInput = Omit<SandboxBotProfile, 'kind'>
@@ -70,6 +95,14 @@ export interface SandboxGroupMember {
   title?: string
   // 禁言到期时间；仅在未到期时表示成员处于禁言状态，过期条目由读取方按当前时间判断。
   mutedUntil?: string
+  // 以下字段属于群成员资料，不回写到账号全局资料。
+  area?: string
+  joinTime?: number
+  lastSentTime?: number
+  level?: string
+  unfriendly?: boolean
+  titleExpireTime?: number
+  cardChangeable?: boolean
 }
 
 // 禁言状态按到期时间保存，读取方统一在此判断是否仍然生效，避免各处重复比较时间。
@@ -159,7 +192,14 @@ export interface SandboxMessageReaction {
   participantIds: string[]
 }
 
-export interface SandboxMessage {
+// 可见消息不携带 lifecycle；一旦进入撤回状态，撤回者与时间必须作为完整事实同时存在。
+export interface SandboxRecalledMessageLifecycle {
+  status: 'recalled'
+  operatorId: string
+  recalledAt: string
+}
+
+interface SandboxMessageBase {
   id: string
   authorId: string
   conversationId: string
@@ -172,13 +212,30 @@ export interface SandboxMessage {
   reactions?: SandboxMessageReaction[]
   // 本轮 ChatLuna 思考内容随消息一起落场景快照，多轮对话后仍能查看历史思考。
   chatLuna?: SandboxMessageChatLuna
+  // 仅用于戳一戳等消息事件；撤回不再占用 event，改用 lifecycle。
   event?: {
     type: 'poke'
     targetId: string
-  } | {
-    type: 'recall'
-    operatorId: string
   }
+}
+
+// 撤回是消息生命周期状态，不是新的系统消息；权威场景始终保留原文与附属事实。
+export type SandboxMessage = SandboxMessageBase & (
+  | { lifecycle?: undefined }
+  | { lifecycle: SandboxRecalledMessageLifecycle }
+)
+
+export function isRecalledMessage(
+  message: SandboxMessage | undefined | null,
+): message is SandboxMessage & { lifecycle: SandboxRecalledMessageLifecycle } {
+  return message?.lifecycle?.status === 'recalled'
+}
+
+export function formatRecalledMessageEventText(
+  message: SandboxMessage & { lifecycle: SandboxRecalledMessageLifecycle },
+  operatorName: string,
+): string {
+  return `${operatorName || message.lifecycle.operatorId} 撤回了一条消息`
 }
 
 export interface SandboxBotDelivery {
@@ -335,6 +392,8 @@ export interface SandboxAppearance {
   webQQTimBubbleTail: boolean
   webQQColorMode: 'auto' | 'light' | 'dark'
   webQQAccentColor: string
+  // 只控制 WebQQ 呈现；关闭时隐藏原气泡并显示撤回事件，底层数据仍保留。
+  webQQMarkRecalledMessages: boolean
 }
 
 export interface SandboxWorkspaceState {
@@ -382,6 +441,13 @@ export interface RecallMessageInput {
   operatorId: string
   conversationId?: string
   messageId: string
+}
+
+export interface SetMessageReactionInput {
+  operatorId: string
+  messageId: string
+  emojiId: string
+  enabled: boolean
 }
 
 export interface SendMediaFileInput {
