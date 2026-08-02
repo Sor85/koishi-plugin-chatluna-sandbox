@@ -151,7 +151,7 @@ const ENVIRONMENT_CHANGE_SCHEMAS = [
       action: { const: 'create-group' },
       data: {
         type: 'object',
-        properties: { id: PARTICIPANT_ID, name: { type: 'string' }, members: GROUP_MEMBERS },
+        properties: { id: PARTICIPANT_ID, name: { type: 'string' }, avatar: { type: 'string' }, members: GROUP_MEMBERS },
         required: ['id', 'name'],
       },
     },
@@ -163,7 +163,7 @@ const ENVIRONMENT_CHANGE_SCHEMAS = [
       action: { const: 'update-group' },
       data: {
         type: 'object',
-        properties: { id: PARTICIPANT_ID, name: { type: 'string' }, members: GROUP_MEMBERS },
+        properties: { id: PARTICIPANT_ID, name: { type: 'string' }, avatar: { type: 'string' }, members: GROUP_MEMBERS },
         required: ['id', 'name'],
       },
     },
@@ -932,7 +932,7 @@ export class SandboxMcpService {
     return result
   }
 
-  private applyEnvironmentChanges(control: SandboxControlService, args: Record<string, unknown>) {
+  private async applyEnvironmentChanges(control: SandboxControlService, args: Record<string, unknown>) {
     this.assertRevision(control, args.expectedRevision)
     const snapshot = structuredClone(control.getSnapshot())
     const changes = Array.isArray(args.changes) ? args.changes : []
@@ -942,30 +942,32 @@ export class SandboxMcpService {
       const data = asRecord(change.data)
       if (action === 'create-user') {
         const profile = parseAccountProfileFromUnknown(data.profile)
+        const id = requireString(data.id, 'id')
         snapshot.participants.push({
           kind: 'user',
-          id: requireString(data.id, 'id'),
+          id,
           name: requireString(data.name, 'name'),
-          avatar: typeof data.avatar === 'string' ? data.avatar : undefined,
+          avatar: await control.importAvatar('user', id, typeof data.avatar === 'string' ? data.avatar : undefined),
           ...(profile ? { profile } : {}),
         })
       }
       else if (action === 'create-bot') {
         const profile = parseAccountProfileFromUnknown(data.profile)
+        const id = requireString(data.id, 'id')
         snapshot.participants.push({
           kind: 'bot',
-          id: requireString(data.id, 'id'),
+          id,
           name: requireString(data.name, 'name'),
           implementation: data.implementation === undefined ? 'napcat' : requireImplementation(data.implementation),
           enabled: data.enabled !== false,
-          avatar: typeof data.avatar === 'string' ? data.avatar : undefined,
+          avatar: await control.importAvatar('bot', id, typeof data.avatar === 'string' ? data.avatar : undefined),
           disabledCapabilities: requireCapabilityList(data.disabledCapabilities),
           ...(profile ? { profile } : {}),
         })
       }
       else if (action === 'create-group') {
         const groupId = requireString(data.id, 'id')
-        snapshot.groups.push({ id: groupId, name: requireString(data.name, 'name'), members: Array.isArray(data.members) ? data.members as never : [], announcements: [] })
+        snapshot.groups.push({ id: groupId, name: requireString(data.name, 'name'), avatar: await control.importAvatar('group', groupId, typeof data.avatar === 'string' ? data.avatar : undefined), members: Array.isArray(data.members) ? data.members as never : [], announcements: [] })
         // 与 set-friendship 自动创建私聊会话保持一致：建群即建群会话，
         // 否则 AI 需要先执行一次群操作才能拿到可发消息的会话。
         const conversationId = createGroupConversationId(groupId)
@@ -975,7 +977,7 @@ export class SandboxMcpService {
         const participant = snapshot.participants.find(({ id, kind }) => id === data.id && kind === 'user')
         if (!participant) throw new SandboxMcpError('participant_not_found', `用户不存在：${String(data.id)}`)
         participant.name = requireString(data.name, 'name')
-        participant.avatar = typeof data.avatar === 'string' ? data.avatar : undefined
+        participant.avatar = await control.importAvatar('user', participant.id, typeof data.avatar === 'string' ? data.avatar : undefined)
         if (data.profile !== undefined) {
           const profile = parseAccountProfileFromUnknown(data.profile)
           if (profile) participant.profile = profile
@@ -988,7 +990,7 @@ export class SandboxMcpService {
           // 局部补丁语义：只改显式提供的字段。旧实现把省略的 implementation 回落成
           // napcat，导致「只改昵称」会静默把 LLBot 重置为 NapCat。
           if (data.name !== undefined) participant.name = requireString(data.name, 'name')
-          if (data.avatar !== undefined) participant.avatar = typeof data.avatar === 'string' ? data.avatar : undefined
+          if (data.avatar !== undefined) participant.avatar = await control.importAvatar('bot', participant.id, typeof data.avatar === 'string' ? data.avatar : undefined)
           if (data.implementation !== undefined) participant.implementation = requireImplementation(data.implementation)
           if (data.enabled !== undefined) participant.enabled = data.enabled !== false
           if (data.disabledCapabilities !== undefined) participant.disabledCapabilities = requireCapabilityList(data.disabledCapabilities)
@@ -1004,6 +1006,7 @@ export class SandboxMcpService {
         const group = snapshot.groups.find(({ id }) => id === data.id)
         if (!group) throw new SandboxMcpError('group_not_found', `群组不存在：${String(data.id)}`)
         group.name = requireString(data.name, 'name')
+        if (data.avatar !== undefined) group.avatar = await control.importAvatar('group', group.id, typeof data.avatar === 'string' ? data.avatar : undefined)
         if (Array.isArray(data.members)) group.members = data.members as never
       } else if (action === 'set-friendship') {
         const participantIds = [requireString(data.firstId, 'firstId'), requireString(data.secondId, 'secondId')].sort() as [string, string]

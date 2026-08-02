@@ -43,7 +43,7 @@ interface ConsoleEventMap {
   'onebot-sandbox/media-content': (input: SpaceScoped<GetMediaContentInput>) => SandboxMediaContent
   'onebot-sandbox/set-group-announcement': (input: SpaceScoped<SetGroupAnnouncementInput>) => SandboxWorkspaceState
   'onebot-sandbox/delete-group-announcement': (input: SpaceScoped<DeleteGroupAnnouncementInput>) => SandboxWorkspaceState
-  'onebot-sandbox/manage-environment': (input: SpaceScoped<ManageSandboxEnvironmentInput>) => SandboxWorkspaceState
+  'onebot-sandbox/manage-environment': (input: SpaceScoped<ManageSandboxEnvironmentInput>) => Promise<SandboxWorkspaceState>
   'onebot-sandbox/friend-action': (input: SpaceScoped<PerformFriendActionInput>) => Promise<SandboxWorkspaceState>
   'onebot-sandbox/group-action': (input: SpaceScoped<PerformGroupActionInput>) => Promise<SandboxWorkspaceState>
   'onebot-sandbox/bot-deliveries': (input?: SpaceScoped<GetSandboxBotDeliveriesInput>) => SandboxBotDelivery[]
@@ -220,33 +220,33 @@ export function registerConsole(
     resolveControl(input, true).deleteGroupAnnouncement(assertInteractionInput(withoutSpaceId(input)) as DeleteGroupAnnouncementInput)
     return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
-  console.addListener('onebot-sandbox/manage-environment', (input) => {
+  console.addListener('onebot-sandbox/manage-environment', async (input) => {
     const activeControl = resolveControl(input, true)
     const command = assertEnvironmentInput(withoutSpaceId(input) as ManageSandboxEnvironmentInput)
     switch (command.action) {
       case 'create-user':
-        activeControl.createUser(command.data)
+        activeControl.createUser({ ...command.data, avatar: await activeControl.importAvatar('user', command.data.id, command.data.avatar) })
         break
       case 'update-user':
-        activeControl.updateUser(command.data)
+        activeControl.updateUser(command.data.avatar === undefined ? command.data : { ...command.data, avatar: await activeControl.importAvatar('user', command.data.id, command.data.avatar) })
         break
       case 'delete-user':
         activeControl.deleteUser(command.data)
         break
       case 'create-bot':
-        activeControl.createBot(command.data)
+        activeControl.createBot({ ...command.data, avatar: await activeControl.importAvatar('bot', command.data.id, command.data.avatar) })
         break
       case 'update-bot':
-        activeControl.updateBot(command.data)
+        activeControl.updateBot(command.data.avatar === undefined ? command.data : { ...command.data, avatar: await activeControl.importAvatar('bot', command.data.id, command.data.avatar) })
         break
       case 'delete-bot':
         activeControl.deleteBot(command.data)
         break
       case 'create-group':
-        activeControl.createGroup(command.data)
+        activeControl.createGroup({ ...command.data, avatar: await activeControl.importAvatar('group', command.data.id, command.data.avatar) })
         break
       case 'update-group':
-        activeControl.updateGroup(command.data)
+        activeControl.updateGroup(command.data.avatar === undefined ? command.data : { ...command.data, avatar: await activeControl.importAvatar('group', command.data.id, command.data.avatar) })
         break
       case 'delete-group':
         activeControl.deleteGroup(command.data)
@@ -297,7 +297,7 @@ declare module '@koishijs/console' {
     'onebot-sandbox/media-content'(input: SpaceScoped<GetMediaContentInput>): SandboxMediaContent
     'onebot-sandbox/set-group-announcement'(input: SpaceScoped<SetGroupAnnouncementInput>): SandboxWorkspaceState
     'onebot-sandbox/delete-group-announcement'(input: SpaceScoped<DeleteGroupAnnouncementInput>): SandboxWorkspaceState
-    'onebot-sandbox/manage-environment'(input: SpaceScoped<ManageSandboxEnvironmentInput>): SandboxWorkspaceState
+    'onebot-sandbox/manage-environment'(input: SpaceScoped<ManageSandboxEnvironmentInput>): Promise<SandboxWorkspaceState>
     'onebot-sandbox/friend-action'(input: SpaceScoped<PerformFriendActionInput>): Promise<SandboxWorkspaceState>
     'onebot-sandbox/group-action'(input: SpaceScoped<PerformGroupActionInput>): Promise<SandboxWorkspaceState>
     'onebot-sandbox/bot-deliveries'(input?: SpaceScoped<GetSandboxBotDeliveriesInput>): SandboxBotDelivery[]

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { basename, resolve } from 'node:path'
-import { mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import type { SandboxMedia, SandboxMediaContent, SandboxMediaType } from './types'
 
 export const MAX_MEDIA_SIZE = 10 * 1024 * 1024
@@ -63,8 +63,7 @@ export class SandboxMediaStorage {
     if (content.length > MAX_MEDIA_SIZE) throw new Error('媒体大小不能超过 10 MB')
 
     const id = randomUUID().replaceAll('-', '')
-    writeFileSync(this.getPath(id), content, { flag: 'wx' })
-    return {
+    const media: SandboxMedia = {
       id,
       type,
       name,
@@ -72,6 +71,9 @@ export class SandboxMediaStorage {
       size: content.length,
       reference: `sandbox-media://${id}`,
     }
+    writeFileSync(this.getPath(id), content, { flag: 'wx' })
+    writeFileSync(this.getMetadataPath(id), `${JSON.stringify(media)}\n`, { flag: 'wx' })
+    return media
   }
 
   read(media: SandboxMedia): SandboxMediaContent {
@@ -87,10 +89,26 @@ export class SandboxMediaStorage {
     }
   }
 
+  readById(id: string): SandboxMediaContent {
+    let media: SandboxMedia
+    try {
+      media = JSON.parse(readFileSync(this.getMetadataPath(id), 'utf8')) as SandboxMedia
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new Error(`媒体文件不存在：${id}`)
+      throw error
+    }
+    return this.read(media)
+  }
+
+  exists(id: string): boolean {
+    return existsSync(this.getPath(id)) && existsSync(this.getMetadataPath(id))
+  }
+
   remove(media: SandboxMedia): void {
     this.validateReference(media)
     try {
       unlinkSync(this.getPath(media.id))
+      rmSync(this.getMetadataPath(media.id), { force: true })
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
     }
@@ -99,6 +117,10 @@ export class SandboxMediaStorage {
   private getPath(id: string): string {
     if (!/^[a-f0-9]{32}$/.test(id)) throw new Error(`无效媒体标识：${id}`)
     return resolve(this.directory, id)
+  }
+
+  private getMetadataPath(id: string): string {
+    return `${this.getPath(id)}.meta.json`
   }
 
   private validateReference(media: SandboxMedia): void {

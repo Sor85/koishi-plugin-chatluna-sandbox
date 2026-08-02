@@ -257,18 +257,18 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     })
 
     await bot.internal._request('set_qq_profile', { nickname: '新 Koishi' })
-    await bot.internal._request('set_qq_avatar', { file: 'https://example.com/koishi.png' })
+    await bot.internal._request('set_qq_avatar', { file: `data:image/png;base64,${Buffer.from('koishi-avatar').toString('base64')}` })
 
     expect(control.getSnapshot().participants.find(({ id }) => id === '20001')).toMatchObject({
       kind: 'bot',
       id: '20001',
       name: '新 Koishi',
-      avatar: 'https://example.com/koishi.png',
+      avatar: expect.stringMatching(/^sandbox-media:\/\//),
     })
     expect(bot.user).toMatchObject({
       id: '20001',
       name: '新 Koishi',
-      avatar: 'https://example.com/koishi.png',
+      avatar: expect.stringMatching(/^sandbox-media:\/\//),
     })
 
     control.updateBot({ id: '20001', name: '新 Koishi', implementation: 'napcat', enabled: false })

@@ -23,11 +23,11 @@ describe('AI 测试空间 Console 适配器', () => {
 
     expect(listeners.get('onebot-sandbox/test-spaces')?.()).toMatchObject([{ id: space.id, status: 'running' }])
     expect(listeners.get('onebot-sandbox/workspace')?.({ spaceId: space.id }).snapshot.participants).toEqual([])
-    expect(() => listeners.get('onebot-sandbox/manage-environment')?.({ spaceId: space.id, action: 'create-user', data: { id: '11001', name: '用户' } })).toThrow('请先接管测试空间')
+    await expect(listeners.get('onebot-sandbox/manage-environment')?.({ spaceId: space.id, action: 'create-user', data: { id: '11001', name: '用户' } })).rejects.toThrow('请先接管测试空间')
 
     listeners.get('onebot-sandbox/take-over-test-space')?.({ spaceId: space.id })
-    const workspace = listeners.get('onebot-sandbox/manage-environment')?.({ spaceId: space.id, action: 'create-user', data: { id: '11001', name: '用户' } })
-    expect(workspace.snapshot.participants).toContainEqual({ kind: 'user', id: '11001', name: '用户' })
+    const workspace = await listeners.get('onebot-sandbox/manage-environment')?.({ spaceId: space.id, action: 'create-user', data: { id: '11001', name: '用户' } })
+    expect(workspace.snapshot.participants).toContainEqual(expect.objectContaining({ kind: 'user', id: '11001', name: '用户' }))
     listeners.get('onebot-sandbox/return-test-space')?.({ spaceId: space.id })
     expect(spaces.getSpace(space.id).status).toBe('running')
 

@@ -119,6 +119,7 @@ export interface SandboxGroupAnnouncement {  id: string
 export interface SandboxGroup {
   id: string
   name: string
+  avatar?: string
   members: SandboxGroupMember[]
   announcements: SandboxGroupAnnouncement[]
 }
@@ -126,6 +127,7 @@ export interface SandboxGroup {
 export interface CreateSandboxGroupInput {
   id: string
   name: string
+  avatar?: string
   members: SandboxGroupMember[]
 }
 

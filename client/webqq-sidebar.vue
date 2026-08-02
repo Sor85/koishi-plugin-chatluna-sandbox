@@ -110,7 +110,7 @@
                   :class="{ 'is-active': group.conversationId && group.conversationId === activeConversationId }"
                   @click="group.conversationId && selectConversation(group.conversationId)"
                 >
-                  <WebqqAvatar class="webqq-avatar webqq-avatar-bot" kind="group" :name="group.name" />
+                  <WebqqAvatar class="webqq-avatar webqq-avatar-bot" kind="group" :name="group.name" :avatar="group.avatar" />
                   <span class="webqq-session-copy">
                     <strong>{{ group.name }}</strong>
                     <small>

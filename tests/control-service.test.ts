@@ -214,7 +214,7 @@ describe('模拟 QQ 环境消息闭环', () => {
       conversationId: 'private:10001:20001',
       media: [{ fileName: '待清理图片.png', mimeType: 'image/png', dataBase64: Buffer.from('orphan-image').toString('base64') }],
     })
-    expect(await readdir(mediaDirectory)).toHaveLength(1)
+    expect(await readdir(mediaDirectory)).toHaveLength(2)
     control.deleteUser({ id: '10001' })
     expect(await readdir(mediaDirectory)).toEqual([])
 
@@ -223,7 +223,7 @@ describe('模拟 QQ 环境消息闭环', () => {
       conversationId: 'private:10002:20001',
       media: [{ fileName: '重启前图片.png', mimeType: 'image/png', dataBase64: Buffer.from('restart-image').toString('base64') }],
     })
-    expect(await readdir(mediaDirectory)).toHaveLength(1)
+    expect(await readdir(mediaDirectory)).toHaveLength(2)
 
     const restartedApp = new App()
     restartedApp.plugin((ctx) => {

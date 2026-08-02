@@ -31,4 +31,16 @@ describe('WebQQ 共享头像', () => {
     expect(notificationSource).toContain('<WebqqAvatar')
     expect(environmentSource.match(/<WebqqAvatar/g)).toHaveLength(3)
   })
+
+  it('把 sandbox-media 头像引用解析为可显示的 data URL', () => {
+    const shellSource = readFileSync(resolve('client/webqq/workspace-shell.ts'), 'utf8')
+    const sidebarSource = readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
+    expect(shellSource).toContain('resolveAvatar(reference')
+    expect(shellSource).toContain('snapshot.value.participants.map(({ avatar }) => avatar)')
+    expect(shellSource).toContain('data:${content.mimeType};base64,${content.dataBase64}')
+    expect(shellSource).toContain('avatar: resolveAvatar(entry.avatar)')
+    expect(shellSource).toContain('avatar: resolveAvatar(group.avatar)')
+    expect(shellSource).toContain('const environmentModel = computed(() => ({')
+    expect(sidebarSource).toContain(':avatar="group.avatar"')
+  })
 })

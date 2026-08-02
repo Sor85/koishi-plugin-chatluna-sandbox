@@ -2,7 +2,7 @@ import { Context, h, Random, Universal } from 'koishi'
 import { resolve } from 'node:path'
 import { SandboxBot } from './bot'
 import { SandboxChatLunaStateStore } from './chatluna-state'
-import { SandboxMediaStorage } from './media-storage'
+import { SandboxMediaStorage, MAX_MEDIA_SIZE } from './media-storage'
 import { SandboxOneBotDebugStore, type AppendOneBotDebugRecordInput } from './onebot-debug'
 import { toOneBotMessageSegments, toOneBotRawMessage } from './onebot-message'
 import type { SandboxScenePersistence } from './persistence'
@@ -210,7 +210,9 @@ export class SandboxControlService {
       const scene = await this.persistence.load()
       if (scene) {
         this.scene = structuredClone(scene)
+        const normalized = await this.normalizePersistedAvatars()
         this.syncRuntimeBots()
+        if (normalized) await this.persistence.save(this.getSnapshot())
       } else {
         // 数据库读取失败时场景会回到默认值，旧媒体已失去引用，必须同步清理以避免跨重启孤儿文件。
         if (!this.persistence.getStatus().available) this.mediaStorage.clear()
@@ -287,6 +289,55 @@ export class SandboxControlService {
 
   storeMedia(input: { fileName: string; mimeType: string; dataBase64: string }): SandboxMedia {
     return this.mediaStorage.save(input)
+  }
+
+  async importAvatar(kind: 'user' | 'bot' | 'group', entityId: string, input?: string): Promise<string | undefined> {
+    const value = input?.trim()
+    if (!value) return
+    if (value.startsWith('sandbox-media://')) return this.requireManagedAvatar(value)
+    const dataUrl = value.match(/^data:([^;,]+);base64,(.+)$/s)
+    if (dataUrl) return this.saveAvatar(`${kind}-${entityId}-avatar`, dataUrl[1], dataUrl[2])
+    if (value.startsWith('base64://')) return this.saveAvatar(`${kind}-${entityId}-avatar.png`, 'image/png', value.slice(9))
+    let url: URL
+    try {
+      url = new URL(value)
+    } catch {
+      throw new Error('头像必须是受管媒体引用、Data URL、base64:// 或 HTTP(S) URL')
+    }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('头像 URL 仅支持 HTTP(S)')
+    const response = await fetch(url, { signal: AbortSignal.timeout(10_000) })
+    if (!response.ok) throw new Error(`头像下载失败：HTTP ${response.status}`)
+    const contentLength = Number(response.headers.get('content-length'))
+    if (Number.isFinite(contentLength) && contentLength > MAX_MEDIA_SIZE) {
+      throw new Error('头像大小不能超过 10 MB')
+    }
+    const mimeType = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() ?? ''
+    const content = Buffer.from(await response.arrayBuffer())
+    if (content.length > MAX_MEDIA_SIZE) throw new Error('头像大小不能超过 10 MB')
+    return this.saveAvatar(`${kind}-${entityId}-avatar`, mimeType, content.toString('base64'))
+  }
+
+  private saveAvatar(fileName: string, mimeType: string, dataBase64: string): string {
+    if (!mimeType.startsWith('image/')) throw new Error(`头像必须是图片：${mimeType || '未知类型'}`)
+    return this.mediaStorage.save({ fileName, mimeType, dataBase64 }).reference
+  }
+
+  private requireManagedAvatar(reference: string): string {
+    const match = reference.match(/^sandbox-media:\/\/([a-f0-9]{32})$/)
+    if (!match || !this.mediaStorage.exists(match[1])) throw new Error(`头像媒体不存在：${reference}`)
+    const media = this.mediaStorage.readById(match[1])
+    if (media.type !== 'image') throw new Error('头像媒体必须是图片')
+    return reference
+  }
+
+  private normalizeLocalAvatar(kind: 'user' | 'bot' | 'group', entityId: string, input?: string): string | undefined {
+    const value = input?.trim()
+    if (!value) return
+    if (value.startsWith('sandbox-media://')) return this.requireManagedAvatar(value)
+    const dataUrl = value.match(/^data:([^;,]+);base64,(.+)$/s)
+    if (dataUrl) return this.saveAvatar(`${kind}-${entityId}-avatar`, dataUrl[1], dataUrl[2])
+    if (value.startsWith('base64://')) return this.saveAvatar(`${kind}-${entityId}-avatar.png`, 'image/png', value.slice(9))
+    throw new Error('外部头像 URL 需要先通过 importAvatar 导入受管媒体')
   }
 
   storeMediaBatch(inputs: Array<{ fileName: string; mimeType: string; dataBase64: string }>): SandboxMedia[] {
@@ -450,11 +501,12 @@ export class SandboxControlService {
     }
 
     const profile = normalizeAccountProfile(input.profile)
+    const avatar = this.normalizeLocalAvatar('user', id, input.avatar)
     this.scene.participants.push({
       kind: 'user',
       id,
       name,
-      ...(input.avatar?.trim() ? { avatar: input.avatar.trim() } : {}),
+      ...(avatar ? { avatar } : {}),
       ...(profile ? { profile } : {}),
     })
     // 环境管理属于测试前置配置，可静默建立关系；WebQQ 用户操作仍必须走好友申请审批。
@@ -465,14 +517,18 @@ export class SandboxControlService {
   updateUser(input: UpdateSandboxUserInput): void {
     const user = this.getUsers().find(({ id }) => id === input.id)
     if (!user) throw new Error(`用户不存在：${input.id}`)
-    user.name = this.validateName(input.name, '用户昵称')
-    if (input.avatar !== undefined) user.avatar = input.avatar.trim() || undefined
-    // 环境管理按提交体整体替换可选资料，避免残留未声明字段掩盖缺失语义。
-    if (input.profile !== undefined) {
-      const profile = normalizeAccountProfile(input.profile)
-      if (profile) user.profile = profile
-      else delete user.profile
-    }
+    const name = this.validateName(input.name, '用户昵称')
+    const avatar = input.avatar !== undefined
+      ? this.normalizeLocalAvatar('user', user.id, input.avatar)
+      : user.avatar
+    let profile = user.profile
+    // 头像导入可能失败，先完成所有校验和媒体写入，再修改场景，避免后续成功操作持久化半成品。
+    if (input.profile !== undefined) profile = normalizeAccountProfile(input.profile)
+    user.name = name
+    if (avatar) user.avatar = avatar
+    else delete user.avatar
+    if (profile) user.profile = profile
+    else delete user.profile
     this.commitSceneMutation()
   }
 
@@ -508,11 +564,12 @@ export class SandboxControlService {
 
     const disabledCapabilities = normalizeDisabledCapabilities(input.implementation, input.disabledCapabilities)
     const profile = normalizeAccountProfile(input.profile)
+    const avatar = this.normalizeLocalAvatar('bot', id, input.avatar)
     this.scene.participants.push({
       kind: 'bot',
       id,
       name,
-      avatar: input.avatar?.trim() || undefined,
+      avatar,
       implementation: input.implementation,
       enabled: input.enabled,
       ...(disabledCapabilities ? { disabledCapabilities } : {}),
@@ -521,7 +578,7 @@ export class SandboxControlService {
     this.createRuntimeBot({
       selfId: id,
       name,
-      avatar: input.avatar?.trim() || undefined,
+      avatar,
       implementation: input.implementation,
       disabledCapabilities,
     })
@@ -534,18 +591,22 @@ export class SandboxControlService {
   updateBot(input: UpdateSandboxBotInput): void {
     const bot = this.getBots().find(({ id }) => id === input.id)
     if (!bot) throw new Error(`机器人不存在：${input.id}`)
-    bot.name = this.validateName(input.name, '机器人昵称')
-    if (input.avatar !== undefined) bot.avatar = input.avatar.trim() || undefined
+    const name = this.validateName(input.name, '机器人昵称')
+    const avatar = input.avatar !== undefined
+      ? this.normalizeLocalAvatar('bot', bot.id, input.avatar)
+      : bot.avatar
     const disabledCapabilities = normalizeDisabledCapabilities(input.implementation, input.disabledCapabilities)
+    let profile = bot.profile
+    if (input.profile !== undefined) profile = normalizeAccountProfile(input.profile)
+    bot.name = name
+    if (avatar) bot.avatar = avatar
+    else delete bot.avatar
     bot.implementation = input.implementation
     bot.enabled = input.enabled
     if (disabledCapabilities) bot.disabledCapabilities = disabledCapabilities
     else delete bot.disabledCapabilities
-    if (input.profile !== undefined) {
-      const profile = normalizeAccountProfile(input.profile)
-      if (profile) bot.profile = profile
-      else delete bot.profile
-    }
+    if (profile) bot.profile = profile
+    else delete bot.profile
     const runtime = this.runtimeBots.get(bot.id)
     if (runtime) {
       runtime.user = { id: bot.id, name: bot.name, avatar: bot.avatar }
@@ -555,7 +616,7 @@ export class SandboxControlService {
     this.commitSceneMutation()
   }
 
-  updateBotSelfProfile(botId: string, input: {
+  async updateBotSelfProfile(botId: string, input: {
     name?: string
     avatar?: string
     personalNote?: string
@@ -563,14 +624,19 @@ export class SandboxControlService {
   }) {
     const bot = this.getBots().find(({ id }) => id === botId)
     if (!bot) throw new Error(`机器人不存在：${botId}`)
-    if (input.name !== undefined) bot.name = this.validateName(input.name, '机器人昵称')
-    if (input.avatar !== undefined) bot.avatar = input.avatar.trim() || undefined
-    if (input.personalNote !== undefined || input.sex !== undefined) {
-      bot.profile = mergeAccountProfile(bot.profile, {
+    const name = input.name !== undefined ? this.validateName(input.name, '机器人昵称') : bot.name
+    const avatar = input.avatar !== undefined ? await this.importAvatar('bot', bot.id, input.avatar) : bot.avatar
+    const profile = input.personalNote !== undefined || input.sex !== undefined
+      ? mergeAccountProfile(bot.profile, {
         ...(input.personalNote !== undefined ? { personalNote: input.personalNote } : {}),
         ...(input.sex !== undefined ? { sex: input.sex } : {}),
       })
-    }
+      : bot.profile
+    bot.name = name
+    if (avatar) bot.avatar = avatar
+    else delete bot.avatar
+    if (profile) bot.profile = profile
+    else delete bot.profile
     const runtime = this.getRuntimeBot(botId)
     runtime.user = { id: bot.id, name: bot.name, avatar: bot.avatar }
     this.commitSceneMutation()
@@ -613,6 +679,7 @@ export class SandboxControlService {
     this.scene.groups.push({
       id,
       name: this.validateName(input.name, '群名称'),
+      avatar: this.normalizeLocalAvatar('group', id, input.avatar),
       members,
       announcements: [],
     })
@@ -623,8 +690,15 @@ export class SandboxControlService {
   updateGroup(input: UpdateSandboxGroupInput): void {
     const group = this.scene.groups.find(({ id }) => id === input.id)
     if (!group) throw new Error(`群组不存在：${input.id}`)
-    group.name = this.validateName(input.name, '群名称')
-    group.members = this.validateGroupMembers(input.members)
+    const name = this.validateName(input.name, '群名称')
+    const avatar = input.avatar !== undefined
+      ? this.normalizeLocalAvatar('group', group.id, input.avatar)
+      : group.avatar
+    const members = this.validateGroupMembers(input.members)
+    group.name = name
+    if (avatar) group.avatar = avatar
+    else delete group.avatar
+    group.members = members
     this.syncGroupConversations(group.id)
     this.commitSceneMutation()
   }
@@ -1131,8 +1205,11 @@ export class SandboxControlService {
       .filter(({ conversationId }) => visibleConversationIds.has(conversationId))
       .flatMap(({ media }) => media ?? [])
       .find(({ id }) => id === input.mediaId)
-    if (!media) throw new Error(`媒体不存在或不可见：${input.mediaId}`)
-    return this.mediaStorage.read(media)
+    if (media) return this.mediaStorage.read(media)
+    const avatarReference = [...this.scene.participants.map(({ avatar }) => avatar), ...this.scene.groups.map(({ avatar }) => avatar)]
+      .find((reference) => reference === `sandbox-media://${input.mediaId}`)
+    if (!avatarReference) throw new Error(`媒体不存在或不可见：${input.mediaId}`)
+    return this.mediaStorage.readById(input.mediaId)
   }
 
   private async dispatchMessageToBots(
@@ -1435,6 +1512,33 @@ export class SandboxControlService {
       this.commitSceneMutation()
       return
     }
+  }
+
+  private async normalizePersistedAvatars(): Promise<boolean> {
+    let changed = false
+    for (const participant of this.scene.participants) {
+      const previous = participant.avatar
+      if (!previous || previous.startsWith('sandbox-media://')) continue
+      try {
+        participant.avatar = await this.importAvatar(participant.kind, participant.id, previous)
+      } catch (error) {
+        this.ctx.logger('onebot-sandbox').warn(`参与者头像规范化失败，已清除旧值：${participant.id}`, error)
+        delete participant.avatar
+      }
+      changed = true
+    }
+    for (const group of this.scene.groups) {
+      const previous = group.avatar
+      if (!previous || previous.startsWith('sandbox-media://')) continue
+      try {
+        group.avatar = await this.importAvatar('group', group.id, previous)
+      } catch (error) {
+        this.ctx.logger('onebot-sandbox').warn(`群头像规范化失败，已清除旧值：${group.id}`, error)
+        delete group.avatar
+      }
+      changed = true
+    }
+    return changed
   }
 
   private commitSceneMutation(): void {

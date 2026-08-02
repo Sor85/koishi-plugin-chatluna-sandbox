@@ -81,7 +81,7 @@ export function createWebqqWorkspaceShell(
     return snapshot.value.messages.filter(({ id }) => ids.has(id))
   })
   const participants = computed(() => Object.fromEntries(snapshot.value.participants
-    .map(({ id, name, avatar, kind }) => [id, { name, avatar, isBot: kind === 'bot' }])))
+    .map(({ id, name, avatar, kind }) => [id, { name, avatar: resolveAvatar(avatar), isBot: kind === 'bot' }])))
   const friendMenuStates = computed<Record<string, FriendMenuState>>(() => {
     const actorId = currentOperatorId.value
     if (!actorId) return {}
@@ -106,7 +106,7 @@ export function createWebqqWorkspaceShell(
     currentGroup: currentGroup.value,
     currentOperatorId: currentOperatorId.value,
     title: currentConversationTitle.value,
-    avatar: currentGroup.value ? '' : currentPeer.value?.avatar ?? '',
+    avatar: resolveAvatar(currentGroup.value?.avatar ?? currentPeer.value?.avatar),
     avatarKind: currentGroup.value ? 'group' : currentBot.value ? 'bot' : 'user',
     hasMoreMessages: !!currentConversation.value?.hasMoreMessages,
     mediaSources: mediaSources.value,
@@ -127,7 +127,7 @@ export function createWebqqWorkspaceShell(
     conversationId: currentConversation.value?.id,
     title: currentConversationTitle.value,
     subtitle: currentConversationSubtitle.value,
-    avatar: currentGroup.value ? '' : currentPeer.value?.avatar ?? '',
+    avatar: resolveAvatar(currentGroup.value?.avatar ?? currentPeer.value?.avatar),
     avatarKind: currentGroup.value ? 'group' : currentBot.value ? 'bot' : 'user',
     profileParticipantId: currentGroup.value ? undefined : currentPeer.value?.id,
     profileGroupId: currentGroup.value?.id,
@@ -151,7 +151,7 @@ export function createWebqqWorkspaceShell(
     privateParticipant: currentPeer.value ? {
       id: currentPeer.value.id,
       name: currentPeer.value.name,
-      avatar: currentPeer.value.avatar,
+      avatar: resolveAvatar(currentPeer.value.avatar),
       isBot: !!currentBot.value,
       personalNote: currentPeer.value.profile?.personalNote,
     } : undefined,
@@ -185,7 +185,7 @@ export function createWebqqWorkspaceShell(
       id: conversation.id,
       groupId: group?.id,
       title: group?.name ?? peer?.name ?? conversation.id,
-      avatar: group ? undefined : peer?.avatar,
+      avatar: resolveAvatar(group?.avatar ?? peer?.avatar),
       avatarKind: group ? 'group' as const : bot ? 'bot' as const : 'user' as const,
       preview: latestPreview,
       time: latestMessage?.createdAt
@@ -204,11 +204,17 @@ export function createWebqqWorkspaceShell(
     activeConversationId: activeConversationId.value,
     currentGroupId: currentGroup.value?.id,
     currentGroupMemberIds: currentGroup.value?.members.map(({ participantId }) => participantId) ?? [],
-    currentOperator: currentOperator.value,
-    bots: bots.value,
+    currentOperator: currentOperator.value ? { ...currentOperator.value, avatar: resolveAvatar(currentOperator.value.avatar) } : undefined,
+    bots: bots.value.map((bot) => ({ ...bot, avatar: resolveAvatar(bot.avatar) })),
     conversations: sidebarConversations.value,
-    friends: getFriendDirectory(snapshot.value, currentOperatorId.value),
-    groups: getGroupDirectory(snapshot.value, currentOperatorId.value),
+    friends: getFriendDirectory(snapshot.value, currentOperatorId.value).map((entry) => ({
+      ...entry,
+      avatar: resolveAvatar(entry.avatar),
+    })),
+    groups: getGroupDirectory(snapshot.value, currentOperatorId.value).map((group) => ({
+      ...group,
+      avatar: resolveAvatar(group.avatar),
+    })),
     notificationRequests: getIncomingNotificationRequests(snapshot.value, currentOperatorId.value),
     participants: participants.value,
     groupNames: Object.fromEntries(snapshot.value.groups.map(({ id, name }) => [id, name])),
@@ -219,7 +225,17 @@ export function createWebqqWorkspaceShell(
     groups: snapshot.value.groups,
     accentColor: appearance.value.webQQAccentColor,
   }))
-  const environmentModel = computed(() => snapshot.value)
+  const environmentModel = computed(() => ({
+    ...snapshot.value,
+    participants: snapshot.value.participants.map((participant) => ({
+      ...participant,
+      avatar: resolveAvatar(participant.avatar),
+    })),
+    groups: snapshot.value.groups.map((group) => ({
+      ...group,
+      avatar: resolveAvatar(group.avatar),
+    })),
+  }))
   const debugWorkspaceModel = computed(() => ({
     records: workspaceController.oneBotDebugRecords.value,
     loading: debugLoading.value,
@@ -233,7 +249,12 @@ export function createWebqqWorkspaceShell(
   })
 
   watch(
-    () => [currentOperatorId.value, ...messages.value.flatMap(({ media }) => media?.map(({ id }) => id) ?? [])].join(':'),
+    () => [
+      currentOperatorId.value,
+      ...messages.value.flatMap(({ media }) => media?.map(({ id }) => id) ?? []),
+      ...snapshot.value.participants.map(({ avatar }) => avatar ?? ''),
+      ...snapshot.value.groups.map(({ avatar }) => avatar ?? ''),
+    ].join(':'),
     () => void loadVisibleMedia(),
     { immediate: true },
   )
@@ -394,12 +415,15 @@ export function createWebqqWorkspaceShell(
       viewerId: currentOperatorId.value,
       groupId: currentGroup.value?.id,
     })
-    if (card) getOverlayHost()?.openProfile(card)
+    if (card) getOverlayHost()?.openProfile({ ...card, avatar: resolveAvatar(card.avatar) })
   }
 
   function openGroupProfile(groupId: string) {
     const group = snapshot.value.groups.find(({ id }) => id === groupId)
-    if (group) getOverlayHost()?.openProfile(buildGroupProfileCardModel(group))
+    if (group) {
+      const card = buildGroupProfileCardModel(group)
+      getOverlayHost()?.openProfile({ ...card, avatar: resolveAvatar(card.avatar) })
+    }
   }
 
   function selectConversation(conversationId: string) {
@@ -447,17 +471,25 @@ export function createWebqqWorkspaceShell(
     return bots.value.find(({ id }) => id === botId)
   }
 
+  function resolveAvatar(reference?: string) {
+    const id = reference?.match(/^sandbox-media:\/\/([a-f0-9]{32})$/)?.[1]
+    return id ? mediaSources.value[id] ?? '' : reference ?? ''
+  }
+
   async function loadVisibleMedia() {
     if (!currentOperatorId.value) return
-    const missingMedia = messages.value.flatMap(({ media }) => media ?? []).filter(({ id }) => !mediaSources.value[id])
-    await Promise.all(missingMedia.map(async (media) => {
+    const messageIds = messages.value.flatMap(({ media }) => media?.map(({ id }) => id) ?? [])
+    const avatarIds = [...snapshot.value.participants.map(({ avatar }) => avatar), ...snapshot.value.groups.map(({ avatar }) => avatar)]
+      .flatMap((reference) => reference?.match(/^sandbox-media:\/\/([a-f0-9]{32})$/)?.[1] ?? [])
+    const missingIds = [...new Set([...messageIds, ...avatarIds])].filter((id) => !mediaSources.value[id])
+    await Promise.all(missingIds.map(async (mediaId) => {
       try {
-        const content = await workspaceController.getMediaContent(media.id)
-        mediaSources.value = { ...mediaSources.value, [media.id]: `data:${content.mimeType};base64,${content.dataBase64}` }
-        const { [media.id]: _, ...remainingFailures } = mediaLoadFailures.value
+        const content = await workspaceController.getMediaContent(mediaId)
+        mediaSources.value = { ...mediaSources.value, [mediaId]: `data:${content.mimeType};base64,${content.dataBase64}` }
+        const { [mediaId]: _, ...remainingFailures } = mediaLoadFailures.value
         mediaLoadFailures.value = remainingFailures
       } catch {
-        mediaLoadFailures.value = { ...mediaLoadFailures.value, [media.id]: true }
+        mediaLoadFailures.value = { ...mediaLoadFailures.value, [mediaId]: true }
       }
     }))
   }

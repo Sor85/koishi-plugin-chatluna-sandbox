@@ -60,7 +60,7 @@ describe('沙盒场景持久化', () => {
       conversationId: 'private:10001:20001',
       media: [{ fileName: 'memory.png', mimeType: 'image/png', dataBase64: Buffer.from('memory').toString('base64') }],
     })
-    expect(await readdir(mediaDirectory)).toHaveLength(1)
+    expect(await readdir(mediaDirectory)).toHaveLength(2)
     expect(first.getSnapshot().participants.some(({ id }) => id === '10099')).toBe(true)
     expect(first.getPersistenceStatus()).toEqual({
       mode: 'memory',
@@ -80,7 +80,7 @@ describe('沙盒场景持久化', () => {
     const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-database-media-'))
     temporaryDirectories.push(mediaDirectory)
     const { app: firstApp, control: first } = await createControl(persistence, mediaDirectory)
-    first.createUser({ id: '10099', name: '持久用户' })
+    first.createUser({ id: '10099', name: '持久用户', avatar: `data:image/png;base64,${Buffer.from('persistent-avatar').toString('base64')}` })
     first.createBot({
       id: '20099',
       name: '持久机器人',
@@ -113,7 +113,10 @@ describe('沙盒场景持久化', () => {
     await firstApp.stop()
 
     const { control: second } = await createControl(persistence, mediaDirectory)
-    expect(second.getSnapshot().participants).toContainEqual({ kind: 'user', id: '10099', name: '持久用户' })
+    expect(second.getSnapshot().participants).toContainEqual(expect.objectContaining({ kind: 'user', id: '10099', name: '持久用户', avatar: expect.stringMatching(/^sandbox-media:\/\//) }))
+    const restoredAvatar = second.getSnapshot().participants.find(({ id }) => id === '10099')!.avatar!
+    expect(second.getMediaContent({ operatorId: '10099', mediaId: restoredAvatar.slice('sandbox-media://'.length) }).dataBase64)
+      .toBe(Buffer.from('persistent-avatar').toString('base64'))
     expect(second.getSnapshot().participants).toContainEqual({
       kind: 'bot',
       id: '20099',

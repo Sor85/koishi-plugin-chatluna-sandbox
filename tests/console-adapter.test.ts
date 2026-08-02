@@ -222,11 +222,11 @@ describe('Koishi 控制台适配器', () => {
     expect(removed.snapshot.groups[0].announcements.some(({ content }: { content: string }) => content === '控制台发布的公告')).toBe(false)
 
     const middlewareCallsBeforeManage = middlewareCalls
-    const managed = manageEnvironmentListener({
+    const managed = await manageEnvironmentListener({
       action: 'create-user',
       data: { id: '10099', name: '控制台用户' },
     })
-    expect(managed.snapshot.participants).toContainEqual({ kind: 'user', id: '10099', name: '控制台用户' })
+    expect(managed.snapshot.participants).toContainEqual(expect.objectContaining({ kind: 'user', id: '10099', name: '控制台用户' }))
     expect(middlewareCalls).toBe(middlewareCallsBeforeManage)
 
     const friendWorkspace = await friendActionListener({
@@ -256,7 +256,7 @@ describe('Koishi 控制台适配器', () => {
       : []))
     expect(['10001', '10002', '10003'].every((userId) => botConversationUserIds.has(userId))).toBe(true)
 
-    const afterCurrentUserDeleted = manageEnvironmentListener({
+    const afterCurrentUserDeleted = await manageEnvironmentListener({
       action: 'delete-user',
       data: { id: '10001' },
     })
@@ -275,11 +275,11 @@ describe('Koishi 控制台适配器', () => {
       conversationId: 'private:10002:20001',
       content: '伪造发送者',
     })).rejects.toThrow('不支持旧 RPC 字段：senderId')
-    expect(() => manageEnvironmentListener({
+    await expect(manageEnvironmentListener({
       operatorId: '10002',
       action: 'create-user',
       data: { id: '10100', name: '不应创建' },
-    })).toThrow('环境管理不接受操作者字段：operatorId')
+    })).rejects.toThrow('环境管理不接受操作者字段：operatorId')
     expect(control.getSnapshot().participants.some(({ id }) => id === '10100')).toBe(false)
   })
 })

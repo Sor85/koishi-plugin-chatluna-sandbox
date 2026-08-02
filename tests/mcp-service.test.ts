@@ -338,7 +338,7 @@ describe('SandboxMcpService', () => {
       expectedRevision: created.revision,
       changes: [{
         action: 'create-bot',
-        data: { id: '21001', name: '被测机器人', implementation: 'llbot', enabled: false, avatar: 'https://example.com/a.png', disabledCapabilities: ['set_qq_profile'] },
+        data: { id: '21001', name: '被测机器人', implementation: 'llbot', enabled: false, avatar: `data:image/png;base64,${Buffer.from('avatar-a').toString('base64')}`, disabledCapabilities: ['set_qq_profile'] },
       }],
     })
     const control = testSpaces.getControl(created.spaceId)
@@ -354,7 +354,7 @@ describe('SandboxMcpService', () => {
       name: 'koishi',
       implementation: 'llbot',
       enabled: false,
-      avatar: 'https://example.com/a.png',
+      avatar: expect.stringMatching(/^sandbox-media:\/\//),
       disabledCapabilities: ['set_qq_profile'],
     })
 

@@ -70,6 +70,7 @@ export function buildGroupProfileCardModel(group: SandboxGroup): ProfileCardMode
   return {
     participantId: group.id,
     name: group.name,
+    ...(group.avatar ? { avatar: group.avatar } : {}),
     avatarKind: 'group',
     identityLabel: '群号',
     fields: [
