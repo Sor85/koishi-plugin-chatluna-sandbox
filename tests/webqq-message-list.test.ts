@@ -138,6 +138,9 @@ describe('WebQQ 消息列表', () => {
     expect(source).toContain('shouldRenderAsEvent(message)')
     expect(source).toContain("{ 'is-recalled': isRecalledMessage(message) }")
     expect(source).toContain('shouldShowThinking(message)')
+    expect(source).toContain('class="webqq-message-recalled-label">已撤回</span>')
+    expect(source).toContain('v-if="!isRecalledMessage(message)" @select="emit(\'reply\', message.id)"')
+    expect(source).toContain('as-child :disabled="isRecalledMessage(message)"')
     expect(source).toContain('formatRecalledMessageEventText')
     expect(source).toContain('isRecalledMessage(message)')
     // 关闭配置时隐藏原文与思考；开启时保留气泡并弱化。
@@ -145,7 +148,13 @@ describe('WebQQ 消息列表', () => {
     expect(styles).toContain('.webqq-message-row.is-recalled')
     expect(styles).toContain('.webqq-message-row.is-recalled .webqq-message-text')
     expect(styles).toContain('text-decoration-line: line-through')
-    expect(styles).not.toContain('.webqq-message-media::after')
+    expect(styles).toContain('.webqq-message-row.is-recalled .webqq-message-media audio')
+    const mediaRecallLine = styles.slice(
+      styles.indexOf('.webqq-message-row.is-recalled .webqq-message-media::after'),
+      styles.indexOf('.webqq-message-recalled-label'),
+    )
+    expect(mediaRecallLine).toContain('pointer-events: none')
+    expect(styles).toContain('.webqq-message-recalled-label')
     expect(styles).toContain('.webqq-thinking-row.is-recalled')
     expect(shellSource).toContain('markRecalledMessages: appearance.value.webQQMarkRecalledMessages')
   })

@@ -33,7 +33,7 @@
   margin-bottom: 0;
 }
 
-/* 撤回只弱化气泡内容；删除线精确落在文字节点，携带的图片和文件不画横线。 */
+/* 撤回只弱化气泡内容；文字和媒体分别覆盖撤回线，避免媒体仍被误认成可操作内容。 */
 .webqq-message-row.is-recalled .webqq-message-bubble,
 .webqq-thinking-row.is-recalled {
   opacity: 0.62;
@@ -46,10 +46,39 @@
 }
 
 .webqq-message-row.is-recalled .webqq-message-media img,
+.webqq-message-row.is-recalled .webqq-message-media audio,
 .webqq-message-row.is-recalled .webqq-message-media video,
 .webqq-message-row.is-recalled .webqq-message-file {
   opacity: 0.72;
   filter: grayscale(0.15);
+}
+
+.webqq-message-row.is-recalled .webqq-message-media {
+  position: relative;
+}
+
+.webqq-message-row.is-recalled .webqq-message-media::after {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: currentColor;
+  content: "";
+  opacity: 0.72;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.webqq-message-recalled-label {
+  align-self: flex-end;
+  color: var(--webqq-muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.webqq-message-row.is-outgoing .webqq-message-recalled-label {
+  color: rgb(255 255 255 / 78%);
 }
 
 .webqq-message-row {

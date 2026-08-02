@@ -12,7 +12,7 @@ describe('插件持久化配置', () => {
     expect(Config.dict.persistenceMode.meta.description).toBe('模拟 QQ 环境状态存储方式')
     expect(Config.dict.webQQTimBubbleTail.meta.description).toBe('显示气泡小尖角')
     expect(Config.dict.webQQMarkRecalledMessages.meta.default).toBe(true)
-    expect(Config.dict.webQQMarkRecalledMessages.meta.description).toBe('撤回后保留原气泡并显示删除线；关闭后隐藏原消息并显示撤回事件')
+    expect(Config.dict.webQQMarkRecalledMessages.meta.description).toBe('仅影响 WebQQ 展示：开启时保留撤回气泡并显示撤回线，关闭时只显示撤回事件')
     expect(Config.dict.webQQChatStyle).toBeUndefined()
   })
 })

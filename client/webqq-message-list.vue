@@ -14,7 +14,7 @@
       <template v-for="(message, messageIndex) in model.messages" :key="message.id">
         <li v-if="shouldRenderAsEvent(message)" class="webqq-message-event">{{ getEventMessageText(message) }}</li>
         <ContextMenu v-else>
-          <ContextMenuTrigger as-child>
+          <ContextMenuTrigger as-child :disabled="isRecalledMessage(message)">
             <li
               class="webqq-message-row"
               :class="[
@@ -106,6 +106,7 @@
                         <span v-else class="webqq-message-media-loading">{{ model.mediaLoadFailures[media.id] ? '媒体不可用' : '媒体加载中...' }}</span>
                       </div>
                       <span v-if="getMessageText(message)" class="webqq-message-text">{{ getMessageText(message) }}</span>
+                      <span v-if="isRecalledMessage(message)" class="webqq-message-recalled-label">已撤回</span>
                       <WebqqMessageReactions
                         v-if="message.reactions?.length"
                         :reactions="message.reactions"
@@ -122,7 +123,7 @@
             </li>
           </ContextMenuTrigger>
           <ContextMenuContent style="z-index: 140">
-            <ContextMenuItem @select="emit('reply', message.id)"><IconMessageReply :size="16" aria-hidden="true" /> 回复</ContextMenuItem>
+            <ContextMenuItem v-if="!isRecalledMessage(message)" @select="emit('reply', message.id)"><IconMessageReply :size="16" aria-hidden="true" /> 回复</ContextMenuItem>
             <ContextMenuItem v-if="canReactToMessage(message)" @select="emit('openReactionPicker', message.id)">
               <IconMoodSmile :size="16" aria-hidden="true" /> 贴表情
             </ContextMenuItem>
