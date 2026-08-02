@@ -85,7 +85,7 @@ describe('消息表情回应', () => {
     ])
   })
 
-  it('私聊与群聊共用表情回应事实', async () => {
+  it('领域层允许私聊回应写入，WebQQ 主动入口另由群消息限制', async () => {
     const { control } = await createControl()
     const sent = await control.sendMessage({
       operatorId: '10001',
@@ -93,6 +93,7 @@ describe('消息表情回应', () => {
       content: '私聊目标',
     })
 
+    // 协议/领域仍可写入私聊回应事实；WebQQ 不提供私聊“贴表情”入口。
     await control.setMessageReaction({
       operatorId: '10001',
       messageId: sent.messageId,

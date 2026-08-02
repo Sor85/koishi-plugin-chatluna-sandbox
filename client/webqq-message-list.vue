@@ -447,13 +447,19 @@ function canRecallMessage(message: SandboxMessage) {
   return target.role !== 'owner' && !(actor.role === 'admin' && target.role === 'admin')
 }
 
-// 私聊和群聊都可主动回应；撤回消息只读展示已有回应。
+// 主动贴表情仅限群消息；私聊不展示入口。撤回消息只读展示已有回应。
 function canReactToMessage(message: SandboxMessage) {
-  return !message.event && !isRecalledMessage(message) && !!props.model.currentOperatorId
+  return !!props.model.currentGroup
+    && !message.event
+    && !isRecalledMessage(message)
+    && !!props.model.currentOperatorId
 }
 
 function isReactionReadonly(message: SandboxMessage) {
-  return !!message.event || isRecalledMessage(message) || !props.model.currentOperatorId
+  return !props.model.currentGroup
+    || !!message.event
+    || isRecalledMessage(message)
+    || !props.model.currentOperatorId
 }
 
 function toggleReaction(message: SandboxMessage, emojiId: string) {

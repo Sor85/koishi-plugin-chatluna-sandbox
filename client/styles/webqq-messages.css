@@ -738,6 +738,10 @@
   cursor: pointer;
 }
 
+.webqq-message-reaction.is-mine {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--webqq-accent) 45%, transparent);
+}
+
 .webqq-message-reaction:disabled,
 .webqq-message-reaction.is-readonly {
   cursor: default;
@@ -802,6 +806,15 @@
 .webqq-message-reaction-label {
   font-size: 12px;
   line-height: 18px;
+}
+
+.webqq-message-reaction-total {
+  min-width: 1em;
+  padding-right: 4px;
+  color: var(--webqq-text);
+  font-size: 12px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
 }
 
 .webqq-emoji-picker {

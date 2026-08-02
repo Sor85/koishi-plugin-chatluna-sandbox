@@ -19,11 +19,11 @@
       <span v-else class="webqq-message-reaction-label">{{ getFace(reaction.emojiId)?.label ?? reaction.emojiId }}</span>
       <span v-if="reaction.participantIds.length" class="webqq-message-reaction-users">
         <span
-          v-for="(participantId, userIndex) in reaction.participantIds"
+          v-for="(participantId, userIndex) in visibleParticipants(reaction)"
           :key="participantId"
           class="webqq-message-reaction-avatar"
           :title="getParticipantName(participantId)"
-          :style="{ zIndex: reaction.participantIds.length - userIndex }"
+          :style="{ zIndex: visibleParticipants(reaction).length - userIndex }"
         >
           <WebqqAvatar
             class="webqq-message-reaction-avatar-image"
@@ -34,6 +34,7 @@
           />
         </span>
       </span>
+      <span class="webqq-message-reaction-total" aria-hidden="true">{{ reaction.participantIds.length }}</span>
     </button>
   </div>
 </template>
@@ -58,8 +59,15 @@ function getFace(emojiId: string) {
   return getSandboxEmojiFace(emojiId)
 }
 
+const MAX_VISIBLE_REACTION_AVATARS = 3
+
 function isMine(reaction: SandboxMessageReaction) {
   return !!props.currentOperatorId && reaction.participantIds.includes(props.currentOperatorId)
+}
+
+// TIM 风格 chip 只叠少量头像，总人数用数字单独展示，避免窄屏被长列表撑破。
+function visibleParticipants(reaction: SandboxMessageReaction) {
+  return reaction.participantIds.slice(0, MAX_VISIBLE_REACTION_AVATARS)
 }
 
 function getParticipantName(id: string) {
