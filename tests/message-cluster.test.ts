@@ -64,7 +64,7 @@ describe('TIM 消息簇', () => {
       .toEqual(['', '', ''])
   })
 
-  it('撤回消息会中断连续消息合并', () => {
+  it('撤回消息继续参与连续消息合并，避免重复头像', () => {
     const recalled: SandboxMessage = {
       ...message('recalled', '20001', '原文仍在'),
       lifecycle: { status: 'recalled', operatorId: '20001', recalledAt: '2026-08-02T00:00:00.000Z' },
@@ -72,6 +72,8 @@ describe('TIM 消息簇', () => {
     const messages = [message('1', '20001'), recalled, message('2', '20001')]
 
     expect(messages.map((_, index) => getMessageClusterClass(messages, index, '10001')))
-      .toEqual(['', '', ''])
+      .toEqual(['is-cluster-first', 'is-cluster-middle', 'is-cluster-last'])
+    expect(messages.map((_, index) => isMergedMessage(messages, index, '10001')))
+      .toEqual([false, true, true])
   })
 })

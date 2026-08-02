@@ -44,52 +44,49 @@
       </DialogFooter>
     </DialogContent>
   </Dialog>
-  <Dialog v-model:open="profileOpen">
-    <DialogContent :style="{ '--webqq-accent': accentColor }" class="webqq-profile-card-dialog">
-      <DialogHeader>
-        <DialogTitle>个人信息卡</DialogTitle>
-        <DialogDescription>只读观察场景中已有资料，字段按所属范围分组。</DialogDescription>
-      </DialogHeader>
-      <div v-if="profileCard" class="webqq-profile-card">
-        <div class="webqq-profile-card-hero">
-          <WebqqAvatar
-            class="webqq-avatar webqq-avatar-profile"
-            :kind="profileCard.isBot ? 'bot' : 'user'"
-            :name="profileCard.name"
-            :avatar="profileCard.avatar"
-            :show-bot-badge="profileCard.isBot"
-          />
-          <div>
-            <h2>{{ profileCard.name }}</h2>
-            <p>{{ profileCard.participantId }}</p>
-            <p v-if="profileCard.personalNote" class="webqq-profile-card-note">{{ profileCard.personalNote }}</p>
-          </div>
+  <section
+    v-if="profileOpen && profileCard"
+    ref="profilePanelRef"
+    class="webqq-secondary-page webqq-profile-card-page"
+    :style="{ '--webqq-accent': accentColor, ...profilePanelStyle }"
+    aria-label="查看资料"
+  >
+    <header class="webqq-secondary-page-header">
+      <strong>查看资料</strong>
+    </header>
+    <div class="webqq-profile-card">
+      <div class="webqq-profile-card-hero">
+        <WebqqAvatar
+          class="webqq-avatar webqq-avatar-profile"
+          :kind="profileCard.avatarKind"
+          :name="profileCard.name"
+          :avatar="profileCard.avatar"
+          :show-bot-badge="profileCard.avatarKind === 'bot'"
+        />
+        <div>
+          <h2>{{ profileCard.name }}</h2>
+          <p>{{ profileCard.identityLabel }} {{ profileCard.participantId }}</p>
         </div>
-        <section v-for="section in profileSections" :key="section.scope" class="webqq-profile-card-section">
-          <h3>{{ section.title }}</h3>
-          <dl>
-            <div v-for="field in section.fields" :key="`${field.scope}:${field.label}`">
-              <dt>{{ field.label }}</dt>
-              <dd>{{ field.value }}</dd>
-            </div>
-          </dl>
-        </section>
       </div>
-      <DialogFooter>
-        <Button variant="outline" @click="profileOpen = false">关闭</Button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
+      <dl class="webqq-profile-card-fields">
+        <div v-for="field in profileCard.fields" :key="field.label">
+          <dt>{{ field.label }}</dt>
+          <dd>{{ field.value }}</dd>
+        </div>
+      </dl>
+    </div>
+  </section>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Button } from './components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './components/ui/dialog'
 import { Input } from './components/ui/input'
 import EnvironmentEntityDialog from './environment-entity-dialog.vue'
 import WebqqAvatar from './webqq-avatar.vue'
-import type { ProfileCardField, ProfileCardModel, ProfileCardScope } from './webqq/profile-card'
+import { getFloatingPanelStyle } from './webqq/floating-panel'
+import type { ProfileCardModel } from './webqq/profile-card'
 import type {
   ManageSandboxEnvironmentInput,
   SandboxBotProfile,
@@ -135,21 +132,8 @@ const groupActionInput = ref('')
 const groupActionCopy = computed(() => GROUP_ACTION_COPY[groupActionMode.value])
 const profileOpen = ref(false)
 const profileCard = ref<ProfileCardModel>()
-const PROFILE_SECTION_TITLES: Record<ProfileCardScope, string> = {
-  account: '账号资料',
-  friend: '好友关系资料',
-  'group-member': '群成员资料',
-  'bot-runtime': '机器人运行资料',
-}
-const profileSections = computed(() => {
-  const fields = profileCard.value?.fields ?? []
-  const scopes: ProfileCardScope[] = ['account', 'friend', 'group-member', 'bot-runtime']
-  return scopes.flatMap((scope) => {
-    const sectionFields = fields.filter((field) => field.scope === scope)
-    if (!sectionFields.length) return []
-    return [{ scope, title: PROFILE_SECTION_TITLES[scope], fields: sectionFields as ProfileCardField[] }]
-  })
-})
+const profilePanelRef = ref<HTMLElement>()
+const profilePanelStyle = ref<Record<string, string>>({})
 
 function openEntity(mode: EntityMode, target: { type: EntityType, id: string }) {
   entityMode.value = mode
@@ -177,8 +161,17 @@ function openGroupAction(mode: GroupActionMode, targetId: string, groupId: strin
 
 function openProfile(card: ProfileCardModel) {
   profileCard.value = card
+  profilePanelStyle.value = getFloatingPanelStyle({ width: 320, height: 360 })
   profileOpen.value = true
 }
+
+function closeProfileOnOutsidePointer(event: PointerEvent) {
+  if (!profileOpen.value || profilePanelRef.value?.contains(event.target as Node)) return
+  profileOpen.value = false
+}
+
+onMounted(() => document.addEventListener('pointerdown', closeProfileOnOutsidePointer))
+onBeforeUnmount(() => document.removeEventListener('pointerdown', closeProfileOnOutsidePointer))
 
 async function submitRemark() {
   if (!remarkTargetId.value) return

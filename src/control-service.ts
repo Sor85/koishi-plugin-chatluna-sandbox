@@ -1282,7 +1282,7 @@ export class SandboxControlService {
     if (!conversation || !this.isConversationVisible(input.operatorId, conversation)) {
       throw new Error(`消息不存在：${input.messageId}`)
     }
-    if (conversation.type !== 'group') throw new Error('私聊消息不支持表情回应')
+    // 私聊和群聊共用回应事实；会话可见性已在上方统一校验。
     // 撤回后保留历史回应，但禁止继续新增或取消，避免把历史事实改写成当前操作。
     if (isRecalledMessage(message)) throw new Error('已撤回消息不支持修改表情回应')
     // 与撤回一致地覆盖同一广播组，避免同一条逻辑消息的副本之间回应不一致。

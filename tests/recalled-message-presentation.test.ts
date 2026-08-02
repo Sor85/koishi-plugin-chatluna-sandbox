@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { App, Universal } from '@koishijs/core'
@@ -10,16 +10,20 @@ import { getOneBotMessageSequence } from '../src/onebot-profiles'
 import { isRecalledMessage } from '../src/types'
 
 const runningApps: App[] = []
+const temporaryDirectories: string[] = []
 
 afterEach(async () => {
   await Promise.all(runningApps.splice(0).map((app) => app.stop()))
+  for (const directory of temporaryDirectories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
 
 async function createControl() {
   const app = new App()
+  const mediaDirectory = mkdtempSync(join(tmpdir(), 'onebot-sandbox-recall-media-'))
+  temporaryDirectories.push(mediaDirectory)
   let control: SandboxControlService | undefined
   app.plugin((ctx) => {
-    control = new SandboxControlService(ctx)
+    control = new SandboxControlService(ctx, { mediaDirectory })
   })
   runningApps.push(app)
   await app.start()
@@ -128,6 +132,7 @@ describe('撤回消息生命周期与呈现', () => {
   it('撤回发出 message.recalled 与 scene.changed，且不销毁场景数据', async () => {
     const { control } = await createControl()
     const directory = mkdtempSync(join(tmpdir(), 'onebot-sandbox-recall-mcp-'))
+    temporaryDirectories.push(directory)
     const mcp = new SandboxMcpService(control, { dataDirectory: directory })
     const credential = mcp.createCredential('撤回事件', ['read', 'interact'])
     const cursor = mcp.currentCursor()

@@ -39,9 +39,9 @@ describe('环境管理组件传输边界', () => {
     expect(overlaySource).not.toContain('SandboxSnapshot')
     expect(overlaySource).not.toContain('snapshot')
     expect(overlaySource).toContain('<EnvironmentEntityDialog')
-    expect(overlaySource).toContain('<Dialog v-model:open="profileOpen">')
-    expect(overlaySource).toContain('<DialogTitle>个人信息卡</DialogTitle>')
-    expect(overlaySource.match(/<Dialog /g)).toHaveLength(3)
+    expect(overlaySource).toContain('class="webqq-secondary-page webqq-profile-card-page"')
+    expect(overlaySource).not.toContain('<Dialog v-model:open="profileOpen">')
+    expect(overlaySource.match(/<Dialog /g)).toHaveLength(2)
   })
 
   it('机器人编辑 Dialog 使用 shadcn-vue 能力覆盖控件', () => {
@@ -77,8 +77,8 @@ describe('环境管理组件传输边界', () => {
     expect(entityDialog).toContain('<DialogHeader>')
     expect(entityDialog).toContain('<DialogFooter>')
     expect(entityDialog).toContain('class="webqq-secondary-form"')
-    expect(overlayHost.match(/<DialogHeader>/g)).toHaveLength(3)
-    expect(overlayHost.match(/<DialogFooter>/g)).toHaveLength(3)
+    expect(overlayHost.match(/<DialogHeader>/g)).toHaveLength(2)
+    expect(overlayHost.match(/<DialogFooter>/g)).toHaveLength(2)
     expect(createPopover).toContain('<form class="webqq-secondary-form"')
   })
 

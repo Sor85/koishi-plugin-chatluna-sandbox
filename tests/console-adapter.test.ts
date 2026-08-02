@@ -1,9 +1,9 @@
 import { App, Universal } from '@koishijs/core'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, mkdir, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { registerConsole, type SandboxConsoleRegistrar } from '../src/console'
+import { registerConsole, resolveConsoleEntry, type SandboxConsoleRegistrar } from '../src/console'
 import { SandboxControlService } from '../src/control-service'
 import type { SandboxAppearance } from '../src/types'
 
@@ -24,6 +24,19 @@ afterEach(async () => {
 })
 
 describe('Koishi 控制台适配器', () => {
+  it('本地软链接安装时保留 node_modules 资源路径', async () => {
+    const workspace = await mkdtemp(join(tmpdir(), 'onebot-sandbox-console-entry-'))
+    temporaryDirectories.push(workspace)
+    const packageDirectory = join(workspace, 'node_modules', 'koishi-plugin-onebot-sandbox')
+    await mkdir(join(workspace, 'node_modules'), { recursive: true })
+    await symlink(resolve('.'), packageDirectory)
+
+    expect(resolveConsoleEntry(workspace)).toEqual({
+      dev: join(packageDirectory, 'client/index.ts'),
+      prod: join(packageDirectory, 'dist'),
+    })
+  })
+
   it('注册 Vue 页面入口并通过共享服务返回消息闭环结果', async () => {
     const app = new App()
     const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-console-media-'))

@@ -34,10 +34,6 @@
           />
         </span>
       </span>
-      <span
-        v-if="reaction.participantIds.length > 1"
-        class="webqq-message-reaction-count"
-      >{{ reaction.participantIds.length }}</span>
     </button>
   </div>
 </template>

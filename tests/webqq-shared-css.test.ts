@@ -23,7 +23,22 @@ describe('WebQQ 共享样式', () => {
     expect(workspace).toContain('.webqq-workspace.is-standalone-view')
     expect(primitives).toContain('[data-webqq-scrollbar="true"]')
     expect(primitives).toContain('.webqq-avatar-bot-badge')
+    const scrollbarRule = primitives.slice(primitives.indexOf('.webqq-scrollbar-overlay {')).split('}')[0]
+    expect(scrollbarRule).toContain('z-index: 100')
+    expect(scrollbarRule).not.toContain('z-index: 10001')
     expect(overlays).toContain('--webqq-secondary-row-gap: 8px')
+    expect(overlays).toContain('.webqq-secondary-page')
+    const secondaryPageRule = overlays.slice(overlays.indexOf('.webqq-secondary-page {')).split('}')[0]
+    expect(secondaryPageRule).toContain('position: fixed')
+    expect(secondaryPageRule).toContain('width: 380px')
+    expect(secondaryPageRule).not.toContain('inset: 0')
+    const profilePageRule = overlays.slice(overlays.indexOf('.webqq-profile-card-page {')).split('}')[0]
+    expect(profilePageRule).toContain('width: max-content')
+    expect(profilePageRule).toContain('max-width: min(320px')
+    const profileFieldsRule = overlays.slice(overlays.indexOf('.webqq-profile-card-fields {')).split('}')[0]
+    expect(profileFieldsRule).not.toContain('border')
+    const profileValueRule = overlays.slice(overlays.indexOf('.webqq-profile-card-fields dd {')).split('}')[0]
+    expect(profileValueRule).toContain('text-align: left')
     expect(overlays).toContain('.webqq-secondary-form')
     expect(overlays).toContain('.webqq-secondary-field')
     expect(entry).not.toContain('.webqq-scrollbar-overlay {')

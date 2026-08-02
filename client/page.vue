@@ -13,6 +13,7 @@
         :data-color-mode="resolvedColorMode"
         :data-mobile-view="currentView"
         :style="{ '--webqq-accent': appearance.webQQAccentColor }"
+        @contextmenu.capture="rememberFloatingPanelAnchor"
       >
         <WebqqSidebar
           :model="sidebarModel"
@@ -74,6 +75,7 @@
           @transfer-group-owner="transferGroupOwner"
           @kick-group-member="kickGroupMember"
           @open-profile="openProfile"
+          @open-group-profile="openGroupProfile"
         />
 
         <WebqqDetailsPanel
@@ -123,6 +125,7 @@ import WebqqDetailsPanel from './webqq-details-panel.vue'
 import WebqqSidebar from './webqq-sidebar.vue'
 import WorkspaceOverlayHost from './workspace-overlay-host.vue'
 import { useResolvedColorMode } from './webqq/color-scheme'
+import { rememberFloatingPanelAnchor } from './webqq/floating-panel'
 import { createKoishiWorkspacePort } from './webqq/koishi-workspace-port'
 import { createSceneMutationSync } from './webqq/scene-sync'
 import { createWorkspaceController } from './webqq/workspace-controller'
@@ -155,6 +158,7 @@ const {
   openComposerParticipantDialog,
   openEntityDialog,
   openGroupActionDialog,
+  openGroupProfile,
   openProfile,
   openRemarkDialog,
   overlayModel,

@@ -6,14 +6,18 @@
         <IconChevronLeft :size="22" aria-hidden="true" />
       </button>
       <div class="webqq-chat-title">
-        <ContextMenu v-if="model.profileParticipantId">
+        <ContextMenu v-if="model.profileParticipantId || model.profileGroupId">
           <ContextMenuTrigger as-child>
             <button type="button" class="webqq-chat-title-avatar" :aria-label="`查看 ${model.title} 的资料`">
               <WebqqAvatar class="webqq-avatar" :kind="model.avatarKind" :name="model.title" :avatar="model.avatar" />
             </button>
           </ContextMenuTrigger>
           <ContextMenuContent style="z-index: 140">
-            <ContextMenuItem @select="emit('openProfile', model.profileParticipantId!)">
+            <ContextMenuItem
+              @select="model.profileGroupId
+                ? emit('openGroupProfile', model.profileGroupId!)
+                : emit('openProfile', model.profileParticipantId!)"
+            >
               <IconId :size="16" aria-hidden="true" /> 查看资料
             </ContextMenuItem>
           </ContextMenuContent>
@@ -34,6 +38,7 @@
       @reply="replyingToMessageId = $event"
       @recall-message="emit('recallMessage', $event)"
       @set-message-reaction="forwardSetMessageReaction"
+      @open-reaction-picker="openReactionPicker"
       @load-history="forwardLoadHistory"
       @request-friend="emit('requestFriend', $event)"
       @poke-friend="emit('pokeFriend', $event)"
@@ -47,6 +52,8 @@
       @kick-group-member="emit('kickGroupMember', $event)"
       @open-profile="emit('openProfile', $event)"
     />
+
+    <WebqqEmojiPicker v-model:open="reactionPickerOpen" @select="selectReaction" />
 
     <WebqqComposer
       :model="composerModel"
@@ -67,6 +74,7 @@ import { computed, ref, watch } from 'vue'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from './components/ui/context-menu'
 import WebqqAvatar from './webqq-avatar.vue'
 import WebqqComposer, { type WebqqComposerModel, type WebqqComposerSendIntent } from './webqq-composer.vue'
+import WebqqEmojiPicker from './webqq-emoji-picker.vue'
 import WebqqMessageList, { type WebqqMessageListModel } from './webqq-message-list.vue'
 import type { ManageSandboxEnvironmentInput } from '../src/types'
 
@@ -77,6 +85,7 @@ export interface WebqqChatPaneModel {
   avatar: string
   avatarKind: 'user' | 'bot' | 'group'
   profileParticipantId?: string
+  profileGroupId?: string
   detailsVisible: boolean
   participantNames: Record<string, string>
   messageList: WebqqMessageListModel
@@ -106,9 +115,17 @@ const emit = defineEmits<{
   transferGroupOwner: [targetId: string]
   kickGroupMember: [targetId: string]
   openProfile: [participantId: string]
+  openGroupProfile: [groupId: string]
 }>()
 
 const replyingToMessageId = ref('')
+const reactionPickerMessageId = ref('')
+const reactionPickerOpen = computed({
+  get: () => !!reactionPickerMessageId.value,
+  set: (open: boolean) => {
+    if (!open) reactionPickerMessageId.value = ''
+  },
+})
 const composerSpace = ref(0)
 const replyingToMessage = computed(() => props.model.messageList.messages.find(({ id }) => id === replyingToMessageId.value))
 const composerModel = computed<WebqqComposerModel>(() => ({
@@ -124,6 +141,7 @@ const composerModel = computed<WebqqComposerModel>(() => ({
 
 watch(() => props.model.conversationId, () => {
   replyingToMessageId.value = ''
+  reactionPickerMessageId.value = ''
 })
 
 function forwardSend(input: WebqqComposerSendIntent, resolve: () => void, reject: (error: unknown) => void) {
@@ -144,6 +162,17 @@ function forwardLoadHistory(resolve: () => void, reject: (error: unknown) => voi
 
 function forwardSetMessageReaction(messageId: string, emojiId: string, enabled: boolean) {
   emit('setMessageReaction', messageId, emojiId, enabled)
+}
+
+function openReactionPicker(messageId: string) {
+  reactionPickerMessageId.value = messageId
+}
+
+function selectReaction(emojiId: string) {
+  const messageId = reactionPickerMessageId.value
+  if (!messageId) return
+  emit('setMessageReaction', messageId, emojiId, true)
+  reactionPickerMessageId.value = ''
 }
 
 function forwardSetGroupAdmin(targetId: string, enabled: boolean) {

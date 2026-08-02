@@ -85,7 +85,7 @@ describe('消息表情回应', () => {
     ])
   })
 
-  it('私聊不支持表情回应', async () => {
+  it('私聊与群聊共用表情回应事实', async () => {
     const { control } = await createControl()
     const sent = await control.sendMessage({
       operatorId: '10001',
@@ -93,12 +93,15 @@ describe('消息表情回应', () => {
       content: '私聊目标',
     })
 
-    await expect(control.setMessageReaction({
+    await control.setMessageReaction({
       operatorId: '10001',
       messageId: sent.messageId,
       emojiId: '76',
       enabled: true,
-    })).rejects.toThrow('私聊消息不支持表情回应')
+    })
+    expect(control.getSnapshot().messages.find(({ id }) => id === sent.messageId)?.reactions).toEqual([
+      { emojiId: '76', participantIds: ['10001'] },
+    ])
   })
 
   it('撤回后保留已有回应但禁止新增或取消', async () => {

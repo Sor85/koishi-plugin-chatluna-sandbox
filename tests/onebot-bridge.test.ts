@@ -301,6 +301,12 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
       retcode: 0,
       data: [{ group_id: 30001, group_name: '测试群', member_count: 4, max_member_count: 4 }],
     })
+    await expect(bot.internal.getGroupInfo('group:30001')).resolves.toEqual({
+      group_id: 30001,
+      group_name: '测试群',
+      member_count: 4,
+      max_member_count: 4,
+    })
     await expect(bot.internal._request('get_group_member_info', { group_id: 30001, user_id: 10002 })).resolves.toMatchObject({
       status: 'ok',
       retcode: 0,

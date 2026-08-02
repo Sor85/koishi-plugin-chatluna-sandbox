@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type {} from '@koishijs/console'
 import type { SandboxControlService } from './control-service'
@@ -83,6 +84,19 @@ function assertEnvironmentInput(input: ManageSandboxEnvironmentInput): ManageSan
   return input
 }
 
+export function resolveConsoleEntry(workspace = process.cwd()): { dev: string; prod: string } {
+  const installedRoot = resolve(workspace, 'node_modules/koishi-plugin-onebot-sandbox')
+  // 本地软链接会让 __dirname 指向仓库真实路径，Koishi Console 因路径不含 node_modules 而拒绝资源。
+  // 优先保留工作区内的安装入口，使安全检查看到合法包路径；普通安装和测试仍回退到模块目录。
+  const packageRoot = existsSync(resolve(installedRoot, 'package.json'))
+    ? installedRoot
+    : resolve(__dirname, '..')
+  return {
+    dev: resolve(packageRoot, 'client/index.ts'),
+    prod: resolve(packageRoot, 'dist'),
+  }
+}
+
 export interface SandboxConsoleRegistrar {
   addEntry(entry: { dev: string; prod: string }): unknown
   addListener<Event extends keyof ConsoleEventMap>(
@@ -100,10 +114,7 @@ export function registerConsole(
   mcp?: SandboxMcpService,
   testSpaces?: SandboxTestSpaceService,
 ) {
-  console.addEntry({
-    dev: resolve(__dirname, '../client/index.ts'),
-    prod: resolve(__dirname, '../dist'),
-  })
+  console.addEntry(resolveConsoleEntry())
 
   // 场景变更实时广播给 WebQQ：发送消息不再等待机器人处理完成，机器人回复靠此通知前端刷新。
   control.onSceneMutation(({ revision }) => {

@@ -95,6 +95,7 @@
     justify-self: stretch;
   }
 
+
   /* 兜底：1180 断点的 is-details-open 放行规则特异度更高，非消息视图下会让详情栏
      在两栏网格里长出隐式第三列，这里显式压回去。 */
   .webqq-workspace.is-details-open:not([data-mobile-view="messages"]) .webqq-profile {

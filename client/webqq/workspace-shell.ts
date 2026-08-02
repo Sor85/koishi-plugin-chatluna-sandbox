@@ -16,7 +16,7 @@ import type { SandboxWorkspaceView } from './workspace-state'
 import type { FriendMenuState } from './friend-menu'
 import { formatMentionContent } from './mention'
 import { getIncomingNotificationRequests } from './notification-requests'
-import { buildProfileCardModel } from './profile-card'
+import { buildGroupProfileCardModel, buildProfileCardModel } from './profile-card'
 import { getConversationPeerId, getFriendDirectory, getGroupDirectory, getVisibleRecentConversations } from './relationship-directory'
 import type { createWorkspaceController } from './workspace-controller'
 import type { createWorkspaceLayout } from './workspace-layout'
@@ -130,6 +130,7 @@ export function createWebqqWorkspaceShell(
     avatar: currentGroup.value ? '' : currentPeer.value?.avatar ?? '',
     avatarKind: currentGroup.value ? 'group' : currentBot.value ? 'bot' : 'user',
     profileParticipantId: currentGroup.value ? undefined : currentPeer.value?.id,
+    profileGroupId: currentGroup.value?.id,
     detailsVisible: detailsVisible.value,
     participantNames: participantNames.value,
     messageList: messageListModel.value,
@@ -396,6 +397,11 @@ export function createWebqqWorkspaceShell(
     if (card) getOverlayHost()?.openProfile(card)
   }
 
+  function openGroupProfile(groupId: string) {
+    const group = snapshot.value.groups.find(({ id }) => id === groupId)
+    if (group) getOverlayHost()?.openProfile(buildGroupProfileCardModel(group))
+  }
+
   function selectConversation(conversationId: string) {
     workspaceController.selectConversation(conversationId)
   }
@@ -548,6 +554,7 @@ export function createWebqqWorkspaceShell(
     openComposerParticipantDialog,
     openEntityDialog,
     openGroupActionDialog,
+    openGroupProfile,
     openProfile,
     openRemarkDialog,
     overlayModel,

@@ -105,16 +105,16 @@
                         </a>
                         <span v-else class="webqq-message-media-loading">{{ model.mediaLoadFailures[media.id] ? '媒体不可用' : '媒体加载中...' }}</span>
                       </div>
-                      <span v-if="getMessageText(message)">{{ getMessageText(message) }}</span>
+                      <span v-if="getMessageText(message)" class="webqq-message-text">{{ getMessageText(message) }}</span>
+                      <WebqqMessageReactions
+                        v-if="message.reactions?.length"
+                        :reactions="message.reactions"
+                        :current-operator-id="model.currentOperatorId"
+                        :participants="model.participants"
+                        :readonly="isReactionReadonly(message)"
+                        @toggle="toggleReaction(message, $event)"
+                      />
                     </div>
-                    <WebqqMessageReactions
-                      v-if="message.reactions?.length"
-                      :reactions="message.reactions"
-                      :current-operator-id="model.currentOperatorId"
-                      :participants="model.participants"
-                      :readonly="isReactionReadonly(message)"
-                      @toggle="toggleReaction(message, $event)"
-                    />
                   </div>
                   <time class="webqq-message-time">{{ formatMessageTime(message.createdAt) }}</time>
                 </div>
@@ -123,7 +123,7 @@
           </ContextMenuTrigger>
           <ContextMenuContent style="z-index: 140">
             <ContextMenuItem @select="emit('reply', message.id)"><IconMessageReply :size="16" aria-hidden="true" /> 回复</ContextMenuItem>
-            <ContextMenuItem v-if="canReactToMessage(message)" @select="openEmojiPicker(message.id)">
+            <ContextMenuItem v-if="canReactToMessage(message)" @select="emit('openReactionPicker', message.id)">
               <IconMoodSmile :size="16" aria-hidden="true" /> 贴表情
             </ContextMenuItem>
             <ContextMenuItem v-if="canRecallMessage(message)" class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="emit('recallMessage', message.id)">
@@ -241,7 +241,6 @@
         </div>
       </li>
     </ol>
-    <WebqqEmojiPicker v-model:open="emojiPickerOpen" @select="selectEmoji" />
   </section>
 </template>
 
@@ -255,7 +254,6 @@ import GroupMemberMenu from './group-member-menu.vue'
 import { getMessageClusterClass, isMergedMessage } from './webqq/message-cluster'
 import { formatMentionContent } from './webqq/mention'
 import WebqqAvatar from './webqq-avatar.vue'
-import WebqqEmojiPicker from './webqq-emoji-picker.vue'
 import WebqqMessageReactions from './webqq-message-reactions.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import {
@@ -298,6 +296,7 @@ const emit = defineEmits<{
   reply: [messageId: string]
   recallMessage: [messageId: string]
   setMessageReaction: [messageId: string, emojiId: string, enabled: boolean]
+  openReactionPicker: [messageId: string]
   loadHistory: [resolve: () => void, reject: (error: unknown) => void]
   requestFriend: [targetId: string]
   pokeFriend: [targetId: string]
@@ -316,8 +315,6 @@ const emit = defineEmits<{
 const historyLoading = ref(false)
 const highlightedMessageId = ref('')
 const expandedThinking = ref<Record<string, true>>({})
-const emojiPickerOpen = ref(false)
-const emojiPickerMessageId = ref('')
 const participantNames = computed(() => Object.fromEntries(
   Object.entries(props.model.participants).map(([id, participant]) => [id, participant.name]),
 ))
@@ -450,25 +447,13 @@ function canRecallMessage(message: SandboxMessage) {
   return target.role !== 'owner' && !(actor.role === 'admin' && target.role === 'admin')
 }
 
-// 私聊不提供主动入口；撤回消息只读展示已有回应。
+// 私聊和群聊都可主动回应；撤回消息只读展示已有回应。
 function canReactToMessage(message: SandboxMessage) {
-  return !!props.model.currentGroup && !message.event && !isRecalledMessage(message) && !!props.model.currentOperatorId
+  return !message.event && !isRecalledMessage(message) && !!props.model.currentOperatorId
 }
 
 function isReactionReadonly(message: SandboxMessage) {
-  return !!message.event || isRecalledMessage(message) || !props.model.currentGroup || !props.model.currentOperatorId
-}
-
-function openEmojiPicker(messageId: string) {
-  emojiPickerMessageId.value = messageId
-  emojiPickerOpen.value = true
-}
-
-function selectEmoji(emojiId: string) {
-  const messageId = emojiPickerMessageId.value
-  if (!messageId) return
-  emit('setMessageReaction', messageId, emojiId, true)
-  emojiPickerMessageId.value = ''
+  return !!message.event || isRecalledMessage(message) || !props.model.currentOperatorId
 }
 
 function toggleReaction(message: SandboxMessage, emojiId: string) {
