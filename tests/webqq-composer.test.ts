@@ -17,6 +17,8 @@ function createDetachedTextarea() {
   } as HTMLTextAreaElement
 }
 
+const TEST_COMPOSER_ID = Symbol('composer')
+
 describe('WebQQ 发送控件', () => {
   it('以只读模型和领域事件隔离页面状态', () => {
     const composerSource = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
@@ -51,6 +53,8 @@ describe('WebQQ 发送控件', () => {
       requestOperatorId: '10001',
       activeConversationId: 'private:10001:20001',
       activeOperatorId: '10001',
+      requestComposerId: TEST_COMPOSER_ID,
+      activeComposerId: TEST_COMPOSER_ID,
       inputElement: textarea,
     })).toBe(true)
 
@@ -60,6 +64,8 @@ describe('WebQQ 发送控件', () => {
       requestOperatorId: '10001',
       activeConversationId: 'group:30001',
       activeOperatorId: '10001',
+      requestComposerId: TEST_COMPOSER_ID,
+      activeComposerId: TEST_COMPOSER_ID,
       inputElement: textarea,
     })).toBe(true)
 
@@ -69,6 +75,8 @@ describe('WebQQ 发送控件', () => {
       requestOperatorId: '10001',
       activeConversationId: 'private:10001:20001',
       activeOperatorId: '10001',
+      requestComposerId: TEST_COMPOSER_ID,
+      activeComposerId: TEST_COMPOSER_ID,
       inputElement: textarea,
     })).toBe(true)
 
@@ -78,6 +86,8 @@ describe('WebQQ 发送控件', () => {
       requestOperatorId: '10001',
       activeConversationId: 'group:30001',
       activeOperatorId: '10001',
+      requestComposerId: TEST_COMPOSER_ID,
+      activeComposerId: TEST_COMPOSER_ID,
       inputElement: textarea,
     })).toBe(false)
 
@@ -87,6 +97,19 @@ describe('WebQQ 发送控件', () => {
       requestOperatorId: '10001',
       activeConversationId: 'private:10001:20001',
       activeOperatorId: '20001',
+      requestComposerId: TEST_COMPOSER_ID,
+      activeComposerId: TEST_COMPOSER_ID,
+      inputElement: textarea,
+    })).toBe(false)
+
+    // 同一会话与操作者下，旧 composer 实例也不能抢新实例焦点。
+    expect(shouldRestoreComposerFocus({
+      requestConversationId: 'private:10001:20001',
+      requestOperatorId: '10001',
+      activeConversationId: 'private:10001:20001',
+      activeOperatorId: '10001',
+      requestComposerId: TEST_COMPOSER_ID,
+      activeComposerId: Symbol('replacement-composer'),
       inputElement: textarea,
     })).toBe(false)
 
@@ -96,6 +119,8 @@ describe('WebQQ 发送控件', () => {
       requestOperatorId: '10001',
       activeConversationId: 'private:10001:20001',
       activeOperatorId: '10001',
+      requestComposerId: TEST_COMPOSER_ID,
+      activeComposerId: TEST_COMPOSER_ID,
       inputElement: createDetachedTextarea(),
     })).toBe(false)
 
@@ -104,6 +129,8 @@ describe('WebQQ 发送控件', () => {
       requestOperatorId: '10001',
       activeConversationId: 'private:10001:20001',
       activeOperatorId: '10001',
+      requestComposerId: TEST_COMPOSER_ID,
+      activeComposerId: TEST_COMPOSER_ID,
       inputElement: null,
     })).toBe(false)
   })
@@ -116,13 +143,15 @@ describe('WebQQ 发送控件', () => {
     expect(source).toContain('shouldRestoreComposerFocus')
     expect(source).toContain('from \'./webqq/composer-focus\'')
     // 成功与失败共用 finally：先解锁，再 nextTick 后条件恢复焦点。
-    expect(source).toMatch(/finally\s*\{[\s\S]*sending\.value = false[\s\S]*await nextTick\(\)[\s\S]*shouldRestoreComposerFocus[\s\S]*focusTarget\?\.focus\(\)/)
+    expect(source).toMatch(/finally\s*\{[\s\S]*sending\.value = false[\s\S]*await nextTick\(\)[\s\S]*shouldRestoreComposerFocus[\s\S]*requestInput\?\.focus\(\)/)
     // 单请求锁：sending 为真时直接返回，不引入队列。
     expect(source).toContain('|| sending.value) return')
     expect(source).not.toMatch(/sendQueue|messageQueue|pendingSends/)
     // 发起发送时捕获原会话、原操作者和原 textarea，避免闭包读到切换后的状态。
     expect(source).toMatch(/requestConversationId|const \{[^}]*conversationId/)
-    expect(source).toContain('inputRef.value')
+    expect(source).toContain('const composerInstanceId = Symbol(\'webqq-composer\')')
+    expect(source).toContain('activeComposerInstanceId = undefined')
+    expect(source).toContain('inputElement: requestInput')
   })
 
   it('禁用的输入框、附件和发送按钮不使用 not-allowed 光标，但保留 disabled 与透明度', () => {

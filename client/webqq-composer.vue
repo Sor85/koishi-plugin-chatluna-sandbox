@@ -260,6 +260,8 @@ let suppressUserStackCollapseTimer: ReturnType<typeof setTimeout> | undefined
 let userStackOverflowMotionTimer: ReturnType<typeof setTimeout> | undefined
 let userStackLayout: AutoLayout | undefined
 let userStackTransitionUntil = 0
+const composerInstanceId = Symbol('webqq-composer')
+let activeComposerInstanceId: symbol | undefined = composerInstanceId
 
 const displayError = computed(() => localError.value || props.model.externalError || '')
 const compactUserStack = ref(false)
@@ -535,16 +537,17 @@ async function sendMessage() {
     sending.value = false
     // 等 disabled 解除后再 focus，否则浏览器会忽略对 disabled 控件的焦点请求。
     await nextTick()
-    // 优先使用仍挂载的原节点；卸载后 ref 可能已清空，需用捕获值判断 isConnected。
-    const focusTarget = inputRef.value ?? requestInput
+    // 始终使用发送开始时捕获的原节点；当前 ref 即使指向新节点，也不能代替旧 composer 恢复焦点。
     if (shouldRestoreComposerFocus({
       requestConversationId,
       requestOperatorId,
+      requestComposerId: composerInstanceId,
       activeConversationId: props.model.conversationId,
       activeOperatorId: props.model.currentOperatorId,
-      inputElement: focusTarget,
+      activeComposerId: activeComposerInstanceId,
+      inputElement: requestInput,
     })) {
-      focusTarget?.focus()
+      requestInput?.focus()
     }
   }
 }
@@ -598,6 +601,8 @@ watch(() => orderedSenders.value.length, () => {
 })
 
 onBeforeUnmount(() => {
+  // 请求可能晚于组件卸载完成；先使实例令牌失效，finally 就不会触碰旧 textarea。
+  activeComposerInstanceId = undefined
   clearSendFiles()
   composerSpaceObserver?.disconnect()
   userStackLayout?.revert()
