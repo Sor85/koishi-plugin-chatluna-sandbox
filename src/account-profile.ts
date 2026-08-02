@@ -2,7 +2,9 @@ import type {
   SandboxAccountProfile,
   SandboxAccountSex,
   SandboxGroupMember,
+  SandboxGroupRole,
   SandboxParticipant,
+  SandboxSnapshot,
 } from './types'
 
 export type SandboxAccountSexInput = SandboxAccountSex | 0 | 1 | 2 | '0' | '1' | '2'
@@ -192,4 +194,88 @@ export function parseAccountProfileFromUnknown(value: unknown): SandboxAccountPr
         ? input.vip_level
         : undefined,
   })
+}
+
+function readOptionalString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+}
+
+function readOptionalNumber(...values: unknown[]): number | undefined {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value)
+  }
+}
+
+function readOptionalBoolean(...values: unknown[]): boolean | undefined {
+  for (const value of values) {
+    if (typeof value === 'boolean') return value
+  }
+}
+
+function normalizeGroupRole(value: unknown): SandboxGroupRole | undefined {
+  if (value === 'owner' || value === 'admin' || value === 'member') return value
+}
+
+/**
+ * 归一化群成员资料。只保留已建模字段，丢弃 raw API 透传。
+ * 群名片/头衔/等级等不回写到账号全局资料。
+ */
+export function normalizeGroupMemberFromUnknown(value: unknown): SandboxGroupMember | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const input = value as Record<string, unknown>
+  const participantId = typeof input.participantId === 'string'
+    ? input.participantId
+    : typeof input.user_id === 'string' || typeof input.user_id === 'number'
+      ? String(input.user_id)
+      : undefined
+  const role = normalizeGroupRole(input.role)
+  if (!participantId || !role) return undefined
+  return {
+    participantId,
+    role,
+    card: readOptionalString(input.card),
+    title: readOptionalString(input.title),
+    mutedUntil: readOptionalString(input.mutedUntil, input.muted_until),
+    area: readOptionalString(input.area),
+    joinTime: readOptionalNumber(input.joinTime, input.join_time),
+    lastSentTime: readOptionalNumber(input.lastSentTime, input.last_sent_time),
+    level: readOptionalString(input.level),
+    unfriendly: readOptionalBoolean(input.unfriendly),
+    titleExpireTime: readOptionalNumber(input.titleExpireTime, input.title_expire_time),
+    cardChangeable: readOptionalBoolean(input.cardChangeable, input.card_changeable),
+  }
+}
+
+export function normalizeFriendshipRemarks(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  return Object.fromEntries(Object.entries(value)
+    .filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+    .map(([key, remark]) => [key, remark.trim()])
+    .filter(([, remark]) => remark.length > 0))
+}
+
+/** 场景导入/替换时剥离未建模资料字段，并保持账号/好友/群成员边界。 */
+export function sanitizeSnapshotProfiles(snapshot: SandboxSnapshot): SandboxSnapshot {
+  return {
+    ...snapshot,
+    participants: snapshot.participants.map((participant) => {
+      const profile = normalizeAccountProfile(participant.profile)
+      if (profile) return { ...participant, profile }
+      const { profile: _ignored, ...rest } = participant
+      return rest
+    }),
+    groups: snapshot.groups.map((group) => ({
+      ...group,
+      members: group.members.flatMap((member) => {
+        const normalized = normalizeGroupMemberFromUnknown(member)
+        return normalized ? [normalized] : []
+      }),
+    })),
+    friendships: snapshot.friendships.map((friendship) => ({
+      ...friendship,
+      remarks: normalizeFriendshipRemarks(friendship.remarks),
+    })),
+  }
 }

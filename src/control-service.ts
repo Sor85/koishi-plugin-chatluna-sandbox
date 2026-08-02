@@ -7,7 +7,7 @@ import { SandboxMediaStorage, MAX_MEDIA_SIZE } from './media-storage'
 import { SandboxOneBotDebugStore, createOneBotDebugError, type AppendOneBotDebugRecordInput, type SandboxOneBotDebugPersistence } from './onebot-debug'
 import { toOneBotMessageSegments, toOneBotRawMessage } from './onebot-message'
 import type { SandboxScenePersistence } from './persistence'
-import { mergeAccountProfile, normalizeAccountProfile } from './account-profile'
+import { mergeAccountProfile, normalizeAccountProfile, sanitizeSnapshotProfiles } from './account-profile'
 import { getOneBotCapabilityMatrix, getOneBotMessageEventFields, getOneBotMessageSequence, normalizeDisabledCapabilities, resolveOneBotMessageId, type SandboxOneBotCapability } from './onebot-profiles'
 import {
   createDirectConversationId,
@@ -299,8 +299,10 @@ export class SandboxControlService {
         if (participant.kind === 'bot') this.runtimeBotRegistry.assertAvailable(participant.id, this.runtimeOwner)
       }
     }
-    next.revision = this.scene.revision + 1
-    this.scene = next
+    // 导入/替换只保留类型化资料字段，避免 raw OneBot JSON 污染领域模型。
+    const sanitized = sanitizeSnapshotProfiles(next)
+    sanitized.revision = this.scene.revision + 1
+    this.scene = sanitized
     this.ensureStableAvatars()
     this.mediaStorage.reclaimUnreferenced(this.getMediaReferences())
     this.botDeliveries = []

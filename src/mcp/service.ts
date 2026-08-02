@@ -1,7 +1,11 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { parseAccountProfileFromUnknown } from '../account-profile'
+import {
+  normalizeFriendshipRemarks,
+  normalizeGroupMemberFromUnknown,
+  parseAccountProfileFromUnknown,
+} from '../account-profile'
 import type { SandboxControlService } from '../control-service'
 import type { SandboxTestSpaceService } from '../test-spaces'
 import type { SandboxMedia, SandboxImplementationProfile, SandboxSnapshot } from '../types'
@@ -1038,7 +1042,19 @@ export class SandboxMcpService {
       }
       else if (action === 'create-group') {
         const groupId = requireString(data.id, 'id')
-        snapshot.groups.push({ id: groupId, name: requireString(data.name, 'name'), avatar: await control.importAvatar('group', groupId, typeof data.avatar === 'string' ? data.avatar : undefined), members: Array.isArray(data.members) ? data.members as never : [], announcements: [] })
+        const members = Array.isArray(data.members)
+          ? data.members.flatMap((member) => {
+            const normalized = normalizeGroupMemberFromUnknown(member)
+            return normalized ? [normalized] : []
+          })
+          : []
+        snapshot.groups.push({
+          id: groupId,
+          name: requireString(data.name, 'name'),
+          avatar: await control.importAvatar('group', groupId, typeof data.avatar === 'string' ? data.avatar : undefined),
+          members,
+          announcements: [],
+        })
         // 与 set-friendship 自动创建私聊会话保持一致：建群即建群会话，
         // 否则 AI 需要先执行一次群操作才能拿到可发消息的会话。
         const conversationId = createGroupConversationId(groupId)
@@ -1078,12 +1094,24 @@ export class SandboxMcpService {
         if (!group) throw new SandboxMcpError('group_not_found', `群组不存在：${String(data.id)}`)
         group.name = requireString(data.name, 'name')
         if (data.avatar !== undefined) group.avatar = await control.importAvatar('group', group.id, typeof data.avatar === 'string' ? data.avatar : undefined)
-        if (Array.isArray(data.members)) group.members = data.members as never
+        if (Array.isArray(data.members)) {
+          group.members = data.members.flatMap((member) => {
+            const normalized = normalizeGroupMemberFromUnknown(member)
+            return normalized ? [normalized] : []
+          })
+        }
       } else if (action === 'set-friendship') {
         const participantIds = [requireString(data.firstId, 'firstId'), requireString(data.secondId, 'secondId')].sort() as [string, string]
         const friendshipId = `friend:${participantIds[0]}:${participantIds[1]}`
         snapshot.friendships = snapshot.friendships.filter(({ id }) => id !== friendshipId)
-        if (data.enabled !== false) snapshot.friendships.push({ id: friendshipId, participantIds, remarks: {}, createdAt: new Date().toISOString() })
+        if (data.enabled !== false) {
+          snapshot.friendships.push({
+            id: friendshipId,
+            participantIds,
+            remarks: normalizeFriendshipRemarks(data.remarks),
+            createdAt: new Date().toISOString(),
+          })
+        }
         const conversationId = createDirectConversationId(...participantIds)
         if (data.enabled !== false && !snapshot.conversations.some(({ id }) => id === conversationId)) snapshot.conversations.push({ id: conversationId, type: 'direct', participantIds, messageIds: [] })
       }
