@@ -420,6 +420,16 @@ const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
       beforeSequence: { type: 'number', description: '新到旧分页游标：仅返回 sequence 更小的记录' },
     },
   },
+  get_onebot_debug_record: {
+    type: 'object',
+    description: '按记录 ID 读取单条 OneBot 调试记录；仅在此接口允许 includeLargeValues 展开完整大型值。',
+    properties: {
+      spaceId: SPACE_OPTIONAL,
+      recordId: { type: 'string' },
+      includeLargeValues: { type: 'boolean', description: '显式展开完整大型值；列表接口不支持此参数' },
+    },
+    required: ['recordId'],
+  },
   clear_onebot_debug_records: { type: 'object', properties: { spaceId: SPACE_REQUIRED }, required: ['spaceId'] },
   list_mcp_call_records: { type: 'object', properties: { spaceId: SPACE_REQUIRED }, required: ['spaceId'] },
   clear_mcp_call_records: { type: 'object', properties: { spaceId: SPACE_REQUIRED }, required: ['spaceId'] },
@@ -455,7 +465,8 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   ['reset_scene', 'manage', '恢复初始场景（主场景为默认场景，测试空间为创建时的空白场景）'],
   ['clear_scene', 'manage', '清空当前场景'],
   ['import_scene', 'manage', '导入版本化 JSON 场景'],
-  ['list_onebot_debug_records', 'debug', '读取 OneBot 调试记录'],
+  ['list_onebot_debug_records', 'debug', '读取 OneBot 调试记录（默认折叠大型值）'],
+  ['get_onebot_debug_record', 'debug', '读取单条 OneBot 调试记录，可显式展开大型值'],
   ['clear_onebot_debug_records', 'debug', '清理 OneBot 调试记录'],
   ['list_mcp_call_records', 'debug', '读取 MCP 调用记录'],
   ['clear_mcp_call_records', 'debug', '清理 MCP 调用记录'],
@@ -727,7 +738,7 @@ export class SandboxMcpService {
     if (tool === 'fail_test_space') return this.withIdempotency(credential, tool, args, async () => this.completeTestSpace(args, true))
     if (tool === 'reactivate_test_space') return this.withIdempotency(credential, tool, args, async () => this.reactivateTestSpace(args))
     if (tool === 'delete_test_space') return this.withIdempotency(credential, tool, args, async () => this.deleteTestSpace(args))
-    const activeControl = this.resolveControl(args, tool !== 'get_scene_snapshot' && tool !== 'list_conversations' && tool !== 'get_conversation' && tool !== 'list_pending_requests' && tool !== 'get_capability_matrix' && tool !== 'export_scene' && tool !== 'list_onebot_debug_records')
+    const activeControl = this.resolveControl(args, tool !== 'get_scene_snapshot' && tool !== 'list_conversations' && tool !== 'get_conversation' && tool !== 'list_pending_requests' && tool !== 'get_capability_matrix' && tool !== 'export_scene' && tool !== 'list_onebot_debug_records' && tool !== 'get_onebot_debug_record')
     if (tool === 'get_scene_snapshot') return activeControl.getSnapshot()
     if (tool === 'list_conversations') return this.listConversations(activeControl, args)
     if (tool === 'get_conversation') return this.getConversation(activeControl, args)
@@ -756,6 +767,9 @@ export class SandboxMcpService {
     if (tool === 'clear_scene') return this.runDestructive(activeControl, credential, tool, args, () => activeControl.replaceScene({ revision: activeControl.getSnapshot().revision, participants: [], groups: [], conversations: [], messages: [], friendships: [], requests: [] }))
     if (tool === 'import_scene') return this.runDestructive(activeControl, credential, tool, args, () => this.importScene(activeControl, args))
     if (tool === 'list_onebot_debug_records') {
+      if ('includeLargeValues' in args) {
+        throw new SandboxMcpError('invalid_argument', '列表接口不允许 includeLargeValues；请使用 get_onebot_debug_record 展开单条记录。')
+      }
       try {
         return activeControl.getOneBotDebugRecords({
           botId: typeof args.botId === 'string' ? args.botId : undefined,
@@ -773,6 +787,16 @@ export class SandboxMcpService {
             : `请使用 earliestCursor=${error.earliestCursor} 恢复分页。`)
         }
         throw error
+      }
+    }
+    if (tool === 'get_onebot_debug_record') {
+      try {
+        return activeControl.getOneBotDebugRecord({
+          recordId: requireString(args.recordId, 'recordId'),
+          includeLargeValues: args.includeLargeValues === true,
+        })
+      } catch (error) {
+        throw new SandboxMcpError('record_not_found', error instanceof Error ? error.message : '调试记录不存在')
       }
     }
     if (tool === 'clear_onebot_debug_records') return { cleared: activeControl.clearOneBotDebugRecords() }

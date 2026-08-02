@@ -23,6 +23,8 @@ describe('WebQQ OneBot 调试工作台', () => {
     expect(debugSource).toContain('record.source.name')
     expect(debugSource).toContain('getRecordKey(record)')
     expect(debugSource).toContain('SandboxDirectoryBot')
+    expect(debugSource).toContain('countLargeValueSummaries')
+    expect(debugSource).toContain('已折叠')
     expect(debugSource).not.toContain("emit('replay'")
   })
 

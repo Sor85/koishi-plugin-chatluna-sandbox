@@ -11,6 +11,7 @@ import type {
   GetMediaContentInput,
   GetMessageHistoryInput,
   GetSandboxBotDeliveriesInput,
+  GetSandboxOneBotDebugRecordInput,
   GetSandboxOneBotDebugRecordsInput,
   GetSandboxWorkspaceInput,
   ManageSandboxEnvironmentInput,
@@ -49,6 +50,7 @@ interface ConsoleEventMap {
   'onebot-sandbox/group-action': (input: SpaceScoped<PerformGroupActionInput>) => Promise<SandboxWorkspaceState>
   'onebot-sandbox/bot-deliveries': (input?: SpaceScoped<GetSandboxBotDeliveriesInput>) => SandboxBotDelivery[]
   'onebot-sandbox/debug-records': (input?: SpaceScoped<GetSandboxOneBotDebugRecordsInput>) => SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord>
+  'onebot-sandbox/debug-record': (input: SpaceScoped<GetSandboxOneBotDebugRecordInput>) => SandboxConsoleOneBotDebugRecord
   'onebot-sandbox/clear-debug-records': (input?: { spaceId?: string }) => ClearSandboxOneBotDebugRecordsResult
   'onebot-sandbox/mcp-credentials': () => Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string }>
   'onebot-sandbox/create-mcp-credential': (input: { name: string; scopes: SandboxMcpScope[] }) => { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
@@ -175,6 +177,12 @@ export function registerConsole(
       .flatMap(({ records: items }) => items)
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt) || right.sequence - left.sequence)
       .slice(0, limit)
+    const capacity = pages.reduce((summary, page) => ({
+      recordCount: summary.recordCount + page.capacity.recordCount,
+      totalBytes: summary.totalBytes + page.capacity.totalBytes,
+      maxRecords: summary.maxRecords + page.capacity.maxRecords,
+      maxBytes: summary.maxBytes + page.capacity.maxBytes,
+    }), { recordCount: 0, totalBytes: 0, maxRecords: 0, maxBytes: 0 })
     return {
       records,
       hasMore: pages.some(({ hasMore }) => hasMore) || pages.flatMap(({ records: items }) => items).length > limit,
@@ -182,6 +190,33 @@ export function registerConsole(
         .map(({ earliestCursor }) => earliestCursor)
         .filter((value): value is number => typeof value === 'number')
         .sort((left, right) => left - right)[0],
+      capacity,
+    }
+  }
+  const getDebugRecord = (input: SpaceScoped<GetSandboxOneBotDebugRecordInput>): SandboxConsoleOneBotDebugRecord => {
+    const query = withoutSpaceId(input)
+    if (input.spaceId) {
+      if (!testSpaces) throw new Error('AI 测试空间服务不可用')
+      const space = testSpaces.getSpace(input.spaceId)
+      return {
+        ...testSpaces.getControl(space.id).getOneBotDebugRecord(query),
+        source: { type: 'test-space', spaceId: space.id, name: space.name },
+      }
+    }
+    try {
+      return { ...control.getOneBotDebugRecord(query), source: mainSource }
+    } catch (error) {
+      for (const space of testSpaces?.listSpaces() ?? []) {
+        try {
+          return {
+            ...testSpaces!.getControl(space.id).getOneBotDebugRecord(query),
+            source: { type: 'test-space', spaceId: space.id, name: space.name },
+          }
+        } catch {
+          // 继续在其他空间查找。
+        }
+      }
+      throw error
     }
   }
   const clearDebugRecords = (input: { spaceId?: string } = {}): ClearSandboxOneBotDebugRecordsResult => {
@@ -285,6 +320,7 @@ export function registerConsole(
   }, { authority: 4 })
   console.addListener('onebot-sandbox/bot-deliveries', (input = {}) => resolveControl(input, false).getBotDeliveries(assertInteractionInput(withoutSpaceId(input)) as GetSandboxBotDeliveriesInput), { authority: 4 })
   console.addListener('onebot-sandbox/debug-records', listDebugRecords, { authority: 4 })
+  console.addListener('onebot-sandbox/debug-record', getDebugRecord, { authority: 4 })
   console.addListener('onebot-sandbox/clear-debug-records', clearDebugRecords, { authority: 4 })
   if (mcp) {
     console.addListener('onebot-sandbox/mcp-credentials', () => mcp.listCredentials(), { authority: 4 })
@@ -323,6 +359,7 @@ declare module '@koishijs/console' {
     'onebot-sandbox/group-action'(input: SpaceScoped<PerformGroupActionInput>): Promise<SandboxWorkspaceState>
     'onebot-sandbox/bot-deliveries'(input?: SpaceScoped<GetSandboxBotDeliveriesInput>): SandboxBotDelivery[]
     'onebot-sandbox/debug-records'(input?: SpaceScoped<GetSandboxOneBotDebugRecordsInput>): SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord>
+    'onebot-sandbox/debug-record'(input: SpaceScoped<GetSandboxOneBotDebugRecordInput>): SandboxConsoleOneBotDebugRecord
     'onebot-sandbox/clear-debug-records'(input?: { spaceId?: string }): ClearSandboxOneBotDebugRecordsResult
     'onebot-sandbox/mcp-credentials'(): Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string }>
     'onebot-sandbox/create-mcp-credential'(input: { name: string; scopes: SandboxMcpScope[] }): { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }

@@ -44,6 +44,7 @@ export class FakeWorkspacePort implements WorkspacePort {
   debugRecordsResult: SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord> = {
     records: [],
     hasMore: false,
+    capacity: { recordCount: 0, totalBytes: 0, maxRecords: 5000, maxBytes: 50 * 1024 * 1024 },
   }
   clearDebugRecordsResult: ClearSandboxOneBotDebugRecordsResult = { cleared: 0 }
   private readonly failures = new Map<WorkspacePortOperation, Error[]>()

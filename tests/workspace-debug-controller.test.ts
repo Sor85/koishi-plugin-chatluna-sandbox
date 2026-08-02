@@ -47,7 +47,12 @@ const record: SandboxConsoleOneBotDebugRecord = {
 describe('WebQQ OneBot 调试控制器', () => {
   it('通过端口加载筛选记录并清理当前缓冲区', async () => {
     const port = createFakeWorkspacePort(workspace)
-    port.debugRecordsResult = { records: [record], hasMore: false, earliestCursor: 1 }
+    port.debugRecordsResult = {
+      records: [record],
+      hasMore: false,
+      earliestCursor: 1,
+      capacity: { recordCount: 1, totalBytes: 128, maxRecords: 5000, maxBytes: 50 * 1024 * 1024 },
+    }
     const controller = createWorkspaceController(port, {
       getItem: () => null,
       setItem: () => undefined,

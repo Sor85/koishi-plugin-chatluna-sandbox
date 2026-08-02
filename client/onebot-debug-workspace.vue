@@ -84,10 +84,16 @@
           <section v-if="record.payload !== undefined">
             <h2>{{ record.direction === 'action' ? '输入' : '事件数据' }}</h2>
             <pre v-webqq-scrollbar>{{ formatPayload(record.payload) }}</pre>
+            <p v-if="countLargeValueSummaries(record.payload)" class="webqq-debug-fold">
+              已折叠 {{ countLargeValueSummaries(record.payload) }} 个大型值（列表仅显示摘要，完整内容请通过单条详情接口展开）
+            </p>
           </section>
           <section v-if="record.result !== undefined">
             <h2>{{ record.direction === 'action' ? '输出' : '处理结果' }}</h2>
             <pre v-webqq-scrollbar>{{ formatPayload(record.result) }}</pre>
+            <p v-if="countLargeValueSummaries(record.result)" class="webqq-debug-fold">
+              已折叠 {{ countLargeValueSummaries(record.result) }} 个大型值（列表仅显示摘要，完整内容请通过单条详情接口展开）
+            </p>
           </section>
         </div>
       </article>
@@ -171,5 +177,16 @@ function formatEntities(record: SandboxConsoleOneBotDebugRecord) {
 
 function formatPayload(value: unknown) {
   return JSON.stringify(value, null, 2)
+}
+
+function isLargeValueSummary(value: unknown): boolean {
+  return !!value && typeof value === 'object' && Reflect.get(value, 'kind') === 'large-value'
+}
+
+function countLargeValueSummaries(value: unknown): number {
+  if (isLargeValueSummary(value)) return 1
+  if (Array.isArray(value)) return value.reduce((sum, item) => sum + countLargeValueSummaries(item), 0)
+  if (!value || typeof value !== 'object') return 0
+  return Object.values(value).reduce((sum, item) => sum + countLargeValueSummaries(item), 0)
 }
 </script>

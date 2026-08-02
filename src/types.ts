@@ -324,6 +324,22 @@ export interface GetSandboxOneBotDebugRecordsInput {
   beforeSequence?: number
 }
 
+export interface SandboxOneBotDebugLargeValueSummary {
+  kind: 'large-value'
+  encoding: 'base64' | 'data-url'
+  mimeType?: string
+  charCount: number
+  byteLength: number
+  sha256: string
+}
+
+export interface SandboxOneBotDebugCapacity {
+  recordCount: number
+  totalBytes: number
+  maxRecords: number
+  maxBytes: number
+}
+
 export interface SandboxOneBotDebugRecordsPage<T extends SandboxOneBotDebugRecord = SandboxOneBotDebugRecord> {
   records: T[]
   hasMore: boolean
@@ -331,6 +347,13 @@ export interface SandboxOneBotDebugRecordsPage<T extends SandboxOneBotDebugRecor
   nextCursor?: number
   /** 当前仍保留的最早 sequence；游标过期恢复时可用。 */
   earliestCursor?: number
+  capacity: SandboxOneBotDebugCapacity
+}
+
+export interface GetSandboxOneBotDebugRecordInput {
+  recordId: string
+  /** 仅单条详情允许展开大型值；列表接口不得接受此参数。 */
+  includeLargeValues?: boolean
 }
 
 export interface ClearSandboxOneBotDebugRecordsResult {

@@ -42,7 +42,8 @@ describe('OneBot 调试记录', () => {
     }))
     expect(record).not.toHaveProperty('matchedAlias')
     expect(JSON.stringify(record.payload)).not.toContain('secret-token')
-    expect(JSON.stringify(record.payload)).not.toContain(Buffer.from('binary').toString('base64'))
+    // 短 Base64 不再按字段名抹除，完整保留；仅超过阈值的 Base64 在投影层折叠。
+    expect(JSON.stringify(record.payload)).toContain(Buffer.from('binary').toString('base64'))
     expect(JSON.stringify(record.payload)).not.toContain('消息正文'.repeat(8))
     expect(record.result).toEqual(expect.objectContaining({
       status: 'ok',

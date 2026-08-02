@@ -43,14 +43,29 @@ describe('OneBot 调试 Console 协议', () => {
     registerConsole(consoleRegistrar, control, appearance)
 
     const listRecords = listeners.get('onebot-sandbox/debug-records')
+    const getRecord = listeners.get('onebot-sandbox/debug-record')
     const clearRecords = listeners.get('onebot-sandbox/clear-debug-records')
     expect(listRecords).toBeTypeOf('function')
+    expect(getRecord).toBeTypeOf('function')
     expect(clearRecords).toBeTypeOf('function')
-    if (typeof listRecords !== 'function' || typeof clearRecords !== 'function') throw new Error('调试记录监听器未注册')
+    if (typeof listRecords !== 'function' || typeof getRecord !== 'function' || typeof clearRecords !== 'function') {
+      throw new Error('调试记录监听器未注册')
+    }
     expect(listeners.has('onebot-sandbox/replay-debug-record')).toBe(false)
-    expect(Reflect.apply(listRecords, undefined, [{ direction: 'action', action: 'get_login_info' }])).toMatchObject({
+    const page = Reflect.apply(listRecords, undefined, [{ direction: 'action', action: 'get_login_info' }]) as {
+      records: Array<{ id: string, requestedAction: string }>
+      hasMore: boolean
+      capacity: { recordCount: number }
+    }
+    expect(page).toMatchObject({
       records: [expect.objectContaining({ requestedAction: 'get_login_info', action: 'get_login_info', status: 'success' })],
       hasMore: false,
+      capacity: expect.objectContaining({ recordCount: 1 }),
+    })
+    expect(Reflect.apply(getRecord, undefined, [{ recordId: page.records[0]!.id }])).toMatchObject({
+      id: page.records[0]!.id,
+      requestedAction: 'get_login_info',
+      source: { type: 'main', name: '主环境' },
     })
     expect(Reflect.apply(clearRecords, undefined, [])).toEqual({ cleared: 1 })
     expect(Reflect.apply(listRecords, undefined, [{}])).toMatchObject({ records: [], hasMore: false })

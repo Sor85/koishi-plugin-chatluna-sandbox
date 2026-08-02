@@ -6,6 +6,7 @@ declare module '@koishijs/client' {
     GetMediaContentInput,
     GetMessageHistoryInput,
     GetSandboxWorkspaceInput,
+    GetSandboxOneBotDebugRecordInput,
     GetSandboxOneBotDebugRecordsInput,
     ManageSandboxEnvironmentInput,
     PerformFriendActionInput,
@@ -54,6 +55,7 @@ declare module '@koishijs/client' {
   export function send(event: 'onebot-sandbox/friend-action', input: SpaceScoped<PerformFriendActionInput>): Promise<SandboxWorkspaceState>
   export function send(event: 'onebot-sandbox/group-action', input: SpaceScoped<PerformGroupActionInput>): Promise<SandboxWorkspaceState>
   export function send(event: 'onebot-sandbox/debug-records', input?: SpaceScoped<GetSandboxOneBotDebugRecordsInput>): Promise<SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord>>
+  export function send(event: 'onebot-sandbox/debug-record', input: SpaceScoped<GetSandboxOneBotDebugRecordInput>): Promise<SandboxConsoleOneBotDebugRecord>
   export function send(event: 'onebot-sandbox/clear-debug-records', input?: { spaceId?: string }): Promise<ClearSandboxOneBotDebugRecordsResult>
   export function send(event: 'onebot-sandbox/mcp-credentials'): Promise<Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string }>>
   export function send(event: 'onebot-sandbox/create-mcp-credential', input: { name: string; scopes: SandboxMcpScope[] }): Promise<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }>

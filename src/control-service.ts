@@ -25,6 +25,7 @@ import {
   type GetSandboxBotDeliveriesInput,
   type GetMessageHistoryInput,
   type GetSandboxOneBotDebugRecordsInput,
+  type GetSandboxOneBotDebugRecordInput,
   type SandboxOneBotDebugRecordsPage,
   type PerformFriendActionInput,
   type PerformFriendActionResult,
@@ -439,6 +440,12 @@ export class SandboxControlService {
 
   getOneBotDebugRecords(input: GetSandboxOneBotDebugRecordsInput = {}): SandboxOneBotDebugRecordsPage {
     return this.oneBotDebug.getRecords(input)
+  }
+
+  getOneBotDebugRecord(input: GetSandboxOneBotDebugRecordInput): SandboxOneBotDebugRecord {
+    const record = this.oneBotDebug.getRecord(input.recordId, input.includeLargeValues === true)
+    if (!record) throw new Error(`调试记录不存在：${input.recordId}`)
+    return record
   }
 
   clearOneBotDebugRecords(): number {
