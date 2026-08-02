@@ -62,7 +62,7 @@ describe('OneBot 调试 Console 协议', () => {
     const runtimeBots = new SandboxRuntimeBotRegistry()
     const control = new SandboxControlService(app, { runtimeBots })
     const spaces = new SandboxTestSpaceService(app, runtimeBots)
-    const first = spaces.createSpace({ controllerId: 'credential-a', name: '空间 A' })
+    const first = spaces.createSpace({ name: '空间 A' })
     const listeners = new Map<string, (...args: any[]) => any>()
     const registrar: SandboxConsoleRegistrar = {
       addEntry() {},

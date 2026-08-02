@@ -124,7 +124,6 @@ describe('Koishi Database 场景仓库', () => {
       id: 'space-1',
       name: '退群公告测试',
       status: 'completed' as const,
-      controllerId: 'credential-a',
       createdAt: '2026-07-25T01:00:00.000Z',
       updatedAt: '2026-07-25T02:00:00.000Z',
       completedAt: '2026-07-25T02:00:00.000Z',

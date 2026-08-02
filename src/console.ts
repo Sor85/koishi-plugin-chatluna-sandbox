@@ -275,7 +275,7 @@ export function registerConsole(
     console.addListener('onebot-sandbox/test-spaces', () => testSpaces.listSpaces()
       .map((space) => ({ ...space, snapshot: trimSnapshotMessages(space.snapshot, 10) })), { authority: 4 })
     console.addListener('onebot-sandbox/create-test-space', ({ name }) => {
-      const space = testSpaces.createSpace({ controllerId: 'console', name })
+      const space = testSpaces.createSpace({ name })
       return testSpaces.takeOver(space.id)
     }, { authority: 4 })
     console.addListener('onebot-sandbox/take-over-test-space', ({ spaceId }) => testSpaces.takeOver(spaceId), { authority: 4 })

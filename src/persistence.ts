@@ -17,7 +17,6 @@ export interface SandboxTestSpacePersistenceRecord {
   id: string
   name: string
   status: 'running' | 'taken-over' | 'completed' | 'failed'
-  controllerId: string
   createdAt: string
   updatedAt: string
   completedAt?: string
@@ -67,7 +66,6 @@ export function registerSandboxTestSpaceModel(ctx: Context): void {
     id: 'string(64)',
     name: 'string(255)',
     status: 'string(32)',
-    controllerId: 'string(64)',
     createdAt: 'string(64)',
     updatedAt: 'string(64)',
     completedAt: 'string(64)',

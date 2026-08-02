@@ -423,7 +423,7 @@ const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
 
 const TOOL_DEFINITIONS: ToolDefinition[] = [
   ['get_server_info', 'read', '获取沙盒服务、测试 API 和 MCP 状态'],
-  ['list_test_spaces', 'read', '列出当前凭证创建的 AI 测试空间'],
+  ['list_test_spaces', 'read', '列出当前 Sandbox 实例的全部 AI 测试空间'],
   ['get_test_space', 'read', '读取单个 AI 测试空间状态'],
   ['get_scene_snapshot', 'read', '读取当前模拟 QQ 场景快照'],
   ['list_conversations', 'read', '分页列出当前操作者可见会话'],
@@ -445,7 +445,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   ['complete_test_space', 'manage', '将 AI 测试空间标记为已完成并停止机器人'],
   ['fail_test_space', 'manage', '将 AI 测试空间标记为失败并停止机器人'],
   ['reactivate_test_space', 'manage', '重新激活已完成或失败的 AI 测试空间'],
-  ['delete_test_space', 'manage', '删除当前凭证创建的 AI 测试空间；除非用户明确要求，否则测试完成后应默认保留'],
+  ['delete_test_space', 'manage', '删除 AI 测试空间；除非用户明确要求，否则测试完成后应默认保留'],
   ['prepare_destructive_action', 'manage', '准备一次性破坏性操作确认令牌'],
   ['delete_environment_entity', 'manage', '删除现有环境实体'],
   ['reset_scene', 'manage', '恢复初始场景（主场景为默认场景，测试空间为创建时的空白场景）'],
@@ -624,7 +624,7 @@ export class SandboxMcpService {
     if (uri === 'onebot-sandbox://scene-schema') return { testApiVersion: { const: 1 }, scene: { type: 'object' } }
     if (uri === 'onebot-sandbox://capabilities/napcat') return this.getCapabilityMatrix(this.control, 'napcat')
     if (uri === 'onebot-sandbox://capabilities/llbot') return this.getCapabilityMatrix(this.control, 'llbot')
-    if (uri === 'onebot-sandbox://errors') return ['unauthorized', 'permission_denied', 'invalid_arguments', 'idempotency_conflict', 'cursor_expired', 'confirmation_required', 'revision_conflict', 'rate_limited', 'space_id_required', 'space_taken_over', 'space_forbidden', 'space_not_found', 'space_unavailable', 'test_spaces_unavailable', 'internal_error']
+    if (uri === 'onebot-sandbox://errors') return ['unauthorized', 'permission_denied', 'invalid_arguments', 'idempotency_conflict', 'cursor_expired', 'confirmation_required', 'revision_conflict', 'rate_limited', 'space_id_required', 'space_taken_over', 'space_not_found', 'space_unavailable', 'test_spaces_unavailable', 'internal_error']
     if (uri === 'onebot-sandbox://examples') return {
       create_test_space: {
         name: '退群公告测试',
@@ -713,17 +713,17 @@ export class SandboxMcpService {
 
   private async executeTool(credential: SandboxMcpCredential, tool: string, args: Record<string, unknown>): Promise<unknown> {
     if (tool === 'get_server_info') return { name: 'onebot-sandbox', testApiVersion: 1, transport: 'streamable-http', stateless: true, cursor: this.currentCursor() }
-    if (tool === 'list_test_spaces') return this.requireTestSpaces().listSpaces().filter(({ controllerId }) => controllerId === credential.id)
-    if (tool === 'get_test_space') return this.getOwnedTestSpace(credential, args)
+    if (tool === 'list_test_spaces') return this.requireTestSpaces().listSpaces()
+    if (tool === 'get_test_space') return this.getTestSpace(args)
     if (tool === 'create_test_space') return this.withIdempotency(credential, tool, args, async () => {
-      const space = this.requireTestSpaces().createSpace({ controllerId: credential.id, name: typeof args.name === 'string' ? args.name : undefined })
+      const space = this.requireTestSpaces().createSpace({ name: typeof args.name === 'string' ? args.name : undefined })
       return { spaceId: space.id, status: space.status, revision: space.snapshot.revision, cursor: this.appendEvent('test-space.created', { spaceId: space.id }, space.id) }
     })
-    if (tool === 'complete_test_space') return this.withIdempotency(credential, tool, args, async () => this.completeTestSpace(credential, args, false))
-    if (tool === 'fail_test_space') return this.withIdempotency(credential, tool, args, async () => this.completeTestSpace(credential, args, true))
-    if (tool === 'reactivate_test_space') return this.withIdempotency(credential, tool, args, async () => this.reactivateTestSpace(credential, args))
-    if (tool === 'delete_test_space') return this.withIdempotency(credential, tool, args, async () => this.deleteTestSpace(credential, args))
-    const activeControl = this.resolveControl(credential, args, tool !== 'get_scene_snapshot' && tool !== 'list_conversations' && tool !== 'get_conversation' && tool !== 'list_pending_requests' && tool !== 'get_capability_matrix' && tool !== 'export_scene' && tool !== 'list_onebot_debug_records')
+    if (tool === 'complete_test_space') return this.withIdempotency(credential, tool, args, async () => this.completeTestSpace(args, false))
+    if (tool === 'fail_test_space') return this.withIdempotency(credential, tool, args, async () => this.completeTestSpace(args, true))
+    if (tool === 'reactivate_test_space') return this.withIdempotency(credential, tool, args, async () => this.reactivateTestSpace(args))
+    if (tool === 'delete_test_space') return this.withIdempotency(credential, tool, args, async () => this.deleteTestSpace(args))
+    const activeControl = this.resolveControl(args, tool !== 'get_scene_snapshot' && tool !== 'list_conversations' && tool !== 'get_conversation' && tool !== 'list_pending_requests' && tool !== 'get_capability_matrix' && tool !== 'export_scene' && tool !== 'list_onebot_debug_records')
     if (tool === 'get_scene_snapshot') return activeControl.getSnapshot()
     if (tool === 'list_conversations') return this.listConversations(activeControl, args)
     if (tool === 'get_conversation') return this.getConversation(activeControl, args)
@@ -1065,47 +1065,45 @@ export class SandboxMcpService {
     return this.testSpaces
   }
 
-  private getOwnedTestSpace(credential: SandboxMcpCredential, args: Record<string, unknown>) {
+  private getTestSpace(args: Record<string, unknown>) {
     const spaceId = requireString(args.spaceId, 'spaceId')
-    const space = this.requireTestSpaces().getSpace(spaceId)
-    if (space.controllerId !== credential.id) throw new SandboxMcpError('space_forbidden', '测试凭证无权读取此空间')
-    return space
+    return this.requireTestSpaces().getSpace(spaceId)
   }
 
-  private resolveControl(credential: SandboxMcpCredential, args: Record<string, unknown>, mutation: boolean): SandboxControlService {
+  private resolveControl(args: Record<string, unknown>, mutation: boolean): SandboxControlService {
     if (typeof args.spaceId !== 'string' || !args.spaceId.trim()) {
       if (mutation && this.testSpaces) throw new SandboxMcpError('space_id_required', 'MCP 修改操作必须显式指定 AI 测试空间', false, '请先调用 create_test_space，再携带返回的 spaceId。')
       return this.control
     }
     try {
       return mutation
-        ? this.requireTestSpaces().requireAiControl(args.spaceId, credential.id)
-        : this.requireTestSpaces().requireReadable(args.spaceId, credential.id)
+        ? this.requireTestSpaces().requireAiControl(args.spaceId)
+        : this.requireTestSpaces().requireReadable(args.spaceId)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'AI 测试空间不可用'
-      const code = message.includes('用户接管') ? 'space_taken_over' : message.includes('无权') ? 'space_forbidden' : message.includes('不存在') ? 'space_not_found' : 'space_unavailable'
+      const code = message.includes('用户接管') ? 'space_taken_over' : message.includes('不存在') ? 'space_not_found' : 'space_unavailable'
       throw new SandboxMcpError(code, message, false, '请重新读取空间状态后重试。')
     }
   }
 
-  private completeTestSpace(credential: SandboxMcpCredential, args: Record<string, unknown>, failed: boolean) {
+  private completeTestSpace(args: Record<string, unknown>, failed: boolean) {
     const spaceId = requireString(args.spaceId, 'spaceId')
     const space = failed
-      ? this.requireTestSpaces().failSpace(spaceId, credential.id)
-      : this.requireTestSpaces().completeSpace(spaceId, credential.id)
+      ? this.requireTestSpaces().failSpace(spaceId)
+      : this.requireTestSpaces().completeSpace(spaceId)
     return { spaceId, status: space.status, revision: space.snapshot.revision, cursor: this.appendEvent(`test-space.${space.status}`, { spaceId }, spaceId) }
   }
 
-  private reactivateTestSpace(credential: SandboxMcpCredential, args: Record<string, unknown>) {
+  private reactivateTestSpace(args: Record<string, unknown>) {
     const spaceId = requireString(args.spaceId, 'spaceId')
-    const current = this.getOwnedTestSpace(credential, args)
+    const current = this.getTestSpace(args)
     const space = this.requireTestSpaces().reactivateSpace(current.id, 'running')
     return { spaceId, status: space.status, revision: space.snapshot.revision, cursor: this.appendEvent('test-space.reactivated', { spaceId }, spaceId) }
   }
 
-  private deleteTestSpace(credential: SandboxMcpCredential, args: Record<string, unknown>) {
+  private deleteTestSpace(args: Record<string, unknown>) {
     const spaceId = requireString(args.spaceId, 'spaceId')
-    this.requireTestSpaces().deleteSpace(spaceId, credential.id)
+    this.requireTestSpaces().deleteSpace(spaceId)
     return { spaceId, deleted: true, cursor: this.appendEvent('test-space.deleted', { spaceId }, spaceId) }
   }
 

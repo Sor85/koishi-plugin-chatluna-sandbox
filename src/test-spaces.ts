@@ -11,7 +11,6 @@ export interface SandboxTestSpaceSummary {
   id: string
   name: string
   status: SandboxTestSpaceStatus
-  controllerId: string
   createdAt: string
   updatedAt: string
   completedAt?: string
@@ -19,7 +18,6 @@ export interface SandboxTestSpaceSummary {
 }
 
 export interface CreateSandboxTestSpaceInput {
-  controllerId: string
   name?: string
 }
 
@@ -71,7 +69,6 @@ export class SandboxTestSpaceService {
       id,
       name: input.name?.trim() || `AI 测试空间 ${this.spaces.size + 1}`,
       status: 'running',
-      controllerId: input.controllerId,
       createdAt: now,
       updatedAt: now,
       control,
@@ -105,15 +102,12 @@ export class SandboxTestSpaceService {
     return this.requireSpace(spaceId).control
   }
 
-  requireReadable(spaceId: string, controllerId: string): SandboxControlService {
-    const space = this.requireSpace(spaceId)
-    if (space.controllerId !== controllerId) throw new Error('测试凭证无权读取此空间')
-    return space.control
+  requireReadable(spaceId: string): SandboxControlService {
+    return this.requireSpace(spaceId).control
   }
 
-  requireAiControl(spaceId: string, controllerId: string): SandboxControlService {
+  requireAiControl(spaceId: string): SandboxControlService {
     const space = this.requireSpace(spaceId)
-    if (space.controllerId !== controllerId) throw new Error('测试凭证无权控制此空间')
     if (space.status === 'taken-over') throw new Error('空间已由用户接管')
     if (space.status !== 'running') throw new Error(`空间当前不可修改：${space.status}`)
     return space.control
@@ -133,8 +127,7 @@ export class SandboxTestSpaceService {
     return this.setStatus(spaceId, 'running')
   }
 
-  // WebUI 空间内任务栏的"终止任务"：用户不持有测试凭证，因此不校验 controllerId；
-  // 终止是用户主动结束而非 AI 报告失败，落到 completed 而不是 failed。
+  // WebUI 空间内任务栏的“终止任务”代表用户主动结束，因此落到 completed 而不是 failed。
   terminateSpace(spaceId: string): SandboxTestSpaceSummary {
     const space = this.requireSpace(spaceId)
     if (space.status === 'completed' || space.status === 'failed') throw new Error('空间已结束')
@@ -146,8 +139,8 @@ export class SandboxTestSpaceService {
     return this.toSummary(space)
   }
 
-  completeSpace(spaceId: string, controllerId: string): SandboxTestSpaceSummary {
-    const space = this.requireRunningAiSpace(spaceId, controllerId)
+  completeSpace(spaceId: string): SandboxTestSpaceSummary {
+    const space = this.requireRunningAiSpace(spaceId)
     space.status = 'completed'
     space.completedAt = new Date().toISOString()
     space.updatedAt = space.completedAt
@@ -156,8 +149,8 @@ export class SandboxTestSpaceService {
     return this.toSummary(space)
   }
 
-  failSpace(spaceId: string, controllerId: string): SandboxTestSpaceSummary {
-    const space = this.requireRunningAiSpace(spaceId, controllerId)
+  failSpace(spaceId: string): SandboxTestSpaceSummary {
+    const space = this.requireRunningAiSpace(spaceId)
     space.status = 'failed'
     space.completedAt = new Date().toISOString()
     space.updatedAt = space.completedAt
@@ -178,9 +171,8 @@ export class SandboxTestSpaceService {
     return this.toSummary(space)
   }
 
-  deleteSpace(spaceId: string, controllerId?: string): void {
+  deleteSpace(spaceId: string): void {
     const space = this.requireSpace(spaceId)
-    if (controllerId && space.controllerId !== controllerId) throw new Error('测试凭证无权删除此空间')
     this.spaces.delete(spaceId)
     void space.control.dispose()
     const persistence = this.persistence
@@ -212,7 +204,6 @@ export class SandboxTestSpaceService {
       id: stored.id,
       name: stored.name,
       status: stored.status,
-      controllerId: stored.controllerId,
       createdAt: stored.createdAt,
       updatedAt: stored.updatedAt,
       completedAt: stored.completedAt,
@@ -237,7 +228,6 @@ export class SandboxTestSpaceService {
       id: record.id,
       name: record.name,
       status: record.status,
-      controllerId: record.controllerId,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
       completedAt: record.completedAt,
@@ -252,9 +242,8 @@ export class SandboxTestSpaceService {
     })
   }
 
-  private requireRunningAiSpace(spaceId: string, controllerId: string): SandboxTestSpaceRecord {
+  private requireRunningAiSpace(spaceId: string): SandboxTestSpaceRecord {
     const space = this.requireSpace(spaceId)
-    if (space.controllerId !== controllerId) throw new Error('测试凭证无权控制此空间')
     if (space.status === 'taken-over') throw new Error('空间已由用户接管')
     if (space.status !== 'running') throw new Error(`空间当前不可修改：${space.status}`)
     return space
@@ -271,7 +260,6 @@ export class SandboxTestSpaceService {
       id: space.id,
       name: space.name,
       status: space.status,
-      controllerId: space.controllerId,
       createdAt: space.createdAt,
       updatedAt: space.updatedAt,
       completedAt: space.completedAt,

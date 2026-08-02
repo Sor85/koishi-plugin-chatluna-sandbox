@@ -21,8 +21,8 @@ function createServices() {
 describe('AI 测试空间', () => {
   it('创建空白隔离空间并按创建时间从旧到新列出', () => {
     const { main, spaces } = createServices()
-    const first = spaces.createSpace({ controllerId: 'credential-a', name: '退群公告测试' })
-    const second = spaces.createSpace({ controllerId: 'credential-a', name: '好友申请测试' })
+    const first = spaces.createSpace({ name: '退群公告测试' })
+    const second = spaces.createSpace({ name: '好友申请测试' })
 
     expect(first.snapshot).toEqual(createEmptyScene())
     expect(spaces.listSpaces().map(({ id }) => id)).toEqual([first.id, second.id])
@@ -36,56 +36,57 @@ describe('AI 测试空间', () => {
 
   it('用户接管时暂停 AI 修改，归还后恢复', () => {
     const { spaces } = createServices()
-    const space = spaces.createSpace({ controllerId: 'credential-a' })
+    const space = spaces.createSpace({})
 
-    expect(spaces.requireAiControl(space.id, 'credential-a')).toBe(space.control)
+    expect(spaces.requireAiControl(space.id)).toBe(space.control)
     spaces.takeOver(space.id)
-    expect(() => spaces.requireAiControl(space.id, 'credential-a')).toThrow('空间已由用户接管')
+    expect(() => spaces.requireAiControl(space.id)).toThrow('空间已由用户接管')
+    expect(spaces.requireReadable(space.id)).toBe(space.control)
     expect(spaces.requireUserControl(space.id)).toBe(space.control)
     spaces.returnControl(space.id)
-    expect(spaces.requireAiControl(space.id, 'credential-a')).toBe(space.control)
+    expect(spaces.requireAiControl(space.id)).toBe(space.control)
   })
 
   it('用户终止任务后空间结束为已完成，AI 不能再修改', () => {
     const { spaces } = createServices()
-    const space = spaces.createSpace({ controllerId: 'credential-a' })
+    const space = spaces.createSpace({})
 
     expect(spaces.terminateSpace(space.id).status).toBe('completed')
     expect(spaces.getSpace(space.id).completedAt).toBeTruthy()
-    expect(() => spaces.requireAiControl(space.id, 'credential-a')).toThrow('空间当前不可修改：completed')
+    expect(() => spaces.requireAiControl(space.id)).toThrow('空间当前不可修改：completed')
     expect(() => spaces.terminateSpace(space.id)).toThrow('空间已结束')
   })
 
   it('AI 重新激活后恢复 AI 控制，用户重新激活后保持接管', () => {
     const { spaces } = createServices()
-    const aiSpace = spaces.createSpace({ controllerId: 'credential-a' })
-    spaces.completeSpace(aiSpace.id, 'credential-a')
+    const aiSpace = spaces.createSpace({})
+    spaces.completeSpace(aiSpace.id)
     expect(spaces.reactivateSpace(aiSpace.id, 'running').status).toBe('running')
-    expect(spaces.requireAiControl(aiSpace.id, 'credential-a')).toBe(aiSpace.control)
+    expect(spaces.requireAiControl(aiSpace.id)).toBe(aiSpace.control)
 
-    spaces.completeSpace(aiSpace.id, 'credential-a')
+    spaces.completeSpace(aiSpace.id)
     expect(spaces.reactivateSpace(aiSpace.id).status).toBe('taken-over')
     expect(spaces.requireUserControl(aiSpace.id)).toBe(aiSpace.control)
   })
 
   it('用户接管后 AI 不能将空间标记为失败', () => {
     const { spaces } = createServices()
-    const space = spaces.createSpace({ controllerId: 'credential-a' })
+    const space = spaces.createSpace({})
     spaces.takeOver(space.id)
 
-    expect(() => spaces.failSpace(space.id, 'credential-a')).toThrow('空间已由用户接管')
+    expect(() => spaces.failSpace(space.id)).toThrow('空间已由用户接管')
   })
 
   it('完成后保留场景并停止机器人，重新激活时检查全局机器人 ID', () => {
     const { spaces } = createServices()
-    const first = spaces.createSpace({ controllerId: 'credential-a' })
+    const first = spaces.createSpace({})
     first.control.createBot({ id: '21001', name: '测试机器人', implementation: 'napcat', enabled: true })
 
-    spaces.completeSpace(first.id, 'credential-a')
+    spaces.completeSpace(first.id)
     expect(spaces.getSpace(first.id).status).toBe('completed')
     expect(spaces.getSpace(first.id).snapshot.participants.map(({ id }) => id)).toEqual(['21001'])
 
-    const second = spaces.createSpace({ controllerId: 'credential-b' })
+    const second = spaces.createSpace({})
     second.control.createBot({ id: '21001', name: '占用 ID 的机器人', implementation: 'llbot', enabled: true })
     expect(() => spaces.reactivateSpace(first.id)).toThrow('机器人 ID 已被活动场景占用：21001')
   })
@@ -100,9 +101,9 @@ describe('AI 测试空间', () => {
     const firstApp = new App()
     apps.push(firstApp)
     const firstSpaces = new SandboxTestSpaceService(firstApp, new SandboxRuntimeBotRegistry(), persistence)
-    const created = firstSpaces.createSpace({ controllerId: 'credential-a', name: '持久化测试' })
+    const created = firstSpaces.createSpace({ name: '持久化测试' })
     created.control.createUser({ id: '11001', name: '测试成员' })
-    firstSpaces.completeSpace(created.id, 'credential-a')
+    firstSpaces.completeSpace(created.id)
     await firstSpaces.waitForPersistence()
 
     const secondApp = new App()
@@ -113,7 +114,6 @@ describe('AI 测试空间', () => {
     expect(restoredSpaces.getSpace(created.id)).toMatchObject({
       name: '持久化测试',
       status: 'completed',
-      controllerId: 'credential-a',
     })
     expect(restoredSpaces.getSpace(created.id).snapshot.participants).toEqual([
       expect.objectContaining({ id: '11001', name: '测试成员' }),

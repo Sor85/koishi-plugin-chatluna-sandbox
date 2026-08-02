@@ -195,7 +195,6 @@ describe('SandboxMcpService', () => {
     expect(service.readResource(credential.token, 'onebot-sandbox://errors')).toEqual(expect.arrayContaining([
       'space_id_required',
       'space_taken_over',
-      'space_forbidden',
       'space_not_found',
       'space_unavailable',
       'test_spaces_unavailable',
@@ -255,6 +254,44 @@ describe('SandboxMcpService', () => {
     })
     const spaces = await service.callTool(credential.token, 'list_test_spaces', {}) as Array<{ id: string; status: string; snapshot: { participants: unknown[] } }>
     expect(spaces).toMatchObject([{ id: created.spaceId, status: 'completed', snapshot: { participants: [{ id: '11001' }] } }])
+  })
+
+  it('让所有有效凭证共享测试空间，同时保留 Scope 与接管限制', async () => {
+    const { service, credential, testSpaces } = createService(['read', 'manage'], true)
+    const rotated = service.createCredential('轮换凭证', ['read', 'manage'])
+    const readOnly = service.createCredential('只读凭证', ['read'])
+    const created = await service.callTool(credential.token, 'create_test_space', {
+      name: '跨凭证空间',
+      idempotencyKey: 'shared-space-create-1',
+    }) as { spaceId: string; revision: number }
+
+    await expect(service.callTool(rotated.token, 'list_test_spaces', {})).resolves.toMatchObject([
+      { id: created.spaceId, name: '跨凭证空间', status: 'running' },
+    ])
+    await expect(service.callTool(rotated.token, 'get_test_space', { spaceId: created.spaceId })).resolves.toMatchObject({
+      id: created.spaceId,
+      name: '跨凭证空间',
+    })
+    await service.callTool(rotated.token, 'apply_environment_changes', {
+      spaceId: created.spaceId,
+      expectedRevision: created.revision,
+      changes: [{ action: 'create-user', data: { id: '11001', name: '轮换后创建' } }],
+    })
+    await expect(service.callTool(readOnly.token, 'apply_environment_changes', {
+      spaceId: created.spaceId,
+      expectedRevision: 1,
+      changes: [],
+    })).rejects.toMatchObject({ code: 'permission_denied' })
+
+    testSpaces.takeOver(created.spaceId)
+    await expect(service.callTool(readOnly.token, 'get_scene_snapshot', { spaceId: created.spaceId })).resolves.toMatchObject({
+      participants: [expect.objectContaining({ id: '11001' })],
+    })
+    await expect(service.callTool(rotated.token, 'apply_environment_changes', {
+      spaceId: created.spaceId,
+      expectedRevision: 1,
+      changes: [],
+    })).rejects.toMatchObject({ code: 'space_taken_over' })
   })
 
   it('等待消息时按空间隔离并返回实际接收机器人的 ID', async () => {

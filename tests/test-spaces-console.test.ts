@@ -16,7 +16,7 @@ describe('AI 测试空间 Console 适配器', () => {
     const runtimeBots = new SandboxRuntimeBotRegistry()
     const control = new SandboxControlService(app, { runtimeBots })
     const spaces = new SandboxTestSpaceService(app, runtimeBots)
-    const space = spaces.createSpace({ controllerId: 'credential-a', name: 'Console 空间' })
+    const space = spaces.createSpace({ name: 'Console 空间' })
     const listeners = new Map<string, (...args: any[]) => any>()
     const registrar: SandboxConsoleRegistrar = { addEntry() {}, addListener(event, callback) { listeners.set(event, callback as never) }, broadcast() {} }
     registerConsole(registrar, control, appearance, undefined, spaces)
