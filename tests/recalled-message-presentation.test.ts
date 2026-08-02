@@ -7,7 +7,8 @@ import { Config } from '../src'
 import { SandboxControlService } from '../src/control-service'
 import { SandboxMcpService } from '../src/mcp/service'
 import { getOneBotMessageSequence } from '../src/onebot-profiles'
-import { isRecalledMessage } from '../src/types'
+import type { SandboxScenePersistence } from '../src/persistence'
+import { isRecalledMessage, type SandboxPersistenceStatus, type SandboxSnapshot } from '../src/types'
 
 const runningApps: App[] = []
 const temporaryDirectories: string[] = []
@@ -33,6 +34,41 @@ async function createControl() {
 
 async function emit(app: App, event: string, ...args: unknown[]) {
   await (app.parallel as unknown as (event: string, ...args: unknown[]) => Promise<void>)(event, ...args)
+}
+
+class TestScenePersistence implements SandboxScenePersistence {
+  private scene?: SandboxSnapshot
+  private status: SandboxPersistenceStatus = {
+    mode: 'database',
+    available: true,
+    persisted: false,
+  }
+
+  getStatus() {
+    return { ...this.status }
+  }
+
+  async load() {
+    return this.scene ? structuredClone(this.scene) : undefined
+  }
+
+  async save(scene: SandboxSnapshot) {
+    this.scene = structuredClone(scene)
+    this.status.persisted = true
+  }
+}
+
+async function createPersistedControl(persistence: SandboxScenePersistence, mediaDirectory: string) {
+  const app = new App()
+  let control: SandboxControlService | undefined
+  app.plugin((ctx) => {
+    control = new SandboxControlService(ctx, { persistence, mediaDirectory })
+  })
+  runningApps.push(app)
+  await app.start()
+  if (!control) throw new Error('沙盒控制服务未注册')
+  await control.waitForPersistence()
+  return { app, control }
 }
 
 describe('撤回消息生命周期与呈现', () => {
@@ -210,6 +246,47 @@ describe('撤回消息生命周期与呈现', () => {
       content: '本轮回复',
       chatLuna: expect.objectContaining({ thought: '本轮思考' }),
       lifecycle: expect.objectContaining({ status: 'recalled' }),
+    }))
+  })
+
+  it('场景导入导出与持久化重启保留撤回生命周期和权威原文', async () => {
+    const persistence = new TestScenePersistence()
+    const mediaDirectory = mkdtempSync(join(tmpdir(), 'onebot-sandbox-recall-persistence-'))
+    temporaryDirectories.push(mediaDirectory)
+    const { app: firstApp, control: first } = await createPersistedControl(persistence, mediaDirectory)
+    const sent = await first.sendMessage({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      content: '跨重启撤回原文',
+    })
+    await first.recallMessage({
+      operatorId: '10001',
+      messageId: sent.messageId,
+      conversationId: 'private:10001:20001',
+    })
+    await first.waitForPersistence()
+
+    const exported = first.getSnapshot()
+    const { control: imported } = await createControl()
+    imported.replaceScene(structuredClone(exported))
+    expect(imported.getSnapshot().messages.find(({ id }) => id === sent.messageId)).toEqual(expect.objectContaining({
+      content: '跨重启撤回原文',
+      lifecycle: expect.objectContaining({
+        status: 'recalled',
+        operatorId: '10001',
+        recalledAt: expect.any(String),
+      }),
+    }))
+
+    await firstApp.stop()
+    const { control: restored } = await createPersistedControl(persistence, mediaDirectory)
+    expect(restored.getSnapshot().messages.find(({ id }) => id === sent.messageId)).toEqual(expect.objectContaining({
+      content: '跨重启撤回原文',
+      lifecycle: expect.objectContaining({
+        status: 'recalled',
+        operatorId: '10001',
+        recalledAt: expect.any(String),
+      }),
     }))
   })
 
