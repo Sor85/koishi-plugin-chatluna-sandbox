@@ -113,6 +113,26 @@
   line-height: 20px;
 }
 
+.webqq-profile-card-note {
+  color: var(--webqq-text) !important;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.webqq-profile-card-section {
+  display: grid;
+  gap: 8px;
+}
+
+.webqq-profile-card-section h3 {
+  margin: 0;
+  color: var(--webqq-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  letter-spacing: 0.02em;
+}
+
 .webqq-profile-card-fields {
   display: grid;
   gap: 8px;

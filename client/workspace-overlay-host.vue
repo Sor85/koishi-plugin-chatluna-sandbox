@@ -66,14 +66,22 @@
         <div>
           <h2>{{ profileCard.name }}</h2>
           <p>{{ profileCard.identityLabel }} {{ profileCard.participantId }}</p>
+          <p v-if="profileCard.personalNote" class="webqq-profile-card-note">{{ profileCard.personalNote }}</p>
         </div>
       </div>
-      <dl class="webqq-profile-card-fields">
-        <div v-for="field in profileCard.fields" :key="field.label">
-          <dt>{{ field.label }}</dt>
-          <dd>{{ field.value }}</dd>
-        </div>
-      </dl>
+      <section
+        v-for="section in profileCardSections"
+        :key="section.group"
+        class="webqq-profile-card-section"
+      >
+        <h3>{{ section.label }}</h3>
+        <dl class="webqq-profile-card-fields">
+          <div v-for="field in section.fields" :key="`${section.group}:${field.label}:${field.value}`">
+            <dt>{{ field.label }}</dt>
+            <dd>{{ field.value }}</dd>
+          </div>
+        </dl>
+      </section>
     </div>
   </section>
 </template>
@@ -86,7 +94,7 @@ import { Input } from './components/ui/input'
 import EnvironmentEntityDialog from './environment-entity-dialog.vue'
 import WebqqAvatar from './webqq-avatar.vue'
 import { getFloatingPanelStyle } from './webqq/floating-panel'
-import type { ProfileCardModel } from './webqq/profile-card'
+import { groupProfileCardFields, type ProfileCardModel } from './webqq/profile-card'
 import type {
   ManageSandboxEnvironmentInput,
   SandboxBotProfile,
@@ -132,6 +140,7 @@ const groupActionInput = ref('')
 const groupActionCopy = computed(() => GROUP_ACTION_COPY[groupActionMode.value])
 const profileOpen = ref(false)
 const profileCard = ref<ProfileCardModel>()
+const profileCardSections = computed(() => profileCard.value ? groupProfileCardFields(profileCard.value.fields) : [])
 const profilePanelRef = ref<HTMLElement>()
 const profilePanelStyle = ref<Record<string, string>>({})
 

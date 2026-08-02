@@ -1,7 +1,11 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { buildGroupProfileCardModel, buildProfileCardModel } from '../client/webqq/profile-card'
+import {
+  buildGroupProfileCardModel,
+  buildProfileCardModel,
+  groupProfileCardFields,
+} from '../client/webqq/profile-card'
 import type { SandboxSnapshot } from '../src/types'
 
 const snapshot: SandboxSnapshot = {
@@ -44,7 +48,7 @@ const snapshot: SandboxSnapshot = {
 }
 
 describe('WebQQ 个人信息卡模型', () => {
-  it('只保留头像昵称、QQ 号、群资料和机器人运行状态', () => {
+  it('按账号、好友、群成员和机器人运行分组展示全部可用资料', () => {
     const card = buildProfileCardModel({
       snapshot,
       participantId: '20001',
@@ -56,14 +60,45 @@ describe('WebQQ 个人信息卡模型', () => {
       name: 'Koishi',
       avatarKind: 'bot',
       identityLabel: 'QQ',
+      personalNote: '机器人签名',
     })
     expect(card?.fields).toEqual([
-      { label: '所在群', value: '测试群' },
-      { label: '群名片', value: 'Koishi' },
-      { label: '群身份', value: '管理员' },
-      { label: '实现配置', value: 'NapCat' },
-      { label: '启用状态', value: '已启用' },
+      { group: 'account', label: '性别', value: '未知' },
+      { group: 'friendship', label: '测试用户1 的备注', value: '机器人备注' },
+      { group: 'group-member', label: '所在群', value: '测试群' },
+      { group: 'group-member', label: '群号', value: '30001' },
+      { group: 'group-member', label: '群身份', value: '管理员' },
+      { group: 'group-member', label: '群名片', value: 'Koishi' },
+      { group: 'bot-runtime', label: '实现配置', value: 'NapCat' },
+      { group: 'bot-runtime', label: '启用状态', value: '已启用' },
+      { group: 'bot-runtime', label: '已禁用能力', value: 'set_qq_profile' },
     ])
+    expect(groupProfileCardFields(card!.fields).map(({ label }) => label)).toEqual([
+      '账号资料',
+      '好友资料',
+      '群成员资料',
+      '机器人运行',
+    ])
+  })
+
+  it('用户卡片展示签名、账号字段和群成员字段，且不伪造缺失值', () => {
+    const card = buildProfileCardModel({
+      snapshot,
+      participantId: '10001',
+      groupId: '30001',
+    })
+    expect(card?.personalNote).toBe('用户签名')
+    expect(card?.fields).toEqual(expect.arrayContaining([
+      { group: 'account', label: '性别', value: '男' },
+      { group: 'account', label: '年龄', value: '20' },
+      { group: 'account', label: '城市', value: '杭州' },
+      { group: 'friendship', label: '备注 Koishi', value: '机器人备注' },
+      { group: 'group-member', label: '群名片', value: '群主名片' },
+      { group: 'group-member', label: '专属头衔', value: '元老' },
+      { group: 'group-member', label: '地区', value: '西湖' },
+      { group: 'group-member', label: '群等级', value: '5' },
+    ]))
+    expect(card?.fields.some(({ value }) => value === '未设置')).toBe(false)
   })
 
   it('群资料与 OneBot get_group_info 使用同一群事实', () => {
@@ -73,8 +108,8 @@ describe('WebQQ 个人信息卡模型', () => {
       avatarKind: 'group',
       identityLabel: '群号',
       fields: [
-        { label: '群成员', value: '2 人' },
-        { label: '群公告', value: '0 条' },
+        { group: 'group', label: '群成员', value: '2 人' },
+        { group: 'group', label: '群公告', value: '0 条' },
       ],
     })
   })
@@ -89,6 +124,7 @@ describe('WebQQ 个人信息卡模型', () => {
       },
       participantId: '10009',
     })
+    expect(card?.personalNote).toBeUndefined()
     expect(card?.fields).toEqual([])
   })
 })
@@ -102,6 +138,7 @@ describe('WebQQ 个人信息卡入口', () => {
     const groupMemberMenu = readFileSync(resolve('client/group-member-menu.vue'), 'utf8')
     const overlay = readFileSync(resolve('client/workspace-overlay-host.vue'), 'utf8')
     const page = readFileSync(resolve('client/page.vue'), 'utf8')
+    const styles = readFileSync(resolve('client/styles/webqq-overlays.css'), 'utf8')
 
     expect(messageList).toContain('查看资料')
     expect(messageList).toContain("emit('openProfile'")
@@ -119,8 +156,13 @@ describe('WebQQ 个人信息卡入口', () => {
     expect(overlay).not.toContain('aria-label="返回聊天"')
     expect(overlay).toContain('openProfile')
     expect(overlay).toContain('{{ profileCard.identityLabel }} {{ profileCard.participantId }}')
+    expect(overlay).toContain('profileCard.personalNote')
+    expect(overlay).toContain('profileCardSections')
     expect(overlay).toContain("document.addEventListener('pointerdown', closeProfileOnOutsidePointer)")
     expect(page).toContain('openProfile')
     expect(page).toContain('@open-group-profile="openGroupProfile"')
+    expect(styles).toContain('.webqq-profile-card-section')
+    expect(styles).toContain('var(--webqq-muted)')
+    expect(styles).toContain('var(--webqq-text)')
   })
 })
