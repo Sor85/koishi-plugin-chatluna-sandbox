@@ -176,20 +176,58 @@
                 <span class="webqq-group-member-copy">
                   <strong>{{ participant.name }}</strong>
                   <small>{{ participant.id }}</small>
+                  <template v-if="memberOf(participant.id)">
+                    <small>{{ memberOf(participant.id)!.card || '未设置群昵称' }}</small>
+                    <small>{{ memberRoleLabel(memberOf(participant.id)!.role) }}</small>
+                  </template>
+                  <small v-else>点击添加</small>
                 </span>
               </button>
-              <div v-if="memberOf(participant.id)" class="webqq-group-member-controls">
+              <button
+                v-if="memberOf(participant.id)"
+                type="button"
+                class="webqq-group-member-edit"
+                :aria-label="`编辑${participant.name}的群资料`"
+                @click="editingMemberId = participant.id"
+              >
+                <IconPencil aria-hidden="true" />
+              </button>
+            </article>
+          </div>
+          <div v-if="editingParticipant && editingMember" class="webqq-group-member-editor">
+            <div class="webqq-group-member-editor-heading">
+              <WebqqAvatar
+                :kind="editingParticipant.type"
+                :name="editingParticipant.name"
+                :avatar="editingParticipant.avatar"
+                :show-bot-badge="editingParticipant.type === 'bot'"
+              />
+              <span>
+                <strong>{{ editingParticipant.name }}</strong>
+                <small>{{ editingParticipant.id }}</small>
+              </span>
+              <Button type="button" variant="ghost" size="icon-sm" aria-label="关闭成员资料编辑" @click="editingMemberId = ''">
+                <IconX aria-hidden="true" />
+              </Button>
+            </div>
+            <div class="webqq-group-member-controls">
+              <div class="webqq-secondary-field">
+                <Label :for="`${fieldPrefix}-member-card`">群昵称</Label>
                 <Input
-                  :model-value="memberOf(participant.id)!.card"
-                  :aria-label="`${participant.name}的群昵称`"
+                  :id="`${fieldPrefix}-member-card`"
+                  :model-value="editingMember.card"
+                  :aria-label="`${editingParticipant.name}的群昵称`"
                   placeholder="群昵称"
-                  @update:model-value="setGroupMemberCard(participant.id, String($event))"
+                  @update:model-value="setGroupMemberCard(editingParticipant.id, String($event))"
                 />
+              </div>
+              <div class="webqq-secondary-field">
+                <Label :for="`${fieldPrefix}-member-role`">群身份</Label>
                 <Select
-                  :model-value="memberOf(participant.id)!.role"
-                  @update:model-value="setGroupMemberRole(participant.id, $event as SandboxGroupMember['role'])"
+                  :model-value="editingMember.role"
+                  @update:model-value="setGroupMemberRole(editingParticipant.id, $event as SandboxGroupMember['role'])"
                 >
-                  <SelectTrigger :aria-label="`${participant.name}的群身份`" class="w-full">
+                  <SelectTrigger :id="`${fieldPrefix}-member-role`" :aria-label="`${editingParticipant.name}的群身份`" class="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent :portal-to="selectPortalTarget">
@@ -199,8 +237,7 @@
                   </SelectContent>
                 </Select>
               </div>
-              <span v-else class="webqq-group-member-empty">点击头像添加</span>
-            </article>
+            </div>
           </div>
           <p v-if="!draft.members.length" class="webqq-secondary-hint m-0 text-xs">至少添加一位普通用户作为群主。</p>
         </section>
@@ -235,7 +272,7 @@
 </template>
 
 <script setup lang="ts">
-import { IconCheck, IconPlus, IconSearch } from '@tabler/icons-vue'
+import { IconCheck, IconPencil, IconPlus, IconSearch, IconX } from '@tabler/icons-vue'
 import { computed, reactive, ref, watch } from 'vue'
 import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
@@ -278,6 +315,7 @@ const busy = ref(false)
 const errorMessage = ref('')
 const capabilitySearch = ref('')
 const avatarPickerOpen = ref(false)
+const editingMemberId = ref('')
 const selectPortalTarget = ref<HTMLElement | null>(null)
 const draft = reactive<{
   id: string
@@ -301,6 +339,8 @@ const participants = computed(() => [
   ...props.users.map((user) => ({ ...user, type: 'user' as const })),
   ...props.bots.map((bot) => ({ ...bot, type: 'bot' as const })),
 ])
+const editingParticipant = computed(() => participants.value.find(({ id }) => id === editingMemberId.value))
+const editingMember = computed(() => memberOf(editingMemberId.value))
 const entityLabel = computed(() => props.target?.type === 'user' ? '用户' : props.target?.type === 'bot' ? '机器人' : '群组')
 const dialogTitle = computed(() => `${props.mode === 'edit' ? '编辑' : '删除'}${entityLabel.value}`)
 const dialogDescription = computed(() => props.mode === 'edit' ? '账号 ID 创建后不可修改。' : '此操作会同步移除相关会话和关系。')
@@ -329,6 +369,7 @@ watch([() => props.open, () => props.target], ([open]) => {
   errorMessage.value = ''
   capabilitySearch.value = ''
   avatarPickerOpen.value = false
+  editingMemberId.value = ''
   if (props.target?.type === 'user') {
     const value = props.users.find(({ id }) => id === props.target?.id)
     if (!value) return
@@ -449,12 +490,19 @@ function toggleGroupMember(participantId: string) {
   const index = draft.members.findIndex((member) => member.participantId === participantId)
   if (index >= 0) {
     draft.members.splice(index, 1)
+    if (editingMemberId.value === participantId) editingMemberId.value = ''
     return
   }
   const participant = participants.value.find(({ id }) => id === participantId)
   if (!participant) return
   const hasOwner = draft.members.some(({ role }) => role === 'owner')
   draft.members.push({ participantId, card: participant.name, role: hasOwner ? 'member' : 'owner' })
+}
+
+function memberRoleLabel(role?: SandboxGroupMember['role']) {
+  if (role === 'owner') return '群主'
+  if (role === 'admin') return '管理员'
+  return '成员'
 }
 
 function setGroupMemberRole(participantId: string, role: SandboxGroupMember['role']) {

@@ -235,32 +235,35 @@
 
 .webqq-group-member-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
 }
 
 .webqq-group-member-card {
+  position: relative;
   min-width: 0;
-  display: grid;
-  align-content: start;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid var(--webqq-border);
+  padding: 10px 8px;
+  border: 1px solid transparent;
   border-radius: 12px;
-  background: var(--webqq-panel);
-  transition: border-color 140ms ease, box-shadow 140ms ease;
+  background: transparent;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.webqq-group-member-card:hover {
+  background: var(--webqq-surface-muted);
 }
 
 .webqq-group-member-card.is-selected {
-  border-color: color-mix(in srgb, var(--webqq-accent) 44%, var(--webqq-border));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--webqq-accent) 8%, transparent);
+  border-color: color-mix(in srgb, var(--webqq-accent) 28%, transparent);
+  background: color-mix(in srgb, var(--webqq-accent) 6%, transparent);
 }
 
 .webqq-group-member-select {
+  width: 100%;
   min-width: 0;
   display: grid;
   justify-items: center;
-  gap: 8px;
+  gap: 7px;
   padding: 0;
   border: 0;
   color: var(--webqq-text);
@@ -280,14 +283,14 @@
 
 .webqq-group-member-avatar-wrap {
   position: relative;
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
 }
 
 .webqq-group-member-avatar {
-  --webqq-avatar-size: 52px;
-  width: 52px;
-  height: 52px;
+  --webqq-avatar-size: 48px;
+  width: 48px;
+  height: 48px;
   transition: box-shadow 140ms ease;
 }
 
@@ -295,8 +298,8 @@
   position: absolute;
   right: -2px;
   bottom: -2px;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   display: grid;
   place-items: center;
   border: 2px solid var(--webqq-panel);
@@ -311,12 +314,13 @@
 }
 
 .webqq-group-member-state svg {
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
   stroke-width: 2.5;
 }
 
 .webqq-group-member-copy {
+  width: 100%;
   min-width: 0;
   display: grid;
   gap: 1px;
@@ -330,39 +334,97 @@
 }
 
 .webqq-group-member-copy strong {
-  font-size: 13px;
-  line-height: 18px;
+  font-size: 12px;
+  line-height: 17px;
 }
 
 .webqq-group-member-copy small {
   color: var(--webqq-muted);
-  font-size: 11px;
-  line-height: 16px;
+  font-size: 10px;
+  line-height: 14px;
 }
 
-.webqq-group-member-controls {
-  display: grid;
-  gap: 6px;
-}
-
-.webqq-group-member-controls :is([data-slot='input'], [data-slot='select-trigger']) {
-  min-height: 32px;
-  height: 32px;
-  padding-inline: 9px;
-  font-size: 12px;
-}
-
-.webqq-group-member-empty {
-  min-height: 70px;
+.webqq-group-member-edit {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
   display: grid;
   place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--webqq-muted);
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+  transition: background 140ms ease, color 140ms ease, opacity 140ms ease;
+}
+
+.webqq-group-member-card:hover .webqq-group-member-edit,
+.webqq-group-member-edit:focus-visible {
+  opacity: 1;
+}
+
+.webqq-group-member-edit:hover,
+.webqq-group-member-edit:focus-visible {
+  color: var(--webqq-accent);
+  outline: none;
+  background: var(--webqq-panel);
+}
+
+.webqq-group-member-edit svg {
+  width: 14px;
+  height: 14px;
+}
+
+.webqq-group-member-editor {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--webqq-surface-muted);
+}
+
+.webqq-group-member-editor-heading {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 10px;
+}
+
+.webqq-group-member-editor-heading .webqq-identity-avatar {
+  --webqq-avatar-size: 40px;
+}
+
+.webqq-group-member-editor-heading > span {
+  min-width: 0;
+  display: grid;
+}
+
+.webqq-group-member-editor-heading strong {
+  font-size: 13px;
+}
+
+.webqq-group-member-editor-heading small {
   color: var(--webqq-muted);
   font-size: 11px;
 }
 
+.webqq-group-member-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
 @media (max-width: 640px) {
   .webqq-group-member-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .webqq-group-member-controls {
+    grid-template-columns: 1fr;
   }
 }
 
