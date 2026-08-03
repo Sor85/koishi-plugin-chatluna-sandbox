@@ -189,6 +189,183 @@
   border-top: 1px solid var(--webqq-border);
 }
 
+.webqq-group-editor-dialog {
+  width: min(760px, calc(100vw - 24px));
+}
+
+.webqq-group-members-editor {
+  display: grid;
+  gap: 12px;
+  padding-top: 16px;
+}
+
+.webqq-group-members-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.webqq-group-members-heading strong,
+.webqq-group-members-heading p {
+  margin: 0;
+}
+
+.webqq-group-members-heading strong {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.webqq-group-members-heading p {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.webqq-group-members-count {
+  flex: none;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: var(--webqq-accent);
+  background: color-mix(in srgb, var(--webqq-accent) 10%, transparent);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.webqq-group-member-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.webqq-group-member-card {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--webqq-border);
+  border-radius: 12px;
+  background: var(--webqq-panel);
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.webqq-group-member-card.is-selected {
+  border-color: color-mix(in srgb, var(--webqq-accent) 44%, var(--webqq-border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--webqq-accent) 8%, transparent);
+}
+
+.webqq-group-member-select {
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  color: var(--webqq-text);
+  background: transparent;
+  text-align: center;
+  cursor: pointer;
+}
+
+.webqq-group-member-select:hover .webqq-group-member-avatar,
+.webqq-group-member-select:focus-visible .webqq-group-member-avatar {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--webqq-accent) 14%, transparent);
+}
+
+.webqq-group-member-select:focus-visible {
+  outline: none;
+}
+
+.webqq-group-member-avatar-wrap {
+  position: relative;
+  width: 52px;
+  height: 52px;
+}
+
+.webqq-group-member-avatar {
+  --webqq-avatar-size: 52px;
+  width: 52px;
+  height: 52px;
+  transition: box-shadow 140ms ease;
+}
+
+.webqq-group-member-state {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--webqq-panel);
+  border-radius: 50%;
+  color: var(--webqq-muted);
+  background: var(--webqq-surface-muted);
+}
+
+.webqq-group-member-card.is-selected .webqq-group-member-state {
+  color: #fff;
+  background: var(--webqq-accent);
+}
+
+.webqq-group-member-state svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2.5;
+}
+
+.webqq-group-member-copy {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.webqq-group-member-copy strong,
+.webqq-group-member-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webqq-group-member-copy strong {
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.webqq-group-member-copy small {
+  color: var(--webqq-muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.webqq-group-member-controls {
+  display: grid;
+  gap: 6px;
+}
+
+.webqq-group-member-controls :is([data-slot='input'], [data-slot='select-trigger']) {
+  min-height: 32px;
+  height: 32px;
+  padding-inline: 9px;
+  font-size: 12px;
+}
+
+.webqq-group-member-empty {
+  min-height: 70px;
+  display: grid;
+  place-items: center;
+  color: var(--webqq-muted);
+  font-size: 11px;
+}
+
+@media (max-width: 640px) {
+  .webqq-group-member-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* 能力覆盖搜索框：控制台可能同时加载多个带 Tailwind 构建的插件样式表，后加载者的 .px-3
    会在层叠顺序上盖过本插件的 .pl-9，把左内边距压回 12px 导致图标与文字重叠。
    用更高优先级的专用类固定左内边距，不依赖工具类在样式表中的相对顺序。 */

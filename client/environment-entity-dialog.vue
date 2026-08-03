@@ -1,6 +1,9 @@
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
-    <DialogContent :style="{ '--webqq-accent': accentColor }">
+    <DialogContent
+      :class="{ 'webqq-group-editor-dialog': target?.type === 'group' && mode === 'edit' }"
+      :style="{ '--webqq-accent': accentColor }"
+    >
       <WebqqAvatarPicker
         v-if="avatarPickerOpen"
         :kind="target?.type ?? 'user'"
@@ -136,43 +139,68 @@
           </div>
         </template>
 
-        <section v-if="target?.type === 'group'" class="webqq-secondary-divider grid gap-2 pt-3">
-          <div class="flex items-center justify-between gap-3">
-            <strong class="text-sm">群成员</strong>
-            <Button type="button" variant="ghost" size="sm" @click="addGroupMember">
-              <IconPlus aria-hidden="true" /> 添加成员
-            </Button>
+        <section v-if="target?.type === 'group'" class="webqq-secondary-divider webqq-group-members-editor">
+          <div class="webqq-group-members-heading">
+            <div>
+              <strong>群成员</strong>
+              <p class="webqq-secondary-hint">点击头像添加或移除群成员。</p>
+            </div>
+            <span class="webqq-group-members-count">{{ draft.members.length }} / {{ participants.length }}</span>
           </div>
-          <div v-for="(member, index) in draft.members" :key="`${member.participantId}:${index}`" class="grid grid-cols-[minmax(0,1fr)_110px_32px] gap-2">
-            <Select v-model="member.participantId">
-              <SelectTrigger :aria-label="`第 ${index + 1} 位群成员`" class="w-full">
-                <SelectValue placeholder="选择参与者" />
-              </SelectTrigger>
-              <SelectContent :portal-to="selectPortalTarget">
-                <SelectItem v-for="participant in participants" :key="participant.id" :value="participant.id">
-                  {{ participant.name }}（{{ participant.id }}）
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <Select v-model="member.role">
-              <SelectTrigger :aria-label="`第 ${index + 1} 位群角色`" class="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent :portal-to="selectPortalTarget">
-                <SelectItem value="owner">群主</SelectItem>
-                <SelectItem value="admin">管理员</SelectItem>
-                <SelectItem value="member">成员</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button type="button" variant="ghost" size="icon-sm" class="text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40" :aria-label="`移除第 ${index + 1} 位成员`" @click="removeGroupMember(index)">
-              <IconTrash aria-hidden="true" />
-            </Button>
-            <Input
-              v-model="member.card"
-              class="col-span-3"
-              :aria-label="`第 ${index + 1} 位群名片`"
-              placeholder="群名片"
-            />
+          <div class="webqq-group-member-grid">
+            <article
+              v-for="participant in participants"
+              :key="participant.id"
+              :class="['webqq-group-member-card', { 'is-selected': memberOf(participant.id) }]"
+            >
+              <button
+                type="button"
+                class="webqq-group-member-select"
+                :aria-pressed="!!memberOf(participant.id)"
+                :aria-label="`${memberOf(participant.id) ? '移除' : '添加'}${participant.name}（${participant.id}）`"
+                @click="toggleGroupMember(participant.id)"
+              >
+                <span class="webqq-group-member-avatar-wrap">
+                  <WebqqAvatar
+                    class="webqq-group-member-avatar"
+                    :kind="participant.type"
+                    :name="participant.name"
+                    :avatar="participant.avatar"
+                    :show-bot-badge="participant.type === 'bot'"
+                  />
+                  <span class="webqq-group-member-state" aria-hidden="true">
+                    <IconCheck v-if="memberOf(participant.id)" />
+                    <IconPlus v-else />
+                  </span>
+                </span>
+                <span class="webqq-group-member-copy">
+                  <strong>{{ participant.name }}</strong>
+                  <small>{{ participant.id }}</small>
+                </span>
+              </button>
+              <div v-if="memberOf(participant.id)" class="webqq-group-member-controls">
+                <Input
+                  :model-value="memberOf(participant.id)!.card"
+                  :aria-label="`${participant.name}的群昵称`"
+                  placeholder="群昵称"
+                  @update:model-value="setGroupMemberCard(participant.id, String($event))"
+                />
+                <Select
+                  :model-value="memberOf(participant.id)!.role"
+                  @update:model-value="setGroupMemberRole(participant.id, $event as SandboxGroupMember['role'])"
+                >
+                  <SelectTrigger :aria-label="`${participant.name}的群身份`" class="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent :portal-to="selectPortalTarget">
+                    <SelectItem value="owner">群主</SelectItem>
+                    <SelectItem value="admin">管理员</SelectItem>
+                    <SelectItem value="member">成员</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <span v-else class="webqq-group-member-empty">点击头像添加</span>
+            </article>
           </div>
           <p v-if="!draft.members.length" class="webqq-secondary-hint m-0 text-xs">至少添加一位普通用户作为群主。</p>
         </section>
@@ -207,7 +235,7 @@
 </template>
 
 <script setup lang="ts">
-import { IconPlus, IconSearch, IconTrash } from '@tabler/icons-vue'
+import { IconCheck, IconPlus, IconSearch } from '@tabler/icons-vue'
 import { computed, reactive, ref, watch } from 'vue'
 import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
@@ -413,15 +441,30 @@ async function submitDelete() {
   if (props.target.type === 'group') await runAction({ action: 'delete-group', data: { id: props.target.id } })
 }
 
-function addGroupMember() {
-  const participant = participants.value.find(({ id }) => !draft.members.some(({ participantId }) => participantId === id))
-  if (!participant) return
-  const hasOwner = draft.members.some(({ role }) => role === 'owner')
-  draft.members.push({ participantId: participant.id, card: participant.name, role: hasOwner ? 'member' : 'owner' })
+function memberOf(participantId: string) {
+  return draft.members.find((member) => member.participantId === participantId)
 }
 
-function removeGroupMember(index: number) {
-  draft.members.splice(index, 1)
+function toggleGroupMember(participantId: string) {
+  const index = draft.members.findIndex((member) => member.participantId === participantId)
+  if (index >= 0) {
+    draft.members.splice(index, 1)
+    return
+  }
+  const participant = participants.value.find(({ id }) => id === participantId)
+  if (!participant) return
+  const hasOwner = draft.members.some(({ role }) => role === 'owner')
+  draft.members.push({ participantId, card: participant.name, role: hasOwner ? 'member' : 'owner' })
+}
+
+function setGroupMemberRole(participantId: string, role: SandboxGroupMember['role']) {
+  const member = memberOf(participantId)
+  if (member) member.role = role
+}
+
+function setGroupMemberCard(participantId: string, card: string) {
+  const member = memberOf(participantId)
+  if (member) member.card = card
 }
 
 </script>

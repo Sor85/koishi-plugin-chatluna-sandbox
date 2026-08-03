@@ -69,6 +69,24 @@ describe('环境管理组件传输边界', () => {
     expect(shell).toContain('avatar: resolveAvatar(participant.avatar)')
   })
 
+  it('群组编辑以全部用户和机器人头像管理成员资料', () => {
+    const source = readFileSync(resolve('client/environment-entity-dialog.vue'), 'utf8')
+    const styles = readFileSync(resolve('client/styles/webqq-overlays.css'), 'utf8')
+
+    expect(source).toContain('v-for="participant in participants"')
+    expect(source).toContain('class="webqq-group-member-avatar"')
+    expect(source).toContain(':show-bot-badge="participant.type === \'bot\'"')
+    expect(source).toContain('{{ participant.id }}')
+    expect(source).toContain('class="webqq-group-member-controls"')
+    expect(source).toContain('class="webqq-group-member-empty"')
+    expect(source).toContain('@click="toggleGroupMember(participant.id)"')
+    expect(source).toContain('`${participant.name}的群身份`')
+    expect(source).toContain('`${participant.name}的群昵称`')
+    expect(styles).toContain('.webqq-group-member-grid')
+    expect(styles).toContain('.webqq-group-member-card.is-selected')
+    expect(styles).toContain('@media (max-width: 640px)')
+  })
+
   it('机器人编辑 Dialog 使用 shadcn-vue 能力覆盖控件', () => {
     const source = readFileSync(resolve('client/environment-entity-dialog.vue'), 'utf8')
 
