@@ -47,7 +47,7 @@
 
     <div v-else v-webqq-scrollbar class="directory-list">
       <article v-for="group in snapshot.groups" :key="group.id" class="directory-card">
-        <WebqqAvatar class="directory-avatar" kind="group" :name="group.name" />
+        <WebqqAvatar class="directory-avatar" kind="group" :name="group.name" :avatar="group.avatar" />
         <span class="directory-copy"><strong>{{ group.name }}</strong><small>{{ group.id }} · {{ group.members.length }} 人</small></span>
       </article>
     </div>

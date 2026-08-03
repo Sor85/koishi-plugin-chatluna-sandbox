@@ -44,6 +44,31 @@ describe('环境管理组件传输边界', () => {
     expect(overlaySource.match(/<Dialog /g)).toHaveLength(2)
   })
 
+  it('三类实体编辑与创建表单通过二级页面选择内置或本地头像', () => {
+    const source = readFileSync(resolve('client/environment-entity-dialog.vue'), 'utf8')
+    const picker = readFileSync(resolve('client/webqq-avatar-picker.vue'), 'utf8')
+    const create = readFileSync(resolve('client/environment-create-popover.vue'), 'utf8')
+    const shell = readFileSync(resolve('client/webqq/workspace-shell.ts'), 'utf8')
+
+    expect(source).toContain('<WebqqAvatarPicker')
+    expect(source).toContain('class="webqq-avatar-editor-trigger"')
+    expect(source).toContain(':kind="target?.type ?? \'user\'"')
+    expect(source).toContain('avatar: draft.avatar')
+    expect(create).toContain('<WebqqAvatarPicker')
+    expect(create).toContain('input-id="environment-create-avatar-file"')
+    expect(create).toContain('...(draft.avatar ? { avatar: draft.avatar } : {})')
+    expect(picker).toContain('v-for="avatar in avatars"')
+    expect(picker).toContain('class="webqq-avatar-picker-file-input"')
+    expect(picker).toContain('class="webqq-avatar-picker-upload-button"')
+    expect(picker).toContain('上传本地图片')
+    expect(picker).not.toContain('<Input')
+    expect(picker).toContain('type="file"')
+    expect(picker).toContain('accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"')
+    expect(picker).toContain('reader.readAsDataURL(file)')
+    expect(shell).toContain('users: users.value.map((user) => ({ ...user, avatar: resolveAvatar(user.avatar) }))')
+    expect(shell).toContain('avatar: resolveAvatar(participant.avatar)')
+  })
+
   it('机器人编辑 Dialog 使用 shadcn-vue 能力覆盖控件', () => {
     const source = readFileSync(resolve('client/environment-entity-dialog.vue'), 'utf8')
 
@@ -79,7 +104,7 @@ describe('环境管理组件传输边界', () => {
     expect(entityDialog).toContain('class="webqq-secondary-form"')
     expect(overlayHost.match(/<DialogHeader>/g)).toHaveLength(2)
     expect(overlayHost.match(/<DialogFooter>/g)).toHaveLength(2)
-    expect(createPopover).toContain('<form class="webqq-secondary-form"')
+    expect(createPopover).toContain('class="webqq-secondary-form"')
   })
 
   it('危险按钮和下拉浮层使用统一控件基线，避免 Portal 中样式退化', () => {

@@ -28,7 +28,7 @@ function avatarOf(control: SandboxControlService, id: string) {
 }
 
 describe('稳定实体头像', () => {
-  it('为默认实体生成稳定且按类型与 ID 区分的头像', async () => {
+  it('为默认实体生成受管头像，并在改名后保持头像不变', async () => {
     const first = await createControl()
     const firstReferences = first.control.getSnapshot().participants.map(({ avatar }) => avatar)
     const firstGroup = first.control.getSnapshot().groups[0].avatar
@@ -40,8 +40,8 @@ describe('稳定实体头像', () => {
     expect(avatarOf(first.control, '10001')).toBe(firstReferences[0])
 
     const second = await createControl()
-    expect(avatarOf(second.control, '10001')).toBe(firstReferences[0])
-    expect(second.control.getSnapshot().groups[0].avatar).toBe(firstGroup)
+    expect(avatarOf(second.control, '10001')).toMatch(/^sandbox-media:\/\//)
+    expect(second.control.getSnapshot().groups[0].avatar).toMatch(/^sandbox-media:\/\//)
   })
 
   it('相同内容去重，并在最后一个引用移除后回收媒体', async () => {

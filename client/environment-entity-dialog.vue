@@ -1,12 +1,30 @@
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
     <DialogContent :style="{ '--webqq-accent': accentColor }">
+      <WebqqAvatarPicker
+        v-if="avatarPickerOpen"
+        :kind="target?.type ?? 'user'"
+        :model-value="draft.avatar"
+        :input-id="`${fieldPrefix}-avatar-file`"
+        @back="avatarPickerOpen = false"
+        @select="selectAvatar"
+      />
+      <template v-else>
       <DialogHeader>
         <DialogTitle>{{ dialogTitle }}</DialogTitle>
         <DialogDescription>{{ dialogDescription }}</DialogDescription>
       </DialogHeader>
 
       <form v-if="mode === 'edit'" class="webqq-secondary-form" @submit.prevent="submitEdit">
+        <button
+          type="button"
+          class="webqq-avatar-editor-trigger"
+          aria-label="选择头像"
+          @click="avatarPickerOpen = true"
+        >
+          <WebqqAvatar :kind="target?.type ?? 'user'" :name="draft.name" :avatar="draft.avatar || entity?.avatar" />
+          <span>点击更换头像</span>
+        </button>
         <div class="webqq-secondary-field">
           <Label :for="`${fieldPrefix}-id`">{{ target?.type === 'group' ? '群号' : 'QQ ID' }}</Label>
           <Input
@@ -183,6 +201,7 @@
         ref="selectPortalTarget"
         class="pointer-events-none absolute inset-0 z-[170] [&_[data-reka-popper-content-wrapper]]:pointer-events-auto"
       />
+      </template>
     </DialogContent>
   </Dialog>
 </template>
@@ -198,6 +217,8 @@ import { Input } from './components/ui/input'
 import { Label } from './components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
 import { getOneBotProfileBaseline } from '../src/onebot-profiles'
+import WebqqAvatar from './webqq-avatar.vue'
+import WebqqAvatarPicker from './webqq-avatar-picker.vue'
 import type {
   ManageSandboxEnvironmentInput,
   SandboxAccountSex,
@@ -228,17 +249,19 @@ const emit = defineEmits<{
 const busy = ref(false)
 const errorMessage = ref('')
 const capabilitySearch = ref('')
+const avatarPickerOpen = ref(false)
 const selectPortalTarget = ref<HTMLElement | null>(null)
 const draft = reactive<{
   id: string
   name: string
+  avatar: string
   personalNote: string
   sex: 'unset' | SandboxAccountSex
   implementation: SandboxImplementationProfile
   enabled: boolean
   disabledCapabilities: string[]
   members: SandboxGroupMember[]
-}>({ id: '', name: '', personalNote: '', sex: 'unset', implementation: 'napcat', enabled: true, disabledCapabilities: [], members: [] })
+}>({ id: '', name: '', avatar: '', personalNote: '', sex: 'unset', implementation: 'napcat', enabled: true, disabledCapabilities: [], members: [] })
 
 const entity = computed(() => {
   if (props.target?.type === 'user') return props.users.find(({ id }) => id === props.target?.id)
@@ -277,12 +300,14 @@ watch([() => props.open, () => props.target], ([open]) => {
   if (!open) return
   errorMessage.value = ''
   capabilitySearch.value = ''
+  avatarPickerOpen.value = false
   if (props.target?.type === 'user') {
     const value = props.users.find(({ id }) => id === props.target?.id)
     if (!value) return
     Object.assign(draft, {
       id: value.id,
       name: value.name,
+      avatar: value.avatar ?? '',
       personalNote: value.profile?.personalNote ?? '',
       sex: value.profile?.sex ?? 'unset',
       implementation: 'napcat',
@@ -295,6 +320,7 @@ watch([() => props.open, () => props.target], ([open]) => {
     if (!value) return
     Object.assign(draft, {
       ...value,
+      avatar: value.avatar ?? '',
       personalNote: value.profile?.personalNote ?? '',
       sex: value.profile?.sex ?? 'unset',
       disabledCapabilities: value.disabledCapabilities ?? [],
@@ -306,6 +332,7 @@ watch([() => props.open, () => props.target], ([open]) => {
     Object.assign(draft, {
       id: value.id,
       name: value.name,
+      avatar: value.avatar ?? '',
       personalNote: '',
       sex: 'unset',
       implementation: 'napcat',
@@ -338,6 +365,12 @@ function buildAccountProfile() {
   return Object.keys(profile).length ? profile : undefined
 }
 
+function selectAvatar(avatar: string) {
+  draft.avatar = avatar
+  avatarPickerOpen.value = false
+  errorMessage.value = ''
+}
+
 async function submitEdit() {
   if (props.target?.type === 'user') {
     await runAction({
@@ -345,6 +378,7 @@ async function submitEdit() {
       data: {
         id: draft.id,
         name: draft.name,
+        avatar: draft.avatar,
         profile: buildAccountProfile(),
       },
     })
@@ -357,11 +391,12 @@ async function submitEdit() {
         implementation: draft.implementation,
         enabled: draft.enabled,
         disabledCapabilities: [...draft.disabledCapabilities],
+        avatar: draft.avatar,
         profile: buildAccountProfile(),
       },
     })
   } else if (props.target?.type === 'group') {
-    await runAction({ action: 'update-group', data: { id: draft.id, name: draft.name, members: draft.members.map((member) => ({ ...member })) } })
+    await runAction({ action: 'update-group', data: { id: draft.id, name: draft.name, avatar: draft.avatar, members: draft.members.map((member) => ({ ...member })) } })
   }
 }
 

@@ -10,7 +10,16 @@
       :aria-label="title"
       :style="{ '--webqq-accent': accentColor }"
     >
-      <form class="webqq-secondary-form" @submit.prevent="submit">
+      <form v-if="!avatarPickerOpen" class="webqq-secondary-form" @submit.prevent="submit">
+        <button
+          type="button"
+          class="webqq-avatar-editor-trigger"
+          aria-label="选择头像"
+          @click="avatarPickerOpen = true"
+        >
+          <WebqqAvatar :kind="effectiveType" :name="draft.name" :avatar="draft.avatar" />
+          <span>点击选择头像</span>
+        </button>
         <header class="grid gap-1">
           <strong class="text-sm">{{ title }}</strong>
           <p class="webqq-secondary-hint m-0 text-xs leading-5">{{ description }}</p>
@@ -100,6 +109,14 @@
           {{ busy ? '创建中...' : submitLabel }}
         </Button>
       </form>
+      <WebqqAvatarPicker
+        v-else
+        :kind="effectiveType"
+        :model-value="draft.avatar"
+        input-id="environment-create-avatar-file"
+        @back="avatarPickerOpen = false"
+        @select="selectAvatar"
+      />
       <!-- 下拉层挂在父 Popover 内的绝对定位宿主，避免外部点击误判，同时不参与表单高度计算。 -->
       <div
         ref="selectPortalTarget"
@@ -118,6 +135,8 @@ import { Input } from './components/ui/input'
 import { Label } from './components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
+import WebqqAvatar from './webqq-avatar.vue'
+import WebqqAvatarPicker from './webqq-avatar-picker.vue'
 import type {
   ManageSandboxEnvironmentInput,
   SandboxBotProfile,
@@ -146,7 +165,8 @@ const emit = defineEmits<{
 const open = ref(false)
 const busy = ref(false)
 const errorMessage = ref('')
-const draft = reactive({ id: '', name: '', personalNote: '' })
+const draft = reactive({ id: '', name: '', avatar: '', personalNote: '' })
+const avatarPickerOpen = ref(false)
 const participantType = ref<ParticipantCreateType>('user')
 const botImplementation = ref<SandboxImplementationProfile>('napcat')
 const botEnabled = ref(true)
@@ -173,7 +193,9 @@ watch(open, (value) => {
   errorMessage.value = ''
   draft.id = ''
   draft.name = ''
+  draft.avatar = ''
   draft.personalNote = ''
+  avatarPickerOpen.value = false
   participantType.value = 'user'
   botImplementation.value = 'napcat'
   botEnabled.value = true
@@ -195,10 +217,15 @@ async function submit() {
   }
 }
 
+function selectAvatar(avatar: string) {
+  draft.avatar = avatar
+  avatarPickerOpen.value = false
+}
+
 function createInput(): ManageSandboxEnvironmentInput | undefined {
   const profile = draft.personalNote.trim() ? { personalNote: draft.personalNote.trim() } : undefined
   if (effectiveType.value === 'user') {
-    return { action: 'create-user', data: { id: draft.id, name: draft.name, ...(profile ? { profile } : {}) } }
+    return { action: 'create-user', data: { id: draft.id, name: draft.name, ...(draft.avatar ? { avatar: draft.avatar } : {}), ...(profile ? { profile } : {}) } }
   }
   if (effectiveType.value === 'bot') {
     return {
@@ -208,6 +235,7 @@ function createInput(): ManageSandboxEnvironmentInput | undefined {
         name: draft.name,
         implementation: botImplementation.value,
         enabled: botEnabled.value,
+        ...(draft.avatar ? { avatar: draft.avatar } : {}),
         ...(profile ? { profile } : {}),
       },
     }
@@ -219,6 +247,7 @@ function createInput(): ManageSandboxEnvironmentInput | undefined {
     data: {
       id: draft.id,
       name: draft.name,
+      ...(draft.avatar ? { avatar: draft.avatar } : {}),
       members: [
         { participantId: owner.id, card: owner.name, role: 'owner' },
         ...props.bots

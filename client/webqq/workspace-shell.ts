@@ -57,7 +57,7 @@ export function createWebqqWorkspaceShell(
   const appearance = computed(() => workspace.value.appearance)
   const currentOperator = computed(() => snapshot.value.participants.find(({ id }) => id === currentOperatorId.value))
   const composerSenders = computed<WebqqComposerSender[]>(() => workspaceController.composer.value.participants
-    .map((participant) => ({ ...participant })))
+    .map((participant) => ({ ...participant, avatar: resolveAvatar(participant.avatar) })))
   const visibleConversations = computed<SandboxConversation[]>(() => workspaceController.sidebar.value.conversations
     .map((conversation) => ({ ...conversation, messageIds: [...conversation.messageIds] })))
   const currentConversation = computed(() => visibleConversations.value.find(({ id }) => id === activeConversationId.value))
@@ -220,9 +220,9 @@ export function createWebqqWorkspaceShell(
     groupNames: Object.fromEntries(snapshot.value.groups.map(({ id, name }) => [id, name])),
   }))
   const overlayModel = computed(() => ({
-    users: users.value,
-    bots: bots.value,
-    groups: snapshot.value.groups,
+    users: users.value.map((user) => ({ ...user, avatar: resolveAvatar(user.avatar) })),
+    bots: bots.value.map((bot) => ({ ...bot, avatar: resolveAvatar(bot.avatar) })),
+    groups: snapshot.value.groups.map((group) => ({ ...group, avatar: resolveAvatar(group.avatar) })),
     accentColor: appearance.value.webQQAccentColor,
   }))
   const environmentModel = computed(() => ({

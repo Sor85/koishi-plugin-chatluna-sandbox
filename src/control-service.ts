@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { Context, h, Random, Universal } from 'koishi'
 import { resolve } from 'node:path'
 import { SandboxBot } from './bot'
+import { BUILTIN_AVATARS, getBuiltinAvatarReference, pickUnusedBuiltinAvatar } from './builtin-avatars'
 import { SandboxChatLunaStateStore } from './chatluna-state'
 import { SandboxMediaStorage, MAX_MEDIA_SIZE } from './media-storage'
 import { SandboxOneBotDebugStore, createOneBotDebugError, type AppendOneBotDebugRecordInput, type SandboxOneBotDebugPersistence } from './onebot-debug'
@@ -350,12 +351,12 @@ export class SandboxControlService {
   private ensureStableAvatars(): void {
     for (const participant of this.scene.participants) {
       if (!participant.avatar || !this.hasManagedAvatar(participant.avatar)) {
-        participant.avatar = this.createDefaultAvatar(participant.kind, participant.id)
+        participant.avatar = this.createDefaultAvatar(participant.kind)
       }
     }
     for (const group of this.scene.groups) {
       if (!group.avatar || !this.hasManagedAvatar(group.avatar)) {
-        group.avatar = this.createDefaultAvatar('group', group.id)
+        group.avatar = this.createDefaultAvatar('group')
       }
     }
   }
@@ -365,12 +366,23 @@ export class SandboxControlService {
     return !!id && this.mediaStorage.exists(id)
   }
 
-  private createDefaultAvatar(kind: 'user' | 'bot' | 'group', entityId: string): string {
-    // 默认图只依赖实体类型与稳定 ID，昵称/群名变更不会改图。
-    const labels = { user: 'U', bot: 'B', group: 'G' } as const
-    const label = labels[kind]
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128"><rect width="128" height="128" rx="28" fill="#2563eb"/><text x="64" y="78" fill="white" font-family="sans-serif" font-size="48" text-anchor="middle">${label}${entityId.slice(-2)}</text></svg>`
-    return this.saveAvatar(`${kind}-${entityId}-default.svg`, 'image/svg+xml', Buffer.from(svg).toString('base64'))
+  private createDefaultAvatar(kind: 'user' | 'bot' | 'group'): string {
+    const pool = BUILTIN_AVATARS[kind]
+    const used = new Set(kind === 'group'
+      ? this.scene.groups.map(({ avatar }) => avatar).filter((avatar): avatar is string => !!avatar)
+      : this.scene.participants
+          .filter((participant) => participant.kind === kind && participant.avatar)
+          .map((participant) => participant.avatar!))
+    // 先按内容寻址引用选出未占用项，再只物化被选中的图片，避免未分配池项成为无主媒体。
+    const selected = pickUnusedBuiltinAvatar(
+      pool,
+      new Set(pool.filter((avatar) => used.has(getBuiltinAvatarReference(avatar)))),
+    )
+    return this.saveAvatar(
+      `builtin-${kind}-${selected.id}.svg`,
+      'image/svg+xml',
+      Buffer.from(selected.svg).toString('base64'),
+    )
   }
 
   private requireManagedAvatar(reference: string): string {
@@ -383,7 +395,7 @@ export class SandboxControlService {
 
   private normalizeLocalAvatar(kind: 'user' | 'bot' | 'group', entityId: string, input?: string): string {
     const value = input?.trim()
-    if (!value) return this.createDefaultAvatar(kind, entityId)
+    if (!value) return this.createDefaultAvatar(kind)
     if (value.startsWith('sandbox-media://')) return this.requireManagedAvatar(value)
     const dataUrl = value.match(/^data:([^;,]+);base64,(.+)$/s)
     if (dataUrl) return this.saveAvatar(`${kind}-${entityId}-avatar`, dataUrl[1], dataUrl[2])
@@ -582,7 +594,7 @@ export class SandboxControlService {
     const name = this.validateName(input.name, '用户昵称')
     const avatar = input.avatar !== undefined
       ? this.normalizeLocalAvatar('user', user.id, input.avatar)
-      : (user.avatar ?? this.createDefaultAvatar('user', user.id))
+      : (user.avatar ?? this.createDefaultAvatar('user'))
     let profile = user.profile
     // 头像导入可能失败，先完成所有校验和媒体写入，再修改场景，避免后续成功操作持久化半成品。
     if (input.profile !== undefined) profile = normalizeAccountProfile(input.profile)
@@ -655,7 +667,7 @@ export class SandboxControlService {
     const name = this.validateName(input.name, '机器人昵称')
     const avatar = input.avatar !== undefined
       ? this.normalizeLocalAvatar('bot', bot.id, input.avatar)
-      : (bot.avatar ?? this.createDefaultAvatar('bot', bot.id))
+      : (bot.avatar ?? this.createDefaultAvatar('bot'))
     const disabledCapabilities = normalizeDisabledCapabilities(input.implementation, input.disabledCapabilities)
     let profile = bot.profile
     if (input.profile !== undefined) profile = normalizeAccountProfile(input.profile)
@@ -686,8 +698,8 @@ export class SandboxControlService {
     if (!bot) throw new Error(`机器人不存在：${botId}`)
     const name = input.name !== undefined ? this.validateName(input.name, '机器人昵称') : bot.name
     const avatar = input.avatar !== undefined
-      ? (await this.importAvatar('bot', bot.id, input.avatar) ?? this.createDefaultAvatar('bot', bot.id))
-      : (bot.avatar ?? this.createDefaultAvatar('bot', bot.id))
+      ? (await this.importAvatar('bot', bot.id, input.avatar) ?? this.createDefaultAvatar('bot'))
+      : (bot.avatar ?? this.createDefaultAvatar('bot'))
     const profile = input.personalNote !== undefined || input.sex !== undefined
       ? mergeAccountProfile(bot.profile, {
         ...(input.personalNote !== undefined ? { personalNote: input.personalNote } : {}),
@@ -754,7 +766,7 @@ export class SandboxControlService {
     const name = this.validateName(input.name, '群名称')
     const avatar = input.avatar !== undefined
       ? this.normalizeLocalAvatar('group', group.id, input.avatar)
-      : (group.avatar ?? this.createDefaultAvatar('group', group.id))
+      : (group.avatar ?? this.createDefaultAvatar('group'))
     const members = this.validateGroupMembers(input.members)
     group.name = name
     group.avatar = avatar
@@ -1579,7 +1591,7 @@ export class SandboxControlService {
     for (const participant of this.scene.participants) {
       const previous = participant.avatar
       if (!previous || (previous.startsWith('sandbox-media://') && !this.hasManagedAvatar(previous))) {
-        participant.avatar = this.createDefaultAvatar(participant.kind, participant.id)
+        participant.avatar = this.createDefaultAvatar(participant.kind)
         changed = true
         continue
       }
@@ -1588,14 +1600,14 @@ export class SandboxControlService {
         participant.avatar = await this.importAvatar(participant.kind, participant.id, previous)
       } catch (error) {
         this.ctx.logger('onebot-sandbox').warn(`参与者头像规范化失败，已替换为默认值：${participant.id}`, error)
-        participant.avatar = this.createDefaultAvatar(participant.kind, participant.id)
+        participant.avatar = this.createDefaultAvatar(participant.kind)
       }
       changed = true
     }
     for (const group of this.scene.groups) {
       const previous = group.avatar
       if (!previous || (previous.startsWith('sandbox-media://') && !this.hasManagedAvatar(previous))) {
-        group.avatar = this.createDefaultAvatar('group', group.id)
+        group.avatar = this.createDefaultAvatar('group')
         changed = true
         continue
       }
@@ -1604,7 +1616,7 @@ export class SandboxControlService {
         group.avatar = await this.importAvatar('group', group.id, previous)
       } catch (error) {
         this.ctx.logger('onebot-sandbox').warn(`群头像规范化失败，已替换为默认值：${group.id}`, error)
-        group.avatar = this.createDefaultAvatar('group', group.id)
+        group.avatar = this.createDefaultAvatar('group')
       }
       changed = true
     }
