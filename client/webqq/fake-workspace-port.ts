@@ -47,13 +47,13 @@ export class FakeWorkspacePort implements WorkspacePort {
     capacity: { recordCount: 0, totalBytes: 0, maxRecords: 5000, maxBytes: 50 * 1024 * 1024 },
   }
   clearDebugRecordsResult: ClearSandboxOneBotDebugRecordsResult = { cleared: 0 }
-  private readonly failures = new Map<WorkspacePortOperation, Error[]>()
+  private readonly failures = new Map<WorkspacePortOperation, unknown[]>()
 
   constructor(workspace: SandboxWorkspaceState) {
     this.workspaceResult = workspace
   }
 
-  rejectNext(operation: WorkspacePortOperation, error: Error) {
+  rejectNext(operation: WorkspacePortOperation, error: unknown) {
     this.failures.set(operation, [...this.failures.get(operation) ?? [], error])
   }
 

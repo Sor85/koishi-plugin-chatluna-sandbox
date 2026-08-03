@@ -42,8 +42,19 @@ export class WorkspaceControllerError extends Error {
   }
 }
 
+function workspaceErrorMessage(error: unknown, fallback: string) {
+  const message = error instanceof Error
+    ? error.message
+    : typeof error === 'string'
+      ? error
+      : error && typeof error === 'object' && 'message' in error
+        ? String(error.message ?? '')
+        : ''
+  return message.trim().split(/\r?\n/, 1)[0]?.replace(/^Error:\s*/, '') || fallback
+}
+
 function normalizeWorkspaceError(error: unknown, fallback: string) {
-  return new WorkspaceControllerError(error instanceof Error ? error.message : fallback)
+  return new WorkspaceControllerError(workspaceErrorMessage(error, fallback))
 }
 
 export type WorkspaceParticipant = SandboxParticipant & { type: SandboxParticipant['kind'] }

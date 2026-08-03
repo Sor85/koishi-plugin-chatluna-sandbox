@@ -807,6 +807,29 @@ describe('WebQQ 工作区控制模块', () => {
     expect(controller.currentOperatorId.value).toBe('10099')
   })
 
+  it('环境管理失败时保留 Console RPC 返回的具体原因', async () => {
+    const port = createFakeWorkspacePort(workspace)
+    const controller = createWorkspaceController(port, createStorage())
+    await controller.load()
+    port.rejectNext('manageEnvironment', 'Error: 群组必须有一个群主\n    at SandboxControlService.validateGroupMembers')
+
+    await expect(controller.manageEnvironment({
+      action: 'update-group',
+      data: {
+        id: '30001',
+        name: '测试群',
+        members: snapshot.groups[0]!.members.map((member) => ({ ...member, role: 'member' })),
+      },
+    })).rejects.toMatchObject({
+      name: 'WorkspaceControllerError',
+      message: '群组必须有一个群主',
+    })
+
+    expect(controller.currentOperatorId.value).toBe('10001')
+    expect(controller.activeConversationId.value).toBe('private:10001:20001')
+    expect(controller.sidebar.value.revision).toBe(7)
+  })
+
   it('环境管理失败时保留工作区和当前选择', async () => {
     const port = createFakeWorkspacePort(workspace)
     const controller = createWorkspaceController(port, createStorage())
