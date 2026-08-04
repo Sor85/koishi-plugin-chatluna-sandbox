@@ -27,7 +27,16 @@
           <SelectContent>
             <SelectItem value="all">全部机器人</SelectItem>
             <SelectItem v-for="bot in bots" :key="getBotKey(bot)" :value="getBotKey(bot)">
-              {{ bot.name }} · {{ bot.id }} · {{ bot.source.name }}
+              <span class="webqq-debug-bot-option">
+                <WebqqAvatar
+                  class="webqq-debug-bot-avatar"
+                  kind="bot"
+                  :name="bot.name"
+                  :avatar="bot.avatar"
+                  :show-bot-badge="false"
+                />
+                <span class="webqq-debug-bot-copy">{{ bot.name }} · {{ bot.id }} · {{ bot.source.name }}</span>
+              </span>
             </SelectItem>
           </SelectContent>
         </Select>
@@ -109,6 +118,7 @@ import { Button } from './components/ui/button'
 import { Checkbox } from './components/ui/checkbox'
 import { Input } from './components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
+import WebqqAvatar from './webqq-avatar.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type {
   GetSandboxOneBotDebugRecordsInput,

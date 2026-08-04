@@ -61,6 +61,29 @@
   width: 100%;
 }
 
+.webqq-debug-bot-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.webqq-debug-bot-avatar {
+  --webqq-avatar-size: 20px;
+
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border-radius: 50%;
+  font-size: 9px;
+}
+
+.webqq-debug-bot-copy {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .webqq-debug-error-filter {
   align-self: end;
   min-height: 40px;

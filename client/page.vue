@@ -170,6 +170,7 @@ const {
   recallMessage,
   setMessageReaction,
   requestFriend,
+  resolveAvatar,
   saveFriendRemark,
   saveGroupAction,
   selectComposerOperator,
@@ -209,6 +210,7 @@ const isWebqqView = computed(() => currentView.value === 'messages' || currentVi
 const debugBots = computed<SandboxDirectoryBot[]>(() => [
   ...getSandboxBots(mainSnapshot.value).map((bot) => ({
     ...bot,
+    avatar: resolveAvatar(bot.avatar),
     source: { type: 'main' as const, name: '主环境' },
   })),
   ...testSpaces.value.flatMap((space) => getSandboxBots(space.snapshot).map((bot) => ({

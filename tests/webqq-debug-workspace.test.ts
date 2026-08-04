@@ -12,6 +12,7 @@ describe('WebQQ OneBot 调试工作台', () => {
     expect(sidebarSource).toContain('IconBug')
     expect(pageSource).toContain("currentView === 'debug'")
     expect(pageSource).toContain('<OneBotDebugWorkspace')
+    expect(pageSource).toContain('avatar: resolveAvatar(bot.avatar)')
     expect(debugSource).toContain("from './components/ui/select'")
     expect(debugSource).toContain("from './components/ui/checkbox'")
     expect(debugSource).toContain("from './components/ui/button'")
@@ -23,6 +24,10 @@ describe('WebQQ OneBot 调试工作台', () => {
     expect(debugSource).toContain('record.source.name')
     expect(debugSource).toContain('getRecordKey(record)')
     expect(debugSource).toContain('SandboxDirectoryBot')
+    expect(debugSource).toContain("import WebqqAvatar from './webqq-avatar.vue'")
+    expect(debugSource).toContain('class="webqq-debug-bot-avatar"')
+    expect(debugSource).toContain(':avatar="bot.avatar"')
+    expect(debugSource).toContain(':show-bot-badge="false"')
     expect(debugSource).toContain('countLargeValueSummaries')
     expect(debugSource).toContain('已折叠')
     expect(debugSource).not.toContain("emit('replay'")
@@ -34,6 +39,7 @@ describe('WebQQ OneBot 调试工作台', () => {
     const primitives = readFileSync(resolve('client/styles/webqq-primitives.css'), 'utf8')
 
     expect(debugSource).toContain('webqq-debug-control')
+    expect(debugStyles).toMatch(/\.webqq-debug-bot-avatar\s*\{[^}]*border-radius:\s*50%/s)
     expect(debugStyles).toMatch(/\.webqq-debug-workspace\s*\{[^}]*grid-template-rows:\s*auto auto minmax\(0, 1fr\)/s)
     expect(debugStyles).toMatch(/\.webqq-debug-records\s*\{[^}]*height:\s*100%/s)
     // 控件颜色统一由 shadcn 控件基线接管：devMode 缺失按需工具类时也不会退化成黑描边或无底色

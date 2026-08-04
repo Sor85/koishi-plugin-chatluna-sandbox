@@ -598,6 +598,7 @@ export function createWebqqWorkspaceShell(
     recallMessage,
     setMessageReaction,
     requestFriend,
+    resolveAvatar,
     saveFriendRemark,
     saveGroupAction,
     selectComposerOperator,
