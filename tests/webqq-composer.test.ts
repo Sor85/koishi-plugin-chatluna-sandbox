@@ -154,15 +154,12 @@ describe('WebQQ 发送控件', () => {
     expect(source).toContain('inputElement: requestInput')
   })
 
-  it('禁用的输入框、附件和发送按钮不使用 not-allowed 光标，但保留 disabled 与透明度', () => {
+  it('禁用的输入框、附件和发送按钮不改变鼠标样式，但保留 disabled 与透明度', () => {
     const css = readFileSync(resolve('client/styles/webqq-composer.css'), 'utf8')
     const source = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
 
-    // 禁用选择器上不得再声明 cursor: not-allowed（注释里的说明文字不算）。
-    expect(css).not.toMatch(/:disabled\s*\{[^}]*cursor:\s*not-allowed/)
+    expect(css).not.toContain('cursor:')
     expect(css).toMatch(/\.webqq-composer-action:disabled\s*\{[^}]*opacity:\s*0\.45/)
-    expect(css).toMatch(/\.webqq-composer-action:disabled\s*\{[^}]*cursor:\s*default/)
-    expect(css).toMatch(/\.webqq-composer textarea:disabled\s*\{[^}]*cursor:\s*text/)
     // disabled 语义仍绑定 sending / 空内容 / 无会话。
     expect(source).toContain(':disabled="sending || !model.conversationId"')
     expect(source).toContain(':disabled="sending || (!input.trim() && !mentions.length && !sendFiles.length) || !model.conversationId"')

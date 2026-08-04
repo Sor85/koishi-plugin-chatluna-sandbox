@@ -42,3 +42,18 @@ export function getFloatingPanelStyle(panel: { width?: number, height: number })
     top: `${position.y}px`,
   }
 }
+
+export function clampFloatingPanelPosition(
+  position: FloatingPanelAnchor,
+  viewport: FloatingPanelViewport,
+  panel: { width: number, height: number },
+): FloatingPanelAnchor {
+  return {
+    x: Math.max(viewportPadding, Math.min(position.x, viewport.width - panel.width - viewportPadding)),
+    y: Math.max(viewportPadding, Math.min(position.y, viewport.height - panel.height - viewportPadding)),
+  }
+}
+
+export function isFloatingPanelInteractiveTarget(target: EventTarget | null): boolean {
+  return typeof Element !== 'undefined' && target instanceof Element && !!target.closest('button, input, textarea, select, [role="button"], a')
+}

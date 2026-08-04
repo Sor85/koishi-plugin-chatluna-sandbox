@@ -26,6 +26,8 @@ describe('WebQQ 共享样式', () => {
     const scrollbarRule = primitives.slice(primitives.indexOf('.webqq-scrollbar-overlay {')).split('}')[0]
     expect(scrollbarRule).toContain('z-index: 100')
     expect(scrollbarRule).not.toContain('z-index: 10001')
+    expect(primitives).not.toContain('cursor:')
+    expect(overlays).not.toContain('cursor:')
     expect(overlays).toContain('--webqq-secondary-row-gap: 8px')
     expect(overlays).toContain('.webqq-secondary-page')
     const secondaryPageRule = overlays.slice(overlays.indexOf('.webqq-secondary-page {')).split('}')[0]

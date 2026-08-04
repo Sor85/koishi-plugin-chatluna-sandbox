@@ -116,7 +116,6 @@
   border: 0;
   color: inherit;
   background: transparent;
-  cursor: context-menu;
 }
 
 .webqq-message-avatar {
@@ -227,7 +226,6 @@
   margin-top: 4px;
   background: transparent;
   color: var(--webqq-muted);
-  cursor: pointer;
   font-size: 12px;
   gap: 2px;
   line-height: 18px;
@@ -519,10 +517,6 @@
   white-space: nowrap;
 }
 
-.webqq-message-quote.is-clickable {
-  cursor: pointer;
-}
-
 .webqq-message-row.is-outgoing .webqq-message-bubble .webqq-message-quote {
   border-left-color: rgb(255 255 255 / 62%);
   color: rgb(255 255 255 / 82%);
@@ -764,12 +758,6 @@
   font-size: 12px;
   line-height: 18px;
   white-space: nowrap;
-  cursor: pointer;
-}
-
-.webqq-message-reaction:disabled,
-.webqq-message-reaction.is-readonly {
-  cursor: default;
 }
 
 .webqq-message-reaction-users {
@@ -874,7 +862,6 @@
   border-radius: 10px;
   color: var(--webqq-text);
   background: color-mix(in srgb, var(--webqq-panel) 88%, transparent);
-  cursor: pointer;
 }
 
 .webqq-emoji-picker-item:hover {

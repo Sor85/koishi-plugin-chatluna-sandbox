@@ -48,7 +48,6 @@
   height: var(--webqq-scrollbar-thumb-height);
   border-radius: 999px;
   background: #94a3b8;
-  cursor: default;
   pointer-events: auto;
   transition: width 0.14s ease, right 0.14s ease, background 0.14s ease;
 }
@@ -61,10 +60,6 @@
 .webqq-scrollbar-thumb:hover {
   right: 2px;
   width: 6px;
-}
-
-.webqq-scrollbar-thumb.is-dragging {
-  cursor: default;
 }
 
 .webqq-identity-avatar {

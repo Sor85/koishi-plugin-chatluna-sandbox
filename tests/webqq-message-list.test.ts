@@ -184,6 +184,8 @@ describe('WebQQ 消息列表', () => {
     expect(pickerSource).toContain('常用')
     expect(pickerSource).toContain('搜索表情名称、拼音或 ID')
     expect(pickerSource).toContain('class="webqq-secondary-page webqq-emoji-picker-page"')
+    expect(pickerSource).toContain('<Teleport to="body">')
+    expect(pickerSource).toContain("zIndex: 140")
     expect(pickerSource).not.toContain('<Dialog')
     expect(pickerSource).not.toContain('aria-label="返回聊天"')
     expect(styles).toContain('.webqq-message-reactions')

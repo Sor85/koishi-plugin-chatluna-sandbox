@@ -19,7 +19,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
   <DialogPortal>
     <DialogOverlay class="fixed inset-0 z-[150] bg-slate-950/35 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=closed]:animate-out" />
     <DialogContent
-      v-webqq-scrollbar
+      v-webqq-scrollbar="{ zIndex: 160 }"
       data-slot="dialog-content"
       class="sandbox-dialog-content"
       v-bind="{ ...$attrs, ...forwarded }"

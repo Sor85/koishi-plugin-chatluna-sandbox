@@ -90,7 +90,6 @@
   border-radius: 9px;
   color: var(--webqq-muted);
   background: transparent;
-  cursor: pointer;
 }
 
 .webqq-sidebar-notify:hover,
@@ -381,7 +380,6 @@
 
 .webqq-session-create {
   padding-right: 12px;
-  cursor: pointer;
 }
 
 .webqq-session-copy,

@@ -44,17 +44,22 @@
       </DialogFooter>
     </DialogContent>
   </Dialog>
-  <section
-    v-if="profileOpen && profileCard"
-    ref="profilePanelRef"
-    class="webqq-secondary-page webqq-profile-card-page"
-    :style="{ '--webqq-accent': accentColor, ...profilePanelStyle }"
-    aria-label="查看资料"
-  >
-    <header class="webqq-secondary-page-header">
-      <strong>查看资料</strong>
-    </header>
-    <div class="webqq-profile-card">
+  <Teleport to="body">
+    <section
+      v-if="profileOpen && profileCard"
+      ref="profilePanelRef"
+      class="webqq-secondary-page webqq-profile-card-page"
+      :style="{ '--webqq-accent': accentColor, ...profilePanelStyle }"
+      aria-label="查看资料"
+    >
+      <header
+        class="webqq-secondary-page-header"
+        :class="{ 'is-dragging': profileDragging }"
+        @pointerdown="startProfileDrag"
+      >
+        <strong>查看资料</strong>
+      </header>
+      <div class="webqq-profile-card">
       <div class="webqq-profile-card-hero">
         <WebqqAvatar
           class="webqq-avatar webqq-avatar-profile"
@@ -83,7 +88,8 @@
         </dl>
       </section>
     </div>
-  </section>
+    </section>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -93,7 +99,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from './components/ui/input'
 import EnvironmentEntityDialog from './environment-entity-dialog.vue'
 import WebqqAvatar from './webqq-avatar.vue'
-import { getFloatingPanelStyle } from './webqq/floating-panel'
+import { getFloatingPanelStyle, clampFloatingPanelPosition, isFloatingPanelInteractiveTarget } from './webqq/floating-panel'
 import { groupProfileCardFields, type ProfileCardModel } from './webqq/profile-card'
 import type {
   ManageSandboxEnvironmentInput,
@@ -143,6 +149,8 @@ const profileCard = ref<ProfileCardModel>()
 const profileCardSections = computed(() => profileCard.value ? groupProfileCardFields(profileCard.value.fields) : [])
 const profilePanelRef = ref<HTMLElement>()
 const profilePanelStyle = ref<Record<string, string>>({})
+const profileDragging = ref(false)
+let profileDragState: { pointerId: number, startX: number, startY: number, left: number, top: number } | undefined
 
 function openEntity(mode: EntityMode, target: { type: EntityType, id: string }) {
   entityMode.value = mode
@@ -179,8 +187,44 @@ function closeProfileOnOutsidePointer(event: PointerEvent) {
   profileOpen.value = false
 }
 
-onMounted(() => document.addEventListener('pointerdown', closeProfileOnOutsidePointer))
-onBeforeUnmount(() => document.removeEventListener('pointerdown', closeProfileOnOutsidePointer))
+function startProfileDrag(event: PointerEvent) {
+  if (event.button !== 0 || isFloatingPanelInteractiveTarget(event.target) || !profilePanelRef.value) return
+  const rect = profilePanelRef.value.getBoundingClientRect()
+  profileDragState = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, left: rect.left, top: rect.top }
+  profileDragging.value = true
+  ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+}
+
+function moveProfileDrag(event: PointerEvent) {
+  if (!profileDragState || event.pointerId !== profileDragState.pointerId || !profilePanelRef.value) return
+  const position = clampFloatingPanelPosition({
+    x: profileDragState.left + event.clientX - profileDragState.startX,
+    y: profileDragState.top + event.clientY - profileDragState.startY,
+  }, { width: window.innerWidth, height: window.innerHeight }, {
+    width: profilePanelRef.value.offsetWidth,
+    height: profilePanelRef.value.offsetHeight,
+  })
+  profilePanelStyle.value = { left: `${position.x}px`, top: `${position.y}px` }
+}
+
+function stopProfileDrag(event: PointerEvent) {
+  if (!profileDragState || event.pointerId !== profileDragState.pointerId) return
+  profileDragState = undefined
+  profileDragging.value = false
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', closeProfileOnOutsidePointer)
+  document.addEventListener('pointermove', moveProfileDrag)
+  document.addEventListener('pointerup', stopProfileDrag)
+  document.addEventListener('pointercancel', stopProfileDrag)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', closeProfileOnOutsidePointer)
+  document.removeEventListener('pointermove', moveProfileDrag)
+  document.removeEventListener('pointerup', stopProfileDrag)
+  document.removeEventListener('pointercancel', stopProfileDrag)
+})
 
 async function submitRemark() {
   if (!remarkTargetId.value) return

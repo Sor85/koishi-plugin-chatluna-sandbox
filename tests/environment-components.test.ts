@@ -36,6 +36,7 @@ describe('环境管理组件传输边界', () => {
 
     expect(pageSource).toContain('<WorkspaceOverlayHost')
     expect(pageSource).not.toContain('<Dialog')
+    expect(overlaySource).toContain('<Teleport to="body">')
     expect(overlaySource).not.toContain('SandboxSnapshot')
     expect(overlaySource).not.toContain('snapshot')
     expect(overlaySource).toContain('<EnvironmentEntityDialog')
@@ -122,6 +123,7 @@ describe('环境管理组件传输边界', () => {
     const createPopover = readFileSync(resolve('client/environment-create-popover.vue'), 'utf8')
 
     expect(dialogContent).toContain('gap: var(--webqq-secondary-row-gap, 8px)')
+    expect(dialogContent).toContain('v-webqq-scrollbar="{ zIndex: 160 }"')
     expect(dialogTitle).toContain('margin: 0')
     expect(dialogDescription).toContain('margin: 0')
     expect(dialogIndex).toContain("DialogHeader")

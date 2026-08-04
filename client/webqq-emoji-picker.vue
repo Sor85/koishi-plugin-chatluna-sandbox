@@ -1,10 +1,15 @@
 <template>
-  <section ref="panelRef" v-if="open" class="webqq-secondary-page webqq-emoji-picker-page" :style="panelStyle" aria-label="贴表情">
-    <header class="webqq-secondary-page-header">
-      <strong>贴表情</strong>
-    </header>
-    <div v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-emoji-picker">
-      <Input
+  <Teleport to="body">
+    <section ref="panelRef" v-if="open" class="webqq-secondary-page webqq-emoji-picker-page" :style="panelStyle" aria-label="贴表情">
+      <header
+        class="webqq-secondary-page-header"
+        :class="{ 'is-dragging': dragging }"
+        @pointerdown="startDrag"
+      >
+        <strong>贴表情</strong>
+      </header>
+      <div v-webqq-scrollbar="{ tone: 'accent', zIndex: 140 }" class="webqq-emoji-picker">
+        <Input
         v-model="query"
         class="webqq-emoji-picker-search"
         type="search"
@@ -59,9 +64,10 @@
           </button>
           <p v-if="!visibleFaces.length" class="webqq-emoji-picker-empty">没有匹配的表情</p>
         </div>
-      </section>
-    </div>
-  </section>
+        </section>
+      </div>
+    </section>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -75,7 +81,7 @@ import {
   searchSandboxEmojiFaces,
   type SandboxEmojiFace,
 } from './webqq/emoji-catalog'
-import { getFloatingPanelStyle } from './webqq/floating-panel'
+import { getFloatingPanelStyle, clampFloatingPanelPosition, isFloatingPanelInteractiveTarget } from './webqq/floating-panel'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 
 const props = defineProps<{
@@ -90,6 +96,8 @@ const emit = defineEmits<{
 const query = ref('')
 const panelRef = ref<HTMLElement>()
 const panelStyle = ref<Record<string, string>>({})
+const dragging = ref(false)
+let dragState: { pointerId: number, startX: number, startY: number, left: number, top: number } | undefined
 const recentIds = ref(loadRecentSandboxEmojiIds())
 const commonFaces = getCommonSandboxEmojiFaces()
 
@@ -112,8 +120,44 @@ function closeOnOutsidePointer(event: PointerEvent) {
   emit('update:open', false)
 }
 
-onMounted(() => document.addEventListener('pointerdown', closeOnOutsidePointer))
-onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutsidePointer))
+function startDrag(event: PointerEvent) {
+  if (event.button !== 0 || isFloatingPanelInteractiveTarget(event.target) || !panelRef.value) return
+  const rect = panelRef.value.getBoundingClientRect()
+  dragState = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, left: rect.left, top: rect.top }
+  dragging.value = true
+  ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+}
+
+function moveDrag(event: PointerEvent) {
+  if (!dragState || event.pointerId !== dragState.pointerId || !panelRef.value) return
+  const position = clampFloatingPanelPosition({
+    x: dragState.left + event.clientX - dragState.startX,
+    y: dragState.top + event.clientY - dragState.startY,
+  }, { width: window.innerWidth, height: window.innerHeight }, {
+    width: panelRef.value.offsetWidth,
+    height: panelRef.value.offsetHeight,
+  })
+  panelStyle.value = { left: `${position.x}px`, top: `${position.y}px` }
+}
+
+function stopDrag(event: PointerEvent) {
+  if (!dragState || event.pointerId !== dragState.pointerId) return
+  dragState = undefined
+  dragging.value = false
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', closeOnOutsidePointer)
+  document.addEventListener('pointermove', moveDrag)
+  document.addEventListener('pointerup', stopDrag)
+  document.addEventListener('pointercancel', stopDrag)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', closeOnOutsidePointer)
+  document.removeEventListener('pointermove', moveDrag)
+  document.removeEventListener('pointerup', stopDrag)
+  document.removeEventListener('pointercancel', stopDrag)
+})
 
 function select(emojiId: string) {
   recentIds.value = rememberSandboxEmojiId(emojiId)

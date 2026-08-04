@@ -143,7 +143,6 @@
   border-radius: 50%;
   color: inherit;
   background: transparent;
-  cursor: pointer;
 }
 
 .webqq-composer-attachment-file button:hover,
@@ -173,7 +172,6 @@
   border: 0;
   border-radius: 10px;
   background: var(--webqq-hover);
-  cursor: pointer;
 }
 
 .webqq-composer-attachment-preview img {
@@ -197,7 +195,6 @@
   border-radius: 50%;
   color: #fff;
   background: rgb(15 23 42 / 72%);
-  cursor: pointer;
 }
 
 .webqq-composer::before {
@@ -314,7 +311,6 @@
   border-radius: 50%;
   color: inherit;
   background: transparent;
-  cursor: pointer;
   transition: right 0.18s ease, opacity 0.12s ease;
   -webkit-tap-highlight-color: transparent;
 }
@@ -331,7 +327,6 @@
   border-radius: 50%;
   color: inherit;
   background: transparent;
-  cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -378,7 +373,6 @@
   color: var(--webqq-accent);
   background: color-mix(in srgb, var(--webqq-accent) 11%, var(--webqq-panel));
   box-shadow: 0 0 0 2px var(--webqq-panel);
-  cursor: pointer;
   pointer-events: auto;
   transition: right 0.18s ease, opacity 0.12s ease, background-color 0.15s ease;
   -webkit-tap-highlight-color: transparent;
@@ -531,7 +525,6 @@
 
 .webqq-composer textarea:disabled {
   /* 发送中仍保留文本光标语义，不用 not-allowed 表达禁用。 */
-  cursor: text;
   opacity: 0.45;
 }
 
@@ -551,7 +544,6 @@
   border-radius: 50%;
   color: var(--webqq-accent);
   background: transparent;
-  cursor: pointer;
 }
 
 .webqq-composer-action.is-primary {
@@ -563,7 +555,6 @@
 
 .webqq-composer-action:disabled {
   /* 禁用态靠 disabled 与透明度表达，避免禁止光标打断连续输入节奏。 */
-  cursor: default;
   opacity: 0.45;
 }
 
