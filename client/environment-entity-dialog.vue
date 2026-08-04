@@ -25,7 +25,7 @@
           aria-label="选择头像"
           @click="avatarPickerOpen = true"
         >
-          <WebqqAvatar :kind="target?.type ?? 'user'" :name="draft.name" :avatar="draft.avatar || entity?.avatar" />
+          <WebqqAvatar :kind="target?.type ?? 'user'" :name="draft.name" :avatar="draft.avatar || entity?.avatar" :show-bot-badge="false" />
           <span>点击更换头像</span>
         </button>
         <div class="webqq-secondary-field">

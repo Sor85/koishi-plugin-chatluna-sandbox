@@ -15,6 +15,18 @@ describe('WebQQ 共享头像', () => {
     expect(source).not.toContain('Tooltip')
   })
 
+  it('共享头像基线和所有尺寸变体保持圆形', () => {
+    const primitives = readFileSync(resolve('client/styles/webqq-primitives.css'), 'utf8')
+    const chat = readFileSync(resolve('client/styles/webqq-chat.css'), 'utf8')
+    const overlays = readFileSync(resolve('client/styles/webqq-overlays.css'), 'utf8')
+
+    expect(primitives).toMatch(/\.webqq-identity-avatar\s*\{[^}]*width:\s*var\(--webqq-avatar-size\)[^}]*height:\s*var\(--webqq-avatar-size\)[^}]*border-radius:\s*50%/s)
+    expect(primitives).toMatch(/\.webqq-identity-avatar\s*>\s*img\s*\{[^}]*border-radius:\s*inherit/s)
+    expect(chat).toMatch(/\.webqq-avatar-large\s*\{[^}]*border-radius:\s*50%/s)
+    expect(overlays).toContain('--webqq-avatar-size: 48px')
+    expect(overlays).toContain('--webqq-avatar-size: 40px')
+  })
+
   it('主要身份区域统一使用共享头像', () => {
     const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
     const composerSource = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')

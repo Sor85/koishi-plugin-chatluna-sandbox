@@ -67,6 +67,22 @@
   cursor: default;
 }
 
+.webqq-identity-avatar {
+  --webqq-avatar-size: 38px;
+
+  display: inline-flex;
+  width: var(--webqq-avatar-size);
+  height: var(--webqq-avatar-size);
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--webqq-accent);
+  font-weight: 700;
+  user-select: none;
+}
+
 .webqq-menu-avatar,
 .webqq-avatar {
   display: inline-flex;
