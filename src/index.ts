@@ -129,7 +129,10 @@ export function apply(ctx: Context, config: Config) {
       })
       const mcpServer = new SandboxMcpHttpServer(inner, mcp, config.mcp)
       registerConsole(inner.console, control, config, mcp, testSpaces)
-      inner.on('ready', () => mcpServer.start().catch((error) => inner.logger('onebot-sandbox').error('MCP 监听器启动失败；WebQQ 仍可继续使用。', error)))
+      inner.on('ready', async () => {
+        await control.waitForSceneReady()
+        await mcpServer.start().catch((error) => inner.logger('onebot-sandbox').error('MCP 监听器启动失败；WebQQ 仍可继续使用。', error))
+      })
       inner.on('dispose', () => mcpServer.stop())
     } catch (error) {
       inner.logger('onebot-sandbox').error('MCP 初始化失败；WebQQ 仍可继续使用。', error)

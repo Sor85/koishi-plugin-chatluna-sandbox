@@ -2,9 +2,14 @@ import type { Context } from 'koishi'
 import type { SandboxOneBotDebugRecord, SandboxPersistenceStatus, SandboxSnapshot } from './types'
 import type { SandboxOneBotDebugPersistence } from './onebot-debug'
 
+export type SandboxSceneLoadResult =
+  | { kind: 'loaded', scene: SandboxSnapshot }
+  | { kind: 'missing' }
+  | { kind: 'unavailable', reason: 'missing-service' | 'query-failed', error?: unknown }
+
 export interface SandboxScenePersistence {
   getStatus(): SandboxPersistenceStatus
-  load(): Promise<SandboxSnapshot | undefined>
+  load(): Promise<SandboxSceneLoadResult>
   save(scene: SandboxSnapshot): Promise<void>
 }
 
@@ -194,17 +199,19 @@ export class KoishiDatabaseScenePersistence implements SandboxScenePersistence {
     return { mode: 'database', available: true, persisted: this.persisted }
   }
 
-  async load(): Promise<SandboxSnapshot | undefined> {
+  async load(): Promise<SandboxSceneLoadResult> {
     const database = this.getDatabase()
-    if (!database) return
+    if (!database) return { kind: 'unavailable', reason: 'missing-service' }
     try {
       const [record] = await database.get(SCENE_TABLE, { id: SCENE_ID })
       this.lastError = undefined
-      if (!record) return
+      if (!record) return { kind: 'missing' }
       this.persisted = true
-      return structuredClone(record.scene)
+      return { kind: 'loaded', scene: structuredClone(record.scene) }
     } catch (error) {
       this.lastError = error
+      // 查询失败不能伪装成首次启动，否则控制服务会用默认场景覆盖仍在数据库中的旧记录。
+      return { kind: 'unavailable', reason: 'query-failed', error }
     }
   }
 

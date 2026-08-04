@@ -493,7 +493,11 @@ describe('类型化账号资料', () => {
       private scene?: Scene
       private status: Status = { mode: 'database', available: true, persisted: false }
       getStatus() { return { ...this.status } }
-      async load() { return this.scene ? structuredClone(this.scene) : undefined }
+      async load() {
+        return this.scene
+          ? { kind: 'loaded' as const, scene: structuredClone(this.scene) }
+          : { kind: 'missing' as const }
+      }
       async save(scene: Scene) {
         this.scene = structuredClone(scene)
         this.status.persisted = true

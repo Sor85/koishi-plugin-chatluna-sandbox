@@ -116,7 +116,7 @@ describe('Koishi 控制台适配器', () => {
       throw new Error('控制台监听器未注册')
     }
 
-    const initialWorkspace = snapshotListener({ operatorId: '10001' })
+    const initialWorkspace = await snapshotListener({ operatorId: '10001' })
     expect(initialWorkspace.persistence).toEqual({
       mode: 'memory',
       available: true,
@@ -162,7 +162,7 @@ describe('Koishi 控制台适配器', () => {
       type: 'onebot-sandbox/scene-mutated',
       body: { revision: replyRevision },
     })
-    const refreshedWorkspace = snapshotListener({ operatorId: '10001' })
+    const refreshedWorkspace = await snapshotListener({ operatorId: '10001' })
     expect(refreshedWorkspace.snapshot.revision).toBe(replyRevision)
     expect(refreshedWorkspace.snapshot.messages.map(({ content }: { content: string }) => content)).toEqual([
       '控制台消息',
@@ -171,10 +171,10 @@ describe('Koishi 控制台适配器', () => {
     expect(snapshot.snapshot.messages.every((message: Record<string, unknown>) => !('botId' in message))).toBe(true)
     expect(snapshot.snapshot.conversations.every((conversation: Record<string, unknown>) => !('userId' in conversation) && !('botId' in conversation))).toBe(true)
     const messageId = snapshot.snapshot.messages.find(({ content }: { content: string }) => content === '控制台消息')?.id
-    expect(botDeliveriesListener({ recipientBotId: '20001', messageId })).toEqual([
+    expect(await botDeliveriesListener({ recipientBotId: '20001', messageId })).toEqual([
       expect.objectContaining({ recipientBotId: '20001', messageId }),
     ])
-    expect(() => botDeliveriesListener({ botId: '20001' })).toThrow('不支持旧 RPC 字段：botId')
+    await expect(botDeliveriesListener({ botId: '20001' })).rejects.toThrow('不支持旧 RPC 字段：botId')
 
     const mediaWorkspace = await sendMediaMessageListener({
       operatorId: '10001',
@@ -183,7 +183,7 @@ describe('Koishi 控制台适配器', () => {
     })
     const media = mediaWorkspace.snapshot.messages.find(({ media }: { media?: unknown[] }) => media?.length)?.media?.[0]
     expect(media).toEqual(expect.objectContaining({ name: '控制台图片.png', type: 'image' }))
-    expect(getMediaContentListener({ operatorId: '10001', mediaId: media.id })).toEqual(expect.objectContaining({
+    expect(await getMediaContentListener({ operatorId: '10001', mediaId: media.id })).toEqual(expect.objectContaining({
       id: media.id,
       dataBase64: 'Y29uc29sZS1pbWFnZQ==',
     }))
@@ -192,7 +192,7 @@ describe('Koishi 控制台适配器', () => {
       expect(control!.getBotDeliveries()).toHaveLength(2)
     })
 
-    const otherWorkspace = snapshotListener({ operatorId: '10002' })
+    const otherWorkspace = await snapshotListener({ operatorId: '10002' })
     expect(otherWorkspace.snapshot.conversations.every((conversation: { type: string; participantIds?: readonly string[]; groupId?: string }) => conversation.type === 'direct'
       ? conversation.participantIds?.includes('10002')
       : otherWorkspace.snapshot.groups.find(({ id }: { id: string }) => id === conversation.groupId)?.members
@@ -200,7 +200,7 @@ describe('Koishi 控制台适配器', () => {
     expect(otherWorkspace.snapshot.messages).toEqual([])
     expect(otherWorkspace.chatLunaStates).toEqual([])
 
-    const history = historyListener({
+    const history = await historyListener({
       operatorId: '10001',
       conversationId: 'private:10001:20001',
       limit: 1,
@@ -208,13 +208,13 @@ describe('Koishi 控制台适配器', () => {
     expect(history.messages).toHaveLength(1)
     expect(history.nextBeforeMessageId).toBeDefined()
 
-    const updated = setGroupAnnouncementListener({
+    const updated = await setGroupAnnouncementListener({
       operatorId: '10001',
       groupId: '30001',
       content: '控制台发布的公告',
     })
     expect(updated.snapshot.groups[0].announcements[0].content).toBe('控制台发布的公告')
-    const removed = deleteGroupAnnouncementListener({
+    const removed = await deleteGroupAnnouncementListener({
       operatorId: '10001',
       groupId: '30001',
       announcementId: updated.snapshot.groups[0].announcements[0].id,
@@ -245,7 +245,7 @@ describe('Koishi 控制台适配器', () => {
     })
     expect(groupWorkspace.snapshot.groups[0].members.find(({ participantId }: { participantId: string }) => participantId === '10002')?.card).toBe('控制台群名片')
 
-    const botWorkspace = snapshotListener({ operatorId: '20001' })
+    const botWorkspace = await snapshotListener({ operatorId: '20001' })
     expect(botWorkspace.snapshot.conversations.length).toBeGreaterThan(0)
     expect(botWorkspace.snapshot.conversations.every((conversation: { type: string; participantIds?: readonly string[]; groupId?: string }) => conversation.type === 'direct'
       ? conversation.participantIds?.includes('20001')
@@ -266,8 +266,8 @@ describe('Koishi 控制台适配器', () => {
       : afterCurrentUserDeleted.snapshot.groups.find(({ id }: { id: string }) => id === conversation.groupId)?.members
         .some(({ participantId }: { participantId: string }) => participantId === '10002'))).toBe(true)
 
-    expect(() => snapshotListener({ operatorId: '99999' })).toThrow('参与者不存在：99999')
-    expect(() => snapshotListener({ userId: '10001' })).toThrow('不支持旧 RPC 字段：userId')
+    await expect(snapshotListener({ operatorId: '99999' })).rejects.toThrow('参与者不存在：99999')
+    await expect(snapshotListener({ userId: '10001' })).rejects.toThrow('不支持旧 RPC 字段：userId')
     await expect(async () => sendMessageListener({
       operatorId: '10002',
       senderId: '10003',

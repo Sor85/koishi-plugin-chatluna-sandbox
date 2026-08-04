@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { Context, h, Random, Universal } from 'koishi'
 import { resolve } from 'node:path'
 import { SandboxBot } from './bot'
-import { BUILTIN_AVATARS, getBuiltinAvatarReference, pickUnusedBuiltinAvatar } from './builtin-avatars'
+import { BUILTIN_AVATARS, findBuiltinAvatarByReference, getBuiltinAvatarReference, pickUnusedBuiltinAvatar } from './builtin-avatars'
 import { SandboxChatLunaStateStore } from './chatluna-state'
 import { SandboxMediaStorage, MAX_MEDIA_SIZE } from './media-storage'
 import { SandboxOneBotDebugStore, createOneBotDebugError, type AppendOneBotDebugRecordInput, type SandboxOneBotDebugPersistence } from './onebot-debug'
@@ -187,6 +187,9 @@ export class SandboxControlService {
   private oneBotDebug: SandboxOneBotDebugStore
   private mediaStorage: SandboxMediaStorage
   private persistence?: SandboxScenePersistence
+  private scenePersistenceAuthoritative = true
+  private sceneReady = Promise.resolve()
+  private resolveSceneReady = () => {}
   private persistenceQueue = Promise.resolve()
   private sceneMutationListeners = new Set<(snapshot: SandboxSnapshot) => void>()
   private debugRecordListeners = new Set<(record: SandboxOneBotDebugRecord) => void>()
@@ -199,6 +202,11 @@ export class SandboxControlService {
     this.runtimeBotsActive = options.runtimeActive ?? true
     this.runtimeBotRegistry = options.runtimeBots ?? new SandboxRuntimeBotRegistry()
     this.persistence = options.persistence
+    if (this.persistence) {
+      this.sceneReady = new Promise((resolve) => {
+        this.resolveSceneReady = resolve
+      })
+    }
     this.oneBotDebug = new SandboxOneBotDebugStore({
       maxRecords: options.debugRecordLimit,
       maxBytes: options.debugRecordMaxBytes,
@@ -226,19 +234,10 @@ export class SandboxControlService {
     })
     this.syncRuntimeBots()
     this.contextDisposers.push(ctx.on('ready', async () => {
-      await this.oneBotDebug.waitForReady()
-      if (!this.persistence) return
-      const scene = await this.persistence.load()
-      if (scene) {
-        this.scene = structuredClone(scene)
-        const normalized = await this.normalizePersistedAvatars()
-        this.syncRuntimeBots()
-        if (normalized) await this.persistence.save(this.getSnapshot())
-      } else {
-        // 数据库读取失败时场景会回到默认值，旧媒体已失去引用，必须同步清理以避免跨重启孤儿文件。
-        if (!this.persistence.getStatus().available) this.mediaStorage.clear()
-        this.ensureStableAvatars()
-        await this.persistence.save(this.getSnapshot())
+      try {
+        await this.restoreScene()
+      } finally {
+        this.resolveSceneReady()
       }
     }))
     this.contextDisposers.push(ctx.on('dispose', () => this.dispose()))
@@ -350,15 +349,33 @@ export class SandboxControlService {
 
   private ensureStableAvatars(): void {
     for (const participant of this.scene.participants) {
-      if (!participant.avatar || !this.hasManagedAvatar(participant.avatar)) {
+      if (!participant.avatar) {
         participant.avatar = this.createDefaultAvatar(participant.kind)
+      } else {
+        this.rematerializeBuiltinAvatar(participant.avatar)
       }
     }
     for (const group of this.scene.groups) {
-      if (!group.avatar || !this.hasManagedAvatar(group.avatar)) {
+      if (!group.avatar) {
         group.avatar = this.createDefaultAvatar('group')
+      } else {
+        this.rematerializeBuiltinAvatar(group.avatar)
       }
     }
+  }
+
+  private rematerializeBuiltinAvatar(reference: string): boolean {
+    if (this.hasManagedAvatar(reference)) return false
+    const avatar = findBuiltinAvatarByReference(reference)
+    if (!avatar) return false
+    const restored = this.saveAvatar(
+      `builtin-${avatar.kind}-${avatar.id}.svg`,
+      'image/svg+xml',
+      Buffer.from(avatar.svg).toString('base64'),
+    )
+    // 内容寻址必须恢复到原引用；不一致说明内置资源或哈希契约被破坏，不能静默换脸。
+    if (restored !== reference) throw new Error(`内置头像引用恢复不一致：${reference}`)
+    return true
   }
 
   private hasManagedAvatar(reference: string): boolean {
@@ -472,12 +489,17 @@ export class SandboxControlService {
     return record
   }
 
-  waitForPersistence(): Promise<void> {
-    return Promise.all([
+  waitForSceneReady(): Promise<void> {
+    return this.sceneReady
+  }
+
+  async waitForPersistence(): Promise<void> {
+    await this.sceneReady
+    await Promise.all([
       this.oneBotDebug.waitForReady(),
       this.persistenceQueue,
       this.oneBotDebug.waitForPersistence(),
-    ]).then(() => undefined)
+    ])
   }
 
   dispose(): Promise<void> {
@@ -1586,16 +1608,50 @@ export class SandboxControlService {
     }
   }
 
+  private async restoreScene(): Promise<void> {
+    await this.oneBotDebug.waitForReady()
+    const persistence = this.persistence
+    if (!persistence) return
+    const result = await persistence.load()
+    if (result.kind === 'loaded') {
+      this.scene = structuredClone(result.scene)
+      const normalized = await this.normalizePersistedAvatars()
+      this.syncRuntimeBots()
+      if (normalized) {
+        await persistence.save(this.getSnapshot())
+      }
+      // 恢复不会产生新的领域变更，因此保留持久化 revision；广播只负责唤醒可能提前挂载的客户端。
+      this.notifySceneMutation()
+      return
+    }
+    if (result.kind === 'missing') {
+      this.ensureStableAvatars()
+      this.syncRuntimeBots()
+      await persistence.save(this.getSnapshot())
+      return
+    }
+    // 数据库暂不可用或查询失败都不能证明旧场景不存在；禁止后续 mutation 写库、清媒体或覆盖真实数据。
+    this.scenePersistenceAuthoritative = false
+    const detail = result.error instanceof Error ? `：${result.error.message}` : ''
+    this.ctx.logger('onebot-sandbox').warn(`场景持久化暂不可用，已保留当前进程内场景且不会覆盖数据库${detail}`)
+  }
+
   private async normalizePersistedAvatars(): Promise<boolean> {
     let changed = false
     for (const participant of this.scene.participants) {
       const previous = participant.avatar
-      if (!previous || (previous.startsWith('sandbox-media://') && !this.hasManagedAvatar(previous))) {
+      if (!previous) {
         participant.avatar = this.createDefaultAvatar(participant.kind)
         changed = true
         continue
       }
-      if (previous.startsWith('sandbox-media://')) continue
+      if (previous.startsWith('sandbox-media://')) {
+        if (this.rematerializeBuiltinAvatar(previous)) changed = true
+        else if (!this.hasManagedAvatar(previous)) {
+          this.ctx.logger('onebot-sandbox').warn(`参与者头像媒体不存在，已保留原引用等待恢复：${participant.id}`)
+        }
+        continue
+      }
       try {
         participant.avatar = await this.importAvatar(participant.kind, participant.id, previous)
       } catch (error) {
@@ -1606,12 +1662,18 @@ export class SandboxControlService {
     }
     for (const group of this.scene.groups) {
       const previous = group.avatar
-      if (!previous || (previous.startsWith('sandbox-media://') && !this.hasManagedAvatar(previous))) {
+      if (!previous) {
         group.avatar = this.createDefaultAvatar('group')
         changed = true
         continue
       }
-      if (previous.startsWith('sandbox-media://')) continue
+      if (previous.startsWith('sandbox-media://')) {
+        if (this.rematerializeBuiltinAvatar(previous)) changed = true
+        else if (!this.hasManagedAvatar(previous)) {
+          this.ctx.logger('onebot-sandbox').warn(`群头像媒体不存在，已保留原引用等待恢复：${group.id}`)
+        }
+        continue
+      }
       try {
         group.avatar = await this.importAvatar('group', group.id, previous)
       } catch (error) {
@@ -1647,7 +1709,7 @@ export class SandboxControlService {
 
   private queueScenePersistence(): void {
     const persistence = this.persistence
-    if (!persistence) return
+    if (!persistence || !this.scenePersistenceAuthoritative) return
     const snapshot = this.getSnapshot()
     this.persistenceQueue = this.persistenceQueue.then(() => persistence.save(snapshot))
   }

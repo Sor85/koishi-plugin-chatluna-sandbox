@@ -49,7 +49,9 @@ class TestScenePersistence implements SandboxScenePersistence {
   }
 
   async load() {
-    return this.scene ? structuredClone(this.scene) : undefined
+    return this.scene
+      ? { kind: 'loaded' as const, scene: structuredClone(this.scene) }
+      : { kind: 'missing' as const }
   }
 
   async save(scene: SandboxSnapshot) {

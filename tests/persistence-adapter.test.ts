@@ -85,10 +85,10 @@ describe('Koishi Database 场景仓库', () => {
       scene: 'json',
       updatedAt: 'timestamp',
     }), { primary: 'id' })
-    expect(await persistence.load()).toBeUndefined()
+    expect(await persistence.load()).toEqual({ kind: 'missing' })
 
     await persistence.save(snapshot)
-    expect(await persistence.load()).toEqual(snapshot)
+    expect(await persistence.load()).toEqual({ kind: 'loaded', scene: snapshot })
     expect(context.database.upsert).toHaveBeenCalledWith('onebot-sandbox.scene', [expect.objectContaining({
       id: 'main',
       scene: snapshot,
@@ -104,7 +104,10 @@ describe('Koishi Database 场景仓库', () => {
   it('数据库服务缺失时明确报告不可用且不误报已持久化', async () => {
     const persistence = new KoishiDatabaseScenePersistence(() => undefined)
 
-    expect(await persistence.load()).toBeUndefined()
+    expect(await persistence.load()).toEqual({
+      kind: 'unavailable',
+      reason: 'missing-service',
+    })
     await persistence.save(snapshot)
     expect(persistence.getStatus()).toEqual({
       mode: 'database',
@@ -112,6 +115,28 @@ describe('Koishi Database 场景仓库', () => {
       persisted: false,
       message: 'Koishi Database 服务未安装或不可用',
     })
+  })
+
+  it('查询失败与空表严格区分，避免调用方把故障当成首次启动', async () => {
+    const error = new Error('SQLITE_BUSY')
+    const database = {
+      get: vi.fn(async () => { throw error }),
+      upsert: vi.fn(async () => ({})),
+    }
+    const persistence = new KoishiDatabaseScenePersistence(() => database)
+
+    expect(await persistence.load()).toEqual({
+      kind: 'unavailable',
+      reason: 'query-failed',
+      error,
+    })
+    expect(persistence.getStatus()).toEqual({
+      mode: 'database',
+      available: false,
+      persisted: false,
+      message: 'Koishi Database 服务未安装或不可用：SQLITE_BUSY',
+    })
+    expect(database.upsert).not.toHaveBeenCalled()
   })
 
   it('持久化 AI 测试空间元数据和独立场景', async () => {

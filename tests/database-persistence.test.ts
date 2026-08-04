@@ -1,5 +1,5 @@
 import { App } from '@koishijs/core'
-import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readdir, rm, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -28,7 +28,9 @@ class TestScenePersistence implements SandboxScenePersistence {
   }
 
   async load() {
-    return this.scene ? structuredClone(this.scene) : undefined
+    return this.scene
+      ? { kind: 'loaded' as const, scene: structuredClone(this.scene) }
+      : { kind: 'missing' as const }
   }
 
   async save(scene: SandboxSnapshot) {
@@ -82,6 +84,8 @@ describe('沙盒场景持久化', () => {
     const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-database-media-'))
     temporaryDirectories.push(mediaDirectory)
     const { app: firstApp, control: first } = await createControl(persistence, mediaDirectory)
+    const persistedDefaultAvatars = first.getSnapshot().participants.map(({ avatar }) => avatar)
+    const persistedGroupAvatar = first.getSnapshot().groups[0].avatar
     first.createUser({ id: '10099', name: '持久用户', avatar: `data:image/png;base64,${Buffer.from('persistent-avatar').toString('base64')}` })
     first.createBot({
       id: '20099',
@@ -115,6 +119,8 @@ describe('沙盒场景持久化', () => {
     await firstApp.stop()
 
     const { control: second } = await createControl(persistence, mediaDirectory)
+    expect(second.getSnapshot().participants.slice(0, persistedDefaultAvatars.length).map(({ avatar }) => avatar)).toEqual(persistedDefaultAvatars)
+    expect(second.getSnapshot().groups.find(({ id }) => id === '30001')?.avatar).toBe(persistedGroupAvatar)
     expect(second.getSnapshot().participants).toContainEqual(expect.objectContaining({ kind: 'user', id: '10099', name: '持久用户', avatar: expect.stringMatching(/^sandbox-media:\/\//) }))
     const restoredAvatar = second.getSnapshot().participants.find(({ id }) => id === '10099')!.avatar!
     expect(second.getMediaContent({ operatorId: '10099', mediaId: restoredAvatar.slice('sandbox-media://'.length) }).dataBase64)
@@ -194,7 +200,50 @@ describe('沙盒场景持久化', () => {
     expect(restoredControl.getSnapshot().participants.some(({ id }) => id === '10098')).toBe(false)
   })
 
-  it('Database 服务不可用时明确报告状态并清理失去场景引用的媒体', async () => {
+  it('内置头像文件丢失后按原引用重新物化，不随机换脸', async () => {
+    const persistence = new TestScenePersistence()
+    const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-avatar-restore-media-'))
+    temporaryDirectories.push(mediaDirectory)
+    const { app: firstApp, control: first } = await createControl(persistence, mediaDirectory)
+    const reference = first.getSnapshot().participants.find(({ id }) => id === '10001')!.avatar!
+    const mediaId = reference.slice('sandbox-media://'.length)
+    await first.waitForPersistence()
+    await firstApp.stop()
+    await unlink(join(mediaDirectory, mediaId))
+    await unlink(join(mediaDirectory, `${mediaId}.meta.json`))
+
+    const { control: second } = await createControl(persistence, mediaDirectory)
+
+    expect(second.getSnapshot().participants.find(({ id }) => id === '10001')!.avatar).toBe(reference)
+    expect(second.getMediaContent({ operatorId: '10001', mediaId }).mimeType).toBe('image/svg+xml')
+  })
+
+  it('查询失败时不保存默认场景也不清理共享媒体', async () => {
+    const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-failed-load-media-'))
+    temporaryDirectories.push(mediaDirectory)
+    await writeFile(join(mediaDirectory, 'preserved'), 'preserved')
+    let saveCalls = 0
+    const persistence: SandboxScenePersistence = {
+      getStatus: () => ({
+        mode: 'database',
+        available: false,
+        persisted: false,
+        message: 'Koishi Database 服务未安装或不可用：SQLITE_BUSY',
+      }),
+      load: async () => ({ kind: 'unavailable', reason: 'query-failed', error: new Error('SQLITE_BUSY') }),
+      save: async () => { saveCalls += 1 },
+    }
+
+    const { control } = await createControl(persistence, mediaDirectory)
+    control.createUser({ id: '10999', name: '故障期间用户' })
+    await control.waitForPersistence()
+
+    expect(saveCalls).toBe(0)
+    expect(await readdir(mediaDirectory)).toContain('preserved')
+    expect(control.getSnapshot().messages).toEqual([])
+  })
+
+  it('Database 服务不可用时明确报告状态且不清理可能仍被旧场景引用的媒体', async () => {
     const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-unavailable-media-'))
     temporaryDirectories.push(mediaDirectory)
     await writeFile(join(mediaDirectory, 'orphan'), 'orphan')
@@ -208,7 +257,7 @@ describe('沙盒场景持久化', () => {
       persisted: false,
       message: 'Koishi Database 服务未安装或不可用',
     })
-    // 不可用数据库会清理孤儿文件，再补齐默认实体头像。
-    expect(await readdir(mediaDirectory)).toHaveLength(10)
+    // 数据库不可读时无法证明 orphan 没有被旧场景引用，必须保留；默认头像仍各带一个 sidecar。
+    expect(await readdir(mediaDirectory)).toHaveLength(11)
   })
 })

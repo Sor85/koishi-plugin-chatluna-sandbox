@@ -22,6 +22,13 @@ export function getBuiltinAvatarReference(avatar: BuiltinAvatar): string {
   return `sandbox-media://${id}`
 }
 
+export function findBuiltinAvatarByReference(reference: string): BuiltinAvatar | undefined {
+  for (const pool of Object.values(BUILTIN_AVATARS)) {
+    const avatar = pool.find((candidate) => getBuiltinAvatarReference(candidate) === reference)
+    if (avatar) return avatar
+  }
+}
+
 export function pickUnusedBuiltinAvatar<T>(pool: readonly T[], used: ReadonlySet<T>, random = Math.random): T {
   if (!pool.length) throw new Error('内置头像池不能为空')
   const available = pool.filter((item) => !used.has(item))
