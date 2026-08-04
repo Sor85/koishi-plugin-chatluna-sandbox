@@ -71,19 +71,21 @@ body[data-sandbox-color-scheme="dark"] .onebot-sandbox-page {
   border-right: 1px solid var(--webqq-border);
 }
 
+/* 毛玻璃声明只写无前缀 backdrop-filter，禁止手写 -webkit-backdrop-filter：
+   构建链路（@tailwindcss/vite 内置 Lightning CSS）会把手写前缀对合并成仅剩
+   -webkit- 版本输出，而 Chrome/Firefox 不识别该前缀，毛玻璃会退化成纯半透明。
+   只写无前缀声明时构建器反而会自动补全 -webkit- 前缀，Safari 也能覆盖。 */
 .webqq-workspace.is-frosted .webqq-rail,
 .webqq-workspace.is-frosted .webqq-conversations,
 .webqq-workspace.is-frosted .webqq-chat,
 .webqq-workspace.is-frosted .webqq-profile {
   background: rgb(248 250 252 / 34%);
   backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
 }
 
 .webqq-workspace.is-frosted {
   background: rgb(244 246 248 / 78%);
   backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
 }
 
 /* 毛玻璃在暗色下沿用深色半透明面，特异度需压过上方 is-frosted 的亮色定义。 */
