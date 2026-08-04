@@ -208,9 +208,6 @@ function getBotKey(bot: SandboxDirectoryBot) {
 
 .directory-avatar {
   --webqq-avatar-size: 36px;
-  --webqq-bot-badge-size: 15px;
-  --webqq-bot-badge-offset: -2px;
-  --webqq-bot-badge-border: 2px;
 
   display: inline-flex;
   width: 36px;

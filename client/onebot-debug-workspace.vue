@@ -33,7 +33,6 @@
                   kind="bot"
                   :name="bot.name"
                   :avatar="bot.avatar"
-                  :show-bot-badge="false"
                 />
                 <span class="webqq-debug-bot-copy">{{ bot.name }} · {{ bot.id }} · {{ bot.source.name }}</span>
               </span>

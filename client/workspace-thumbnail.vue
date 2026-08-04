@@ -10,7 +10,7 @@
       </nav>
       <aside class="webqq-space-mini-sessions">
         <div v-for="session in preview.sessions" :key="session.id" class="webqq-space-mini-session" :class="{ 'is-active': session.active }">
-          <WebqqAvatar class="webqq-avatar" :kind="session.avatarKind" :name="session.title" :avatar="session.avatar" :show-bot-badge="false" />
+          <WebqqAvatar class="webqq-avatar" :kind="session.avatarKind" :name="session.title" :avatar="session.avatar" />
           <span class="webqq-space-mini-session-copy">
             <strong>{{ session.title }}</strong>
             <small>{{ session.preview }}</small>
@@ -23,7 +23,7 @@
           <span v-if="message.event" class="webqq-message-event">{{ message.text }}</span>
           <div v-else class="webqq-message-row" :class="message.outgoing ? 'is-outgoing' : 'is-incoming'">
             <span class="webqq-message-avatar-wrap">
-              <WebqqAvatar class="webqq-message-avatar" :kind="message.avatarKind" :name="message.authorName" :avatar="message.avatar" :show-bot-badge="false" />
+              <WebqqAvatar class="webqq-message-avatar" :kind="message.avatarKind" :name="message.authorName" :avatar="message.avatar" />
             </span>
             <div class="webqq-message-content">
               <div v-if="!message.outgoing" class="webqq-sender-line"><span class="webqq-message-author">{{ message.authorName }}</span></div>

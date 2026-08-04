@@ -79,7 +79,7 @@
 
     <div v-else v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-private-info">
       <div class="webqq-profile-hero">
-        <WebqqAvatar class="webqq-avatar webqq-avatar-profile" :kind="model.privateParticipant?.isBot ? 'bot' : 'user'" :name="model.privateParticipant?.name" :avatar="model.privateParticipant?.avatar" :show-bot-badge="model.privateParticipant?.isBot" />
+        <WebqqAvatar class="webqq-avatar webqq-avatar-profile" :kind="model.privateParticipant?.isBot ? 'bot' : 'user'" :name="model.privateParticipant?.name" :avatar="model.privateParticipant?.avatar" />
         <h2>{{ model.privateParticipant?.name ?? '未选择联系人' }}</h2>
         <p>{{ model.privateParticipant?.id ?? '未选择会话' }}</p>
         <span class="webqq-online"><i /> 在线</span>

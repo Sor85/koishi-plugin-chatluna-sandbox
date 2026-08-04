@@ -66,7 +66,6 @@
           :kind="profileCard.avatarKind"
           :name="profileCard.name"
           :avatar="profileCard.avatar"
-          :show-bot-badge="profileCard.avatarKind === 'bot'"
         />
         <div>
           <h2>{{ profileCard.name }}</h2>

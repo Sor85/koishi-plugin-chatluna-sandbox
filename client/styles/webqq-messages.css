@@ -120,9 +120,6 @@
 
 .webqq-message-avatar {
   --webqq-avatar-size: 32px;
-  --webqq-bot-badge-size: 13.333px;
-  --webqq-bot-badge-offset: -1.778px;
-  --webqq-bot-badge-border: 1.778px;
 
   display: flex;
   width: 32px;

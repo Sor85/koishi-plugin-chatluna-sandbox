@@ -285,9 +285,6 @@
 
 .webqq-group-member-avatar {
   --webqq-avatar-size: 48px;
-  --webqq-bot-badge-size: 18px;
-  --webqq-bot-badge-offset: -2px;
-  --webqq-bot-badge-border: 2px;
 
   width: 48px;
   height: 48px;
@@ -307,10 +304,6 @@
   border-radius: 50%;
   color: var(--webqq-muted);
   background: var(--webqq-surface-muted);
-}
-
-.webqq-group-member-card.is-selected .webqq-group-member-avatar .webqq-avatar-bot-badge {
-  display: none;
 }
 
 .webqq-group-member-card.is-selected .webqq-group-member-state {

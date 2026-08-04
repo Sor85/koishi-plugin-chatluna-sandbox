@@ -25,7 +25,7 @@
           aria-label="选择头像"
           @click="avatarPickerOpen = true"
         >
-          <WebqqAvatar :kind="target?.type ?? 'user'" :name="draft.name" :avatar="draft.avatar || entity?.avatar" :show-bot-badge="false" />
+          <WebqqAvatar :kind="target?.type ?? 'user'" :name="draft.name" :avatar="draft.avatar || entity?.avatar" />
           <span>点击更换头像</span>
         </button>
         <div class="webqq-secondary-field">
@@ -166,7 +166,6 @@
                     :kind="participant.type"
                     :name="participant.name"
                     :avatar="participant.avatar"
-                    :show-bot-badge="participant.type === 'bot'"
                   />
                   <span class="webqq-group-member-state" aria-hidden="true">
                     <IconCheck v-if="memberOf(participant.id)" />
@@ -200,7 +199,6 @@
                 :kind="editingParticipant.type"
                 :name="editingParticipant.name"
                 :avatar="editingParticipant.avatar"
-                :show-bot-badge="editingParticipant.type === 'bot'"
               />
               <span>
                 <strong>{{ editingParticipant.name }}</strong>

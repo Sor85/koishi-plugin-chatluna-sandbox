@@ -185,9 +185,6 @@
 
 .webqq-notification-avatar {
   --webqq-avatar-size: 38px;
-  --webqq-bot-badge-size: 15.833px;
-  --webqq-bot-badge-offset: -2.111px;
-  --webqq-bot-badge-border: 2.111px;
 
   display: flex;
   width: 38px;

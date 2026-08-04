@@ -22,7 +22,8 @@ describe('WebQQ 共享样式', () => {
     expect(workspace).toContain('.webqq-workspace.is-details-closed')
     expect(workspace).toContain('.webqq-workspace.is-standalone-view')
     expect(primitives).toContain('[data-webqq-scrollbar="true"]')
-    expect(primitives).toContain('.webqq-avatar-bot-badge')
+    expect(primitives).not.toContain('.webqq-avatar-bot-badge')
+    expect(primitives).not.toContain('--webqq-bot-badge')
     const scrollbarRule = primitives.slice(primitives.indexOf('.webqq-scrollbar-overlay {')).split('}')[0]
     expect(scrollbarRule).toContain('z-index: 100')
     expect(scrollbarRule).not.toContain('z-index: 10001')

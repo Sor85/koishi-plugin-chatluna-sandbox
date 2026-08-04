@@ -17,7 +17,7 @@
           aria-label="选择头像"
           @click="avatarPickerOpen = true"
         >
-          <WebqqAvatar :kind="effectiveType" :name="draft.name" :avatar="draft.avatar" :show-bot-badge="false" />
+          <WebqqAvatar :kind="effectiveType" :name="draft.name" :avatar="draft.avatar" />
           <span>点击选择头像</span>
         </button>
         <header class="grid gap-1">

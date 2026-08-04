@@ -27,7 +27,7 @@ describe('WebQQ OneBot 调试工作台', () => {
     expect(debugSource).toContain("import WebqqAvatar from './webqq-avatar.vue'")
     expect(debugSource).toContain('class="webqq-debug-bot-avatar"')
     expect(debugSource).toContain(':avatar="bot.avatar"')
-    expect(debugSource).toContain(':show-bot-badge="false"')
+    expect(debugSource).not.toContain('show-bot-badge')
     expect(debugSource).toContain('countLargeValueSummaries')
     expect(debugSource).toContain('已折叠')
     expect(debugSource).not.toContain("emit('replay'")

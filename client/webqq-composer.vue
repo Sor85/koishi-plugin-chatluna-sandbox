@@ -80,7 +80,6 @@
                             :kind="sender.type"
                             :name="sender.name"
                             :avatar="sender.avatar"
-                            :show-bot-badge="sender.id === model.currentOperatorId"
                           />
                         </button>
                       </ContextMenuTrigger>
@@ -110,7 +109,6 @@
                 :kind="userOverflowPreview.type"
                 :name="userOverflowPreview.name"
                 :avatar="userOverflowPreview.avatar"
-                :show-bot-badge="userOverflowPreview.id === model.currentOperatorId"
               />
               <span class="webqq-composer-user-overflow-label">
                 <span class="webqq-composer-user-overflow-plus">+</span>

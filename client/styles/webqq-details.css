@@ -309,9 +309,6 @@
 
 .webqq-avatar-profile {
   --webqq-avatar-size: 76px;
-  --webqq-bot-badge-size: 31.667px;
-  --webqq-bot-badge-offset: -4.222px;
-  --webqq-bot-badge-border: 4.222px;
 
   width: 76px;
   height: 76px;

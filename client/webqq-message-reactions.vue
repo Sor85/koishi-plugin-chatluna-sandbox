@@ -30,7 +30,6 @@
             :kind="isBotParticipant(participantId) ? 'bot' : 'user'"
             :name="getParticipantName(participantId)"
             :avatar="getParticipantAvatar(participantId)"
-            :show-bot-badge="false"
           />
         </span>
       </span>
