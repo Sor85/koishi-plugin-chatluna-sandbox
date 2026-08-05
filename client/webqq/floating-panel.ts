@@ -12,8 +12,20 @@ const panelGap = 8
 const viewportPadding = 12
 let lastAnchor: FloatingPanelAnchor = { x: viewportPadding, y: viewportPadding }
 
+export function getFloatingPanelRectAnchor(rect: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>): FloatingPanelAnchor {
+  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+}
+
 export function rememberFloatingPanelAnchor(event: MouseEvent): void {
-  lastAnchor = { x: event.clientX, y: event.clientY }
+  if (event.clientX || event.clientY) {
+    lastAnchor = { x: event.clientX, y: event.clientY }
+    return
+  }
+  // 键盘激活按钮产生的 click 坐标通常是 (0, 0)；改用控件中心，避免浮层跳到视口左上角。
+  if (typeof Element === 'undefined' || !(event.target instanceof Element)) return
+  const target = event.target.closest('button, [role="button"], a')
+  if (!target) return
+  lastAnchor = getFloatingPanelRectAnchor(target.getBoundingClientRect())
 }
 
 export function getFloatingPanelPosition(

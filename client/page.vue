@@ -13,6 +13,7 @@
         :data-color-mode="resolvedColorMode"
         :data-mobile-view="currentView"
         :style="{ '--webqq-accent': appearance.webQQAccentColor }"
+        @click.capture="rememberFloatingPanelAnchor"
         @contextmenu.capture="rememberFloatingPanelAnchor"
       >
         <WebqqSidebar

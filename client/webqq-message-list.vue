@@ -49,7 +49,7 @@
               <div class="webqq-message-select-body">
               <ContextMenu v-if="message.authorId !== model.currentOperatorId">
                 <ContextMenuTrigger as-child :disabled="model.selectionMode">
-                  <button type="button" class="webqq-message-avatar-wrap webqq-message-avatar-trigger" :aria-label="`打开 ${getMessageAuthorName(message.authorId)} 的操作菜单`" @contextmenu.stop>
+                  <button type="button" class="webqq-message-avatar-wrap webqq-message-avatar-trigger" :aria-label="`查看 ${getMessageAuthorName(message.authorId)} 的资料`" @click="handleMessageAvatarClick(message, $event)" @contextmenu.stop>
                     <WebqqAvatar class="webqq-message-avatar" :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'" :name="getMessageAuthorName(message.authorId)" :avatar="getParticipantAvatar(message.authorId)" />
                   </button>
                 </ContextMenuTrigger>
@@ -90,7 +90,7 @@
               </ContextMenu>
               <ContextMenu v-else>
                 <ContextMenuTrigger as-child :disabled="model.selectionMode">
-                  <button type="button" class="webqq-message-avatar-wrap webqq-message-avatar-trigger" :aria-label="`查看 ${getMessageAuthorName(message.authorId)} 的资料`" @contextmenu.stop>
+                  <button type="button" class="webqq-message-avatar-wrap webqq-message-avatar-trigger" :aria-label="`查看 ${getMessageAuthorName(message.authorId)} 的资料`" @click="handleMessageAvatarClick(message, $event)" @contextmenu.stop>
                     <WebqqAvatar class="webqq-message-avatar" :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'" :name="getMessageAuthorName(message.authorId)" :avatar="getParticipantAvatar(message.authorId)" />
                   </button>
                 </ContextMenuTrigger>
@@ -584,6 +584,14 @@ function isMessageSelectable(message: SandboxMessage) {
 
 function isMessageSelected(messageId: string) {
   return !!props.model.selectedMessageIds?.includes(messageId)
+}
+
+function handleMessageAvatarClick(message: SandboxMessage, event: MouseEvent) {
+  // 多选时头像仍属于整条消息的可选区域；不能阻断冒泡，否则点击头像无法切换勾选。
+  if (props.model.selectionMode) return
+  event.preventDefault()
+  event.stopPropagation()
+  emit('openProfile', message.authorId)
 }
 
 function handleMessageBubbleClick(message: SandboxMessage, event: MouseEvent) {

@@ -8,7 +8,7 @@
       <div class="webqq-chat-title">
         <ContextMenu v-if="model.profileParticipantId || model.profileGroupId">
           <ContextMenuTrigger as-child>
-            <button type="button" class="webqq-chat-title-avatar" :aria-label="`查看 ${model.title} 的资料`">
+            <button type="button" class="webqq-chat-title-avatar" :aria-label="`查看 ${model.title} 的资料`" @click="openTitleProfile">
               <WebqqAvatar class="webqq-avatar" :kind="model.avatarKind" :name="model.title" :avatar="model.avatar" />
             </button>
           </ContextMenuTrigger>
@@ -229,6 +229,14 @@ watch(selectionMode, (active) => {
     composerSpace.value = 64
   }
 })
+
+function openTitleProfile() {
+  if (props.model.profileGroupId) {
+    emit('openGroupProfile', props.model.profileGroupId)
+    return
+  }
+  if (props.model.profileParticipantId) emit('openProfile', props.model.profileParticipantId)
+}
 
 function isSelectableMessageId(messageId: string) {
   const message = props.model.messageList.messages.find(({ id }) => id === messageId)
