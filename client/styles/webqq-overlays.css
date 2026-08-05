@@ -643,7 +643,7 @@ body[data-sandbox-color-scheme="dark"] .webqq-form-error {
 .webqq-forward-modal-body {
   min-height: 0;
   overflow-y: auto;
-  padding: 14px 16px 2px;
+  padding: 14px 16px 28px;
 }
 
 .webqq-forward-modal .webqq-message-row {

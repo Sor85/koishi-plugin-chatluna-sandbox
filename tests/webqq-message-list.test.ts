@@ -69,6 +69,7 @@ describe('WebQQ 消息列表', () => {
     expect(overlays).toContain('z-index: 160')
     expect(overlays).toContain('width: min(480px, calc(100vw - 32px))')
     expect(overlays).toContain('max-height: min(80vh, 620px)')
+    expect(overlays).toContain('padding: 14px 16px 28px')
     expect(overlays).not.toContain('cursor:')
   })
 
