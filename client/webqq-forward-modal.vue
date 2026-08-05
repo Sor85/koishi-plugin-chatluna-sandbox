@@ -12,6 +12,15 @@
     >
       <div class="webqq-forward-modal" @click.stop>
         <header class="webqq-forward-modal-header">
+          <button
+            v-if="canNavigateBack"
+            type="button"
+            aria-label="返回上一层合并转发"
+            @click="emit('back')"
+          >
+            <IconChevronLeft :size="18" aria-hidden="true" />
+          </button>
+          <span v-else class="webqq-forward-modal-header-placeholder" aria-hidden="true" />
           <strong>{{ title || '合并转发' }}</strong>
           <button type="button" aria-label="关闭合并转发消息" @click="emit('close')">
             <IconX :size="18" aria-hidden="true" />
@@ -92,7 +101,7 @@
 </template>
 
 <script setup lang="ts">
-import { IconPaperclip, IconX } from '@tabler/icons-vue'
+import { IconChevronLeft, IconPaperclip, IconX } from '@tabler/icons-vue'
 import { onMounted, ref } from 'vue'
 import WebqqAvatar from './webqq-avatar.vue'
 import { buildForwardPreview } from './webqq/forward-preview'
@@ -105,12 +114,14 @@ const props = defineProps<{
   items: SandboxForwardNode[]
   // 已加载的转发资源，用于嵌套卡片摘要。
   nestedForwards?: Record<string, SandboxForward>
+  canNavigateBack: boolean
   participants: Record<string, { name: string; avatar?: string; isBot: boolean }>
   mediaSources: Record<string, string>
   mediaLoadFailures: Record<string, true>
 }>()
 
 const emit = defineEmits<{
+  back: []
   close: []
   openForward: [forwardId: string]
   openImage: [url: string]

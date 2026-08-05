@@ -595,14 +595,19 @@ body[data-sandbox-color-scheme="dark"] .webqq-form-error {
 }
 
 .webqq-forward-modal-header {
-  display: flex;
+  display: grid;
   min-height: 46px;
   flex-shrink: 0;
+  grid-template-columns: 30px minmax(0, 1fr) 30px;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 12px 0 16px;
+  gap: 8px;
+  padding: 0 12px;
   border-bottom: 1px solid rgb(226 232 240 / 82%);
+}
+
+.webqq-forward-modal-header-placeholder {
+  width: 30px;
+  height: 30px;
 }
 
 .webqq-forward-modal-header strong {
@@ -612,6 +617,7 @@ body[data-sandbox-color-scheme="dark"] .webqq-form-error {
   font-size: 14px;
   line-height: 20px;
   white-space: nowrap;
+  text-align: center;
   text-overflow: ellipsis;
 }
 

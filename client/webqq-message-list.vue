@@ -109,7 +109,7 @@
                 </div>
                 <div class="webqq-message-body">
                   <div class="webqq-message-stack">
-                    <div class="webqq-message-bubble">
+                    <div class="webqq-message-bubble" @click.capture="handleMessageBubbleClick(message, $event)">
                       <button v-if="getReplyMessage(message)" class="webqq-message-quote is-clickable" type="button" aria-label="跳转到引用消息" @click.stop="scrollToQuotedMessage(getReplyMessage(message)!.id)">
                         <strong class="webqq-message-quote-title">{{ getMessageAuthorName(getReplyMessage(message)!.authorId) }}</strong>
                         <span>{{ getMessageText(getReplyMessage(message)!) }}</span>
@@ -492,10 +492,18 @@ function isMessageSelected(messageId: string) {
   return !!props.model.selectedMessageIds?.includes(messageId)
 }
 
+function handleMessageBubbleClick(message: SandboxMessage, event: MouseEvent) {
+  if (!props.model.selectionMode || !isMessageSelectable(message)) return
+  // 捕获阶段先于卡片、媒体和回应控件执行；多选时整颗气泡只负责切换勾选，不能误打开详情或文件。
+  event.preventDefault()
+  event.stopPropagation()
+  emit('toggleSelection', message.id)
+}
+
 function handleMessageClick(message: SandboxMessage, event: MouseEvent) {
   if (!props.model.selectionMode || !isMessageSelectable(message)) return
-  // 引用跳转等交互按钮自己 stop，这里只接管可转发消息的勾选切换。
-  if ((event.target as HTMLElement | null)?.closest('button, a, audio, video, input, textarea')) return
+  // 气泡由捕获处理器统一接管；这里只覆盖头像、发送者信息和行内空白区域。
+  if ((event.target as HTMLElement | null)?.closest('.webqq-message-bubble')) return
   emit('toggleSelection', message.id)
 }
 

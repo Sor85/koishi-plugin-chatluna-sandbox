@@ -1,27 +1,15 @@
 /* 消息多选与合并转发目标选择：独立文件，避免触碰 webqq-messages.css 中的 forward 卡片规则。 */
 
 .webqq-messages.is-selecting .webqq-message-row.is-selectable {
+  width: 100%;
   max-width: 100%;
 }
 
 .webqq-message-row.is-selecting {
   position: relative;
   align-items: center;
-}
-
-.webqq-message-row.is-selecting.is-selectable {
-  border-radius: 12px;
-  outline: 1px solid transparent;
-  transition: background-color 0.12s ease, outline-color 0.12s ease;
-}
-
-.webqq-message-row.is-selecting.is-selectable:hover {
-  background: color-mix(in srgb, var(--webqq-accent) 8%, transparent);
-}
-
-.webqq-message-row.is-selecting.is-selected {
-  background: color-mix(in srgb, var(--webqq-accent) 12%, transparent);
-  outline-color: color-mix(in srgb, var(--webqq-accent) 28%, transparent);
+  flex-direction: row;
+  text-align: left;
 }
 
 .webqq-message-select-marker {
@@ -57,12 +45,7 @@
   text-align: right;
 }
 
-.webqq-message-row.is-selecting.is-outgoing {
-  /* 多选时强制勾选框始终在消息行最左侧，避免 row-reverse 把勾选挤到右侧。 */
-  flex-direction: row;
-  text-align: left;
-}
-
+/* 多选态统一为 LTR：marker 固定占据最左列，出站气泡仍由 select-body 内部反转并靠右。 */
 .webqq-message-row.is-selecting.is-outgoing .webqq-message-select-body {
   margin-left: auto;
 }
@@ -85,54 +68,99 @@
 .webqq-selection-bar {
   position: absolute;
   z-index: 20;
-  right: 16px;
   bottom: 16px;
-  left: 16px;
+  left: 50%;
   display: flex;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  min-height: 48px;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 16px;
-  min-height: 56px;
-  padding: 12px 16px;
+  padding: 7px 8px 7px 16px;
   border: 1px solid var(--webqq-border);
-  border-radius: 16px;
+  border-radius: 999px;
   background: color-mix(in srgb, var(--webqq-panel, var(--webqq-bg)) 92%, transparent);
   box-shadow: 0 10px 28px rgb(15 23 42 / 12%);
   backdrop-filter: blur(12px);
+  transform: translateX(-50%);
 }
 
 .webqq-workspace.is-frosted .webqq-selection-bar {
   background: color-mix(in srgb, var(--webqq-panel, var(--webqq-bg)) 78%, transparent);
 }
 
-.webqq-selection-bar-copy {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.webqq-selection-bar-copy strong {
+.webqq-selection-bar-count {
+  flex: none;
   font-size: 14px;
   line-height: 20px;
-}
-
-.webqq-selection-bar-copy span {
-  color: var(--webqq-muted);
-  font-size: 12px;
-  line-height: 16px;
+  white-space: nowrap;
 }
 
 .webqq-selection-bar-actions {
   display: flex;
   flex: none;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+}
+
+.webqq-selection-bar .webqq-selection-bar-button {
+  min-height: 34px;
+  padding-right: 14px;
+  padding-left: 14px;
+  border-radius: 999px;
 }
 
 .webqq-forward-target-dialog {
   display: grid;
   gap: 12px;
+}
+
+/* Dialog 会 Teleport 到 body；搜索框使用独立结构，避免侧栏 .webqq-search 的 padding 和绝对定位混入。 */
+.webqq-forward-target-search {
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-height: 40px;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--webqq-muted) 36%, var(--webqq-border));
+  border-radius: 12px;
+  color: var(--webqq-muted);
+  background: color-mix(in srgb, var(--webqq-surface-muted, var(--webqq-bg)) 88%, transparent);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease;
+}
+
+.webqq-forward-target-search:focus-within {
+  border-color: color-mix(in srgb, var(--webqq-accent) 58%, var(--webqq-border));
+  background: var(--webqq-panel, var(--webqq-bg));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--webqq-accent) 14%, transparent);
+}
+
+.webqq-forward-target-search > svg {
+  position: static;
+  flex: none;
+  transform: none;
+}
+
+.webqq-forward-target-search input {
+  position: static;
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  outline: none;
+  color: var(--webqq-text);
+  background: transparent;
+}
+
+.webqq-forward-target-search input::placeholder {
+  color: color-mix(in srgb, var(--webqq-muted) 84%, transparent);
+  opacity: 1;
 }
 
 .webqq-forward-target-tabs {
@@ -240,4 +268,17 @@
 .webqq-forward-target-item.is-active .webqq-forward-target-radio {
   border-color: var(--webqq-accent);
   background: radial-gradient(circle at center, var(--webqq-accent) 0 5px, transparent 6px);
+}
+
+@media (max-width: 520px) {
+  .webqq-selection-bar {
+    max-width: calc(100% - 16px);
+    gap: 8px;
+    padding-left: 12px;
+  }
+
+  .webqq-selection-bar .webqq-selection-bar-button {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
 }

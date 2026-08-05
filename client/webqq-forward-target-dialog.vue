@@ -6,12 +6,12 @@
         <DialogDescription>将已选消息合并转发到一个最近会话、好友或群组。</DialogDescription>
       </DialogHeader>
 
-      <label class="webqq-search webqq-forward-target-search">
+      <label class="webqq-forward-target-search">
         <IconSearch :size="18" aria-hidden="true" />
-        <span class="sr-only">搜索目标会话</span>
         <input
           v-model="searchQuery"
           type="search"
+          aria-label="搜索目标会话"
           placeholder="搜索最近、好友或群组..."
           autocomplete="off"
         >

@@ -64,13 +64,10 @@
       role="toolbar"
       aria-label="消息多选操作"
     >
-      <div class="webqq-selection-bar-copy">
-        <strong>已选 {{ selectedMessageIds.length }} 条</strong>
-        <span>点击消息切换勾选，Esc 退出多选</span>
-      </div>
+      <strong class="webqq-selection-bar-count">已选 {{ selectedMessageIds.length }} 条</strong>
       <div class="webqq-selection-bar-actions">
-        <Button variant="outline" @click="exitSelection">取消</Button>
-        <Button :disabled="!selectedMessageIds.length" @click="openForwardTargetDialog">
+        <Button class="webqq-selection-bar-button" variant="outline" @click="exitSelection">取消</Button>
+        <Button class="webqq-selection-bar-button" :disabled="!selectedMessageIds.length" @click="openForwardTargetDialog">
           <IconShare3 :size="16" aria-hidden="true" />
           合并转发
         </Button>
@@ -101,9 +98,11 @@
       :title="forwardDialog.title"
       :items="forwardDialog.items"
       :nested-forwards="forwardDialog.nestedForwards"
+      :can-navigate-back="forwardStack.length > 1"
       :participants="model.messageList.participants"
       :media-sources="model.messageList.mediaSources"
       :media-load-failures="model.messageList.mediaLoadFailures"
+      @back="popForwardDialog"
       @close="closeForwardDialog"
       @open-forward="openNestedForward"
       @open-image="previewImageUrl = $event"
@@ -190,11 +189,13 @@ const selectedMessageIds = ref<string[]>([])
 const forwardTargetOpen = ref(false)
 const forwardLoading = ref(false)
 const previewImageUrl = ref('')
-const forwardDialog = ref<{
+interface ForwardDialogFrame {
   title: string
   items: SandboxForwardNode[]
   nestedForwards: Record<string, SandboxForward>
-}>()
+}
+const forwardStack = ref<ForwardDialogFrame[]>([])
+const forwardDialog = computed(() => forwardStack.value.at(-1))
 const replyingToMessage = computed(() => props.model.messageList.messages.find(({ id }) => id === replyingToMessageId.value))
 const composerModel = computed<WebqqComposerModel>(() => ({
   ...props.model.composer,
@@ -224,8 +225,8 @@ watch(selectionMode, (active) => {
   if (active) {
     replyingToMessageId.value = ''
     reactionPickerMessageId.value = ''
-    // 底部操作栏高度近似 composer 默认占用，保持消息列表底部留白。
-    composerSpace.value = 88
+    // 短胶囊仍需为消息列表保留底部安全区，避免最后一条消息被悬浮操作栏遮住。
+    composerSpace.value = 64
   }
 })
 
@@ -332,7 +333,7 @@ function loadForwardMessage(input: { forwardId?: string; messageId?: string }) {
   })
 }
 
-async function openForwardByInput(input: { forwardId?: string; messageId?: string }) {
+async function openForwardByInput(input: { forwardId?: string; messageId?: string }, mode: 'replace' | 'push') {
   if (forwardLoading.value) return
   forwardLoading.value = true
   try {
@@ -351,11 +352,13 @@ async function openForwardByInput(input: { forwardId?: string; messageId?: strin
         }),
     )
     const nestedForwards = Object.fromEntries(nestedEntries.filter((entry): entry is readonly [string, SandboxForward] => !!entry))
-    forwardDialog.value = {
+    const frame: ForwardDialogFrame = {
       title: buildForwardPreview(forward).title || '合并转发',
       items: forward.nodes.map((node) => ({ ...node })),
       nestedForwards,
     }
+    // 根消息重置历史；嵌套详情压栈，返回时直接恢复上一帧而不重复 RPC。
+    forwardStack.value = mode === 'push' ? [...forwardStack.value, frame] : [frame]
   } catch {
     // 页面控制层负责展示错误；弹窗只在成功后打开。
   } finally {
@@ -365,15 +368,21 @@ async function openForwardByInput(input: { forwardId?: string; messageId?: strin
 
 function openForwardDialog(input: { messageId: string; forwardId: string }) {
   if (selectionMode.value) return
-  void openForwardByInput(input)
+  void openForwardByInput(input, 'replace')
 }
 
 function openNestedForward(forwardId: string) {
-  void openForwardByInput({ forwardId })
+  void openForwardByInput({ forwardId }, 'push')
+}
+
+function popForwardDialog() {
+  if (forwardStack.value.length <= 1) return
+  forwardStack.value = forwardStack.value.slice(0, -1)
+  previewImageUrl.value = ''
 }
 
 function closeForwardDialog() {
-  forwardDialog.value = undefined
+  forwardStack.value = []
   previewImageUrl.value = ''
 }
 </script>
