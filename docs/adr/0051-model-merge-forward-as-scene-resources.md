@@ -10,3 +10,5 @@
 读取路径中，`get_msg`、消息历史和机器人事件对外层消息暴露 `{ type: 'forward', data: { id } }` 段；`get_forward_msg` 接受转发资源 `id` 或外层 `message_id`，返回可被参考仓消费的 node 列表，并支持嵌套 forward。
 
 节点保存作者 ID/昵称快照、正文、媒体与时间；删除参与者或改名不影响历史 node。来源消息必须对操作者可见、非事件且未撤回；目标会话必须可见；节点数量设上限，避免场景无限膨胀。机器人操作者发送合并转发必须走自身 OneBot action，以保持能力覆盖、调试记录与真实操作通道约束。
+
+MCP 对外暴露领域化的 `send_forward_message` 与 `get_forward_message`，不提供任意原始 OneBot action 调用。发送工具接受已有 `messageIds`，或由 reference/custom 组成的显式节点；custom 节点媒体必须先经 `upload_media` 上传，再以 `mediaIds` 引用，避免外部控制器伪造 `SandboxMedia`。读取工具复用领域层的操作者可见性与嵌套资源可达性检查。

@@ -38,6 +38,7 @@ describe('SandboxMcpService', () => {
       'get_scene_snapshot',
       'list_conversations',
       'get_conversation',
+      'get_forward_message',
       'list_pending_requests',
       'get_capability_matrix',
       'export_scene',
@@ -109,6 +110,81 @@ describe('SandboxMcpService', () => {
         },
       },
     })
+  })
+
+  it('发送、读取并幂等重放合并转发，同时支持上传媒体与嵌套节点', async () => {
+    const { control, service, credential } = createService(['read', 'interact'])
+    control.updateBot({ id: '20001', name: 'Koishi', implementation: 'napcat', enabled: false })
+    const firstMessage = await service.callTool(credential.token, 'send_message', {
+      operatorId: '10001', conversationId: 'private:10001:20001', content: '第一条', idempotencyKey: 'forward-source-1',
+    }) as { messageId: string }
+    const secondMessage = await service.callTool(credential.token, 'send_message', {
+      operatorId: '10001', conversationId: 'private:10001:20001', content: '第二条', idempotencyKey: 'forward-source-2',
+    }) as { messageId: string }
+    const input = {
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      messageIds: [secondMessage.messageId, firstMessage.messageId],
+      idempotencyKey: 'forward-send-1',
+    }
+    const sent = await service.callTool(credential.token, 'send_forward_message', input) as { messageId: string; forwardId: string }
+    await expect(service.callTool(credential.token, 'send_forward_message', input)).resolves.toEqual(sent)
+    await expect(service.callTool(credential.token, 'send_forward_message', { ...input, messageIds: [firstMessage.messageId] })).rejects.toMatchObject({ code: 'idempotency_conflict' })
+
+    const byForward = await service.callTool(credential.token, 'get_forward_message', {
+      operatorId: '10001', forwardId: sent.forwardId,
+    }) as { nodes: Array<{ content: string }> }
+    await expect(service.callTool(credential.token, 'get_forward_message', {
+      operatorId: '10001', messageId: sent.messageId,
+    })).resolves.toEqual(expect.objectContaining({ id: sent.forwardId }))
+    expect(byForward.nodes.map(({ content }) => content)).toEqual(['第一条', '第二条'])
+
+    const upload = await service.callTool(credential.token, 'upload_media', {
+      fileName: '节点.txt', mimeType: 'text/plain', dataBase64: Buffer.from('node').toString('base64'),
+    }) as { mediaId: string }
+    const nested = await service.callTool(credential.token, 'send_forward_message', {
+      operatorId: '10001', conversationId: 'private:10001:20001', idempotencyKey: 'forward-send-2',
+      nodes: [{ type: 'custom', userId: '10001', nickname: '测试用户', content: '媒体节点', mediaIds: [upload.mediaId], forwardId: sent.forwardId }],
+    }) as { forwardId: string }
+    await expect(service.callTool(credential.token, 'get_forward_message', {
+      operatorId: '10001', forwardId: nested.forwardId,
+    })).resolves.toMatchObject({
+      nodes: [{ content: '媒体节点', forwardId: sent.forwardId, media: [expect.objectContaining({ id: upload.mediaId })] }],
+    })
+
+    await expect(service.callTool(credential.token, 'send_forward_message', {
+      operatorId: '10001', conversationId: 'private:10001:20001', messageIds: [firstMessage.messageId], nodes: [{ type: 'reference', messageId: secondMessage.messageId }], idempotencyKey: 'forward-invalid-1',
+    })).rejects.toMatchObject({ code: 'invalid_arguments' })
+    await expect(service.callTool(credential.token, 'send_forward_message', {
+      operatorId: '10001', conversationId: 'private:10001:20001', nodes: [{ type: 'custom', userId: '10001', nickname: '测试用户', mediaIds: ['missing'] }], idempotencyKey: 'forward-invalid-2',
+    })).rejects.toMatchObject({ code: 'media_not_found' })
+    await expect(service.callTool(credential.token, 'send_forward_message', {
+      operatorId: '20001', conversationId: 'private:10001:20001', messageIds: [firstMessage.messageId], idempotencyKey: 'forward-invalid-3',
+    })).rejects.toMatchObject({ code: 'permission_denied' })
+  })
+
+  it('合并转发投递完成后可从发送前游标等待机器人同步回复', async () => {
+    const { app, service, credential } = createService(['read', 'interact'])
+    app.middleware((session, next) => next(async () => {
+      if (session.selfId !== '20001' || session.userId !== '10001') return
+      await session.send('收到合并转发')
+    }))
+    await app.start()
+    const source = await service.callTool(credential.token, 'send_message', {
+      operatorId: '10001', conversationId: 'private:10001:20001', content: '来源', idempotencyKey: 'forward-wait-source',
+    }) as { messageId: string }
+    const cursor = service.currentCursor()
+
+    await service.callTool(credential.token, 'send_forward_message', {
+      operatorId: '10001', conversationId: 'private:10001:20001', messageIds: [source.messageId], idempotencyKey: 'forward-wait-send',
+    })
+
+    await expect(service.callTool(credential.token, 'wait_for_message', {
+      cursor, conversationId: 'private:10001:20001', authorId: '20001', timeoutSeconds: 1,
+    })).resolves.toMatchObject({ matched: true, event: { data: { content: '收到合并转发', authorId: '20001' } } })
+    await expect(service.callTool(credential.token, 'wait_for_message', {
+      cursor, conversationId: 'private:10001:20001', authorId: '10001', recipientBotId: '20001', timeoutSeconds: 1,
+    })).resolves.toMatchObject({ matched: true, event: { data: { recipientBotId: '20001', forwardId: expect.any(String) } } })
   })
 
   it('领域交互复用真实权限并禁止代机器人审批', async () => {
@@ -215,6 +291,17 @@ describe('SandboxMcpService', () => {
         conversationId: 'private:10001:20002',
         content: '你好',
         idempotencyKey: 'example-message-1',
+      },
+      send_forward_message: {
+        spaceId: '<create_test_space.spaceId>',
+        operatorId: '10001',
+        conversationId: 'private:10001:20002',
+        messageIds: expect.any(Array),
+        idempotencyKey: 'example-forward-1',
+      },
+      get_forward_message: {
+        operatorId: '10001',
+        forwardId: '<send_forward_message.forwardId>',
       },
       等待机器人回复: {
         步骤: [

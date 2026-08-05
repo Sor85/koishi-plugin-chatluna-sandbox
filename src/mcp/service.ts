@@ -8,7 +8,7 @@ import {
 } from '../account-profile'
 import type { SandboxControlService } from '../control-service'
 import type { SandboxTestSpaceService } from '../test-spaces'
-import type { SandboxMedia, SandboxImplementationProfile, SandboxSnapshot } from '../types'
+import type { SandboxForwardNodeInput, SandboxMedia, SandboxImplementationProfile, SandboxSnapshot } from '../types'
 import { createDirectConversationId, createGroupConversationId, isRecalledMessage, SandboxOneBotDebugCursorExpiredError } from '../types'
 import { getOneBotCapabilityMatrix } from '../onebot-profiles'
 import { SandboxMcpError, type SandboxMcpCallRecord, type SandboxMcpCreatedCredential, type SandboxMcpCredential, type SandboxMcpEvent, type SandboxMcpEventCursor, type SandboxMcpExport, type SandboxMcpScope } from './types'
@@ -250,6 +250,55 @@ const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
     required: ['spaceId', 'operatorId', 'conversationId', 'idempotencyKey'],
     description: '等待机器人回复的正确模式：先记录发送前 cursor，发送后用 wait_for_message({ cursor: 发送前游标, authorId: 机器人ID }) 等待；同步回复在本调用返回前即已进入事件流，用返回的 cursor 会错过。',
   },
+  send_forward_message: {
+    type: 'object',
+    properties: {
+      spaceId: SPACE_REQUIRED,
+      operatorId: OPERATOR_ID,
+      conversationId: { type: 'string' },
+      messageIds: { type: 'array', items: { type: 'string' }, maxItems: 100, description: '要引用的已有消息 ID；与 nodes 二选一，服务端按消息时间稳定排序' },
+      nodes: {
+        type: 'array',
+        maxItems: 100,
+        description: '显式节点；与 messageIds 二选一，可混合引用节点与自定义节点',
+        items: {
+          oneOf: [
+            {
+              type: 'object',
+              properties: { type: { type: 'string', const: 'reference' }, messageId: { type: 'string' } },
+              required: ['type', 'messageId'],
+            },
+            {
+              type: 'object',
+              properties: {
+                type: { type: 'string', const: 'custom' },
+                userId: PARTICIPANT_ID,
+                nickname: { type: 'string' },
+                content: { type: 'string' },
+                createdAt: { type: 'string', description: '可选 ISO 8601 时间' },
+                mediaIds: { type: 'array', items: { type: 'string' }, description: 'upload_media 返回的媒体 ID 列表' },
+                forwardId: { type: 'string', description: '嵌套已有合并转发资源 ID' },
+              },
+              required: ['type', 'userId', 'nickname'],
+            },
+          ],
+        },
+      },
+      idempotencyKey: IDEMPOTENCY_KEY,
+    },
+    required: ['spaceId', 'operatorId', 'conversationId', 'idempotencyKey'],
+    description: 'messageIds 与 nodes 必须且只能提供一项。等待机器人回复时应先记录发送前 cursor，再用 wait_for_message 等待。',
+  },
+  get_forward_message: {
+    type: 'object',
+    properties: {
+      spaceId: SPACE_OPTIONAL,
+      operatorId: OPERATOR_ID,
+      forwardId: { type: 'string', description: '合并转发资源 ID；与 messageId 至少提供一项' },
+      messageId: { type: 'string', description: '外层合并转发消息 ID；与 forwardId 至少提供一项' },
+    },
+    required: ['operatorId'],
+  },
   perform_friend_action: {
     type: 'object',
     properties: {
@@ -315,7 +364,7 @@ const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
       cursor: CURSOR,
       conversationId: { type: 'string' },
       authorId: { type: 'string', description: '按消息作者过滤；等待机器人回复时传机器人 ID' },
-      recipientBotId: { type: 'string', description: '按投递目标机器人过滤（仅 send_message 的投递事件携带）' },
+      recipientBotId: { type: 'string', description: '按投递目标机器人过滤（send_message 与 send_forward_message 的投递事件携带）' },
       settleSeconds: {
         type: 'number',
         minimum: 1,
@@ -446,11 +495,13 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   ['get_scene_snapshot', 'read', '读取当前模拟 QQ 场景快照'],
   ['list_conversations', 'read', '分页列出当前操作者可见会话'],
   ['get_conversation', 'read', '读取单个会话及其消息'],
+  ['get_forward_message', 'read', '按操作者可见性读取合并转发资源详情'],
   ['list_pending_requests', 'read', '列出当前待处理好友和群申请'],
   ['get_capability_matrix', 'read', '读取 NapCat 或 LLBot 能力覆盖'],
   ['export_scene', 'read', '导出版本化 JSON 场景'],
   ['upload_media', 'interact', '上传供消息引用的媒体'],
   ['send_message', 'interact', '以明确操作者身份发送消息'],
+  ['send_forward_message', 'interact', '以明确操作者身份发送合并转发消息'],
   ['perform_friend_action', 'interact', '执行好友申请、审批、删除、备注或戳一戳'],
   ['perform_group_action', 'interact', '执行入群、邀请、退群、管理或戳一戳'],
   ['handle_request', 'interact', '处理普通用户有权审批的申请'],
@@ -665,8 +716,27 @@ export class SandboxMcpService {
         content: '你好',
         idempotencyKey: 'example-message-1',
       },
+      send_forward_message: {
+        spaceId: '<create_test_space.spaceId>',
+        operatorId: '10001',
+        conversationId: 'private:10001:20002',
+        messageIds: ['<send_message.messageId>', '<另一条可见消息 ID>'],
+        idempotencyKey: 'example-forward-1',
+      },
+      get_forward_message: {
+        spaceId: '<create_test_space.spaceId>',
+        operatorId: '10001',
+        forwardId: '<send_forward_message.forwardId>',
+      },
+      自定义媒体转发节点: {
+        说明: '先用 upload_media 上传媒体，再把 mediaId 放进 custom node；嵌套转发使用已有 forwardId。',
+        send_forward_message: {
+          spaceId: '<spaceId>', operatorId: '10001', conversationId: 'private:10001:20002', idempotencyKey: 'example-forward-2',
+          nodes: [{ type: 'custom', userId: '10001', nickname: '测试用户', content: '图片节点', mediaIds: ['<upload_media.mediaId>'], forwardId: '<可选嵌套 forwardId>' }],
+        },
+      },
       等待机器人回复: {
-        说明: 'send_message 会等待被测机器人的同步处理完成才返回，回复可能在返回前已进入事件流；必须用发送前的 cursor 加 authorId 过滤等待，用 send_message 返回的 cursor 会错过同步回复。',
+        说明: 'send_message 与 send_forward_message 都会等待被测机器人的同步处理完成才返回，回复可能在返回前已进入事件流；必须用发送前的 cursor 加 authorId 过滤等待，用发送工具返回的 cursor 会错过同步回复。',
         步骤: [
           { tool: 'get_server_info', 得到: 'cursor（发送前）' },
           { tool: 'send_message', arguments: { spaceId: '<spaceId>', operatorId: '10001', conversationId: 'private:10001:20002', content: 'help', idempotencyKey: 'example-message-2' } },
@@ -742,15 +812,17 @@ export class SandboxMcpService {
     if (tool === 'fail_test_space') return this.withIdempotency(credential, tool, args, async () => this.completeTestSpace(args, true))
     if (tool === 'reactivate_test_space') return this.withIdempotency(credential, tool, args, async () => this.reactivateTestSpace(args))
     if (tool === 'delete_test_space') return this.withIdempotency(credential, tool, args, async () => this.deleteTestSpace(args))
-    const activeControl = this.resolveControl(args, tool !== 'get_scene_snapshot' && tool !== 'list_conversations' && tool !== 'get_conversation' && tool !== 'list_pending_requests' && tool !== 'get_capability_matrix' && tool !== 'export_scene' && tool !== 'list_onebot_debug_records' && tool !== 'get_onebot_debug_record')
+    const activeControl = this.resolveControl(args, tool !== 'get_scene_snapshot' && tool !== 'list_conversations' && tool !== 'get_conversation' && tool !== 'get_forward_message' && tool !== 'list_pending_requests' && tool !== 'get_capability_matrix' && tool !== 'export_scene' && tool !== 'list_onebot_debug_records' && tool !== 'get_onebot_debug_record')
     if (tool === 'get_scene_snapshot') return activeControl.getSnapshot()
     if (tool === 'list_conversations') return this.listConversations(activeControl, args)
     if (tool === 'get_conversation') return this.getConversation(activeControl, args)
+    if (tool === 'get_forward_message') return this.getForwardMessage(activeControl, args)
     if (tool === 'list_pending_requests') return activeControl.getSnapshot().requests
     if (tool === 'get_capability_matrix') return this.getCapabilityMatrix(activeControl, args.implementation)
     if (tool === 'export_scene') return this.exportScene(activeControl)
     if (tool === 'upload_media') return this.uploadMedia(activeControl, args)
     if (tool === 'send_message') return this.withIdempotency(credential, tool, args, async () => this.sendMessage(activeControl, args))
+    if (tool === 'send_forward_message') return this.withIdempotency(credential, tool, args, async () => this.sendForwardMessage(activeControl, args))
     if (tool === 'perform_friend_action') return this.withIdempotency(credential, tool, args, async () => this.performFriendAction(activeControl, args))
     if (tool === 'perform_group_action') return this.withIdempotency(credential, tool, args, async () => this.performGroupAction(activeControl, args))
     if (tool === 'handle_request') return this.withIdempotency(credential, tool, args, async () => this.handleRequest(activeControl, args))
@@ -828,6 +900,16 @@ export class SandboxMcpService {
     return { conversation, messages: snapshot.messages.filter(({ id }) => messageIds.has(id)) }
   }
 
+  private getForwardMessage(control: SandboxControlService, args: Record<string, unknown>) {
+    const operatorId = requireString(args.operatorId, 'operatorId')
+    const forwardId = typeof args.forwardId === 'string' ? args.forwardId : undefined
+    const messageId = typeof args.messageId === 'string' ? args.messageId : undefined
+    if (!forwardId?.trim() && !messageId?.trim()) {
+      throw new SandboxMcpError('invalid_arguments', 'forwardId 与 messageId 至少需要提供一项')
+    }
+    return control.getForwardMessage({ operatorId, forwardId, messageId })
+  }
+
   private getCapabilityMatrix(control: SandboxControlService, implementation: unknown) {
     const profile = implementation === 'llbot' ? 'llbot' : 'napcat'
     const snapshot = control.getSnapshot()
@@ -871,6 +953,61 @@ export class SandboxMcpService {
       }
     }
     return { ...result, cursor: this.currentCursor() }
+  }
+
+  private async sendForwardMessage(control: SandboxControlService, args: Record<string, unknown>) {
+    const operatorId = requireString(args.operatorId, 'operatorId')
+    const conversationId = requireString(args.conversationId, 'conversationId')
+    const operator = control.getSnapshot().participants.find(({ id }) => id === operatorId)
+    if (operator?.kind === 'bot') {
+      throw new SandboxMcpError('permission_denied', 'MCP 测试控制器不能代机器人发送合并转发；请由被测插件调用 OneBot action')
+    }
+    const messageIds = Array.isArray(args.messageIds) ? args.messageIds.map(String) : []
+    const rawNodes = Array.isArray(args.nodes) ? args.nodes : []
+    if (!!messageIds.length === !!rawNodes.length) {
+      throw new SandboxMcpError('invalid_arguments', 'messageIds 与 nodes 必须且只能提供一项')
+    }
+    const nodes = rawNodes.length ? this.resolveForwardNodes(args, rawNodes) : undefined
+    const previousMessageIds = new Set(control.getSnapshot().messages.map(({ id }) => id))
+    const { result, delivery } = control.startForwardMessage({
+      operatorId,
+      conversationId,
+      ...(messageIds.length ? { messageIds } : {}),
+      ...(nodes ? { nodes } : {}),
+    })
+    await delivery
+    const spaceId = typeof args.spaceId === 'string' ? args.spaceId : undefined
+    // 场景监听已产生外层消息事件；这里只补齐按接收机器人过滤所需的投递事件。
+    for (const message of control.getSnapshot().messages.filter(({ id }) => !previousMessageIds.has(id))) {
+      for (const item of control.getBotDeliveries({ messageId: message.id })) {
+        this.appendEvent('message.created', { ...message, recipientBotId: item.recipientBotId }, spaceId)
+      }
+    }
+    return { ...result, cursor: this.currentCursor() }
+  }
+
+  private resolveForwardNodes(args: Record<string, unknown>, rawNodes: unknown[]): SandboxForwardNodeInput[] {
+    return rawNodes.map((rawNode, index) => {
+      const node = asRecord(rawNode)
+      if (node.type === 'reference') {
+        return { type: 'reference', messageId: requireString(node.messageId, `nodes[${index}].messageId`) }
+      }
+      if (node.type !== 'custom') {
+        throw new SandboxMcpError('invalid_arguments', `nodes[${index}].type 必须是 reference 或 custom`)
+      }
+      const mediaIds = Array.isArray(node.mediaIds) ? node.mediaIds.map(String) : []
+      const media = mediaIds.map((id) => this.uploadedMedia.get(this.mediaCacheKey(args, id))
+        ?? (() => { throw new SandboxMcpError('media_not_found', `媒体不存在：${id}`) })())
+      return {
+        type: 'custom',
+        userId: requireString(node.userId, `nodes[${index}].userId`),
+        nickname: requireString(node.nickname, `nodes[${index}].nickname`),
+        content: typeof node.content === 'string' ? node.content : '',
+        ...(typeof node.createdAt === 'string' ? { createdAt: node.createdAt } : {}),
+        ...(media.length ? { media } : {}),
+        ...(typeof node.forwardId === 'string' ? { forwardId: node.forwardId } : {}),
+      }
+    })
   }
 
   private mediaCacheKey(args: Record<string, unknown>, mediaId: string): string {

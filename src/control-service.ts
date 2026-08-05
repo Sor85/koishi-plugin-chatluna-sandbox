@@ -1314,11 +1314,15 @@ export class SandboxControlService {
       if (!message || !forwardId) throw new Error('合并转发发送失败：未返回有效资源')
       return { messageId: message.id, forwardId, revision: this.scene.revision }
     }
-    return this.applyForwardMessage(input)
+    const { result, delivery } = this.startForwardMessage(input)
+    // WebQQ 必须即时收到外层消息结果；机器人投递继续在后台进行。
+    void delivery.catch(() => {})
+    return result
   }
 
-  // bot action 与用户交互最终都落到这里，保证场景转发资源唯一。
-  async applyForwardMessage(input: SendForwardMessageInput): Promise<SendForwardMessageResult> {
+  // MCP 可等待该入口的 delivery，保证同步回复已进入发送前 cursor 对应的事件流；
+  // WebQQ 与 OneBot action 则只消费 result，并让投递在后台继续。
+  startForwardMessage(input: SendForwardMessageInput): { result: SendForwardMessageResult; delivery: Promise<void> } {
     const context = this.getMessageContext({
       operatorId: input.operatorId,
       conversationId: input.conversationId,
@@ -1334,16 +1338,25 @@ export class SandboxControlService {
     const content = this.formatForwardPreview(nodes)
     const message = this.appendMessage(context.operator.id, context.conversation.id, content, undefined, undefined, undefined, undefined, forward.id)
     const onebotMessage = [{ type: 'forward', data: { id: forward.id } }]
-    // 与 startMessageSend 一致：先落库并返回，机器人投递在后台继续。
-    // 若同步等待 dispatch，当前操作者为 bot 且目标会话会触发 ChatLuna 时，WebUI 会卡在“转发中...”。
-    void this.dispatchMessageToBots(
+    const delivery = this.dispatchMessageToBots(
       context,
       message,
       [h('forward', { id: forward.id })],
       onebotMessage,
       toOneBotRawMessage(onebotMessage),
-    ).catch(() => {})
-    return { messageId: message.id, forwardId: forward.id, revision: this.scene.revision }
+    )
+    return {
+      result: { messageId: message.id, forwardId: forward.id, revision: this.scene.revision },
+      delivery,
+    }
+  }
+
+  // bot action 与用户交互最终都落到这里，保证场景转发资源唯一。
+  async applyForwardMessage(input: SendForwardMessageInput): Promise<SendForwardMessageResult> {
+    const { result, delivery } = this.startForwardMessage(input)
+    // OneBot action 返回前不等待目标插件处理，避免机器人向自身会话发送时形成调用环。
+    void delivery.catch(() => {})
+    return result
   }
 
   getForwardMessage(input: GetForwardMessageInput): SandboxForward {
