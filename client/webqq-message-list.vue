@@ -1,16 +1,18 @@
 <template>
   <section
+    ref="messagesElement"
     v-webqq-scrollbar="{ tone: 'accent' }"
     class="webqq-messages"
     :class="{ 'is-selecting': model.selectionMode }"
     aria-label="消息记录"
+    @scroll="handleMessagesScroll"
   >
     <div v-if="!model.messages.length && !model.chatLunaStates.some((state) => state.thinking)" class="webqq-welcome">
       <WebqqAvatar class="webqq-avatar webqq-avatar-large" :kind="model.avatarKind" :name="model.title" :avatar="model.avatar" />
       <strong>{{ model.title }}</strong>
       <p>发送消息，验证插件在模拟 QQ 环境中的响应</p>
     </div>
-    <ol v-else>
+    <ol v-else ref="messagesContentElement">
       <li v-if="model.hasMoreMessages" class="webqq-history-more-row">
         <button type="button" class="webqq-history-more" :disabled="historyLoading" @click="loadEarlierMessages">
           {{ historyLoading ? '加载中...' : '查看更早消息' }}
@@ -293,12 +295,18 @@
 
 <script setup lang="ts">
 import { IconArrowBackUp, IconBell, IconCheck, IconChecks, IconClock, IconHandClick, IconId, IconMessageReply, IconMoodSmile, IconPaperclip, IconTag, IconUserMinus, IconUserPlus, IconUsers } from '@tabler/icons-vue'
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from './components/ui/context-menu'
 import { getFriendMenuActions, type FriendMenuState } from './webqq/friend-menu'
 import { getGroupAuthorityBadge, getGroupMemberDisplayName } from './webqq/group-display'
 import GroupMemberMenu from './group-member-menu.vue'
 import { getMessageClusterClass, isMergedMessage } from './webqq/message-cluster'
+import {
+  buildMessageListTail,
+  isMessageListNearBottom,
+  scrollMessageListToBottom,
+  shouldFollowMessageListTail,
+} from './webqq/message-list-scroll'
 import { formatMentionContent } from './webqq/mention'
 import WebqqAvatar from './webqq-avatar.vue'
 import WebqqMessageReactions from './webqq-message-reactions.vue'
@@ -371,10 +379,96 @@ const emit = defineEmits<{
 const historyLoading = ref(false)
 const highlightedMessageId = ref('')
 const expandedThinking = ref<Record<string, true>>({})
+const messagesElement = ref<HTMLElement>()
+const messagesContentElement = ref<HTMLOListElement>()
+let stickingToBottom = true
+let previousMessageListTail: ReturnType<typeof buildMessageListTail> | undefined
+let scrollFrame = 0
+let scrollSettleFrame = 0
+let followingMessageListTail = false
+let forcingMessageListBottom = false
+let contentResizeObserver: ResizeObserver | undefined
 const participantNames = computed(() => Object.fromEntries(
   Object.entries(props.model.participants).map(([id, participant]) => [id, participant.name]),
 ))
 let quoteHighlightTimer: ReturnType<typeof setTimeout> | undefined
+
+const messageListTail = computed(() => buildMessageListTail({
+  conversationId: props.model.currentConversation?.id ?? props.model.messages.at(-1)?.conversationId,
+  messages: props.model.messages,
+  chatLunaStates: props.model.chatLunaStates,
+}))
+
+function handleMessagesScroll() {
+  const element = messagesElement.value
+  if (!element) return
+  const nearBottom = isMessageListNearBottom(element)
+  if (followingMessageListTail && nearBottom) return
+  // 追踪窗口内仍可能发生真实上滑；只有程序性滚动产生的置底事件可以忽略，否则会吞掉用户的脱离操作。
+  stickingToBottom = nearBottom
+  if (!nearBottom && followingMessageListTail) {
+    followingMessageListTail = false
+    if (scrollFrame) cancelAnimationFrame(scrollFrame)
+    if (scrollSettleFrame) cancelAnimationFrame(scrollSettleFrame)
+    scrollFrame = 0
+    scrollSettleFrame = 0
+    forcingMessageListBottom = false
+  }
+}
+
+async function scheduleMessageListBottom(force = false) {
+  followingMessageListTail = true
+  forcingMessageListBottom ||= force
+  await nextTick()
+  if (scrollFrame) cancelAnimationFrame(scrollFrame)
+  if (scrollSettleFrame) cancelAnimationFrame(scrollSettleFrame)
+  scrollFrame = requestAnimationFrame(() => {
+    scrollFrame = 0
+    const element = messagesElement.value
+    if (!element || (!stickingToBottom && !forcingMessageListBottom)) {
+      followingMessageListTail = false
+      forcingMessageListBottom = false
+      return
+    }
+    scrollMessageListToBottom(element)
+    // ResizeObserver 和浏览器滚动事件可能落在同一帧；再等一帧确认最终高度后才交还用户滚动判定。
+    scrollSettleFrame = requestAnimationFrame(() => {
+      scrollSettleFrame = 0
+      const settledElement = messagesElement.value
+      if (settledElement && (stickingToBottom || forcingMessageListBottom)) {
+        scrollMessageListToBottom(settledElement)
+      }
+      followingMessageListTail = false
+      forcingMessageListBottom = false
+    })
+  })
+}
+
+watch(messageListTail, (nextTail) => {
+  const previousTail = previousMessageListTail
+  const shouldFollow = shouldFollowMessageListTail(
+    previousTail,
+    nextTail,
+    stickingToBottom,
+  )
+  previousMessageListTail = nextTail
+  if (!shouldFollow) return
+  stickingToBottom = true
+  // 首次进入与切换会话必须覆盖上一会话的上滑状态；同会话尾部更新仍只在 sticky 状态下调用。
+  void scheduleMessageListBottom(!previousTail || previousTail.conversationId !== nextTail.conversationId)
+}, { immediate: true, flush: 'post' })
+
+watch([messagesElement, messagesContentElement], ([element, content]) => {
+  contentResizeObserver?.disconnect()
+  contentResizeObserver = undefined
+  if (!element || typeof ResizeObserver === 'undefined') return
+  // 新消息中的媒体与 thinking 内容可能在 Vue 更新后继续增高；仅在 sticky 状态下补齐末尾位置。
+  contentResizeObserver = new ResizeObserver(() => {
+    if (stickingToBottom) void scheduleMessageListBottom()
+  })
+  contentResizeObserver.observe(element)
+  if (content) contentResizeObserver.observe(content)
+}, { flush: 'post' })
 
 // 思考与用量归档在消息上，因此多轮对话后每条机器人消息都保留自己的指标。
 function getMessageThinking(message: SandboxMessage) {
@@ -605,5 +699,8 @@ async function loadEarlierMessages() {
 
 onBeforeUnmount(() => {
   if (quoteHighlightTimer) clearTimeout(quoteHighlightTimer)
+  if (scrollFrame) cancelAnimationFrame(scrollFrame)
+  if (scrollSettleFrame) cancelAnimationFrame(scrollSettleFrame)
+  contentResizeObserver?.disconnect()
 })
 </script>
