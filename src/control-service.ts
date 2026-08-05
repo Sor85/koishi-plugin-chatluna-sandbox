@@ -7,7 +7,7 @@ import { SandboxChatLunaStateStore } from './chatluna-state'
 import { SandboxMediaStorage, MAX_MEDIA_SIZE } from './media-storage'
 import { SandboxOneBotDebugStore, createOneBotDebugError, type AppendOneBotDebugRecordInput, type SandboxOneBotDebugPersistence } from './onebot-debug'
 import { toOneBotMessageSegments, toOneBotRawMessage } from './onebot-message'
-import type { SandboxScenePersistence } from './persistence'
+import type { SandboxSceneLoadResult, SandboxScenePersistence } from './persistence'
 import { mergeAccountProfile, normalizeAccountProfile, sanitizeSnapshotProfiles } from './account-profile'
 import { getOneBotCapabilityMatrix, getOneBotMessageEventFields, getOneBotMessageSequence, normalizeDisabledCapabilities, resolveOneBotMessageId, type SandboxOneBotCapability } from './onebot-profiles'
 import {
@@ -72,6 +72,7 @@ export interface SandboxControlServiceOptions {
   initialScene?: SandboxSnapshot
   runtimeBots?: SandboxRuntimeBotRegistry
   runtimeActive?: boolean
+  databaseReadyTimeoutMs?: number
 }
 
 export class SandboxRuntimeBotRegistry {
@@ -105,6 +106,7 @@ const SECONDARY_USER_ID = '10002'
 const ADMIN_USER_ID = '10003'
 const DEFAULT_BOT_ID = '20001'
 const DEFAULT_GROUP_ID = '30001'
+const DEFAULT_DATABASE_READY_TIMEOUT_MS = 10_000
 // 与真实 QQ 群禁言上限一致，避免插件写入不可能的到期时间。
 const MAX_GROUP_MUTE_SECONDS = 30 * 24 * 60 * 60
 
@@ -195,12 +197,15 @@ export class SandboxControlService {
   private debugRecordListeners = new Set<(record: SandboxOneBotDebugRecord) => void>()
   private contextDisposers: Array<() => void> = []
   private disposePromise?: Promise<void>
+  private databaseReadyTimeoutMs: number
+  private disposed = false
 
   constructor(private ctx: Context, options: SandboxControlServiceOptions = {}) {
     this.initialScene = structuredClone(options.initialScene ?? createDefaultScene())
     this.scene = structuredClone(this.initialScene)
     this.runtimeBotsActive = options.runtimeActive ?? true
     this.runtimeBotRegistry = options.runtimeBots ?? new SandboxRuntimeBotRegistry()
+    this.databaseReadyTimeoutMs = options.databaseReadyTimeoutMs ?? DEFAULT_DATABASE_READY_TIMEOUT_MS
     this.persistence = options.persistence
     if (this.persistence) {
       this.sceneReady = new Promise((resolve) => {
@@ -504,6 +509,7 @@ export class SandboxControlService {
 
   dispose(): Promise<void> {
     if (this.disposePromise) return this.disposePromise
+    this.disposed = true
     this.disposePromise = (async () => {
       for (const dispose of this.contextDisposers.splice(0)) dispose()
       this.chatLunaState.dispose()
@@ -1608,11 +1614,27 @@ export class SandboxControlService {
     }
   }
 
+  private async loadSceneAfterDatabaseReady(persistence: SandboxScenePersistence): Promise<SandboxSceneLoadResult> {
+    let result = await persistence.load()
+    if (result.kind !== 'unavailable' || result.reason !== 'missing-service') return result
+
+    const deadline = Date.now() + this.databaseReadyTimeoutMs
+    // Minato 驱动与本插件都在 ready 阶段启动，database 可能要等异步驱动完成后才注册。
+    // 这里只重试 missing-service；query-failed 代表数据库已经可读到但查询失败，绝不能重试成“空库”。
+    while (!this.disposed && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, Math.min(25, Math.max(1, deadline - Date.now()))))
+      if (this.disposed) break
+      result = await persistence.load()
+      if (result.kind !== 'unavailable' || result.reason !== 'missing-service') return result
+    }
+    return result
+  }
+
   private async restoreScene(): Promise<void> {
     await this.oneBotDebug.waitForReady()
     const persistence = this.persistence
     if (!persistence) return
-    const result = await persistence.load()
+    const result = await this.loadSceneAfterDatabaseReady(persistence)
     if (result.kind === 'loaded') {
       this.scene = structuredClone(result.scene)
       const normalized = await this.normalizePersistedAvatars()
@@ -1632,8 +1654,10 @@ export class SandboxControlService {
     }
     // 数据库暂不可用或查询失败都不能证明旧场景不存在；禁止后续 mutation 写库、清媒体或覆盖真实数据。
     this.scenePersistenceAuthoritative = false
-    const detail = result.error instanceof Error ? `：${result.error.message}` : ''
-    this.ctx.logger('onebot-sandbox').warn(`场景持久化暂不可用，已保留当前进程内场景且不会覆盖数据库${detail}`)
+    const reason = result.reason === 'missing-service'
+      ? `等待 Koishi Database 服务 ${this.databaseReadyTimeoutMs}ms 后仍不可用`
+      : result.error instanceof Error ? result.error.message : '数据库查询失败'
+    this.ctx.logger('onebot-sandbox').warn(`场景持久化暂不可用，已保留当前进程内场景且不会覆盖数据库：${reason}`)
   }
 
   private async normalizePersistedAvatars(): Promise<boolean> {

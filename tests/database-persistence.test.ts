@@ -39,11 +39,15 @@ class TestScenePersistence implements SandboxScenePersistence {
   }
 }
 
-async function createControl(persistence?: SandboxScenePersistence, mediaDirectory?: string) {
+async function createControl(
+  persistence?: SandboxScenePersistence,
+  mediaDirectory?: string,
+  options: { databaseReadyTimeoutMs?: number } = {},
+) {
   const app = new App()
   let control: SandboxControlService | undefined
   app.plugin((ctx) => {
-    control = new SandboxControlService(ctx, { persistence, mediaDirectory })
+    control = new SandboxControlService(ctx, { persistence, mediaDirectory, ...options })
   })
   runningApps.push(app)
   await app.start()
@@ -77,6 +81,79 @@ describe('沙盒场景持久化', () => {
     expect(second.getSnapshot().participants.map(({ id }) => id)).toEqual(['10001', '10002', '10003', '20001'])
     // 内存模式重启后会重新生成默认头像，不再清空整个目录。
     expect(await readdir(mediaDirectory)).toHaveLength(10)
+  })
+
+  it('Database 服务在 ready 后晚到时仍恢复旧场景并继续持久化', async () => {
+    const stored = new TestScenePersistence()
+    const { app: seedApp, control: seed } = await createControl(stored)
+    const avatar = seed.getSnapshot().participants.find(({ id }) => id === '10001')!.avatar
+    seed.createUser({ id: '10099', name: '晚到数据库用户' })
+    await seed.sendMessage({
+      operatorId: '10099',
+      conversationId: 'private:10099:20001',
+      content: '数据库晚到前的历史消息',
+    })
+    await seed.waitForPersistence()
+    await seedApp.stop()
+
+    let available = false
+    let saveCalls = 0
+    const delayedPersistence: SandboxScenePersistence = {
+      getStatus: () => stored.getStatus(),
+      load: async () => available
+        ? stored.load()
+        : { kind: 'unavailable', reason: 'missing-service' },
+      save: async (scene) => {
+        saveCalls += 1
+        await stored.save(scene)
+      },
+    }
+    const app = new App()
+    let control: SandboxControlService | undefined
+    app.plugin((ctx) => {
+      control = new SandboxControlService(ctx, {
+        persistence: delayedPersistence,
+        databaseReadyTimeoutMs: 500,
+      })
+      // 模拟 Minato：database 插件同样在 ready 中异步启动，服务晚于 control 的恢复回调出现。
+      ctx.on('ready', async () => {
+        await new Promise((resolve) => setTimeout(resolve, 30))
+        available = true
+      })
+    })
+    runningApps.push(app)
+    await app.start()
+    if (!control) throw new Error('沙盒控制服务未注册')
+
+    expect(control.getSnapshot().messages).toContainEqual(expect.objectContaining({ content: '数据库晚到前的历史消息' }))
+    expect(control.getSnapshot().participants.find(({ id }) => id === '10001')?.avatar).toBe(avatar)
+    control.createUser({ id: '10100', name: '恢复后写入用户' })
+    await control.waitForPersistence()
+    expect(saveCalls).toBeGreaterThan(0)
+    expect((await stored.load()).kind).toBe('loaded')
+    const restored = await stored.load()
+    expect(restored.kind === 'loaded' && restored.scene.participants.some(({ id }) => id === '10100')).toBe(true)
+  })
+
+  it('Database 服务永不出现时有界结束且不覆盖旧场景或清理媒体', async () => {
+    const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-database-timeout-media-'))
+    temporaryDirectories.push(mediaDirectory)
+    await writeFile(join(mediaDirectory, 'preserved'), 'preserved')
+    let saveCalls = 0
+    const persistence: SandboxScenePersistence = {
+      getStatus: () => ({ mode: 'database', available: false, persisted: false }),
+      load: async () => ({ kind: 'unavailable', reason: 'missing-service' }),
+      save: async () => { saveCalls += 1 },
+    }
+
+    const startedAt = Date.now()
+    const { control } = await createControl(persistence, mediaDirectory, { databaseReadyTimeoutMs: 50 })
+    expect(Date.now() - startedAt).toBeLessThan(1000)
+    control.createUser({ id: '10998', name: '超时期间用户' })
+    await control.waitForPersistence()
+
+    expect(saveCalls).toBe(0)
+    expect(await readdir(mediaDirectory)).toContain('preserved')
   })
 
   it('Database 模式在控制服务重启后恢复场景', async () => {
@@ -249,7 +326,7 @@ describe('沙盒场景持久化', () => {
     await writeFile(join(mediaDirectory, 'orphan'), 'orphan')
 
     const persistence = new KoishiDatabaseScenePersistence(() => undefined)
-    const { control } = await createControl(persistence, mediaDirectory)
+    const { control } = await createControl(persistence, mediaDirectory, { databaseReadyTimeoutMs: 50 })
 
     expect(control.getPersistenceStatus()).toEqual({
       mode: 'database',
