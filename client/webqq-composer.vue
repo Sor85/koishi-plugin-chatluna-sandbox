@@ -2,17 +2,21 @@
   <div ref="composerLayoutRef" class="webqq-composer-layout-root">
     <form ref="composerFormRef" class="webqq-composer" :style="composerStyle" @submit.prevent="sendMessage">
       <span v-if="displayError" class="webqq-composer-error" role="alert">{{ displayError }}</span>
-      <div v-if="model.replyingTo || mentions.length" class="webqq-composer-reply">
-        <span>
-          <template v-if="model.replyingTo">回复 {{ model.replyingTo.authorName }}：{{ model.replyingTo.content }}</template>
-          <template v-if="model.replyingTo && mentions.length"> · </template>
-          <template v-if="mentions.length">提及 {{ mentions.map(({ name }) => `@${name}`).join('、') }}</template>
-        </span>
-        <button type="button" aria-label="清除回复与提及" @click="clearComposerContext">
-          <IconX :size="15" aria-hidden="true" />
-        </button>
-      </div>
-      <div v-if="sendFiles.length" :class="['webqq-composer-attachments', { 'has-reply': model.replyingTo || mentions.length }]">
+      <div
+        v-if="model.replyingTo || mentions.length || sendFiles.length"
+        ref="composerContextRef"
+        class="webqq-composer-context"
+      >
+        <div v-if="model.replyingTo || mentions.length" class="webqq-composer-reply">
+          <span>
+            <template v-if="model.replyingTo">回复 {{ model.replyingTo.authorName }}：{{ model.replyingTo.content }}</template>
+            <template v-if="model.replyingTo && mentions.length"> · </template>
+            <template v-if="mentions.length">提及 {{ mentions.map(({ name }) => `@${name}`).join('、') }}</template>
+          </span>
+          <button type="button" aria-label="清除回复与提及" @click="clearComposerContext">
+            <IconX :size="15" aria-hidden="true" />
+          </button>
+        </div>
         <template v-for="file in sendFiles" :key="file.id">
           <span v-if="!file.previewUrl" class="webqq-composer-attachment-file">
             <IconFile :size="14" stroke-width="2" aria-hidden="true" />
@@ -247,6 +251,7 @@ const sending = ref(false)
 const localError = ref('')
 const composerLayoutRef = ref<HTMLElement>()
 const composerFormRef = ref<HTMLFormElement>()
+const composerContextRef = ref<HTMLElement>()
 const userStackLayoutRef = ref<HTMLElement>()
 const userStackExpanded = ref(false)
 const userStackHovered = ref(false)
@@ -563,34 +568,38 @@ function updateCompactUserStack(form: HTMLElement) {
   compactUserStack.value = form.clientWidth < fullWidth + COMPOSER_FIXED_WIDTH + COMPOSER_MIN_INPUT_WIDTH
 }
 
-// 回复/附件浮条挂在输入胶囊上方、多行输入会撑高胶囊，消息区底部留白必须跟随实际高度，
-// 否则窄屏或浮条出现时最后几条消息会被输入区盖住。
+// 回复与附件共用一个浮动包络；消息区底部留白按包络真实高度计算，不能分别累加同一行中的子项。
 let composerSpaceObserver: ResizeObserver | undefined
 function updateComposerSpace() {
   const form = composerFormRef.value
   if (!form) return
   updateCompactUserStack(form)
   const formHeight = Math.ceil(form.getBoundingClientRect().height)
-  const overlays = form.querySelectorAll('.webqq-composer-reply, .webqq-composer-attachments')
-  let overlayHeight = 0
-  overlays.forEach((overlay) => {
-    overlayHeight += Math.ceil(overlay.getBoundingClientRect().height) + 8
-  })
+  const context = composerContextRef.value
+  const overlayHeight = context ? Math.ceil(context.getBoundingClientRect().height) + 8 : 0
   // 常量 28 = 胶囊底部偏移 20px + 置底时末条消息与输入区的可视间隙 8px，与 onebot-webqq 一致；
-  // 浮条自身的 8px 间隔已在上面按条累加，这里不再重复计入。
+  // 上下文包络与胶囊之间的 8px 间隔已计入 overlayHeight，这里不再重复计入。
   emit('spaceChange', formHeight + overlayHeight + 28)
 }
 
-watch(composerFormRef, (form) => {
+function bindComposerSpaceObserver() {
   composerSpaceObserver?.disconnect()
+  const form = composerFormRef.value
   if (!form) return
   composerSpaceObserver = new ResizeObserver(() => updateComposerSpace())
   composerSpaceObserver.observe(form)
+  const context = composerContextRef.value
+  if (context) composerSpaceObserver.observe(context)
   updateComposerSpace()
+}
+
+watch(composerFormRef, () => {
+  bindComposerSpaceObserver()
 }, { immediate: true })
 
 watch([() => props.model.replyingTo?.id, () => mentions.value.length, () => sendFiles.value.length], () => {
-  void nextTick(() => updateComposerSpace())
+  // context 会随回复、提及和附件挂载或卸载；等待 DOM 更新后重绑，才能观察换行造成的真实高度变化。
+  void nextTick(() => bindComposerSpaceObserver())
 })
 
 // 人数变化会改变 compact 阈值，但胶囊被 max-width 钳住时宽度不变、ResizeObserver 不触发，需主动重判。

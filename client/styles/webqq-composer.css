@@ -28,13 +28,26 @@
   pointer-events: auto;
 }
 
-.webqq-composer-reply {
+.webqq-composer-context {
   position: absolute;
   right: 14px;
   bottom: calc(100% + 8px);
   left: 14px;
   display: flex;
+  box-sizing: border-box;
   min-width: 0;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.webqq-composer-reply {
+  display: flex;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
+  flex: 0 1 auto;
   align-items: center;
   gap: 8px;
   padding: 7px 10px;
@@ -48,7 +61,7 @@
 
 .webqq-composer-reply span {
   min-width: 0;
-  flex: 1;
+  flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -74,22 +87,7 @@
   background: var(--webqq-hover);
 }
 
-/* 待发附件浮条：复刻 onebot-webqq 的 wrap 布局，图片方卡与文件胶囊底对齐。 */
-.webqq-composer-attachments {
-  position: absolute;
-  right: 14px;
-  bottom: calc(100% + 8px);
-  left: 14px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: 6px;
-}
-
-.webqq-composer-attachments.has-reply {
-  bottom: calc(100% + 54px);
-}
-
+/* 待发附件与回复条共享同一 wrap 容器；附件作为直接子项，保证回复始终是第一行最左项。 */
 .webqq-composer-attachment-file {
   display: inline-flex;
   min-width: 96px;
