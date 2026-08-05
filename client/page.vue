@@ -63,6 +63,8 @@
           @load-history="loadEarlierMessages"
           @recall-message="recallMessage"
           @set-message-reaction="setMessageReaction"
+          @send-forward-message="sendForwardMessage"
+          @get-forward-message="getForwardMessage"
           @request-friend="requestFriend"
           @poke-friend="pokeFriend"
           @set-remark="openRemarkDialog"
@@ -177,6 +179,8 @@ const {
   selectConversation,
   selectNavigation: selectWorkspaceNavigation,
   sendComposerMessage,
+  sendForwardMessage,
+  getForwardMessage,
   setGroupAdmin,
   sidebarModel,
   toggleDetails,

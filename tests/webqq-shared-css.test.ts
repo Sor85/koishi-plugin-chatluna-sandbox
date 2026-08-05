@@ -44,6 +44,10 @@ describe('WebQQ 共享样式', () => {
     expect(profileValueRule).toContain('text-align: left')
     expect(overlays).toContain('.webqq-secondary-form')
     expect(overlays).toContain('.webqq-secondary-field')
+    expect(overlays).toContain('.webqq-forward-modal-backdrop')
+    const forwardBackdropRule = overlays.slice(overlays.indexOf('.webqq-forward-modal-backdrop {')).split('}')[0]
+    expect(forwardBackdropRule).toContain('z-index: 160')
+    expect(forwardBackdropRule).toContain('position: fixed')
     expect(entry).not.toContain('.webqq-scrollbar-overlay {')
     expect(entry).not.toContain('.webqq-secondary-form {')
   })

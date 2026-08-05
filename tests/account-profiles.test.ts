@@ -334,6 +334,7 @@ describe('类型化账号资料', () => {
         { id: 'group:30001', type: 'group', groupId: '30001', messageIds: [] },
       ],
       messages: [],
+      forwards: [],
       friendships: [{
         id: 'friend:10001:20001',
         participantIds: ['10001', '20001'],

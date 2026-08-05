@@ -21,6 +21,7 @@ const snapshot: SandboxSnapshot = {
     { id: 'group:30001', type: 'group', groupId: '30001', messageIds: [] },
   ],
   messages: [],
+  forwards: [],
   friendships: [{ id: 'friend:10001:10002', participantIds: ['10001', '10002'], remarks: { 10001: '搭档' }, createdAt: '' }],
   requests: [{ id: 'request:group', type: 'group', requesterId: '10001', groupId: '30002', status: 'pending', createdAt: '' }],
 }

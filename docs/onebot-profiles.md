@@ -50,5 +50,8 @@ OneBot 协议层统一向插件返回数字 `message_id`：消息事件、`send_
 - `set_group_ban` 写入群成员禁言到期时间，`get_group_shut_list` 返回当前仍在禁言中的成员，`get_group_member_info` 的 `shut_up_timestamp` 返回秒级到期时间戳；`duration` 为 0 表示解除禁言，禁言时长上限为 30 天。
 - `set_msg_emoji_like` 按 emoji 聚合表情回应参与者并写入消息，`set` 为 `false` 时移除当前机器人的回应。
 - `set_qq_profile` 写入机器人账号资料：NapCat 与 LLOneBot 都支持 `nickname` 和 `personal_note`，只有 NapCat 接受 `sex`（`0/1/2` 或 `unknown/male/female`）；LLOneBot 传入性别时明确失败，不静默忽略。对应 `get_login_info`、`get_stranger_info`、`get_friend_list` 与 `get_group_member_info` 只返回已建模的类型化字段，不透传 raw JSON。
+- `send_forward_msg` / `send_group_forward_msg` / `send_private_forward_msg` 创建独立合并转发资源，并在目标会话写入外层 forward 卡片消息；响应同时返回 `message_id`、`res_id` 与 `forward_id`。节点支持 `{ data: { id } }` 引用已有可见消息，以及 `{ data: { user_id, nickname, content } }` 自定义内容，可混合使用。自定义节点内的媒体与普通 `send_msg` 一致，接受 `sandbox-media://`、`base64://`、Data URL 与 HTTP(S) 来源，落盘后再写入 node。
+- `get_forward_msg` 读取合并转发详情，接受转发资源 `id` 或外层消息 `message_id`；返回的 `messages` / `message` / `nodes` 为同一份 node 列表，节点正文复用现有 OneBot 消息段转换，并支持嵌套 forward。嵌套资源内的节点媒体只要父链对操作者可见即可读取。
+- 外层 `get_msg`、消息历史和机器人消息事件对合并转发只暴露 `{ type: 'forward', data: { id } }` 段，不再把节点展平成普通文本。
 
 Koishi 的 OneBot 适配器同时提供 camelCase 便捷方法，沙盒显式实现 `getGroupInfo`、`getGroupMemberInfo` 和 `getGroupMemberList`，避免它们被当作原始 action 名转发而报「不支持的 action」。未显式声明的名称仍按原始 action 解析，不会伪造成功。

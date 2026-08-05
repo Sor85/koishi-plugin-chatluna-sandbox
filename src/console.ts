@@ -8,6 +8,7 @@ import { trimSnapshotMessages, type SandboxTestSpaceService, type SandboxTestSpa
 import type {
   DeleteGroupAnnouncementInput,
   ClearSandboxOneBotDebugRecordsResult,
+  GetForwardMessageInput,
   GetMediaContentInput,
   GetMessageHistoryInput,
   GetSandboxBotDeliveriesInput,
@@ -23,10 +24,12 @@ import type {
   SandboxBotDelivery,
   SandboxConsoleOneBotDebugRecord,
   SandboxEntitySource,
+  SandboxForward,
   SandboxMediaContent,
   SandboxMessageHistory,
   SandboxOneBotDebugRecordsPage,
   SandboxWorkspaceState,
+  SendForwardMessageInput,
   SendMediaMessageInput,
   SendMessageInput,
   SetGroupAnnouncementInput,
@@ -40,6 +43,8 @@ interface ConsoleEventMap {
   'onebot-sandbox/message-history': (input: SpaceScoped<GetMessageHistoryInput>) => Promise<SandboxMessageHistory>
   'onebot-sandbox/send-message': (input: SpaceScoped<SendMessageInput>) => Promise<SandboxWorkspaceState>
   'onebot-sandbox/send-media-message': (input: SpaceScoped<SendMediaMessageInput>) => Promise<SandboxWorkspaceState>
+  'onebot-sandbox/send-forward-message': (input: SpaceScoped<SendForwardMessageInput>) => Promise<SandboxWorkspaceState>
+  'onebot-sandbox/get-forward-message': (input: SpaceScoped<GetForwardMessageInput>) => Promise<SandboxForward>
   'onebot-sandbox/recall-message': (input: SpaceScoped<RecallMessageInput>) => Promise<SandboxWorkspaceState>
   'onebot-sandbox/set-message-reaction': (input: SpaceScoped<SetMessageReactionInput>) => Promise<SandboxWorkspaceState>
   'onebot-sandbox/media-content': (input: SpaceScoped<GetMediaContentInput>) => Promise<SandboxMediaContent>
@@ -264,6 +269,14 @@ export function registerConsole(
     delivery.catch(() => {})
     return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
+  console.addListener('onebot-sandbox/send-forward-message', async (input) => {
+    // 合并转发领域路径会等待机器人投递，保证返回的工作区已包含外层 forward 卡片。
+    await (await resolveReadyControl(input, true)).sendForwardMessage(assertInteractionInput(withoutSpaceId(input)) as SendForwardMessageInput)
+    return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
+  }, { authority: 4 })
+  console.addListener('onebot-sandbox/get-forward-message', async (input) => (
+    await resolveReadyControl(input, false)
+  ).getForwardMessage(assertInteractionInput(withoutSpaceId(input)) as GetForwardMessageInput), { authority: 4 })
   console.addListener('onebot-sandbox/recall-message', async (input) => {
     await (await resolveReadyControl(input, true)).recallMessage(assertInteractionInput(withoutSpaceId(input)) as RecallMessageInput)
     return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
@@ -354,6 +367,8 @@ declare module '@koishijs/console' {
     'onebot-sandbox/message-history'(input: SpaceScoped<GetMessageHistoryInput>): Promise<SandboxMessageHistory>
     'onebot-sandbox/send-message'(input: SpaceScoped<SendMessageInput>): Promise<SandboxWorkspaceState>
     'onebot-sandbox/send-media-message'(input: SpaceScoped<SendMediaMessageInput>): Promise<SandboxWorkspaceState>
+    'onebot-sandbox/send-forward-message'(input: SpaceScoped<SendForwardMessageInput>): Promise<SandboxWorkspaceState>
+    'onebot-sandbox/get-forward-message'(input: SpaceScoped<GetForwardMessageInput>): Promise<SandboxForward>
     'onebot-sandbox/recall-message'(input: SpaceScoped<RecallMessageInput>): Promise<SandboxWorkspaceState>
     'onebot-sandbox/set-message-reaction'(input: SpaceScoped<SetMessageReactionInput>): Promise<SandboxWorkspaceState>
     'onebot-sandbox/media-content'(input: SpaceScoped<GetMediaContentInput>): Promise<SandboxMediaContent>

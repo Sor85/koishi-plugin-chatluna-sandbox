@@ -13,6 +13,7 @@ const workspace: SandboxWorkspaceState = {
     groups: [],
     conversations: [{ id: 'private:10001:20001', type: 'direct', participantIds: ['10001', '20001'], messageIds: [] }],
     messages: [],
+    forwards: [],
     friendships: [],
     requests: [],
   },

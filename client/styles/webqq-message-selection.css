@@ -1,0 +1,243 @@
+/* 消息多选与合并转发目标选择：独立文件，避免触碰 webqq-messages.css 中的 forward 卡片规则。 */
+
+.webqq-messages.is-selecting .webqq-message-row.is-selectable {
+  max-width: 100%;
+}
+
+.webqq-message-row.is-selecting {
+  position: relative;
+  align-items: center;
+}
+
+.webqq-message-row.is-selecting.is-selectable {
+  border-radius: 12px;
+  outline: 1px solid transparent;
+  transition: background-color 0.12s ease, outline-color 0.12s ease;
+}
+
+.webqq-message-row.is-selecting.is-selectable:hover {
+  background: color-mix(in srgb, var(--webqq-accent) 8%, transparent);
+}
+
+.webqq-message-row.is-selecting.is-selected {
+  background: color-mix(in srgb, var(--webqq-accent) 12%, transparent);
+  outline-color: color-mix(in srgb, var(--webqq-accent) 28%, transparent);
+}
+
+.webqq-message-select-marker {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid color-mix(in srgb, var(--webqq-muted) 55%, transparent);
+  border-radius: 50%;
+  color: transparent;
+  background: color-mix(in srgb, var(--webqq-bg) 88%, transparent);
+  transition: border-color 0.12s ease, background-color 0.12s ease, color 0.12s ease;
+}
+
+.webqq-message-row.is-selecting .webqq-message-select-marker {
+  margin-top: 10px;
+  align-self: flex-start;
+}
+
+/* select-body 始终承接原 message-row 的左右布局，避免非多选时头像与内容叠成一列。 */
+.webqq-message-select-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.webqq-message-row.is-outgoing .webqq-message-select-body {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+.webqq-message-row.is-selecting.is-outgoing {
+  /* 多选时强制勾选框始终在消息行最左侧，避免 row-reverse 把勾选挤到右侧。 */
+  flex-direction: row;
+  text-align: left;
+}
+
+.webqq-message-row.is-selecting.is-outgoing .webqq-message-select-body {
+  margin-left: auto;
+}
+
+.webqq-message-select-marker.is-checked {
+  border-color: var(--webqq-accent);
+  color: #fff;
+  background: var(--webqq-accent);
+}
+
+.webqq-message-row.is-selecting:not(.is-selectable) {
+  opacity: 0.55;
+}
+
+.webqq-message-row.is-selecting:not(.is-selectable) .webqq-message-select-marker {
+  border-style: dashed;
+  opacity: 0.7;
+}
+
+.webqq-selection-bar {
+  position: absolute;
+  z-index: 20;
+  right: 16px;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 56px;
+  padding: 12px 16px;
+  border: 1px solid var(--webqq-border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--webqq-panel, var(--webqq-bg)) 92%, transparent);
+  box-shadow: 0 10px 28px rgb(15 23 42 / 12%);
+  backdrop-filter: blur(12px);
+}
+
+.webqq-workspace.is-frosted .webqq-selection-bar {
+  background: color-mix(in srgb, var(--webqq-panel, var(--webqq-bg)) 78%, transparent);
+}
+
+.webqq-selection-bar-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.webqq-selection-bar-copy strong {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.webqq-selection-bar-copy span {
+  color: var(--webqq-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.webqq-selection-bar-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.webqq-forward-target-dialog {
+  display: grid;
+  gap: 12px;
+}
+
+.webqq-forward-target-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.webqq-forward-target-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--webqq-muted);
+  background: transparent;
+  font-size: 13px;
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.webqq-forward-target-tab.is-active {
+  color: var(--webqq-accent);
+  border-color: color-mix(in srgb, var(--webqq-accent) 28%, transparent);
+  background: color-mix(in srgb, var(--webqq-accent) 12%, transparent);
+}
+
+.webqq-forward-target-list {
+  display: flex;
+  max-height: min(360px, 50vh);
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.webqq-forward-target-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  text-align: left;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+
+.webqq-forward-target-item:hover {
+  background: color-mix(in srgb, var(--webqq-accent) 8%, transparent);
+}
+
+.webqq-forward-target-item.is-active {
+  border-color: color-mix(in srgb, var(--webqq-accent) 30%, transparent);
+  background: color-mix(in srgb, var(--webqq-accent) 12%, transparent);
+}
+
+.webqq-forward-target-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.webqq-forward-target-copy strong {
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webqq-forward-target-copy small {
+  overflow: hidden;
+  color: var(--webqq-muted);
+  font-size: 12px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webqq-forward-target-empty {
+  display: flex;
+  min-height: 120px;
+  align-items: center;
+  justify-content: center;
+  color: var(--webqq-muted);
+  font-size: 13px;
+}
+
+.webqq-forward-target-radio {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid color-mix(in srgb, var(--webqq-muted) 55%, transparent);
+  border-radius: 50%;
+}
+
+.webqq-forward-target-item.is-active .webqq-forward-target-radio {
+  border-color: var(--webqq-accent);
+  background: radial-gradient(circle at center, var(--webqq-accent) 0 5px, transparent 6px);
+}

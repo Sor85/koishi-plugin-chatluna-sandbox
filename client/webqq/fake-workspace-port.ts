@@ -1,6 +1,7 @@
 import type {
   DeleteGroupAnnouncementInput,
   ClearSandboxOneBotDebugRecordsResult,
+  GetForwardMessageInput,
   GetMediaContentInput,
   GetMessageHistoryInput,
   GetSandboxWorkspaceInput,
@@ -11,10 +12,12 @@ import type {
   RecallMessageInput,
   SetMessageReactionInput,
   SandboxConsoleOneBotDebugRecord,
+  SandboxForward,
   SandboxMediaContent,
   SandboxMessageHistory,
   SandboxOneBotDebugRecordsPage,
   SandboxWorkspaceState,
+  SendForwardMessageInput,
   SendMediaMessageInput,
   SendMessageInput,
   SetGroupAnnouncementInput,
@@ -31,7 +34,19 @@ export interface WorkspacePortCall {
 export class FakeWorkspacePort implements WorkspacePort {
   readonly calls: WorkspacePortCall[] = []
   workspaceResult: SandboxWorkspaceState
-  historyResult: SandboxMessageHistory = { messages: [] }
+  historyResult: SandboxMessageHistory = { messages: [], forwards: [] }
+  forwardResult: SandboxForward = {
+    id: 'forward-1',
+    authorId: '10001',
+    createdAt: '2026-07-23T00:00:00.000Z',
+    nodes: [{
+      userId: '10001',
+      nickname: '测试用户1',
+      content: '基准消息',
+      createdAt: '2026-07-23T00:00:00.000Z',
+      sourceMessageId: 'message-1',
+    }],
+  }
   mediaContentResult: SandboxMediaContent = {
     id: 'media-1',
     type: 'file',
@@ -79,6 +94,14 @@ export class FakeWorkspacePort implements WorkspacePort {
 
   sendMediaMessage(input: SendMediaMessageInput) {
     return this.invoke('sendMediaMessage', input, this.workspaceResult)
+  }
+
+  sendForwardMessage(input: SendForwardMessageInput) {
+    return this.invoke('sendForwardMessage', input, this.workspaceResult)
+  }
+
+  getForwardMessage(input: GetForwardMessageInput) {
+    return this.invoke('getForwardMessage', input, this.forwardResult)
   }
 
   recallMessage(input: RecallMessageInput) {

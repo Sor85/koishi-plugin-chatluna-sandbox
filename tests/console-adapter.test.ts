@@ -95,6 +95,8 @@ describe('Koishi 控制台适配器', () => {
     const historyListener = listeners.get('onebot-sandbox/message-history')
     const sendMessageListener = listeners.get('onebot-sandbox/send-message')
     const sendMediaMessageListener = listeners.get('onebot-sandbox/send-media-message')
+    const sendForwardMessageListener = listeners.get('onebot-sandbox/send-forward-message')
+    const getForwardMessageListener = listeners.get('onebot-sandbox/get-forward-message')
     const getMediaContentListener = listeners.get('onebot-sandbox/media-content')
     const setGroupAnnouncementListener = listeners.get('onebot-sandbox/set-group-announcement')
     const deleteGroupAnnouncementListener = listeners.get('onebot-sandbox/delete-group-announcement')
@@ -106,6 +108,8 @@ describe('Koishi 控制台适配器', () => {
       || typeof historyListener !== 'function'
       || typeof sendMessageListener !== 'function'
       || typeof sendMediaMessageListener !== 'function'
+      || typeof sendForwardMessageListener !== 'function'
+      || typeof getForwardMessageListener !== 'function'
       || typeof getMediaContentListener !== 'function'
       || typeof setGroupAnnouncementListener !== 'function'
       || typeof deleteGroupAnnouncementListener !== 'function'
@@ -191,6 +195,32 @@ describe('Koishi 控制台适配器', () => {
     await vi.waitFor(() => {
       expect(control!.getBotDeliveries()).toHaveLength(2)
     })
+
+    const sourceMessageId = snapshot.snapshot.messages.find(({ content }: { content: string }) => content === '控制台消息')?.id
+    expect(sourceMessageId).toBeTruthy()
+    const forwardWorkspace = await sendForwardMessageListener({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      messageIds: [sourceMessageId],
+    })
+    const forwardMessage = forwardWorkspace.snapshot.messages.find(({ forwardId }: { forwardId?: string }) => !!forwardId)
+    expect(forwardMessage?.forwardId).toBeTruthy()
+    expect(forwardWorkspace.snapshot.forwards).toContainEqual(expect.objectContaining({
+      id: forwardMessage.forwardId,
+    }))
+    expect(await getForwardMessageListener({
+      operatorId: '10001',
+      forwardId: forwardMessage.forwardId,
+    })).toMatchObject({
+      id: forwardMessage.forwardId,
+      nodes: [expect.objectContaining({ content: '控制台消息', sourceMessageId })],
+    })
+    const forwardHistory = await historyListener({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      limit: 50,
+    })
+    expect(forwardHistory.forwards).toContainEqual(expect.objectContaining({ id: forwardMessage.forwardId }))
 
     const otherWorkspace = await snapshotListener({ operatorId: '10002' })
     expect(otherWorkspace.snapshot.conversations.every((conversation: { type: string; participantIds?: readonly string[]; groupId?: string }) => conversation.type === 'direct'

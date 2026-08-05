@@ -1,6 +1,7 @@
 import { computed, readonly, ref, type DeepReadonly } from 'vue'
 import type {
   DeleteGroupAnnouncementInput,
+  GetForwardMessageInput,
   GetMessageHistoryInput,
   GetSandboxOneBotDebugRecordsInput,
   ManageSandboxEnvironmentInput,
@@ -11,6 +12,7 @@ import type {
   SandboxChatLunaState,
   SandboxConsoleOneBotDebugRecord,
   SandboxConversation,
+  SandboxForward,
   SandboxFriendAction,
   SandboxGroup,
   SandboxGroupAction,
@@ -18,6 +20,7 @@ import type {
   SandboxParticipant,
   SandboxSnapshot,
   SandboxWorkspaceState,
+  SendForwardMessageInput,
   SendMediaMessageInput,
   SendMessageInput,
   SetGroupAnnouncementInput,
@@ -72,6 +75,8 @@ export interface ChatWorkspaceModel {
   readonly currentOperator?: DeepReadonly<WorkspaceParticipant>
   readonly conversation?: DeepReadonly<SandboxConversation>
   readonly messages: readonly DeepReadonly<SandboxMessage>[]
+  // 当前会话消息直接引用的合并转发资源，供列表预览与后续详情展开。
+  readonly forwards: readonly DeepReadonly<SandboxForward>[]
   readonly chatLunaStates: readonly DeepReadonly<SandboxChatLunaState>[]
 }
 
@@ -104,6 +109,7 @@ const emptySnapshot: SandboxSnapshot = {
   groups: [],
   conversations: [],
   messages: [],
+  forwards: [],
   friendships: [],
   requests: [],
 }
@@ -137,6 +143,11 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     const ids = new Set(activeConversation.value?.messageIds ?? [])
     return snapshot.value.messages.filter(({ id }) => ids.has(id))
   })
+  // 仅暴露当前会话消息直接引用的转发资源；嵌套详情通过 getForwardMessage 按需加载。
+  const activeForwards = computed(() => {
+    const visibleForwardIds = new Set(activeMessages.value.flatMap(({ forwardId }) => forwardId ? [forwardId] : []))
+    return (snapshot.value.forwards ?? []).filter(({ id }) => visibleForwardIds.has(id))
+  })
   const activeChatLunaStates = computed(() => workspaceState.value.chatLunaStates
     .filter(({ conversationId }) => conversationId === activeConversation.value?.id))
   const activeBot = computed(() => {
@@ -162,6 +173,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     currentOperator: currentOperator.value,
     conversation: activeConversation.value,
     messages: activeMessages.value,
+    forwards: activeForwards.value,
     chatLunaStates: activeChatLunaStates.value,
   }))
   const composer = computed<ComposerWorkspaceModel>(() => ({
@@ -283,6 +295,35 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     }
   }
 
+  async function sendForwardMessage(input: Omit<SendForwardMessageInput, 'operatorId'>) {
+    const operatorId = getCurrentOperatorId()
+    try {
+      replaceWorkspace(await port.sendForwardMessage({ ...input, operatorId }))
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '合并转发失败')
+    }
+  }
+
+  async function getForwardMessage(input: Omit<GetForwardMessageInput, 'operatorId'>) {
+    const operatorId = getCurrentOperatorId()
+    try {
+      const forward = await port.getForwardMessage({ ...input, operatorId })
+      // 按需详情也并入本地快照，避免重复 RPC 与列表预览丢失嵌套资源。
+      if (!(snapshot.value.forwards ?? []).some(({ id }) => id === forward.id)) {
+        replaceWorkspace({
+          ...workspaceState.value,
+          snapshot: {
+            ...snapshot.value,
+            forwards: [...(snapshot.value.forwards ?? []), forward],
+          },
+        })
+      }
+      return forward
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '读取合并转发失败')
+    }
+  }
+
   async function recallMessage(input: Omit<RecallMessageInput, 'operatorId'>) {
     const operatorId = getCurrentOperatorId()
     try {
@@ -345,6 +386,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     try {
       const history = await port.getMessageHistory({ ...input, operatorId })
       const knownIds = new Set(snapshot.value.messages.map(({ id }) => id))
+      const knownForwardIds = new Set((snapshot.value.forwards ?? []).map(({ id }) => id))
       replaceWorkspace({
         ...workspaceState.value,
         snapshot: {
@@ -355,6 +397,10 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
             hasMoreMessages: !!history.nextBeforeMessageId,
           } : conversation),
           messages: [...history.messages.filter(({ id }) => !knownIds.has(id)), ...snapshot.value.messages],
+          forwards: [
+            ...(snapshot.value.forwards ?? []),
+            ...(history.forwards ?? []).filter(({ id }) => !knownForwardIds.has(id)),
+          ],
         },
       })
     } catch (error) {
@@ -464,6 +510,8 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     selectConversation,
     selectOperator,
     selectView,
+    sendForwardMessage,
+    getForwardMessage,
     sendMediaMessage,
     sendMessage,
     setGroupAnnouncement,

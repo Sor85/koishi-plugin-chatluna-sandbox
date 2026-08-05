@@ -201,6 +201,43 @@ export interface SandboxRecalledMessageLifecycle {
   recalledAt: string
 }
 
+// 合并转发节点保存作者快照与正文/媒体；删除参与者或改名不影响历史 node。
+export interface SandboxForwardNode {
+  userId: string
+  nickname: string
+  content: string
+  createdAt: string
+  media?: SandboxMedia[]
+  // 引用节点可保留来源消息 ID，便于调试与测试断言。
+  sourceMessageId?: string
+  // 节点本身是嵌套合并转发时，只保存转发资源 ID，详情再按资源读取。
+  forwardId?: string
+}
+
+// 合并转发是独立资源：外层消息只挂 forwardId，完整 node 列表通过资源读取。
+export interface SandboxForward {
+  id: string
+  authorId: string
+  createdAt: string
+  nodes: SandboxForwardNode[]
+}
+
+// OneBot 自定义节点与领域 builder 共用同一输入形状。
+export type SandboxForwardNodeInput =
+  | {
+    type: 'reference'
+    messageId: string
+  }
+  | {
+    type: 'custom'
+    userId: string
+    nickname: string
+    content: string
+    createdAt?: string
+    media?: SandboxMedia[]
+    forwardId?: string
+  }
+
 interface SandboxMessageBase {
   id: string
   authorId: string
@@ -210,6 +247,8 @@ interface SandboxMessageBase {
   replyToMessageId?: string
   broadcastId?: string
   media?: SandboxMedia[]
+  // 外层消息只挂资源 ID；完整 node 列表保存在场景 forwards 集合中。
+  forwardId?: string
   // 表情回应按 emoji 聚合参与者，与真实 QQ 一致：同一人对同一 emoji 只计一次。
   reactions?: SandboxMessageReaction[]
   // 本轮 ChatLuna 思考内容随消息一起落场景快照，多轮对话后仍能查看历史思考。
@@ -408,6 +447,9 @@ export interface SandboxSnapshot {
   groups: SandboxGroup[]
   conversations: SandboxConversation[]
   messages: SandboxMessage[]
+  // 合并转发资源与消息解耦；重启后仍可按 forwardId 展开完整 node。
+  // 读取路径统一把缺失值规范成 []，以便旧测试夹具与未改动的客户端空快照继续通过类型检查。
+  forwards?: SandboxForward[]
   friendships: SandboxFriendship[]
   requests: SandboxRelationshipRequest[]
 }
@@ -485,7 +527,16 @@ export interface GetMessageHistoryInput {
 
 export interface SandboxMessageHistory {
   messages: SandboxMessage[]
+  // 历史页直接引用的转发资源；嵌套详情仍按 getForwardMessage 按需读取。
+  forwards?: SandboxForward[]
   nextBeforeMessageId?: string
+}
+
+// WebQQ 消息列表外层卡片用的轻量预览，不替代完整 SandboxForward 资源。
+export interface SandboxForwardPreview {
+  title: string
+  total: number
+  lines: string[]
 }
 
 export interface SendMessageInput {
@@ -498,6 +549,26 @@ export interface SendMessageInput {
 export interface SendMessageResult {
   messageId: string
   revision: number
+}
+
+export interface SendForwardMessageInput {
+  operatorId: string
+  conversationId: string
+  // WebQQ 多选：服务端按 createdAt + id 稳定排序后生成引用 node。
+  messageIds?: string[]
+  // OneBot 或内部 builder：可混合引用节点与自定义节点。
+  nodes?: SandboxForwardNodeInput[]
+}
+
+export interface SendForwardMessageResult extends SendMessageResult {
+  forwardId: string
+}
+
+export interface GetForwardMessageInput {
+  operatorId: string
+  // 标准 get_forward_msg 使用转发资源 ID；兼容 message_id 时由调用方解析外层消息。
+  forwardId?: string
+  messageId?: string
 }
 
 export interface RecallMessageInput {

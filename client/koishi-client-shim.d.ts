@@ -3,6 +3,7 @@ declare module '@koishijs/client' {
   import type {
     DeleteGroupAnnouncementInput,
     ClearSandboxOneBotDebugRecordsResult,
+    GetForwardMessageInput,
     GetMediaContentInput,
     GetMessageHistoryInput,
     GetSandboxWorkspaceInput,
@@ -14,10 +15,12 @@ declare module '@koishijs/client' {
     RecallMessageInput,
     SetMessageReactionInput,
     SandboxConsoleOneBotDebugRecord,
+    SandboxForward,
     SandboxMediaContent,
     SandboxMessageHistory,
     SandboxOneBotDebugRecordsPage,
     SandboxWorkspaceState,
+    SendForwardMessageInput,
     SendMediaMessageInput,
     SendMessageInput,
     SetGroupAnnouncementInput,
@@ -46,6 +49,8 @@ declare module '@koishijs/client' {
   export function send(event: 'onebot-sandbox/message-history', input: SpaceScoped<GetMessageHistoryInput>): Promise<SandboxMessageHistory>
   export function send(event: 'onebot-sandbox/send-message', input: SpaceScoped<SendMessageInput>): Promise<SandboxWorkspaceState>
   export function send(event: 'onebot-sandbox/send-media-message', input: SpaceScoped<SendMediaMessageInput>): Promise<SandboxWorkspaceState>
+  export function send(event: 'onebot-sandbox/send-forward-message', input: SpaceScoped<SendForwardMessageInput>): Promise<SandboxWorkspaceState>
+  export function send(event: 'onebot-sandbox/get-forward-message', input: SpaceScoped<GetForwardMessageInput>): Promise<SandboxForward>
   export function send(event: 'onebot-sandbox/recall-message', input: SpaceScoped<RecallMessageInput>): Promise<SandboxWorkspaceState>
   export function send(event: 'onebot-sandbox/set-message-reaction', input: SpaceScoped<SetMessageReactionInput>): Promise<SandboxWorkspaceState>
   export function send(event: 'onebot-sandbox/media-content', input: SpaceScoped<GetMediaContentInput>): Promise<SandboxMediaContent>

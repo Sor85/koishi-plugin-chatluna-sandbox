@@ -40,6 +40,9 @@ import {
   type SandboxChatLunaState,
   type SandboxConversation,
   type SandboxDirectConversation,
+  type SandboxForward,
+  type SandboxForwardNode,
+  type SandboxForwardNodeInput,
   type SandboxFriendship,
   type SandboxGroup,
   type SandboxGroupMember,
@@ -53,6 +56,9 @@ import {
   type SandboxSnapshot,
   type SandboxParticipant,
   type SandboxUser,
+  type GetForwardMessageInput,
+  type SendForwardMessageInput,
+  type SendForwardMessageResult,
   type SendMediaMessageInput,
   type SendMessageInput,
   type SendMessageResult,
@@ -109,9 +115,11 @@ const DEFAULT_GROUP_ID = '30001'
 const DEFAULT_DATABASE_READY_TIMEOUT_MS = 10_000
 // 与真实 QQ 群禁言上限一致，避免插件写入不可能的到期时间。
 const MAX_GROUP_MUTE_SECONDS = 30 * 24 * 60 * 60
+// 防止插件或 WebQQ 多选无限塞 node 导致场景膨胀。
+const MAX_FORWARD_NODES = 100
 
 export function createEmptyScene(): SandboxSnapshot {
-  return { revision: 0, participants: [], groups: [], conversations: [], messages: [], friendships: [], requests: [] }
+  return { revision: 0, participants: [], groups: [], conversations: [], messages: [], forwards: [], friendships: [], requests: [] }
 }
 
 export function createDefaultScene(): SandboxSnapshot {
@@ -158,6 +166,7 @@ export function createDefaultScene(): SandboxSnapshot {
     }],
     conversations: [...directConversations, groupConversation],
     messages: [],
+    forwards: [],
     friendships: [
       DEFAULT_USER_ID,
       SECONDARY_USER_ID,
@@ -201,7 +210,7 @@ export class SandboxControlService {
   private disposed = false
 
   constructor(private ctx: Context, options: SandboxControlServiceOptions = {}) {
-    this.initialScene = structuredClone(options.initialScene ?? createDefaultScene())
+    this.initialScene = this.normalizeSceneForwards(structuredClone(options.initialScene ?? createDefaultScene()))
     this.scene = structuredClone(this.initialScene)
     this.runtimeBotsActive = options.runtimeActive ?? true
     this.runtimeBotRegistry = options.runtimeBots ?? new SandboxRuntimeBotRegistry()
@@ -298,6 +307,22 @@ export class SandboxControlService {
     if (next.messages.some(({ authorId, conversationId }) => !participantIds.has(authorId) || !conversationIds.has(conversationId))) throw new Error('消息引用不存在的参与者或会话')
     if (next.messages.some(({ media }) => media?.some(({ id, reference }) => reference !== `sandbox-media://${id}`))) throw new Error('消息包含无效媒体引用')
     if (next.conversations.some((conversation) => conversation.messageIds.some((id) => !messageIds.has(id)))) throw new Error('会话引用不存在的消息')
+    // 未发布阶段直接规范化 forwards；缺失时补空数组，避免旧测试快照或半成品导入炸掉。
+    this.normalizeSceneForwards(next)
+    const forwardIds = new Set(next.forwards!.map(({ id }) => id))
+    if (forwardIds.size !== next.forwards!.length) throw new Error('合并转发 ID 不能重复')
+    if (next.forwards!.some(({ authorId, nodes }) => !participantIds.has(authorId) || !Array.isArray(nodes) || !nodes.length)) {
+      throw new Error('合并转发资源无效')
+    }
+    if (next.forwards!.some(({ nodes }) => nodes.some(({ media }) => media?.some(({ id, reference }) => reference !== `sandbox-media://${id}`)))) {
+      throw new Error('合并转发包含无效媒体引用')
+    }
+    if (next.forwards!.some(({ nodes }) => nodes.some(({ forwardId }) => !!forwardId && !forwardIds.has(forwardId)))) {
+      throw new Error('合并转发引用了不存在的嵌套资源')
+    }
+    if (next.messages.some(({ forwardId }) => !!forwardId && !forwardIds.has(forwardId))) {
+      throw new Error('消息引用了不存在的合并转发资源')
+    }
     if (next.friendships.some(({ participantIds: ids }) => !ids.every((id) => participantIds.has(id)))) throw new Error('好友关系引用不存在的参与者')
     if (this.runtimeBotsActive) {
       for (const participant of next.participants) {
@@ -571,10 +596,14 @@ export class SandboxControlService {
         hasMoreMessages: conversation.messageIds.length > limit,
       }))
     const visibleMessageIds = new Set(conversations.flatMap(({ messageIds }) => messageIds))
+    const messages = this.scene.messages.filter(({ id }) => visibleMessageIds.has(id))
+    // 只返回当前页消息直接引用的转发资源；嵌套资源由 getForwardMessage 按需读取。
+    const visibleForwardIds = new Set(messages.flatMap(({ forwardId }) => forwardId ? [forwardId] : []))
     return structuredClone({
       ...this.scene,
       conversations,
-      messages: this.scene.messages.filter(({ id }) => visibleMessageIds.has(id)),
+      messages,
+      forwards: this.getForwards().filter(({ id }) => visibleForwardIds.has(id)),
     })
   }
 
@@ -589,8 +618,12 @@ export class SandboxControlService {
     const start = Math.max(0, end - limit)
     const messageIds = conversation.messageIds.slice(start, end)
     const messagesById = new Map(this.scene.messages.map((message) => [message.id, message]))
+    const messages = messageIds.flatMap((id) => messagesById.get(id) ?? [])
+    // 与 getVisibleSnapshot 一致：历史页只附带直接引用的转发资源，嵌套资源按需读取。
+    const visibleForwardIds = new Set(messages.flatMap(({ forwardId }) => forwardId ? [forwardId] : []))
     return {
-      messages: structuredClone(messageIds.flatMap((id) => messagesById.get(id) ?? [])),
+      messages: structuredClone(messages),
+      forwards: structuredClone(this.getForwards().filter(({ id }) => visibleForwardIds.has(id))),
       nextBeforeMessageId: start > 0 ? messageIds[0] : undefined,
     }
   }
@@ -1257,6 +1290,236 @@ export class SandboxControlService {
     return { result: { messageId: message.id, revision: this.scene.revision }, delivery }
   }
 
+  // WebQQ 多选与 OneBot send_forward_msg 共用同一领域 builder。
+  // 机器人操作者必须走自身 OneBot action，保持能力禁用、调试记录与真实操作通道一致。
+  async sendForwardMessage(input: SendForwardMessageInput): Promise<SendForwardMessageResult> {
+    if (this.isBot(input.operatorId)) {
+      const bot = this.getBots().find(({ id }) => id === input.operatorId)!
+      if (!bot.enabled) throw new Error(`机器人已停用：${bot.id}`)
+      const conversation = this.getVisibleConversation(input.operatorId, input.conversationId)
+      const params: Record<string, unknown> = {
+        messages: this.toOneBotForwardNodePayloads(this.buildForwardNodes(input)),
+      }
+      if (conversation.type === 'group') params.group_id = Number(conversation.groupId)
+      else params.user_id = Number(getDirectConversationPeerId(conversation, input.operatorId))
+      const result = await this.getRuntimeBot(bot.id).internal._request('send_forward_msg', params) as {
+        data?: { message_id?: number | string; forward_id?: string; res_id?: string }
+      }
+      const messageId = resolveOneBotMessageId(result?.data?.message_id, this.scene.messages.map(({ id }) => id))
+        ?? String(result?.data?.message_id ?? '')
+      const message = this.scene.messages.find(({ id }) => id === messageId)
+      const forwardId = message?.forwardId
+        ?? (typeof result?.data?.forward_id === 'string' ? result.data.forward_id : undefined)
+        ?? (typeof result?.data?.res_id === 'string' ? result.data.res_id : undefined)
+      if (!message || !forwardId) throw new Error('合并转发发送失败：未返回有效资源')
+      return { messageId: message.id, forwardId, revision: this.scene.revision }
+    }
+    return this.applyForwardMessage(input)
+  }
+
+  // bot action 与用户交互最终都落到这里，保证场景转发资源唯一。
+  async applyForwardMessage(input: SendForwardMessageInput): Promise<SendForwardMessageResult> {
+    const context = this.getMessageContext({
+      operatorId: input.operatorId,
+      conversationId: input.conversationId,
+    })
+    const nodes = this.buildForwardNodes(input)
+    const forward: SandboxForward = {
+      id: Random.id(),
+      authorId: context.operator.id,
+      createdAt: new Date().toISOString(),
+      nodes,
+    }
+    this.getForwards().push(forward)
+    const content = this.formatForwardPreview(nodes)
+    const message = this.appendMessage(context.operator.id, context.conversation.id, content, undefined, undefined, undefined, undefined, forward.id)
+    const onebotMessage = [{ type: 'forward', data: { id: forward.id } }]
+    // 与 startMessageSend 一致：先落库并返回，机器人投递在后台继续。
+    // 若同步等待 dispatch，当前操作者为 bot 且目标会话会触发 ChatLuna 时，WebUI 会卡在“转发中...”。
+    void this.dispatchMessageToBots(
+      context,
+      message,
+      [h('forward', { id: forward.id })],
+      onebotMessage,
+      toOneBotRawMessage(onebotMessage),
+    ).catch(() => {})
+    return { messageId: message.id, forwardId: forward.id, revision: this.scene.revision }
+  }
+
+  getForwardMessage(input: GetForwardMessageInput): SandboxForward {
+    this.getParticipant(input.operatorId)
+    const forwardId = input.forwardId?.trim()
+      || this.resolveForwardIdFromMessage(input.operatorId, input.messageId)
+    if (!forwardId) throw new Error('缺少合并转发 ID')
+    const forward = this.getForwards().find(({ id }) => id === forwardId)
+    if (!forward) throw new Error(`合并转发不存在：${forwardId}`)
+    // 资源本身不绑定会话：外层消息直接引用，或从已可见转发资源的嵌套节点进入，都允许展开。
+    if (!this.canAccessForward(input.operatorId, forward.id)) {
+      throw new Error(`合并转发不存在：${forwardId}`)
+    }
+    return structuredClone(forward)
+  }
+
+  private getForwards(): SandboxForward[] {
+    if (!this.scene.forwards) this.scene.forwards = []
+    return this.scene.forwards
+  }
+
+  private normalizeSceneForwards(snapshot: SandboxSnapshot): SandboxSnapshot {
+    snapshot.forwards = Array.isArray(snapshot.forwards) ? snapshot.forwards : []
+    return snapshot
+  }
+
+  private canAccessForward(operatorId: string, forwardId: string, seen = new Set<string>()): boolean {
+    if (seen.has(forwardId)) return false
+    seen.add(forwardId)
+    const linkedMessages = this.scene.messages.filter(({ forwardId: id }) => id === forwardId)
+    for (const message of linkedMessages) {
+      const conversation = this.scene.conversations.find(({ id }) => id === message.conversationId)
+      if (conversation && this.isConversationVisible(operatorId, conversation)) return true
+    }
+    // 嵌套资源：只要某个已可见父转发的节点引用它，就允许继续读取详情。
+    for (const parent of this.getForwards()) {
+      if (!parent.nodes.some((node) => node.forwardId === forwardId)) continue
+      if (this.canAccessForward(operatorId, parent.id, seen)) return true
+    }
+    return false
+  }
+
+  private resolveForwardIdFromMessage(operatorId: string, rawMessageId?: string): string | undefined {
+    if (!rawMessageId?.trim()) return undefined
+    const messageId = resolveOneBotMessageId(rawMessageId, this.scene.messages.map(({ id }) => id)) ?? rawMessageId
+    const message = this.scene.messages.find(({ id }) => id === messageId)
+    if (!message?.forwardId) throw new Error(`消息不是合并转发：${rawMessageId}`)
+    const conversation = this.scene.conversations.find(({ id }) => id === message.conversationId)
+    if (!conversation || !this.isConversationVisible(operatorId, conversation)) {
+      throw new Error(`消息不存在：${rawMessageId}`)
+    }
+    if (isRecalledMessage(message)) throw new Error(`消息已撤回：${rawMessageId}`)
+    return message.forwardId
+  }
+
+  private buildForwardNodes(input: SendForwardMessageInput): SandboxForwardNode[] {
+    if (input.messageIds?.length && input.nodes?.length) {
+      throw new Error('合并转发不能同时传入 messageIds 与 nodes')
+    }
+    if (input.messageIds?.length) return this.buildReferenceForwardNodes(input.operatorId, input.messageIds)
+    if (input.nodes?.length) return this.buildExplicitForwardNodes(input.operatorId, input.nodes)
+    throw new Error('合并转发至少需要一个消息节点')
+  }
+
+  private buildReferenceForwardNodes(operatorId: string, messageIds: string[]): SandboxForwardNode[] {
+    const uniqueIds = [...new Set(messageIds.map((id) => id.trim()).filter(Boolean))]
+    if (!uniqueIds.length) throw new Error('合并转发至少需要一个消息节点')
+    if (uniqueIds.length > MAX_FORWARD_NODES) throw new Error(`合并转发节点不能超过 ${MAX_FORWARD_NODES} 条`)
+    const messages = uniqueIds.map((messageId) => {
+      const message = this.scene.messages.find(({ id }) => id === messageId)
+      if (!message) throw new Error(`消息不存在：${messageId}`)
+      const conversation = this.scene.conversations.find(({ id }) => id === message.conversationId)
+      if (!conversation || !this.isConversationVisible(operatorId, conversation)) {
+        throw new Error(`消息不存在：${messageId}`)
+      }
+      if (message.event) throw new Error(`事件消息不能合并转发：${messageId}`)
+      if (isRecalledMessage(message)) throw new Error(`已撤回消息不能合并转发：${messageId}`)
+      return message
+    })
+    // 多选发送按时间稳定排序，不使用点击顺序。
+    // createdAt 相同时回退到场景插入顺序，避免 Random.id 字典序把后发消息排到前面。
+    const messageOrder = new Map(this.scene.messages.map((message, index) => [message.id, index]))
+    messages.sort((left, right) => {
+      const time = left.createdAt.localeCompare(right.createdAt)
+      if (time) return time
+      return (messageOrder.get(left.id) ?? 0) - (messageOrder.get(right.id) ?? 0)
+    })
+    return messages.map((message) => this.toForwardNodeFromMessage(message))
+  }
+
+  private buildExplicitForwardNodes(operatorId: string, nodes: SandboxForwardNodeInput[]): SandboxForwardNode[] {
+    if (nodes.length > MAX_FORWARD_NODES) throw new Error(`合并转发节点不能超过 ${MAX_FORWARD_NODES} 条`)
+    return nodes.map((node, index) => {
+      if (node.type === 'reference') {
+        const [built] = this.buildReferenceForwardNodes(operatorId, [node.messageId])
+        return built
+      }
+      const userId = node.userId.trim()
+      const nickname = node.nickname.trim() || userId
+      if (!userId) throw new Error(`合并转发节点 #${index + 1} 缺少 user_id`)
+      const content = node.content.trim()
+      const media = node.media?.length ? structuredClone(node.media) : undefined
+      if (!content && !media?.length && !node.forwardId) {
+        throw new Error(`合并转发节点 #${index + 1} 不能为空`)
+      }
+      if (node.forwardId && !this.getForwards().some(({ id }) => id === node.forwardId)) {
+        throw new Error(`嵌套合并转发不存在：${node.forwardId}`)
+      }
+      if (media?.some(({ id, reference }) => reference !== `sandbox-media://${id}`)) {
+        throw new Error(`合并转发节点 #${index + 1} 包含无效媒体引用`)
+      }
+      return {
+        userId,
+        nickname,
+        content: content || (media?.length
+          ? media.map((item) => `[${this.getMediaLabel(item)}] ${item.name}`).join(' ')
+          : '[合并转发]'),
+        createdAt: node.createdAt ?? new Date().toISOString(),
+        ...(media ? { media } : {}),
+        ...(node.forwardId ? { forwardId: node.forwardId } : {}),
+      }
+    })
+  }
+
+  private toForwardNodeFromMessage(message: SandboxMessage): SandboxForwardNode {
+    const author = this.scene.participants.find(({ id }) => id === message.authorId)
+    const conversation = this.scene.conversations.find(({ id }) => id === message.conversationId)
+    const groupMember = conversation?.type === 'group'
+      ? this.scene.groups.find(({ id }) => id === conversation.groupId)
+        ?.members.find(({ participantId }) => participantId === message.authorId)
+      : undefined
+    return {
+      userId: message.authorId,
+      nickname: groupMember?.card?.trim() || author?.name || message.authorId,
+      content: message.content,
+      createdAt: message.createdAt,
+      ...(message.media?.length ? { media: structuredClone(message.media) } : {}),
+      sourceMessageId: message.id,
+      ...(message.forwardId ? { forwardId: message.forwardId } : {}),
+    }
+  }
+
+  private formatForwardPreview(nodes: SandboxForwardNode[]): string {
+    const lines = nodes.slice(0, 4).map((node) => {
+      const summary = node.forwardId
+        ? '[合并转发]'
+        : node.content.replace(/\s+/g, ' ').trim() || (node.media?.length
+          ? node.media.map((item) => `[${this.getMediaLabel(item)}] ${item.name}`).join(' ')
+          : '[消息]')
+      return `${node.nickname}：${summary}`
+    })
+    return lines.join('\n') || '[合并转发]'
+  }
+
+  private toOneBotForwardNodePayloads(nodes: SandboxForwardNode[]): Array<{ type: 'node'; data: Record<string, unknown> }> {
+    return nodes.map((node) => {
+      if (node.sourceMessageId) {
+        return { type: 'node', data: { id: node.sourceMessageId } }
+      }
+      const content = node.forwardId
+        ? [{ type: 'forward', data: { id: node.forwardId } }]
+        : [
+          ...toOneBotMessageSegments(node.content, node.media),
+        ]
+      return {
+        type: 'node',
+        data: {
+          user_id: Number(node.userId) || node.userId,
+          nickname: node.nickname,
+          content,
+          time: Math.floor(new Date(node.createdAt).getTime() / 1000),
+        },
+      }
+    })
+  }
+
   async sendMediaMessage(input: SendMediaMessageInput): Promise<SendMessageResult> {
     const { result, delivery } = this.startMediaMessageSend(input)
     await delivery
@@ -1301,11 +1564,17 @@ export class SandboxControlService {
       .filter((conversation) => this.isConversationVisible(input.operatorId, conversation))
       .map(({ id }) => id))
     this.getParticipant(input.operatorId)
-    const media = this.scene.messages
+    const messageMedia = this.scene.messages
       .filter(({ conversationId }) => visibleConversationIds.has(conversationId))
       .flatMap(({ media }) => media ?? [])
       .find(({ id }) => id === input.mediaId)
-    if (media) return this.mediaStorage.read(media)
+    if (messageMedia) return this.mediaStorage.read(messageMedia)
+    // 合并转发详情中的媒体只挂在节点上；嵌套资源按 canAccessForward 递归可达，与 getForwardMessage 一致。
+    const forwardMedia = this.getForwards()
+      .filter(({ id }) => this.canAccessForward(input.operatorId, id))
+      .flatMap(({ nodes }) => nodes.flatMap(({ media }) => media ?? []))
+      .find(({ id }) => id === input.mediaId)
+    if (forwardMedia) return this.mediaStorage.read(forwardMedia)
     const avatarReference = [...this.scene.participants.map(({ avatar }) => avatar), ...this.scene.groups.map(({ avatar }) => avatar)]
       .find((reference) => reference === `sandbox-media://${input.mediaId}`)
     if (!avatarReference) throw new Error(`媒体不存在或不可见：${input.mediaId}`)
@@ -1379,16 +1648,31 @@ export class SandboxControlService {
 
     // Koishi 的 dispatch() 是同步触发事件、异步执行中间件；等待 middleware
     // 完成才能保证控制台 RPC 返回时，插件通过 session.send() 写入的回复已可见。
+    // ChatLuna 等长耗时中间件可能永不触发同 session 的 middleware 结束事件，
+    // 或阻塞在外部请求上；无超时会让 void 掉的投递 Promise 永久挂起，堆积监听器并拖垮运行时。
+    let disposeMiddlewareWait: (() => void) | undefined
     const middlewareFinished = new Promise<void>((resolve) => {
-      const dispose = this.ctx.on('middleware', (processedSession) => {
+      const timer = setTimeout(() => {
+        disposeMiddlewareWait?.()
+        disposeMiddlewareWait = undefined
+        resolve()
+      }, 15_000)
+      disposeMiddlewareWait = this.ctx.on('middleware', (processedSession) => {
         if (processedSession.id !== session.id) return
-        dispose()
+        clearTimeout(timer)
+        disposeMiddlewareWait?.()
+        disposeMiddlewareWait = undefined
         resolve()
       })
     })
 
-    await this.dispatchOneBotEvent(runtimeBot, session)
-    await middlewareFinished
+    try {
+      await this.dispatchOneBotEvent(runtimeBot, session)
+      await middlewareFinished
+    } finally {
+      disposeMiddlewareWait?.()
+      disposeMiddlewareWait = undefined
+    }
     this.botDeliveries.push({
       id: Random.id(),
       recipientBotId: recipientBot.id,
@@ -1576,6 +1860,7 @@ export class SandboxControlService {
     media?: SandboxMedia[],
     event?: SandboxMessage['event'],
     broadcastId?: string,
+    forwardId?: string,
   ): SandboxMessage {
     const conversation = this.scene.conversations.find(({ id }) => id === conversationId)
     if (!conversation) throw new Error(`会话不存在：${conversationId}`)
@@ -1590,6 +1875,7 @@ export class SandboxControlService {
       broadcastId,
       media,
       event,
+      ...(forwardId ? { forwardId } : {}),
     }
     this.scene.messages.push(message)
     conversation.messageIds.push(message.id)
@@ -1636,7 +1922,8 @@ export class SandboxControlService {
     if (!persistence) return
     const result = await this.loadSceneAfterDatabaseReady(persistence)
     if (result.kind === 'loaded') {
-      this.scene = structuredClone(result.scene)
+      // 未发布阶段直接补齐 forwards，避免本地旧快照缺字段导致读取路径崩溃。
+      this.scene = this.normalizeSceneForwards(structuredClone(result.scene))
       const normalized = await this.normalizePersistedAvatars()
       this.syncRuntimeBots()
       if (normalized) {
@@ -1715,6 +2002,8 @@ export class SandboxControlService {
       ...this.scene.participants.flatMap(({ avatar }) => avatar ? [avatar] : []),
       ...this.scene.groups.flatMap(({ avatar }) => avatar ? [avatar] : []),
       ...this.scene.messages.flatMap(({ media }) => media?.map(({ reference }) => reference) ?? []),
+      // 合并转发节点内的媒体也必须计入引用，避免场景回收删掉详情里的图片。
+      ...this.getForwards().flatMap(({ nodes }) => nodes.flatMap(({ media }) => media?.map(({ reference }) => reference) ?? [])),
     ])
   }
 
@@ -2232,6 +2521,34 @@ export class SandboxControlService {
     this.scene.conversations = this.scene.conversations.filter(({ id }) => !removedIds.has(id))
     this.scene.messages = this.scene.messages.filter(({ conversationId }) => !removedIds.has(conversationId))
     this.botDeliveries = this.botDeliveries.filter(({ messageId }) => !removedMessageIds.has(messageId))
+    // 删除会话消息后级联清理不再被任何存活消息/嵌套节点引用的 forward，
+    // 否则 getMediaReferences 会永久钉住节点媒体，且残留 authorId 会卡住后续 replaceScene。
+    this.pruneUnreferencedForwards()
+  }
+
+  // 从仍被消息引用的外层 forward 出发 BFS，保留可达嵌套资源，删除其余孤儿。
+  private pruneUnreferencedForwards(): void {
+    const forwards = this.getForwards()
+    if (!forwards.length) return
+    const byId = new Map(forwards.map((forward) => [forward.id, forward]))
+    const reachable = new Set<string>()
+    const queue: string[] = []
+    for (const message of this.scene.messages) {
+      if (!message.forwardId || !byId.has(message.forwardId) || reachable.has(message.forwardId)) continue
+      reachable.add(message.forwardId)
+      queue.push(message.forwardId)
+    }
+    while (queue.length) {
+      const current = byId.get(queue.shift()!)
+      if (!current) continue
+      for (const node of current.nodes) {
+        if (!node.forwardId || !byId.has(node.forwardId) || reachable.has(node.forwardId)) continue
+        reachable.add(node.forwardId)
+        queue.push(node.forwardId)
+      }
+    }
+    if (reachable.size === forwards.length) return
+    this.scene.forwards = forwards.filter(({ id }) => reachable.has(id))
   }
 
   private validateGroupMembers(members: SandboxSnapshot['groups'][number]['members']) {

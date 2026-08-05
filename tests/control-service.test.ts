@@ -532,4 +532,185 @@ describe('模拟 QQ 环境消息闭环', () => {
       content: '机器人主动消息',
     }))
   })
+
+  it('多选合并转发按时间排序、拒绝事件/撤回，并随场景持久化', async () => {
+    const app = new App()
+    let control: SandboxControlService | undefined
+    app.plugin((ctx) => {
+      control = new SandboxControlService(ctx)
+    })
+    runningApps.push(app)
+    await app.start()
+    if (!control) throw new Error('沙盒控制服务未注册')
+
+    const older = await control.sendMessage({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      content: '较早消息',
+    })
+    const newer = await control.sendMessage({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      content: '较晚消息',
+    })
+    // 传入乱序 messageIds 时，服务端仍按 createdAt + id 稳定排序。
+    const result = await control.sendForwardMessage({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      messageIds: [newer.messageId, older.messageId],
+    })
+    expect(result.forwardId).toBeTruthy()
+    expect(control.getSnapshot().messages.find(({ id }) => id === result.messageId)).toMatchObject({
+      authorId: '10001',
+      forwardId: result.forwardId,
+      content: '测试用户1：较早消息\n测试用户1：较晚消息',
+    })
+    expect(control.getForwardMessage({
+      operatorId: '10001',
+      forwardId: result.forwardId,
+    }).nodes.map(({ content, sourceMessageId }) => ({ content, sourceMessageId }))).toEqual([
+      { content: '较早消息', sourceMessageId: older.messageId },
+      { content: '较晚消息', sourceMessageId: newer.messageId },
+    ])
+
+    await control.performFriendAction({
+      action: 'poke',
+      operatorId: '10001',
+      targetId: '20001',
+      conversationId: 'private:10001:20001',
+    })
+    const poke = control.getSnapshot().messages.find(({ event }) => event?.type === 'poke')!
+    await expect(control.sendForwardMessage({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      messageIds: [poke.id],
+    })).rejects.toThrow('事件消息不能合并转发')
+
+    await control.recallMessage({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      messageId: newer.messageId,
+    })
+    await expect(control.sendForwardMessage({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      messageIds: [newer.messageId],
+    })).rejects.toThrow('已撤回消息不能合并转发')
+
+    await expect(control.sendForwardMessage({
+      operatorId: '10001',
+      conversationId: 'private:10002:20001',
+      messageIds: [older.messageId],
+    })).rejects.toThrow('会话不存在')
+
+    const exported = control.getSnapshot()
+    expect(exported.forwards).toContainEqual(expect.objectContaining({ id: result.forwardId }))
+    control.replaceScene(structuredClone(exported))
+    expect(control.getForwardMessage({
+      operatorId: '10001',
+      messageId: result.messageId,
+    }).nodes.map(({ content }) => content)).toEqual(['较早消息', '较晚消息'])
+
+    // 机器人操作者必须走 OneBot action，以便调试记录可见。
+    await control.sendForwardMessage({
+      operatorId: '20001',
+      conversationId: 'private:10001:20001',
+      messageIds: [older.messageId],
+    })
+    expect(control.getOneBotDebugRecords({ direction: 'action', action: 'send_forward_msg' }).records[0]).toMatchObject({
+      requestedAction: 'send_forward_msg',
+      status: 'success',
+    })
+  })
+
+  it('嵌套合并转发的节点媒体对可达操作者可读，删除会话后级联清理孤儿资源', async () => {
+    const app = new App()
+    const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-forward-media-'))
+    temporaryDirectories.push(mediaDirectory)
+    let control: SandboxControlService | undefined
+    app.plugin((ctx) => {
+      control = new SandboxControlService(ctx, { mediaDirectory })
+    })
+    runningApps.push(app)
+    await app.start()
+    if (!control) throw new Error('沙盒控制服务未注册')
+
+    control.createGroup({
+      id: '30090',
+      name: '外层可见群',
+      members: [
+        { participantId: '10001', role: 'owner' },
+        { participantId: '10002', role: 'member' },
+        { participantId: '20001', role: 'member' },
+      ],
+    })
+    // 内层资源落在 10002 不可见的私聊；外层卡片挂在双方可见的群聊。
+    const hiddenConversationId = 'private:10001:20001'
+    const visibleConversationId = 'group:30090'
+    const mediaMessage = await control.sendMediaMessage({
+      operatorId: '10001',
+      conversationId: hiddenConversationId,
+      media: [{
+        fileName: '嵌套图片.png',
+        mimeType: 'image/png',
+        dataBase64: Buffer.from('nested-forward-image').toString('base64'),
+      }],
+    })
+    const sourceMedia = control.getSnapshot().messages.find(({ id }) => id === mediaMessage.messageId)?.media?.[0]
+    expect(sourceMedia?.id).toBeTruthy()
+    const mediaId = sourceMedia!.id
+
+    const inner = await control.sendForwardMessage({
+      operatorId: '10001',
+      conversationId: hiddenConversationId,
+      nodes: [{
+        type: 'custom',
+        userId: '10001',
+        nickname: '测试用户1',
+        content: '[图片] 嵌套图片.png',
+        media: [sourceMedia!],
+      }],
+    })
+    const outer = await control.sendForwardMessage({
+      operatorId: '10001',
+      conversationId: visibleConversationId,
+      nodes: [{
+        type: 'custom',
+        userId: '10001',
+        nickname: '测试用户1',
+        content: '[合并转发]',
+        forwardId: inner.forwardId,
+      }],
+    })
+
+    // 10002 看不到内层外层消息，但可通过群聊外层卡片展开嵌套资源。
+    expect(() => control!.getForwardMessage({
+      operatorId: '10002',
+      forwardId: inner.forwardId,
+    })).not.toThrow()
+    expect(control.getMediaContent({
+      operatorId: '10002',
+      mediaId,
+    })).toMatchObject({
+      id: mediaId,
+      dataBase64: Buffer.from('nested-forward-image').toString('base64'),
+    })
+
+    expect(await readdir(mediaDirectory)).toContain(mediaId)
+
+    // 删除群会话后外层不可达；内层仍被私聊消息引用，资源与媒体应保留。
+    control.deleteGroup({ id: '30090' })
+    expect(control.getSnapshot().forwards?.some(({ id }) => id === outer.forwardId)).toBe(false)
+    expect(control.getSnapshot().forwards?.some(({ id }) => id === inner.forwardId)).toBe(true)
+    expect(await readdir(mediaDirectory)).toContain(mediaId)
+
+    // 删除内层所在私聊参与者后，内层 forward 与节点媒体一并回收。
+    control.deleteUser({ id: '10001' })
+    expect(control.getSnapshot().forwards?.some(({ id }) => id === inner.forwardId || id === outer.forwardId)).toBe(false)
+    expect(await readdir(mediaDirectory)).not.toContain(mediaId)
+    expect(() => control!.getMediaContent({
+      operatorId: '10002',
+      mediaId,
+    })).toThrow(/媒体不存在或不可见/)
+  })
 })

@@ -560,14 +560,208 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     const sent = await bot.internal._request('send_group_msg', { group_id: 30002, message: '表情回应目标' }) as { data: { message_id: number } }
     await expect(bot.internal._request('set_msg_emoji_like', { message_id: sent.data.message_id, emoji_id: '128077' })).resolves.toMatchObject({ status: 'ok' })
 
-    await bot.internal._request('send_forward_msg', { group_id: 30002, messages: [
+    const forward = await bot.internal._request('send_forward_msg', { group_id: 30002, messages: [
       { type: 'node', data: { user_id: 20001, nickname: 'Koishi', content: '第一段' } },
       { type: 'node', data: { user_id: 20001, nickname: 'Koishi', content: [{ type: 'text', data: { text: '第二段' } }] } },
-    ] })
-    expect(control.getSnapshot().messages.at(-1)).toMatchObject({ authorId: '20001', content: '第一段\n第二段' })
+    ] }) as { data: { message_id: number; res_id: string; forward_id: string } }
+    expect(forward.data.res_id).toBe(forward.data.forward_id)
+    expect(control.getSnapshot().messages.at(-1)).toMatchObject({
+      authorId: '20001',
+      forwardId: forward.data.forward_id,
+      content: 'Koishi：第一段\nKoishi：第二段',
+    })
+    expect(control.getSnapshot().forwards).toContainEqual(expect.objectContaining({
+      id: forward.data.forward_id,
+      nodes: [
+        expect.objectContaining({ userId: '20001', nickname: 'Koishi', content: '第一段' }),
+        expect.objectContaining({ userId: '20001', nickname: 'Koishi', content: '第二段' }),
+      ],
+    }))
 
     await expect(bot.internal._request('set_group_leave', { group_id: 30002 })).resolves.toMatchObject({ status: 'ok' })
     expect(control.getSnapshot().groups.find(({ id }) => id === '30002')!.members.some(({ participantId }) => participantId === '20001')).toBe(false)
+  })
+
+  it('合并转发创建真实资源并支持 get_forward_msg / 引用节点 / 别名 action', async () => {
+    const { control } = await createControl()
+    const bot = control.bot
+    control.createGroup({ id: '30020', name: '合并转发群', members: [
+      { participantId: '10001', role: 'owner' },
+      { participantId: '20001', role: 'admin' },
+      { participantId: '10003', role: 'member' },
+    ] })
+    const first = await bot.internal._request('send_group_msg', {
+      group_id: 30020,
+      message: '引用节点 A',
+    }) as { data: { message_id: number } }
+    const second = await bot.internal._request('send_group_msg', {
+      group_id: 30020,
+      message: '引用节点 B',
+    }) as { data: { message_id: number } }
+
+    const mixed = await bot.internal._request('send_group_forward_msg', {
+      group_id: 30020,
+      messages: [
+        { type: 'node', data: { id: first.data.message_id } },
+        { type: 'node', data: { user_id: 10003, nickname: '自定义昵称', content: '自定义节点' } },
+        { type: 'node', data: { id: second.data.message_id } },
+      ],
+    }) as { data: { message_id: number; res_id: string; forward_id: string } }
+    expect(mixed.data.forward_id).toBeTruthy()
+    expect(mixed.data.res_id).toBe(mixed.data.forward_id)
+
+    const outer = await bot.internal._request('get_msg', { message_id: mixed.data.message_id }) as {
+      data: { message: Array<{ type: string; data: Record<string, string> }> }
+    }
+    expect(outer.data.message).toEqual([{ type: 'forward', data: { id: mixed.data.forward_id } }])
+
+    const byId = await bot.internal._request('get_forward_msg', { id: mixed.data.forward_id }) as {
+      data: { messages: Array<{ type: string; data: Record<string, unknown> }> }
+    }
+    expect(byId.data.messages).toHaveLength(3)
+    expect(byId.data.messages[0]).toMatchObject({
+      type: 'node',
+      data: {
+        user_id: 20001,
+        content: [{ type: 'text', data: { text: '引用节点 A' } }],
+      },
+    })
+    expect(byId.data.messages[1]).toMatchObject({
+      type: 'node',
+      data: {
+        user_id: 10003,
+        nickname: '自定义昵称',
+        content: [{ type: 'text', data: { text: '自定义节点' } }],
+      },
+    })
+
+    const byMessageId = await bot.internal._request('get_forward_msg', {
+      message_id: mixed.data.message_id,
+    }) as { data: { nodes: Array<{ type: string }> } }
+    expect(byMessageId.data.nodes).toHaveLength(3)
+
+    const privateForward = await bot.internal._request('send_private_forward_msg', {
+      user_id: 10001,
+      messages: [
+        { type: 'node', data: { user_id: 20001, nickname: 'Koishi', content: '私聊转发' } },
+      ],
+    }) as { data: { message_id: number; forward_id: string } }
+    expect(control.getSnapshot().messages.find(({ id }) => getOneBotMessageSequence(id) === privateForward.data.message_id)).toMatchObject({
+      conversationId: 'private:10001:20001',
+      forwardId: privateForward.data.forward_id,
+    })
+
+    // 嵌套 forward：自定义节点 content 直接挂已有资源。
+    const nested = await bot.internal._request('send_forward_msg', {
+      group_id: 30020,
+      messages: [
+        { type: 'node', data: { user_id: 20001, nickname: 'Koishi', content: [{ type: 'forward', data: { id: mixed.data.forward_id } }] } },
+      ],
+    }) as { data: { forward_id: string } }
+    const nestedDetail = await bot.internal._request('get_forward_msg', { id: nested.data.forward_id }) as {
+      data: { messages: Array<{ data: { content: Array<{ type: string; data: { id: string } }> } }> }
+    }
+    expect(nestedDetail.data.messages[0].data.content).toEqual([
+      { type: 'forward', data: { id: mixed.data.forward_id } },
+    ])
+    await expect(bot.internal._request('get_forward_msg', { id: mixed.data.forward_id })).resolves.toMatchObject({
+      data: { messages: expect.any(Array) },
+    })
+
+    // 自定义节点媒体支持 data URI，落盘后可被 get_forward_msg 读回。
+    const imagePayload = Buffer.from('forward-node-image').toString('base64')
+    const mediaForward = await bot.internal._request('send_forward_msg', {
+      group_id: 30020,
+      messages: [{
+        type: 'node',
+        data: {
+          user_id: 20001,
+          nickname: 'Koishi',
+          content: [{
+            type: 'image',
+            data: { file: `data:image/png;base64,${imagePayload}`, name: 'forward-node.png' },
+          }],
+        },
+      }],
+    }) as { data: { forward_id: string } }
+    const mediaDetail = await bot.internal._request('get_forward_msg', { id: mediaForward.data.forward_id }) as {
+      data: { messages: Array<{ data: { content: Array<{ type: string; data: Record<string, string> }> } }> }
+    }
+    expect(mediaDetail.data.messages[0].data.content).toEqual([
+      expect.objectContaining({
+        type: 'image',
+        data: expect.objectContaining({
+          file: expect.stringMatching(/^sandbox-media:\/\//),
+          url: expect.stringMatching(/^sandbox-media:\/\//),
+        }),
+      }),
+    ])
+    const storedMediaId = mediaDetail.data.messages[0].data.content[0].data.file.replace('sandbox-media://', '')
+    expect(control.getMediaContent({
+      operatorId: '20001',
+      mediaId: storedMediaId,
+    })).toMatchObject({
+      mimeType: 'image/png',
+      dataBase64: imagePayload,
+    })
+  })
+
+  it('合并转发拒绝不可见/事件/撤回消息，并遵守能力禁用', async () => {
+    const { control } = await createControl()
+    const bot = control.bot
+    control.createGroup({ id: '30021', name: '权限群', members: [
+      { participantId: '10001', role: 'owner' },
+      { participantId: '20001', role: 'admin' },
+    ] })
+    control.createUser({ id: '10088', name: '外人' })
+    control.createBot({ id: '20088', name: '外人机器人', implementation: 'napcat', enabled: true })
+    control.createGroup({ id: '30022', name: '外人群', members: [
+      { participantId: '10088', role: 'owner' },
+      { participantId: '20088', role: 'member' },
+    ] })
+
+    const hidden = await control.getRuntimeBot('20088').internal._request('send_group_msg', {
+      group_id: 30022,
+      message: '外人消息',
+    }) as { data: { message_id: number } }
+    await expect(bot.internal._request('send_forward_msg', {
+      group_id: 30021,
+      messages: [{ type: 'node', data: { id: hidden.data.message_id } }],
+    })).rejects.toThrow(/消息不存在|不能合并转发/)
+
+    await control.performFriendAction({
+      action: 'poke',
+      operatorId: '10001',
+      targetId: '20001',
+      conversationId: 'private:10001:20001',
+    })
+    const poke = control.getSnapshot().messages.find(({ event }) => event?.type === 'poke')!
+    await expect(bot.internal._request('send_private_forward_msg', {
+      user_id: 10001,
+      messages: [{ type: 'node', data: { id: poke.id } }],
+    })).rejects.toThrow('事件消息不能合并转发')
+
+    const sent = await bot.internal._request('send_group_msg', {
+      group_id: 30021,
+      message: '即将撤回',
+    }) as { data: { message_id: number } }
+    await bot.internal._request('delete_msg', { message_id: sent.data.message_id })
+    await expect(bot.internal._request('send_group_forward_msg', {
+      group_id: 30021,
+      messages: [{ type: 'node', data: { id: sent.data.message_id } }],
+    })).rejects.toThrow(/撤回|消息已撤回/)
+
+    control.updateBot({
+      id: '20001',
+      name: 'Koishi',
+      implementation: 'napcat',
+      enabled: true,
+      disabledCapabilities: ['message.forward.send'],
+    })
+    await expect(bot.internal._request('send_forward_msg', {
+      group_id: 30021,
+      messages: [{ type: 'node', data: { user_id: 20001, nickname: 'Koishi', content: '禁用后' } }],
+    })).rejects.toThrow(/不支持|disabled|禁用|message\.forward\.send|send_forward_msg/i)
   })
 
   it('群头衔、禁言与表情回应写入沙盒领域状态', async () => {

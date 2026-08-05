@@ -524,12 +524,62 @@
   color: #fff;
 }
 
+/* 合并转发卡片：1:1 复刻 onebot-webqq 的 quote + forward 结构/尺寸。 */
+.webqq-message-quote.webqq-message-forward {
+  width: 260px;
+  max-width: 100%;
+  text-align: left;
+}
+
+.webqq-message-forward > span:not(.webqq-message-forward-entry) {
+  display: block;
+  /* Flex 子项默认可能按内容宽度参与布局，长转发文本不会形成可截断边界；显式限制到卡片内容区才能稳定显示省略号。 */
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.webqq-message-forward-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 38px;
+  margin: 4px -8px -6px;
+  padding: 0 8px;
+  border-top: 1px solid rgb(148 163 184 / 18%);
+  color: rgb(80 90 110 / 62%);
+  text-align: left;
+}
+
+.webqq-message-forward-entry::after {
+  content: "›";
+  font-size: 20px;
+  line-height: 16px;
+}
+
+.webqq-message-row.is-outgoing .webqq-message-bubble .webqq-message-forward-entry {
+  border-top-color: rgb(255 255 255 / 22%);
+  color: rgb(255 255 255 / 78%);
+}
+
 .webqq-message-media {
   display: flex;
   max-width: min(280px, 100%);
   flex-direction: column;
 }
 
+.webqq-message-image {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.webqq-message-image img,
 .webqq-message-media img,
 .webqq-message-media video {
   display: block;
@@ -695,6 +745,16 @@
 
 .webqq-workspace[data-color-mode="dark"] .webqq-message-row.is-outgoing .webqq-message-quote-title {
   color: #fff;
+}
+
+.webqq-workspace[data-color-mode="dark"] .webqq-message-forward-entry {
+  border-top-color: rgb(148 163 184 / 24%);
+  color: #94a3b8;
+}
+
+.webqq-workspace[data-color-mode="dark"] .webqq-message-row.is-outgoing .webqq-message-bubble .webqq-message-forward-entry {
+  border-top-color: rgb(255 255 255 / 22%);
+  color: rgb(255 255 255 / 78%);
 }
 
 .webqq-workspace[data-color-mode="dark"] .webqq-message-bubble {

@@ -18,6 +18,7 @@ const snapshot = {
   }],
   conversations: [],
   messages: [],
+  forwards: [],
   friendships: [],
   requests: [
     { id: 'friend', type: 'friend', requesterId: 'applicant', targetId: 'owner', status: 'pending', createdAt: '' },

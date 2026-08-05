@@ -1,5 +1,10 @@
 <template>
-  <section v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-messages" aria-label="消息记录">
+  <section
+    v-webqq-scrollbar="{ tone: 'accent' }"
+    class="webqq-messages"
+    :class="{ 'is-selecting': model.selectionMode }"
+    aria-label="消息记录"
+  >
     <div v-if="!model.messages.length && !model.chatLunaStates.some((state) => state.thinking)" class="webqq-welcome">
       <WebqqAvatar class="webqq-avatar webqq-avatar-large" :kind="model.avatarKind" :name="model.title" :avatar="model.avatar" />
       <strong>{{ model.title }}</strong>
@@ -14,7 +19,7 @@
       <template v-for="(message, messageIndex) in model.messages" :key="message.id">
         <li v-if="shouldRenderAsEvent(message)" class="webqq-message-event">{{ getEventMessageText(message) }}</li>
         <ContextMenu v-else>
-          <ContextMenuTrigger as-child :disabled="isRecalledMessage(message)">
+          <ContextMenuTrigger as-child :disabled="isRecalledMessage(message) || model.selectionMode">
             <li
               class="webqq-message-row"
               :class="[
@@ -23,11 +28,25 @@
                 { 'is-merged': isMergedMessage(model.messages, messageIndex, model.currentOperatorId) },
                 { 'is-quote-target': highlightedMessageId === message.id },
                 { 'is-recalled': isRecalledMessage(message) },
+                { 'is-selecting': model.selectionMode },
+                { 'is-selectable': model.selectionMode && isMessageSelectable(message) },
+                { 'is-selected': model.selectionMode && isMessageSelected(message.id) },
               ]"
               :data-message-id="message.id"
+              :aria-selected="model.selectionMode ? isMessageSelected(message.id) : undefined"
+              @click="handleMessageClick(message, $event)"
             >
+              <span
+                v-if="model.selectionMode"
+                class="webqq-message-select-marker"
+                :class="{ 'is-checked': isMessageSelected(message.id) }"
+                aria-hidden="true"
+              >
+                <IconCheck :size="12" stroke-width="3" />
+              </span>
+              <div class="webqq-message-select-body">
               <ContextMenu v-if="message.authorId !== model.currentOperatorId">
-                <ContextMenuTrigger as-child>
+                <ContextMenuTrigger as-child :disabled="model.selectionMode">
                   <button type="button" class="webqq-message-avatar-wrap webqq-message-avatar-trigger" :aria-label="`打开 ${getMessageAuthorName(message.authorId)} 的操作菜单`" @contextmenu.stop>
                     <WebqqAvatar class="webqq-message-avatar" :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'" :name="getMessageAuthorName(message.authorId)" :avatar="getParticipantAvatar(message.authorId)" />
                   </button>
@@ -68,7 +87,7 @@
                 </ContextMenuContent>
               </ContextMenu>
               <ContextMenu v-else>
-                <ContextMenuTrigger as-child>
+                <ContextMenuTrigger as-child :disabled="model.selectionMode">
                   <button type="button" class="webqq-message-avatar-wrap webqq-message-avatar-trigger" :aria-label="`查看 ${getMessageAuthorName(message.authorId)} 的资料`" @contextmenu.stop>
                     <WebqqAvatar class="webqq-message-avatar" :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'" :name="getMessageAuthorName(message.authorId)" :avatar="getParticipantAvatar(message.authorId)" />
                   </button>
@@ -95,17 +114,37 @@
                         <strong class="webqq-message-quote-title">{{ getMessageAuthorName(getReplyMessage(message)!.authorId) }}</strong>
                         <span>{{ getMessageText(getReplyMessage(message)!) }}</span>
                       </button>
-                      <div v-for="media in message.media" :key="media.id" class="webqq-message-media">
-                        <img v-if="media.type === 'image' && getMediaSource(media.id)" :src="getMediaSource(media.id)" :alt="media.name">
-                        <audio v-else-if="media.type === 'audio' && getMediaSource(media.id)" :src="getMediaSource(media.id)" controls preload="metadata" />
-                        <video v-else-if="media.type === 'video' && getMediaSource(media.id)" :src="getMediaSource(media.id)" controls preload="metadata" />
-                        <a v-else-if="media.type === 'file' && getMediaSource(media.id)" :href="getMediaSource(media.id)" :download="media.name" class="webqq-message-file">
-                          <IconPaperclip :size="18" aria-hidden="true" />
-                          <span><strong>{{ media.name }}</strong><small>{{ formatMediaSize(media.size) }}</small></span>
-                        </a>
-                        <span v-else class="webqq-message-media-loading">{{ model.mediaLoadFailures[media.id] ? '媒体不可用' : '媒体加载中...' }}</span>
-                      </div>
-                      <span v-if="getMessageText(message)" class="webqq-message-text">{{ getMessageText(message) }}</span>
+                      <button
+                        v-if="message.forwardId"
+                        class="webqq-message-quote webqq-message-forward"
+                        type="button"
+                        :disabled="!getForwardPreview(message)"
+                        aria-label="查看合并转发消息"
+                        @click.stop="openForwardMessage(message)"
+                      >
+                        <strong class="webqq-message-quote-title">{{ getForwardPreview(message)?.title || '合并转发' }}</strong>
+                        <template v-if="getForwardPreview(message)">
+                          <span
+                            v-for="(line, lineIndex) in getForwardPreview(message)!.lines"
+                            :key="`${message.id}:forward:${lineIndex}`"
+                          >{{ line }}</span>
+                          <span class="webqq-message-forward-entry">查看{{ getForwardPreview(message)!.total }}条转发消息</span>
+                        </template>
+                        <span v-else>{{ getMessageText(message) || '[合并转发]' }}</span>
+                      </button>
+                      <template v-else>
+                        <div v-for="media in message.media" :key="media.id" class="webqq-message-media">
+                          <img v-if="media.type === 'image' && getMediaSource(media.id)" :src="getMediaSource(media.id)" :alt="media.name">
+                          <audio v-else-if="media.type === 'audio' && getMediaSource(media.id)" :src="getMediaSource(media.id)" controls preload="metadata" />
+                          <video v-else-if="media.type === 'video' && getMediaSource(media.id)" :src="getMediaSource(media.id)" controls preload="metadata" />
+                          <a v-else-if="media.type === 'file' && getMediaSource(media.id)" :href="getMediaSource(media.id)" :download="media.name" class="webqq-message-file">
+                            <IconPaperclip :size="18" aria-hidden="true" />
+                            <span><strong>{{ media.name }}</strong><small>{{ formatMediaSize(media.size) }}</small></span>
+                          </a>
+                          <span v-else class="webqq-message-media-loading">{{ model.mediaLoadFailures[media.id] ? '媒体不可用' : '媒体加载中...' }}</span>
+                        </div>
+                        <span v-if="getMessageText(message)" class="webqq-message-text">{{ getMessageText(message) }}</span>
+                      </template>
                       <span v-if="isRecalledMessage(message)" class="webqq-message-recalled-label">已撤回</span>
                       <WebqqMessageReactions
                         v-if="message.reactions?.length"
@@ -120,12 +159,19 @@
                   <time class="webqq-message-time">{{ formatMessageTime(message.createdAt) }}</time>
                 </div>
               </div>
+              </div>
             </li>
           </ContextMenuTrigger>
           <ContextMenuContent style="z-index: 140">
             <ContextMenuItem v-if="!isRecalledMessage(message)" @select="emit('reply', message.id)"><IconMessageReply :size="16" aria-hidden="true" /> 回复</ContextMenuItem>
             <ContextMenuItem v-if="canReactToMessage(message)" @select="emit('openReactionPicker', message.id)">
               <IconMoodSmile :size="16" aria-hidden="true" /> 贴表情
+            </ContextMenuItem>
+            <ContextMenuItem
+              v-if="!isRecalledMessage(message) && !message.event"
+              @select="emit('enterSelection', message.id)"
+            >
+              <IconChecks :size="16" aria-hidden="true" /> 多选
             </ContextMenuItem>
             <ContextMenuItem v-if="canRecallMessage(message)" class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="emit('recallMessage', message.id)">
               <IconArrowBackUp :size="16" aria-hidden="true" /> 撤回
@@ -246,7 +292,7 @@
 </template>
 
 <script setup lang="ts">
-import { IconArrowBackUp, IconBell, IconClock, IconHandClick, IconId, IconMessageReply, IconMoodSmile, IconPaperclip, IconTag, IconUserMinus, IconUserPlus, IconUsers } from '@tabler/icons-vue'
+import { IconArrowBackUp, IconBell, IconCheck, IconChecks, IconClock, IconHandClick, IconId, IconMessageReply, IconMoodSmile, IconPaperclip, IconTag, IconUserMinus, IconUserPlus, IconUsers } from '@tabler/icons-vue'
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from './components/ui/context-menu'
 import { getFriendMenuActions, type FriendMenuState } from './webqq/friend-menu'
@@ -262,6 +308,7 @@ import {
   isRecalledMessage,
   type SandboxChatLunaState,
   type SandboxConversation,
+  type SandboxForwardPreview,
   type SandboxGroup,
   type SandboxMedia,
   type SandboxMessage,
@@ -277,6 +324,8 @@ export interface WebqqMessageListModel {
   messages: SandboxMessage[]
   chatLunaStates: SandboxChatLunaState[]
   replyMessages: Record<string, SandboxMessage>
+  // 外层合并转发卡片的轻量投影：标题、总数、最多 4 行。
+  forwardPreviews: Record<string, SandboxForwardPreview>
   participants: Record<string, MessageParticipant>
   friendMenuStates: Record<string, FriendMenuState>
   currentConversation?: SandboxConversation
@@ -290,12 +339,18 @@ export interface WebqqMessageListModel {
   mediaLoadFailures: Record<string, true>
   // 默认 true：保留撤回气泡；false：隐藏原文并显示结构化撤回事件。
   markRecalledMessages: boolean
+  // chat-pane 多选态：列表只渲染勾选与点击切换，不拥有选择集合。
+  selectionMode?: boolean
+  selectedMessageIds?: string[]
 }
 
 const props = defineProps<{ model: WebqqMessageListModel }>()
 const emit = defineEmits<{
   reply: [messageId: string]
   recallMessage: [messageId: string]
+  enterSelection: [messageId: string]
+  toggleSelection: [messageId: string]
+  openForward: [input: { messageId: string; forwardId: string }]
   setMessageReaction: [messageId: string, emojiId: string, enabled: boolean]
   openReactionPicker: [messageId: string]
   loadHistory: [resolve: () => void, reject: (error: unknown) => void]
@@ -414,9 +469,34 @@ function getReplyMessage(message: SandboxMessage) {
   return message.replyToMessageId ? props.model.replyMessages[message.replyToMessageId] : undefined
 }
 
+function getForwardPreview(message: SandboxMessage) {
+  return message.forwardId ? props.model.forwardPreviews[message.id] : undefined
+}
+
+function openForwardMessage(message: SandboxMessage) {
+  if (!message.forwardId || !getForwardPreview(message)) return
+  emit('openForward', { messageId: message.id, forwardId: message.forwardId })
+}
+
 // 戳一戳始终是事件；撤回在关闭 mark 时也呈现为结构化事件，开启时仍渲染原气泡。
 function shouldRenderAsEvent(message: SandboxMessage) {
   return !!message.event || (isRecalledMessage(message) && !props.model.markRecalledMessages)
+}
+
+// 与服务端 sendForwardMessage 约束一致：事件与撤回消息不可进入合并转发。
+function isMessageSelectable(message: SandboxMessage) {
+  return !message.event && !isRecalledMessage(message)
+}
+
+function isMessageSelected(messageId: string) {
+  return !!props.model.selectedMessageIds?.includes(messageId)
+}
+
+function handleMessageClick(message: SandboxMessage, event: MouseEvent) {
+  if (!props.model.selectionMode || !isMessageSelectable(message)) return
+  // 引用跳转等交互按钮自己 stop，这里只接管可转发消息的勾选切换。
+  if ((event.target as HTMLElement | null)?.closest('button, a, audio, video, input, textarea')) return
+  emit('toggleSelection', message.id)
 }
 
 function getEventMessageText(message: SandboxMessage) {
@@ -475,6 +555,8 @@ function getMediaLabel(media: SandboxMedia) {
 }
 
 function getMessageText(message: SandboxMessage) {
+  // 外层合并转发卡片自己渲染预览行，避免与 content 摘要重复。
+  if (message.forwardId) return ''
   if (message.media?.length === 1 && message.content === `[${getMediaLabel(message.media[0])}] ${message.media[0].name}`) return ''
   return formatMentionContent(message.content, participantNames.value)
 }

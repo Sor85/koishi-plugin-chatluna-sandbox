@@ -567,6 +567,114 @@ body[data-sandbox-color-scheme="dark"] .webqq-form-error {
   background: rgb(127 29 29 / 42%);
 }
 
+/* 合并转发详情：居中 modal。z-index 落在二级页 130 与菜单 140 之上，图片预览 10002 之下。 */
+.webqq-forward-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 160;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 16px;
+  background: rgb(15 23 42 / 50%);
+  backdrop-filter: blur(8px);
+  outline: none;
+}
+
+.webqq-forward-modal {
+  display: flex;
+  width: min(480px, calc(100vw - 32px));
+  max-height: min(80vh, 620px);
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgb(226 232 240 / 94%);
+  border-radius: 16px;
+  background: rgb(248 250 252 / 98%);
+  box-shadow: 0 24px 70px rgb(15 23 42 / 32%);
+}
+
+.webqq-forward-modal-header {
+  display: flex;
+  min-height: 46px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px 0 16px;
+  border-bottom: 1px solid rgb(226 232 240 / 82%);
+}
+
+.webqq-forward-modal-header strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #334155;
+  font-size: 14px;
+  line-height: 20px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.webqq-forward-modal-header button {
+  width: 30px;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #64748b;
+  background: transparent;
+}
+
+.webqq-forward-modal-header button:hover,
+.webqq-forward-modal-header button:focus-visible {
+  outline: none;
+  background: rgb(148 163 184 / 14%);
+}
+
+.webqq-forward-modal-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 16px 2px;
+}
+
+.webqq-forward-modal .webqq-message-row {
+  max-width: 74%;
+}
+
+.webqq-forward-modal-empty {
+  padding: 28px 0;
+  color: #94a3b8;
+  font-size: 13px;
+  line-height: 19px;
+  text-align: center;
+}
+
+body[data-sandbox-color-scheme="dark"] .webqq-forward-modal {
+  border-color: rgb(51 65 85 / 88%);
+  background: rgb(15 23 42 / 96%);
+  box-shadow: 0 24px 70px rgb(2 6 23 / 48%);
+}
+
+body[data-sandbox-color-scheme="dark"] .webqq-forward-modal-header {
+  border-bottom-color: rgb(51 65 85 / 88%);
+}
+
+body[data-sandbox-color-scheme="dark"] .webqq-forward-modal-header strong {
+  color: #e2e8f0;
+}
+
+body[data-sandbox-color-scheme="dark"] .webqq-forward-modal-header button {
+  color: #94a3b8;
+}
+
+body[data-sandbox-color-scheme="dark"] .webqq-forward-modal-header button:hover,
+body[data-sandbox-color-scheme="dark"] .webqq-forward-modal-header button:focus-visible {
+  background: rgb(148 163 184 / 16%);
+}
+
 /* 图片全屏预览：teleport 到 body，与工作区令牌隔离，遮罩固定深色（亮暗通用）。 */
 .webqq-image-preview {
   position: fixed;

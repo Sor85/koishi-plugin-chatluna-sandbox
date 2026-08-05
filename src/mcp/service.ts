@@ -768,7 +768,7 @@ export class SandboxMcpService {
     if (tool === 'prepare_destructive_action') return this.prepareDestructiveAction(activeControl, credential, args)
     if (tool === 'delete_environment_entity') return this.runDestructive(activeControl, credential, tool, args, () => this.deleteEnvironmentEntity(activeControl, args))
     if (tool === 'reset_scene') return this.runDestructive(activeControl, credential, tool, args, () => activeControl.resetScene())
-    if (tool === 'clear_scene') return this.runDestructive(activeControl, credential, tool, args, () => activeControl.replaceScene({ revision: activeControl.getSnapshot().revision, participants: [], groups: [], conversations: [], messages: [], friendships: [], requests: [] }))
+    if (tool === 'clear_scene') return this.runDestructive(activeControl, credential, tool, args, () => activeControl.replaceScene({ revision: activeControl.getSnapshot().revision, participants: [], groups: [], conversations: [], messages: [], forwards: [], friendships: [], requests: [] }))
     if (tool === 'import_scene') return this.runDestructive(activeControl, credential, tool, args, () => this.importScene(activeControl, args))
     if (tool === 'list_onebot_debug_records') {
       if ('includeLargeValues' in args) {

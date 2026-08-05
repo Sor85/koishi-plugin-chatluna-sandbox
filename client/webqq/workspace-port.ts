@@ -1,6 +1,7 @@
 import type {
   DeleteGroupAnnouncementInput,
   ClearSandboxOneBotDebugRecordsResult,
+  GetForwardMessageInput,
   GetMediaContentInput,
   GetMessageHistoryInput,
   GetSandboxWorkspaceInput,
@@ -11,10 +12,12 @@ import type {
   RecallMessageInput,
   SetMessageReactionInput,
   SandboxConsoleOneBotDebugRecord,
+  SandboxForward,
   SandboxMediaContent,
   SandboxMessageHistory,
   SandboxOneBotDebugRecordsPage,
   SandboxWorkspaceState,
+  SendForwardMessageInput,
   SendMediaMessageInput,
   SendMessageInput,
   SetGroupAnnouncementInput,
@@ -25,6 +28,8 @@ export interface WorkspacePort {
   getMessageHistory(input: GetMessageHistoryInput): Promise<SandboxMessageHistory>
   sendMessage(input: SendMessageInput): Promise<SandboxWorkspaceState>
   sendMediaMessage(input: SendMediaMessageInput): Promise<SandboxWorkspaceState>
+  sendForwardMessage(input: SendForwardMessageInput): Promise<SandboxWorkspaceState>
+  getForwardMessage(input: GetForwardMessageInput): Promise<SandboxForward>
   recallMessage(input: RecallMessageInput): Promise<SandboxWorkspaceState>
   setMessageReaction(input: SetMessageReactionInput): Promise<SandboxWorkspaceState>
   getMediaContent(input: GetMediaContentInput): Promise<SandboxMediaContent>

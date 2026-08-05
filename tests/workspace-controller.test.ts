@@ -33,6 +33,7 @@ const snapshot: SandboxSnapshot = {
     content: '基准消息',
     createdAt: '2026-07-23T00:00:00.000Z',
   }],
+  forwards: [],
   friendships: [],
   requests: [{
     id: 'friend-request-1',
@@ -126,6 +127,7 @@ describe('WebQQ 工作区控制模块', () => {
       revision: 7,
       conversation: { id: 'group:30001' },
       messages: [],
+      forwards: [],
     })
     expect(JSON.parse(storage.read('onebot-sandbox.workspace') ?? '{}')).toEqual({
       currentOperatorId: '10001',
@@ -214,6 +216,8 @@ describe('WebQQ 工作区控制模块', () => {
 
     await controller.sendMessage({ conversationId: 'private:10001:20001', content: '机器人消息' })
     await controller.sendMediaMessage({ conversationId: 'private:10001:20001', media: [{ fileName: 'bot.txt', mimeType: 'text/plain', dataBase64: '' }] })
+    await controller.sendForwardMessage({ conversationId: 'private:10001:20001', messageIds: ['message-1'] })
+    await controller.getForwardMessage({ forwardId: 'forward-1' })
     await controller.getMediaContent('media-1')
     await controller.loadMessageHistory({ conversationId: 'private:10001:20001', limit: 10 })
     await controller.setGroupAnnouncement({ groupId: '30001', content: '机器人公告' })
@@ -221,7 +225,7 @@ describe('WebQQ 工作区控制模块', () => {
     await controller.manageEnvironment({ action: 'create-user', data: { id: '10099', name: '新用户' } })
     await controller.handleRelationshipRequest('friend-request-1', true)
 
-    expect(port.calls.slice(-8).map(({ input }) => Reflect.get(input as object, 'operatorId')).filter(Boolean)).toEqual(Array(7).fill('20001'))
+    expect(port.calls.slice(-10).map(({ input }) => Reflect.get(input as object, 'operatorId')).filter(Boolean)).toEqual(Array(9).fill('20001'))
   })
 
   it('端口拒绝操作者切换时保留全部区域模型并返回规范化错误', async () => {
@@ -671,6 +675,19 @@ describe('WebQQ 工作区控制模块', () => {
         conversationId: 'private:10001:20001',
         content: '更早的消息',
         createdAt: '2026-07-22T23:59:59.000Z',
+        forwardId: 'forward-history-1',
+      }],
+      forwards: [{
+        id: 'forward-history-1',
+        authorId: '20001',
+        createdAt: '2026-07-22T23:59:59.000Z',
+        nodes: [{
+          userId: '20001',
+          nickname: 'Koishi',
+          content: '更早的消息',
+          createdAt: '2026-07-22T23:59:59.000Z',
+          sourceMessageId: 'message-0',
+        }],
       }],
       nextBeforeMessageId: 'message-before-0',
     }
@@ -693,6 +710,87 @@ describe('WebQQ 工作区控制模块', () => {
     expect(controller.chat.value.messages.map(({ id }) => id)).toEqual(['message-0', 'message-1'])
     expect(controller.chat.value.conversation?.messageIds).toEqual(['message-0', 'message-1'])
     expect(controller.chat.value.conversation?.hasMoreMessages).toBe(true)
+    expect(controller.chat.value.forwards).toEqual([
+      expect.objectContaining({ id: 'forward-history-1' }),
+    ])
+  })
+
+  it('发送合并转发与按需读取详情都注入当前操作者', async () => {
+    const port = createFakeWorkspacePort(workspace)
+    const controller = createWorkspaceController(port, createStorage())
+    await controller.load()
+    port.workspaceResult = {
+      ...workspace,
+      snapshot: {
+        ...workspace.snapshot,
+        revision: 8,
+        messages: [...workspace.snapshot.messages, {
+          id: 'message-forward',
+          authorId: '10001',
+          conversationId: 'private:10001:20001',
+          content: '测试用户1：基准消息',
+          createdAt: '2026-07-23T00:00:03.000Z',
+          forwardId: 'forward-1',
+        }],
+        conversations: workspace.snapshot.conversations.map((conversation) => conversation.id === 'private:10001:20001'
+          ? { ...conversation, messageIds: [...conversation.messageIds, 'message-forward'] }
+          : conversation),
+        forwards: [{
+          id: 'forward-1',
+          authorId: '10001',
+          createdAt: '2026-07-23T00:00:03.000Z',
+          nodes: [{
+            userId: '10001',
+            nickname: '测试用户1',
+            content: '基准消息',
+            createdAt: '2026-07-23T00:00:00.000Z',
+            sourceMessageId: 'message-1',
+          }],
+        }],
+      },
+    }
+
+    await controller.sendForwardMessage({
+      conversationId: 'private:10001:20001',
+      messageIds: ['message-1'],
+    })
+    expect(port.calls.at(-1)).toEqual({
+      operation: 'sendForwardMessage',
+      input: {
+        operatorId: '10001',
+        conversationId: 'private:10001:20001',
+        messageIds: ['message-1'],
+      },
+    })
+    expect(controller.chat.value.forwards).toEqual([
+      expect.objectContaining({ id: 'forward-1' }),
+    ])
+
+    port.forwardResult = {
+      id: 'forward-nested',
+      authorId: '10001',
+      createdAt: '2026-07-23T00:00:04.000Z',
+      nodes: [{
+        userId: '10001',
+        nickname: '测试用户1',
+        content: '嵌套',
+        createdAt: '2026-07-23T00:00:04.000Z',
+        forwardId: 'forward-1',
+      }],
+    }
+    const nested = await controller.getForwardMessage({ forwardId: 'forward-nested' })
+    expect(port.calls.at(-1)).toEqual({
+      operation: 'getForwardMessage',
+      input: {
+        operatorId: '10001',
+        forwardId: 'forward-nested',
+      },
+    })
+    expect(nested.id).toBe('forward-nested')
+    expect(controller.workspace.value.snapshot.forwards).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'forward-1' }),
+      expect.objectContaining({ id: 'forward-nested' }),
+    ]))
   })
 
   it('群公告新增和删除通过端口更新工作区', async () => {
@@ -781,6 +879,7 @@ describe('WebQQ 工作区控制模块', () => {
         groups: [],
         conversations: [],
         messages: [],
+        forwards: [],
         friendships: [],
         requests: [],
       },

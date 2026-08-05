@@ -22,7 +22,16 @@ import {
 } from './onebot-profiles'
 import { createOneBotDebugError } from './onebot-debug'
 import { MAX_MEDIA_SIZE } from './media-storage'
-import { createDirectConversationId, createGroupConversationId, getDirectConversationPeerId, isRecalledMessage, isSandboxGroupMemberMuted, type SandboxGroupMember, type SandboxImplementationProfile } from './types'
+import {
+  createDirectConversationId,
+  createGroupConversationId,
+  getDirectConversationPeerId,
+  isRecalledMessage,
+  isSandboxGroupMemberMuted,
+  type SandboxForwardNodeInput,
+  type SandboxGroupMember,
+  type SandboxImplementationProfile,
+} from './types'
 
 function normalizeOneBotGroupId(value: unknown): string {
   const groupId = String(value ?? '')
@@ -416,23 +425,49 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           return { status: 'ok', retcode: 0, data: null }
         }
         if (action === 'send_forward_msg') {
-          const nodes = Array.isArray(params.messages) ? params.messages : []
-          if (!nodes.length) throw new Error('send_forward_msg 需要至少一个消息节点')
-          // 沙盒不模拟合并转发卡片：把各节点内容展平为一条多行消息写入会话，
-          // 节点支持内联 content 与引用已有消息 ID 两种真实形态。
-          const content = nodes.map((node) => {
-            const data = node && typeof node === 'object' ? Reflect.get(node, 'data') as Record<string, unknown> | undefined : undefined
-            if (!data) return ''
-            if (data.content !== undefined) return this.getOutboundMessageSummary(parseOneBotOutboundMessage(data.content))
-            if (data.id !== undefined) return this.requireReadableMessage(String(data.id)).content
-            return ''
-          }).filter(Boolean).join('\n')
-          if (!content) throw new Error('send_forward_msg 的消息节点不能全部为空')
+          // send_forward_msg / send_group_forward_msg / send_private_forward_msg
+          // 统一生成真实转发资源，不再把节点展平成普通文本。
           const conversationId = params.group_id !== undefined
             ? createGroupConversationId(normalizeOneBotGroupId(params.group_id))
             : createDirectConversationId(this.selfId, String(params.user_id ?? ''))
-          const messageId = await this.deliverOutboundMessage(conversationId, { content, mediaSources: [] })
-          return { status: 'ok', retcode: 0, data: { message_id: getOneBotMessageSequence(messageId) } }
+          this.getVisibleConversation(conversationId)
+          const nodes = await this.parseOneBotForwardNodes(params.messages)
+          const result = await this.control.applyForwardMessage({
+            operatorId: this.selfId,
+            conversationId,
+            nodes,
+          })
+          return {
+            status: 'ok',
+            retcode: 0,
+            data: {
+              message_id: getOneBotMessageSequence(result.messageId),
+              // 不同实现分别返回 res_id / forward_id；沙盒同时提供二者，方便插件兼容。
+              res_id: result.forwardId,
+              forward_id: result.forwardId,
+            },
+          }
+        }
+        if (action === 'get_forward_msg') {
+          const forwardId = typeof params.id === 'string' || typeof params.id === 'number'
+            ? String(params.id)
+            : undefined
+          const messageId = params.message_id !== undefined ? String(params.message_id) : undefined
+          const forward = this.control.getForwardMessage({
+            operatorId: this.selfId,
+            ...(forwardId ? { forwardId } : {}),
+            ...(messageId ? { messageId } : {}),
+          })
+          return {
+            status: 'ok',
+            retcode: 0,
+            data: {
+              // 参考仓会同时尝试 messages / message / nodes；这里三者返回同一份 node 列表。
+              messages: forward.nodes.map((node) => this.toOneBotForwardNode(node)),
+              message: forward.nodes.map((node) => this.toOneBotForwardNode(node)),
+              nodes: forward.nodes.map((node) => this.toOneBotForwardNode(node)),
+            },
+          }
         }
         throw new Error(`OneBot action 已声明但未接入处理器：${capability.action}`)
     }
@@ -892,10 +927,13 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     const groupMember = conversation?.groupId
       ? snapshot.groups.find(({ id }) => id === conversation.groupId)?.members.find(({ participantId }) => participantId === message.authorId)
       : undefined
-    const onebotMessage: Array<{ type: string; data: Record<string, string> }> = [
-      ...(message.replyToMessageId ? [{ type: 'reply', data: { id: String(getOneBotMessageSequence(message.replyToMessageId)) } }] : []),
-      ...toOneBotMessageSegments(message.content, message.media),
-    ]
+    // 外层消息只暴露 forward 段；完整 node 通过 get_forward_msg 读取。
+    const onebotMessage: Array<{ type: string; data: Record<string, string> }> = message.forwardId
+      ? [{ type: 'forward', data: { id: message.forwardId } }]
+      : [
+        ...(message.replyToMessageId ? [{ type: 'reply', data: { id: String(getOneBotMessageSequence(message.replyToMessageId)) } }] : []),
+        ...toOneBotMessageSegments(message.content, message.media),
+      ]
     return {
       time: Math.floor(new Date(message.createdAt).getTime() / 1000),
       message_type: conversation?.type === 'group' ? 'group' : 'private',
@@ -913,6 +951,110 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
       message_format: 'array',
       font: 0,
       raw_message: toOneBotRawMessage(onebotMessage),
+    }
+  }
+
+  private async parseOneBotForwardNodes(rawNodes: unknown): Promise<SandboxForwardNodeInput[]> {
+    if (!Array.isArray(rawNodes) || !rawNodes.length) throw new Error('send_forward_msg 需要至少一个消息节点')
+    const nodes: SandboxForwardNodeInput[] = []
+    for (const [index, node] of rawNodes.entries()) {
+      const payload = node && typeof node === 'object' ? node as Record<string, unknown> : {}
+      const data = payload.data && typeof payload.data === 'object'
+        ? payload.data as Record<string, unknown>
+        : payload
+      if (data.id !== undefined && data.id !== null && String(data.id)) {
+        // 引用节点：校验可见性/撤回/事件后，再固化为独立 node 快照。
+        const message = this.requireReadableMessage(String(data.id))
+        if (message.event) throw new Error(`事件消息不能合并转发：${data.id}`)
+        nodes.push({ type: 'reference', messageId: message.id })
+        continue
+      }
+      const userId = String(data.user_id ?? data.uin ?? data.uid ?? '').trim()
+      const nickname = String(data.nickname ?? data.name ?? data.senderName ?? data.sender_name ?? userId).trim() || userId
+      if (!userId) throw new Error(`send_forward_msg 节点 #${index + 1} 缺少 user_id`)
+      const contentSource = data.content ?? data.message
+      if (contentSource === undefined || contentSource === null) {
+        throw new Error(`send_forward_msg 节点 #${index + 1} 缺少 content`)
+      }
+      // 节点 content 可能本身是 forward 段；嵌套资源直接挂到 domain node.forwardId。
+      if (Array.isArray(contentSource) && contentSource.length === 1) {
+        const only = contentSource[0]
+        if (only && typeof only === 'object') {
+          const type = String(Reflect.get(only, 'type') ?? '')
+          const nestedData = Reflect.get(only, 'data')
+          const nestedId = nestedData && typeof nestedData === 'object'
+            ? String(Reflect.get(nestedData as object, 'id') ?? '')
+            : ''
+          if (type === 'forward' && nestedId) {
+            nodes.push({
+              type: 'custom',
+              userId,
+              nickname,
+              content: '[合并转发]',
+              forwardId: nestedId,
+              ...(typeof data.time === 'number' || typeof data.time === 'string'
+                ? { createdAt: new Date(Number(data.time) * 1000).toISOString() }
+                : {}),
+            })
+            continue
+          }
+        }
+      }
+      const outbound = parseOneBotOutboundMessage(contentSource)
+      // 自定义节点媒体与 send_msg 对齐：sandbox-media / base64 / data URI / http(s) 均可，落盘后再写入 node。
+      const media = outbound.mediaSources.length
+        ? await this.resolveForwardNodeMedia(outbound.mediaSources)
+        : undefined
+      nodes.push({
+        type: 'custom',
+        userId,
+        nickname,
+        content: this.getOutboundMessageSummary(outbound) || (media?.length ? media.map((item) => `[${item.type === 'image' ? '图片' : item.type === 'audio' ? '语音' : item.type === 'video' ? '视频' : '文件'}] ${item.name}`).join(' ') : ''),
+        ...(media ? { media } : {}),
+        ...(typeof data.time === 'number' || typeof data.time === 'string'
+          ? { createdAt: new Date(Number(data.time) * 1000).toISOString() }
+          : {}),
+      })
+    }
+    return nodes
+  }
+
+  // 复用已有 sandbox-media 引用，其余来源走 resolveOutboundMedia + storeMediaBatch，与普通出站消息一致。
+  private async resolveForwardNodeMedia(sources: SandboxOutboundMediaSource[]) {
+    const media: Array<ReturnType<SandboxControlService['storeMedia']>> = []
+    for (const source of sources) {
+      const match = /^sandbox-media:\/\/([a-f0-9]{32})$/.exec(source.source.trim())
+      if (match) {
+        const content = this.control.getMediaContent({ operatorId: this.selfId, mediaId: match[1] })
+        media.push({
+          id: content.id,
+          type: content.type,
+          name: source.fileName || content.name,
+          mimeType: content.mimeType,
+          size: content.size,
+          reference: content.reference,
+        })
+        continue
+      }
+      const input = await this.resolveOutboundMedia(source)
+      media.push(...this.control.storeMediaBatch([input]))
+    }
+    return media
+  }
+
+  private toOneBotForwardNode(node: NonNullable<ReturnType<SandboxControlService['getSnapshot']>['forwards']>[number]['nodes'][number]) {
+    const content = node.forwardId
+      ? [{ type: 'forward', data: { id: node.forwardId } }]
+      : toOneBotMessageSegments(node.content, node.media)
+    return {
+      type: 'node',
+      data: {
+        user_id: Number(node.userId) || node.userId,
+        nickname: node.nickname,
+        content,
+        time: Math.floor(new Date(node.createdAt).getTime() / 1000),
+        ...(node.sourceMessageId ? { id: String(getOneBotMessageSequence(node.sourceMessageId)) } : {}),
+      },
     }
   }
 }

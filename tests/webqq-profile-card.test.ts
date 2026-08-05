@@ -38,6 +38,7 @@ const snapshot: SandboxSnapshot = {
   }],
   conversations: [],
   messages: [],
+  forwards: [],
   friendships: [{
     id: 'friend:10001:20001',
     participantIds: ['10001', '20001'],

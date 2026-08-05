@@ -30,10 +30,13 @@ export function trimSnapshotMessages(snapshot: SandboxSnapshot, limit: number): 
     hasMoreMessages: conversation.hasMoreMessages || conversation.messageIds.length > limit,
   }))
   const visibleMessageIds = new Set(conversations.flatMap(({ messageIds }) => messageIds))
+  const messages = snapshot.messages.filter(({ id }) => visibleMessageIds.has(id))
+  const visibleForwardIds = new Set(messages.flatMap(({ forwardId }) => forwardId ? [forwardId] : []))
   return {
     ...snapshot,
     conversations,
-    messages: snapshot.messages.filter(({ id }) => visibleMessageIds.has(id)),
+    messages,
+    forwards: (snapshot.forwards ?? []).filter(({ id }) => visibleForwardIds.has(id)),
   }
 }
 

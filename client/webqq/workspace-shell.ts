@@ -2,18 +2,21 @@ import { computed, onMounted, ref, watch } from 'vue'
 import type { WebqqChatPaneModel } from '../webqq-chat-pane.vue'
 import type { WebqqComposerModel, WebqqComposerSendIntent, WebqqComposerSender } from '../webqq-composer.vue'
 import type { WebqqDetailsPanelModel } from '../webqq-details-panel.vue'
+import type { WebqqForwardTargetModel, WebqqForwardTargetOption } from '../webqq-forward-target-dialog.vue'
 import type { WebqqMessageListModel } from '../webqq-message-list.vue'
 import type { WebqqSidebarModel } from '../webqq-sidebar.vue'
 import type {
   GetSandboxOneBotDebugRecordsInput,
   ManageSandboxEnvironmentInput,
   SandboxConversation,
+  SandboxForward,
   SandboxFriendAction,
   SandboxGroupAction,
 } from '../../src/types'
 import { formatRecalledMessageEventText, getSandboxBots, getSandboxUsers, isRecalledMessage } from '../../src/types'
 import type { SandboxWorkspaceView } from './workspace-state'
 import type { FriendMenuState } from './friend-menu'
+import { buildForwardPreviewMap } from './forward-preview'
 import { formatMentionContent } from './mention'
 import { getIncomingNotificationRequests } from './notification-requests'
 import { buildGroupProfileCardModel, buildProfileCardModel } from './profile-card'
@@ -96,10 +99,16 @@ export function createWebqqWorkspaceShell(
     const reply = snapshot.value.messages.find(({ id }) => id === replyToMessageId)
     return reply ? [[reply.id, reply]] : []
   })))
+  const forwardPreviews = computed(() => buildForwardPreviewMap(
+    messages.value,
+    // chat.forwards 是 DeepReadonly，预览投影只读节点内容，可安全降级为可变输入类型。
+    workspaceController.chat.value.forwards as unknown as SandboxForward[],
+  ))
   const messageListModel = computed<WebqqMessageListModel>(() => ({
     messages: messages.value,
     chatLunaStates: workspaceController.chat.value.chatLunaStates.map((state) => ({ ...state })),
     replyMessages: replyMessages.value,
+    forwardPreviews: forwardPreviews.value,
     participants: participants.value,
     friendMenuStates: friendMenuStates.value,
     currentConversation: currentConversation.value,
@@ -123,6 +132,34 @@ export function createWebqqWorkspaceShell(
   const participantNames = computed(() => Object.fromEntries([
     ...snapshot.value.participants.map(({ id, name }) => [id, name]),
   ]))
+  const forwardTargets = computed<WebqqForwardTargetModel>(() => {
+    const recent: WebqqForwardTargetOption[] = sidebarConversations.value.map((conversation) => ({
+      conversationId: conversation.id,
+      title: conversation.title,
+      subtitle: conversation.preview,
+      avatar: conversation.avatar,
+      avatarKind: conversation.avatarKind,
+    }))
+    const friends: WebqqForwardTargetOption[] = getFriendDirectory(snapshot.value, currentOperatorId.value)
+      .filter((entry) => entry.isFriend && entry.conversationId)
+      .map((entry) => ({
+        conversationId: entry.conversationId!,
+        title: entry.displayName,
+        subtitle: entry.status,
+        avatar: resolveAvatar(entry.avatar),
+        avatarKind: entry.isBot ? 'bot' as const : 'user' as const,
+      }))
+    const groups: WebqqForwardTargetOption[] = getGroupDirectory(snapshot.value, currentOperatorId.value)
+      .filter((group) => !!group.member && group.conversationId)
+      .map((group) => ({
+        conversationId: group.conversationId!,
+        title: group.name,
+        subtitle: `群聊 ${group.id} · ${group.members.length} 人`,
+        avatar: resolveAvatar(group.avatar),
+        avatarKind: 'group' as const,
+      }))
+    return { recent, friends, groups }
+  })
   const chatPaneModel = computed<WebqqChatPaneModel>(() => ({
     conversationId: currentConversation.value?.id,
     title: currentConversationTitle.value,
@@ -135,6 +172,7 @@ export function createWebqqWorkspaceShell(
     participantNames: participantNames.value,
     messageList: messageListModel.value,
     composer: composerModel.value,
+    forwardTargets: forwardTargets.value,
   }))
   const detailsPanelModel = computed<WebqqDetailsPanelModel>(() => ({
     view: currentView.value === 'profile' ? 'profile' : currentGroup.value ? 'group' : 'private',
@@ -252,6 +290,7 @@ export function createWebqqWorkspaceShell(
     () => [
       currentOperatorId.value,
       ...messages.value.flatMap(({ media }) => media?.map(({ id }) => id) ?? []),
+      ...(snapshot.value.forwards ?? []).flatMap(({ nodes }) => nodes.flatMap(({ media }) => media?.map(({ id }) => id) ?? [])),
       ...snapshot.value.participants.map(({ avatar }) => avatar ?? ''),
       ...snapshot.value.groups.map(({ avatar }) => avatar ?? ''),
     ].join(':'),
@@ -479,9 +518,11 @@ export function createWebqqWorkspaceShell(
   async function loadVisibleMedia() {
     if (!currentOperatorId.value) return
     const messageIds = messages.value.flatMap(({ media }) => media?.map(({ id }) => id) ?? [])
+    // 合并转发详情弹窗可能挂着嵌套资源媒体；按本地已缓存 forwards 一并预取。
+    const forwardMediaIds = (snapshot.value.forwards ?? []).flatMap(({ nodes }) => nodes.flatMap(({ media }) => media?.map(({ id }) => id) ?? []))
     const avatarIds = [...snapshot.value.participants.map(({ avatar }) => avatar), ...snapshot.value.groups.map(({ avatar }) => avatar)]
       .flatMap((reference) => reference?.match(/^sandbox-media:\/\/([a-f0-9]{32})$/)?.[1] ?? [])
-    const missingIds = [...new Set([...messageIds, ...avatarIds])].filter((id) => !mediaSources.value[id])
+    const missingIds = [...new Set([...messageIds, ...forwardMediaIds, ...avatarIds])].filter((id) => !mediaSources.value[id])
     await Promise.all(missingIds.map(async (mediaId) => {
       try {
         const content = await workspaceController.getMediaContent(mediaId)
@@ -526,6 +567,35 @@ export function createWebqqWorkspaceShell(
       }
       resolve()
     } catch (error) {
+      reject(error)
+    }
+  }
+
+  // Phase D 多选目标确认后由 chat-pane 调用；选择态仍由 chat-pane 本地持有。
+  async function sendForwardMessage(
+    input: { conversationId: string; messageIds?: string[] },
+    resolve: Resolve,
+    reject: Reject,
+  ) {
+    errorMessage.value = ''
+    try {
+      await workspaceController.sendForwardMessage(input)
+      resolve()
+    } catch (error) {
+      errorMessage.value = error instanceof Error ? error.message : '合并转发失败'
+      reject(error)
+    }
+  }
+
+  async function getForwardMessage(
+    input: { forwardId?: string; messageId?: string },
+    resolve: (forward: Awaited<ReturnType<WorkspaceController['getForwardMessage']>>) => void,
+    reject: Reject,
+  ) {
+    try {
+      resolve(await workspaceController.getForwardMessage(input))
+    } catch (error) {
+      errorMessage.value = error instanceof Error ? error.message : '读取合并转发失败'
       reject(error)
     }
   }
@@ -605,6 +675,8 @@ export function createWebqqWorkspaceShell(
     selectConversation,
     selectNavigation,
     sendComposerMessage,
+    sendForwardMessage,
+    getForwardMessage,
     setGroupAdmin,
     sidebarModel,
     toggleDetails,
