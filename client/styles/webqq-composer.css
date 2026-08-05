@@ -13,10 +13,7 @@
   right: calc(50% - 230px);
   bottom: 0;
   z-index: 1;
-  /* 不要在此加 isolation: isolate：composer 已是 position + z-index 层叠上下文，
-     ::before(z-index:-1) 天然被约束；而 isolation 会按规范把 composer 变成
-     backdrop root，严格实现的引擎（Firefox）里 ::before 的毛玻璃将采样不到
-     背后的消息内容，退化成纯半透明。 */
+  isolation: isolate;
   display: flex;
   width: 460px;
   max-width: calc(100% - 96px);

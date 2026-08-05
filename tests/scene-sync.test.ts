@@ -6,7 +6,7 @@ const clientMocks = vi.hoisted(() => ({
 
 vi.mock('@koishijs/client', () => clientMocks)
 
-import { createSceneMutationSync } from '../client/webqq/scene-sync'
+import { createSceneMutationSync, installContextMutationReceiver } from '../client/webqq/scene-sync'
 
 describe('场景变更实时同步', () => {
   beforeEach(() => {
@@ -29,5 +29,22 @@ describe('场景变更实时同步', () => {
     expect(firstController.notifySceneRevision).toHaveBeenCalledWith(7)
     expect(secondController.notifySceneRevision).not.toHaveBeenCalled()
     disposeFirst()
+  })
+
+  it('主 Context 广播会通知现有页面监听器', () => {
+    const controller = { notifySceneRevision: vi.fn() }
+    const dispose = createSceneMutationSync(controller, () => undefined)
+    const contextListeners = new Map<string, (payload: { revision: number }) => void>()
+
+    installContextMutationReceiver({
+      on(event: string, callback: (payload: { revision: number }) => void) {
+        contextListeners.set(event, callback as (payload: { revision: number }) => void)
+        return () => true
+      },
+    })
+    contextListeners.get('onebot-sandbox/scene-mutated')?.({ revision: 9 })
+
+    expect(controller.notifySceneRevision).toHaveBeenCalledWith(9)
+    dispose()
   })
 })

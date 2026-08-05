@@ -28,6 +28,7 @@
     "build": "yarn clean && yarn build:server && yarn build:client",
     "build:types": "tsc -p tsconfig.json --emitDeclarationOnly",
     "build:server": "yarn build:types && tsup src/index.ts --format cjs --out-dir lib --clean false",
+    "watch:server": "node scripts/watch-server.mjs",
     "build:client": "vite build",
     "typecheck": "vue-tsc -p tsconfig.typecheck.json --noEmit",
     "test": "vitest run",
