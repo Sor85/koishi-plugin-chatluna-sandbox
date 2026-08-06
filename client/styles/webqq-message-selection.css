@@ -56,15 +56,6 @@
   background: var(--webqq-accent);
 }
 
-.webqq-message-row.is-selecting:not(.is-selectable) {
-  opacity: 0.55;
-}
-
-.webqq-message-row.is-selecting:not(.is-selectable) .webqq-message-select-marker {
-  border-style: dashed;
-  opacity: 0.7;
-}
-
 .webqq-selection-bar {
   position: absolute;
   z-index: 20;

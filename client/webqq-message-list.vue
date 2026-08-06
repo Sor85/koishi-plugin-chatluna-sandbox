@@ -39,7 +39,7 @@
               @click="handleMessageClick(message, $event)"
             >
               <span
-                v-if="model.selectionMode"
+                v-if="model.selectionMode && isMessageSelectable(message)"
                 class="webqq-message-select-marker"
                 :class="{ 'is-checked': isMessageSelected(message.id) }"
                 aria-hidden="true"

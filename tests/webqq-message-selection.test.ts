@@ -21,6 +21,9 @@ describe('WebQQ 消息多选与目标选择', () => {
     expect(source).toContain("closest('.webqq-message-bubble')")
     expect(source).toContain("{ 'is-selected': model.selectionMode && isMessageSelected(message.id) }")
     expect(source).toContain('isMessageSelectable(message)')
+    expect(source).toContain('v-if="model.selectionMode && isMessageSelectable(message)"')
+    expect(source).not.toContain('v-if="model.selectionMode"\n                class="webqq-message-select-marker"')
+    expect(source).toContain('return !message.event && !isRecalledMessage(message)')
     expect(source).toContain('class="webqq-message-select-marker"')
     // 多选态禁用普通右键操作，避免和勾选冲突。
     expect(source).toContain(':disabled="isRecalledMessage(message) || model.selectionMode"')
@@ -81,6 +84,8 @@ describe('WebQQ 消息多选与目标选择', () => {
     expect(selectionStyles).toContain('.webqq-selection-bar .webqq-selection-bar-button')
     expect(selectionStyles).toContain('.webqq-message-row.is-selecting')
     expect(selectionStyles).toContain('width: 100%')
+    expect(selectionStyles).not.toContain('.webqq-message-row.is-selecting:not(.is-selectable)')
+    expect(selectionStyles).not.toContain('border-style: dashed')
     expect(selectionStyles).not.toContain('.webqq-message-row.is-selecting.is-selected {')
     expect(selectionStyles).not.toContain('.webqq-message-row.is-selecting.is-selectable:hover')
     expect(selectionStyles).toContain('.webqq-message-row.is-selecting.is-outgoing .webqq-message-select-body')
