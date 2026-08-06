@@ -13,16 +13,16 @@ export interface ComposerFocusRestoreContext {
   /** 请求完成时仍挂载的 composer 实例标识 */
   activeComposerId?: symbol
   /**
-   * 发起发送时捕获的原 textarea。
+   * 发起发送时捕获的原输入控件（textarea 或 contenteditable）。
    * 组件卸载或 DOM 替换后 isConnected 为 false，不得再 focus。
    */
-  inputElement?: HTMLTextAreaElement | null
+  inputElement?: HTMLElement | null
 }
 
 /**
  * 判断一次异步发送结束后是否应恢复输入焦点。
  *
- * 只在“原 composer + 原会话 + 原操作者 + 原 textarea 仍挂载有效”时返回 true，
+ * 只在“原 composer + 原会话 + 原操作者 + 原输入控件仍挂载有效”时返回 true，
  * 避免切换会话/操作者或卸载后的旧请求抢焦点。
  */
 export function shouldRestoreComposerFocus(context: ComposerFocusRestoreContext): boolean {

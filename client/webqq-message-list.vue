@@ -307,6 +307,7 @@ import {
   scrollMessageListToBottom,
   shouldFollowMessageListTail,
 } from './webqq/message-list-scroll'
+import { highlightMessageElement } from './webqq/message-reveal'
 import { formatMentionContent } from './webqq/mention'
 import WebqqAvatar from './webqq-avatar.vue'
 import WebqqMessageReactions from './webqq-message-reactions.vue'
@@ -681,17 +682,30 @@ function formatMediaSize(size: number) {
   return `${(size / 1024 / 1024).toFixed(1)} MB`
 }
 
-function scrollToQuotedMessage(messageId: string) {
-  const element = document.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`)
-  if (!element) return
-  element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  highlightedMessageId.value = messageId
-  if (quoteHighlightTimer) clearTimeout(quoteHighlightTimer)
-  quoteHighlightTimer = setTimeout(() => {
-    highlightedMessageId.value = ''
-    quoteHighlightTimer = undefined
-  }, 1400)
+function revealMessage(messageId: string) {
+  const result = highlightMessageElement({
+    messageId,
+    root: messagesElement.value ?? document,
+    onHighlight: (id) => {
+      highlightedMessageId.value = id
+    },
+    onClear: () => {
+      highlightedMessageId.value = ''
+      quoteHighlightTimer = undefined
+    },
+    clearTimer: quoteHighlightTimer,
+  })
+  quoteHighlightTimer = result.clearTimer
+  return result.highlighted
 }
+
+function scrollToQuotedMessage(messageId: string) {
+  revealMessage(messageId)
+}
+
+defineExpose({
+  revealMessage,
+})
 
 async function loadEarlierMessages() {
   if (historyLoading.value) return

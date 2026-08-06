@@ -28,12 +28,40 @@
           <span>{{ model.subtitle }}</span>
         </div>
       </div>
-      <button type="button" class="webqq-icon-button" :class="{ 'is-active': model.detailsVisible }" :aria-label="model.detailsVisible ? '关闭会话信息' : '打开会话信息'" @click="emit('toggleDetails')">
-        <IconDots :size="22" aria-hidden="true" />
-      </button>
+      <div class="webqq-chat-header-actions">
+        <button
+          type="button"
+          class="webqq-icon-button"
+          :class="{ 'is-active': searchOpen }"
+          :disabled="!model.conversationId"
+          :aria-label="searchOpen ? '关闭查找聊天记录' : '查找聊天记录'"
+          @click="toggleSearch"
+        >
+          <IconSearch :size="22" aria-hidden="true" />
+        </button>
+        <button type="button" class="webqq-icon-button" :class="{ 'is-active': model.detailsVisible }" :aria-label="model.detailsVisible ? '关闭会话信息' : '打开会话信息'" @click="emit('toggleDetails')">
+          <IconDots :size="22" aria-hidden="true" />
+        </button>
+      </div>
     </header>
 
+    <WebqqMessageSearch
+      :open="searchOpen"
+      :loading="searchLoading"
+      :error-message="searchError"
+      :hits="searchHits"
+      :next-before-message-id="searchNextBeforeMessageId"
+      :participant-names="model.participantNames"
+      :active-message-id="activeSearchMessageId"
+      :revealing-message-id="revealingMessageId"
+      @close="closeSearch"
+      @search="runSearch"
+      @load-more="loadMoreSearchHits"
+      @select="revealSearchHit"
+    />
+
     <WebqqMessageList
+      ref="messageListRef"
       :model="messageListModel"
       @reply="replyingToMessageId = $event"
       @recall-message="emit('recallMessage', $event)"
@@ -112,8 +140,8 @@
 </template>
 
 <script setup lang="ts">
-import { IconChevronLeft, IconDots, IconId, IconShare3 } from '@tabler/icons-vue'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { IconChevronLeft, IconDots, IconId, IconSearch, IconShare3 } from '@tabler/icons-vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Button } from './components/ui/button'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from './components/ui/context-menu'
 import WebqqAvatar from './webqq-avatar.vue'
@@ -123,12 +151,16 @@ import WebqqForwardModal from './webqq-forward-modal.vue'
 import WebqqForwardTargetDialog, { type WebqqForwardTargetModel } from './webqq-forward-target-dialog.vue'
 import WebqqImagePreview from './webqq-image-preview.vue'
 import WebqqMessageList, { type WebqqMessageListModel } from './webqq-message-list.vue'
+import WebqqMessageSearch from './webqq-message-search.vue'
 import { buildForwardPreview } from './webqq/forward-preview'
+import { ensureMessageLoaded } from './webqq/message-reveal'
 import {
   isRecalledMessage,
   type ManageSandboxEnvironmentInput,
   type SandboxForward,
   type SandboxForwardNode,
+  type SandboxMessageSearchHit,
+  type SandboxMessageSearchResult,
 } from '../src/types'
 
 export interface WebqqChatPaneModel {
@@ -157,6 +189,11 @@ const emit = defineEmits<{
   editParticipant: [entity: { type: 'user' | 'bot', id: string }]
   deleteParticipant: [entity: { type: 'user' | 'bot', id: string }]
   loadHistory: [resolve: () => void, reject: (error: unknown) => void]
+  searchConversationMessages: [
+    input: { conversationId: string, query: string, beforeMessageId?: string, limit?: number },
+    resolve: (result: SandboxMessageSearchResult) => void,
+    reject: (error: unknown) => void,
+  ]
   recallMessage: [messageId: string]
   setMessageReaction: [messageId: string, emojiId: string, enabled: boolean]
   sendForwardMessage: [input: { conversationId: string, messageIds: string[] }, resolve: () => void, reject: (error: unknown) => void]
@@ -189,6 +226,16 @@ const selectedMessageIds = ref<string[]>([])
 const forwardTargetOpen = ref(false)
 const forwardLoading = ref(false)
 const previewImageUrl = ref('')
+const messageListRef = ref<{ revealMessage: (messageId: string) => boolean }>()
+const searchOpen = ref(false)
+const searchLoading = ref(false)
+const searchError = ref('')
+const searchQuery = ref('')
+const searchHits = ref<SandboxMessageSearchHit[]>([])
+const searchNextBeforeMessageId = ref<string>()
+const activeSearchMessageId = ref('')
+const revealingMessageId = ref('')
+let searchRequestSerial = 0
 interface ForwardDialogFrame {
   title: string
   items: SandboxForwardNode[]
@@ -219,12 +266,17 @@ watch(() => props.model.conversationId, () => {
   closeForwardDialog()
   // 切换会话必须清空多选，避免把旧会话 messageId 误转发。
   exitSelection()
+  // 搜索结果绑定当前会话；换会话后旧 hits 的 messageId 无意义。
+  resetSearchState()
+  searchOpen.value = false
 })
 
 watch(selectionMode, (active) => {
   if (active) {
     replyingToMessageId.value = ''
     reactionPickerMessageId.value = ''
+    // 搜索面板与多选操作栏叠在同一区域会抢焦点；进入多选时收起搜索。
+    closeSearch()
     // 短胶囊仍需为消息列表保留底部安全区，避免最后一条消息被悬浮操作栏遮住。
     composerSpace.value = 64
   }
@@ -282,13 +334,20 @@ function confirmForward(conversationId: string, resolve: () => void, reject: (er
 }
 
 function handleSelectionKeydown(event: KeyboardEvent) {
-  if (event.key !== 'Escape' || !selectionMode.value) return
-  if (forwardTargetOpen.value) {
-    forwardTargetOpen.value = false
+  if (event.key !== 'Escape') return
+  if (selectionMode.value) {
+    if (forwardTargetOpen.value) {
+      forwardTargetOpen.value = false
+      return
+    }
+    event.preventDefault()
+    exitSelection()
     return
   }
-  event.preventDefault()
-  exitSelection()
+  if (searchOpen.value) {
+    event.preventDefault()
+    closeSearch()
+  }
 }
 
 onMounted(() => {
@@ -298,6 +357,126 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleSelectionKeydown)
 })
+
+function resetSearchState() {
+  searchRequestSerial += 1
+  searchLoading.value = false
+  searchError.value = ''
+  searchQuery.value = ''
+  searchHits.value = []
+  searchNextBeforeMessageId.value = undefined
+  activeSearchMessageId.value = ''
+  revealingMessageId.value = ''
+}
+
+function closeSearch() {
+  searchOpen.value = false
+  resetSearchState()
+}
+
+function toggleSearch() {
+  if (!props.model.conversationId) return
+  if (searchOpen.value) {
+    closeSearch()
+    return
+  }
+  // 搜索与多选互斥：避免同时出现悬浮操作栏与结果面板。
+  if (selectionMode.value) exitSelection()
+  searchOpen.value = true
+}
+
+function requestSearch(input: { conversationId: string, query: string, beforeMessageId?: string, limit?: number }) {
+  return new Promise<SandboxMessageSearchResult>((resolve, reject) => {
+    emit('searchConversationMessages', input, resolve, reject)
+  })
+}
+
+async function runSearch(query: string) {
+  const conversationId = props.model.conversationId
+  const trimmed = query.trim()
+  searchQuery.value = trimmed
+  activeSearchMessageId.value = ''
+  if (!conversationId || !trimmed) {
+    searchHits.value = []
+    searchNextBeforeMessageId.value = undefined
+    searchError.value = ''
+    searchLoading.value = false
+    return
+  }
+
+  const serial = ++searchRequestSerial
+  searchLoading.value = true
+  searchError.value = ''
+  try {
+    const result = await requestSearch({ conversationId, query: trimmed, limit: 30 })
+    if (serial !== searchRequestSerial) return
+    searchHits.value = result.hits
+    searchNextBeforeMessageId.value = result.nextBeforeMessageId
+  } catch (error) {
+    if (serial !== searchRequestSerial) return
+    searchHits.value = []
+    searchNextBeforeMessageId.value = undefined
+    searchError.value = error instanceof Error ? error.message : '搜索会话消息失败'
+  } finally {
+    if (serial === searchRequestSerial) searchLoading.value = false
+  }
+}
+
+async function loadMoreSearchHits() {
+  const conversationId = props.model.conversationId
+  const beforeMessageId = searchNextBeforeMessageId.value
+  const query = searchQuery.value
+  if (!conversationId || !beforeMessageId || !query || searchLoading.value) return
+
+  const serial = ++searchRequestSerial
+  searchLoading.value = true
+  searchError.value = ''
+  try {
+    const result = await requestSearch({ conversationId, query, beforeMessageId, limit: 30 })
+    if (serial !== searchRequestSerial) return
+    const known = new Set(searchHits.value.map(({ messageId }) => messageId))
+    searchHits.value = [
+      ...searchHits.value,
+      ...result.hits.filter(({ messageId }) => !known.has(messageId)),
+    ]
+    searchNextBeforeMessageId.value = result.nextBeforeMessageId
+  } catch (error) {
+    if (serial !== searchRequestSerial) return
+    searchError.value = error instanceof Error ? error.message : '搜索会话消息失败'
+  } finally {
+    if (serial === searchRequestSerial) searchLoading.value = false
+  }
+}
+
+async function revealSearchHit(hit: SandboxMessageSearchHit) {
+  if (revealingMessageId.value) return
+  revealingMessageId.value = hit.messageId
+  searchError.value = ''
+  try {
+    const loaded = await ensureMessageLoaded({
+      messageId: hit.messageId,
+      isLoaded: () => props.model.messageList.messages.some(({ id }) => id === hit.messageId),
+      canLoadMore: () => !!props.model.messageList.hasMoreMessages,
+      getOldestLoadedMessageId: () => props.model.messageList.messages[0]?.id,
+      loadMore: () => new Promise<void>((resolve, reject) => emit('loadHistory', resolve, reject)),
+    })
+    if (!loaded) {
+      searchError.value = '消息尚未加载，且没有更多历史消息'
+      return
+    }
+    await nextTick()
+    const revealed = messageListRef.value?.revealMessage(hit.messageId) ?? false
+    if (!revealed) {
+      searchError.value = '无法定位到该消息'
+      return
+    }
+    activeSearchMessageId.value = hit.messageId
+  } catch (error) {
+    searchError.value = error instanceof Error ? error.message : '定位消息失败'
+  } finally {
+    revealingMessageId.value = ''
+  }
+}
 
 function forwardSend(input: WebqqComposerSendIntent, resolve: () => void, reject: (error: unknown) => void) {
   emit('send', input, resolve, reject)

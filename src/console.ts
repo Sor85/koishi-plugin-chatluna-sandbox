@@ -19,6 +19,7 @@ import type {
   PerformFriendActionInput,
   PerformGroupActionInput,
   RecallMessageInput,
+  SearchConversationMessagesInput,
   SetMessageReactionInput,
   SandboxAppearance,
   SandboxBotDelivery,
@@ -27,6 +28,7 @@ import type {
   SandboxForward,
   SandboxMediaContent,
   SandboxMessageHistory,
+  SandboxMessageSearchResult,
   SandboxOneBotDebugRecordsPage,
   SandboxWorkspaceState,
   SendForwardMessageInput,
@@ -41,6 +43,7 @@ type SpaceScoped<Input> = Input & { spaceId?: string }
 interface ConsoleEventMap {
   'onebot-sandbox/workspace': (input?: SpaceScoped<GetSandboxWorkspaceInput>) => Promise<SandboxWorkspaceState>
   'onebot-sandbox/message-history': (input: SpaceScoped<GetMessageHistoryInput>) => Promise<SandboxMessageHistory>
+  'onebot-sandbox/search-conversation-messages': (input: SpaceScoped<SearchConversationMessagesInput>) => Promise<SandboxMessageSearchResult>
   'onebot-sandbox/send-message': (input: SpaceScoped<SendMessageInput>) => Promise<SandboxWorkspaceState>
   'onebot-sandbox/send-media-message': (input: SpaceScoped<SendMediaMessageInput>) => Promise<SandboxWorkspaceState>
   'onebot-sandbox/send-forward-message': (input: SpaceScoped<SendForwardMessageInput>) => Promise<SandboxWorkspaceState>
@@ -258,6 +261,9 @@ export function registerConsole(
 
   console.addListener('onebot-sandbox/workspace', (input) => getWorkspace(input), { authority: 4 })
   console.addListener('onebot-sandbox/message-history', async (input) => (await resolveReadyControl(input, false)).getMessageHistory(assertInteractionInput(withoutSpaceId(input)) as GetMessageHistoryInput), { authority: 4 })
+  console.addListener('onebot-sandbox/search-conversation-messages', async (input) => (
+    await resolveReadyControl(input, false)
+  ).searchConversationMessages(assertInteractionInput(withoutSpaceId(input)) as SearchConversationMessagesInput), { authority: 4 })
   console.addListener('onebot-sandbox/send-message', async (input) => {
     // 消息同步落库后立即返回，机器人投递在后台继续；派发失败已写入调试记录与日志。
     const { delivery } = (await resolveReadyControl(input, true)).startMessageSend(assertInteractionInput(withoutSpaceId(input)) as SendMessageInput)
@@ -365,6 +371,7 @@ declare module '@koishijs/console' {
   interface Events {
     'onebot-sandbox/workspace'(input?: SpaceScoped<GetSandboxWorkspaceInput>): Promise<SandboxWorkspaceState>
     'onebot-sandbox/message-history'(input: SpaceScoped<GetMessageHistoryInput>): Promise<SandboxMessageHistory>
+    'onebot-sandbox/search-conversation-messages'(input: SpaceScoped<SearchConversationMessagesInput>): Promise<SandboxMessageSearchResult>
     'onebot-sandbox/send-message'(input: SpaceScoped<SendMessageInput>): Promise<SandboxWorkspaceState>
     'onebot-sandbox/send-media-message'(input: SpaceScoped<SendMediaMessageInput>): Promise<SandboxWorkspaceState>
     'onebot-sandbox/send-forward-message'(input: SpaceScoped<SendForwardMessageInput>): Promise<SandboxWorkspaceState>

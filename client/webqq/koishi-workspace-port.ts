@@ -10,6 +10,7 @@ export function createKoishiWorkspacePort(resolveSpaceId: () => string | undefin
   // Koishi Console 会把省略的 send 参数序列化为 null；服务端工作区接口需要收到普通对象才能执行 fallback。
   getWorkspace: (input = {}) => send('onebot-sandbox/workspace', scoped(input)),
   getMessageHistory: (input) => send('onebot-sandbox/message-history', scoped(input)),
+  searchConversationMessages: (input) => send('onebot-sandbox/search-conversation-messages', scoped(input)),
   sendMessage: (input) => send('onebot-sandbox/send-message', scoped(input)),
   sendMediaMessage: (input) => send('onebot-sandbox/send-media-message', scoped(input)),
   sendForwardMessage: (input) => send('onebot-sandbox/send-forward-message', scoped(input)),

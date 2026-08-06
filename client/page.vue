@@ -62,6 +62,7 @@
           @edit-participant="openComposerParticipantDialog('edit', $event)"
           @delete-participant="openComposerParticipantDialog('delete', $event)"
           @load-history="loadEarlierMessages"
+          @search-conversation-messages="searchConversationMessages"
           @recall-message="recallMessage"
           @set-message-reaction="setMessageReaction"
           @send-forward-message="sendForwardMessage"
@@ -156,6 +157,7 @@ const {
   handleSidebarNotification,
   kickGroupMember,
   loadEarlierMessages,
+  searchConversationMessages,
   loadOneBotDebugRecords,
   manageEnvironment,
   openComposerParticipantDialog,

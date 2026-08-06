@@ -33,6 +33,7 @@ import {
   type PerformGroupActionInput,
   type PerformGroupActionResult,
   type RecallMessageInput,
+  type SearchConversationMessagesInput,
   type SetMessageReactionInput,
   type SandboxBotDelivery,
   type SandboxAccountSex,
@@ -51,6 +52,7 @@ import {
   type SandboxMessage,
   type SandboxMessageChatLuna,
   type SandboxMessageHistory,
+  type SandboxMessageSearchResult,
   type SandboxOneBotDebugRecord,
   type SandboxPersistenceStatus,
   type SandboxSnapshot,
@@ -626,6 +628,41 @@ export class SandboxControlService {
       forwards: structuredClone(this.getForwards().filter(({ id }) => visibleForwardIds.has(id))),
       nextBeforeMessageId: start > 0 ? messageIds[0] : undefined,
     }
+  }
+
+  searchConversationMessages(input: SearchConversationMessagesInput): SandboxMessageSearchResult {
+    const conversation = this.getVisibleConversation(input.operatorId, input.conversationId)
+    const query = input.query.trim()
+    // 空查询不回扫全量消息，避免搜索面板防抖首帧把整个会话当命中返回。
+    if (!query) return { hits: [] }
+    const limit = this.validateMessageLimit(input.limit ?? 50)
+    let end = conversation.messageIds.length
+    if (input.beforeMessageId) {
+      end = conversation.messageIds.indexOf(input.beforeMessageId)
+      if (end < 0) throw new Error(`消息不存在：${input.beforeMessageId}`)
+    }
+    const needle = query.toLocaleLowerCase()
+    const messagesById = new Map(this.scene.messages.map((message) => [message.id, message]))
+    const hits: SandboxMessageSearchResult['hits'] = []
+    // 从新到旧扫描命中；撤回消息仍按底层 content 匹配，不改变其呈现规则。
+    for (let index = end - 1; index >= 0; index -= 1) {
+      const message = messagesById.get(conversation.messageIds[index])
+      if (!message) continue
+      if (!message.content.toLocaleLowerCase().includes(needle)) continue
+      hits.push({
+        messageId: message.id,
+        authorId: message.authorId,
+        createdAt: message.createdAt,
+        summary: message.content,
+      })
+      if (hits.length === limit) {
+        return {
+          hits,
+          nextBeforeMessageId: index > 0 ? message.id : undefined,
+        }
+      }
+    }
+    return { hits }
   }
 
   createUser(input: CreateSandboxUserInput): void {

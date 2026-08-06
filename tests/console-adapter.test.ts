@@ -93,6 +93,7 @@ describe('Koishi 控制台适配器', () => {
 
     const snapshotListener = listeners.get('onebot-sandbox/workspace')
     const historyListener = listeners.get('onebot-sandbox/message-history')
+    const searchConversationMessagesListener = listeners.get('onebot-sandbox/search-conversation-messages')
     const sendMessageListener = listeners.get('onebot-sandbox/send-message')
     const sendMediaMessageListener = listeners.get('onebot-sandbox/send-media-message')
     const sendForwardMessageListener = listeners.get('onebot-sandbox/send-forward-message')
@@ -106,6 +107,7 @@ describe('Koishi 控制台适配器', () => {
     const botDeliveriesListener = listeners.get('onebot-sandbox/bot-deliveries')
     if (typeof snapshotListener !== 'function'
       || typeof historyListener !== 'function'
+      || typeof searchConversationMessagesListener !== 'function'
       || typeof sendMessageListener !== 'function'
       || typeof sendMediaMessageListener !== 'function'
       || typeof sendForwardMessageListener !== 'function'
@@ -151,6 +153,21 @@ describe('Koishi 控制台适配器', () => {
       conversationId: 'private:10001:20001',
       content: '控制台消息',
     })
+    expect(await searchConversationMessagesListener({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      query: '控制台',
+    })).toMatchObject({
+      hits: [expect.objectContaining({
+        summary: '控制台消息',
+        authorId: '10001',
+      })],
+    })
+    expect(await searchConversationMessagesListener({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      query: '   ',
+    })).toEqual({ hits: [] })
     // 发送 RPC 即时返回，此刻只包含用户消息本体；机器人回复在后台派发完成后经场景广播刷新。
     expect(snapshot.snapshot.messages.map(({ content }: { content: string }) => content)).toEqual([
       '控制台消息',

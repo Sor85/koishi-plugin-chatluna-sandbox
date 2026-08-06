@@ -24,6 +24,12 @@ describe('Koishi 工作区端口', () => {
     await port.manageEnvironment({ action: 'create-user', data: { id: '11002', name: '用户' } })
     await port.sendForwardMessage({ operatorId: '11001', conversationId: 'private:11001:12001', messageIds: ['message-1'] })
     await port.getForwardMessage({ operatorId: '11001', forwardId: 'forward-1' })
+    await port.searchConversationMessages({
+      operatorId: '11001',
+      conversationId: 'private:11001:12001',
+      query: 'hello',
+      limit: 10,
+    })
 
     expect(send).toHaveBeenNthCalledWith(1, 'onebot-sandbox/workspace', { operatorId: '11001', spaceId: 'space-1' })
     expect(send).toHaveBeenNthCalledWith(2, 'onebot-sandbox/manage-environment', { action: 'create-user', data: { id: '11002', name: '用户' }, spaceId: 'space-1' })
@@ -36,6 +42,13 @@ describe('Koishi 工作区端口', () => {
     expect(send).toHaveBeenNthCalledWith(4, 'onebot-sandbox/get-forward-message', {
       operatorId: '11001',
       forwardId: 'forward-1',
+      spaceId: 'space-1',
+    })
+    expect(send).toHaveBeenNthCalledWith(5, 'onebot-sandbox/search-conversation-messages', {
+      operatorId: '11001',
+      conversationId: 'private:11001:12001',
+      query: 'hello',
+      limit: 10,
       spaceId: 'space-1',
     })
   })

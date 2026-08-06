@@ -532,6 +532,29 @@ export interface SandboxMessageHistory {
   nextBeforeMessageId?: string
 }
 
+// 当前会话内按正文查找：游标语义与 getMessageHistory 一致，命中只返回摘要。
+export interface SearchConversationMessagesInput {
+  operatorId: string
+  conversationId: string
+  query: string
+  beforeMessageId?: string
+  limit?: number
+}
+
+export interface SandboxMessageSearchHit {
+  messageId: string
+  authorId: string
+  createdAt: string
+  // 命中摘要使用消息 content 原文；撤回消息仍可搜到底层正文。
+  summary: string
+}
+
+export interface SandboxMessageSearchResult {
+  // 由新到旧排列，便于搜索面板直接渲染。
+  hits: SandboxMessageSearchHit[]
+  nextBeforeMessageId?: string
+}
+
 // WebQQ 消息列表外层卡片用的轻量预览，不替代完整 SandboxForward 资源。
 export interface SandboxForwardPreview {
   title: string

@@ -10,11 +10,13 @@ import type {
   PerformFriendActionInput,
   PerformGroupActionInput,
   RecallMessageInput,
+  SearchConversationMessagesInput,
   SetMessageReactionInput,
   SandboxConsoleOneBotDebugRecord,
   SandboxForward,
   SandboxMediaContent,
   SandboxMessageHistory,
+  SandboxMessageSearchResult,
   SandboxOneBotDebugRecordsPage,
   SandboxWorkspaceState,
   SendForwardMessageInput,
@@ -35,6 +37,7 @@ export class FakeWorkspacePort implements WorkspacePort {
   readonly calls: WorkspacePortCall[] = []
   workspaceResult: SandboxWorkspaceState
   historyResult: SandboxMessageHistory = { messages: [], forwards: [] }
+  searchResult: SandboxMessageSearchResult = { hits: [] }
   forwardResult: SandboxForward = {
     id: 'forward-1',
     authorId: '10001',
@@ -86,6 +89,10 @@ export class FakeWorkspacePort implements WorkspacePort {
 
   getMessageHistory(input: GetMessageHistoryInput) {
     return this.invoke('getMessageHistory', input, this.historyResult)
+  }
+
+  searchConversationMessages(input: SearchConversationMessagesInput) {
+    return this.invoke('searchConversationMessages', input, this.searchResult)
   }
 
   sendMessage(input: SendMessageInput) {

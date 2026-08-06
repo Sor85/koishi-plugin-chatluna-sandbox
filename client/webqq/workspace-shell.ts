@@ -122,10 +122,30 @@ export function createWebqqWorkspaceShell(
     mediaLoadFailures: mediaLoadFailures.value,
     markRecalledMessages: appearance.value.webQQMarkRecalledMessages,
   }))
+  const mentionCandidates = computed(() => {
+    const group = currentGroup.value
+    if (!group) return []
+    return group.members.flatMap((member) => {
+      const participant = participants.value[member.participantId]
+      if (!participant) return []
+      const displayName = member.card?.trim() || participant.name
+      const keywords = member.card?.trim() && member.card.trim() !== participant.name
+        ? [participant.name]
+        : undefined
+      return [{
+        id: member.participantId,
+        name: displayName,
+        avatar: participant.avatar,
+        kind: participant.isBot ? 'bot' as const : 'user' as const,
+        keywords,
+      }]
+    })
+  })
   const composerModel = computed<WebqqComposerModel>(() => ({
     senders: composerSenders.value,
     currentOperatorId: currentOperatorId.value,
     conversationId: currentConversation.value?.id,
+    mentionCandidates: mentionCandidates.value,
     accentColor: appearance.value.webQQAccentColor,
     externalError: errorMessage.value,
   }))
@@ -549,6 +569,21 @@ export function createWebqqWorkspaceShell(
     }
   }
 
+  // 搜索只返回摘要；定位旧消息仍走 loadEarlierMessages 循环加载。
+  async function searchConversationMessages(
+    input: { conversationId: string, query: string, beforeMessageId?: string, limit?: number },
+    resolve: (result: Awaited<ReturnType<WorkspaceController['searchConversationMessages']>>) => void,
+    reject: Reject,
+  ) {
+    errorMessage.value = ''
+    try {
+      resolve(await workspaceController.searchConversationMessages(input))
+    } catch (error) {
+      errorMessage.value = error instanceof Error ? error.message : '搜索会话消息失败'
+      reject(error)
+    }
+  }
+
   async function sendComposerMessage(input: WebqqComposerSendIntent, resolve: Resolve, reject: Reject) {
     try {
       if (input.media?.length) {
@@ -651,6 +686,7 @@ export function createWebqqWorkspaceShell(
     handleSidebarNotification,
     kickGroupMember,
     loadEarlierMessages,
+    searchConversationMessages,
     loadOneBotDebugRecords,
     manageEnvironment,
     openComposerParticipantDialog,

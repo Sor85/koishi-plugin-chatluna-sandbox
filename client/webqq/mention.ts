@@ -1,18 +1,4 @@
-export interface ComposerMention {
-  id: string
-  name: string
-}
-
-export function addComposerMention(mentions: readonly ComposerMention[], mention: ComposerMention): ComposerMention[] {
-  if (mentions.some(({ id }) => id === mention.id)) return [...mentions]
-  return [...mentions, mention]
-}
-
-export function buildMentionContent(mentions: readonly ComposerMention[], input: string): string {
-  const mentionContent = mentions.map(({ id }) => `<at id="${id}"/>`).join(' ')
-  return [mentionContent, input.trim()].filter(Boolean).join(' ')
-}
-
+/** 将消息正文中的结构化 at 元素格式化为展示文本。 */
 export function formatMentionContent(content: string, participantNames: Readonly<Record<string, string>>): string {
   return content.replace(/<at\s+id="([^"]+)"\s*\/>/g, (_, id: string) => `@${participantNames[id] ?? id}`)
 }

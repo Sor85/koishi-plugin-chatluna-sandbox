@@ -288,6 +288,66 @@ describe('模拟 QQ 环境消息闭环', () => {
     })).toThrow('会话不存在')
   })
 
+  it('按会话正文搜索消息并支持分页与可见性校验', async () => {
+    const app = new App()
+    let control: SandboxControlService | undefined
+    app.plugin((ctx) => {
+      control = new SandboxControlService(ctx)
+    })
+    runningApps.push(app)
+    await app.start()
+    if (!control) throw new Error('沙盒控制服务未注册')
+
+    await control.sendMessage({ operatorId: '20001', conversationId: 'private:10001:20001', content: 'Hello Alpha' })
+    await control.sendMessage({ operatorId: '20001', conversationId: 'private:10001:20001', content: 'hello Beta' })
+    await control.sendMessage({ operatorId: '20001', conversationId: 'private:10001:20001', content: '无关消息' })
+    await control.sendMessage({ operatorId: '20001', conversationId: 'private:10001:20001', content: 'HELLO Gamma' })
+    // 用户撤回路径直接改 lifecycle，便于断言撤回消息仍可按底层正文命中。
+    const recalled = await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content: 'hello Recalled' })
+    await control.recallMessage({ operatorId: '10001', messageId: recalled.messageId })
+    await control.sendMessage({ operatorId: '20001', conversationId: 'private:10002:20001', content: 'hello Other' })
+
+    expect(control.searchConversationMessages({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      query: '   ',
+    })).toEqual({ hits: [] })
+
+    const firstPage = control.searchConversationMessages({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      query: 'HeLLo',
+      limit: 2,
+    })
+    expect(firstPage.hits.map(({ summary }) => summary)).toEqual(['hello Recalled', 'HELLO Gamma'])
+    expect(firstPage.hits[0]).toMatchObject({
+      messageId: recalled.messageId,
+      authorId: '10001',
+    })
+    expect(firstPage.nextBeforeMessageId).toBe(firstPage.hits[1].messageId)
+
+    const secondPage = control.searchConversationMessages({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      query: 'HeLLo',
+      beforeMessageId: firstPage.nextBeforeMessageId,
+      limit: 2,
+    })
+    expect(secondPage.hits.map(({ summary }) => summary)).toEqual(['hello Beta', 'Hello Alpha'])
+    expect(secondPage.nextBeforeMessageId).toBeUndefined()
+
+    expect(control.searchConversationMessages({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      query: '不存在关键词',
+    })).toEqual({ hits: [] })
+    expect(() => control!.searchConversationMessages({
+      operatorId: '10002',
+      conversationId: 'private:10001:20001',
+      query: 'hello',
+    })).toThrow('会话不存在')
+  })
+
   it('保留回复关系并由目标机器人生成对应 Session 与回复', async () => {
     const app = new App()
     let control: SandboxControlService | undefined

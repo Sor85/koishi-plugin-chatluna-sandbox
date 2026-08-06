@@ -23,12 +23,197 @@
   grid-column: 3;
   grid-row: 1;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  /* 顶栏 + 可选搜索面板 + 消息列表；composer/多选栏绝对定位不占行。 */
+  grid-template-rows: auto auto minmax(0, 1fr);
   background: var(--webqq-bg);
 }
 
 .webqq-chat.is-environment {
   grid-template-rows: minmax(0, 1fr);
+}
+
+.webqq-chat-header-actions {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+
+.webqq-message-search {
+  display: grid;
+  gap: 10px;
+  padding: 0 16px 12px;
+  border-bottom: 1px solid var(--webqq-border);
+  background: color-mix(in srgb, var(--webqq-panel, var(--webqq-bg)) 88%, transparent);
+}
+
+/* 复用转发目标搜索框的网格结构，避免侧栏 .webqq-search 的绝对定位图标混入。 */
+.webqq-message-search-field {
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-height: 40px;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  padding: 0 10px 0 12px;
+  border: 1px solid color-mix(in srgb, var(--webqq-muted) 36%, var(--webqq-border));
+  border-radius: 12px;
+  color: var(--webqq-muted);
+  background: color-mix(in srgb, var(--webqq-surface-muted, var(--webqq-bg)) 88%, transparent);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease;
+}
+
+.webqq-message-search-field:focus-within {
+  border-color: color-mix(in srgb, var(--webqq-accent) 58%, var(--webqq-border));
+  background: var(--webqq-panel, var(--webqq-bg));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--webqq-accent) 14%, transparent);
+}
+
+.webqq-message-search-field > svg {
+  flex: none;
+}
+
+.webqq-message-search-field input {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  outline: none;
+  color: var(--webqq-text);
+  background: transparent;
+  font-size: 13px;
+}
+
+.webqq-message-search-field input::placeholder {
+  color: color-mix(in srgb, var(--webqq-muted) 84%, transparent);
+  opacity: 1;
+}
+
+.webqq-message-search-clear {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 8px;
+  color: var(--webqq-muted);
+  background: transparent;
+}
+
+.webqq-message-search-clear:hover,
+.webqq-message-search-clear:focus-visible {
+  color: var(--webqq-text);
+  background: var(--webqq-hover);
+  outline: none;
+}
+
+.webqq-message-search-results {
+  display: grid;
+  gap: 6px;
+  max-height: min(280px, 38vh);
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.webqq-message-search-status {
+  margin: 0;
+  padding: 10px 4px 4px;
+  color: var(--webqq-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.webqq-message-search-hit {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+
+.webqq-message-search-hit:hover,
+.webqq-message-search-hit:focus-visible {
+  border-color: color-mix(in srgb, var(--webqq-accent) 22%, transparent);
+  background: color-mix(in srgb, var(--webqq-accent) 10%, transparent);
+  outline: none;
+}
+
+.webqq-message-search-hit.is-active {
+  border-color: color-mix(in srgb, var(--webqq-accent) 34%, transparent);
+  background: color-mix(in srgb, var(--webqq-accent) 14%, transparent);
+}
+
+.webqq-message-search-hit:disabled {
+  opacity: 0.72;
+}
+
+.webqq-message-search-hit-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.webqq-message-search-hit-meta strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--webqq-text);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webqq-message-search-hit-meta time {
+  flex: none;
+  color: var(--webqq-muted);
+  font-size: 11px;
+}
+
+.webqq-message-search-hit-summary {
+  overflow: hidden;
+  color: var(--webqq-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webqq-message-search-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  margin-top: 2px;
+  border: 1px dashed color-mix(in srgb, var(--webqq-muted) 34%, transparent);
+  border-radius: 10px;
+  color: var(--webqq-muted);
+  background: transparent;
+  font-size: 12px;
+}
+
+.webqq-message-search-more:hover,
+.webqq-message-search-more:focus-visible {
+  color: var(--webqq-text);
+  border-color: color-mix(in srgb, var(--webqq-accent) 40%, transparent);
+  background: color-mix(in srgb, var(--webqq-accent) 8%, transparent);
+  outline: none;
+}
+
+.webqq-message-search-more:disabled {
+  opacity: 0.7;
 }
 
 .webqq-chat-title {

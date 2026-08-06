@@ -715,6 +715,41 @@ describe('WebQQ 工作区控制模块', () => {
     ])
   })
 
+  it('搜索会话消息时注入当前操作者并直接返回命中摘要', async () => {
+    const port = createFakeWorkspacePort(workspace)
+    const controller = createWorkspaceController(port, createStorage())
+    await controller.load()
+    port.searchResult = {
+      hits: [{
+        messageId: 'message-1',
+        authorId: '20001',
+        createdAt: '2026-07-23T00:00:00.000Z',
+        summary: '基准消息',
+      }],
+      nextBeforeMessageId: 'message-0',
+    }
+
+    const result = await controller.searchConversationMessages({
+      conversationId: 'private:10001:20001',
+      query: '基准',
+      limit: 20,
+      beforeMessageId: 'message-2',
+    })
+
+    expect(port.calls.at(-1)).toEqual({
+      operation: 'searchConversationMessages',
+      input: {
+        operatorId: '10001',
+        conversationId: 'private:10001:20001',
+        query: '基准',
+        limit: 20,
+        beforeMessageId: 'message-2',
+      },
+    })
+    expect(result).toEqual(port.searchResult)
+    expect(controller.chat.value.messages.map(({ id }) => id)).toEqual(['message-1'])
+  })
+
   it('发送合并转发与按需读取详情都注入当前操作者', async () => {
     const port = createFakeWorkspacePort(workspace)
     const controller = createWorkspaceController(port, createStorage())

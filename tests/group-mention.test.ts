@@ -1,14 +1,30 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { addComposerMention, buildMentionContent, formatMentionContent } from '../client/webqq/mention'
+import {
+  createEmptyComposerDraft,
+  insertComposerMention,
+  serializeComposerDraft,
+} from '../client/webqq/composer-draft'
+import { formatMentionContent } from '../client/webqq/mention'
 
 describe('群聊右键提及成员', () => {
-  it('去重提及并编码为 Koishi at 消息元素', () => {
-    const mentions = addComposerMention([], { id: '10002', name: '测试用户2' })
-    expect(addComposerMention(mentions, { id: '10002', name: '重复名称' })).toEqual(mentions)
-    expect(buildMentionContent(mentions, '你好')).toBe('<at id="10002"/> 你好')
-    expect(buildMentionContent(mentions, '')).toBe('<at id="10002"/>')
+  it('右键提及按光标插入 token 并按顺序序列化为 Koishi at 消息元素', () => {
+    const draft = insertComposerMention(
+      createEmptyComposerDraft().tokens,
+      0,
+      0,
+      { id: '10002', name: '测试用户2' },
+    )
+    const withText = insertComposerMention(
+      [{ type: 'text', text: '你好' }],
+      0,
+      2,
+      { id: '10002', name: '测试用户2' },
+    )
+
+    expect(serializeComposerDraft(draft.tokens)).toBe('<at id="10002"/>')
+    expect(serializeComposerDraft(withText.tokens)).toBe('你好 <at id="10002"/>')
     expect(formatMentionContent('<at id="10002"/> 你好', { '10002': '测试用户2' })).toBe('@测试用户2 你好')
   })
 
@@ -25,8 +41,11 @@ describe('群聊右键提及成员', () => {
     expect(detailsSource).toContain("@mention=\"emit('mentionGroupMember', member.participantId)\"")
     expect(messageSource).toContain("@mention=\"emit('mentionGroupMember', message.authorId)\"")
     expect(pageSource).toContain('@mention-group-member="mentionGroupMember"')
-    expect(composerSource).toContain('buildMentionContent(mentions.value, input.value)')
+    expect(composerSource).toContain('serializeComposerDraft(draft.value.tokens)')
+    expect(composerSource).toContain('insertComposerMention')
+    expect(composerSource).toContain('mentionCandidates')
     expect(shellSource).toContain('formatMentionContent(latestMessage.content, participantNames.value)')
+    expect(shellSource).toContain('mentionCandidates')
     // 会话列表预览复用领域格式化函数，避免硬编码文案或直接展示撤回原文。
     expect(shellSource).toContain('formatRecalledMessageEventText(latestMessage, operatorName)')
   })

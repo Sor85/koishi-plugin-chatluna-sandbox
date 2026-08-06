@@ -13,11 +13,13 @@ declare module '@koishijs/client' {
     PerformFriendActionInput,
     PerformGroupActionInput,
     RecallMessageInput,
+    SearchConversationMessagesInput,
     SetMessageReactionInput,
     SandboxConsoleOneBotDebugRecord,
     SandboxForward,
     SandboxMediaContent,
     SandboxMessageHistory,
+    SandboxMessageSearchResult,
     SandboxOneBotDebugRecordsPage,
     SandboxWorkspaceState,
     SendForwardMessageInput,
@@ -47,6 +49,7 @@ declare module '@koishijs/client' {
 
   export function send(event: 'onebot-sandbox/workspace', input?: SpaceScoped<GetSandboxWorkspaceInput>): Promise<SandboxWorkspaceState>
   export function send(event: 'onebot-sandbox/message-history', input: SpaceScoped<GetMessageHistoryInput>): Promise<SandboxMessageHistory>
+  export function send(event: 'onebot-sandbox/search-conversation-messages', input: SpaceScoped<SearchConversationMessagesInput>): Promise<SandboxMessageSearchResult>
   export function send(event: 'onebot-sandbox/send-message', input: SpaceScoped<SendMessageInput>): Promise<SandboxWorkspaceState>
   export function send(event: 'onebot-sandbox/send-media-message', input: SpaceScoped<SendMediaMessageInput>): Promise<SandboxWorkspaceState>
   export function send(event: 'onebot-sandbox/send-forward-message', input: SpaceScoped<SendForwardMessageInput>): Promise<SandboxWorkspaceState>
