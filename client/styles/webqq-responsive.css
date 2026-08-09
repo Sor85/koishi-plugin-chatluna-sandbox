@@ -67,6 +67,21 @@
     min-width: 0;
   }
 
+  .webqq-chat-header.is-searching .webqq-chat-title {
+    display: none;
+  }
+
+  .webqq-chat-header.is-searching .webqq-chat-header-actions {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .webqq-chat-header.is-searching .webqq-chat-search-shell {
+    width: auto;
+    min-width: 0;
+    flex: 1;
+  }
+
   .webqq-conversations,
   .webqq-chat,
   .webqq-profile {
@@ -142,6 +157,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .webqq-chat-search-shell {
+    transition: none;
+  }
+
   .webqq-composer-user-stack.is-overflow-collapsing .webqq-composer-user-overflow-avatar,
   .webqq-composer-user-stack.is-overflow-collapsing .webqq-composer-user-overflow-label {
     animation: none;

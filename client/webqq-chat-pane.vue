@@ -1,6 +1,6 @@
 <template>
   <main class="webqq-chat" :style="{ '--webqq-composer-space': composerSpace ? `${composerSpace}px` : undefined }">
-    <header class="webqq-chat-header">
+    <header class="webqq-chat-header" :class="{ 'is-searching': searchOpen }">
       <!-- 窄屏为单栏互切布局，会话列表被隐藏，必须提供返回入口；宽屏下此按钮不显示。 -->
       <button type="button" class="webqq-icon-button webqq-chat-back" aria-label="返回会话列表" @click="emit('back')">
         <IconChevronLeft :size="22" aria-hidden="true" />
@@ -29,36 +29,45 @@
         </div>
       </div>
       <div class="webqq-chat-header-actions">
-        <button
-          type="button"
-          class="webqq-icon-button"
-          :class="{ 'is-active': searchOpen }"
-          :disabled="!model.conversationId"
-          :aria-label="searchOpen ? '关闭查找聊天记录' : '查找聊天记录'"
-          @click="toggleSearch"
+        <div
+          ref="searchShellRef"
+          class="webqq-chat-search-shell"
+          :class="{ 'is-expanded': searchOpen }"
         >
-          <IconSearch :size="22" aria-hidden="true" />
-        </button>
+          <button
+            v-if="!searchOpen"
+            ref="searchTriggerRef"
+            type="button"
+            class="webqq-icon-button webqq-chat-search-trigger"
+            :disabled="!model.conversationId"
+            aria-label="查找聊天记录"
+            :aria-expanded="searchOpen"
+            aria-controls="webqq-message-search-results"
+            @click="toggleSearch"
+          >
+            <IconSearch :size="22" aria-hidden="true" />
+          </button>
+          <WebqqMessageSearch
+            v-else
+            :open="searchOpen"
+            :loading="searchLoading"
+            :error-message="searchError"
+            :hits="searchHits"
+            :next-before-message-id="searchNextBeforeMessageId"
+            :participants="model.messageList.participants"
+            :active-message-id="activeSearchMessageId"
+            :revealing-message-id="revealingMessageId"
+            @close="closeSearch(true)"
+            @search="runSearch"
+            @load-more="loadMoreSearchHits"
+            @select="revealSearchHit"
+          />
+        </div>
         <button type="button" class="webqq-icon-button" :class="{ 'is-active': model.detailsVisible }" :aria-label="model.detailsVisible ? '关闭会话信息' : '打开会话信息'" @click="emit('toggleDetails')">
           <IconDots :size="22" aria-hidden="true" />
         </button>
       </div>
     </header>
-
-    <WebqqMessageSearch
-      :open="searchOpen"
-      :loading="searchLoading"
-      :error-message="searchError"
-      :hits="searchHits"
-      :next-before-message-id="searchNextBeforeMessageId"
-      :participant-names="model.participantNames"
-      :active-message-id="activeSearchMessageId"
-      :revealing-message-id="revealingMessageId"
-      @close="closeSearch"
-      @search="runSearch"
-      @load-more="loadMoreSearchHits"
-      @select="revealSearchHit"
-    />
 
     <WebqqMessageList
       ref="messageListRef"
@@ -227,6 +236,8 @@ const forwardTargetOpen = ref(false)
 const forwardLoading = ref(false)
 const previewImageUrl = ref('')
 const messageListRef = ref<{ revealMessage: (messageId: string) => boolean }>()
+const searchShellRef = ref<HTMLElement>()
+const searchTriggerRef = ref<HTMLButtonElement>()
 const searchOpen = ref(false)
 const searchLoading = ref(false)
 const searchError = ref('')
@@ -346,16 +357,26 @@ function handleSelectionKeydown(event: KeyboardEvent) {
   }
   if (searchOpen.value) {
     event.preventDefault()
-    closeSearch()
+    void closeSearch(true)
   }
+}
+
+function handleSearchOutsidePointerDown(event: PointerEvent) {
+  if (!searchOpen.value) return
+  const target = event.target
+  if (target instanceof Node && searchShellRef.value?.contains(target)) return
+  // 外部点击应让目标元素自然接管焦点，不能像 Escape 一样强制回焦搜索按钮。
+  void closeSearch()
 }
 
 onMounted(() => {
   window.addEventListener('keydown', handleSelectionKeydown)
+  document.addEventListener('pointerdown', handleSearchOutsidePointerDown)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleSelectionKeydown)
+  document.removeEventListener('pointerdown', handleSearchOutsidePointerDown)
 })
 
 function resetSearchState() {
@@ -369,9 +390,12 @@ function resetSearchState() {
   revealingMessageId.value = ''
 }
 
-function closeSearch() {
+async function closeSearch(restoreFocus = false) {
   searchOpen.value = false
   resetSearchState()
+  if (!restoreFocus) return
+  await nextTick()
+  searchTriggerRef.value?.focus()
 }
 
 function toggleSearch() {

@@ -23,8 +23,8 @@
   grid-column: 3;
   grid-row: 1;
   display: grid;
-  /* 顶栏 + 可选搜索面板 + 消息列表；composer/多选栏绝对定位不占行。 */
-  grid-template-rows: auto auto minmax(0, 1fr);
+  /* 搜索框位于顶栏，结果以悬浮层展示；这里只保留顶栏与消息列表两行。 */
+  grid-template-rows: auto minmax(0, 1fr);
   background: var(--webqq-bg);
 }
 
@@ -33,33 +33,61 @@
 }
 
 .webqq-chat-header-actions {
+  position: relative;
   display: inline-flex;
+  min-width: 0;
   flex: none;
   align-items: center;
   gap: 4px;
 }
 
-.webqq-message-search {
-  display: grid;
-  gap: 10px;
-  padding: 0 16px 12px;
-  border-bottom: 1px solid var(--webqq-border);
-  background: color-mix(in srgb, var(--webqq-panel, var(--webqq-bg)) 88%, transparent);
+.webqq-chat-search-shell {
+  position: relative;
+  width: 36px;
+  min-width: 0;
+  flex: none;
+  transition: width 180ms ease;
 }
 
-/* 复用转发目标搜索框的网格结构，避免侧栏 .webqq-search 的绝对定位图标混入。 */
+.webqq-chat-search-shell.is-expanded {
+  width: clamp(200px, 32vw, 320px);
+}
+
+.webqq-chat-search-trigger {
+  width: 100%;
+  color: var(--webqq-accent);
+}
+
+.webqq-chat-search-trigger:hover,
+.webqq-chat-search-trigger:focus-visible,
+.webqq-chat-search-trigger.is-active {
+  color: var(--webqq-accent);
+}
+
+.webqq-chat-search-trigger:disabled {
+  color: var(--webqq-muted);
+}
+
+.webqq-message-search {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+/* 输入框在搜索图标原位置向左展开，内部图标维持展开前后的视觉连续性。 */
 .webqq-message-search-field {
   position: relative;
   display: grid;
   width: 100%;
-  min-height: 40px;
-  grid-template-columns: 18px minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 36px;
+  grid-template-columns: 18px minmax(0, 1fr) 28px;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   box-sizing: border-box;
-  padding: 0 10px 0 12px;
+  padding: 0 4px 0 10px;
   border: 1px solid color-mix(in srgb, var(--webqq-muted) 36%, var(--webqq-border));
-  border-radius: 12px;
+  border-radius: 10px;
   color: var(--webqq-muted);
   background: color-mix(in srgb, var(--webqq-surface-muted, var(--webqq-bg)) 88%, transparent);
   transition: border-color 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease;
@@ -73,12 +101,13 @@
 
 .webqq-message-search-field > svg {
   flex: none;
+  color: color-mix(in srgb, var(--webqq-accent) 84%, var(--webqq-muted));
 }
 
 .webqq-message-search-field input {
   width: 100%;
   min-width: 0;
-  height: 38px;
+  height: 34px;
   padding: 0;
   border: 0;
   outline: none;
@@ -99,6 +128,7 @@
   flex: none;
   align-items: center;
   justify-content: center;
+  padding: 0;
   border: 0;
   border-radius: 8px;
   color: var(--webqq-muted);
@@ -113,12 +143,24 @@
 }
 
 .webqq-message-search-results {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
   display: grid;
   gap: 6px;
-  max-height: min(280px, 38vh);
+  width: 100%;
+  max-width: 100%;
+  max-height: min(320px, 42vh);
   min-height: 0;
   overflow-y: auto;
-  padding-right: 2px;
+  box-sizing: border-box;
+  padding: 8px;
+  border: 1px solid var(--webqq-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--webqq-panel, var(--webqq-bg)) 96%, transparent);
+  box-shadow: 0 16px 36px rgb(15 23 42 / 18%);
+  backdrop-filter: saturate(160%) blur(16px);
 }
 
 .webqq-message-search-status {
@@ -131,8 +173,10 @@
 
 .webqq-message-search-hit {
   display: grid;
-  gap: 4px;
   width: 100%;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
   padding: 10px 12px;
   border: 1px solid transparent;
   border-radius: 12px;
@@ -156,6 +200,21 @@
 
 .webqq-message-search-hit:disabled {
   opacity: 0.72;
+}
+
+.webqq-message-search-avatar {
+  --webqq-avatar-size: 32px;
+
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 10.667px;
+}
+
+.webqq-message-search-hit-body {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
 }
 
 .webqq-message-search-hit-meta {

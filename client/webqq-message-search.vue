@@ -17,23 +17,31 @@
         @keydown.esc.prevent="emit('close')"
       >
       <button
-        v-if="query"
         type="button"
         class="webqq-message-search-clear"
-        aria-label="清空搜索"
-        @click="clearQuery"
+        :aria-label="query ? '清空搜索' : '关闭查找聊天记录'"
+        @click="query ? clearQuery() : emit('close')"
       >
         <IconX :size="16" aria-hidden="true" />
       </button>
     </label>
 
     <div
+      v-if="hasQuery"
+      id="webqq-message-search-results"
       v-webqq-scrollbar="{ tone: 'accent' }"
       class="webqq-message-search-results"
       role="listbox"
       aria-label="搜索结果"
     >
-      <p v-if="statusText" class="webqq-message-search-status">{{ statusText }}</p>
+      <p
+        v-if="statusText"
+        class="webqq-message-search-status"
+        role="status"
+        aria-live="polite"
+      >
+        {{ statusText }}
+      </p>
       <button
         v-for="hit in hits"
         :key="hit.messageId"
@@ -45,11 +53,19 @@
         :aria-selected="activeMessageId === hit.messageId"
         @click="emit('select', hit)"
       >
-        <span class="webqq-message-search-hit-meta">
-          <strong>{{ authorName(hit.authorId) }}</strong>
-          <time :datetime="hit.createdAt">{{ formatSearchTime(hit.createdAt) }}</time>
+        <WebqqAvatar
+          class="webqq-message-search-avatar"
+          :kind="participant(hit.authorId).isBot ? 'bot' : 'user'"
+          :name="participant(hit.authorId).name"
+          :avatar="participant(hit.authorId).avatar"
+        />
+        <span class="webqq-message-search-hit-body">
+          <span class="webqq-message-search-hit-meta">
+            <strong>{{ participant(hit.authorId).name }}</strong>
+            <time :datetime="hit.createdAt">{{ formatSearchTime(hit.createdAt) }}</time>
+          </span>
+          <span class="webqq-message-search-hit-summary">{{ formatSummary(hit.summary) }}</span>
         </span>
-        <span class="webqq-message-search-hit-summary">{{ formatSummary(hit.summary) }}</span>
       </button>
       <button
         v-if="nextBeforeMessageId && hits.length"
@@ -68,6 +84,7 @@
 import { IconSearch, IconX } from '@tabler/icons-vue'
 import { computed, nextTick, ref, watch } from 'vue'
 import type { SandboxMessageSearchHit } from '../src/types'
+import WebqqAvatar from './webqq-avatar.vue'
 import { formatMentionContent } from './webqq/mention'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 
@@ -77,7 +94,7 @@ const props = defineProps<{
   errorMessage: string
   hits: SandboxMessageSearchHit[]
   nextBeforeMessageId?: string
-  participantNames: Record<string, string>
+  participants: Record<string, { name: string; avatar?: string; isBot: boolean }>
   activeMessageId?: string
   revealingMessageId?: string
 }>()
@@ -93,12 +110,16 @@ const query = ref('')
 const inputElement = ref<HTMLInputElement>()
 let debounceTimer: ReturnType<typeof setTimeout> | undefined
 
+const trimmedQuery = computed(() => query.value.trim())
+const hasQuery = computed(() => !!trimmedQuery.value)
+const participantNames = computed(() => Object.fromEntries(
+  Object.entries(props.participants).map(([id, value]) => [id, value.name]),
+))
+
 const statusText = computed(() => {
   if (props.errorMessage) return props.errorMessage
   if (props.loading && !props.hits.length) return '搜索中...'
   if (props.revealingMessageId) return '正在定位消息...'
-  const trimmed = query.value.trim()
-  if (!trimmed) return '输入关键词查找当前会话消息'
   if (!props.loading && !props.hits.length) return '没有匹配的聊天记录'
   return ''
 })
@@ -111,7 +132,7 @@ watch(() => props.open, async (open) => {
   }
   await nextTick()
   inputElement.value?.focus()
-})
+}, { immediate: true })
 
 watch(query, (value) => {
   if (debounceTimer) clearTimeout(debounceTimer)
@@ -130,12 +151,16 @@ function clearQuery() {
   inputElement.value?.focus()
 }
 
-function authorName(authorId: string) {
-  return props.participantNames[authorId] ?? authorId
+function participant(authorId: string) {
+  return props.participants[authorId] ?? {
+    name: authorId,
+    avatar: undefined,
+    isBot: false,
+  }
 }
 
 function formatSummary(summary: string) {
-  return formatMentionContent(summary, props.participantNames)
+  return formatMentionContent(summary, participantNames.value)
 }
 
 function formatSearchTime(value: string) {

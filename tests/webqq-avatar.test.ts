@@ -35,6 +35,7 @@ describe('WebQQ 共享头像', () => {
     const messageListSource = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
     const detailsPanelSource = readFileSync(resolve('client/webqq-details-panel.vue'), 'utf8')
     const sidebarSource = readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
+    const searchSource = readFileSync(resolve('client/webqq-message-search.vue'), 'utf8')
     const notificationSource = readFileSync(resolve('client/notification-menu.vue'), 'utf8')
     const environmentSource = readFileSync(resolve('client/environment-manager.vue'), 'utf8')
 
@@ -42,6 +43,8 @@ describe('WebQQ 共享头像', () => {
       .reduce((count, source) => count + (source.match(/<WebqqAvatar/g)?.length ?? 0), 0)
     expect(avatarCount).toBeGreaterThanOrEqual(10)
     expect(pageSource).not.toContain('webqq-avatar-bot-badge')
+    expect(searchSource).toContain('<WebqqAvatar')
+    expect(searchSource).toContain(':avatar="participant(hit.authorId).avatar"')
     expect(notificationSource).toContain('<WebqqAvatar')
     expect(environmentSource.match(/<WebqqAvatar/g)).toHaveLength(3)
   })
