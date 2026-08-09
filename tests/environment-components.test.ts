@@ -40,7 +40,7 @@ describe('环境管理组件传输边界', () => {
     expect(overlaySource).not.toContain('SandboxSnapshot')
     expect(overlaySource).not.toContain('snapshot')
     expect(overlaySource).toContain('<EnvironmentEntityDialog')
-    expect(overlaySource).toContain('class="webqq-secondary-page webqq-profile-card-page"')
+    expect(overlaySource).toContain('class="webqq-secondary-page webqq-profile-card-page onebot-sandbox-profile-card-page"')
     expect(overlaySource).not.toContain('<Dialog v-model:open="profileOpen">')
     expect(overlaySource.match(/<Dialog /g)).toHaveLength(2)
   })

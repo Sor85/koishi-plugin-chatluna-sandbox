@@ -474,26 +474,45 @@
   max-width: min(320px, calc(100vw - 24px));
 }
 
+.webqq-secondary-page.onebot-sandbox-profile-card-page > .webqq-secondary-page-header {
+  /* Koishi 会把各插件样式加载到同一页面；onebot-webqq 的同名通用标题栏是 absolute。
+     资料卡依赖 Grid 首行给标题栏占位，因此在插件专属作用域内恢复文档流，避免头像被覆盖。 */
+  position: relative;
+  inset: auto;
+  z-index: auto;
+}
+
 .webqq-profile-card {
   min-height: 0;
   display: grid;
   gap: 16px;
   overflow-y: auto;
   padding: 16px;
+  scrollbar-width: none;
+}
+
+.onebot-sandbox-profile-card-page .webqq-profile-card::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .webqq-profile-card-hero {
-  display: grid;
-  grid-template-columns: 64px minmax(0, 1fr);
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
 }
 
 .webqq-profile-card-hero .webqq-avatar-profile {
-  --webqq-avatar-size: 64px;
-  width: 64px;
-  height: 64px;
-  font-size: 21px;
+  --webqq-avatar-size: 96px;
+
+  width: 96px;
+  height: 96px;
+  border: 5px solid color-mix(in srgb, var(--webqq-accent) 18%, transparent);
+  box-shadow: 0 8px 22px rgb(15 23 42 / 12%);
+  font-size: 28px;
 }
 
 .webqq-profile-card-hero h2 {

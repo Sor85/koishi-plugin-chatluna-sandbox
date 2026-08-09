@@ -38,6 +38,26 @@ describe('WebQQ 共享样式', () => {
     const profilePageRule = overlays.slice(overlays.indexOf('.webqq-profile-card-page {')).split('}')[0]
     expect(profilePageRule).toContain('width: max-content')
     expect(profilePageRule).toContain('max-width: min(320px')
+    const scopedProfileHeaderRule = overlays
+      .slice(overlays.indexOf('.webqq-secondary-page.onebot-sandbox-profile-card-page > .webqq-secondary-page-header {'))
+      .split('}')[0]
+    expect(scopedProfileHeaderRule).toContain('position: relative')
+    expect(scopedProfileHeaderRule).toContain('inset: auto')
+    const profileCardRule = overlays.slice(overlays.indexOf('.webqq-profile-card {')).split('}')[0]
+    expect(profileCardRule).toContain('overflow-y: auto')
+    expect(profileCardRule).toContain('scrollbar-width: none')
+    expect(overlays).toContain('.onebot-sandbox-profile-card-page .webqq-profile-card::-webkit-scrollbar {')
+    const profileHeroRule = overlays.slice(overlays.indexOf('.webqq-profile-card-hero {')).split('}')[0]
+    expect(profileHeroRule).toContain('display: flex')
+    expect(profileHeroRule).toContain('flex-direction: column')
+    expect(profileHeroRule).toContain('align-items: center')
+    expect(profileHeroRule).toContain('justify-content: center')
+    expect(profileHeroRule).toContain('text-align: center')
+    expect(profileHeroRule).not.toContain('grid-template-columns')
+    const profileAvatarRule = overlays.slice(overlays.indexOf('.webqq-profile-card-hero .webqq-avatar-profile {')).split('}')[0]
+    expect(profileAvatarRule).toContain('--webqq-avatar-size: 96px')
+    expect(profileAvatarRule).toContain('width: 96px')
+    expect(profileAvatarRule).toContain('height: 96px')
     const profileFieldsRule = overlays.slice(overlays.indexOf('.webqq-profile-card-fields {')).split('}')[0]
     expect(profileFieldsRule).not.toContain('border')
     const profileValueRule = overlays.slice(overlays.indexOf('.webqq-profile-card-fields dd {')).split('}')[0]
