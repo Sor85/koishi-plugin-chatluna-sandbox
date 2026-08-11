@@ -23,6 +23,8 @@ describe('WebQQ 消息列表', () => {
     expect(source).toContain('class="webqq-message-event"')
     expect(source).toContain("message.authorId === model.currentOperatorId ? 'is-outgoing' : 'is-incoming'")
     expect(source).toContain('loadHistory: [resolve: () => void')
+    expect(source).toContain("!model.currentGroup && getChatFriendActions(message.authorId).includes('remark')")
+    expect(source).toContain("!model.currentGroup && getChatFriendActions(message.authorId).includes('delete')")
     expect(source).toContain('ref="messagesElement"')
     expect(source).toContain('@scroll="handleMessagesScroll"')
     expect(source).toContain("from './webqq/message-list-scroll'")
