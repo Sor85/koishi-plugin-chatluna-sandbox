@@ -163,6 +163,16 @@ describe('Koishi 控制台适配器', () => {
         authorId: '10001',
       })],
     })
+    const sentMessage = control.getSnapshot().messages.find(({ content }) => content === '控制台消息')!
+    expect(await searchConversationMessagesListener({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      query: '',
+      createdAtStart: sentMessage.createdAt,
+      createdAtEnd: new Date(new Date(sentMessage.createdAt).getTime() + 1).toISOString(),
+    })).toMatchObject({
+      hits: [expect.objectContaining({ summary: '控制台消息' })],
+    })
     expect(await searchConversationMessagesListener({
       operatorId: '10001',
       conversationId: 'private:10001:20001',

@@ -633,8 +633,23 @@ export class SandboxControlService {
   searchConversationMessages(input: SearchConversationMessagesInput): SandboxMessageSearchResult {
     const conversation = this.getVisibleConversation(input.operatorId, input.conversationId)
     const query = input.query.trim()
-    // 空查询不回扫全量消息，避免搜索面板防抖首帧把整个会话当命中返回。
-    if (!query) return { hits: [] }
+    const hasStart = input.createdAtStart !== undefined
+    const hasEnd = input.createdAtEnd !== undefined
+    if (hasStart !== hasEnd) throw new Error('消息日期筛选必须同时提供开始和结束时间')
+
+    let createdAtStart: number | undefined
+    let createdAtEnd: number | undefined
+    if (hasStart && hasEnd) {
+      createdAtStart = Date.parse(input.createdAtStart!)
+      createdAtEnd = Date.parse(input.createdAtEnd!)
+      if (!Number.isFinite(createdAtStart) || !Number.isFinite(createdAtEnd)) {
+        throw new Error('消息日期筛选时间无效')
+      }
+      if (createdAtStart >= createdAtEnd) throw new Error('消息日期筛选结束时间必须晚于开始时间')
+    }
+    // 没有任何条件时不能回扫全量消息；仅日期筛选则允许空关键词。
+    if (!query && createdAtStart === undefined) return { hits: [] }
+
     const limit = this.validateMessageLimit(input.limit ?? 50)
     let end = conversation.messageIds.length
     if (input.beforeMessageId) {
@@ -644,11 +659,15 @@ export class SandboxControlService {
     const needle = query.toLocaleLowerCase()
     const messagesById = new Map(this.scene.messages.map((message) => [message.id, message]))
     const hits: SandboxMessageSearchResult['hits'] = []
-    // 从新到旧扫描命中；撤回消息仍按底层 content 匹配，不改变其呈现规则。
+    // 从新到旧扫描命中；日期必须在游标扫描内过滤，否则分页会漏掉同日的后续消息。
     for (let index = end - 1; index >= 0; index -= 1) {
       const message = messagesById.get(conversation.messageIds[index])
       if (!message) continue
-      if (!message.content.toLocaleLowerCase().includes(needle)) continue
+      if (createdAtStart !== undefined) {
+        const createdAt = Date.parse(message.createdAt)
+        if (!Number.isFinite(createdAt) || createdAt < createdAtStart || createdAt >= createdAtEnd!) continue
+      }
+      if (query && !message.content.toLocaleLowerCase().includes(needle)) continue
       hits.push({
         messageId: message.id,
         authorId: message.authorId,

@@ -29,11 +29,13 @@
     "build:types": "tsc -p tsconfig.json --emitDeclarationOnly",
     "build:server": "yarn build:types && tsup src/index.ts --format cjs --out-dir lib --clean false",
     "watch:server": "node scripts/watch-server.mjs",
-    "build:client": "vite build",
+    "build:client": "yarn build:css && vite build",
     "typecheck": "vue-tsc -p tsconfig.typecheck.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prepublishOnly": "yarn test && yarn typecheck && yarn build"
+    "prepublishOnly": "yarn test && yarn typecheck && yarn build",
+    "build:css": "tailwindcss -i client/styles/tailwind.source.css -o client/styles/tailwind.generated.css",
+    "watch:css": "tailwindcss -i client/styles/tailwind.source.css -o client/styles/tailwind.generated.css --watch"
   },
   "keywords": [
     "bot",
@@ -72,18 +74,21 @@
     "zod": "^3.25.0"
   },
   "devDependencies": {
+    "@internationalized/date": "3.12.2",
     "@koishijs/client": "^5.30.11",
     "@koishijs/core": "^4.18.10",
     "@koishijs/plugin-console": "^5.30.11",
     "@tabler/icons-vue": "^3.45.0",
-    "@tailwindcss/vite": "^4.1.11",
+    "@tailwindcss/cli": "^4.3.3",
     "@types/node": "^24.0.0",
     "@vitejs/plugin-vue": "^6.0.2",
     "@vueuse/core": "^14.3.0",
     "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "koishi": "^4.18.10",
     "reka-ui": "^2.10.1",
     "shx": "^0.4.0",
+    "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.1.11",
     "tsup": "^8.0.0",
     "typescript": "5.7.2",

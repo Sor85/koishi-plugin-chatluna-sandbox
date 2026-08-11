@@ -12,6 +12,7 @@ import type {
   SandboxForward,
   SandboxFriendAction,
   SandboxGroupAction,
+  SearchConversationMessagesInput,
 } from '../../src/types'
 import { formatRecalledMessageEventText, getSandboxBots, getSandboxUsers, isRecalledMessage } from '../../src/types'
 import type { SandboxWorkspaceView } from './workspace-state'
@@ -571,7 +572,7 @@ export function createWebqqWorkspaceShell(
 
   // 搜索只返回摘要；定位旧消息仍走 loadEarlierMessages 循环加载。
   async function searchConversationMessages(
-    input: { conversationId: string, query: string, beforeMessageId?: string, limit?: number },
+    input: Omit<SearchConversationMessagesInput, 'operatorId'>,
     resolve: (result: Awaited<ReturnType<WorkspaceController['searchConversationMessages']>>) => void,
     reject: Reject,
   ) {

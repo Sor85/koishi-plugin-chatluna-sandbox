@@ -6,6 +6,9 @@
     "moduleResolution": "Bundler",
     "baseUrl": ".",
     "paths": {
+      "@/*": [
+        "./client/*"
+      ],
       "@koishijs/client": [
         "./client/koishi-client-shim.d.ts"
       ]

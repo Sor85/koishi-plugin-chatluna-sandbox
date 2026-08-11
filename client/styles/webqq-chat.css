@@ -81,7 +81,7 @@
   width: 100%;
   min-width: 0;
   min-height: 36px;
-  grid-template-columns: 18px minmax(0, 1fr) 28px;
+  grid-template-columns: 18px minmax(0, 1fr) 28px 28px;
   align-items: center;
   gap: 8px;
   box-sizing: border-box;
@@ -121,7 +121,8 @@
   opacity: 1;
 }
 
-.webqq-message-search-clear {
+.webqq-message-search-clear,
+.webqq-message-search-date-trigger {
   display: inline-flex;
   width: 28px;
   height: 28px;
@@ -136,10 +137,36 @@
 }
 
 .webqq-message-search-clear:hover,
-.webqq-message-search-clear:focus-visible {
+.webqq-message-search-clear:focus-visible,
+.webqq-message-search-date-trigger:hover,
+.webqq-message-search-date-trigger:focus-visible {
   color: var(--webqq-text);
   background: var(--webqq-hover);
   outline: none;
+}
+
+.webqq-message-search-date-trigger.is-active {
+  color: var(--webqq-accent);
+  background: color-mix(in srgb, var(--webqq-accent) 12%, transparent);
+}
+
+/* 只做颜色令牌映射：把 registry 组件消费的 shadcn 变量对接到 webqq 主题
+   （含暗色，--webqq-* 会随 body[data-sandbox-color-scheme] 翻转）。
+   尺寸/间距/圆角一律交给 registry 自带的 Tailwind 工具类，不在这里复刻——
+   本文件不在 @layer 内，任何复刻声明都会永远压过工具类，反而破坏 1:1 还原。 */
+.webqq-message-search-date-popover {
+  --background: var(--webqq-bg);
+  --foreground: var(--webqq-text);
+  --popover: var(--webqq-bg);
+  --popover-foreground: var(--webqq-text);
+  --primary: var(--webqq-accent);
+  --primary-foreground: #fff;
+  --accent: var(--webqq-hover);
+  --accent-foreground: var(--webqq-text);
+  --muted-foreground: var(--webqq-muted);
+  --border: var(--webqq-border);
+  --input: var(--webqq-border);
+  --ring: var(--webqq-accent);
 }
 
 .webqq-message-search-results {

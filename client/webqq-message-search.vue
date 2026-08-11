@@ -5,7 +5,7 @@
     role="search"
     aria-label="查找聊天记录"
   >
-    <label class="webqq-message-search-field">
+    <div class="webqq-message-search-field">
       <IconSearch :size="18" aria-hidden="true" />
       <input
         ref="inputElement"
@@ -16,6 +16,37 @@
         autocomplete="off"
         @keydown.esc.prevent="emit('close')"
       >
+      <Popover v-slot="{ close }" v-model:open="datePopoverOpen">
+        <PopoverTrigger as-child>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            class="webqq-message-search-date-trigger"
+            :class="{ 'is-active': !!selectedDate }"
+            :aria-label="dateTriggerLabel"
+            :aria-pressed="!!selectedDate"
+          >
+            <IconCalendar :size="17" aria-hidden="true" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="end"
+          class="webqq-message-search-date-popover w-auto rounded-md p-0 shadow-md"
+          data-webqq-message-search-date
+          @escape-key-down.stop
+          @pointer-down-outside="handleDatePointerDownOutside"
+        >
+          <Calendar
+            v-model="calendarDate"
+            locale="zh-CN"
+            :default-placeholder="defaultCalendarPlaceholder"
+            layout="month-and-year"
+            initial-focus
+            @update:model-value="close"
+          />
+        </PopoverContent>
+      </Popover>
       <button
         type="button"
         class="webqq-message-search-clear"
@@ -24,10 +55,10 @@
       >
         <IconX :size="16" aria-hidden="true" />
       </button>
-    </label>
+    </div>
 
     <div
-      v-if="hasQuery"
+      v-if="hasCriteria"
       id="webqq-message-search-results"
       v-webqq-scrollbar="{ tone: 'accent' }"
       class="webqq-message-search-results"
@@ -81,12 +112,26 @@
 </template>
 
 <script setup lang="ts">
-import { IconSearch, IconX } from '@tabler/icons-vue'
+import type { DateValue } from '@internationalized/date'
+import { getLocalTimeZone, today } from '@internationalized/date'
+import { IconCalendar, IconSearch, IconX } from '@tabler/icons-vue'
 import { computed, nextTick, ref, watch } from 'vue'
+import { Button } from './components/ui/button'
+import { Calendar } from './components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover'
 import type { SandboxMessageSearchHit } from '../src/types'
 import WebqqAvatar from './webqq-avatar.vue'
+import {
+  calendarValueToLocalDate,
+  localDateToCalendarValue,
+} from './webqq/message-search-date'
 import { formatMentionContent } from './webqq/mention'
 import { vWebqqScrollbar } from './webqq-scrollbar'
+
+export interface WebqqMessageSearchCriteria {
+  query: string
+  localDate?: string
+}
 
 const props = defineProps<{
   open: boolean
@@ -101,17 +146,30 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
-  search: [query: string]
+  search: [criteria: WebqqMessageSearchCriteria]
   loadMore: []
   select: [hit: SandboxMessageSearchHit]
+  datePopoverChange: [open: boolean]
 }>()
 
 const query = ref('')
+const selectedDate = ref('')
+const datePopoverOpen = ref(false)
 const inputElement = ref<HTMLInputElement>()
 let debounceTimer: ReturnType<typeof setTimeout> | undefined
 
 const trimmedQuery = computed(() => query.value.trim())
-const hasQuery = computed(() => !!trimmedQuery.value)
+const defaultCalendarPlaceholder = today(getLocalTimeZone())
+const calendarDate = computed<DateValue | undefined>({
+  get: () => localDateToCalendarValue(selectedDate.value),
+  set: (value) => {
+    selectedDate.value = calendarValueToLocalDate(value)
+  },
+})
+const hasCriteria = computed(() => !!trimmedQuery.value || !!selectedDate.value)
+const dateTriggerLabel = computed(() => selectedDate.value
+  ? `筛选日期，当前为 ${selectedDate.value}`
+  : '按日期筛选聊天记录')
 const participantNames = computed(() => Object.fromEntries(
   Object.entries(props.participants).map(([id, value]) => [id, value.name]),
 ))
@@ -127,6 +185,8 @@ const statusText = computed(() => {
 watch(() => props.open, async (open) => {
   if (!open) {
     query.value = ''
+    selectedDate.value = ''
+    datePopoverOpen.value = false
     if (debounceTimer) clearTimeout(debounceTimer)
     return
   }
@@ -134,21 +194,40 @@ watch(() => props.open, async (open) => {
   inputElement.value?.focus()
 }, { immediate: true })
 
-watch(query, (value) => {
+watch(datePopoverOpen, (open) => emit('datePopoverChange', open))
+
+watch(query, () => {
   if (debounceTimer) clearTimeout(debounceTimer)
-  // 防抖首帧避免每次按键都打 RPC；空串立即清空结果。
-  if (!value.trim()) {
-    emit('search', '')
+  // 关键词保持防抖；若清空后仍有日期，继续按日期检索而不是清空结果。
+  if (!trimmedQuery.value) {
+    emitSearch()
     return
   }
-  debounceTimer = setTimeout(() => {
-    emit('search', value)
-  }, 250)
+  debounceTimer = setTimeout(emitSearch, 250)
 })
+
+watch(selectedDate, () => {
+  if (debounceTimer) clearTimeout(debounceTimer)
+  emitSearch()
+})
+
+function emitSearch() {
+  emit('search', {
+    query: trimmedQuery.value,
+    ...(selectedDate.value ? { localDate: selectedDate.value } : {}),
+  })
+}
 
 function clearQuery() {
   query.value = ''
   inputElement.value?.focus()
+}
+
+function handleDatePointerDownOutside(event: Event) {
+  const target = event.target
+  if (target instanceof Node && document.querySelector('.webqq-chat-search-shell')?.contains(target)) {
+    event.preventDefault()
+  }
 }
 
 function participant(authorId: string) {

@@ -61,6 +61,7 @@
             @search="runSearch"
             @load-more="loadMoreSearchHits"
             @select="revealSearchHit"
+            @date-popover-change="searchDatePopoverOpen = $event"
           />
         </div>
         <button type="button" class="webqq-icon-button" :class="{ 'is-active': model.detailsVisible }" :aria-label="model.detailsVisible ? '关闭会话信息' : '打开会话信息'" @click="emit('toggleDetails')">
@@ -160,8 +161,9 @@ import WebqqForwardModal from './webqq-forward-modal.vue'
 import WebqqForwardTargetDialog, { type WebqqForwardTargetModel } from './webqq-forward-target-dialog.vue'
 import WebqqImagePreview from './webqq-image-preview.vue'
 import WebqqMessageList, { type WebqqMessageListModel } from './webqq-message-list.vue'
-import WebqqMessageSearch from './webqq-message-search.vue'
+import WebqqMessageSearch, { type WebqqMessageSearchCriteria } from './webqq-message-search.vue'
 import { buildForwardPreview } from './webqq/forward-preview'
+import { localDateToMessageSearchRange } from './webqq/message-search-date'
 import { ensureMessageLoaded } from './webqq/message-reveal'
 import {
   isRecalledMessage,
@@ -170,6 +172,7 @@ import {
   type SandboxForwardNode,
   type SandboxMessageSearchHit,
   type SandboxMessageSearchResult,
+  type SearchConversationMessagesInput,
 } from '../src/types'
 
 export interface WebqqChatPaneModel {
@@ -199,7 +202,7 @@ const emit = defineEmits<{
   deleteParticipant: [entity: { type: 'user' | 'bot', id: string }]
   loadHistory: [resolve: () => void, reject: (error: unknown) => void]
   searchConversationMessages: [
-    input: { conversationId: string, query: string, beforeMessageId?: string, limit?: number },
+    input: Omit<SearchConversationMessagesInput, 'operatorId'>,
     resolve: (result: SandboxMessageSearchResult) => void,
     reject: (error: unknown) => void,
   ]
@@ -239,9 +242,14 @@ const messageListRef = ref<{ revealMessage: (messageId: string) => boolean }>()
 const searchShellRef = ref<HTMLElement>()
 const searchTriggerRef = ref<HTMLButtonElement>()
 const searchOpen = ref(false)
+const searchDatePopoverOpen = ref(false)
 const searchLoading = ref(false)
 const searchError = ref('')
-const searchQuery = ref('')
+type SearchCriteriaSnapshot = Pick<
+  SearchConversationMessagesInput,
+  'query' | 'createdAtStart' | 'createdAtEnd'
+>
+const searchCriteria = ref<SearchCriteriaSnapshot>({ query: '' })
 const searchHits = ref<SandboxMessageSearchHit[]>([])
 const searchNextBeforeMessageId = ref<string>()
 const activeSearchMessageId = ref('')
@@ -356,6 +364,7 @@ function handleSelectionKeydown(event: KeyboardEvent) {
     return
   }
   if (searchOpen.value) {
+    if (searchDatePopoverOpen.value) return
     event.preventDefault()
     void closeSearch(true)
   }
@@ -365,6 +374,7 @@ function handleSearchOutsidePointerDown(event: PointerEvent) {
   if (!searchOpen.value) return
   const target = event.target
   if (target instanceof Node && searchShellRef.value?.contains(target)) return
+  if (target instanceof Element && target.closest('[data-webqq-message-search-date]')) return
   // 外部点击应让目标元素自然接管焦点，不能像 Escape 一样强制回焦搜索按钮。
   void closeSearch()
 }
@@ -381,9 +391,10 @@ onBeforeUnmount(() => {
 
 function resetSearchState() {
   searchRequestSerial += 1
+  searchDatePopoverOpen.value = false
   searchLoading.value = false
   searchError.value = ''
-  searchQuery.value = ''
+  searchCriteria.value = { query: '' }
   searchHits.value = []
   searchNextBeforeMessageId.value = undefined
   activeSearchMessageId.value = ''
@@ -409,30 +420,41 @@ function toggleSearch() {
   searchOpen.value = true
 }
 
-function requestSearch(input: { conversationId: string, query: string, beforeMessageId?: string, limit?: number }) {
+function requestSearch(input: Omit<SearchConversationMessagesInput, 'operatorId'>) {
   return new Promise<SandboxMessageSearchResult>((resolve, reject) => {
     emit('searchConversationMessages', input, resolve, reject)
   })
 }
 
-async function runSearch(query: string) {
+async function runSearch(criteria: WebqqMessageSearchCriteria) {
   const conversationId = props.model.conversationId
-  const trimmed = query.trim()
-  searchQuery.value = trimmed
+  const query = criteria.query.trim()
+  const dateRange = criteria.localDate
+    ? localDateToMessageSearchRange(criteria.localDate)
+    : undefined
+  const snapshot: SearchCriteriaSnapshot = {
+    query,
+    ...(dateRange ?? {}),
+  }
+  const serial = ++searchRequestSerial
+  searchCriteria.value = snapshot
   activeSearchMessageId.value = ''
-  if (!conversationId || !trimmed) {
-    searchHits.value = []
-    searchNextBeforeMessageId.value = undefined
-    searchError.value = ''
+  searchHits.value = []
+  searchNextBeforeMessageId.value = undefined
+  searchError.value = ''
+  if (!conversationId || (!query && !dateRange)) {
     searchLoading.value = false
     return
   }
+  if (criteria.localDate && !dateRange) {
+    searchLoading.value = false
+    searchError.value = '筛选日期无效'
+    return
+  }
 
-  const serial = ++searchRequestSerial
   searchLoading.value = true
-  searchError.value = ''
   try {
-    const result = await requestSearch({ conversationId, query: trimmed, limit: 30 })
+    const result = await requestSearch({ conversationId, ...snapshot, limit: 30 })
     if (serial !== searchRequestSerial) return
     searchHits.value = result.hits
     searchNextBeforeMessageId.value = result.nextBeforeMessageId
@@ -449,14 +471,24 @@ async function runSearch(query: string) {
 async function loadMoreSearchHits() {
   const conversationId = props.model.conversationId
   const beforeMessageId = searchNextBeforeMessageId.value
-  const query = searchQuery.value
-  if (!conversationId || !beforeMessageId || !query || searchLoading.value) return
+  const criteria = searchCriteria.value
+  if (
+    !conversationId
+    || !beforeMessageId
+    || (!criteria.query && !criteria.createdAtStart)
+    || searchLoading.value
+  ) return
 
   const serial = ++searchRequestSerial
   searchLoading.value = true
   searchError.value = ''
   try {
-    const result = await requestSearch({ conversationId, query, beforeMessageId, limit: 30 })
+    const result = await requestSearch({
+      conversationId,
+      ...criteria,
+      beforeMessageId,
+      limit: 30,
+    })
     if (serial !== searchRequestSerial) return
     const known = new Set(searchHits.value.map(({ messageId }) => messageId))
     searchHits.value = [

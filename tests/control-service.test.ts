@@ -313,6 +313,50 @@ describe('模拟 QQ 环境消息闭环', () => {
       query: '   ',
     })).toEqual({ hits: [] })
 
+    const datedScene = control.getSnapshot()
+    const datedMessages = datedScene.messages.filter(({ conversationId }) => conversationId === 'private:10001:20001')
+    datedMessages.forEach((message, index) => {
+      message.createdAt = `2026-08-${index < 2 ? '09' : '10'}T0${index}:00:00.000Z`
+    })
+    control.replaceScene(datedScene)
+    const dateOnly = control.searchConversationMessages({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      query: '',
+      createdAtStart: '2026-08-10T00:00:00.000Z',
+      createdAtEnd: '2026-08-11T00:00:00.000Z',
+      limit: 2,
+    })
+    expect(dateOnly.hits.map(({ summary }) => summary)).toEqual(['hello Recalled', 'HELLO Gamma'])
+    expect(dateOnly.nextBeforeMessageId).toBe(dateOnly.hits[1].messageId)
+    expect(control.searchConversationMessages({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      query: '无关',
+      createdAtStart: '2026-08-10T00:00:00.000Z',
+      createdAtEnd: '2026-08-11T00:00:00.000Z',
+    }).hits.map(({ summary }) => summary)).toEqual(['无关消息'])
+    expect(() => control!.searchConversationMessages({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      query: '',
+      createdAtStart: '2026-08-10T00:00:00.000Z',
+    })).toThrow('必须同时提供开始和结束时间')
+    expect(() => control!.searchConversationMessages({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      query: '',
+      createdAtStart: 'invalid',
+      createdAtEnd: '2026-08-11T00:00:00.000Z',
+    })).toThrow('时间无效')
+    expect(() => control!.searchConversationMessages({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      query: '',
+      createdAtStart: '2026-08-11T00:00:00.000Z',
+      createdAtEnd: '2026-08-10T00:00:00.000Z',
+    })).toThrow('结束时间必须晚于开始时间')
+
     const firstPage = control.searchConversationMessages({
       operatorId: '10001',
       conversationId: 'private:10001:20001',

@@ -1,4 +1,8 @@
-@import "tailwindcss";
+/* tailwind.generated.css 由 yarn build:css 从 tailwind.source.css 预编译；
+   不直接 @import "tailwindcss"——控制台 devMode 用宿主 vite（无 Tailwind
+   插件）加载本文件时无法生成工具类，只能消费编译完成的静态产物。 */
+@import "./styles/tailwind.generated.css";
+@import "./styles/shadcn-theme.css";
 @import "./styles/webqq-tokens.css";
 @import "./styles/webqq-workspace.css";
 @import "./styles/webqq-primitives.css";

@@ -732,6 +732,8 @@ describe('WebQQ 工作区控制模块', () => {
     const result = await controller.searchConversationMessages({
       conversationId: 'private:10001:20001',
       query: '基准',
+      createdAtStart: '2026-07-23T00:00:00.000Z',
+      createdAtEnd: '2026-07-24T00:00:00.000Z',
       limit: 20,
       beforeMessageId: 'message-2',
     })
@@ -742,6 +744,8 @@ describe('WebQQ 工作区控制模块', () => {
         operatorId: '10001',
         conversationId: 'private:10001:20001',
         query: '基准',
+        createdAtStart: '2026-07-23T00:00:00.000Z',
+        createdAtEnd: '2026-07-24T00:00:00.000Z',
         limit: 20,
         beforeMessageId: 'message-2',
       },

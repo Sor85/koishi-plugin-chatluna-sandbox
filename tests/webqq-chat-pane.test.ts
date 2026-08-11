@@ -1,8 +1,27 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
+function collectVueFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = resolve(directory, entry.name)
+    return entry.isDirectory()
+      ? collectVueFiles(path)
+      : entry.name.endsWith('.vue') ? [path] : []
+  })
+}
+
 describe('WebQQ 聊天区域', () => {
+  it('确保宿主 Console Vite 可解析 shadcn-vue 组件导入', () => {
+    const uiRoot = resolve('client/components/ui')
+    const componentFiles = collectVueFiles(uiRoot)
+
+    for (const file of componentFiles) {
+      const source = readFileSync(file, 'utf8')
+      expect(source, file).not.toMatch(/from\s+['"]@\//)
+    }
+  })
+
   it('组合顶栏、消息列表与发送控件', () => {
     const source = readFileSync(resolve('client/webqq-chat-pane.vue'), 'utf8')
     const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
@@ -56,9 +75,28 @@ describe('WebQQ 聊天区域', () => {
     expect(source).toContain('closeSearch()')
     expect(source).toContain('resetSearchState()')
     expect(searchSource).toContain('id="webqq-message-search-results"')
-    expect(searchSource).toContain('v-if="hasQuery"')
+    expect(searchSource).toContain('v-if="hasCriteria"')
     expect(searchSource).toContain('const trimmedQuery = computed(() => query.value.trim())')
-    expect(searchSource).toContain('const hasQuery = computed(() => !!trimmedQuery.value)')
+    expect(searchSource).toContain('const hasCriteria = computed(() => !!trimmedQuery.value || !!selectedDate.value)')
+    expect(searchSource).not.toContain('type="date"')
+    expect(searchSource).not.toContain("from './components/ui/input'")
+    expect(searchSource).not.toContain("from './components/ui/label'")
+    expect(searchSource).toContain("import { Calendar } from './components/ui/calendar'")
+    expect(searchSource).toContain('<Popover v-slot="{ close }" v-model:open="datePopoverOpen">')
+    expect(searchSource).toContain('<Calendar')
+    expect(searchSource).toContain('v-model="calendarDate"')
+    expect(searchSource).toContain(':default-placeholder="defaultCalendarPlaceholder"')
+    expect(searchSource).toContain('layout="month-and-year"')
+    expect(searchSource).toContain('@update:model-value="close"')
+    expect(searchSource).toContain('localDateToCalendarValue(selectedDate.value)')
+    expect(searchSource).toContain('calendarValueToLocalDate(value)')
+    expect(searchSource).not.toContain('RangeCalendar')
+    expect(searchSource).not.toContain('webqq-message-search-date-actions')
+    expect(searchSource).toContain('按日期筛选聊天记录')
+    expect(searchSource).toContain(':aria-pressed="!!selectedDate"')
+    expect(searchSource).toContain('data-webqq-message-search-date')
+    expect(searchSource).toContain("search: [criteria: WebqqMessageSearchCriteria]")
+    expect(searchSource).toContain('datePopoverChange: [open: boolean]')
     expect(searchSource).not.toContain('输入关键词查找当前会话消息')
     expect(searchSource).toContain('role="status"')
     expect(searchSource).toContain('aria-live="polite"')
@@ -73,8 +111,14 @@ describe('WebQQ 聊天区域', () => {
     expect(source).toContain('searchShellRef.value?.contains(target)')
     expect(source).toContain("document.addEventListener('pointerdown', handleSearchOutsidePointerDown)")
     expect(source).toContain("document.removeEventListener('pointerdown', handleSearchOutsidePointerDown)")
+    expect(source).toContain('@date-popover-change="searchDatePopoverOpen = $event"')
+    expect(source).toContain("target.closest('[data-webqq-message-search-date]')")
+    expect(source).toContain('localDateToMessageSearchRange(criteria.localDate)')
+    expect(source).toContain('const searchCriteria = ref<SearchCriteriaSnapshot>')
+    expect(source).toContain('...criteria,')
+    expect(source).toContain('const serial = ++searchRequestSerial')
     expect(source).toContain('void closeSearch(true)')
-    expect(searchSource).toContain('}, 250)')
+    expect(searchSource).toContain('setTimeout(emitSearch, 250)')
     expect(source).toContain(':participants="model.messageList.participants"')
     expect(searchSource).toContain("import WebqqAvatar from './webqq-avatar.vue'")
     expect(searchSource).toContain('<WebqqAvatar')
@@ -97,6 +141,36 @@ describe('WebQQ 聊天区域', () => {
     expect(triggerRule).toContain('color: var(--webqq-accent)')
     const fieldIconRule = styles.slice(styles.indexOf('.webqq-message-search-field > svg {')).split('}')[0]
     expect(fieldIconRule).toContain('var(--webqq-accent)')
+    expect(searchSource).toContain('class="webqq-message-search-date-popover w-auto rounded-md p-0 shadow-md"')
+    expect(styles).toContain('.webqq-message-search-date-trigger.is-active')
+    expect(styles).not.toContain('.webqq-message-search-date-actions')
+    const datePopoverRule = styles.slice(styles.indexOf('.webqq-message-search-date-popover {')).split('}')[0]
+    expect(datePopoverRule).toContain('--popover: var(--webqq-bg)')
+    expect(datePopoverRule).toContain('--popover-foreground: var(--webqq-text)')
+    expect(datePopoverRule).toContain('--input: var(--webqq-border)')
+    expect(datePopoverRule).toContain('--ring: var(--webqq-accent)')
+    expect(datePopoverRule).not.toContain('width: 242px')
+    // 尺寸/圆角/阴影必须完全交给 registry 的 Tailwind 工具类；本文件无 layer，
+    // 任何手写复刻都会压过 @layer utilities 里的类，破坏 1:1 还原。
+    expect(datePopoverRule).not.toContain('border-radius')
+    expect(datePopoverRule).not.toContain('box-shadow')
+    expect(styles).not.toContain('.webqq-message-search-date-popover [data-slot="calendar-prev-button"]')
+    expect(styles).not.toContain('.webqq-message-search-date-popover [data-slot="calendar-cell-trigger"]')
+    expect(styles).not.toContain('.webqq-message-search-date-popover [data-slot="native-select"]')
+    // shadcn 语义工具类由 build:css 从 tailwind.source.css 预编译（宿主控制台
+    // devMode 的 vite 没有 Tailwind 插件，无法现场生成）；宿主的全局 table
+    // 样式需要在日历范围内用无 layer 规则归零，否则出现行分隔线和超大内边距。
+    const tailwindSource = readFileSync(resolve('client/styles/tailwind.source.css'), 'utf8')
+    expect(tailwindSource).toContain('@theme inline')
+    expect(tailwindSource).toContain('--color-muted-foreground: var(--muted-foreground)')
+    expect(tailwindSource).toContain('--color-primary: var(--primary)')
+    const themeStyles = readFileSync(resolve('client/styles/shadcn-theme.css'), 'utf8')
+    expect(themeStyles).toContain('[data-slot="calendar"] tr')
+    expect(themeStyles).toContain('[data-slot="calendar"] td')
+    const entryStyles = readFileSync(resolve('client/style.css'), 'utf8')
+    expect(entryStyles).toContain('@import "./styles/tailwind.generated.css"')
+    expect(entryStyles).toContain('@import "./styles/shadcn-theme.css"')
+    expect(entryStyles).not.toContain('@import "tailwindcss";')
     const hitRule = styles.slice(styles.indexOf('.webqq-message-search-hit {')).split('}')[0]
     expect(hitRule).toContain('grid-template-columns: 32px minmax(0, 1fr)')
     const avatarRule = styles.slice(styles.indexOf('.webqq-message-search-avatar {')).split('}')[0]

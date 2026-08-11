@@ -532,11 +532,14 @@ export interface SandboxMessageHistory {
   nextBeforeMessageId?: string
 }
 
-// 当前会话内按正文查找：游标语义与 getMessageHistory 一致，命中只返回摘要。
+// 当前会话内按正文和/或创建时间查找：游标语义与 getMessageHistory 一致，命中只返回摘要。
 export interface SearchConversationMessagesInput {
   operatorId: string
   conversationId: string
   query: string
+  // 成对提供，使用 [createdAtStart, createdAtEnd) 半开区间。
+  createdAtStart?: string
+  createdAtEnd?: string
   beforeMessageId?: string
   limit?: number
 }

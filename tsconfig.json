@@ -5,6 +5,12 @@
     "moduleResolution": "Node",
     "declaration": true,
     "outDir": "lib",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./client/*"
+      ]
+    },
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

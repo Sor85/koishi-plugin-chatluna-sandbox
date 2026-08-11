@@ -28,6 +28,8 @@ describe('Koishi 工作区端口', () => {
       operatorId: '11001',
       conversationId: 'private:11001:12001',
       query: 'hello',
+      createdAtStart: '2026-08-10T00:00:00.000Z',
+      createdAtEnd: '2026-08-11T00:00:00.000Z',
       limit: 10,
     })
 
@@ -48,6 +50,8 @@ describe('Koishi 工作区端口', () => {
       operatorId: '11001',
       conversationId: 'private:11001:12001',
       query: 'hello',
+      createdAtStart: '2026-08-10T00:00:00.000Z',
+      createdAtEnd: '2026-08-11T00:00:00.000Z',
       limit: 10,
       spaceId: 'space-1',
     })
