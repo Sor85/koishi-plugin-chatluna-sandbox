@@ -142,7 +142,12 @@
 .webqq-message-search-date-trigger:focus-visible {
   color: var(--webqq-text);
   background: var(--webqq-hover);
-  outline: none;
+  /* 只关 outline-style，不能写 outline: none 简写：简写会把 outline-color/width
+     重置为 currentColor(近黑)/medium(3px)。页面上其他插件的无 layer UnoCSS 产物
+     把 .outline-none 定义为 outline: 2px solid transparent（压过本插件 @layer utilities
+     的同名类），叠加按钮自身的 transition-all，悬停/聚焦切换瞬间会出现
+     "黑圈显形、变大再消失"的闪烁动画。 */
+  outline-style: none;
 }
 
 .webqq-message-search-date-trigger.is-active {

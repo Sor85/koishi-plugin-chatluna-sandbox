@@ -8,7 +8,7 @@ import { CalendarRoot, useDateFormatter, useForwardPropsEmits } from "reka-ui"
 import { createYear, createYearRange, toDate } from "reka-ui/date"
 import { computed, toRaw } from "vue"
 import { cn } from "../../../lib/utils"
-import { NativeSelect, NativeSelectOption } from '../native-select'
+import { Select, SelectContent, SelectItem, SelectTrigger } from '../select'
 import { CalendarCell, CalendarCellTrigger, CalendarGrid, CalendarGridBody, CalendarGridHead, CalendarGridRow, CalendarHeadCell, CalendarHeader, CalendarHeading, CalendarNextButton, CalendarPrevButton } from "."
 
 const props = withDefaults(defineProps<CalendarRootProps & { class?: HTMLAttributes["class"], layout?: LayoutTypes, yearRange?: DateValue[] }>(), {
@@ -43,50 +43,43 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
 </script>
 
 <template>
+  <!-- 月/年选择使用 shadcn-vue Select 而不是原生 <select>：原生下拉菜单无法定制
+       （样式随系统走、无法隐藏滚动条），且"透明 select + 文字覆盖层"的宽度对不齐
+       会让下拉箭头叠在文字上。SelectTrigger 自身是 flex 布局，文字与箭头天然分列。 -->
   <DefineMonthTemplate v-slot="{ date }">
-    <div class="**:data-[slot=native-select-icon]:right-1">
-      <div class="relative">
-        <div class="absolute inset-0 flex h-full items-center text-sm pl-2 pointer-events-none">
-          {{ formatter.custom(toDate(date), { month: 'short' }) }}
-        </div>
-        <NativeSelect
-          class="text-xs h-8 pr-6 pl-2 text-transparent relative"
-          :model-value="date.month"
-          @change="(e: Event) => {
-            placeholder = placeholder.set({
-              month: Number((e?.target as any)?.value),
-            })
-          }"
-        >
-          <NativeSelectOption v-for="(month) in createYear({ dateObj: date })" :key="month.toString()" :value="month.month" :selected="date.month === month.month">
-            {{ formatter.custom(toDate(month), { month: 'short' }) }}
-          </NativeSelectOption>
-        </NativeSelect>
-      </div>
-    </div>
+    <Select
+      :model-value="date.month"
+      @update:model-value="(value) => {
+        if (typeof value === 'number') placeholder = placeholder.set({ month: value })
+      }"
+    >
+      <SelectTrigger size="sm" class="relative h-8 gap-1 px-2 font-medium">
+        {{ formatter.custom(toDate(date), { month: 'short' }) }}
+      </SelectTrigger>
+      <SelectContent class="min-w-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <SelectItem v-for="month in createYear({ dateObj: date })" :key="month.toString()" :value="month.month" class="whitespace-nowrap">
+          {{ formatter.custom(toDate(month), { month: 'short' }) }}
+        </SelectItem>
+      </SelectContent>
+    </Select>
   </DefineMonthTemplate>
 
   <DefineYearTemplate v-slot="{ date }">
-    <div class="**:data-[slot=native-select-icon]:right-1">
-      <div class="relative">
-        <div class="absolute inset-0 flex h-full items-center text-sm pl-2 pointer-events-none">
-          {{ formatter.custom(toDate(date), { year: 'numeric' }) }}
-        </div>
-        <NativeSelect
-          class="text-xs h-8 pr-6 pl-2 text-transparent relative"
-          :model-value="date.year"
-          @change="(e: Event) => {
-            placeholder = placeholder.set({
-              year: Number((e?.target as any)?.value),
-            })
-          }"
-        >
-          <NativeSelectOption v-for="(year) in yearRange" :key="year.toString()" :value="year.year" :selected="date.year === year.year">
-            {{ formatter.custom(toDate(year), { year: 'numeric' }) }}
-          </NativeSelectOption>
-        </NativeSelect>
-      </div>
-    </div>
+    <Select
+      :model-value="date.year"
+      @update:model-value="(value) => {
+        if (typeof value === 'number') placeholder = placeholder.set({ year: value })
+      }"
+    >
+      <SelectTrigger size="sm" class="relative h-8 gap-1 px-2 font-medium">
+        {{ formatter.custom(toDate(date), { year: 'numeric' }) }}
+      </SelectTrigger>
+      <SelectContent class="min-w-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <SelectItem v-for="year in yearRange" :key="year.toString()" :value="year.year" class="whitespace-nowrap">
+          {{ formatter.custom(toDate(year), { year: 'numeric' }) }}
+        </SelectItem>
+      </SelectContent>
+    </Select>
   </DefineYearTemplate>
 
   <CalendarRoot

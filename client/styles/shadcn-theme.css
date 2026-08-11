@@ -53,17 +53,34 @@
 /* 宿主页面里可能存在其他插件打包的无 layer Tailwind（v3 产物），其
    .rounded-md 等静态值（0.375rem）会压过本插件位于 @layer utilities 的
    同名类（无 layer 永远优先于有 layer）。在本插件的表面范围内用同样
-   无 layer 的规则恢复 shadcn 的 radius 标度，保证 1:1 观感。 */
-:is(.webqq-workspace, .sandbox-popover-content, .sandbox-dialog-content, .sandbox-select-content, .webqq-secondary-page) .rounded-sm {
+   无 layer 的规则恢复 shadcn 的 radius 标度，保证 1:1 观感。
+   浮层容器（popover/dialog/select）自身也直接携带 .rounded-*，
+   所以除后代形式外必须同时写自身命中的形式。 */
+:is(.webqq-workspace, .sandbox-popover-content, .sandbox-dialog-content, .sandbox-select-content, .webqq-secondary-page) .rounded-sm,
+:is(.sandbox-popover-content, .sandbox-dialog-content, .sandbox-select-content).rounded-sm {
   border-radius: calc(var(--radius) - 4px);
 }
 
-:is(.webqq-workspace, .sandbox-popover-content, .sandbox-dialog-content, .sandbox-select-content, .webqq-secondary-page) .rounded-md {
+:is(.webqq-workspace, .sandbox-popover-content, .sandbox-dialog-content, .sandbox-select-content, .webqq-secondary-page) .rounded-md,
+:is(.sandbox-popover-content, .sandbox-dialog-content, .sandbox-select-content).rounded-md {
   border-radius: calc(var(--radius) - 2px);
 }
 
-:is(.webqq-workspace, .sandbox-popover-content, .sandbox-dialog-content, .sandbox-select-content, .webqq-secondary-page) .rounded-lg {
+:is(.webqq-workspace, .sandbox-popover-content, .sandbox-dialog-content, .sandbox-select-content, .webqq-secondary-page) .rounded-lg,
+:is(.sandbox-popover-content, .sandbox-dialog-content, .sandbox-select-content).rounded-lg {
   border-radius: var(--radius);
+}
+
+/* 宿主里另有插件打包的无 layer UnoCSS 产物，其 .shadow-md、.shadow-lg 等的
+   box-shadow 引用 var(--un-shadow) 系列变量；这些变量在本插件的元素上从未定义，
+   整条 box-shadow 在计算值阶段失效（IACVT），浏览器回退为 none——表现为
+   弹层/下拉"完全没有阴影"（而不是错误的阴影）。机制与上面的 .rounded-* 相同：
+   无 layer 压过 @layer utilities。这里只重申 Tailwind v4 的合成 box-shadow 声明，
+   各 --tw-* 分量的值仍由 @layer utilities 里的真实工具类与 @property 默认值提供，
+   不复刻任何具体阴影数值。 */
+:is(.webqq-workspace, .sandbox-popover-content, .sandbox-dialog-content, .sandbox-select-content, .webqq-secondary-page) :is(.shadow-2xs, .shadow-xs, .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl),
+:is(.sandbox-popover-content, .sandbox-dialog-content, .sandbox-select-content):is(.shadow-2xs, .shadow-xs, .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl) {
+  box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
 }
 
 /* 宿主控制台全局样式（@koishijs/client app/index.scss:28-45）给所有

@@ -143,6 +143,13 @@ describe('WebQQ 聊天区域', () => {
     expect(fieldIconRule).toContain('var(--webqq-accent)')
     expect(searchSource).toContain('class="webqq-message-search-date-popover w-auto rounded-md p-0 shadow-md"')
     expect(styles).toContain('.webqq-message-search-date-trigger.is-active')
+    // 悬停/聚焦规则只允许关 outline-style：outline: none 简写会把 outline-color/width
+    // 重置为 currentColor/3px，与其他插件无 layer 的 outline: 2px solid transparent
+    // 底座叠加按钮的 transition-all，产生"黑圈变大再消失"的闪烁动画。
+    const dateTriggerFocusRule = styles.slice(styles.indexOf('.webqq-message-search-date-trigger:focus-visible {')).split('}')[0]
+    expect(dateTriggerFocusRule).toContain('outline-style: none')
+    // 带分号匹配声明本身，避免误伤规则内解释"为什么不能用简写"的注释文本。
+    expect(dateTriggerFocusRule).not.toContain('outline: none;')
     expect(styles).not.toContain('.webqq-message-search-date-actions')
     const datePopoverRule = styles.slice(styles.indexOf('.webqq-message-search-date-popover {')).split('}')[0]
     expect(datePopoverRule).toContain('--popover: var(--webqq-bg)')
@@ -157,6 +164,16 @@ describe('WebQQ 聊天区域', () => {
     expect(styles).not.toContain('.webqq-message-search-date-popover [data-slot="calendar-prev-button"]')
     expect(styles).not.toContain('.webqq-message-search-date-popover [data-slot="calendar-cell-trigger"]')
     expect(styles).not.toContain('.webqq-message-search-date-popover [data-slot="native-select"]')
+    // 月/年下拉必须用 shadcn-vue Select：原生 <select> 的下拉面板无法定制样式，
+    // 且"透明 select + 覆盖文字"的宽度对不齐会让箭头叠在文字上。
+    // 年份范围由调用方收紧为近 10 年；下拉面板不显示原生滚动条。
+    const calendarSource = readFileSync(resolve('client/components/ui/calendar/Calendar.vue'), 'utf8')
+    expect(calendarSource).toContain("import { Select, SelectContent, SelectItem, SelectTrigger } from '../select'")
+    expect(calendarSource).not.toContain('NativeSelect')
+    expect(calendarSource).toContain('[scrollbar-width:none]')
+    expect(calendarSource).toContain('[&::-webkit-scrollbar]:hidden')
+    expect(searchSource).toContain(':year-range="calendarYearRange"')
+    expect(searchSource).toContain('subtract({ years: 9 })')
     // shadcn 语义工具类由 build:css 从 tailwind.source.css 预编译（宿主控制台
     // devMode 的 vite 没有 Tailwind 插件，无法现场生成）；宿主的全局 table
     // 样式需要在日历范围内用无 layer 规则归零，否则出现行分隔线和超大内边距。
@@ -167,6 +184,10 @@ describe('WebQQ 聊天区域', () => {
     const themeStyles = readFileSync(resolve('client/styles/shadcn-theme.css'), 'utf8')
     expect(themeStyles).toContain('[data-slot="calendar"] tr')
     expect(themeStyles).toContain('[data-slot="calendar"] td')
+    // 其他插件无 layer 的 UnoCSS .shadow-* 引用 var(--un-*)，在本插件元素上整条
+    // box-shadow 失效回退为 none；必须在表面范围内重申 Tailwind v4 合成 box-shadow。
+    expect(themeStyles).toContain('.shadow-md')
+    expect(themeStyles).toContain('box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow)')
     const entryStyles = readFileSync(resolve('client/style.css'), 'utf8')
     expect(entryStyles).toContain('@import "./styles/tailwind.generated.css"')
     expect(entryStyles).toContain('@import "./styles/shadcn-theme.css"')

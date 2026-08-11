@@ -41,6 +41,7 @@
             v-model="calendarDate"
             locale="zh-CN"
             :default-placeholder="defaultCalendarPlaceholder"
+            :year-range="calendarYearRange"
             layout="month-and-year"
             initial-focus
             @update:model-value="close"
@@ -115,6 +116,7 @@
 import type { DateValue } from '@internationalized/date'
 import { getLocalTimeZone, today } from '@internationalized/date'
 import { IconCalendar, IconSearch, IconX } from '@tabler/icons-vue'
+import { createYearRange } from 'reka-ui/date'
 import { computed, nextTick, ref, watch } from 'vue'
 import { Button } from './components/ui/button'
 import { Calendar } from './components/ui/calendar'
@@ -160,6 +162,12 @@ let debounceTimer: ReturnType<typeof setTimeout> | undefined
 
 const trimmedQuery = computed(() => query.value.trim())
 const defaultCalendarPlaceholder = today(getLocalTimeZone())
+// 年份下拉只列近 10 年（含今年）：聊天记录由本地沙盒产生，不存在未来日期；
+// Calendar 默认的 -100/+10 年范围会生成上百个选项，下拉长到必须滚动。
+const calendarYearRange = createYearRange({
+  start: defaultCalendarPlaceholder.subtract({ years: 9 }),
+  end: defaultCalendarPlaceholder,
+})
 const calendarDate = computed<DateValue | undefined>({
   get: () => localDateToCalendarValue(selectedDate.value),
   set: (value) => {
@@ -225,7 +233,14 @@ function clearQuery() {
 
 function handleDatePointerDownOutside(event: Event) {
   const target = event.target
-  if (target instanceof Node && document.querySelector('.webqq-chat-search-shell')?.contains(target)) {
+  if (!(target instanceof Node)) return
+  // 月/年下拉（shadcn Select）portal 到 body，不在日期弹层的 DOM 子树内；
+  // 点击下拉选项会被 Popover 误判为"点击外部"而关闭整个日期弹层，必须豁免。
+  if (target instanceof Element && target.closest('.sandbox-select-content')) {
+    event.preventDefault()
+    return
+  }
+  if (document.querySelector('.webqq-chat-search-shell')?.contains(target)) {
     event.preventDefault()
   }
 }

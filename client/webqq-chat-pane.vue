@@ -375,6 +375,9 @@ function handleSearchOutsidePointerDown(event: PointerEvent) {
   const target = event.target
   if (target instanceof Node && searchShellRef.value?.contains(target)) return
   if (target instanceof Element && target.closest('[data-webqq-message-search-date]')) return
+  // 日期弹层里的月/年下拉（shadcn Select）portal 到 body，不在弹层 DOM 子树内；
+  // 点击下拉选项不是"搜索外部点击"，否则会把搜索栏连同日期弹层一起关掉。
+  if (target instanceof Element && target.closest('.sandbox-select-content')) return
   // 外部点击应让目标元素自然接管焦点，不能像 Escape 一样强制回焦搜索按钮。
   void closeSearch()
 }
