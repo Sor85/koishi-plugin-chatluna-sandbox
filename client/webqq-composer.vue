@@ -58,6 +58,7 @@
                     :class="['webqq-composer-user-switch', {
                       'is-active': sender.id === model.currentOperatorId,
                       'is-bot': sender.type === 'bot',
+                      'is-overlapped': index > 0,
                       'is-collapsed-extra': isUserCollapsedExtra(index),
                     }]"
                     :aria-hidden="isUserCollapsedHidden(index) ? 'true' : undefined"

@@ -1,3 +1,9 @@
+@property --webqq-user-avatar-overlap-center {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 39px;
+}
+
 .webqq-composer-layout-root {
   position: absolute;
   right: 0;
@@ -258,7 +264,6 @@
   border-radius: 50%;
   color: #fff;
   background: var(--webqq-accent);
-  box-shadow: 0 0 0 2px var(--webqq-panel);
   font-size: 12px;
   font-weight: 700;
 }
@@ -393,6 +398,22 @@
   pointer-events: auto;
 }
 
+/* 后方头像挖掉与前方头像重叠的圆形区域，由发送胶囊的真实表面形成分隔。
+   折叠与展开分别需要 39px/45px 圆心；使用与头像位移相同的 180ms 缓动连续过渡，
+   避免状态类先切换、头像仍在移动时出现瞬时宽缝。 */
+.webqq-composer-user-switch.is-overlapped .webqq-composer-user-avatar {
+  --webqq-user-avatar-overlap-center: 39px;
+  --webqq-user-avatar-overlap-cutout: radial-gradient(circle 20px at var(--webqq-user-avatar-overlap-center) 18px, transparent 98%, #000 100%);
+  box-shadow: none;
+  transition: --webqq-user-avatar-overlap-center 0.18s ease;
+  -webkit-mask-image: var(--webqq-user-avatar-overlap-cutout);
+  mask-image: var(--webqq-user-avatar-overlap-cutout);
+}
+
+.webqq-composer-user-stack.is-expanded .webqq-composer-user-switch.is-overlapped .webqq-composer-user-avatar {
+  --webqq-user-avatar-overlap-center: 45px;
+}
+
 .webqq-composer-user-overflow {
   position: absolute;
   top: 0;
@@ -417,6 +438,11 @@
   pointer-events: none;
   transition: right 0.18s ease, opacity 0.12s ease;
   will-change: opacity;
+  --webqq-user-avatar-overlap-center: 39px;
+  --webqq-user-avatar-overlap-cutout: radial-gradient(circle 20px at var(--webqq-user-avatar-overlap-center) 18px, transparent 98%, #000 100%);
+  box-shadow: none;
+  -webkit-mask-image: var(--webqq-user-avatar-overlap-cutout);
+  mask-image: var(--webqq-user-avatar-overlap-cutout);
 }
 
 .webqq-composer-user-overflow-avatar,

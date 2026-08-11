@@ -50,6 +50,27 @@ describe('发送框用户头像组', () => {
     })
   })
 
+  it('重叠头像使用 WebQQ 小胶囊的遮罩裁切而不是背景描边', () => {
+    const composerSource = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
+    const composerStyles = readFileSync(resolve('client/styles/webqq-composer.css'), 'utf8')
+
+    expect(composerSource).toContain("'is-overlapped': index > 0")
+    expect(composerStyles).toContain('.webqq-composer-user-switch.is-overlapped .webqq-composer-user-avatar')
+    expect(composerStyles).toContain('-webkit-mask-image: var(--webqq-user-avatar-overlap-cutout)')
+    expect(composerStyles).toContain('mask-image: var(--webqq-user-avatar-overlap-cutout)')
+    expect(composerStyles).toContain('@property --webqq-user-avatar-overlap-center')
+    expect(composerStyles).toContain('initial-value: 39px')
+    expect(composerStyles).toContain('transition: --webqq-user-avatar-overlap-center 0.18s ease')
+    expect(composerStyles).toContain('--webqq-user-avatar-overlap-center: 39px')
+    expect(composerStyles).toContain(
+      '.webqq-composer-user-stack.is-expanded .webqq-composer-user-switch.is-overlapped .webqq-composer-user-avatar',
+    )
+    expect(composerStyles).toContain('--webqq-user-avatar-overlap-center: 45px')
+    expect(composerStyles).toContain('transition: right 0.18s ease, opacity 0.12s ease')
+    const avatarRule = composerStyles.match(/\.webqq-composer-user-avatar \{([\s\S]*?)\n\}/)?.[1] ?? ''
+    expect(avatarRule).not.toContain('box-shadow')
+  })
+
   it('在发送消息控件中统一创建普通用户和机器人', () => {
     const composerSource = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
     const popoverSource = readFileSync(resolve('client/environment-create-popover.vue'), 'utf8')
