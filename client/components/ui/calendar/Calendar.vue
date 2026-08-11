@@ -6,7 +6,7 @@ import { getLocalTimeZone, today } from "@internationalized/date"
 import { createReusableTemplate, reactiveOmit, useVModel } from "@vueuse/core"
 import { CalendarRoot, useDateFormatter, useForwardPropsEmits } from "reka-ui"
 import { createYear, createYearRange, toDate } from "reka-ui/date"
-import { computed, toRaw } from "vue"
+import { computed, ref, toRaw } from "vue"
 import { cn } from "../../../lib/utils"
 import { Select, SelectContent, SelectItem, SelectTrigger } from '../select'
 import { CalendarCell, CalendarCellTrigger, CalendarGrid, CalendarGridBody, CalendarGridHead, CalendarGridRow, CalendarHeadCell, CalendarHeader, CalendarHeading, CalendarNextButton, CalendarPrevButton } from "."
@@ -38,6 +38,18 @@ const yearRange = computed(() => {
 
 const [DefineMonthTemplate, ReuseMonthTemplate] = createReusableTemplate<{ date: DateValue }>()
 const [DefineYearTemplate, ReuseYearTemplate] = createReusableTemplate<{ date: DateValue }>()
+const monthSelectOpen = ref(false)
+const yearSelectOpen = ref(false)
+
+function handleMonthSelectOpen(open: boolean) {
+  monthSelectOpen.value = open
+  if (open) yearSelectOpen.value = false
+}
+
+function handleYearSelectOpen(open: boolean) {
+  yearSelectOpen.value = open
+  if (open) monthSelectOpen.value = false
+}
 
 const forwarded = useForwardPropsEmits(delegatedProps, emits)
 </script>
@@ -48,12 +60,18 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
        会让下拉箭头叠在文字上。SelectTrigger 自身是 flex 布局，文字与箭头天然分列。 -->
   <DefineMonthTemplate v-slot="{ date }">
     <Select
+      :open="monthSelectOpen"
       :model-value="date.month"
+      @update:open="handleMonthSelectOpen"
       @update:model-value="(value) => {
         if (typeof value === 'number') placeholder = placeholder.set({ month: value })
       }"
     >
-      <SelectTrigger size="sm" class="relative h-8 gap-1 px-2 font-medium">
+      <SelectTrigger
+        size="sm"
+        class="relative h-8 gap-1 px-2 font-medium"
+        @pointerdown.capture="yearSelectOpen = false"
+      >
         {{ formatter.custom(toDate(date), { month: 'short' }) }}
       </SelectTrigger>
       <SelectContent class="min-w-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -66,12 +84,18 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
 
   <DefineYearTemplate v-slot="{ date }">
     <Select
+      :open="yearSelectOpen"
       :model-value="date.year"
+      @update:open="handleYearSelectOpen"
       @update:model-value="(value) => {
         if (typeof value === 'number') placeholder = placeholder.set({ year: value })
       }"
     >
-      <SelectTrigger size="sm" class="relative h-8 gap-1 px-2 font-medium">
+      <SelectTrigger
+        size="sm"
+        class="relative h-8 gap-1 px-2 font-medium"
+        @pointerdown.capture="monthSelectOpen = false"
+      >
         {{ formatter.custom(toDate(date), { year: 'numeric' }) }}
       </SelectTrigger>
       <SelectContent class="min-w-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

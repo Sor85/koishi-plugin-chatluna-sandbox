@@ -30,12 +30,15 @@
             <IconCalendar :size="17" aria-hidden="true" />
           </Button>
         </PopoverTrigger>
+        <!-- Select 打开时 reka-ui 会临时禁用 body 指针事件；显式恢复当前 Popover 的命中，
+             避免月份弹层打开后年份触发器的点击穿透到 html 并关闭整个日期控件。 -->
         <PopoverContent
           align="end"
           class="webqq-message-search-date-popover w-auto rounded-md p-0 shadow-md"
+          style="pointer-events: auto"
           data-webqq-message-search-date
           @escape-key-down.stop
-          @pointer-down-outside="handleDatePointerDownOutside"
+          @interact-outside="handleDateInteractOutside"
         >
           <Calendar
             v-model="calendarDate"
@@ -231,11 +234,12 @@ function clearQuery() {
   inputElement.value?.focus()
 }
 
-function handleDatePointerDownOutside(event: Event) {
+function handleDateInteractOutside(event: Event) {
   const target = event.target
   if (!(target instanceof Node)) return
   // 月/年下拉（shadcn Select）portal 到 body，不在日期弹层的 DOM 子树内；
-  // 点击下拉选项会被 Popover 误判为"点击外部"而关闭整个日期弹层，必须豁免。
+  // Popover 会分别把 pointerdown 和后续 focusin 判定为外部交互，因此必须在
+  // interactOutside 统一豁免两条事件链，否则从月份切到年份时仍会关闭日期弹层。
   if (target instanceof Element && target.closest('.sandbox-select-content')) {
     event.preventDefault()
     return
