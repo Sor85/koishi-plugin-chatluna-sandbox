@@ -14,6 +14,7 @@
   justify-content: space-between;
   padding: 0 18px;
   border-bottom: 1px solid var(--webqq-border);
+  background: var(--webqq-bg);
 }
 
 .webqq-info-header strong {
@@ -49,6 +50,7 @@
   overflow-y: auto;
   padding: 12px;
   border-bottom: 1px solid var(--webqq-border);
+  background: var(--webqq-bg);
 }
 
 .webqq-group-announcements h3,

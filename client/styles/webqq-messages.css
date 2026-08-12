@@ -774,7 +774,7 @@
 
   color: #fff;
   background: var(--webqq-bubble-bg);
-  box-shadow: 0 8px 18px var(--webqq-accent-shadow);
+  box-shadow: none;
 }
 
 .webqq-message-stack {

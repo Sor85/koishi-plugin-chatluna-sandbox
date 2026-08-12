@@ -258,7 +258,7 @@
 
 .webqq-forward-target-item.is-active .webqq-forward-target-radio {
   border-color: var(--webqq-accent);
-  background: radial-gradient(circle at center, var(--webqq-accent) 0 5px, transparent 6px);
+  background: var(--webqq-accent);
 }
 
 @media (max-width: 520px) {

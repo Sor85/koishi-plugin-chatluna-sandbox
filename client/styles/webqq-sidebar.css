@@ -43,8 +43,6 @@
   padding: 10px 10px 0;
   border-bottom: 1px solid var(--webqq-border);
   background: transparent;
-  /* 不要手写 -webkit-backdrop-filter，构建时会把无前缀声明吞掉（详见 webqq-workspace.css 毛玻璃注释）。 */
-  backdrop-filter: saturate(180%) blur(20px);
 }
 
 .webqq-sidebar-tabs {
