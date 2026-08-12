@@ -76,5 +76,6 @@ declare module '@koishijs/client' {
   export function send(event: 'onebot-sandbox/terminate-test-space', input: { spaceId: string }): Promise<SandboxTestSpaceSummary>
   export function send(event: 'onebot-sandbox/reactivate-test-space', input: { spaceId: string }): Promise<SandboxTestSpaceSummary>
   export function send(event: 'onebot-sandbox/delete-test-space', input: { spaceId: string }): Promise<void>
+  export function useColorMode(): import('vue').ComputedRef<'light' | 'dark'>
   export function receive<T = unknown>(event: string, listener: (data: T) => void): void
 }

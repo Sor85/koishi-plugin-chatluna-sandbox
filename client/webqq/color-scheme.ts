@@ -1,17 +1,17 @@
-import { useMediaQuery } from '@vueuse/core'
+import { useColorMode } from '@koishijs/client'
 import { computed, onBeforeUnmount, watchEffect, type Ref } from 'vue'
 import type { SandboxAppearance } from '../../src/types'
+import { resolveSandboxColorMode } from './resolve-color-mode'
 
-// 把 webQQColorMode 的 auto 解析为实际配色再交给模板输出：
-// webqq-*.css 的暗色规则只匹配 data-color-mode="dark"，若把 "auto" 原样写到 DOM，
-// 跟随系统进入暗色时这些规则全部失效（气泡、输入区等仍是亮色）。
-// 同时把解析结果同步到 body，供 teleport 到 body 的 Dialog/Popover/Select 面板
-// 跟随工作区配色，而不是控制台自身的 .dark 主题。
+// Koishi 已经把控制台的自动主题解析成最终明暗模式；插件的 auto 必须继承该响应式结果，
+// 不能再次读取 prefers-color-scheme，否则控制台被用户强制设为深色时 WebQQ 仍会跟随操作系统亮色。
+// 同时把解析结果同步到 body，供 teleport 到 body 的 Dialog/Popover/Select 面板继承工作区配色。
 export function useResolvedColorMode(appearance: Ref<SandboxAppearance>): Ref<'light' | 'dark'> {
-  const prefersDark = useMediaQuery('(prefers-color-scheme: dark)')
-  const resolved = computed<'light' | 'dark'>(() => appearance.value.webQQColorMode === 'auto'
-    ? (prefersDark.value ? 'dark' : 'light')
-    : appearance.value.webQQColorMode)
+  const koishiColorMode = useColorMode()
+  const resolved = computed<'light' | 'dark'>(() => resolveSandboxColorMode(
+    appearance.value.webQQColorMode,
+    koishiColorMode.value,
+  ))
   watchEffect(() => {
     document.body.dataset.sandboxColorScheme = resolved.value
   })
