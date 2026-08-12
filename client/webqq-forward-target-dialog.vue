@@ -33,7 +33,7 @@
       </div>
 
       <div
-        v-webqq-scrollbar="{ tone: 'accent' }"
+        v-webqq-scrollbar="{ showOverlay: false, tone: 'accent' }"
         class="webqq-forward-target-list"
         role="listbox"
         aria-label="目标会话"

@@ -123,7 +123,7 @@ describe('环境管理组件传输边界', () => {
     const createPopover = readFileSync(resolve('client/environment-create-popover.vue'), 'utf8')
 
     expect(dialogContent).toContain('gap: var(--webqq-secondary-row-gap, 8px)')
-    expect(dialogContent).toContain('v-webqq-scrollbar="{ zIndex: 160 }"')
+    expect(dialogContent).toContain('v-webqq-scrollbar="{ showOverlay: false, zIndex: 160 }"')
     expect(dialogTitle).toContain('margin: 0')
     expect(dialogDescription).toContain('margin: 0')
     expect(dialogIndex).toContain("DialogHeader")
@@ -151,6 +151,7 @@ describe('环境管理组件传输边界', () => {
     expect(popoverContent).toContain('sandbox-popover-content webqq-solid-secondary-surface')
     expect(selectContent).toContain('z-[200]')
     expect(selectContent).toContain('sandbox-select-content webqq-solid-secondary-surface')
+    expect(selectContent).toContain('v-webqq-scrollbar="{ showOverlay: false }"')
     expect(primitives).toContain('.sandbox-select-content')
     const dialogPopoverRule = primitives.slice(primitives.indexOf('.sandbox-dialog-content,\n.sandbox-popover-content {')).split('}')[0]
     const solidSurfaceRule = primitives.slice(primitives.indexOf('.webqq-solid-secondary-surface:not(.is-frosted) {')).split('}')[0]

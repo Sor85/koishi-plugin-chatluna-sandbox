@@ -8,7 +8,7 @@
       >
         <strong>贴表情</strong>
       </header>
-      <div v-webqq-scrollbar="{ tone: 'accent', zIndex: 140 }" class="webqq-emoji-picker">
+      <div v-webqq-scrollbar="{ showOverlay: false, tone: 'accent', zIndex: 140 }" class="webqq-emoji-picker">
         <Input
         v-model="query"
         class="webqq-emoji-picker-search"

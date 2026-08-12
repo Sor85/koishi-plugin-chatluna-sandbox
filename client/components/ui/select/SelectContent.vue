@@ -44,7 +44,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
     >
       <SelectScrollUpButton />
       <SelectViewport as-child>
-        <div v-webqq-scrollbar :class="cn('p-1', position === 'popper' && 'h-(--reka-select-trigger-height) w-full min-w-(--reka-select-trigger-width) scroll-my-1')">
+        <div v-webqq-scrollbar="{ showOverlay: false }" :class="cn('p-1', position === 'popper' && 'h-(--reka-select-trigger-height) w-full min-w-(--reka-select-trigger-width) scroll-my-1')">
           <slot />
         </div>
       </SelectViewport>

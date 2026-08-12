@@ -10,6 +10,7 @@ interface WebQQScrollbarState {
   element: HTMLElement
   overlay: HTMLDivElement
   thumb: HTMLDivElement
+  showOverlay: boolean
   resizeObserver?: ResizeObserver
   mutationObserver?: MutationObserver
   frame: number
@@ -28,6 +29,7 @@ const states = new WeakMap<HTMLElement, WebQQScrollbarState>()
 
 interface WebQQScrollbarOptions {
   hideOnNarrow?: boolean
+  showOverlay?: boolean
   tone?: 'accent' | 'neutral'
   zIndex?: number
 }
@@ -43,7 +45,7 @@ function addListener(
 }
 
 function setVisible(state: WebQQScrollbarState, visible: boolean) {
-  state.overlay.classList.toggle('is-visible', visible)
+  state.overlay.classList.toggle('is-visible', visible && state.showOverlay)
 }
 
 function clearHideTimer(state: WebQQScrollbarState) {
@@ -161,6 +163,9 @@ function applyScrollbarOptions(
   binding: DirectiveBinding<WebQQScrollbarOptions | undefined>,
 ) {
   const { overlay } = state
+  state.showOverlay = binding.value?.showOverlay !== false
+  // 二级页面保留滚动能力，但设计规范要求隐藏挂载到 body 的自定义轨道。
+  if (!state.showOverlay) setVisible(state, false)
   overlay.classList.toggle('is-hidden-on-narrow', Boolean(binding.value?.hideOnNarrow))
   overlay.classList.toggle('is-accent', binding.value?.tone === 'accent')
   overlay.style.zIndex = String(binding.value?.zIndex ?? 100)
@@ -175,6 +180,7 @@ export const vWebqqScrollbar: Directive<HTMLElement, WebQQScrollbarOptions | und
       element,
       overlay,
       thumb,
+      showOverlay: binding.value?.showOverlay !== false,
       frame: 0,
       hideTimer: 0,
       hovering: false,

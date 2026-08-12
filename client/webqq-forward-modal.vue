@@ -26,7 +26,7 @@
             <IconX :size="18" aria-hidden="true" />
           </button>
         </header>
-        <div v-webqq-scrollbar class="webqq-forward-modal-body">
+        <div v-webqq-scrollbar="{ showOverlay: false }" class="webqq-forward-modal-body">
           <article
             v-for="(item, itemIndex) in items"
             :key="`forward:${itemIndex}`"

@@ -7,6 +7,7 @@ describe('WebQQ 左侧栏', () => {
     const source = readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
     const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
 
+    const notificationSource = readFileSync(resolve('client/notification-menu.vue'), 'utf8')
     const sidebarStyles = readFileSync(resolve('client/styles/webqq-sidebar.css'), 'utf8')
 
     expect(source).toContain('<nav class="webqq-rail"')
@@ -37,6 +38,7 @@ describe('WebQQ 左侧栏', () => {
     expect(source).not.toContain("'is-color-auto'")
     expect(source).toContain(':color-mode="colorMode"')
     expect(source).toContain("colorMode: 'light' | 'dark'")
+    expect(notificationSource).toContain('v-webqq-scrollbar="{ showOverlay: false }"')
     const notificationRule = sidebarStyles.slice(sidebarStyles.indexOf('.webqq-notification-popover {')).split('}')[0]
     const plainNotificationRule = sidebarStyles.slice(sidebarStyles.indexOf('.webqq-notification-popover.is-plain {')).split('}')[0]
     const darkNotificationRule = sidebarStyles.slice(sidebarStyles.indexOf('.webqq-notification-popover.is-color-dark {')).split('}')[0]

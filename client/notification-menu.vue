@@ -4,7 +4,7 @@
       <Button variant="ghost" size="sm" :class="{ 'is-active': tab === 'friends' }" @click="tab = 'friends'">好友申请</Button>
       <Button variant="ghost" size="sm" :class="{ 'is-active': tab === 'groups' }" @click="tab = 'groups'">群通知</Button>
     </div>
-    <div v-webqq-scrollbar class="webqq-notification-body">
+    <div v-webqq-scrollbar="{ showOverlay: false }" class="webqq-notification-body">
       <div v-if="errorText" class="webqq-notification-empty is-error">{{ errorText }}</div>
       <div v-else-if="!visibleRequests.length" class="webqq-notification-empty">暂无通知</div>
       <div v-else class="webqq-notifications">
