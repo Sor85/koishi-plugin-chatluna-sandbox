@@ -164,6 +164,7 @@ import WebqqMessageList, { type WebqqMessageListModel } from './webqq-message-li
 import WebqqMessageSearch, { type WebqqMessageSearchCriteria } from './webqq-message-search.vue'
 import { buildForwardPreview } from './webqq/forward-preview'
 import { localDateToMessageSearchRange } from './webqq/message-search-date'
+import { formatMentionContent } from './webqq/mention'
 import { ensureMessageLoaded } from './webqq/message-reveal'
 import {
   isRecalledMessage,
@@ -269,7 +270,7 @@ const composerModel = computed<WebqqComposerModel>(() => ({
     ? {
         id: replyingToMessage.value.id,
         authorName: props.model.participantNames[replyingToMessage.value.authorId] ?? replyingToMessage.value.authorId,
-        content: replyingToMessage.value.content,
+        content: formatMentionContent(replyingToMessage.value.content, props.model.participantNames),
       }
     : undefined,
 }))

@@ -29,6 +29,7 @@ describe('WebQQ 聊天区域', () => {
     expect(source).toContain('<main class="webqq-chat"')
     expect(source).toContain('<WebqqMessageList')
     expect(source).toContain('<WebqqComposer')
+    expect(source).toContain('formatMentionContent(replyingToMessage.value.content, props.model.participantNames)')
     expect(source).toContain('watch(() => props.model.conversationId')
     expect(source).toContain('forwardTargets: WebqqForwardTargetModel')
     expect(source).toContain('sendForwardMessage:')
