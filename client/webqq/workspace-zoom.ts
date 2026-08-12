@@ -4,6 +4,7 @@ import { animate, cubicBezier, stagger } from 'animejs'
 const zoomEase = cubicBezier(0.32, 0.72, 0, 1)
 const ZOOM_DURATION = 440
 const CARD_RADIUS = 18
+const ZOOMING_CLASS = 'onebot-sandbox-workspace-zooming'
 
 let activeZoom: ReturnType<typeof animate> | undefined
 
@@ -30,6 +31,9 @@ function runZoom(element: HTMLElement, fromRect: DOMRect, radius: [string, strin
   const scale = fromRect.width / targetRect.width
   const x = fromRect.left - targetRect.left
   const y = fromRect.top - targetRect.top
+  // 自定义滚动条挂在 body，而工作区在缩放期间独立 transform；若消息列表此时因置底触发 scroll，
+  // 滑块会脱离聊天区域短暂悬在动画起点。用全局状态覆盖完整缩放周期，统一抑制这类 body 级覆盖层。
+  document.documentElement.classList.add(ZOOMING_CLASS)
   // 卡片自带 transition: transform 180ms（hover 上浮），会把 anime.js 每帧写入的 transform 再平滑一次，
   // 表现为初始帧从网格位飞向全屏再折返的大幅弹跳，动画期间必须整体禁用过渡。
   element.style.transition = 'none'
@@ -44,6 +48,7 @@ function runZoom(element: HTMLElement, fromRect: DOMRect, radius: [string, strin
     element.style.transformOrigin = ''
     element.style.willChange = ''
     element.style.borderRadius = ''
+    document.documentElement.classList.remove(ZOOMING_CLASS)
     onCleanup?.()
   }
   const animation = animate(element, {

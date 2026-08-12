@@ -39,6 +39,12 @@
   opacity: 1;
 }
 
+/* 空间缩放只变换工作区，body 级滚动条不会随动；动画期间隐藏可避免滑块悬在过渡画面中。 */
+.onebot-sandbox-workspace-zooming .webqq-scrollbar-overlay {
+  opacity: 0 !important;
+  transition: none;
+}
+
 .webqq-scrollbar-thumb {
   position: absolute;
   top: var(--webqq-scrollbar-thumb-top);

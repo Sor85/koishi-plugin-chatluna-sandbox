@@ -38,6 +38,9 @@ describe('AI 测试空间总览', () => {
     // ease 字符串 'cubicBezier(...)' 在 anime.js 4 已废弃并静默降级为线性，必须导入函数形式。
     expect(zoom).toContain("import { animate, cubicBezier, stagger } from 'animejs'")
     expect(zoom).toContain('cubicBezier(0.32, 0.72, 0, 1)')
+    expect(zoom).toContain("const ZOOMING_CLASS = 'onebot-sandbox-workspace-zooming'")
+    expect(zoom).toContain('document.documentElement.classList.add(ZOOMING_CLASS)')
+    expect(zoom).toContain('document.documentElement.classList.remove(ZOOMING_CLASS)')
     expect(zoom).toContain('prefers-reduced-motion')
   })
 

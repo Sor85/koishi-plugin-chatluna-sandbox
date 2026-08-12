@@ -27,6 +27,8 @@ describe('WebQQ 共享样式', () => {
     const scrollbarRule = primitives.slice(primitives.indexOf('.webqq-scrollbar-overlay {')).split('}')[0]
     expect(scrollbarRule).toContain('z-index: 100')
     expect(scrollbarRule).not.toContain('z-index: 10001')
+    expect(primitives).toContain('.onebot-sandbox-workspace-zooming .webqq-scrollbar-overlay')
+    expect(primitives).toContain('opacity: 0 !important')
     expect(primitives).not.toContain('cursor:')
     expect(overlays).not.toContain('cursor:')
     expect(overlays).toContain('--webqq-secondary-row-gap: 8px')
