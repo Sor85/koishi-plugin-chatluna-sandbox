@@ -253,8 +253,11 @@ describe('WebQQ 消息列表', () => {
     expect(source).toContain('<WebqqMessageReactions')
     expect(source).toContain('贴表情')
     expect(source).toContain('canReactToMessage(message)')
-    // 主动入口仅限群消息，私聊不显示“贴表情”。
-    expect(source).toContain('!!props.model.currentGroup')
+    // 私聊与群聊都允许主动贴表情，不再依赖当前群组。
+    const reactionPermissionSource = source.slice(source.indexOf('function canReactToMessage'), source.indexOf('function toggleReaction'))
+    expect(reactionPermissionSource).not.toContain('props.model.currentGroup')
+    expect(reactionPermissionSource).toContain('!message.event')
+    expect(reactionPermissionSource).toContain('!isRecalledMessage(message)')
     expect(source).toContain("emit('openReactionPicker', message.id)")
     expect(source).toContain("emit('setMessageReaction', message.id, emojiId, enabled)")
     expect(reactionsSource).toContain('class="webqq-message-reaction"')

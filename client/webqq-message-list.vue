@@ -639,17 +639,15 @@ function canRecallMessage(message: SandboxMessage) {
   return target.role !== 'owner' && !(actor.role === 'admin' && target.role === 'admin')
 }
 
-// 主动贴表情仅限群消息；私聊不展示入口。撤回消息只读展示已有回应。
+// 私聊与群聊共用回应入口；事件消息不可回应，撤回消息只读展示已有回应。
 function canReactToMessage(message: SandboxMessage) {
-  return !!props.model.currentGroup
-    && !message.event
+  return !message.event
     && !isRecalledMessage(message)
     && !!props.model.currentOperatorId
 }
 
 function isReactionReadonly(message: SandboxMessage) {
-  return !props.model.currentGroup
-    || !!message.event
+  return !!message.event
     || isRecalledMessage(message)
     || !props.model.currentOperatorId
 }
