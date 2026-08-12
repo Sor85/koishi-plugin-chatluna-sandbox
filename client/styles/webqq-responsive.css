@@ -158,31 +158,31 @@
 
 /* 缩略图始终绘制固定桌面画布；若把这些覆盖放进 viewport 媒体查询，
    卡片自身虽很窄却会跟随浏览器宽度切换布局，导致预览与正式聊天页不再 1:1。 */
-.webqq-space-thumbnail-workspace,
-.webqq-space-thumbnail-workspace.is-details-open,
-.webqq-space-thumbnail-workspace.is-details-closed {
+:is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace),
+:is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace).is-details-open,
+:is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace).is-details-closed {
   grid-template-columns: 72px 300px minmax(360px, 1fr) 280px;
 }
 
-.webqq-space-thumbnail-workspace .webqq-rail {
+:is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) .webqq-rail {
   grid-column: 1;
   padding: 10px 8px;
 }
 
-.webqq-space-thumbnail-workspace .webqq-conversations {
+:is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) .webqq-conversations {
   display: flex;
   grid-column: 2;
   grid-row: 1;
 }
 
-.webqq-space-thumbnail-workspace.is-details-open .webqq-chat {
+:is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace).is-details-open .webqq-chat {
   display: grid;
   visibility: visible;
   grid-column: 3;
   grid-row: 1;
 }
 
-.webqq-space-thumbnail-workspace.is-details-open .webqq-profile {
+:is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace).is-details-open .webqq-profile {
   z-index: auto;
   display: flex;
   width: auto;
@@ -191,23 +191,23 @@
   justify-self: stretch;
 }
 
-.webqq-space-thumbnail-workspace .webqq-info-close,
-.webqq-space-thumbnail-workspace .webqq-chat-back {
+:is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) .webqq-info-close,
+:is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) .webqq-chat-back {
   display: none;
 }
 
-.webqq-space-thumbnail-workspace .webqq-composer-layout-root {
+:is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) .webqq-composer-layout-root {
   bottom: 20px;
 }
 
-.webqq-space-thumbnail-workspace .webqq-composer {
+:is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) .webqq-composer {
   right: calc(50% - 230px);
   left: auto;
   margin: 0;
   max-width: calc(100% - 96px);
 }
 
-.webqq-space-thumbnail-workspace .webqq-messages {
+:is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) .webqq-messages {
   padding-right: 28px;
   padding-left: 28px;
 }

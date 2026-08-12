@@ -1,9 +1,10 @@
 import { send } from '@koishijs/client'
-import { nextTick, onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, shallowRef, type Ref } from 'vue'
 import type { SandboxTestSpaceSummary } from '../../src/test-spaces'
 import type { SandboxSnapshot } from '../../src/types'
 import { createWorkspaceController } from './workspace-controller'
 import type { SandboxWorkspaceView } from './workspace-state'
+import { captureWorkspaceThumbnail, type WorkspaceThumbnailCapture } from './workspace-thumbnail-capture'
 import { captureZoomRect, staggerCardsIn, zoomCardFromRect, zoomWorkspaceFromRect } from './workspace-zoom'
 
 const emptySnapshot: SandboxSnapshot = {
@@ -24,7 +25,15 @@ export function createAiTestSpaceShell(
 ) {
   const testSpaces = ref<SandboxTestSpaceSummary[]>([])
   const mainSnapshot = ref<SandboxSnapshot>(emptySnapshot)
+  const thumbnailCaptures = shallowRef<Record<string, WorkspaceThumbnailCapture>>({})
   let refreshTimer: ReturnType<typeof setInterval> | undefined
+
+  function rememberCurrentWorkspaceThumbnail() {
+    const workspace = document.querySelector<HTMLElement>('.webqq-workspace')
+    if (!workspace || currentView.value === 'spaces') return
+    const key = activeSpaceId.value ?? 'main'
+    thumbnailCaptures.value = { ...thumbnailCaptures.value, [key]: captureWorkspaceThumbnail(workspace) }
+  }
 
   async function loadTestSpaces() {
     const [spaces, mainWorkspace] = await Promise.all([
@@ -45,6 +54,8 @@ export function createAiTestSpaceShell(
       await loadTestSpaces()
       return
     }
+    // 在切到总览前保存完整可见 DOM；领域快照无法表达当前页签、滚动位置与详情栏开关。
+    rememberCurrentWorkspaceThumbnail()
     // 记录工作区当前位置，切换视图后让活动空间的卡片从这里缩回网格位。
     const fromRect = captureZoomRect(document.querySelector('.webqq-workspace'))
     // 先取数据再切视图：nextTick 发生在浏览器绘制前，卡片的初始 transform 能赶在首帧写入；
@@ -102,5 +113,5 @@ export function createAiTestSpaceShell(
     if (refreshTimer) clearInterval(refreshTimer)
   })
 
-  return { createTestSpace, enterTestSpace, handleTestSpaceAction, mainSnapshot, selectNavigation, testSpaces }
+  return { createTestSpace, enterTestSpace, handleTestSpaceAction, mainSnapshot, selectNavigation, testSpaces, thumbnailCaptures }
 }

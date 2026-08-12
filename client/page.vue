@@ -36,6 +36,7 @@
           v-if="currentView === 'spaces'"
           :spaces="testSpaces"
           :main-snapshot="mainSnapshot"
+          :thumbnail-captures="thumbnailCaptures"
           :appearance="appearance"
           :color-mode="resolvedColorMode"
           @enter="enterTestSpace"
@@ -211,7 +212,7 @@ function mentionGroupMember(targetId: string) {
   }
 }
 
-const { createTestSpace, enterTestSpace, handleTestSpaceAction, mainSnapshot, selectNavigation, testSpaces } = createAiTestSpaceShell(
+const { createTestSpace, enterTestSpace, handleTestSpaceAction, mainSnapshot, selectNavigation, testSpaces, thumbnailCaptures } = createAiTestSpaceShell(
   workspaceController,
   activeSpaceId,
   currentView,

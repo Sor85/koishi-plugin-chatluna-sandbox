@@ -13,7 +13,13 @@
 
     <div class="webqq-space-grid">
       <article class="webqq-space-card is-main" data-space-id="main" tabindex="0" @click="openCard(undefined)" @keydown.enter="openCard(undefined)">
-        <WorkspaceThumbnail :snapshot="mainSnapshot" :appearance="appearance" :color-mode="colorMode" />
+        <WorkspaceThumbnail
+          :snapshot="mainSnapshot"
+          :capture="thumbnailCaptures.main"
+          :space-id="undefined"
+          :appearance="appearance"
+          :color-mode="colorMode"
+        />
         <footer><div><strong>主模拟 QQ 环境</strong><small>固定空间 · 不可删除</small></div><Badge variant="secondary">主环境</Badge></footer>
       </article>
 
@@ -29,6 +35,8 @@
       >
         <WorkspaceThumbnail
           :snapshot="space.snapshot"
+          :capture="thumbnailCaptures[space.id]"
+          :space-id="space.id"
           :appearance="appearance"
           :color-mode="colorMode"
           :running="space.status === 'running'"
@@ -61,10 +69,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import WorkspaceThumbnail from './workspace-thumbnail.vue'
 import type { SandboxAppearance, SandboxSnapshot } from '../src/types'
 import type { SandboxTestSpaceStatus, SandboxTestSpaceSummary } from '../src/test-spaces'
+import type { WorkspaceThumbnailCapture } from './webqq/workspace-thumbnail-capture'
 
 const props = defineProps<{
   spaces: SandboxTestSpaceSummary[]
   mainSnapshot: SandboxSnapshot
+  thumbnailCaptures: Record<string, WorkspaceThumbnailCapture>
   appearance: SandboxAppearance
   colorMode: 'light' | 'dark'
 }>()
