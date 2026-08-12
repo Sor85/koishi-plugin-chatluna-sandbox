@@ -518,9 +518,19 @@
 
   width: 96px;
   height: 96px;
-  border: 5px solid color-mix(in srgb, var(--webqq-accent) 18%, transparent);
+  overflow: hidden;
+  border: 0;
+  border-radius: 50%;
   box-shadow: 0 8px 22px rgb(15 23 42 / 12%);
   font-size: 28px;
+  /* 资料头像完整铺满圆形区域；重叠挖空只允许出现在发送消息控件。 */
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+.webqq-profile-card-hero .webqq-avatar-profile > img {
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 
 .webqq-profile-card-hero h2 {

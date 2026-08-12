@@ -65,6 +65,15 @@ describe('WebQQ 共享样式', () => {
     expect(profileAvatarRule).toContain('--webqq-avatar-size: 96px')
     expect(profileAvatarRule).toContain('width: 96px')
     expect(profileAvatarRule).toContain('height: 96px')
+    expect(profileAvatarRule).toContain('overflow: hidden')
+    expect(profileAvatarRule).toContain('border: 0')
+    expect(profileAvatarRule).toContain('border-radius: 50%')
+    expect(profileAvatarRule).toContain('-webkit-mask-image: none')
+    expect(profileAvatarRule).toContain('mask-image: none')
+    expect(profileAvatarRule).not.toContain('var(--webqq-accent)')
+    const profileAvatarImageRule = overlays.slice(overlays.indexOf('.webqq-profile-card-hero .webqq-avatar-profile > img {')).split('}')[0]
+    expect(profileAvatarImageRule).toContain('-webkit-mask-image: none')
+    expect(profileAvatarImageRule).toContain('mask-image: none')
     const profileFieldsRule = overlays.slice(overlays.indexOf('.webqq-profile-card-fields {')).split('}')[0]
     expect(profileFieldsRule).not.toContain('border')
     const profileValueRule = overlays.slice(overlays.indexOf('.webqq-profile-card-fields dd {')).split('}')[0]
