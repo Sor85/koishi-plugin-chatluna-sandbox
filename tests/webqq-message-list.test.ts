@@ -61,6 +61,9 @@ describe('WebQQ 消息列表', () => {
     expect(styles).toContain('width: 260px')
     expect(styles).toContain('.webqq-message-forward-entry')
     expect(styles).toContain("content: \"›\"")
+    expect(styles).toContain('border-left-color: rgb(161 161 170 / 62%)')
+    expect(styles).toContain('background: rgb(39 39 42 / 62%)')
+    expect(styles).toContain('border-top-color: rgb(161 161 170 / 28%)')
     expect(modalSource).toContain('class="webqq-forward-modal-backdrop"')
     expect(modalSource).toContain('aria-label="合并转发消息"')
     expect(modalSource).toContain('@keydown.esc="emit(\'close\')"')
@@ -75,13 +78,22 @@ describe('WebQQ 消息列表', () => {
     expect(overlays).toContain('width: min(480px, calc(100vw - 32px))')
     expect(overlays).toContain('max-height: min(80vh, 620px)')
     expect(overlays).toContain('padding: 14px 16px 28px')
+    expect(overlays).toContain('border-color: rgb(113 113 122 / 44%)')
+    expect(overlays).toContain('background: rgb(44 44 48 / 98%)')
     expect(overlays).not.toContain('cursor:')
   })
 
-  it('显式深色主题下当前操作者气泡仍使用强调色', () => {
+  it('显式深色主题下区分其他用户与当前操作者气泡', () => {
     const styles = readFileSync(resolve('client/styles/webqq-messages.css'), 'utf8')
-    const darkIncomingRule = styles.indexOf('.webqq-workspace[data-color-mode="dark"] .webqq-message-bubble')
+    const darkIncomingRule = styles.indexOf(
+      '.webqq-workspace[data-color-mode="dark"] .webqq-message-bubble {\n  --webqq-bubble-bg:',
+    )
     const darkOutgoingRule = styles.lastIndexOf('.webqq-workspace[data-color-mode="dark"] .webqq-message-row.is-outgoing .webqq-message-bubble')
+
+    const darkIncomingBubble = styles.slice(darkIncomingRule, darkIncomingRule + 420)
+    expect(darkIncomingBubble).toContain('--webqq-bubble-bg: rgb(57 57 63)')
+    expect(darkIncomingBubble).toContain('border-color: rgb(113 113 122 / 36%)')
+    expect(darkIncomingBubble).toContain('background: var(--webqq-bubble-bg)')
 
     expect(darkOutgoingRule).toBeGreaterThan(darkIncomingRule)
     const darkOutgoingBubble = styles.slice(darkOutgoingRule, darkOutgoingRule + 360)

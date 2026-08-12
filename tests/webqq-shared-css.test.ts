@@ -38,11 +38,13 @@ describe('WebQQ 共享样式', () => {
     const profilePageRule = overlays.slice(overlays.indexOf('.webqq-profile-card-page {')).split('}')[0]
     expect(profilePageRule).toContain('width: max-content')
     expect(profilePageRule).toContain('max-width: min(320px')
+    expect(profilePageRule).toContain('border-color: transparent')
     const scopedProfileHeaderRule = overlays
       .slice(overlays.indexOf('.webqq-secondary-page.onebot-sandbox-profile-card-page > .webqq-secondary-page-header {'))
       .split('}')[0]
     expect(scopedProfileHeaderRule).toContain('position: relative')
     expect(scopedProfileHeaderRule).toContain('inset: auto')
+    expect(scopedProfileHeaderRule).toContain('background: var(--webqq-bg)')
     const profileCardRule = overlays.slice(overlays.indexOf('.webqq-profile-card {')).split('}')[0]
     expect(profileCardRule).toContain('overflow-y: auto')
     expect(profileCardRule).toContain('scrollbar-width: none')

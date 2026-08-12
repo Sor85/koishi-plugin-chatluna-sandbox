@@ -55,8 +55,7 @@
                 :class="['webqq-notification-popover', {
                   'is-frosted': appearance.enableWebQQFrostedGlass,
                   'is-plain': !appearance.enableWebQQFrostedGlass,
-                  'is-color-dark': appearance.webQQColorMode === 'dark',
-                  'is-color-auto': appearance.webQQColorMode === 'auto',
+                  'is-color-dark': colorMode === 'dark',
                 }]"
                 :style="{ '--webqq-accent': appearance.webQQAccentColor, '--webqq-muted': '#64748b' }"
               >
@@ -89,6 +88,7 @@
               type="group"
               :current-operator="model.currentOperator"
               :bots="model.bots"
+              :color-mode="colorMode"
               :accent-color="appearance.webQQAccentColor"
               @submit="manageEnvironment"
             >
@@ -357,7 +357,11 @@ export interface WebqqSidebarModel {
   groupNames: Record<string, string>
 }
 
-const props = defineProps<{ model: WebqqSidebarModel, activeSpaceId?: string }>()
+const props = defineProps<{
+  model: WebqqSidebarModel
+  activeSpaceId?: string
+  colorMode: 'light' | 'dark'
+}>()
 const emit = defineEmits<{
   selectView: [view: WebqqSidebarModel['currentView']]
   selectConversation: [conversationId: string]
@@ -372,6 +376,7 @@ const emit = defineEmits<{
 }>()
 
 const appearance = computed(() => props.model.appearance)
+const colorMode = computed(() => props.colorMode)
 const currentView = computed(() => props.model.currentView)
 const isWebqqView = computed(() => currentView.value === 'messages' || currentView.value === 'contacts')
 const activeConversationId = computed(() => props.model.activeConversationId)

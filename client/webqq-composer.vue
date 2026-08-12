@@ -119,6 +119,7 @@
             <EnvironmentCreatePopover
               type="participant"
               side="top"
+              :color-mode="model.colorMode"
               :accent-color="model.accentColor"
               @submit="forwardManageEnvironment"
               @open-change="handleCreateParticipantOpen"
@@ -239,6 +240,7 @@ export interface WebqqComposerModel {
   mentionRequest?: { id: string, name: string, requestId: number }
   mentionCandidates?: MentionCandidate[]
   accentColor: string
+  colorMode: 'light' | 'dark'
   externalError?: string
 }
 

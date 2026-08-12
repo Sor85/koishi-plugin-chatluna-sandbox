@@ -273,38 +273,36 @@
   backdrop-filter: none;
 }
 
-.webqq-notification-popover.is-color-dark,
+.webqq-notification-popover.is-color-dark {
+  border-color: rgb(113 113 122 / 44%);
+  color: #edf2f7;
+  background: rgb(44 44 48 / 98%);
+  box-shadow: 0 18px 42px rgb(9 9 11 / 42%);
+}
+
+.webqq-notification-popover.is-color-dark .webqq-notification-tabs {
+  border-bottom-color: rgb(113 113 122 / 36%);
+}
+
 .webqq-notification-popover.is-color-dark .webqq-notification-card {
-  border-color: rgb(148 163 184 / 24%);
-  background: rgb(15 23 42 / 90%);
+  border-color: rgb(113 113 122 / 36%);
+  background: rgb(57 57 63);
+  box-shadow: none;
 }
 
 .webqq-notification-popover.is-color-dark .webqq-notification-tabs button {
-  color: #94a3b8;
+  color: #a1a1aa;
 }
 
 .webqq-notification-popover.is-color-dark .webqq-notification-tabs button.is-active,
 .webqq-notification-popover.is-color-dark .webqq-notification-actions button {
-  color: #dbeafe;
-  background: rgb(37 99 235 / 26%);
+  color: var(--webqq-accent);
+  background: color-mix(in srgb, var(--webqq-accent) 16%, transparent);
 }
 
-@media (prefers-color-scheme: dark) {
-  .webqq-notification-popover.is-color-auto,
-  .webqq-notification-popover.is-color-auto .webqq-notification-card {
-    border-color: rgb(148 163 184 / 24%);
-    background: rgb(15 23 42 / 90%);
-  }
-
-  .webqq-notification-popover.is-color-auto .webqq-notification-tabs button {
-    color: #94a3b8;
-  }
-
-  .webqq-notification-popover.is-color-auto .webqq-notification-tabs button.is-active,
-  .webqq-notification-popover.is-color-auto .webqq-notification-actions button {
-    color: #dbeafe;
-    background: rgb(37 99 235 / 26%);
-  }
+.webqq-notification-popover.is-color-dark .webqq-notification-actions button:last-child {
+  color: #d4d4d8;
+  background: rgb(113 113 122 / 24%);
 }
 
 .webqq-search {

@@ -297,8 +297,8 @@
 .webqq-workspace[data-color-mode="dark"] .webqq-announcement-editor,
 .webqq-workspace[data-color-mode="dark"] .webqq-group-announcement,
 .webqq-workspace[data-color-mode="dark"] .webqq-group-members > input {
-  border-color: rgb(148 163 184 / 24%);
-  background: rgb(15 23 42 / 62%);
+  border-color: rgb(113 113 122 / 36%);
+  background: rgb(57 57 63);
 }
 .webqq-profile-hero {
   display: flex;

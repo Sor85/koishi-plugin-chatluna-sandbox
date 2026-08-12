@@ -472,14 +472,16 @@
   width: max-content;
   min-width: 260px;
   max-width: min(320px, calc(100vw - 24px));
+  border-color: transparent;
 }
 
 .webqq-secondary-page.onebot-sandbox-profile-card-page > .webqq-secondary-page-header {
-  /* Koishi 会把各插件样式加载到同一页面；onebot-webqq 的同名通用标题栏是 absolute。
-     资料卡依赖 Grid 首行给标题栏占位，因此在插件专属作用域内恢复文档流，避免头像被覆盖。 */
+  /* Koishi 会把各插件样式加载到同一页面；onebot-webqq 的同名通用标题栏会覆盖定位与背景。
+     资料卡依赖 Grid 首行给标题栏占位，并需要显式恢复当前插件令牌色，避免顶栏回退为白色。 */
   position: relative;
   inset: auto;
   z-index: auto;
+  background: var(--webqq-bg);
 }
 
 .webqq-profile-card {
@@ -678,26 +680,26 @@ body[data-sandbox-color-scheme="dark"] .webqq-form-error {
 }
 
 body[data-sandbox-color-scheme="dark"] .webqq-forward-modal {
-  border-color: rgb(51 65 85 / 88%);
-  background: rgb(15 23 42 / 96%);
-  box-shadow: 0 24px 70px rgb(2 6 23 / 48%);
+  border-color: rgb(113 113 122 / 44%);
+  background: rgb(44 44 48 / 98%);
+  box-shadow: 0 24px 70px rgb(9 9 11 / 48%);
 }
 
 body[data-sandbox-color-scheme="dark"] .webqq-forward-modal-header {
-  border-bottom-color: rgb(51 65 85 / 88%);
+  border-bottom-color: rgb(113 113 122 / 36%);
 }
 
 body[data-sandbox-color-scheme="dark"] .webqq-forward-modal-header strong {
-  color: #e2e8f0;
+  color: #f4f4f5;
 }
 
 body[data-sandbox-color-scheme="dark"] .webqq-forward-modal-header button {
-  color: #94a3b8;
+  color: #a1a1aa;
 }
 
 body[data-sandbox-color-scheme="dark"] .webqq-forward-modal-header button:hover,
 body[data-sandbox-color-scheme="dark"] .webqq-forward-modal-header button:focus-visible {
-  background: rgb(148 163 184 / 16%);
+  background: rgb(113 113 122 / 20%);
 }
 
 /* 图片全屏预览：teleport 到 body，与工作区令牌隔离，遮罩固定深色（亮暗通用）。 */

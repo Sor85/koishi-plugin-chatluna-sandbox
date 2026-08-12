@@ -19,7 +19,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
       data-slot="context-menu-content"
       v-bind="{ ...$attrs, ...forwarded }"
       :class="cn(
-        'z-50 min-w-44 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 text-slate-900 shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
+        'z-50 min-w-44 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 text-slate-900 shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out dark:border-[#52525b] dark:bg-[#39393f] dark:text-[#f4f4f5]',
         props.class,
       )"
     >

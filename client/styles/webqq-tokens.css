@@ -13,15 +13,15 @@
 
 /* data-color-mode 由 useResolvedColorMode 解析后输出，只会是 light/dark，不存在 "auto"。 */
 .webqq-workspace[data-color-mode="dark"] {
-  --webqq-bg: #0f172a;
-  --webqq-rail: #0f172a;
-  --webqq-surface: #0f172a;
-  --webqq-surface-muted: #162032;
-  --webqq-border: #2f3a4d;
+  --webqq-bg: #2c2c30;
+  --webqq-rail: #252529;
+  --webqq-surface: #2c2c30;
+  --webqq-surface-muted: #323238;
+  --webqq-border: #45454c;
   --webqq-text: #edf2f7;
-  --webqq-muted: #9ba7b8;
-  --webqq-hover: #273247;
-  --webqq-panel: #1e293b;
+  --webqq-muted: #a1a1aa;
+  --webqq-hover: #39393f;
+  --webqq-panel: #333338;
 }
 /* Dialog/Popover/Select 面板 teleport 到 body，取不到 .webqq-workspace 上的令牌，这里镜像一份；
    暗色跟随 useResolvedColorMode 写到 body 上的解析结果，与工作区配色保持一致。
@@ -46,12 +46,12 @@ body[data-sandbox-color-scheme="dark"] .sandbox-dialog-content,
 body[data-sandbox-color-scheme="dark"] .sandbox-popover-content,
 body[data-sandbox-color-scheme="dark"] .sandbox-select-content,
 body[data-sandbox-color-scheme="dark"] .webqq-secondary-page {
-  --webqq-bg: #162032;
-  --webqq-surface: #0f172a;
-  --webqq-surface-muted: #1b2740;
-  --webqq-border: #2f3a4d;
+  --webqq-bg: #2c2c30;
+  --webqq-surface: #2c2c30;
+  --webqq-surface-muted: #323238;
+  --webqq-border: #45454c;
   --webqq-text: #edf2f7;
-  --webqq-muted: #9ba7b8;
-  --webqq-hover: #273247;
-  --webqq-panel: #1e293b;
+  --webqq-muted: #a1a1aa;
+  --webqq-hover: #39393f;
+  --webqq-panel: #333338;
 }

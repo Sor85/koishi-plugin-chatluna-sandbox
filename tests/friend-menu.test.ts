@@ -16,6 +16,18 @@ describe('好友操作菜单', () => {
       .toEqual(['request'])
   })
 
+  it('右键菜单深色模式使用中性灰层级', () => {
+    const content = readFileSync(resolve('client/components/ui/context-menu/ContextMenuContent.vue'), 'utf8')
+    const subContent = readFileSync(resolve('client/components/ui/context-menu/ContextMenuSubContent.vue'), 'utf8')
+    const item = readFileSync(resolve('client/components/ui/context-menu/ContextMenuItem.vue'), 'utf8')
+    const subTrigger = readFileSync(resolve('client/components/ui/context-menu/ContextMenuSubTrigger.vue'), 'utf8')
+
+    expect(content).toContain('dark:border-[#52525b] dark:bg-[#39393f] dark:text-[#f4f4f5]')
+    expect(subContent).toContain('dark:border-[#52525b] dark:bg-[#39393f] dark:text-[#f4f4f5]')
+    expect(item).toContain('dark:focus:bg-[#494950]')
+    expect(subTrigger).toContain('dark:focus:bg-[#494950] dark:data-[state=open]:bg-[#494950]')
+  })
+
   it('子菜单内容不重复使用 Portal', () => {
     const source = readFileSync(resolve('client/components/ui/context-menu/ContextMenuSubContent.vue'), 'utf8')
     expect(source).not.toContain('ContextMenuPortal')

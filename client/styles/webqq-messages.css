@@ -728,13 +728,13 @@
 }
 
 .webqq-workspace[data-color-mode="dark"] .webqq-message-quote {
-  border-left-color: rgb(147 197 253 / 56%);
-  color: #cbd5e1;
-  background: rgb(15 23 42 / 42%);
+  border-left-color: rgb(161 161 170 / 62%);
+  color: rgb(212 212 216 / 82%);
+  background: rgb(39 39 42 / 62%);
 }
 
 .webqq-workspace[data-color-mode="dark"] .webqq-message-quote-title {
-  color: #dbeafe;
+  color: #f4f4f5;
 }
 
 .webqq-workspace[data-color-mode="dark"] .webqq-message-row.is-outgoing .webqq-message-quote {
@@ -748,8 +748,8 @@
 }
 
 .webqq-workspace[data-color-mode="dark"] .webqq-message-forward-entry {
-  border-top-color: rgb(148 163 184 / 24%);
-  color: #94a3b8;
+  border-top-color: rgb(161 161 170 / 28%);
+  color: #a1a1aa;
 }
 
 .webqq-workspace[data-color-mode="dark"] .webqq-message-row.is-outgoing .webqq-message-bubble .webqq-message-forward-entry {
@@ -758,14 +758,16 @@
 }
 
 .webqq-workspace[data-color-mode="dark"] .webqq-message-bubble {
-  --webqq-bubble-bg: rgb(30 41 59 / 90%);
-  --webqq-reaction-bg: color-mix(in srgb, var(--webqq-bubble-bg) 88%, #0f172a 12%);
+  --webqq-bubble-bg: rgb(57 57 63);
+  --webqq-reaction-bg: color-mix(in srgb, var(--webqq-bubble-bg) 88%, #252529 12%);
+
+  border-color: rgb(113 113 122 / 36%);
+  background: var(--webqq-bubble-bg);
 }
 
-.webqq-workspace[data-color-mode="dark"] .webqq-message-bubble,
 .webqq-workspace[data-color-mode="dark"] .webqq-composer::before {
-  border-color: rgb(148 163 184 / 24%);
-  background: rgb(30 41 59 / 90%);
+  border-color: rgb(113 113 122 / 36%);
+  background: rgb(51 51 56);
 }
 
 .webqq-workspace[data-color-mode="dark"] .webqq-message-row.is-outgoing .webqq-message-bubble {

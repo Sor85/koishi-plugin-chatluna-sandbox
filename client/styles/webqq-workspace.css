@@ -23,7 +23,7 @@ body:has(.onebot-sandbox-layout) > #app > .layout-status {
 
 /* 页面容器在 .webqq-workspace 之外拿不到 data-color-mode，跟随 body 上的解析配色。 */
 body[data-sandbox-color-scheme="dark"] .onebot-sandbox-page {
-  background: #0f172a;
+  background: rgb(37 37 41);
 }
 
 .onebot-sandbox-layout .layout-header {
@@ -98,23 +98,23 @@ body[data-sandbox-color-scheme="dark"] .onebot-sandbox-page {
   backdrop-filter: saturate(180%) blur(20px);
 }
 
-/* 暗色工作台保持聊天区与导航侧栏的轻微层级差；颜色使用不透明值，避免毛玻璃底色再次混合后偏色。 */
+/* 暗色工作台以侧栏 rgb(37 37 41) 为基准，聊天区稍微提亮以保留区域层级。 */
 .webqq-workspace.is-frosted[data-color-mode="dark"] {
-  background: rgb(15 23 42);
+  background: rgb(37 37 41);
 }
 
 .webqq-workspace.is-frosted[data-color-mode="dark"] .webqq-chat,
 .webqq-workspace.is-frosted[data-color-mode="dark"] .webqq-chat-header {
-  background: rgb(15 23 42);
+  background: rgb(44 44 48);
 }
 
 .webqq-workspace.is-frosted[data-color-mode="dark"] .webqq-rail,
 .webqq-workspace.is-frosted[data-color-mode="dark"] .webqq-conversations {
-  background: rgb(17 24 39);
+  background: rgb(37 37 41);
 }
 
 .webqq-workspace.is-frosted[data-color-mode="dark"] .webqq-profile {
-  background: rgb(30 41 59);
+  background: rgb(51 51 56);
 }
 .webqq-conversations,
 .webqq-profile {
@@ -124,14 +124,14 @@ body[data-sandbox-color-scheme="dark"] .onebot-sandbox-page {
 
 .webqq-workspace[data-color-mode="dark"] .webqq-chat,
 .webqq-workspace[data-color-mode="dark"] .webqq-chat-header {
-  background: rgb(15 23 42);
+  background: rgb(44 44 48);
 }
 
 .webqq-workspace[data-color-mode="dark"] .webqq-rail,
 .webqq-workspace[data-color-mode="dark"] .webqq-conversations {
-  background: rgb(17 24 39);
+  background: rgb(37 37 41);
 }
 
 .webqq-workspace[data-color-mode="dark"] .webqq-profile {
-  background: rgb(30 41 59);
+  background: rgb(51 51 56);
 }

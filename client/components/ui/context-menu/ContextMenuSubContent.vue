@@ -17,7 +17,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
   <ContextMenuSubContent
     data-slot="context-menu-sub-content"
     v-bind="{ ...$attrs, ...forwarded }"
-    :class="cn('z-50 min-w-44 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 text-slate-900 shadow-2xl outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100', props.class)"
+    :class="cn('z-50 min-w-44 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 text-slate-900 shadow-2xl outline-none dark:border-[#52525b] dark:bg-[#39393f] dark:text-[#f4f4f5]', props.class)"
   >
     <slot />
   </ContextMenuSubContent>

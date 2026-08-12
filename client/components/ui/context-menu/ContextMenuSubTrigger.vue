@@ -15,7 +15,7 @@ const forwarded = useForwardProps(delegatedProps)
   <ContextMenuSubTrigger
     data-slot="context-menu-sub-trigger"
     v-bind="forwarded"
-    :class="cn('flex cursor-default select-none items-center gap-2 rounded-lg px-2.5 py-2 text-sm outline-none focus:bg-slate-100 data-[state=open]:bg-slate-100 dark:focus:bg-slate-800 dark:data-[state=open]:bg-slate-800', props.class)"
+    :class="cn('flex cursor-default select-none items-center gap-2 rounded-lg px-2.5 py-2 text-sm outline-none focus:bg-slate-100 data-[state=open]:bg-slate-100 dark:focus:bg-[#494950] dark:data-[state=open]:bg-[#494950]', props.class)"
   >
     <slot />
     <IconChevronRight class="ml-auto" :size="16" aria-hidden="true" />

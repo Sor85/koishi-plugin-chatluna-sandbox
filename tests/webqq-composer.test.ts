@@ -202,6 +202,21 @@ describe('WebQQ 发送控件', () => {
     expect(source).toContain('aria-label="清除回复"')
   })
 
+  it('深色发送者添加按钮保留中性灰底，并用主题色显示虚线与加号', () => {
+    const css = readFileSync(resolve('client/styles/webqq-composer.css'), 'utf8')
+    const source = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
+    const darkAddRule = css
+      .slice(css.indexOf('.webqq-workspace[data-color-mode="dark"] .webqq-composer-user-add {'))
+      .split('}')[0]
+
+    expect(darkAddRule).toContain('border-color: var(--webqq-accent)')
+    expect(darkAddRule).toContain('color: var(--webqq-accent)')
+    expect(darkAddRule).toContain('background: rgb(57 57 63)')
+    expect(darkAddRule).not.toContain('#0f172a')
+    expect(source).toContain(':color-mode="model.colorMode"')
+    expect(source).toContain("colorMode: 'light' | 'dark'")
+  })
+
   it('禁用的输入框、附件和发送按钮不改变鼠标样式，但保留 disabled 与透明度', () => {
     const css = readFileSync(resolve('client/styles/webqq-composer.css'), 'utf8')
     const source = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')

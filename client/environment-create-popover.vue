@@ -4,7 +4,8 @@
       <slot name="trigger" />
     </PopoverTrigger>
     <PopoverContent
-      class="relative"
+      class="webqq-environment-create-popover relative"
+      :class="{ 'is-color-dark': colorMode === 'dark' }"
       :side="resolvedSide"
       align="start"
       :aria-label="title"
@@ -152,6 +153,7 @@ const props = withDefaults(defineProps<{
   currentOperator?: Pick<SandboxParticipant, 'id' | 'name'>
   bots?: Pick<SandboxBotProfile, 'id' | 'name'>[]
   accentColor: string
+  colorMode: 'light' | 'dark'
   side?: 'top' | 'right' | 'bottom' | 'left'
 }>(), {
   bots: () => [],

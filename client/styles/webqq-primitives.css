@@ -263,12 +263,38 @@
   background: var(--webqq-accent);
 }
 
+:is(body[data-sandbox-color-scheme="dark"] .webqq-environment-create-popover, .webqq-environment-create-popover.is-color-dark) :is([data-slot="input"], [data-slot="select-trigger"]) {
+  border-color: transparent;
+  background: rgb(57 57 63);
+}
+
+:is(body[data-sandbox-color-scheme="dark"] .webqq-environment-create-popover, .webqq-environment-create-popover.is-color-dark) :is([data-slot="input"], [data-slot="select-trigger"]):focus-visible {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+:is(body[data-sandbox-color-scheme="dark"] .webqq-environment-create-popover, .webqq-environment-create-popover.is-color-dark) [data-slot="button"]:not([data-variant]) {
+  color: var(--webqq-text);
+  background: rgb(57 57 63);
+}
+
+:is(body[data-sandbox-color-scheme="dark"] .webqq-environment-create-popover, .webqq-environment-create-popover.is-color-dark) [data-slot="button"]:not([data-variant]):hover:not(:disabled) {
+  background: rgb(73 73 80);
+}
+
 /* Dialog / Popover / Select 面板本体（teleport 到 body，颜色取自 tokens 的面板镜像变量）。 */
 .sandbox-dialog-content,
 .sandbox-popover-content {
   border-color: var(--webqq-border);
   color: var(--webqq-text);
   background: var(--webqq-bg);
+}
+
+body[data-sandbox-color-scheme="dark"] .webqq-environment-create-popover,
+.webqq-environment-create-popover.is-color-dark {
+  border-color: transparent;
+  color: #edf2f7;
+  background: rgb(44 44 48);
 }
 
 .sandbox-dialog-close {

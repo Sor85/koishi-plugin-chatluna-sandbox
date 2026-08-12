@@ -19,6 +19,7 @@
         <WebqqSidebar
           :model="sidebarModel"
           :active-space-id="activeSpaceId"
+          :color-mode="resolvedColorMode"
           @select-view="selectNavigation"
           @select-conversation="selectConversation"
           @manage-environment="manageEnvironment"
@@ -195,6 +196,7 @@ const chatPaneViewModel = computed(() => ({
   ...chatPaneModel.value,
   composer: {
     ...chatPaneModel.value.composer,
+    colorMode: resolvedColorMode.value,
     mentionRequest: mentionRequest.value,
   },
 }))
