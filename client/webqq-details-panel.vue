@@ -63,7 +63,6 @@
             <GroupMemberMenu
               :actor="getCurrentGroupMember(model.currentOperatorId ?? '')"
               :target="member"
-              @open-profile="emit('openProfile', member.participantId)"
               @mention="emit('mentionGroupMember', member.participantId)"
               @poke="emit('pokeGroupMember', member.participantId)"
               @set-card="emit('setGroupCard', member.participantId)"

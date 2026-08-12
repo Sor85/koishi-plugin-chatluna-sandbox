@@ -39,7 +39,8 @@ describe('群聊右键提及成员', () => {
     expect(menuSource).toContain("actions.includes('mention')")
     expect(menuSource).toContain("emit('mention')")
     expect(detailsSource).toContain("@mention=\"emit('mentionGroupMember', member.participantId)\"")
-    expect(messageSource).toContain("@mention=\"emit('mentionGroupMember', message.authorId)\"")
+    // 消息头像菜单把高频提及动作提升到一级，但继续发出相同事件。
+    expect(messageSource).toContain("@select=\"emit('mentionGroupMember', message.authorId)\"")
     expect(pageSource).toContain('@mention-group-member="mentionGroupMember"')
     expect(composerSource).toContain('serializeComposerDraft(draft.value.tokens)')
     expect(composerSource).toContain('insertComposerMention')

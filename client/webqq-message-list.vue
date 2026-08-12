@@ -57,15 +57,19 @@
                   <ContextMenuItem @select="emit('openProfile', message.authorId)">
                     <IconId :size="16" aria-hidden="true" /> 查看资料
                   </ContextMenuItem>
-                  <ContextMenuSub v-if="model.currentGroup && getCurrentGroupMember(message.authorId)">
+                  <ContextMenuItem v-if="getMessageGroupMemberActions(message.authorId).includes('mention')" @select="emit('mentionGroupMember', message.authorId)">
+                    <IconAt :size="16" aria-hidden="true" /> @ 用户
+                  </ContextMenuItem>
+                  <ContextMenuItem v-if="getMessageGroupMemberActions(message.authorId).includes('poke')" @select="emit('pokeGroupMember', message.authorId)">
+                    <IconHandClick :size="16" aria-hidden="true" /> 戳一戳
+                  </ContextMenuItem>
+                  <ContextMenuSub v-if="hasMessageGroupMemberManagementActions(message.authorId)">
                     <ContextMenuSubTrigger><IconUsers :size="16" aria-hidden="true" /> 群成员操作</ContextMenuSubTrigger>
                     <GroupMemberMenu
                       sub
+                      management-only
                       :actor="getCurrentGroupMember(model.currentOperatorId ?? '')"
                       :target="getCurrentGroupMember(message.authorId)!"
-                      @open-profile="emit('openProfile', message.authorId)"
-                      @mention="emit('mentionGroupMember', message.authorId)"
-                      @poke="emit('pokeGroupMember', message.authorId)"
                       @set-card="emit('setGroupCard', message.authorId)"
                       @set-title="emit('setGroupTitle', message.authorId)"
                       @set-admin="emit('setGroupAdmin', message.authorId, $event)"
@@ -294,11 +298,12 @@
 </template>
 
 <script setup lang="ts">
-import { IconArrowBackUp, IconBell, IconCheck, IconChecks, IconClock, IconHandClick, IconId, IconMessageReply, IconMoodSmile, IconPaperclip, IconTag, IconUserMinus, IconUserPlus, IconUsers } from '@tabler/icons-vue'
+import { IconArrowBackUp, IconAt, IconBell, IconCheck, IconChecks, IconClock, IconHandClick, IconId, IconMessageReply, IconMoodSmile, IconPaperclip, IconTag, IconUserMinus, IconUserPlus, IconUsers } from '@tabler/icons-vue'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from './components/ui/context-menu'
 import { getFriendMenuActions, type FriendMenuState } from './webqq/friend-menu'
 import { getGroupAuthorityBadge, getGroupMemberDisplayName } from './webqq/group-display'
+import { getGroupMemberMenuActions, type GroupMemberMenuAction } from './webqq/group-menu'
 import GroupMemberMenu from './group-member-menu.vue'
 import { getMessageClusterClass, isMergedMessage } from './webqq/message-cluster'
 import {
@@ -534,6 +539,25 @@ function isBotParticipant(id: string) {
 
 function getCurrentGroupMember(participantId: string) {
   return props.model.currentGroup?.members.find((member) => member.participantId === participantId)
+}
+
+function getMessageGroupMemberActions(participantId: string) {
+  const target = getCurrentGroupMember(participantId)
+  if (!target) return []
+  return getGroupMemberMenuActions(getCurrentGroupMember(props.model.currentOperatorId ?? ''), target)
+}
+
+const messageGroupManagementActions: GroupMemberMenuAction[] = [
+  'set-card',
+  'set-title',
+  'set-admin',
+  'unset-admin',
+  'transfer-owner',
+  'kick',
+]
+
+function hasMessageGroupMemberManagementActions(participantId: string) {
+  return getMessageGroupMemberActions(participantId).some((action) => messageGroupManagementActions.includes(action))
 }
 
 function getMessageAuthorName(participantId: string) {

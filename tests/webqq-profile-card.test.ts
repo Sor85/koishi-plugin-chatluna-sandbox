@@ -131,7 +131,7 @@ describe('WebQQ 个人信息卡模型', () => {
 })
 
 describe('WebQQ 个人信息卡入口', () => {
-  it('消息、私聊头部、好友列表和群成员列表提供查看资料', () => {
+  it('消息、私聊头部和好友列表提供查看资料，群成员操作菜单不重复显示', () => {
     const messageList = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
     const chatPane = readFileSync(resolve('client/webqq-chat-pane.vue'), 'utf8')
     const sidebar = readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
@@ -150,10 +150,11 @@ describe('WebQQ 个人信息卡入口', () => {
     expect(chatPane).toContain("emit('openGroupProfile', props.model.profileGroupId)")
     expect(sidebar).toContain('查看资料')
     expect(sidebar).toContain("emit('openProfile'")
-    expect(details).toContain("emit('openProfile'")
+    expect(details).not.toContain('@open-profile=')
     expect(details).toContain('personalNote')
     expect(details).toContain('个性签名')
-    expect(groupMemberMenu).toContain('查看资料')
+    expect(groupMemberMenu).not.toContain('查看资料')
+    expect(groupMemberMenu).not.toContain("'open-profile': []")
     expect(overlay).toContain('class="webqq-secondary-page webqq-profile-card-page webqq-solid-secondary-surface onebot-sandbox-secondary-page onebot-sandbox-profile-card-page"')
     expect(styles).toContain('scrollbar-width: none')
     expect(overlay).not.toContain('<Dialog v-model:open="profileOpen">')
