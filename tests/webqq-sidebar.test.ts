@@ -43,9 +43,11 @@ describe('WebQQ 左侧栏', () => {
     expect(notificationSource).toContain('v-webqq-scrollbar="{ showOverlay: false }"')
     const notificationRule = sidebarStyles.slice(sidebarStyles.indexOf('.webqq-notification-popover {')).split('}')[0]
     const plainNotificationRule = sidebarStyles.slice(sidebarStyles.indexOf('.webqq-notification-popover.is-plain {')).split('}')[0]
+    const frostedNotificationRule = sidebarStyles.slice(sidebarStyles.indexOf('.webqq-notification-popover.is-frosted {')).split('}')[0]
     const darkNotificationRule = sidebarStyles.slice(sidebarStyles.indexOf('.webqq-notification-popover.is-color-dark {')).split('}')[0]
     expect(notificationRule).toContain('border: 1px solid transparent')
-    expect(plainNotificationRule).toContain('border-color: var(--webqq-secondary-outline)')
+    expect(plainNotificationRule).toContain('border: 1px solid var(--webqq-secondary-outline)')
+    expect(frostedNotificationRule).toContain('border: 1px solid color-mix(in srgb, var(--webqq-secondary-outline) 64%, transparent)')
     expect(plainNotificationRule).toContain('box-shadow: var(--webqq-secondary-shadow)')
     expect(plainNotificationRule).toContain('backdrop-filter: none')
     expect(darkNotificationRule).toContain('background: rgb(44 44 48 / 98%)')

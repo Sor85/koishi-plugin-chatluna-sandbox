@@ -273,7 +273,7 @@
 }
 
 .webqq-notification-popover.is-plain {
-  border-color: var(--webqq-secondary-outline);
+  border: 1px solid var(--webqq-secondary-outline);
   background: #fff;
   box-shadow: var(--webqq-secondary-shadow);
   backdrop-filter: none;
@@ -283,6 +283,10 @@
   border-color: #d9e1ea;
   background: #fff;
   backdrop-filter: none;
+}
+
+.webqq-notification-popover.is-frosted {
+  border: 1px solid color-mix(in srgb, var(--webqq-secondary-outline) 64%, transparent);
 }
 
 .webqq-notification-popover.is-color-dark {
