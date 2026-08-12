@@ -34,6 +34,8 @@ describe('WebQQ 左侧栏', () => {
     expect(sidebarStyles).toMatch(/\.webqq-rail-tooltip-trigger\.is-rail-pin-bottom\s*\{[^}]*margin-top:\s*auto/s)
     expect(source.indexOf("label: '调试'")).toBeLessThan(source.indexOf("label: 'AI 测试空间'"))
     expect(source.indexOf("label: '资料'")).toBeLessThan(source.indexOf("label: 'AI 测试空间'"))
+    expect(sidebarStyles).toMatch(/\.webqq-sidebar-tabs button\s*\{[^}]*border-radius:\s*8px 8px 0 0/s)
+    expect(sidebarStyles).toMatch(/\.webqq-sidebar-notify:hover,\s*\.webqq-sidebar-notify:focus-visible,\s*\.webqq-sidebar-notify\.is-active\s*\{[^}]*border-radius:\s*8px 8px 0 0/s)
     expect(source).toContain("'is-color-dark': colorMode === 'dark'")
     expect(source).not.toContain("'is-color-auto'")
     expect(source).toContain(':color-mode="colorMode"')

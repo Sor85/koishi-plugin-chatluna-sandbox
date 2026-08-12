@@ -98,6 +98,12 @@
   outline: none;
 }
 
+.webqq-sidebar-notify:hover,
+.webqq-sidebar-notify:focus-visible,
+.webqq-sidebar-notify.is-active {
+  border-radius: 8px 8px 0 0;
+}
+
 .webqq-sidebar-notify.has-notification::after {
   position: absolute;
   top: 7px;
