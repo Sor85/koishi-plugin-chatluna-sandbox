@@ -22,7 +22,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
       data-slot="popover-content"
       v-bind="{ ...$attrs, ...forwarded }"
       :class="cn(
-        'sandbox-popover-content z-[100] w-72 max-w-[calc(100vw-24px)] rounded-2xl border p-4 shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out',
+        'sandbox-popover-content webqq-solid-secondary-surface z-[100] w-72 max-w-[calc(100vw-24px)] rounded-2xl border p-4 shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out',
         props.class,
       )"
     >

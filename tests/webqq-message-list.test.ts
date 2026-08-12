@@ -78,8 +78,11 @@ describe('WebQQ 消息列表', () => {
     expect(overlays).toContain('width: min(480px, calc(100vw - 32px))')
     expect(overlays).toContain('max-height: min(80vh, 620px)')
     expect(overlays).toContain('padding: 14px 16px 28px')
-    expect(overlays).toContain('border-color: rgb(113 113 122 / 44%)')
-    expect(overlays).toContain('background: rgb(44 44 48 / 98%)')
+    const forwardModalRule = overlays.slice(overlays.indexOf('.webqq-forward-modal {')).split('}')[0]
+    const darkForwardModalRule = overlays.slice(overlays.indexOf('body[data-sandbox-color-scheme="dark"] .webqq-forward-modal {')).split('}')[0]
+    expect(forwardModalRule).toContain('border: 1px solid transparent')
+    expect(darkForwardModalRule).toContain('border-color: transparent')
+    expect(darkForwardModalRule).toContain('background: rgb(44 44 48 / 98%)')
     expect(overlays).not.toContain('cursor:')
   })
 
@@ -92,6 +95,7 @@ describe('WebQQ 消息列表', () => {
 
     const darkIncomingBubble = styles.slice(darkIncomingRule, darkIncomingRule + 420)
     expect(darkIncomingBubble).toContain('--webqq-bubble-bg: rgb(57 57 63)')
+    expect(darkIncomingBubble).toContain('--webqq-reaction-bg: rgb(47 47 52)')
     expect(darkIncomingBubble).toContain('border-color: rgb(113 113 122 / 36%)')
     expect(darkIncomingBubble).toContain('background: var(--webqq-bubble-bg)')
 
@@ -254,7 +258,7 @@ describe('WebQQ 消息列表', () => {
     expect(pickerSource).toContain('searchSandboxEmojiFaces')
     expect(pickerSource).toContain('常用')
     expect(pickerSource).toContain('搜索表情名称、拼音或 ID')
-    expect(pickerSource).toContain('class="webqq-secondary-page webqq-emoji-picker-page"')
+    expect(pickerSource).toContain('class="webqq-secondary-page webqq-emoji-picker-page onebot-sandbox-secondary-page"')
     expect(pickerSource).toContain('<Teleport to="body">')
     expect(pickerSource).toContain("zIndex: 140")
     expect(pickerSource).not.toContain('<Dialog')
@@ -268,6 +272,7 @@ describe('WebQQ 消息列表', () => {
     expect(styles).toContain('.webqq-message-reaction-avatar-image.is-bot')
     expect(styles).toContain('background: var(--webqq-accent)')
     expect(styles).toContain('--webqq-reaction-bg: color-mix(in srgb, var(--webqq-bubble-bg) 88%, #64748b 12%)')
+    expect(styles).toContain('--webqq-reaction-bg: rgb(47 47 52)')
     expect(styles).toContain('--webqq-reaction-bg: color-mix(in srgb, var(--webqq-bubble-bg) 88%, #0f172a 12%)')
     expect(styles).not.toContain('var(--webqq-accent) 16%, #ffffff 84%')
     expect(styles).toContain('.webqq-emoji-picker-grid')

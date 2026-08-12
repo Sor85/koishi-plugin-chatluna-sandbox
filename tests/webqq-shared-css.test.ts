@@ -34,17 +34,22 @@ describe('WebQQ 共享样式', () => {
     const secondaryPageRule = overlays.slice(overlays.indexOf('.webqq-secondary-page {')).split('}')[0]
     expect(secondaryPageRule).toContain('position: fixed')
     expect(secondaryPageRule).toContain('width: 380px')
+    expect(secondaryPageRule).toContain('border: 1px solid transparent')
     expect(secondaryPageRule).not.toContain('inset: 0')
+    const solidSecondaryPageRule = overlays.slice(overlays.indexOf('.webqq-secondary-page.webqq-solid-secondary-surface {')).split('}')[0]
+    expect(solidSecondaryPageRule).toContain('border-color: var(--webqq-secondary-outline)')
+    expect(solidSecondaryPageRule).toContain('box-shadow: var(--webqq-secondary-shadow)')
+    expect(solidSecondaryPageRule).toContain('backdrop-filter: none')
     const profilePageRule = overlays.slice(overlays.indexOf('.webqq-profile-card-page {')).split('}')[0]
     expect(profilePageRule).toContain('width: max-content')
     expect(profilePageRule).toContain('max-width: min(320px')
-    expect(profilePageRule).toContain('border-color: transparent')
-    const scopedProfileHeaderRule = overlays
-      .slice(overlays.indexOf('.webqq-secondary-page.onebot-sandbox-profile-card-page > .webqq-secondary-page-header {'))
+    const scopedSecondaryHeaderRule = overlays
+      .slice(overlays.indexOf('.webqq-secondary-page.onebot-sandbox-secondary-page > .webqq-secondary-page-header {'))
       .split('}')[0]
-    expect(scopedProfileHeaderRule).toContain('position: relative')
-    expect(scopedProfileHeaderRule).toContain('inset: auto')
-    expect(scopedProfileHeaderRule).toContain('background: var(--webqq-bg)')
+    expect(scopedSecondaryHeaderRule).toContain('position: relative')
+    expect(scopedSecondaryHeaderRule).toContain('inset: auto')
+    expect(scopedSecondaryHeaderRule).toContain('color: var(--webqq-text)')
+    expect(scopedSecondaryHeaderRule).toContain('background: var(--webqq-bg)')
     const profileCardRule = overlays.slice(overlays.indexOf('.webqq-profile-card {')).split('}')[0]
     expect(profileCardRule).toContain('overflow-y: auto')
     expect(profileCardRule).toContain('scrollbar-width: none')

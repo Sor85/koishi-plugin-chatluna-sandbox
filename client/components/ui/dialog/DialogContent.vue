@@ -21,7 +21,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
     <DialogContent
       v-webqq-scrollbar="{ zIndex: 160 }"
       data-slot="dialog-content"
-      class="sandbox-dialog-content"
+      class="sandbox-dialog-content webqq-solid-secondary-surface"
       v-bind="{ ...$attrs, ...forwarded }"
       :class="cn(
         'fixed inset-x-0 top-4 z-[151] mx-auto grid max-h-[calc(100vh-32px)] w-[min(520px,calc(100vw-24px))] overflow-y-auto rounded-2xl border p-5 shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out',

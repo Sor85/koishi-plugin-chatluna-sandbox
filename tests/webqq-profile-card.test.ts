@@ -154,7 +154,7 @@ describe('WebQQ 个人信息卡入口', () => {
     expect(details).toContain('personalNote')
     expect(details).toContain('个性签名')
     expect(groupMemberMenu).toContain('查看资料')
-    expect(overlay).toContain('class="webqq-secondary-page webqq-profile-card-page onebot-sandbox-profile-card-page"')
+    expect(overlay).toContain('class="webqq-secondary-page webqq-profile-card-page webqq-solid-secondary-surface onebot-sandbox-secondary-page onebot-sandbox-profile-card-page"')
     expect(overlay).not.toContain('<Dialog v-model:open="profileOpen">')
     expect(overlay).not.toContain('aria-label="返回聊天"')
     expect(overlay).toContain('openProfile')

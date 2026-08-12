@@ -285,14 +285,19 @@
 /* Dialog / Popover / Select 面板本体（teleport 到 body，颜色取自 tokens 的面板镜像变量）。 */
 .sandbox-dialog-content,
 .sandbox-popover-content {
-  border-color: var(--webqq-border);
+  border-color: transparent;
   color: var(--webqq-text);
   background: var(--webqq-bg);
 }
 
+.webqq-solid-secondary-surface:not(.is-frosted) {
+  border-color: var(--webqq-secondary-outline);
+  box-shadow: var(--webqq-secondary-shadow);
+  backdrop-filter: none;
+}
+
 body[data-sandbox-color-scheme="dark"] .webqq-environment-create-popover,
 .webqq-environment-create-popover.is-color-dark {
-  border-color: transparent;
   color: #edf2f7;
   background: rgb(44 44 48);
 }
@@ -310,11 +315,9 @@ body[data-sandbox-color-scheme="dark"] .webqq-environment-create-popover,
   /* 下拉面板统一与触发器同宽（reka popper 提供触发器宽度变量）。 */
   width: var(--reka-select-trigger-width);
   min-width: var(--reka-select-trigger-width);
-  border-color: var(--webqq-border);
   border-radius: 12px;
   color: var(--webqq-text);
   background: var(--webqq-bg);
-  box-shadow: 0 12px 32px rgb(15 23 42 / 16%);
 }
 
 .sandbox-select-content [data-slot="select-item"] {

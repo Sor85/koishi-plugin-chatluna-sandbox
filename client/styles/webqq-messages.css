@@ -759,7 +759,7 @@
 
 .webqq-workspace[data-color-mode="dark"] .webqq-message-bubble {
   --webqq-bubble-bg: rgb(57 57 63);
-  --webqq-reaction-bg: color-mix(in srgb, var(--webqq-bubble-bg) 88%, #252529 12%);
+  --webqq-reaction-bg: rgb(47 47 52);
 
   border-color: rgb(113 113 122 / 36%);
   background: var(--webqq-bubble-bg);

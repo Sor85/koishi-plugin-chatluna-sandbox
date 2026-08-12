@@ -48,7 +48,7 @@
     <section
       v-if="profileOpen && profileCard"
       ref="profilePanelRef"
-      class="webqq-secondary-page webqq-profile-card-page onebot-sandbox-profile-card-page"
+      class="webqq-secondary-page webqq-profile-card-page webqq-solid-secondary-surface onebot-sandbox-secondary-page onebot-sandbox-profile-card-page"
       :style="{ '--webqq-accent': accentColor, ...profilePanelStyle }"
       aria-label="查看资料"
     >

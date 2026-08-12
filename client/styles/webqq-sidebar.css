@@ -115,7 +115,7 @@
   max-width: calc(100vw - 40px);
   overflow: hidden;
   padding: 0;
-  border: 1px solid rgb(255 255 255 / 58%);
+  border: 1px solid transparent;
   border-radius: 12px;
   background: rgb(255 255 255 / 92%);
   box-shadow: 0 18px 42px rgb(15 23 42 / 18%);
@@ -266,7 +266,13 @@
   white-space: nowrap;
 }
 
-.webqq-notification-popover.is-plain,
+.webqq-notification-popover.is-plain {
+  border-color: var(--webqq-secondary-outline);
+  background: #fff;
+  box-shadow: var(--webqq-secondary-shadow);
+  backdrop-filter: none;
+}
+
 .webqq-notification-popover.is-plain .webqq-notification-card {
   border-color: #d9e1ea;
   background: #fff;
@@ -274,10 +280,8 @@
 }
 
 .webqq-notification-popover.is-color-dark {
-  border-color: rgb(113 113 122 / 44%);
   color: #edf2f7;
   background: rgb(44 44 48 / 98%);
-  box-shadow: 0 18px 42px rgb(9 9 11 / 42%);
 }
 
 .webqq-notification-popover.is-color-dark .webqq-notification-tabs {

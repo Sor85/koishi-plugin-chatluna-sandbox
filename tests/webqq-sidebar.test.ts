@@ -37,8 +37,14 @@ describe('WebQQ 左侧栏', () => {
     expect(source).not.toContain("'is-color-auto'")
     expect(source).toContain(':color-mode="colorMode"')
     expect(source).toContain("colorMode: 'light' | 'dark'")
-    expect(sidebarStyles).toContain('.webqq-notification-popover.is-color-dark')
-    expect(sidebarStyles).toContain('background: rgb(44 44 48 / 98%)')
+    const notificationRule = sidebarStyles.slice(sidebarStyles.indexOf('.webqq-notification-popover {')).split('}')[0]
+    const plainNotificationRule = sidebarStyles.slice(sidebarStyles.indexOf('.webqq-notification-popover.is-plain {')).split('}')[0]
+    const darkNotificationRule = sidebarStyles.slice(sidebarStyles.indexOf('.webqq-notification-popover.is-color-dark {')).split('}')[0]
+    expect(notificationRule).toContain('border: 1px solid transparent')
+    expect(plainNotificationRule).toContain('border-color: var(--webqq-secondary-outline)')
+    expect(plainNotificationRule).toContain('box-shadow: var(--webqq-secondary-shadow)')
+    expect(plainNotificationRule).toContain('backdrop-filter: none')
+    expect(darkNotificationRule).toContain('background: rgb(44 44 48 / 98%)')
     expect(sidebarStyles).toContain('background: rgb(57 57 63)')
     expect(sidebarStyles).not.toContain('@media (prefers-color-scheme: dark)')
     expect(pageSource).toContain('<WebqqSidebar')

@@ -40,7 +40,7 @@ describe('环境管理组件传输边界', () => {
     expect(overlaySource).not.toContain('SandboxSnapshot')
     expect(overlaySource).not.toContain('snapshot')
     expect(overlaySource).toContain('<EnvironmentEntityDialog')
-    expect(overlaySource).toContain('class="webqq-secondary-page webqq-profile-card-page onebot-sandbox-profile-card-page"')
+    expect(overlaySource).toContain('class="webqq-secondary-page webqq-profile-card-page webqq-solid-secondary-surface onebot-sandbox-secondary-page onebot-sandbox-profile-card-page"')
     expect(overlaySource).not.toContain('<Dialog v-model:open="profileOpen">')
     expect(overlaySource.match(/<Dialog /g)).toHaveLength(2)
   })
@@ -141,13 +141,23 @@ describe('环境管理组件传输边界', () => {
 
   it('危险按钮和下拉浮层使用统一控件基线，避免 Portal 中样式退化', () => {
     const entityDialog = readFileSync(resolve('client/environment-entity-dialog.vue'), 'utf8')
+    const dialogContent = readFileSync(resolve('client/components/ui/dialog/DialogContent.vue'), 'utf8')
+    const popoverContent = readFileSync(resolve('client/components/ui/popover/PopoverContent.vue'), 'utf8')
     const selectContent = readFileSync(resolve('client/components/ui/select/SelectContent.vue'), 'utf8')
     const primitives = readFileSync(resolve('client/styles/webqq-primitives.css'), 'utf8')
 
     expect(entityDialog).toContain('variant="destructive"')
+    expect(dialogContent).toContain('sandbox-dialog-content webqq-solid-secondary-surface')
+    expect(popoverContent).toContain('sandbox-popover-content webqq-solid-secondary-surface')
     expect(selectContent).toContain('z-[200]')
-    expect(selectContent).toContain('sandbox-select-content')
+    expect(selectContent).toContain('sandbox-select-content webqq-solid-secondary-surface')
     expect(primitives).toContain('.sandbox-select-content')
+    const dialogPopoverRule = primitives.slice(primitives.indexOf('.sandbox-dialog-content,\n.sandbox-popover-content {')).split('}')[0]
+    const solidSurfaceRule = primitives.slice(primitives.indexOf('.webqq-solid-secondary-surface:not(.is-frosted) {')).split('}')[0]
+    expect(dialogPopoverRule).toContain('border-color: transparent')
+    expect(solidSurfaceRule).toContain('border-color: var(--webqq-secondary-outline)')
+    expect(solidSurfaceRule).toContain('box-shadow: var(--webqq-secondary-shadow)')
+    expect(solidSurfaceRule).toContain('backdrop-filter: none')
   })
 
   it('Portal 二级菜单提供完整的控件令牌，避免控件回退为黑色描边', () => {
@@ -171,5 +181,11 @@ describe('环境管理组件传输边界', () => {
     expect(primitives).toContain('background: rgb(44 44 48)')
     expect(primitives).toContain('background: rgb(57 57 63)')
     expect(primitives).toContain('border-color: transparent')
+    expect(tokens).toContain('--webqq-secondary-outline: color-mix(in srgb, var(--webqq-border) 72%, transparent)')
+    expect(tokens).toContain('--webqq-secondary-shadow: 0 18px 42px rgb(15 23 42 / 18%)')
+    expect(tokens).toContain('--webqq-secondary-shadow: 0 18px 42px rgb(9 9 11 / 42%)')
+    const solidSurfaceRule = primitives.slice(primitives.indexOf('.webqq-solid-secondary-surface:not(.is-frosted) {')).split('}')[0]
+    expect(solidSurfaceRule).toContain('border-color: var(--webqq-secondary-outline)')
+    expect(solidSurfaceRule).toContain('box-shadow: var(--webqq-secondary-shadow)')
   })
 })

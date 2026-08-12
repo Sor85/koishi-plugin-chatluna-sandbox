@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <section ref="panelRef" v-if="open" class="webqq-secondary-page webqq-emoji-picker-page" :style="panelStyle" aria-label="贴表情">
+    <section ref="panelRef" v-if="open" class="webqq-secondary-page webqq-emoji-picker-page onebot-sandbox-secondary-page" :style="panelStyle" aria-label="贴表情">
       <header
         class="webqq-secondary-page-header"
         :class="{ 'is-dragging': dragging }"
