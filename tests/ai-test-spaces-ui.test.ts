@@ -69,6 +69,10 @@ describe('AI 测试空间总览', () => {
     expect(effect).toContain('rampColor')
     expect(effect).toContain('uAccent')
     expect(styles).toContain('.webqq-agent-observe-dots')
+    expect(styles).toContain('background-image: radial-gradient(circle, rgb(55 55 55 / 10%) 1px, transparent 1px)')
+    expect(styles).toContain('background-size: 6px 6px')
+    expect(styles).toContain('background-image: radial-gradient(circle, rgb(255 255 255 / 15%) 1px, transparent 1px)')
+    expect(styles).not.toContain('.webqq-agent-observe-dots { position: absolute; inset: 0; opacity: 0.5; background-color:')
     // 空间内任务栏：接管 + 终止任务置于空间内部（ego 底栏置顶复刻）
     expect(overlay).toContain('webqq-agent-taskbar')
     expect(overlay).toContain('Agent 正在控制')
