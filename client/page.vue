@@ -36,6 +36,8 @@
           v-if="currentView === 'spaces'"
           :spaces="testSpaces"
           :main-snapshot="mainSnapshot"
+          :appearance="appearance"
+          :color-mode="resolvedColorMode"
           @enter="enterTestSpace"
           @create="createTestSpace"
           @action="handleTestSpaceAction"

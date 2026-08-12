@@ -21,19 +21,13 @@
 .webqq-space-card-actions [data-slot="button"][data-variant="outline"] { height: 22px; padding: 0 10px; border: 0; border-radius: 999px; color: var(--webqq-muted); background: var(--webqq-hover); font-size: 12px; font-weight: 500; }
 .webqq-space-card-actions [data-slot="button"][data-variant="outline"]:hover:not(:disabled) { color: var(--webqq-text); background: color-mix(in srgb, var(--webqq-hover) 70%, var(--webqq-border)); }
 .webqq-space-create { place-items: center; place-content: center; gap: 10px; border-style: dashed; color: var(--webqq-muted); }
-/* 迷你工作区以 4 倍卡片尺寸渲染后 scale(0.25)，字号与真实工作区保持同比例，无需 JS 测量。 */
-.webqq-space-thumbnail { position: relative; min-height: 190px; overflow: hidden; background: var(--webqq-surface-muted); pointer-events: none; }
-.webqq-space-mini { position: absolute; top: 0; left: 0; display: grid; grid-template-columns: 72px 230px minmax(0, 1fr); width: 400%; height: 400%; background: var(--webqq-bg); transform: scale(0.25); transform-origin: 0 0; }
-.webqq-space-mini-rail { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px 8px; border-right: 1px solid var(--webqq-border); background: var(--webqq-rail); }
-.webqq-space-mini-sessions { display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; overflow: hidden; border-right: 1px solid var(--webqq-border); }
-.webqq-space-mini-session { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 12px; align-items: center; flex: none; padding: 10px 12px; border-radius: 10px; }
-.webqq-space-mini-session.is-active { background: color-mix(in srgb, var(--webqq-accent) 14%, transparent); }
-.webqq-space-mini-session-copy { min-width: 0; }
-.webqq-space-mini-session-copy strong, .webqq-space-mini-session-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.webqq-space-mini-session-copy strong { font-size: 13px; line-height: 18px; font-weight: 600; }
-.webqq-space-mini-session-copy small { margin-top: 1px; color: var(--webqq-muted); font-size: 12px; line-height: 16px; }
-.webqq-space-mini-chat { display: flex; flex-direction: column; justify-content: flex-end; padding: 20px 22px; overflow: hidden; background: var(--webqq-surface-muted); }
-.webqq-space-mini-empty { align-self: center; margin: auto; color: var(--webqq-muted); font-size: 13px; }
+/* 缩略图复用 1440×760 的正式四栏工作区，再按卡片可视区等比缩小；组件 DOM、布局和主题样式因此与聊天页保持 1:1。 */
+.webqq-space-thumbnail { position: relative; height: 190px; min-height: 190px; overflow: hidden; background: var(--webqq-bg); pointer-events: none; }
+.webqq-space-thumbnail-workspace { position: absolute; top: 0; left: 0; width: 400%; height: 760px; grid-template-columns: 72px 300px minmax(360px, 1fr) 280px; transform: scale(0.25); transform-origin: 0 0; }
+/* 预览里的正式组件只负责绘制；裁掉滚动条、弹层和动态选择态，避免缩放副本污染正文交互。 */
+.webqq-space-thumbnail-workspace :is(.webqq-scrollbar-overlay, [data-reka-popper-content-wrapper]) { display: none !important; }
+.webqq-space-thumbnail-workspace .webqq-messages { scrollbar-width: none; }
+.webqq-space-thumbnail-workspace .webqq-messages::-webkit-scrollbar { display: none; }
 
 /* ==== ego lite agent 视觉复刻（边缘效果与光标动画 1:1 取自 ego lite resources.pak 内 Actor Overlay 源码；任务栏按实机截图与 --bg-agent-task-bar: #0009 令牌复刻）==== */
 

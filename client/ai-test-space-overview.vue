@@ -13,7 +13,7 @@
 
     <div class="webqq-space-grid">
       <article class="webqq-space-card is-main" data-space-id="main" tabindex="0" @click="openCard(undefined)" @keydown.enter="openCard(undefined)">
-        <WorkspaceThumbnail :snapshot="mainSnapshot" />
+        <WorkspaceThumbnail :snapshot="mainSnapshot" :appearance="appearance" :color-mode="colorMode" />
         <footer><div><strong>主模拟 QQ 环境</strong><small>固定空间 · 不可删除</small></div><Badge variant="secondary">主环境</Badge></footer>
       </article>
 
@@ -27,7 +27,12 @@
         @click="openCard(space.id)"
         @keydown.enter="openCard(space.id)"
       >
-        <WorkspaceThumbnail :snapshot="space.snapshot" :running="space.status === 'running'" />
+        <WorkspaceThumbnail
+          :snapshot="space.snapshot"
+          :appearance="appearance"
+          :color-mode="colorMode"
+          :running="space.status === 'running'"
+        />
         <footer>
           <div><strong>{{ space.name }}</strong><small><span v-if="space.status === 'running'" class="webqq-agent-pulse-dot" aria-hidden="true" />{{ statusLabel(space.status) }} · {{ formatTime(space.createdAt) }}</small></div>
           <div class="webqq-space-card-actions" @click.stop>
@@ -54,10 +59,15 @@ import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
 import WorkspaceThumbnail from './workspace-thumbnail.vue'
-import type { SandboxSnapshot } from '../src/types'
+import type { SandboxAppearance, SandboxSnapshot } from '../src/types'
 import type { SandboxTestSpaceStatus, SandboxTestSpaceSummary } from '../src/test-spaces'
 
-const props = defineProps<{ spaces: SandboxTestSpaceSummary[]; mainSnapshot: SandboxSnapshot }>()
+const props = defineProps<{
+  spaces: SandboxTestSpaceSummary[]
+  mainSnapshot: SandboxSnapshot
+  appearance: SandboxAppearance
+  colorMode: 'light' | 'dark'
+}>()
 const emit = defineEmits<{
   enter: [spaceId?: string]
   create: []

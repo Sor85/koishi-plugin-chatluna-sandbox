@@ -28,6 +28,7 @@ interface WebQQScrollbarState {
 const states = new WeakMap<HTMLElement, WebQQScrollbarState>()
 
 interface WebQQScrollbarOptions {
+  disabled?: boolean
   hideOnNarrow?: boolean
   showOverlay?: boolean
   tone?: 'accent' | 'neutral'
@@ -173,7 +174,7 @@ function applyScrollbarOptions(
 
 export const vWebqqScrollbar: Directive<HTMLElement, WebQQScrollbarOptions | undefined> = {
   mounted(element, binding) {
-    if (typeof window === 'undefined' || typeof document === 'undefined') return
+    if (typeof window === 'undefined' || typeof document === 'undefined' || binding.value?.disabled) return
 
     const { overlay, thumb } = createOverlay()
     const state: WebQQScrollbarState = {

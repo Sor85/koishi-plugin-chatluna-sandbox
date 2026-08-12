@@ -73,6 +73,7 @@
     <WebqqMessageList
       ref="messageListRef"
       :model="messageListModel"
+      :preview="preview"
       @reply="replyingToMessageId = $event"
       @recall-message="emit('recallMessage', $event)"
       @enter-selection="enterSelection"
@@ -115,6 +116,7 @@
     <WebqqComposer
       v-else
       :model="composerModel"
+      :preview="preview"
       @send="forwardSend"
       @select-operator="forwardSelectOperator"
       @manage-environment="forwardManageEnvironment"
@@ -192,7 +194,8 @@ export interface WebqqChatPaneModel {
   forwardTargets: WebqqForwardTargetModel
 }
 
-const props = defineProps<{ model: WebqqChatPaneModel }>()
+const props = defineProps<{ model: WebqqChatPaneModel; preview?: boolean }>()
+const preview = computed(() => !!props.preview)
 const emit = defineEmits<{
   back: []
   toggleDetails: []
@@ -384,6 +387,7 @@ function handleSearchOutsidePointerDown(event: PointerEvent) {
 }
 
 onMounted(() => {
+  if (preview.value) return
   window.addEventListener('keydown', handleSelectionKeydown)
   document.addEventListener('pointerdown', handleSearchOutsidePointerDown)
 })

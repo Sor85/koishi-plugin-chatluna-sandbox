@@ -1,7 +1,7 @@
 <template>
   <section
     ref="messagesElement"
-    v-webqq-scrollbar="{ tone: 'accent' }"
+    v-webqq-scrollbar="{ disabled: preview, tone: 'accent' }"
     class="webqq-messages"
     :class="{ 'is-selecting': model.selectionMode }"
     aria-label="消息记录"
@@ -358,7 +358,8 @@ export interface WebqqMessageListModel {
   selectedMessageIds?: string[]
 }
 
-const props = defineProps<{ model: WebqqMessageListModel }>()
+const props = defineProps<{ model: WebqqMessageListModel; preview?: boolean }>()
+const preview = computed(() => !!props.preview)
 const emit = defineEmits<{
   reply: [messageId: string]
   recallMessage: [messageId: string]
@@ -451,6 +452,7 @@ async function scheduleMessageListBottom(force = false) {
 }
 
 watch(messageListTail, (nextTail) => {
+  if (preview.value) return
   const previousTail = previousMessageListTail
   const shouldFollow = shouldFollowMessageListTail(
     previousTail,
@@ -466,6 +468,7 @@ watch(messageListTail, (nextTail) => {
 
 watch([messagesElement, messagesContentElement], ([element, content]) => {
   contentResizeObserver?.disconnect()
+  if (preview.value) return
   contentResizeObserver = undefined
   if (!element || typeof ResizeObserver === 'undefined') return
   // 新消息中的媒体与 thinking 内容可能在 Vue 更新后继续增高；仅在 sticky 状态下补齐末尾位置。

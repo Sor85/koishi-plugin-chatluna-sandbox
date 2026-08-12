@@ -148,6 +148,8 @@ export function createWebqqWorkspaceShell(
     conversationId: currentConversation.value?.id,
     mentionCandidates: mentionCandidates.value,
     accentColor: appearance.value.webQQAccentColor,
+    // page.vue 会用 Koishi 已解析的响应式明暗模式覆盖此值；这里仍提供确定值，保证基础模型契约完整。
+    colorMode: appearance.value.webQQColorMode === 'dark' ? 'dark' : 'light',
     externalError: errorMessage.value,
   }))
   const participantNames = computed(() => Object.fromEntries([

@@ -44,13 +44,20 @@ describe('AI 测试空间总览', () => {
     expect(zoom).toContain('prefers-reduced-motion')
   })
 
-  it('卡片缩略图渲染快照的真实迷你界面', () => {
+  it('卡片缩略图以预览模式复用正式聊天工作区组件', () => {
     const thumbnail = readFileSync(resolve('client/workspace-thumbnail.vue'), 'utf8')
-    const preview = readFileSync(resolve('client/webqq/workspace-preview.ts'), 'utf8')
-    expect(thumbnail).toContain('buildWorkspacePreview')
-    expect(thumbnail).toContain('WebqqAvatar')
-    expect(thumbnail).toContain('webqq-message-bubble')
-    expect(preview).toContain('resolveWorkspaceSelection')
+    const model = readFileSync(resolve('client/webqq/workspace-thumbnail-model.ts'), 'utf8')
+    const chatPane = readFileSync(resolve('client/webqq-chat-pane.vue'), 'utf8')
+    const styles = readFileSync(resolve('client/styles/webqq-spaces.css'), 'utf8')
+    expect(thumbnail).toContain('WebqqSidebar')
+    expect(thumbnail).toContain('WebqqChatPane')
+    expect(thumbnail).toContain('WebqqDetailsPanel')
+    expect(thumbnail).toContain('buildWorkspaceThumbnailModels')
+    expect(thumbnail).toContain('inert')
+    expect(chatPane).toContain(':preview="preview"')
+    expect(model).toContain('resolveWorkspaceSelection')
+    expect(styles).toContain('width: 400%; height: 760px')
+    expect(styles).toContain('transform: scale(0.25)')
   })
 
   it('复刻 ego lite 的 agent 光标与被控空间观察覆盖层', () => {

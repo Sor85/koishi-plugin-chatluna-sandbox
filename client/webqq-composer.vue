@@ -251,7 +251,8 @@ export interface WebqqComposerSendIntent {
   media?: Array<{ fileName: string, mimeType: string, dataBase64: string }>
 }
 
-const props = defineProps<{ model: WebqqComposerModel }>()
+const props = defineProps<{ model: WebqqComposerModel; preview?: boolean }>()
+const preview = computed(() => !!props.preview)
 const emit = defineEmits<{
   send: [input: WebqqComposerSendIntent, resolve: () => void, reject: (error: unknown) => void]
   selectOperator: [participantId: string, resolve: () => void, reject: (error: unknown) => void]
@@ -378,6 +379,7 @@ watch(filteredMentionCandidates, (candidates) => {
 })
 
 onMounted(() => {
+  if (preview.value) return
   renderDraftToEditor(draft.value)
 })
 
@@ -965,6 +967,7 @@ function updateComposerSpace() {
 
 function bindComposerSpaceObserver() {
   composerSpaceObserver?.disconnect()
+  if (preview.value) return
   const form = composerFormRef.value
   if (!form) return
   composerSpaceObserver = new ResizeObserver(() => updateComposerSpace())
