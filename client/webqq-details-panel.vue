@@ -7,7 +7,7 @@
       </button>
     </header>
 
-    <div v-if="model.view === 'profile'" v-webqq-scrollbar class="webqq-private-info">
+    <div v-if="model.view === 'profile'" v-webqq-scrollbar="{ disabled: preview }" class="webqq-private-info">
       <div class="webqq-profile-hero">
         <span class="webqq-avatar webqq-avatar-profile webqq-avatar-bot"><IconDatabase :size="32" aria-hidden="true" /></span>
         <h2>{{ persistenceTitle }}</h2>
@@ -23,7 +23,7 @@
     </div>
 
     <div v-else-if="model.group" class="webqq-group-info-body">
-      <section v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-group-announcements">
+      <section v-webqq-scrollbar="{ disabled: preview, tone: 'accent' }" class="webqq-group-announcements">
         <div class="webqq-info-section-title">
           <h3>群公告</h3>
           <button type="button" :aria-label="announcementEditorOpen ? '取消添加群公告' : '添加群公告'" :class="{ 'is-active': announcementEditorOpen }" @click="toggleAnnouncementEditor">
@@ -48,7 +48,7 @@
         <h3>群成员 {{ model.group.members.length }}</h3>
         <input v-model="groupMemberSearch" type="search" placeholder="搜索群昵称或 QQ 号">
         <div v-if="!visibleGroupMembers.length" class="webqq-group-empty">暂无群成员</div>
-        <div v-else v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-group-member-list">
+        <div v-else v-webqq-scrollbar="{ disabled: preview, tone: 'accent' }" class="webqq-group-member-list">
           <ContextMenu v-for="member in visibleGroupMembers" :key="member.participantId">
             <ContextMenuTrigger as-child>
               <article class="webqq-group-member">
@@ -76,7 +76,7 @@
       </section>
     </div>
 
-    <div v-else v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-private-info">
+    <div v-else v-webqq-scrollbar="{ disabled: preview, tone: 'accent' }" class="webqq-private-info">
       <div class="webqq-profile-hero">
         <WebqqAvatar class="webqq-avatar webqq-avatar-profile" :kind="model.privateParticipant?.isBot ? 'bot' : 'user'" :name="model.privateParticipant?.name" :avatar="model.privateParticipant?.avatar" />
         <h2>{{ model.privateParticipant?.name ?? '未选择联系人' }}</h2>
@@ -124,7 +124,8 @@ export interface WebqqDetailsPanelModel {
   participants: Record<string, WebqqDetailsParticipant>
 }
 
-const props = defineProps<{ model: WebqqDetailsPanelModel }>()
+const props = defineProps<{ model: WebqqDetailsPanelModel; preview?: boolean }>()
+const preview = computed(() => props.preview)
 const emit = defineEmits<{
   close: []
   publishAnnouncement: [content: string, resolve: () => void, reject: (error: unknown) => void]

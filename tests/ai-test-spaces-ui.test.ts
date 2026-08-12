@@ -41,6 +41,9 @@ describe('AI 测试空间总览', () => {
     expect(zoom).toContain("const ZOOMING_CLASS = 'onebot-sandbox-workspace-zooming'")
     expect(zoom).toContain('document.documentElement.classList.add(ZOOMING_CLASS)')
     expect(zoom).toContain('document.documentElement.classList.remove(ZOOMING_CLASS)')
+    const scrollbar = readFileSync(resolve('client/webqq-scrollbar.ts'), 'utf8')
+    expect(scrollbar).toContain("classList.contains('onebot-sandbox-workspace-zooming')")
+    expect(scrollbar).toContain('visible && state.showOverlay && !workspaceZooming')
     expect(zoom).toContain('prefers-reduced-motion')
   })
 
@@ -59,6 +62,11 @@ describe('AI 测试空间总览', () => {
     expect(thumbnail).toContain('restoreWorkspaceThumbnailScroll')
     expect(thumbnail).toContain("send('onebot-sandbox/media-content'")
     expect(thumbnail).toContain('v-if="!capture"')
+    expect(thumbnail).toContain('<WebqqSidebar :model="models.sidebar" :color-mode="colorMode" preview />')
+    expect(thumbnail).toContain('<WebqqDetailsPanel :model="models.detailsPanel" preview />')
+    // 缩略图是 inert 视觉副本，但 Vue 指令仍会执行；必须显式禁用 body 级滚动条 Portal，避免缩放时在页面中间闪现。
+    expect(readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')).toContain("v-webqq-scrollbar=\"{ disabled: preview, tone: 'accent' }\"")
+    expect(readFileSync(resolve('client/webqq-details-panel.vue'), 'utf8')).toContain('v-webqq-scrollbar="{ disabled: preview')
     expect(capture).toContain('scrollOffsets')
     expect(capture).toContain('copyCanvasPixels')
     expect(capture).toContain("node.removeAttribute('id')")

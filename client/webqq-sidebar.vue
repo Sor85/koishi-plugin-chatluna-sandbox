@@ -82,7 +82,7 @@
               autocomplete="off"
             >
           </label>
-          <div v-webqq-scrollbar="{ tone: 'accent' }" class="webqq-session-list">
+          <div v-webqq-scrollbar="{ disabled: preview, tone: 'accent' }" class="webqq-session-list">
             <EnvironmentCreatePopover
               v-if="sidebarTab === 'groups'"
               type="group"
@@ -361,7 +361,9 @@ const props = defineProps<{
   model: WebqqSidebarModel
   activeSpaceId?: string
   colorMode: 'light' | 'dark'
+  preview?: boolean
 }>()
+const preview = computed(() => props.preview)
 const emit = defineEmits<{
   selectView: [view: WebqqSidebarModel['currentView']]
   selectConversation: [conversationId: string]

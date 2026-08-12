@@ -14,9 +14,9 @@
       data-mobile-view="messages"
       :style="{ '--webqq-accent': appearance.webQQAccentColor }"
     >
-      <WebqqSidebar :model="models.sidebar" :color-mode="colorMode" />
+      <WebqqSidebar :model="models.sidebar" :color-mode="colorMode" preview />
       <WebqqChatPane :model="models.chatPane" preview />
-      <WebqqDetailsPanel :model="models.detailsPanel" />
+      <WebqqDetailsPanel :model="models.detailsPanel" preview />
     </div>
     <!-- AI 控制中的游走光标放在 scale 层之外，保持真实尺寸覆盖在缩略图上。 -->
     <AgentCursor v-if="running" :size="16" />
