@@ -5,9 +5,11 @@ import type { SandboxControlService } from './control-service'
 import type { SandboxMcpService } from './mcp/service'
 import type { SandboxMcpScope } from './mcp/types'
 import { trimSnapshotMessages, type SandboxTestSpaceService, type SandboxTestSpaceSummary } from './test-spaces'
+import { MAIN_MODEL_REQUEST_SCOPE_ID, type SandboxModelRequestStore } from './model-request'
 import type {
   DeleteGroupAnnouncementInput,
   ClearSandboxOneBotDebugRecordsResult,
+  ClearSandboxModelRequestRecordsResult,
   GetForwardMessageInput,
   GetMediaContentInput,
   GetMessageHistoryInput,
@@ -15,6 +17,13 @@ import type {
   GetSandboxOneBotDebugRecordInput,
   GetSandboxOneBotDebugRecordsInput,
   GetSandboxWorkspaceInput,
+  ListSandboxModelRequestRecordsInput,
+  ReadSandboxModelRequestRecordInput,
+  SandboxConsoleModelRequestDetail,
+  SandboxConsoleModelRequestListItem,
+  SandboxModelRequestRecordsPage,
+  SandboxModelRequestScope,
+  SandboxModelRequestSource,
   ManageSandboxEnvironmentInput,
   PerformFriendActionInput,
   PerformGroupActionInput,
@@ -60,6 +69,9 @@ interface ConsoleEventMap {
   'onebot-sandbox/debug-records': (input?: SpaceScoped<GetSandboxOneBotDebugRecordsInput>) => SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord>
   'onebot-sandbox/debug-record': (input: SpaceScoped<GetSandboxOneBotDebugRecordInput>) => SandboxConsoleOneBotDebugRecord
   'onebot-sandbox/clear-debug-records': (input?: { spaceId?: string }) => ClearSandboxOneBotDebugRecordsResult
+  'onebot-sandbox/model-request-records': (input: ListSandboxModelRequestRecordsInput) => SandboxModelRequestRecordsPage<SandboxConsoleModelRequestListItem>
+  'onebot-sandbox/model-request-record': (input: ReadSandboxModelRequestRecordInput) => SandboxConsoleModelRequestDetail
+  'onebot-sandbox/clear-model-request-records': (input: SandboxModelRequestScope) => ClearSandboxModelRequestRecordsResult
   'onebot-sandbox/mcp-credentials': () => Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string }>
   'onebot-sandbox/create-mcp-credential': (input: { name: string; scopes: SandboxMcpScope[] }) => { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
   'onebot-sandbox/set-mcp-credential-enabled': (input: { id: string; enabled: boolean }) => void
@@ -124,6 +136,7 @@ export function registerConsole(
   appearance: SandboxAppearance,
   mcp?: SandboxMcpService,
   testSpaces?: SandboxTestSpaceService,
+  unattributedModelRequests?: SandboxModelRequestStore,
 ) {
   console.addEntry(resolveConsoleEntry())
 
@@ -343,9 +356,56 @@ export function registerConsole(
     return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
   console.addListener('onebot-sandbox/bot-deliveries', async (input = {}) => (await resolveReadyControl(input, false)).getBotDeliveries(assertInteractionInput(withoutSpaceId(input)) as GetSandboxBotDeliveriesInput), { authority: 4 })
+  const requireUnattributedModelRequests = () => {
+    if (!unattributedModelRequests) throw new Error('未归属模型请求库不可用')
+    return unattributedModelRequests
+  }
+  const resolveModelRequestSource = (input: SandboxModelRequestScope): SandboxModelRequestSource => {
+    if (input.scope === 'unattributed') return { type: 'unattributed', name: '未归属' }
+    if (input.scope === 'main' || input.spaceId === MAIN_MODEL_REQUEST_SCOPE_ID) return { type: 'main', name: '主环境' }
+    if (input.scope !== 'space' || !input.spaceId?.trim()) throw new Error('必须指定 main、space 或 unattributed')
+    if (!testSpaces) throw new Error('AI 测试空间服务不可用')
+    const space = testSpaces.getSpace(input.spaceId)
+    return { type: 'test-space', spaceId: space.id, name: space.name }
+  }
+  const resolveModelRequestControl = (input: SandboxModelRequestScope) => {
+    if (input.scope === 'unattributed') return
+    if (input.scope === 'main') return control
+    if (input.scope !== 'space' || !input.spaceId?.trim()) throw new Error('必须指定 main、space 或 unattributed')
+    if (input.spaceId === MAIN_MODEL_REQUEST_SCOPE_ID) return control
+    if (!testSpaces) throw new Error('AI 测试空间服务不可用')
+    return testSpaces.getControl(input.spaceId)
+  }
+  const listModelRequestRecords = (input: ListSandboxModelRequestRecordsInput): SandboxModelRequestRecordsPage<SandboxConsoleModelRequestListItem> => {
+    const source = resolveModelRequestSource(input)
+    const page = input.scope === 'unattributed'
+      ? requireUnattributedModelRequests().getRecords(input)
+      : resolveModelRequestControl(input)!.getModelRequestRecords(input)
+    return {
+      ...page,
+      records: page.records.map((record) => ({ ...record, source })),
+    }
+  }
+  const getModelRequestRecord = (input: ReadSandboxModelRequestRecordInput): SandboxConsoleModelRequestDetail => {
+    const source = resolveModelRequestSource(input)
+    if (input.scope === 'unattributed') {
+      const record = requireUnattributedModelRequests().getRecord(input.recordId)
+      if (!record) throw new Error(`模型请求记录不存在：${input.recordId}`)
+      return { ...record, source }
+    }
+    return { ...resolveModelRequestControl(input)!.getModelRequestRecord(input), source }
+  }
+  const clearModelRequestRecords = (input: SandboxModelRequestScope): ClearSandboxModelRequestRecordsResult => {
+    if (input.scope === 'unattributed') return { cleared: requireUnattributedModelRequests().clear() }
+    return { cleared: resolveModelRequestControl(input)!.clearModelRequestRecords() }
+  }
+
   console.addListener('onebot-sandbox/debug-records', listDebugRecords, { authority: 4 })
   console.addListener('onebot-sandbox/debug-record', getDebugRecord, { authority: 4 })
   console.addListener('onebot-sandbox/clear-debug-records', clearDebugRecords, { authority: 4 })
+  console.addListener('onebot-sandbox/model-request-records', listModelRequestRecords, { authority: 4 })
+  console.addListener('onebot-sandbox/model-request-record', getModelRequestRecord, { authority: 4 })
+  console.addListener('onebot-sandbox/clear-model-request-records', clearModelRequestRecords, { authority: 4 })
   if (mcp) {
     console.addListener('onebot-sandbox/mcp-credentials', () => mcp.listCredentials(), { authority: 4 })
     console.addListener('onebot-sandbox/create-mcp-credential', (input) => mcp.createCredential(input.name, input.scopes), { authority: 4 })
@@ -388,6 +448,9 @@ declare module '@koishijs/console' {
     'onebot-sandbox/debug-records'(input?: SpaceScoped<GetSandboxOneBotDebugRecordsInput>): SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord>
     'onebot-sandbox/debug-record'(input: SpaceScoped<GetSandboxOneBotDebugRecordInput>): SandboxConsoleOneBotDebugRecord
     'onebot-sandbox/clear-debug-records'(input?: { spaceId?: string }): ClearSandboxOneBotDebugRecordsResult
+    'onebot-sandbox/model-request-records'(input: ListSandboxModelRequestRecordsInput): SandboxModelRequestRecordsPage<SandboxConsoleModelRequestListItem>
+    'onebot-sandbox/model-request-record'(input: ReadSandboxModelRequestRecordInput): SandboxConsoleModelRequestDetail
+    'onebot-sandbox/clear-model-request-records'(input: SandboxModelRequestScope): ClearSandboxModelRequestRecordsResult
     'onebot-sandbox/mcp-credentials'(): Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string }>
     'onebot-sandbox/create-mcp-credential'(input: { name: string; scopes: SandboxMcpScope[] }): { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
     'onebot-sandbox/set-mcp-credential-enabled'(input: { id: string; enabled: boolean }): void

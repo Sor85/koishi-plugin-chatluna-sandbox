@@ -1,0 +1,83 @@
+import { App } from '@koishijs/core'
+import { afterEach, describe, expect, it } from 'vitest'
+import { registerConsole, type SandboxConsoleRegistrar } from '../src/console'
+import { SandboxControlService, SandboxRuntimeBotRegistry } from '../src/control-service'
+import { SandboxModelRequestStore } from '../src/model-request'
+import { SandboxTestSpaceService } from '../src/test-spaces'
+import type { SandboxAppearance } from '../src/types'
+
+const appearance: SandboxAppearance = {
+  enableWebQQFrostedGlass: true,
+  webQQTimBubbleTail: true,
+  webQQColorMode: 'auto',
+  webQQAccentColor: '#2563eb',
+  webQQMarkRecalledMessages: true,
+}
+
+const runningApps: App[] = []
+
+afterEach(async () => {
+  await Promise.all(runningApps.splice(0).map((app) => app.stop()))
+})
+
+describe('模型请求 Console 协议', () => {
+  it('按分类读取和清理主环境、测试空间与未归属记录', () => {
+    const app = new App()
+    runningApps.push(app)
+    const runtimeBots = new SandboxRuntimeBotRegistry()
+    const control = new SandboxControlService(app, { runtimeBots })
+    const spaces = new SandboxTestSpaceService(app, runtimeBots)
+    const space = spaces.createSpace({ name: '请求空间' })
+    const unattributed = new SandboxModelRequestStore()
+    const listeners = new Map<string, unknown>()
+    const registrar: SandboxConsoleRegistrar = {
+      addEntry() {},
+      addListener(event, callback) {
+        listeners.set(event, callback)
+      },
+      broadcast() {},
+    }
+    registerConsole(registrar, control, appearance, undefined, spaces, unattributed)
+
+    const mainRecord = control.recordModelRequest({
+      status: 'success', durationMs: 3, model: 'main-model',
+      attribution: 'attributed', entities: { scopeId: 'main' }, requestBodyAvailable: false,
+    })
+    space.control.recordModelRequest({
+      status: 'success', durationMs: 4, model: 'space-model',
+      attribution: 'attributed', entities: { scopeId: space.id }, requestBodyAvailable: false,
+    })
+    const unattributedRecord = unattributed.append({
+      status: 'error', durationMs: 5, model: 'lost-model',
+      attribution: 'unattributed', entities: {}, requestBodyAvailable: true,
+      requestBody: { model: 'lost-model', messages: [] },
+    })
+
+    const listRecords = listeners.get('onebot-sandbox/model-request-records')
+    const getRecord = listeners.get('onebot-sandbox/model-request-record')
+    const clearRecords = listeners.get('onebot-sandbox/clear-model-request-records')
+    if (typeof listRecords !== 'function' || typeof getRecord !== 'function' || typeof clearRecords !== 'function') {
+      throw new Error('模型请求记录监听器未注册')
+    }
+
+    expect(Reflect.apply(listRecords, undefined, [{ scope: 'space', spaceId: 'main' }])).toMatchObject({
+      records: [expect.objectContaining({ id: mainRecord.id, model: 'main-model' })],
+    })
+    expect(Reflect.apply(listRecords, undefined, [{ scope: 'space', spaceId: space.id }])).toMatchObject({
+      records: [expect.objectContaining({ model: 'space-model' })],
+    })
+    const unattributedPage = Reflect.apply(listRecords, undefined, [{ scope: 'unattributed' }]) as { records: Array<{ id: string }> }
+    expect(unattributedPage.records[0]).toMatchObject({ id: unattributedRecord.id, model: 'lost-model' })
+    expect(unattributedPage.records[0]).not.toHaveProperty('requestBody')
+    expect(Reflect.apply(getRecord, undefined, [{ scope: 'unattributed', recordId: unattributedRecord.id }])).toMatchObject({
+      id: unattributedRecord.id,
+      requestBody: { model: 'lost-model', messages: [] },
+    })
+
+    expect(Reflect.apply(clearRecords, undefined, [{ scope: 'space', spaceId: space.id }])).toEqual({ cleared: 1 })
+    expect(space.control.getModelRequestRecords().records).toEqual([])
+    expect(control.getModelRequestRecords().records).toHaveLength(1)
+    expect(Reflect.apply(clearRecords, undefined, [{ scope: 'unattributed' }])).toEqual({ cleared: 1 })
+    expect(unattributed.getRecords().records).toEqual([])
+  })
+})

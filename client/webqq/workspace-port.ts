@@ -1,5 +1,6 @@
 import type {
   DeleteGroupAnnouncementInput,
+  ClearSandboxModelRequestRecordsResult,
   ClearSandboxOneBotDebugRecordsResult,
   GetForwardMessageInput,
   GetMediaContentInput,
@@ -17,6 +18,8 @@ import type {
   SandboxMediaContent,
   SandboxMessageHistory,
   SandboxMessageSearchResult,
+  SandboxModelRequestDetail,
+  SandboxModelRequestRecordsPage,
   SandboxOneBotDebugRecordsPage,
   SandboxWorkspaceState,
   SendForwardMessageInput,
@@ -24,6 +27,11 @@ import type {
   SendMessageInput,
   SetGroupAnnouncementInput,
 } from '../../src/types'
+import type {
+  ClearModelRequestRecordsQuery,
+  ModelRequestRecordQuery,
+  ModelRequestRecordsQuery,
+} from './model-request-query'
 
 export interface WorkspacePort {
   getWorkspace(input?: GetSandboxWorkspaceInput): Promise<SandboxWorkspaceState>
@@ -43,4 +51,7 @@ export interface WorkspacePort {
   performGroupAction(input: PerformGroupActionInput): Promise<SandboxWorkspaceState>
   getOneBotDebugRecords(input?: GetSandboxOneBotDebugRecordsInput): Promise<SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord>>
   clearOneBotDebugRecords(): Promise<ClearSandboxOneBotDebugRecordsResult>
+  getModelRequestRecords(input: ModelRequestRecordsQuery): Promise<SandboxModelRequestRecordsPage>
+  getModelRequestRecord(input: ModelRequestRecordQuery): Promise<SandboxModelRequestDetail>
+  clearModelRequestRecords(input: ClearModelRequestRecordsQuery): Promise<ClearSandboxModelRequestRecordsResult>
 }

@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import type { Context } from 'koishi'
 import { createEmptyScene, SandboxControlService, type SandboxRuntimeBotRegistry } from './control-service'
 import type { SandboxOneBotDebugPersistence } from './onebot-debug'
+import type { SandboxModelRequestPersistence } from './model-request'
 import type { SandboxTestSpacePersistence, SandboxTestSpacePersistenceRecord } from './persistence'
 import type { SandboxSnapshot } from './types'
 
@@ -54,6 +55,7 @@ export class SandboxTestSpaceService {
     private runtimeBots: SandboxRuntimeBotRegistry,
     private persistence?: SandboxTestSpacePersistence,
     private createDebugPersistence?: (scopeId: string) => SandboxOneBotDebugPersistence,
+    private createModelRequestPersistence?: (scopeId: string) => SandboxModelRequestPersistence,
   ) {
     ctx.on('ready', async () => {
       if (!this.persistence) return
@@ -181,6 +183,7 @@ export class SandboxTestSpaceService {
     this.spaces.delete(spaceId)
     // 删除空间时清空并落盘独立调试证据，再 dispose，避免恢复到已删空间记录。
     space.control.clearOneBotDebugRecords()
+    space.control.clearModelRequestRecords()
     void space.control.waitForPersistence().finally(() => {
       void space.control.dispose()
     })
@@ -204,6 +207,7 @@ export class SandboxTestSpaceService {
       runtimeBots: this.runtimeBots,
       mediaDirectory: resolve(this.ctx.baseDir, 'data/onebot-sandbox/spaces', id, 'media'),
       debugPersistence: this.createDebugPersistence?.(id),
+      modelRequestPersistence: this.createModelRequestPersistence?.(id),
     })
   }
 

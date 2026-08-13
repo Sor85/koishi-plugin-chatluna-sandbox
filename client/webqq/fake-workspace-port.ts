@@ -1,5 +1,6 @@
 import type {
   DeleteGroupAnnouncementInput,
+  ClearSandboxModelRequestRecordsResult,
   ClearSandboxOneBotDebugRecordsResult,
   GetForwardMessageInput,
   GetMediaContentInput,
@@ -17,6 +18,8 @@ import type {
   SandboxMediaContent,
   SandboxMessageHistory,
   SandboxMessageSearchResult,
+  SandboxModelRequestDetail,
+  SandboxModelRequestRecordsPage,
   SandboxOneBotDebugRecordsPage,
   SandboxWorkspaceState,
   SendForwardMessageInput,
@@ -25,6 +28,12 @@ import type {
   SetGroupAnnouncementInput,
 } from '../../src/types'
 import type { WorkspacePort } from './workspace-port'
+import type {
+  ClearModelRequestRecordsQuery,
+  ModelRequestRecordQuery,
+  ModelRequestRecordsQuery,
+} from './model-request-query'
+import { emptyModelRequestRecordsPage } from './model-request-query'
 
 export type WorkspacePortOperation = keyof WorkspacePort
 
@@ -65,6 +74,9 @@ export class FakeWorkspacePort implements WorkspacePort {
     capacity: { recordCount: 0, totalBytes: 0, maxRecords: 5000, maxBytes: 50 * 1024 * 1024 },
   }
   clearDebugRecordsResult: ClearSandboxOneBotDebugRecordsResult = { cleared: 0 }
+  modelRequestRecordsResult: SandboxModelRequestRecordsPage = emptyModelRequestRecordsPage
+  modelRequestRecordResult?: SandboxModelRequestDetail
+  clearModelRequestRecordsResult: ClearSandboxModelRequestRecordsResult = { cleared: 0 }
   private readonly failures = new Map<WorkspacePortOperation, unknown[]>()
 
   constructor(workspace: SandboxWorkspaceState) {
@@ -149,6 +161,25 @@ export class FakeWorkspacePort implements WorkspacePort {
 
   clearOneBotDebugRecords() {
     return this.invoke('clearOneBotDebugRecords', undefined, this.clearDebugRecordsResult)
+  }
+
+  getModelRequestRecords(input: ModelRequestRecordsQuery) {
+    return this.invoke('getModelRequestRecords', input, this.modelRequestRecordsResult)
+  }
+
+  getModelRequestRecord(input: ModelRequestRecordQuery) {
+    const record = this.modelRequestRecordResult
+      ?? this.modelRequestRecordsResult.records.find(({ id }) => id === input.recordId)
+    if (!record) this.rejectNext('getModelRequestRecord', new Error('模型请求记录不存在'))
+    return this.invoke('getModelRequestRecord', input, {
+      ...record,
+      requestBody: record && 'requestBody' in record ? record.requestBody : undefined,
+      summary: record?.summary ?? { keys: 0, messageCount: 0, toolCount: 0, bodyAvailable: false },
+    } as SandboxModelRequestDetail)
+  }
+
+  clearModelRequestRecords(input: ClearModelRequestRecordsQuery) {
+    return this.invoke('clearModelRequestRecords', input, this.clearModelRequestRecordsResult)
   }
 }
 

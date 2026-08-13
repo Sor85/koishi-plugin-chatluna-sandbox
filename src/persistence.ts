@@ -1,6 +1,7 @@
 import type { Context } from 'koishi'
-import type { SandboxOneBotDebugRecord, SandboxPersistenceStatus, SandboxSnapshot } from './types'
+import type { SandboxOneBotDebugRecord, SandboxModelRequestRecord, SandboxPersistenceStatus, SandboxSnapshot } from './types'
 import type { SandboxOneBotDebugPersistence } from './onebot-debug'
+import type { SandboxModelRequestPersistence } from './model-request'
 
 export type SandboxSceneLoadResult =
   | { kind: 'loaded', scene: SandboxSnapshot }
@@ -42,11 +43,19 @@ export interface SandboxOneBotDebugPersistenceRecord {
   updatedAt: Date
 }
 
+export interface SandboxModelRequestPersistenceRecord {
+  scopeId: string
+  nextSequence: number
+  records: SandboxModelRequestRecord[]
+  updatedAt: Date
+}
+
 declare module '@koishijs/core' {
   interface Tables {
     'onebot-sandbox.scene': SandboxSceneRecord
     'onebot-sandbox.test-space': SandboxTestSpacePersistenceRecord
     'onebot-sandbox.debug-records': SandboxOneBotDebugPersistenceRecord
+    'onebot-sandbox.model-requests': SandboxModelRequestPersistenceRecord
   }
 }
 
@@ -67,12 +76,19 @@ interface SandboxOneBotDebugDatabase {
   remove(table: 'onebot-sandbox.debug-records', query: { scopeId: string }): Promise<unknown>
 }
 
+interface SandboxModelRequestDatabase {
+  get(table: 'onebot-sandbox.model-requests', query: { scopeId: string }): Promise<SandboxModelRequestPersistenceRecord[]>
+  upsert(table: 'onebot-sandbox.model-requests', rows: SandboxModelRequestPersistenceRecord[]): Promise<unknown>
+  remove(table: 'onebot-sandbox.model-requests', query: { scopeId: string }): Promise<unknown>
+}
+
 // 表名使用 "onebot-sandbox." 前缀：dataview-next 等工具按点号前缀归属插件；
 // ctx.inject 回调里的 model.extend 拿不到插件运行时名称，仅靠上下文会被归为未知来源。
 const SCENE_TABLE = 'onebot-sandbox.scene'
 const SCENE_ID = 'main'
 const TEST_SPACE_TABLE = 'onebot-sandbox.test-space'
 const DEBUG_TABLE = 'onebot-sandbox.debug-records'
+const MODEL_REQUEST_TABLE = 'onebot-sandbox.model-requests'
 
 export function registerSandboxSceneModel(ctx: Context): void {
   ctx.model.extend(SCENE_TABLE, {
@@ -92,6 +108,15 @@ export function registerSandboxTestSpaceModel(ctx: Context): void {
     completedAt: 'string(64)',
     scene: 'json',
   }, { primary: 'id' })
+}
+
+export function registerSandboxModelRequestModel(ctx: Context): void {
+  ctx.model.extend(MODEL_REQUEST_TABLE, {
+    scopeId: 'string(64)',
+    nextSequence: 'unsigned',
+    records: 'json',
+    updatedAt: 'timestamp',
+  }, { primary: 'scopeId' })
 }
 
 export function registerSandboxOneBotDebugModel(ctx: Context): void {
@@ -159,6 +184,39 @@ export class KoishiDatabaseOneBotDebugPersistence implements SandboxOneBotDebugP
     const database = this.getDatabase()
     if (!database) return
     await database.remove(DEBUG_TABLE, { scopeId: this.scopeId })
+  }
+}
+
+export class MemoryModelRequestPersistence implements SandboxModelRequestPersistence {
+  private store = new Map<string, { nextSequence: number, records: SandboxModelRequestRecord[] }>()
+  constructor(private scopeId: string) {}
+  async load() {
+    const current = this.store.get(this.scopeId)
+    return current ? { nextSequence: current.nextSequence, records: structuredClone(current.records) } : { nextSequence: 1, records: [] }
+  }
+  async replaceAll(nextSequence: number, records: SandboxModelRequestRecord[]) {
+    this.store.set(this.scopeId, { nextSequence, records: structuredClone(records) })
+  }
+  async clear() { this.store.delete(this.scopeId) }
+}
+
+export class KoishiDatabaseModelRequestPersistence implements SandboxModelRequestPersistence {
+  constructor(private scopeId: string, private getDatabase: () => SandboxModelRequestDatabase | undefined) {}
+  async load() {
+    const database = this.getDatabase()
+    if (!database) return { nextSequence: 1, records: [] }
+    const [record] = await database.get(MODEL_REQUEST_TABLE, { scopeId: this.scopeId })
+    return record ? { nextSequence: Math.max(1, Number(record.nextSequence) || 1), records: structuredClone(record.records ?? []) } : { nextSequence: 1, records: [] }
+  }
+  async replaceAll(nextSequence: number, records: SandboxModelRequestRecord[]) {
+    const database = this.getDatabase()
+    if (!database) return
+    await database.upsert(MODEL_REQUEST_TABLE, [{ scopeId: this.scopeId, nextSequence, records: structuredClone(records), updatedAt: new Date() }])
+  }
+  async clear() {
+    const database = this.getDatabase()
+    if (!database) return
+    await database.remove(MODEL_REQUEST_TABLE, { scopeId: this.scopeId })
   }
 }
 

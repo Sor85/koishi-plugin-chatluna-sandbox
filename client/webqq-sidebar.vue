@@ -291,7 +291,7 @@
 
 <script setup lang="ts">
 import {
-  IconBell, IconBug, IconClock, IconEdit, IconId, IconLayoutGrid, IconMessageCircle, IconPlus,
+  IconBell, IconBrain, IconBug, IconClock, IconEdit, IconId, IconLayoutGrid, IconMessageCircle, IconPlus,
   IconSearch, IconTag, IconTrash, IconUser, IconUserCircle, IconUserMinus, IconUserPlus, IconUsers,
 } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
@@ -354,7 +354,7 @@ interface SidebarParticipant {
 
 export interface WebqqSidebarModel {
   appearance: SandboxAppearance
-  currentView: 'messages' | 'contacts' | 'profile' | 'debug' | 'spaces'
+  currentView: 'messages' | 'contacts' | 'profile' | 'debug' | 'model-requests' | 'spaces'
   activeConversationId?: string
   currentGroupId?: string
   currentGroupMemberIds: string[]
@@ -402,11 +402,12 @@ const notificationErrorMessage = ref('')
 const navigationItems = [
   { id: 'messages' as const, label: '消息', icon: IconMessageCircle },
   { id: 'debug' as const, label: '调试', icon: IconBug },
+  { id: 'model-requests' as const, label: '模型请求', icon: IconBrain },
   { id: 'profile' as const, label: '资料', icon: IconUserCircle },
   { id: 'spaces' as const, label: 'AI 测试空间', icon: IconLayoutGrid },
 ]
 const visibleNavigationItems = computed(() => props.activeSpaceId
-  ? navigationItems.filter(({ id }) => id === 'messages' || id === 'spaces')
+  ? navigationItems.filter(({ id }) => id === 'messages' || id === 'model-requests' || id === 'spaces')
   : navigationItems)
 const sidebarTabs = [
   { id: 'recent' as const, label: '最近', icon: IconClock },

@@ -56,4 +56,18 @@ describe('Koishi 工作区端口', () => {
       spaceId: 'space-1',
     })
   })
+
+  it('模型请求记录按显式 scope 发送，不注入当前工作区 spaceId', async () => {
+    send.mockClear()
+    send.mockResolvedValue({ records: [], hasMore: false, capacity: { recordCount: 0, totalBytes: 0, maxRecords: 5000, maxBytes: 1 } })
+    const port = createKoishiWorkspacePort(() => 'space-1')
+
+    await port.getModelRequestRecords({ scope: 'unattributed', limit: 50 })
+    await port.getModelRequestRecord({ scope: 'space', spaceId: 'main', recordId: 'record-1' })
+    await port.clearModelRequestRecords({ scope: 'unattributed' })
+
+    expect(send).toHaveBeenNthCalledWith(1, 'onebot-sandbox/model-request-records', { scope: 'unattributed', limit: 50 })
+    expect(send).toHaveBeenNthCalledWith(2, 'onebot-sandbox/model-request-record', { scope: 'space', spaceId: 'main', recordId: 'record-1' })
+    expect(send).toHaveBeenNthCalledWith(3, 'onebot-sandbox/clear-model-request-records', { scope: 'unattributed' })
+  })
 })

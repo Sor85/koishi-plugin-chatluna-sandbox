@@ -17,7 +17,7 @@ afterEach(async () => {
 })
 
 describe('MCP Streamable HTTP', () => {
-  it('按凭证权限发现 36 个工具并拒绝不受信 Origin', async () => {
+  it('按凭证权限发现 39 个工具并拒绝不受信 Origin', async () => {
     const app = new App()
     const directory = mkdtempSync(join(tmpdir(), 'onebot-sandbox-mcp-http-'))
     const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media') })
@@ -63,7 +63,7 @@ describe('MCP Streamable HTTP', () => {
       requestInit: { headers: { authorization: `Bearer ${credential.token}`, origin: 'https://allowed.example' } },
     })
     await client.connect(transport)
-    expect((await client.listTools()).tools).toHaveLength(36)
+    expect((await client.listTools()).tools).toHaveLength(39)
     expect((await client.listResources()).resources).toHaveLength(6)
     await client.close()
   })

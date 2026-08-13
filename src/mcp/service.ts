@@ -7,9 +7,10 @@ import {
   parseAccountProfileFromUnknown,
 } from '../account-profile'
 import type { SandboxControlService } from '../control-service'
+import { MAIN_MODEL_REQUEST_SCOPE_ID, type SandboxModelRequestStore } from '../model-request'
 import type { SandboxTestSpaceService } from '../test-spaces'
 import type { SandboxForwardNodeInput, SandboxMedia, SandboxImplementationProfile, SandboxSnapshot } from '../types'
-import { createDirectConversationId, createGroupConversationId, isRecalledMessage, SandboxOneBotDebugCursorExpiredError } from '../types'
+import { createDirectConversationId, createGroupConversationId, isRecalledMessage, SandboxModelRequestCursorExpiredError, SandboxOneBotDebugCursorExpiredError } from '../types'
 import { getOneBotCapabilityMatrix } from '../onebot-profiles'
 import { SandboxMcpError, type SandboxMcpCallRecord, type SandboxMcpCreatedCredential, type SandboxMcpCredential, type SandboxMcpEvent, type SandboxMcpEventCursor, type SandboxMcpExport, type SandboxMcpScope } from './types'
 
@@ -25,6 +26,7 @@ export interface SandboxMcpServiceOptions {
   maxConcurrentWaits?: number
   maxConcurrentUploads?: number
   testSpaces?: SandboxTestSpaceService
+  unattributedModelRequests?: SandboxModelRequestStore
 }
 
 interface ToolDefinition {
@@ -484,6 +486,38 @@ const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
     required: ['recordId'],
   },
   clear_onebot_debug_records: { type: 'object', properties: { spaceId: SPACE_REQUIRED }, required: ['spaceId'] },
+  list_model_request_records: {
+    type: 'object',
+    properties: {
+      scope: { type: 'string', enum: ['main', 'space', 'unattributed'], description: 'main 读取主环境，space 读取指定 AI 测试空间，unattributed 读取无法安全归属的记录' },
+      spaceId: { type: 'string', description: 'AI 测试空间 ID；scope=space 且省略时读取主环境' },
+      botId: { type: 'string' },
+      conversationId: { type: 'string' },
+      interactionId: { type: 'string' },
+      model: { type: 'string' },
+      errorsOnly: { type: 'boolean' },
+      limit: { type: 'number', description: '每页条数，默认 50，最大 200' },
+      beforeSequence: { type: 'number', description: '新到旧分页游标：仅返回 sequence 更小的记录' },
+    },
+    required: ['scope'],
+  },
+  get_model_request_record: {
+    type: 'object',
+    properties: {
+      scope: { type: 'string', enum: ['main', 'space', 'unattributed'] },
+      spaceId: { type: 'string', description: 'AI 测试空间 ID；scope=space 且省略时读取主环境' },
+      recordId: { type: 'string' },
+    },
+    required: ['scope', 'recordId'],
+  },
+  clear_model_request_records: {
+    type: 'object',
+    properties: {
+      scope: { type: 'string', enum: ['space'], description: '仅允许清理已归属到 AI 测试空间的记录；未归属分类只能在 WebQQ 清理' },
+      spaceId: SPACE_REQUIRED,
+    },
+    required: ['spaceId'],
+  },
   list_mcp_call_records: { type: 'object', properties: { spaceId: SPACE_REQUIRED }, required: ['spaceId'] },
   clear_mcp_call_records: { type: 'object', properties: { spaceId: SPACE_REQUIRED }, required: ['spaceId'] },
 }
@@ -523,6 +557,9 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   ['list_onebot_debug_records', 'debug', '读取 OneBot 调试记录（默认折叠大型值）'],
   ['get_onebot_debug_record', 'debug', '读取单条 OneBot 调试记录，可显式展开大型值'],
   ['clear_onebot_debug_records', 'debug', '清理 OneBot 调试记录'],
+  ['list_model_request_records', 'debug', '读取模型请求记录'],
+  ['get_model_request_record', 'debug', '读取单条模型请求记录，含完整请求体'],
+  ['clear_model_request_records', 'debug', '清理指定 AI 测试空间的模型请求记录'],
   ['list_mcp_call_records', 'debug', '读取 MCP 调用记录'],
   ['clear_mcp_call_records', 'debug', '清理 MCP 调用记录'],
 ].map(([name, scope, description]) => ({ name, scope, description, inputSchema: TOOL_SCHEMAS[name as string] ?? { type: 'object', properties: {} } }) as ToolDefinition)
@@ -588,9 +625,11 @@ export class SandboxMcpService {
   private activeCalls = new Map<string, number>()
   private concurrentLimits: Record<'mutation' | 'wait' | 'upload', number>
   private testSpaces?: SandboxTestSpaceService
+  private unattributedModelRequests?: SandboxModelRequestStore
 
   constructor(private control: SandboxControlService, options: SandboxMcpServiceOptions) {
     this.testSpaces = options.testSpaces
+    this.unattributedModelRequests = options.unattributedModelRequests
     mkdirSync(options.dataDirectory, { recursive: true })
     this.credentialFile = join(options.dataDirectory, 'mcp-credentials.json')
     this.eventLimit = options.eventLimit ?? 1000
@@ -812,6 +851,14 @@ export class SandboxMcpService {
     if (tool === 'fail_test_space') return this.withIdempotency(credential, tool, args, async () => this.completeTestSpace(args, true))
     if (tool === 'reactivate_test_space') return this.withIdempotency(credential, tool, args, async () => this.reactivateTestSpace(args))
     if (tool === 'delete_test_space') return this.withIdempotency(credential, tool, args, async () => this.deleteTestSpace(args))
+    if (tool === 'list_model_request_records') return this.listModelRequestRecords(args)
+    if (tool === 'get_model_request_record') return this.getModelRequestRecord(args)
+    if (tool === 'clear_model_request_records') {
+      if (args.scope === 'unattributed') {
+        throw new SandboxMcpError('invalid_arguments', 'MCP 不能清理未归属模型请求记录')
+      }
+      return { cleared: this.resolveControl(args, true).clearModelRequestRecords() }
+    }
     const activeControl = this.resolveControl(args, tool !== 'get_scene_snapshot' && tool !== 'list_conversations' && tool !== 'get_conversation' && tool !== 'get_forward_message' && tool !== 'list_pending_requests' && tool !== 'get_capability_matrix' && tool !== 'export_scene' && tool !== 'list_onebot_debug_records' && tool !== 'get_onebot_debug_record')
     if (tool === 'get_scene_snapshot') return activeControl.getSnapshot()
     if (tool === 'list_conversations') return this.listConversations(activeControl, args)
@@ -1307,6 +1354,62 @@ export class SandboxMcpService {
   private getTestSpace(args: Record<string, unknown>) {
     const spaceId = requireString(args.spaceId, 'spaceId')
     return this.requireTestSpaces().getSpace(spaceId)
+  }
+
+  private requireUnattributedModelRequests(): SandboxModelRequestStore {
+    if (!this.unattributedModelRequests) throw new SandboxMcpError('internal_error', '未归属模型请求库不可用')
+    return this.unattributedModelRequests
+  }
+
+  private resolveModelRequestScope(args: Record<string, unknown>) {
+    if (args.scope === 'unattributed') return { kind: 'unattributed' as const }
+    if (args.scope === 'main') return { kind: 'main' as const }
+    if (args.scope !== 'space') throw new SandboxMcpError('invalid_arguments', 'scope 必须是 main、space 或 unattributed')
+    const spaceId = typeof args.spaceId === 'string' && args.spaceId.trim() ? args.spaceId.trim() : MAIN_MODEL_REQUEST_SCOPE_ID
+    if (spaceId === MAIN_MODEL_REQUEST_SCOPE_ID) return { kind: 'main' as const }
+    return { kind: 'space' as const, spaceId }
+  }
+
+  private listModelRequestRecords(args: Record<string, unknown>) {
+    const query = {
+      botId: typeof args.botId === 'string' ? args.botId : undefined,
+      conversationId: typeof args.conversationId === 'string' ? args.conversationId : undefined,
+      interactionId: typeof args.interactionId === 'string' ? args.interactionId : undefined,
+      model: typeof args.model === 'string' ? args.model : undefined,
+      errorsOnly: args.errorsOnly === true ? true : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+      beforeSequence: typeof args.beforeSequence === 'number' ? args.beforeSequence : undefined,
+    }
+    try {
+      const scope = this.resolveModelRequestScope(args)
+      if (scope.kind === 'unattributed') return this.requireUnattributedModelRequests().getRecords(query)
+      if (scope.kind === 'main') return this.control.getModelRequestRecords(query)
+      return this.resolveControl({ spaceId: scope.spaceId }, false).getModelRequestRecords(query)
+    } catch (error) {
+      if (error instanceof SandboxModelRequestCursorExpiredError) {
+        throw new SandboxMcpError('cursor_expired', error.message, false, error.earliestCursor === undefined
+          ? '请重新从最新页开始读取。'
+          : `请使用 earliestCursor=${error.earliestCursor} 恢复分页。`)
+      }
+      throw error
+    }
+  }
+
+  private getModelRequestRecord(args: Record<string, unknown>) {
+    const recordId = requireString(args.recordId, 'recordId')
+    try {
+      const scope = this.resolveModelRequestScope(args)
+      if (scope.kind === 'unattributed') {
+        const record = this.requireUnattributedModelRequests().getRecord(recordId)
+        if (!record) throw new Error(`模型请求记录不存在：${recordId}`)
+        return record
+      }
+      if (scope.kind === 'main') return this.control.getModelRequestRecord({ recordId })
+      return this.resolveControl({ spaceId: scope.spaceId }, false).getModelRequestRecord({ recordId })
+    } catch (error) {
+      if (error instanceof SandboxMcpError) throw error
+      throw new SandboxMcpError('record_not_found', error instanceof Error ? error.message : '模型请求记录不存在')
+    }
   }
 
   private resolveControl(args: Record<string, unknown>, mutation: boolean): SandboxControlService {

@@ -24,6 +24,11 @@ import { buildGroupProfileCardModel, buildProfileCardModel } from './profile-car
 import { getConversationPeerId, getFriendDirectory, getGroupDirectory, getVisibleRecentConversations } from './relationship-directory'
 import type { createWorkspaceController } from './workspace-controller'
 import type { createWorkspaceLayout } from './workspace-layout'
+import type {
+  ClearModelRequestRecordsQuery,
+  ModelRequestRecordQuery,
+  ModelRequestRecordsQuery,
+} from './model-request-query'
 
 type WorkspaceController = ReturnType<typeof createWorkspaceController>
 type WorkspaceLayout = ReturnType<typeof createWorkspaceLayout>
@@ -55,6 +60,9 @@ export function createWebqqWorkspaceShell(
   const errorMessage = ref('')
   const debugLoading = ref(false)
   const debugError = ref('')
+  const modelRequestLoading = ref(false)
+  const modelRequestDetailLoading = ref(false)
+  const modelRequestError = ref('')
   const snapshot = computed(() => workspace.value.snapshot)
   const users = computed(() => getSandboxUsers(snapshot.value))
   const bots = computed(() => getSandboxBots(snapshot.value))
@@ -302,6 +310,16 @@ export function createWebqqWorkspaceShell(
     loading: debugLoading.value,
     error: debugError.value,
   }))
+  const modelRequestWorkspaceModel = computed(() => ({
+    records: workspaceController.modelRequestRecords.value,
+    detail: workspaceController.modelRequestRecord.value,
+    hasMore: workspaceController.modelRequestRecordsPage.value.hasMore,
+    nextCursor: workspaceController.modelRequestRecordsPage.value.nextCursor,
+    capacity: workspaceController.modelRequestRecordsPage.value.capacity,
+    loading: modelRequestLoading.value,
+    detailLoading: modelRequestDetailLoading.value,
+    error: modelRequestError.value,
+  }))
 
   onMounted(() => workspaceController.load())
 
@@ -521,6 +539,46 @@ export function createWebqqWorkspaceShell(
     }
   }
 
+  async function loadModelRequestRecords(input: ModelRequestRecordsQuery, mode: 'replace' | 'append' = 'replace') {
+    modelRequestLoading.value = true
+    modelRequestError.value = ''
+    try {
+      await workspaceController.loadModelRequestRecords(input, mode)
+    } catch (error) {
+      modelRequestError.value = error instanceof Error ? error.message : '读取模型请求记录失败'
+    } finally {
+      modelRequestLoading.value = false
+    }
+  }
+
+  async function loadMoreModelRequestRecords(input: ModelRequestRecordsQuery) {
+    return loadModelRequestRecords(input, 'append')
+  }
+
+  async function loadModelRequestRecord(input: ModelRequestRecordQuery) {
+    modelRequestDetailLoading.value = true
+    modelRequestError.value = ''
+    try {
+      await workspaceController.loadModelRequestRecord(input)
+    } catch (error) {
+      modelRequestError.value = error instanceof Error ? error.message : '读取模型请求详情失败'
+    } finally {
+      modelRequestDetailLoading.value = false
+    }
+  }
+
+  async function clearModelRequestRecords(input: ClearModelRequestRecordsQuery) {
+    modelRequestLoading.value = true
+    modelRequestError.value = ''
+    try {
+      await workspaceController.clearModelRequestRecords(input)
+    } catch (error) {
+      modelRequestError.value = error instanceof Error ? error.message : '清理模型请求记录失败'
+    } finally {
+      modelRequestLoading.value = false
+    }
+  }
+
   function toggleDetails() {
     workspaceLayout.toggleDetails()
   }
@@ -678,6 +736,7 @@ export function createWebqqWorkspaceShell(
     appearance,
     chatPaneModel,
     clearOneBotDebugRecords,
+    clearModelRequestRecords,
     closeDetails,
     currentView,
     deleteAnnouncement,
@@ -686,11 +745,15 @@ export function createWebqqWorkspaceShell(
     detailsVisible,
     debugWorkspaceModel,
     environmentModel,
+    modelRequestWorkspaceModel,
     handleSidebarNotification,
     kickGroupMember,
     loadEarlierMessages,
     searchConversationMessages,
     loadOneBotDebugRecords,
+    loadModelRequestRecords,
+    loadMoreModelRequestRecords,
+    loadModelRequestRecord,
     manageEnvironment,
     openComposerParticipantDialog,
     openEntityDialog,

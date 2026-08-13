@@ -1,6 +1,6 @@
 import type { SandboxSnapshot } from '../../src/types'
 
-export type SandboxWorkspaceView = 'messages' | 'contacts' | 'profile' | 'debug' | 'spaces'
+export type SandboxWorkspaceView = 'messages' | 'contacts' | 'profile' | 'debug' | 'model-requests' | 'spaces'
 export type SandboxDetailsPreference = 'auto' | 'open' | 'closed'
 
 export interface SandboxWorkspacePreferences {
@@ -18,7 +18,7 @@ const STORAGE_KEY = 'onebot-sandbox.workspace'
 const DEFAULT_PREFERENCES: SandboxWorkspacePreferences = {
   currentView: 'messages',
 }
-const WORKSPACE_VIEWS = new Set<SandboxWorkspaceView>(['messages', 'contacts', 'profile', 'debug'])
+const WORKSPACE_VIEWS = new Set<SandboxWorkspaceView>(['messages', 'contacts', 'profile', 'debug', 'model-requests'])
 
 export function resolveDetailsVisibility(preference: SandboxDetailsPreference, wideLayout: boolean) {
   if (preference === 'open') return true

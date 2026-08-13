@@ -60,6 +60,13 @@ describe('WebQQ 浏览器工作台状态', () => {
       activeConversationId: 'private:10002:20001',
       currentView: 'profile',
     })
+
+    saveWorkspacePreferences(storage, {
+      currentOperatorId: '20001',
+      activeConversationId: 'private:10002:20001',
+      currentView: 'model-requests',
+    })
+    expect(loadWorkspacePreferences(storage).currentView).toBe('model-requests')
     expect(snapshot.participants[0].id).toBe('10001')
   })
 

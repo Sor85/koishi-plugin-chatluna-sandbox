@@ -6,6 +6,12 @@ import { BUILTIN_AVATARS, findBuiltinAvatarByReference, getBuiltinAvatarReferenc
 import { SandboxChatLunaStateStore } from './chatluna-state'
 import { SandboxMediaStorage, MAX_MEDIA_SIZE } from './media-storage'
 import { SandboxOneBotDebugStore, createOneBotDebugError, type AppendOneBotDebugRecordInput, type SandboxOneBotDebugPersistence } from './onebot-debug'
+import {
+  SandboxModelRequestStore,
+  type AppendModelRequestRecordInput,
+  type SandboxModelRequestPersistence,
+  type UpdateModelRequestRecordInput,
+} from './model-request'
 import { toOneBotMessageSegments, toOneBotRawMessage } from './onebot-message'
 import type { SandboxSceneLoadResult, SandboxScenePersistence } from './persistence'
 import { mergeAccountProfile, normalizeAccountProfile, sanitizeSnapshotProfiles } from './account-profile'
@@ -27,7 +33,11 @@ import {
   type GetMessageHistoryInput,
   type GetSandboxOneBotDebugRecordsInput,
   type GetSandboxOneBotDebugRecordInput,
+  type GetSandboxModelRequestRecordInput,
+  type GetSandboxModelRequestRecordsInput,
   type SandboxOneBotDebugRecordsPage,
+  type SandboxModelRequestDetail,
+  type SandboxModelRequestRecordsPage,
   type PerformFriendActionInput,
   type PerformFriendActionResult,
   type PerformGroupActionInput,
@@ -77,6 +87,9 @@ export interface SandboxControlServiceOptions {
   debugPersistence?: SandboxOneBotDebugPersistence
   debugRecordLimit?: number
   debugRecordMaxBytes?: number
+  modelRequestPersistence?: SandboxModelRequestPersistence
+  modelRequestRecordLimit?: number
+  modelRequestRecordMaxBytes?: number
   initialScene?: SandboxSnapshot
   runtimeBots?: SandboxRuntimeBotRegistry
   runtimeActive?: boolean
@@ -198,6 +211,7 @@ export class SandboxControlService {
   private chatLunaState: SandboxChatLunaStateStore
   private initialScene: SandboxSnapshot
   private oneBotDebug: SandboxOneBotDebugStore
+  private modelRequests: SandboxModelRequestStore
   private mediaStorage: SandboxMediaStorage
   private persistence?: SandboxScenePersistence
   private scenePersistenceAuthoritative = true
@@ -227,6 +241,11 @@ export class SandboxControlService {
       maxRecords: options.debugRecordLimit,
       maxBytes: options.debugRecordMaxBytes,
       persistence: options.debugPersistence,
+    })
+    this.modelRequests = new SandboxModelRequestStore({
+      maxRecords: options.modelRequestRecordLimit,
+      maxBytes: options.modelRequestRecordMaxBytes,
+      persistence: options.modelRequestPersistence,
     })
     // 内存模式默认使用实例级媒体目录，避免并行测试/多实例共享默认目录时互相 clear 与写冲突。
     // Database 模式仍使用共享目录，以便场景引用在重启后继续命中同一媒体文件。
@@ -515,6 +534,38 @@ export class SandboxControlService {
     return this.oneBotDebug.clear()
   }
 
+  getModelRequestStore(): SandboxModelRequestStore {
+    return this.modelRequests
+  }
+
+  getThinkingModelRequestTargets(): Array<{ botId: string, conversationId: string }> {
+    return this.chatLunaState.getStates()
+      .filter(({ thinking }) => thinking)
+      .map(({ botParticipantId, conversationId }) => ({ botId: botParticipantId, conversationId }))
+  }
+
+  getModelRequestRecords(input: GetSandboxModelRequestRecordsInput = {}): SandboxModelRequestRecordsPage {
+    return this.modelRequests.getRecords(input)
+  }
+
+  getModelRequestRecord(input: GetSandboxModelRequestRecordInput): SandboxModelRequestDetail {
+    const record = this.modelRequests.getRecord(input.recordId)
+    if (!record) throw new Error(`模型请求记录不存在：${input.recordId}`)
+    return record
+  }
+
+  clearModelRequestRecords(): number {
+    return this.modelRequests.clear()
+  }
+
+  recordModelRequest(input: AppendModelRequestRecordInput) {
+    return this.modelRequests.append(input)
+  }
+
+  updateModelRequest(recordId: string, input: UpdateModelRequestRecordInput) {
+    return this.modelRequests.update(recordId, input)
+  }
+
   recordOneBotDebug(input: AppendOneBotDebugRecordInput): SandboxOneBotDebugRecord {
     const record = this.oneBotDebug.append(input)
     for (const listener of this.debugRecordListeners) listener(record)
@@ -529,8 +580,10 @@ export class SandboxControlService {
     await this.sceneReady
     await Promise.all([
       this.oneBotDebug.waitForReady(),
+      this.modelRequests.waitForReady(),
       this.persistenceQueue,
       this.oneBotDebug.waitForPersistence(),
+      this.modelRequests.waitForPersistence(),
     ])
   }
 
@@ -553,6 +606,7 @@ export class SandboxControlService {
   resetScene(): void {
     this.chatLunaState.clear()
     this.oneBotDebug.clear()
+    this.modelRequests.clear()
     this.botDeliveries = []
     // 恢复到本实例的初始场景而非全局默认场景：测试空间的初始场景是空白，
     // 直接 createDefaultScene() 会引入默认机器人 20001，与主场景在全局

@@ -18,6 +18,8 @@ import type {
   SandboxGroup,
   SandboxGroupAction,
   SandboxMessage,
+  SandboxModelRequestDetail,
+  SandboxModelRequestListItem,
   SandboxParticipant,
   SandboxSnapshot,
   SandboxWorkspaceState,
@@ -33,6 +35,13 @@ import {
   type SandboxWorkspaceView,
 } from './workspace-state'
 import type { WorkspacePort } from './workspace-port'
+import {
+  emptyModelRequestCapacity,
+  type ClearModelRequestRecordsQuery,
+  type ModelRequestRecordQuery,
+  type ModelRequestRecordsPageState,
+  type ModelRequestRecordsQuery,
+} from './model-request-query'
 
 type WorkspaceStorage = {
   getItem(key: string): string | null
@@ -126,6 +135,12 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   const activeConversationIdState = ref<string>()
   const currentViewState = ref<SandboxWorkspaceView>('messages')
   const oneBotDebugRecordsState = ref<SandboxConsoleOneBotDebugRecord[]>([])
+  const modelRequestRecordsState = ref<SandboxModelRequestListItem[]>([])
+  const modelRequestRecordState = ref<SandboxModelRequestDetail>()
+  const modelRequestRecordsPageState = ref<ModelRequestRecordsPageState>({
+    hasMore: false,
+    capacity: emptyModelRequestCapacity,
+  })
 
   const snapshot = computed(() => workspaceState.value.snapshot)
   const currentOperator = computed<WorkspaceParticipant | undefined>(() => {
@@ -480,6 +495,45 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     }
   }
 
+  async function loadModelRequestRecords(input: ModelRequestRecordsQuery, mode: 'replace' | 'append' = 'replace') {
+    try {
+      const page = await port.getModelRequestRecords(input)
+      modelRequestRecordsState.value = mode === 'append'
+        ? [...modelRequestRecordsState.value, ...page.records]
+        : page.records
+      modelRequestRecordsPageState.value = {
+        hasMore: page.hasMore,
+        nextCursor: page.nextCursor,
+        earliestCursor: page.earliestCursor,
+        capacity: page.capacity,
+      }
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '读取模型请求记录失败')
+    }
+  }
+
+  async function loadModelRequestRecord(input: ModelRequestRecordQuery) {
+    try {
+      modelRequestRecordState.value = await port.getModelRequestRecord(input)
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '读取模型请求详情失败')
+    }
+  }
+
+  async function clearModelRequestRecords(input: ClearModelRequestRecordsQuery) {
+    try {
+      await port.clearModelRequestRecords(input)
+      modelRequestRecordsState.value = []
+      modelRequestRecordState.value = undefined
+      modelRequestRecordsPageState.value = {
+        hasMore: false,
+        capacity: emptyModelRequestCapacity,
+      }
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '清理模型请求记录失败')
+    }
+  }
+
   async function handleRelationshipRequest(requestId: string, approve: boolean) {
     const operatorId = getCurrentOperatorId()
     const request = snapshot.value.requests.find(({ id }) => id === requestId)
@@ -500,6 +554,9 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     activeConversationId: readonly(activeConversationIdState),
     currentView: readonly(currentViewState),
     oneBotDebugRecords: readonly(oneBotDebugRecordsState),
+    modelRequestRecords: readonly(modelRequestRecordsState),
+    modelRequestRecord: readonly(modelRequestRecordState),
+    modelRequestRecordsPage: readonly(modelRequestRecordsPageState),
     sidebar,
     chat,
     composer,
@@ -511,11 +568,14 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     loadMessageHistory,
     searchConversationMessages,
     loadOneBotDebugRecords,
+    loadModelRequestRecords,
+    loadModelRequestRecord,
     manageEnvironment,
     notifySceneRevision,
     performFriendAction,
     performGroupAction,
     clearOneBotDebugRecords,
+    clearModelRequestRecords,
     recallMessage,
     setMessageReaction,
     replaceWorkspace,

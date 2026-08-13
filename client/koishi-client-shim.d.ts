@@ -2,11 +2,14 @@ declare module '@koishijs/client' {
   import type { Component } from 'vue'
   import type {
     DeleteGroupAnnouncementInput,
+    ClearSandboxModelRequestRecordsResult,
     ClearSandboxOneBotDebugRecordsResult,
     GetForwardMessageInput,
     GetMediaContentInput,
     GetMessageHistoryInput,
     GetSandboxWorkspaceInput,
+    GetSandboxModelRequestRecordInput,
+    GetSandboxModelRequestRecordsInput,
     GetSandboxOneBotDebugRecordInput,
     GetSandboxOneBotDebugRecordsInput,
     ManageSandboxEnvironmentInput,
@@ -16,6 +19,9 @@ declare module '@koishijs/client' {
     SearchConversationMessagesInput,
     SetMessageReactionInput,
     SandboxConsoleOneBotDebugRecord,
+    SandboxModelRequestDetail,
+    SandboxModelRequestRecordsPage,
+    SandboxModelRequestScope,
     SandboxForward,
     SandboxMediaContent,
     SandboxMessageHistory,
@@ -65,6 +71,9 @@ declare module '@koishijs/client' {
   export function send(event: 'onebot-sandbox/debug-records', input?: SpaceScoped<GetSandboxOneBotDebugRecordsInput>): Promise<SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord>>
   export function send(event: 'onebot-sandbox/debug-record', input: SpaceScoped<GetSandboxOneBotDebugRecordInput>): Promise<SandboxConsoleOneBotDebugRecord>
   export function send(event: 'onebot-sandbox/clear-debug-records', input?: { spaceId?: string }): Promise<ClearSandboxOneBotDebugRecordsResult>
+  export function send(event: 'onebot-sandbox/model-request-records', input: GetSandboxModelRequestRecordsInput & SandboxModelRequestScope): Promise<SandboxModelRequestRecordsPage>
+  export function send(event: 'onebot-sandbox/model-request-record', input: GetSandboxModelRequestRecordInput & SandboxModelRequestScope): Promise<SandboxModelRequestDetail>
+  export function send(event: 'onebot-sandbox/clear-model-request-records', input: SandboxModelRequestScope): Promise<ClearSandboxModelRequestRecordsResult>
   export function send(event: 'onebot-sandbox/mcp-credentials'): Promise<Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string }>>
   export function send(event: 'onebot-sandbox/create-mcp-credential', input: { name: string; scopes: SandboxMcpScope[] }): Promise<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }>
   export function send(event: 'onebot-sandbox/set-mcp-credential-enabled', input: { id: string; enabled: boolean }): Promise<void>

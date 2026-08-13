@@ -411,7 +411,110 @@ export class SandboxOneBotDebugCursorExpiredError extends Error {
   }
 }
 
+export class SandboxModelRequestCursorExpiredError extends Error {
+  readonly code = 'cursor_expired' as const
+
+  constructor(
+    message: string,
+    readonly earliestCursor?: number,
+  ) {
+    super(message)
+    this.name = 'SandboxModelRequestCursorExpiredError'
+  }
+}
+
+export type SandboxModelRequestStatus = 'pending' | 'success' | 'error'
+export type SandboxModelRequestAttribution = 'attributed' | 'unattributed'
+
+export interface SandboxModelRequestError {
+  code: string
+  message: string
+  retryable: boolean
+  traceId: string
+}
+
+export interface SandboxModelRequestEntities {
+  scopeId?: string
+  botId?: string
+  conversationId?: string
+}
+
+export interface SandboxModelRequestSummary {
+  keys: number
+  messageCount: number
+  toolCount: number
+  bodyAvailable: boolean
+}
+
+export interface SandboxModelRequestRecord {
+  id: string
+  sequence: number
+  createdAt: string
+  status: SandboxModelRequestStatus
+  durationMs: number
+  method?: string
+  url?: string
+  provider?: string
+  model?: string
+  attribution: SandboxModelRequestAttribution
+  entities: SandboxModelRequestEntities
+  requestBodyAvailable: boolean
+  requestBody?: unknown
+  interactionId?: string
+  error?: SandboxModelRequestError
+}
+
+export type SandboxModelRequestListItem = Omit<SandboxModelRequestRecord, 'requestBody'> & {
+  summary: SandboxModelRequestSummary
+}
+export type SandboxModelRequestDetail = SandboxModelRequestRecord & { summary: SandboxModelRequestSummary }
+
+export interface GetSandboxModelRequestRecordsInput {
+  botId?: string
+  conversationId?: string
+  interactionId?: string
+  model?: string
+  errorsOnly?: boolean
+  limit?: number
+  beforeSequence?: number
+}
+
+export interface SandboxModelRequestCapacity {
+  recordCount: number
+  totalBytes: number
+  maxRecords: number
+  maxBytes: number
+}
+
+export interface SandboxModelRequestRecordsPage<T extends SandboxModelRequestListItem = SandboxModelRequestListItem> {
+  records: T[]
+  hasMore: boolean
+  nextCursor?: number
+  earliestCursor?: number
+  capacity: SandboxModelRequestCapacity
+}
+
+export interface GetSandboxModelRequestRecordInput { recordId: string }
+export interface ClearSandboxModelRequestRecordsResult { cleared: number }
+
+export type SandboxModelRequestSource =
+  | { type: 'main', name: string }
+  | { type: 'test-space', spaceId: string, name: string }
+  | { type: 'unattributed', name: string }
+
+export type SandboxConsoleModelRequestListItem = SandboxModelRequestListItem & { source: SandboxModelRequestSource }
+export type SandboxConsoleModelRequestDetail = SandboxModelRequestDetail & { source: SandboxModelRequestSource }
+
+export type SandboxModelRequestScope =
+  | { scope: 'main', spaceId?: never, unattributed?: false }
+  | { scope: 'space', spaceId: string, unattributed?: false }
+  | { scope: 'unattributed', spaceId?: never, unattributed?: true }
+
+export type ListSandboxModelRequestRecordsInput = SandboxModelRequestScope & GetSandboxModelRequestRecordsInput
+export type ReadSandboxModelRequestRecordInput = SandboxModelRequestScope & GetSandboxModelRequestRecordInput
+
 export type SandboxMediaType = 'image' | 'file' | 'audio' | 'video'
+
 
 export interface SandboxMedia {
   id: string

@@ -2,15 +2,20 @@ import { Context, Schema } from 'koishi'
 import { registerConsole } from './console'
 import { SandboxControlService, SandboxRuntimeBotRegistry } from './control-service'
 import {
+  KoishiDatabaseModelRequestPersistence,
   KoishiDatabaseOneBotDebugPersistence,
   KoishiDatabaseScenePersistence,
   KoishiDatabaseTestSpacePersistence,
+  MemoryModelRequestPersistence,
   MemoryOneBotDebugPersistence,
+  registerSandboxModelRequestModel,
   registerSandboxOneBotDebugModel,
   registerSandboxSceneModel,
   registerSandboxTestSpaceModel,
 } from './persistence'
 import type { SandboxOneBotDebugPersistence } from './onebot-debug'
+import { installModelRequestCollector, resolveChatLunaPluginClass } from './model-request-collector'
+import { MAIN_MODEL_REQUEST_SCOPE_ID, SandboxModelRequestStore, UNATTRIBUTED_MODEL_REQUEST_SCOPE_ID, type SandboxModelRequestPersistence } from './model-request'
 import { SandboxMcpHttpServer, type SandboxMcpServerConfig } from './mcp/server'
 import { SandboxMcpService } from './mcp/service'
 import { SandboxTestSpaceService } from './test-spaces'
@@ -20,6 +25,8 @@ import type { SandboxAppearance, SandboxPersistenceMode } from './types'
 export * from './control-service'
 export * from './persistence'
 export * from './onebot-debug'
+export * from './model-request'
+export * from './model-request-collector'
 export * from './types'
 export * from './mcp/server'
 export * from './mcp/service'
@@ -84,16 +91,20 @@ export function apply(ctx: Context, config: Config) {
   }, (inner) => {
     let persistence: KoishiDatabaseScenePersistence | undefined
     let createDebugPersistence: (scopeId: string) => SandboxOneBotDebugPersistence
+    let createModelRequestPersistence: (scopeId: string) => SandboxModelRequestPersistence
     if (config.persistenceMode === 'database') {
       registerSandboxSceneModel(inner)
       registerSandboxTestSpaceModel(inner)
       registerSandboxOneBotDebugModel(inner)
+      registerSandboxModelRequestModel(inner)
       // database 是可选注入，可能在本插件之后加载；必须传 getter 延迟解析，不能在此刻取值。
       persistence = new KoishiDatabaseScenePersistence(() => inner.database)
       createDebugPersistence = (scopeId) => new KoishiDatabaseOneBotDebugPersistence(scopeId, () => inner.database)
+      createModelRequestPersistence = (scopeId) => new KoishiDatabaseModelRequestPersistence(scopeId, () => inner.database)
     } else {
       // 内存 Adapter 与数据库 Adapter 共用同一 Interface；进程内跨控制服务实例可恢复，进程退出后不保留。
       const memoryDebug = new Map<string, MemoryOneBotDebugPersistence>()
+      const memoryModelRequests = new Map<string, MemoryModelRequestPersistence>()
       createDebugPersistence = (scopeId) => {
         const existing = memoryDebug.get(scopeId)
         if (existing) return existing
@@ -101,19 +112,55 @@ export function apply(ctx: Context, config: Config) {
         memoryDebug.set(scopeId, created)
         return created
       }
+      createModelRequestPersistence = (scopeId) => {
+        const existing = memoryModelRequests.get(scopeId)
+        if (existing) return existing
+        const created = new MemoryModelRequestPersistence(scopeId)
+        memoryModelRequests.set(scopeId, created)
+        return created
+      }
     }
     const runtimeBots = new SandboxRuntimeBotRegistry()
+    const unattributedModelRequests = new SandboxModelRequestStore({
+      persistence: createModelRequestPersistence(UNATTRIBUTED_MODEL_REQUEST_SCOPE_ID),
+    })
     const control = new SandboxControlService(inner, {
       persistence,
       runtimeBots,
       debugPersistence: createDebugPersistence('main'),
+      modelRequestPersistence: createModelRequestPersistence(MAIN_MODEL_REQUEST_SCOPE_ID),
     })
     const testSpaces = new SandboxTestSpaceService(
       inner,
       runtimeBots,
       config.persistenceMode === 'database' ? new KoishiDatabaseTestSpacePersistence(() => inner.database) : undefined,
       createDebugPersistence,
+      createModelRequestPersistence,
     )
+    const chatLunaPlugin = resolveChatLunaPluginClass(inner.baseDir)
+    const disposeModelRequestCollector = installModelRequestCollector({
+      plugin: chatLunaPlugin,
+      baseDir: inner.baseDir,
+      unattributed: unattributedModelRequests,
+      getCandidates: () => [
+        {
+          scopeId: MAIN_MODEL_REQUEST_SCOPE_ID,
+          store: control.getModelRequestStore(),
+          thinking: control.getThinkingModelRequestTargets(),
+        },
+        ...testSpaces.listSpaces().map((space) => {
+          const spaceControl = testSpaces.getControl(space.id)
+          return {
+            scopeId: space.id,
+            store: spaceControl.getModelRequestStore(),
+            thinking: spaceControl.getThinkingModelRequestTargets(),
+          }
+        }),
+      ],
+    })
+    inner.logger('onebot-sandbox').info(chatLunaPlugin
+      ? 'ChatLuna 模型请求采集器已安装。'
+      : '未找到 ChatLuna 运行时，模型请求采集器未安装。')
     inner.provide('onebotSandbox', control, true)
     try {
       const mcp = new SandboxMcpService(control, {
@@ -126,17 +173,26 @@ export function apply(ctx: Context, config: Config) {
         maxConcurrentWaits: config.mcp.maxConcurrentWaits,
         maxConcurrentUploads: config.mcp.maxConcurrentUploads,
         testSpaces,
+        unattributedModelRequests,
       })
       const mcpServer = new SandboxMcpHttpServer(inner, mcp, config.mcp)
-      registerConsole(inner.console, control, config, mcp, testSpaces)
+      registerConsole(inner.console, control, config, mcp, testSpaces, unattributedModelRequests)
       inner.on('ready', async () => {
         await control.waitForSceneReady()
         await mcpServer.start().catch((error) => inner.logger('onebot-sandbox').error('MCP 监听器启动失败；WebQQ 仍可继续使用。', error))
       })
-      inner.on('dispose', () => mcpServer.stop())
+      inner.on('dispose', () => {
+        disposeModelRequestCollector()
+        void unattributedModelRequests.waitForPersistence()
+        mcpServer.stop()
+      })
     } catch (error) {
       inner.logger('onebot-sandbox').error('MCP 初始化失败；WebQQ 仍可继续使用。', error)
-      registerConsole(inner.console, control, config, undefined, testSpaces)
+      registerConsole(inner.console, control, config, undefined, testSpaces, unattributedModelRequests)
+      inner.on('dispose', () => {
+        disposeModelRequestCollector()
+        void unattributedModelRequests.waitForPersistence()
+      })
     }
   })
 }

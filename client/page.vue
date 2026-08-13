@@ -55,6 +55,23 @@
           @query="loadOneBotDebugRecords"
           @clear="clearOneBotDebugRecords"
         />
+        <ModelRequestWorkspace
+          v-else-if="currentView === 'model-requests'"
+          :records="modelRequestWorkspaceModel.records"
+          :detail="modelRequestWorkspaceModel.detail"
+          :spaces="modelRequestSpaces"
+          :default-space-id="activeSpaceId ?? 'main'"
+          :has-more="modelRequestWorkspaceModel.hasMore"
+          :next-cursor="modelRequestWorkspaceModel.nextCursor"
+          :capacity="modelRequestWorkspaceModel.capacity"
+          :loading="modelRequestWorkspaceModel.loading"
+          :detail-loading="modelRequestWorkspaceModel.detailLoading"
+          :error="modelRequestWorkspaceModel.error"
+          @query="loadModelRequestRecords"
+          @load-more="loadMoreModelRequestRecords"
+          @open="loadModelRequestRecord"
+          @clear="clearModelRequestRecords"
+        />
         <WebqqChatPane
           v-else
           :model="chatPaneViewModel"
@@ -128,6 +145,7 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 import AgentObserveOverlay from './agent-observe-overlay.vue'
 import AiTestSpaceOverview from './ai-test-space-overview.vue'
 import EnvironmentManager from './environment-manager.vue'
+import ModelRequestWorkspace from './model-request-workspace.vue'
 import OneBotDebugWorkspace from './onebot-debug-workspace.vue'
 import WebqqChatPane from './webqq-chat-pane.vue'
 import WebqqDetailsPanel from './webqq-details-panel.vue'
@@ -151,6 +169,7 @@ const {
   appearance,
   chatPaneModel,
   clearOneBotDebugRecords,
+  clearModelRequestRecords,
   closeDetails,
   currentView,
   deleteAnnouncement,
@@ -158,12 +177,16 @@ const {
   detailsPanelModel,
   detailsVisible,
   debugWorkspaceModel,
+  modelRequestWorkspaceModel,
   environmentModel,
   handleSidebarNotification,
   kickGroupMember,
   loadEarlierMessages,
   searchConversationMessages,
   loadOneBotDebugRecords,
+  loadModelRequestRecords,
+  loadMoreModelRequestRecords,
+  loadModelRequestRecord,
   manageEnvironment,
   openComposerParticipantDialog,
   openEntityDialog,
@@ -220,6 +243,10 @@ const { createTestSpace, enterTestSpace, handleTestSpaceAction, mainSnapshot, se
   selectWorkspaceNavigation,
 )
 const isWebqqView = computed(() => currentView.value === 'messages' || currentView.value === 'contacts')
+const modelRequestSpaces = computed(() => [
+  { id: 'main', name: '主环境' },
+  ...testSpaces.value.map((space) => ({ id: space.id, name: space.name })),
+])
 const debugBots = computed<SandboxDirectoryBot[]>(() => [
   ...getSandboxBots(mainSnapshot.value).map((bot) => ({
     ...bot,
