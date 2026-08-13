@@ -20,6 +20,7 @@
     </ContextMenuItem>
     <ContextMenuItem v-if="actions.includes('transfer-owner')" @select="emit('transfer-owner')">
       <IconCrown :size="16" aria-hidden="true" /> 转让群主
+      <WebqqMenuExtensionMark />
     </ContextMenuItem>
     <ContextMenuItem
       v-if="actions.includes('kick')"
@@ -39,6 +40,7 @@ import { computed } from 'vue'
 import { IconAt, IconAward, IconCrown, IconHandClick, IconTag, IconUserMinus, IconUserPlus } from '@tabler/icons-vue'
 import { ContextMenuContent, ContextMenuItem, ContextMenuSubContent } from './components/ui/context-menu'
 import { getGroupMemberMenuActions } from './webqq/group-menu'
+import WebqqMenuExtensionMark from './webqq-menu-extension-mark.vue'
 import type { SandboxGroupMember } from '../src/types'
 
 const props = defineProps<{

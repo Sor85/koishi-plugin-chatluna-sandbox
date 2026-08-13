@@ -129,6 +129,7 @@
               <ContextMenuContent style="z-index: 140">
                 <ContextMenuItem v-if="!group.member && !group.pending" @select="requestJoinGroup(group.id)">
                   <IconUserPlus :size="16" aria-hidden="true" /> 申请加入群组
+                  <WebqqMenuExtensionMark />
                 </ContextMenuItem>
                 <ContextMenuItem v-else-if="!group.member && group.pending" disabled>
                   <IconClock :size="16" aria-hidden="true" /> 等待群管理员处理
@@ -152,9 +153,11 @@
                 </ContextMenuItem>
                 <ContextMenuItem @select="openEntityDialog('edit', { type: 'group', id: group.id })">
                   <IconEdit :size="16" aria-hidden="true" /> 编辑群组
+                  <WebqqMenuExtensionMark />
                 </ContextMenuItem>
                 <ContextMenuItem class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="openEntityDialog('delete', { type: 'group', id: group.id })">
                   <IconTrash :size="16" aria-hidden="true" /> 删除群组
+                  <WebqqMenuExtensionMark />
                 </ContextMenuItem>
               </ContextMenuContent>
             </ContextMenu>
@@ -190,6 +193,7 @@
                 </ContextMenuItem>
                 <ContextMenuItem v-if="!entry.isFriend && !entry.pendingOutgoing && !entry.pendingIncoming" @select="requestFriend(entry.id)">
                   <IconUserPlus :size="16" aria-hidden="true" /> 发送好友申请
+                  <WebqqMenuExtensionMark />
                 </ContextMenuItem>
                 <ContextMenuItem v-else-if="entry.pendingOutgoing" disabled>
                   <IconClock :size="16" aria-hidden="true" /> 等待对方处理
@@ -199,6 +203,7 @@
                 </ContextMenuItem>
                 <ContextMenuItem v-if="entry.isFriend" @select="openRemarkDialog(entry.id)">
                   <IconTag :size="16" aria-hidden="true" /> 设置好友备注
+                  <WebqqMenuExtensionMark />
                 </ContextMenuItem>
                 <ContextMenuItem v-if="entry.isFriend" class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="deleteFriend(entry.id)">
                   <IconUserMinus :size="16" aria-hidden="true" /> 删除好友
@@ -208,12 +213,15 @@
                   @select="inviteToCurrentGroup(entry.id)"
                 >
                   <IconUserPlus :size="16" aria-hidden="true" /> 邀请加入当前群组
+                  <WebqqMenuExtensionMark />
                 </ContextMenuItem>
                 <ContextMenuItem @select="openEntityDialog('edit', { type: entry.isBot ? 'bot' : 'user', id: entry.id })">
                   <IconEdit :size="16" aria-hidden="true" /> 编辑{{ entry.isBot ? '机器人' : '用户' }}
+                  <WebqqMenuExtensionMark />
                 </ContextMenuItem>
                 <ContextMenuItem class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="openEntityDialog('delete', { type: entry.isBot ? 'bot' : 'user', id: entry.id })">
                   <IconTrash :size="16" aria-hidden="true" /> 删除{{ entry.isBot ? '机器人' : '用户' }}
+                  <WebqqMenuExtensionMark />
                 </ContextMenuItem>
               </ContextMenuContent>
             </ContextMenu>
@@ -261,9 +269,11 @@
                 </ContextMenuItem>
                 <ContextMenuItem @select="openEntityDialog('edit', conversation.entityTarget)">
                   <IconEdit :size="16" aria-hidden="true" /> 编辑{{ conversation.entityLabel }}
+                  <WebqqMenuExtensionMark />
                 </ContextMenuItem>
                 <ContextMenuItem class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="openEntityDialog('delete', conversation.entityTarget)">
                   <IconTrash :size="16" aria-hidden="true" /> 删除{{ conversation.entityLabel }}
+                  <WebqqMenuExtensionMark />
                 </ContextMenuItem>
               </ContextMenuContent>
             </ContextMenu>
@@ -292,6 +302,7 @@ import EnvironmentCreatePopover from './environment-create-popover.vue'
 import NotificationMenu from './notification-menu.vue'
 import { getGroupRoleLabel } from './webqq/group-display'
 import WebqqAvatar from './webqq-avatar.vue'
+import WebqqMenuExtensionMark from './webqq-menu-extension-mark.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type {
   ManageSandboxEnvironmentInput, SandboxAppearance, SandboxBotProfile, SandboxFriendAction,

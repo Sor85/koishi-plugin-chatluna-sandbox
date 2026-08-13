@@ -87,9 +87,11 @@
                       <ContextMenuContent class="webqq-composer-user-menu" style="z-index: 160">
                         <ContextMenuItem @select="emit('editParticipant', { type: sender.type, id: sender.id })">
                           <IconEdit :size="16" aria-hidden="true" /> 编辑{{ sender.type === 'bot' ? '机器人' : '用户' }}
+                          <WebqqMenuExtensionMark />
                         </ContextMenuItem>
                         <ContextMenuItem class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="emit('deleteParticipant', { type: sender.type, id: sender.id })">
                           <IconTrash :size="16" aria-hidden="true" /> 删除{{ sender.type === 'bot' ? '机器人' : '用户' }}
+                          <WebqqMenuExtensionMark />
                         </ContextMenuItem>
                       </ContextMenuContent>
                     </ContextMenu>
@@ -200,6 +202,7 @@ import EnvironmentCreatePopover from './environment-create-popover.vue'
 import WebqqAvatar from './webqq-avatar.vue'
 import WebqqImagePreview from './webqq-image-preview.vue'
 import WebqqMentionMenu from './webqq-mention-menu.vue'
+import WebqqMenuExtensionMark from './webqq-menu-extension-mark.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import {
   createEmptyComposerDraft,

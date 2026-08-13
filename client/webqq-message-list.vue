@@ -82,6 +82,7 @@
                   </ContextMenuSub>
                   <ContextMenuItem v-if="getChatFriendActions(message.authorId).includes('request')" @select="emit('requestFriend', message.authorId)">
                     <IconUserPlus :size="16" aria-hidden="true" /> 发送好友申请
+                    <WebqqMenuExtensionMark />
                   </ContextMenuItem>
                   <ContextMenuItem v-else-if="getFriendMenuState(message.authorId).pendingOutgoing" disabled><IconClock :size="16" aria-hidden="true" /> 等待对方处理</ContextMenuItem>
                   <ContextMenuItem v-else-if="getFriendMenuState(message.authorId).pendingIncoming" disabled><IconBell :size="16" aria-hidden="true" /> 请在通知中处理申请</ContextMenuItem>
@@ -91,7 +92,7 @@
                       <ContextMenuItem @select="emit('pokeFriend', message.authorId)"><IconHandClick :size="16" aria-hidden="true" /> 戳一戳</ContextMenuItem>
                     </ContextMenuSubContent>
                   </ContextMenuSub>
-                  <ContextMenuItem v-if="!model.currentGroup && getChatFriendActions(message.authorId).includes('remark')" @select="emit('setRemark', message.authorId)"><IconTag :size="16" aria-hidden="true" /> 设置好友备注</ContextMenuItem>
+                  <ContextMenuItem v-if="!model.currentGroup && getChatFriendActions(message.authorId).includes('remark')" @select="emit('setRemark', message.authorId)"><IconTag :size="16" aria-hidden="true" /> 设置好友备注 <WebqqMenuExtensionMark /></ContextMenuItem>
                   <ContextMenuItem v-if="!model.currentGroup && getChatFriendActions(message.authorId).includes('delete')" class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="emit('deleteFriend', message.authorId)"><IconUserMinus :size="16" aria-hidden="true" /> 删除好友</ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>
@@ -326,6 +327,7 @@ import { highlightMessageElement } from './webqq/message-reveal'
 import { formatMentionContent } from './webqq/mention'
 import WebqqAvatar from './webqq-avatar.vue'
 import WebqqMessageReactions from './webqq-message-reactions.vue'
+import WebqqMenuExtensionMark from './webqq-menu-extension-mark.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import {
   formatRecalledMessageEventText,
