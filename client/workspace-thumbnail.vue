@@ -36,8 +36,11 @@ import {
   restoreWorkspaceThumbnailScroll,
   type WorkspaceThumbnailCapture,
 } from './webqq/workspace-thumbnail-capture'
+import { calculateContainedWorkspaceThumbnailTransform } from './webqq/workspace-thumbnail-scale'
 import type { SandboxAppearance, SandboxSnapshot } from '../src/types'
 
+const THUMBNAIL_CANVAS_WIDTH = 1440
+const THUMBNAIL_CANVAS_HEIGHT = 760
 const thumbnailMediaCache = new Map<string, string>()
 
 const props = defineProps<{
@@ -102,29 +105,43 @@ function renderCapture() {
 
   const element = instantiateWorkspaceThumbnail(capture)
   host.append(element)
-  scaleCapture(element, capture)
+  applyContainedScale(element, capture.width, capture.height)
   // scrollTop/scrollLeft 只有在克隆节点接入文档、完成布局后才会生效。
   nextTick(() => restoreWorkspaceThumbnailScroll(capture, element))
 }
 
-function scaleCapture(element: HTMLElement, capture: WorkspaceThumbnailCapture) {
+function applyContainedScale(element: HTMLElement, canvasWidth: number, canvasHeight: number) {
   const thumbnail = thumbnailRef.value
-  if (!thumbnail || !capture.width || !capture.height) return
+  if (!thumbnail) return
   // 进入总览时卡片会执行 transform 动画，getBoundingClientRect 会读到动画中的视觉尺寸且 ResizeObserver 不会为 transform 重触发。
   // 使用不受祖先变换影响的布局尺寸，避免把过渡帧比例永久写入缩略图。
-  const width = thumbnail.clientWidth
-  const height = thumbnail.clientHeight
-  // 缩略图需要铺满卡片；保持等比 cover，并从中心裁掉超出的部分，避免 contain 留白让内容挤在中间。
-  const scale = Math.max(width / capture.width, height / capture.height)
-  const left = (width - capture.width * scale) / 2
-  const top = (height - capture.height * scale) / 2
-  element.style.width = `${capture.width}px`
-  element.style.height = `${capture.height}px`
-  element.style.transform = `translate(${left}px, ${top}px) scale(${scale})`
+  const transform = calculateContainedWorkspaceThumbnailTransform({
+    containerWidth: thumbnail.clientWidth,
+    containerHeight: thumbnail.clientHeight,
+    canvasWidth,
+    canvasHeight,
+  })
+  if (!transform) return
+  // 卡片与页面宽高比不一致时必须保留留白；使用 contain 才能避免宽屏或矮屏下裁掉真实页面区域。
+  element.style.width = `${canvasWidth}px`
+  element.style.height = `${canvasHeight}px`
+  element.style.transform = `translate(${transform.left}px, ${transform.top}px) scale(${transform.scale})`
+}
+
+function scaleThumbnail() {
+  const capture = props.capture
+  if (capture) {
+    const element = liveHostRef.value?.firstElementChild
+    if (element instanceof HTMLElement) applyContainedScale(element, capture.width, capture.height)
+    return
+  }
+  const element = thumbnailRef.value?.querySelector<HTMLElement>('.webqq-space-thumbnail-workspace')
+  if (element) applyContainedScale(element, THUMBNAIL_CANVAS_WIDTH, THUMBNAIL_CANVAS_HEIGHT)
 }
 
 watch(() => props.capture, () => {
   renderCapture()
+  void nextTick(scaleThumbnail)
   void resolveSnapshotMedia()
 })
 watch(() => props.snapshot, () => {
@@ -133,8 +150,9 @@ watch(() => props.snapshot, () => {
 })
 onMounted(() => {
   renderCapture()
+  void nextTick(scaleThumbnail)
   void resolveSnapshotMedia()
-  resizeObserver = new ResizeObserver(renderCapture)
+  resizeObserver = new ResizeObserver(scaleThumbnail)
   if (thumbnailRef.value) resizeObserver.observe(thumbnailRef.value)
 })
 onBeforeUnmount(() => resizeObserver?.disconnect())
