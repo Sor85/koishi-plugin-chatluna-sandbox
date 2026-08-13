@@ -43,7 +43,8 @@ export function shouldFollowMessageListTail(
   next: MessageListTail,
   stickingToBottom: boolean,
 ) {
-  if (!previous || previous.conversationId !== next.conversationId) return true
+  // 首次进入与会话切换由 scrollStateKey 决定恢复缓存还是置底，尾部 watcher 只跟踪同一会话的增量。
+  if (!previous || previous.conversationId !== next.conversationId) return false
   if (!stickingToBottom) return false
   return previous.lastMessageId !== next.lastMessageId
     || previous.thinkingIds.join('\n') !== next.thinkingIds.join('\n')

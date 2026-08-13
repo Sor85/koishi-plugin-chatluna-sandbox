@@ -58,6 +58,7 @@
         <WebqqChatPane
           v-else
           :model="chatPaneViewModel"
+          :scroll-scope="activeSpaceId ?? 'main'"
           @back="selectNavigation('contacts')"
           @toggle-details="toggleDetails"
           @send="sendComposerMessage"

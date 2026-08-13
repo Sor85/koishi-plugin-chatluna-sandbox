@@ -64,12 +64,12 @@ describe('WebQQ 消息列表置底追踪', () => {
     expect(shouldFollowMessageListTail(previous, appended, false)).toBe(false)
   })
 
-  it('首次渲染和切换会话强制置底', () => {
+  it('首次渲染和切换会话交给滚动状态键处理', () => {
     const first = buildMessageListTail({ conversationId: 'private:1:2', messages: [], chatLunaStates: [] })
     const next = buildMessageListTail({ conversationId: 'private:1:3', messages: [], chatLunaStates: [] })
 
-    expect(shouldFollowMessageListTail(undefined, first, false)).toBe(true)
-    expect(shouldFollowMessageListTail(first, next, false)).toBe(true)
+    expect(shouldFollowMessageListTail(undefined, first, false)).toBe(false)
+    expect(shouldFollowMessageListTail(first, next, false)).toBe(false)
   })
 
   it('直接把滚动容器移动到内容末尾', () => {

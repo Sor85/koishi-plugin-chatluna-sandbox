@@ -6,6 +6,9 @@
     :class="{ 'is-selecting': model.selectionMode }"
     aria-label="消息记录"
     @scroll="handleMessagesScroll"
+    @wheel.passive="finishMessageListScrollRestore"
+    @touchstart.passive="finishMessageListScrollRestore"
+    @pointerdown="finishMessageListScrollRestore"
   >
     <div v-if="!model.messages.length && !model.chatLunaStates.some((state) => state.thinking)" class="webqq-welcome">
       <WebqqAvatar class="webqq-avatar webqq-avatar-large" :kind="model.avatarKind" :name="model.title" :avatar="model.avatar" />
@@ -312,6 +315,13 @@ import {
   scrollMessageListToBottom,
   shouldFollowMessageListTail,
 } from './webqq/message-list-scroll'
+import {
+  buildMessageListScrollStateKey,
+  calculateAnchoredMessageListScrollTop,
+  readMessageListScrollState,
+  writeMessageListScrollState,
+  type MessageListScrollState,
+} from './webqq/message-list-scroll-state'
 import { highlightMessageElement } from './webqq/message-reveal'
 import { formatMentionContent } from './webqq/mention'
 import WebqqAvatar from './webqq-avatar.vue'
@@ -358,7 +368,7 @@ export interface WebqqMessageListModel {
   selectedMessageIds?: string[]
 }
 
-const props = defineProps<{ model: WebqqMessageListModel; preview?: boolean }>()
+const props = defineProps<{ model: WebqqMessageListModel; preview?: boolean; scrollScope?: string }>()
 const preview = computed(() => !!props.preview)
 const emit = defineEmits<{
   reply: [messageId: string]
@@ -392,8 +402,11 @@ let stickingToBottom = true
 let previousMessageListTail: ReturnType<typeof buildMessageListTail> | undefined
 let scrollFrame = 0
 let scrollSettleFrame = 0
+let restoreFrame = 0
+let restoreSettleFrame = 0
 let followingMessageListTail = false
 let forcingMessageListBottom = false
+let restoringScrollState: MessageListScrollState | undefined
 let contentResizeObserver: ResizeObserver | undefined
 const participantNames = computed(() => Object.fromEntries(
   Object.entries(props.model.participants).map(([id, participant]) => [id, participant.name]),
@@ -405,22 +418,116 @@ const messageListTail = computed(() => buildMessageListTail({
   messages: props.model.messages,
   chatLunaStates: props.model.chatLunaStates,
 }))
+const scrollStateKey = computed(() => buildMessageListScrollStateKey(
+  props.scrollScope,
+  messageListTail.value.conversationId,
+))
+let activeScrollStateKey: string | undefined
+
+function cancelMessageListBottomSchedule() {
+  if (scrollFrame) cancelAnimationFrame(scrollFrame)
+  if (scrollSettleFrame) cancelAnimationFrame(scrollSettleFrame)
+  scrollFrame = 0
+  scrollSettleFrame = 0
+  followingMessageListTail = false
+  forcingMessageListBottom = false
+}
+
+function getMessageListScrollAnchor(element: HTMLElement) {
+  const containerTop = element.getBoundingClientRect().top
+  const rows = element.querySelectorAll<HTMLElement>('[data-message-id]')
+  for (const row of rows) {
+    const rect = row.getBoundingClientRect()
+    if (rect.bottom <= containerTop) continue
+    return {
+      messageId: row.dataset.messageId!,
+      offsetTop: rect.top - containerTop,
+    }
+  }
+}
+
+function applyMessageListScrollState(state: MessageListScrollState) {
+  const element = messagesElement.value
+  if (!element) return
+  if (state.stickingToBottom) {
+    scrollMessageListToBottom(element)
+    return
+  }
+  const anchor = state.anchor
+  const anchorElement = anchor
+    ? [...element.querySelectorAll<HTMLElement>('[data-message-id]')]
+        .find((row) => row.dataset.messageId === anchor.messageId)
+    : undefined
+  if (!anchor || !anchorElement) {
+    element.scrollTop = state.scrollTop
+    return
+  }
+  element.scrollTop = calculateAnchoredMessageListScrollTop({
+    currentScrollTop: element.scrollTop,
+    currentAnchorTop: anchorElement.getBoundingClientRect().top,
+    containerTop: element.getBoundingClientRect().top,
+    savedAnchorOffsetTop: anchor.offsetTop,
+  })
+}
+
+function saveMessageListScrollState(key = activeScrollStateKey) {
+  if (preview.value) return
+  if (restoringScrollState) {
+    writeMessageListScrollState(key, restoringScrollState)
+    return
+  }
+  const element = messagesElement.value
+  if (!element) return
+  const stickingToBottom = isMessageListNearBottom(element)
+  writeMessageListScrollState(key, {
+    scrollTop: element.scrollTop,
+    stickingToBottom,
+    anchor: stickingToBottom ? undefined : getMessageListScrollAnchor(element),
+  })
+}
+
+function scheduleMessageListScrollRestore(key: string | undefined) {
+  if (!restoringScrollState) return
+  if (restoreFrame) cancelAnimationFrame(restoreFrame)
+  if (restoreSettleFrame) cancelAnimationFrame(restoreSettleFrame)
+  restoreFrame = requestAnimationFrame(() => {
+    restoreFrame = 0
+    if (!restoringScrollState || activeScrollStateKey !== key) return
+    applyMessageListScrollState(restoringScrollState)
+    restoreSettleFrame = requestAnimationFrame(() => {
+      restoreSettleFrame = 0
+      if (!restoringScrollState || activeScrollStateKey !== key) return
+      applyMessageListScrollState(restoringScrollState)
+    })
+  })
+}
+
+function finishMessageListScrollRestore() {
+  restoringScrollState = undefined
+  if (restoreFrame) cancelAnimationFrame(restoreFrame)
+  if (restoreSettleFrame) cancelAnimationFrame(restoreSettleFrame)
+  restoreFrame = 0
+  restoreSettleFrame = 0
+}
+
+function restoreMessageListScrollState(key: string | undefined) {
+  const state = readMessageListScrollState(key)
+  if (!state) return false
+  cancelMessageListBottomSchedule()
+  restoringScrollState = state
+  stickingToBottom = state.stickingToBottom
+  void nextTick(() => scheduleMessageListScrollRestore(key))
+  return true
+}
 
 function handleMessagesScroll() {
   const element = messagesElement.value
-  if (!element) return
+  if (!element || restoringScrollState) return
   const nearBottom = isMessageListNearBottom(element)
   if (followingMessageListTail && nearBottom) return
   // 追踪窗口内仍可能发生真实上滑；只有程序性滚动产生的置底事件可以忽略，否则会吞掉用户的脱离操作。
   stickingToBottom = nearBottom
-  if (!nearBottom && followingMessageListTail) {
-    followingMessageListTail = false
-    if (scrollFrame) cancelAnimationFrame(scrollFrame)
-    if (scrollSettleFrame) cancelAnimationFrame(scrollSettleFrame)
-    scrollFrame = 0
-    scrollSettleFrame = 0
-    forcingMessageListBottom = false
-  }
+  if (!nearBottom && followingMessageListTail) cancelMessageListBottomSchedule()
 }
 
 async function scheduleMessageListBottom(force = false) {
@@ -451,6 +558,19 @@ async function scheduleMessageListBottom(force = false) {
   })
 }
 
+watch(scrollStateKey, (nextKey, previousKey) => {
+  if (preview.value) return
+  if (previousKey) saveMessageListScrollState(previousKey)
+  finishMessageListScrollRestore()
+  cancelMessageListBottomSchedule()
+  activeScrollStateKey = nextKey
+  previousMessageListTail = messageListTail.value
+  if (restoreMessageListScrollState(nextKey)) return
+  if (!nextKey) return
+  stickingToBottom = true
+  void scheduleMessageListBottom(true)
+}, { immediate: true })
+
 watch(messageListTail, (nextTail) => {
   if (preview.value) return
   const previousTail = previousMessageListTail
@@ -462,8 +582,8 @@ watch(messageListTail, (nextTail) => {
   previousMessageListTail = nextTail
   if (!shouldFollow) return
   stickingToBottom = true
-  // 首次进入与切换会话必须覆盖上一会话的上滑状态；同会话尾部更新仍只在 sticky 状态下调用。
-  void scheduleMessageListBottom(!previousTail || previousTail.conversationId !== nextTail.conversationId)
+  // 新消息与思考状态只在用户仍跟随末尾时置底；会话切换由 scrollStateKey watcher 单独处理。
+  void scheduleMessageListBottom()
 }, { immediate: true, flush: 'post' })
 
 watch([messagesElement, messagesContentElement], ([element, content]) => {
@@ -473,7 +593,8 @@ watch([messagesElement, messagesContentElement], ([element, content]) => {
   if (!element || typeof ResizeObserver === 'undefined') return
   // 新消息中的媒体与 thinking 内容可能在 Vue 更新后继续增高；仅在 sticky 状态下补齐末尾位置。
   contentResizeObserver = new ResizeObserver(() => {
-    if (stickingToBottom) void scheduleMessageListBottom()
+    if (restoringScrollState) scheduleMessageListScrollRestore(activeScrollStateKey)
+    else if (stickingToBottom) void scheduleMessageListBottom()
   })
   contentResizeObserver.observe(element)
   if (content) contentResizeObserver.observe(content)
@@ -745,9 +866,10 @@ async function loadEarlierMessages() {
 }
 
 onBeforeUnmount(() => {
+  saveMessageListScrollState()
   if (quoteHighlightTimer) clearTimeout(quoteHighlightTimer)
-  if (scrollFrame) cancelAnimationFrame(scrollFrame)
-  if (scrollSettleFrame) cancelAnimationFrame(scrollSettleFrame)
+  cancelMessageListBottomSchedule()
+  finishMessageListScrollRestore()
   contentResizeObserver?.disconnect()
 })
 </script>

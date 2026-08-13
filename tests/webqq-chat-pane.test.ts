@@ -47,6 +47,8 @@ describe('WebQQ 聊天区域', () => {
     expect(source).toContain('forwardStack.value = []')
     expect(source).not.toContain('koishiWorkspacePort')
     expect(pageSource).toContain('<WebqqChatPane')
+    expect(pageSource).toContain(':scroll-scope="activeSpaceId ?? \'main\'"')
+    expect(source).toContain(':scroll-scope="scrollScope"')
     expect(pageSource).toContain('@send-forward-message="sendForwardMessage"')
     expect(pageSource).toContain('@get-forward-message="getForwardMessage"')
     expect(pageSource).not.toContain('class="webqq-chat-header"')

@@ -74,6 +74,7 @@
       ref="messageListRef"
       :model="messageListModel"
       :preview="preview"
+      :scroll-scope="scrollScope"
       @reply="replyingToMessageId = $event"
       @recall-message="emit('recallMessage', $event)"
       @enter-selection="enterSelection"
@@ -194,8 +195,9 @@ export interface WebqqChatPaneModel {
   forwardTargets: WebqqForwardTargetModel
 }
 
-const props = defineProps<{ model: WebqqChatPaneModel; preview?: boolean }>()
+const props = defineProps<{ model: WebqqChatPaneModel; preview?: boolean; scrollScope?: string }>()
 const preview = computed(() => !!props.preview)
+const scrollScope = computed(() => props.scrollScope)
 const emit = defineEmits<{
   back: []
   toggleDetails: []
