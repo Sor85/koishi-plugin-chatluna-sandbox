@@ -13,6 +13,8 @@ describe('插件持久化配置', () => {
     expect(Config.dict.webQQTimBubbleTail.meta.description).toBe('显示气泡小尖角')
     expect(Config.dict.webQQMarkRecalledMessages.meta.default).toBe(true)
     expect(Config.dict.webQQMarkRecalledMessages.meta.description).toBe('仅影响 WebQQ 展示：开启时保留撤回气泡并显示撤回线，关闭时只显示撤回事件')
+    expect(Config.dict.modelRequestRecordLimit.meta.default).toBe(500)
+    expect(Config.dict.modelRequestRecordLimit.meta.description).toBe('每个空间保留的模型请求记录上限')
     expect(Config.dict.webQQChatStyle).toBeUndefined()
   })
 })

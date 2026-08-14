@@ -49,6 +49,9 @@ describe('模型请求 MCP 工具', () => {
 
     const mainPage = await service.callTool(credential.token, 'list_model_request_records', { scope: 'space' }) as { records: Array<{ model: string }> }
     expect(mainPage.records.map(({ model }) => model)).toEqual(['main-model'])
+    const allPage = await service.callTool(credential.token, 'list_model_request_records', { scope: 'all' }) as { records: Array<{ model: string }> }
+    expect(allPage.records.map(({ model }) => model).sort()).toEqual(['main-model', 'space-model'])
+    expect(allPage.records.some(({ model }) => model === 'lost-model')).toBe(false)
     const spacePage = await service.callTool(credential.token, 'list_model_request_records', {
       scope: 'space',
       spaceId: created.spaceId,

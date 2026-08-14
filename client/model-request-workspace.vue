@@ -3,12 +3,12 @@
     <header class="webqq-model-request-header">
       <div>
         <h1>模型请求</h1>
-        <p>查看实际上游对话模型交互的只读证据。列表只提供摘要，完整请求体和响应体需打开单条详情。</p>
+        <p>查看模型调用请求日志</p>
       </div>
       <div class="webqq-model-request-actions">
         <label class="webqq-model-request-live">
-          <Checkbox v-model="liveRefresh" aria-label="实时刷新" />
-          <span>实时刷新</span>
+          <Switch v-model="liveRefresh" aria-label="自动刷新" />
+          <span>自动刷新</span>
         </label>
         <Button variant="outline" :disabled="loading" @click="refresh()">
           <IconRefresh :size="16" aria-hidden="true" />
@@ -26,53 +26,90 @@
       </div>
     </header>
 
-    <div v-if="capacityText || error" class="webqq-model-request-status">
-      <p v-if="capacityText" class="webqq-model-request-capacity">{{ capacityText }}</p>
-      <p v-if="error" class="webqq-model-request-error" role="alert">{{ error }}</p>
+    <div v-if="error" class="webqq-model-request-status">
+      <p class="webqq-model-request-error" role="alert">{{ error }}</p>
     </div>
 
     <div class="webqq-model-request-split">
       <section class="webqq-model-request-list-pane" aria-label="模型请求列表">
-        <section class="webqq-model-request-filters" aria-label="模型请求分类">
-          <label>
-            <span>分类</span>
-            <Select v-model="category">
-              <SelectTrigger class="webqq-model-request-control" aria-label="按分类筛选">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="space">空间</SelectItem>
-                <SelectItem value="unattributed">未归属</SelectItem>
-              </SelectContent>
-            </Select>
-          </label>
-          <label v-if="category === 'space'">
-            <span>空间</span>
-            <Select v-model="spaceId">
-              <SelectTrigger class="webqq-model-request-control" aria-label="按空间筛选">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem v-for="space in spaces" :key="space.id" :value="space.id">
-                  {{ space.name }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </label>
-          <label>
-            <span>模型</span>
-            <Input
-              v-model="model"
-              class="webqq-model-request-control"
-              placeholder="例如 gpt-4.1"
-              @keyup.enter="refresh()"
-            />
-          </label>
-          <label class="webqq-model-request-error-filter">
-            <Checkbox v-model="errorsOnly" />
-            <span>仅显示错误</span>
-          </label>
-        </section>
+        <header class="webqq-model-request-list-toolbar">
+          <h2>请求列表</h2>
+          <div class="webqq-model-request-list-tools">
+            <button
+              type="button"
+              class="webqq-model-request-sort"
+              :aria-label="sortOrder === 'asc' ? '当前按时间正序，点击改为倒序' : '当前按时间倒序，点击改为正序'"
+              @click="toggleSortOrder"
+            >
+              {{ sortOrder === 'asc' ? '按时间正序' : '按时间倒序' }}
+              <IconChevronUp v-if="sortOrder === 'asc'" :size="16" aria-hidden="true" />
+              <IconChevronDown v-else :size="16" aria-hidden="true" />
+            </button>
+            <Popover v-model:open="filterOpen">
+              <PopoverTrigger as-child>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  class="webqq-model-request-filter-trigger"
+                  :class="{ 'is-filtered': filtersActive }"
+                  :aria-label="`筛选模型请求，当前：${filterSummary}`"
+                >
+                  <IconFilter :size="16" aria-hidden="true" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                class="webqq-model-request-filter-popover relative"
+                aria-label="模型请求筛选"
+              >
+              <label>
+                <span>范围</span>
+                <Select v-model="category">
+                  <SelectTrigger class="webqq-model-request-control" aria-label="按范围筛选">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent :portal-to="filterSelectPortalTarget" class="z-[120]">
+                    <SelectItem value="all">全部空间</SelectItem>
+                    <SelectItem value="space">指定空间</SelectItem>
+                    <SelectItem value="unattributed">未归属</SelectItem>
+                  </SelectContent>
+                </Select>
+              </label>
+              <label v-if="category === 'space'">
+                <span>空间</span>
+                <Select v-model="spaceId">
+                  <SelectTrigger class="webqq-model-request-control" aria-label="按空间筛选">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent :portal-to="filterSelectPortalTarget" class="z-[120]">
+                    <SelectItem v-for="space in spaces" :key="space.id" :value="space.id">
+                      {{ space.name }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </label>
+              <label>
+                <span>模型</span>
+                <Input
+                  v-model="model"
+                  class="webqq-model-request-control"
+                  placeholder="例如 gpt-4.1"
+                  @keyup.enter="refresh()"
+                />
+              </label>
+              <label class="webqq-model-request-error-filter">
+                <Checkbox v-model="errorsOnly" />
+                <span>仅显示错误</span>
+              </label>
+              <Button variant="outline" size="sm" @click="resetFilters">重置</Button>
+              <div
+                ref="filterSelectPortalTarget"
+                class="pointer-events-none absolute inset-0 z-[120] [&_[data-reka-popper-content-wrapper]]:pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
+          </div>
+        </header>
 
         <div v-if="loading && !records.length" class="webqq-model-request-empty">正在读取模型请求记录…</div>
         <div v-else-if="!records.length" class="webqq-model-request-empty">暂无符合条件的模型请求记录</div>
@@ -97,6 +134,7 @@
                     <span class="webqq-model-request-bot-name">
                       <strong>{{ resolveRequestBot(record).name }}</strong>
                       <Badge :class="statusClass(record.status)">{{ statusLabel(record.status) }}</Badge>
+                      <Badge v-if="category === 'all'" variant="outline" class="webqq-model-request-source">{{ resolveRecordSpaceName(record) }}</Badge>
                       <Badge v-if="record.provider" variant="outline" class="webqq-model-request-provider">{{ record.provider }}</Badge>
                     </span>
                     <span class="webqq-model-request-timing">
@@ -376,10 +414,13 @@ import {
   IconBraces,
   IconCalendarTime,
   IconChartBar,
+  IconChevronDown,
+  IconChevronUp,
   IconClock,
   IconCpu,
   IconCopy,
   IconDownload,
+  IconFilter,
   IconFingerprint,
   IconLayoutGrid,
   IconMessages,
@@ -394,8 +435,10 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
 import { Checkbox } from './components/ui/checkbox'
+import { Switch } from './components/ui/switch'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './components/ui/dialog'
 import { Input } from './components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
 import ModelRequestJsonTree from './model-request-json-tree.vue'
 import ModelResponseContentPreview from './model-response-content-preview.vue'
@@ -406,6 +449,8 @@ import { buildModelRequestJsonTree, parseModelResponseBody } from './webqq/model
 import { createModelRequestLiveRefresh } from './webqq/model-request-live-refresh'
 import {
   createModelRequestRecordsQuery,
+  createSpaceModelRequestScope,
+  createUnattributedModelRequestScope,
   MAIN_MODEL_REQUEST_SPACE_ID,
   MODEL_REQUEST_PAGE_SIZE,
   resolveModelRequestScope,
@@ -415,8 +460,8 @@ import {
 } from './webqq/model-request-query'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type {
-  SandboxModelRequestCapacity,
   SandboxModelRequestDetail,
+  SandboxModelRequestScope,
   SandboxModelRequestListItem,
   SandboxModelRequestStatus,
   SandboxDirectoryBot,
@@ -430,7 +475,8 @@ const props = defineProps<{
   defaultSpaceId?: string
   hasMore: boolean
   nextCursor?: number
-  capacity?: SandboxModelRequestCapacity
+  nextCreatedAt?: string
+  nextId?: string
   loading: boolean
   detailLoading: boolean
   error: string
@@ -443,10 +489,13 @@ const emit = defineEmits<{
   clear: [input: ClearModelRequestRecordsQuery]
 }>()
 
-const category = ref<'space' | 'unattributed'>('space')
+const category = ref<'all' | 'space' | 'unattributed'>('all')
 const spaceId = ref(props.defaultSpaceId || MAIN_MODEL_REQUEST_SPACE_ID)
 const model = ref('')
 const errorsOnly = ref(false)
+const sortOrder = ref<'asc' | 'desc'>('desc')
+const filterOpen = ref(false)
+const filterSelectPortalTarget = ref<HTMLElement>()
 const liveRefresh = ref(false)
 const selectedRecordId = ref('')
 const clearDialogOpen = ref(false)
@@ -505,10 +554,17 @@ const responseBodyLabel = computed(() => {
   ].filter(Boolean)
   return parts.join(' · ') || '响应体'
 })
-const capacityText = computed(() => {
-  const capacity = props.capacity
-  if (!capacity) return ''
-  return `${capacity.recordCount} / ${capacity.maxRecords} 条`
+const filtersActive = computed(() => Boolean(
+  category.value !== 'all'
+  || model.value.trim()
+  || errorsOnly.value,
+))
+const filterSummary = computed(() => {
+  const parts = [categoryLabel(category.value)]
+  if (category.value === 'space') parts[0] = resolveSpaceName(spaceId.value)
+  if (model.value.trim()) parts.push(model.value.trim())
+  if (errorsOnly.value) parts.push('仅错误')
+  return parts.join(' · ')
 })
 
 watch(() => props.defaultSpaceId, (value) => {
@@ -517,9 +573,13 @@ watch(() => props.defaultSpaceId, (value) => {
   }
 })
 
-watch([category, spaceId], () => {
+watch([category, spaceId, errorsOnly, sortOrder], () => {
   selectedRecordId.value = ''
   refresh()
+})
+
+watch(filterOpen, (open, wasOpen) => {
+  if (wasOpen && !open) refresh()
 })
 
 watch(() => props.detail?.id, () => {
@@ -539,6 +599,7 @@ function emitQuery(limit = MODEL_REQUEST_PAGE_SIZE) {
   emit('query', createModelRequestRecordsQuery(currentScope(), {
     model: model.value.trim() || undefined,
     errorsOnly: errorsOnly.value || undefined,
+    order: sortOrder.value,
     limit,
   }))
 }
@@ -546,22 +607,69 @@ function emitQuery(limit = MODEL_REQUEST_PAGE_SIZE) {
 function refresh(limit = MODEL_REQUEST_PAGE_SIZE) {
   emitQuery(limit)
   if (selectedRecordId.value) {
-    emit('open', { ...currentScope(), recordId: selectedRecordId.value })
+    const record = props.records.find(({ id }) => id === selectedRecordId.value) ?? props.detail
+    emit('open', {
+      ...(record ? resolveRecordScope(record) : currentScope()),
+      recordId: selectedRecordId.value,
+    })
   }
 }
 
 function loadMore() {
-  if (props.nextCursor === undefined) return
+  const canPageByTime = Boolean(props.nextCreatedAt && props.nextId)
+  if (props.nextCursor === undefined && !canPageByTime) return
   emit('loadMore', createModelRequestRecordsQuery(currentScope(), {
     model: model.value.trim() || undefined,
     errorsOnly: errorsOnly.value || undefined,
-    beforeSequence: props.nextCursor,
+    order: sortOrder.value,
+    ...(category.value === 'all'
+      ? { beforeCreatedAt: props.nextCreatedAt, beforeId: props.nextId }
+      : { beforeSequence: props.nextCursor }),
   }))
+}
+
+function toggleSortOrder() {
+  sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
 }
 
 function openRecord(recordId: string) {
   selectedRecordId.value = recordId
-  emit('open', { ...currentScope(), recordId })
+  const record = props.records.find(({ id }) => id === recordId)
+  emit('open', {
+    ...(record ? resolveRecordScope(record) : currentScope()),
+    recordId,
+  })
+}
+
+function resetFilters() {
+  category.value = 'all'
+  spaceId.value = props.defaultSpaceId || MAIN_MODEL_REQUEST_SPACE_ID
+  model.value = ''
+  errorsOnly.value = false
+}
+
+function categoryLabel(value: 'all' | 'space' | 'unattributed') {
+  if (value === 'unattributed') return '未归属'
+  if (value === 'space') return '指定空间'
+  return '全部空间'
+}
+
+function resolveSpaceName(id: string) {
+  return props.spaces.find((space) => space.id === id)?.name || (id === MAIN_MODEL_REQUEST_SPACE_ID ? '主环境' : id)
+}
+
+function resolveRecordSpaceName(record: SandboxModelRequestListItem | SandboxModelRequestDetail) {
+  if (record.attribution === 'unattributed' || !record.entities.scopeId) return '未归属'
+  return resolveSpaceName(record.entities.scopeId)
+}
+
+function resolveRecordScope(record: SandboxModelRequestListItem | SandboxModelRequestDetail): SandboxModelRequestScope {
+  if (category.value === 'unattributed' || record.attribution === 'unattributed') {
+    return createUnattributedModelRequestScope()
+  }
+  const scopeId = record.entities.scopeId
+  if (scopeId && scopeId !== MAIN_MODEL_REQUEST_SPACE_ID) return createSpaceModelRequestScope(scopeId)
+  return createSpaceModelRequestScope(MAIN_MODEL_REQUEST_SPACE_ID)
 }
 
 function openClearDialog() {

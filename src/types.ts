@@ -482,8 +482,11 @@ export interface GetSandboxModelRequestRecordsInput {
   interactionId?: string
   model?: string
   errorsOnly?: boolean
+  order?: 'asc' | 'desc'
   limit?: number
   beforeSequence?: number
+  beforeCreatedAt?: string
+  beforeId?: string
 }
 
 export interface SandboxModelRequestCapacity {
@@ -497,6 +500,8 @@ export interface SandboxModelRequestRecordsPage<T extends SandboxModelRequestLis
   records: T[]
   hasMore: boolean
   nextCursor?: number
+  nextCreatedAt?: string
+  nextId?: string
   earliestCursor?: number
   capacity: SandboxModelRequestCapacity
 }
@@ -513,6 +518,7 @@ export type SandboxConsoleModelRequestListItem = SandboxModelRequestListItem & {
 export type SandboxConsoleModelRequestDetail = SandboxModelRequestDetail & { source: SandboxModelRequestSource }
 
 export type SandboxModelRequestScope =
+  | { scope: 'all', spaceId?: never, unattributed?: false }
   | { scope: 'main', spaceId?: never, unattributed?: false }
   | { scope: 'space', spaceId: string, unattributed?: false }
   | { scope: 'unattributed', spaceId?: never, unattributed?: true }

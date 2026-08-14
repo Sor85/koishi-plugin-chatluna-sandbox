@@ -56,6 +56,7 @@ export class SandboxTestSpaceService {
     private persistence?: SandboxTestSpacePersistence,
     private createDebugPersistence?: (scopeId: string) => SandboxOneBotDebugPersistence,
     private createModelRequestPersistence?: (scopeId: string) => SandboxModelRequestPersistence,
+    private modelRequestRecordLimit?: number,
   ) {
     ctx.on('ready', async () => {
       if (!this.persistence) return
@@ -208,6 +209,7 @@ export class SandboxTestSpaceService {
       mediaDirectory: resolve(this.ctx.baseDir, 'data/onebot-sandbox/spaces', id, 'media'),
       debugPersistence: this.createDebugPersistence?.(id),
       modelRequestPersistence: this.createModelRequestPersistence?.(id),
+      modelRequestRecordLimit: this.modelRequestRecordLimit,
     })
   }
 

@@ -99,4 +99,20 @@ describe('模型请求记录库', () => {
     expect(store.getRecords({ limit: 1, beforeSequence: page.nextCursor }).records.map(({ model }) => model)).toEqual(['two'])
     expect(() => store.getRecords({ beforeSequence: 1 })).toThrow(SandboxModelRequestCursorExpiredError)
   })
+
+  it('支持按创建时间和记录 ID 做跨库分页游标', () => {
+    const store = new SandboxModelRequestStore()
+    const created = appendRecord(store, { model: 'one' })
+    expect(store.getRecords({ beforeCreatedAt: '1970-01-01T00:00:00.000Z' }).records).toEqual([])
+    expect(store.getRecords({ beforeCreatedAt: created.createdAt, beforeId: created.id }).records).toEqual([])
+    expect(store.getRecords({ beforeCreatedAt: '2999-01-01T00:00:00.000Z' }).records.map(({ id }) => id)).toEqual([created.id])
+  })
+
+  it('支持按时间正序返回记录', () => {
+    const store = new SandboxModelRequestStore()
+    appendRecord(store, { model: 'one' })
+    appendRecord(store, { model: 'two' })
+    expect(store.getRecords({ order: 'asc' }).records.map(({ model }) => model)).toEqual(['one', 'two'])
+    expect(store.getRecords({ order: 'desc' }).records.map(({ model }) => model)).toEqual(['two', 'one'])
+  })
 })

@@ -41,6 +41,7 @@ export const inject = {
 
 export interface Config extends SandboxAppearance {
   persistenceMode: SandboxPersistenceMode
+  modelRequestRecordLimit: number
   mcp: SandboxMcpServerConfig
 }
 
@@ -58,6 +59,7 @@ export const Config: Schema<Config> = Schema.object({
   ]).default('auto').role('radio').description('WebQQ 颜色模式'),
   webQQAccentColor: Schema.string().default('#2563eb').role('color').description('WebQQ 强调色'),
   webQQMarkRecalledMessages: Schema.boolean().default(true).description('仅影响 WebQQ 展示：开启时保留撤回气泡并显示撤回线，关闭时只显示撤回事件'),
+  modelRequestRecordLimit: Schema.number().min(1).default(500).description('每个空间保留的模型请求记录上限'),
   mcp: Schema.object({
     enabled: Schema.boolean().default(false).description('启用独立 MCP Streamable HTTP 端点'),
     host: Schema.string().default('127.0.0.1').description('监听地址'),
@@ -123,12 +125,14 @@ export function apply(ctx: Context, config: Config) {
     const runtimeBots = new SandboxRuntimeBotRegistry()
     const unattributedModelRequests = new SandboxModelRequestStore({
       persistence: createModelRequestPersistence(UNATTRIBUTED_MODEL_REQUEST_SCOPE_ID),
+      maxRecords: config.modelRequestRecordLimit,
     })
     const control = new SandboxControlService(inner, {
       persistence,
       runtimeBots,
       debugPersistence: createDebugPersistence('main'),
       modelRequestPersistence: createModelRequestPersistence(MAIN_MODEL_REQUEST_SCOPE_ID),
+      modelRequestRecordLimit: config.modelRequestRecordLimit,
     })
     const testSpaces = new SandboxTestSpaceService(
       inner,
@@ -136,6 +140,7 @@ export function apply(ctx: Context, config: Config) {
       config.persistenceMode === 'database' ? new KoishiDatabaseTestSpacePersistence(() => inner.database) : undefined,
       createDebugPersistence,
       createModelRequestPersistence,
+      config.modelRequestRecordLimit,
     )
     const chatLunaPlugin = resolveChatLunaPluginClass(inner.baseDir)
     const disposeModelRequestCollector = installModelRequestCollector({

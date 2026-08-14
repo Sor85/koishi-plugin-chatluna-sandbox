@@ -81,6 +81,11 @@ describe('模型请求 Console 协议', () => {
       responseBodyRaw: JSON.stringify({ error: 'failed' }),
     })
 
+    const allPage = Reflect.apply(listRecords, undefined, [{ scope: 'all' }]) as { records: Array<{ model: string, source: { type: string } }> }
+    expect(allPage.records.map(({ model }) => model).sort()).toEqual(['main-model', 'space-model'])
+    expect(allPage.records.some(({ source }) => source.type === 'unattributed')).toBe(false)
+    expect(() => Reflect.apply(clearRecords, undefined, [{ scope: 'all' }])).toThrow('全部空间视图不支持一次性清理')
+
     expect(Reflect.apply(clearRecords, undefined, [{ scope: 'space', spaceId: space.id }])).toEqual({ cleared: 1 })
     expect(space.control.getModelRequestRecords().records).toEqual([])
     expect(control.getModelRequestRecords().records).toHaveLength(1)

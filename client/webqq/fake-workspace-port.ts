@@ -71,7 +71,7 @@ export class FakeWorkspacePort implements WorkspacePort {
   debugRecordsResult: SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord> = {
     records: [],
     hasMore: false,
-    capacity: { recordCount: 0, totalBytes: 0, maxRecords: 5000, maxBytes: 50 * 1024 * 1024 },
+    capacity: { recordCount: 0, totalBytes: 0, maxRecords: 500, maxBytes: 50 * 1024 * 1024 },
   }
   clearDebugRecordsResult: ClearSandboxOneBotDebugRecordsResult = { cleared: 0 }
   modelRequestRecordsResult: SandboxModelRequestRecordsPage = emptyModelRequestRecordsPage

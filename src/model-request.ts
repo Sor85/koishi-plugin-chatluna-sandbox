@@ -18,7 +18,7 @@ import { SandboxModelRequestCursorExpiredError } from './types'
 export const MAIN_MODEL_REQUEST_SCOPE_ID = 'main'
 export const UNATTRIBUTED_MODEL_REQUEST_SCOPE_ID = 'unattributed'
 
-export const DEFAULT_MODEL_REQUEST_RECORD_LIMIT = 5000
+export const DEFAULT_MODEL_REQUEST_RECORD_LIMIT = 500
 export const DEFAULT_MODEL_REQUEST_RECORD_MAX_BYTES = 50 * 1024 * 1024
 export const DEFAULT_MODEL_REQUEST_PAGE_SIZE = 50
 export const MAX_MODEL_REQUEST_PAGE_SIZE = 200
@@ -241,14 +241,17 @@ export class SandboxModelRequestStore {
       && (!input.interactionId || record.interactionId === input.interactionId)
       && (!input.model || record.model === input.model)
       && (!input.errorsOnly || record.status === 'error')
-      && (input.beforeSequence === undefined || record.sequence < input.beforeSequence)
-    )).sort((a, b) => b.sequence - a.sequence)
+      && isBeforeModelRequestPageCursor(record, input)
+    )).sort((a, b) => compareModelRequestSequence(a.sequence, b.sequence, resolveModelRequestOrder(input)))
     const records = filtered.slice(0, limit)
     const hasMore = filtered.length > records.length
+    const last = records[records.length - 1]
     return {
       records: records.map((record) => presentModelRequestRecord(record, 'list') as SandboxModelRequestListItem),
       hasMore,
-      nextCursor: hasMore ? records[records.length - 1]?.sequence : undefined,
+      nextCursor: hasMore ? last?.sequence : undefined,
+      nextCreatedAt: hasMore ? last?.createdAt : undefined,
+      nextId: hasMore ? last?.id : undefined,
       earliestCursor,
       capacity: this.getCapacity(),
     }
@@ -292,4 +295,60 @@ export class SandboxModelRequestStore {
       }
     }).catch(() => undefined)
   }
+}
+
+export function mergeModelRequestRecordPages<T extends SandboxModelRequestListItem>(
+  pages: readonly SandboxModelRequestRecordsPage<T>[],
+  limit: number,
+  order: 'asc' | 'desc' = 'desc',
+): SandboxModelRequestRecordsPage<T> {
+  const pageSize = Math.min(Math.max(Number(limit) || DEFAULT_MODEL_REQUEST_PAGE_SIZE, 1), MAX_MODEL_REQUEST_PAGE_SIZE)
+  const sign = order === 'asc' ? 1 : -1
+  const merged = pages
+    .flatMap(({ records }) => records)
+    .sort((left, right) => sign * (left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id)))
+  const records = merged.slice(0, pageSize)
+  const last = records[records.length - 1]
+  const leftover = merged.length > records.length
+  const hasMore = leftover || pages.some(({ hasMore: pageHasMore }) => pageHasMore)
+  return {
+    records,
+    hasMore,
+    nextCreatedAt: hasMore ? last?.createdAt : undefined,
+    nextId: hasMore ? last?.id : undefined,
+    earliestCursor: pages
+      .map(({ earliestCursor }) => earliestCursor)
+      .filter((value): value is number => typeof value === 'number')
+      .sort((left, right) => left - right)[0],
+    capacity: pages.reduce((summary, page) => ({
+      recordCount: summary.recordCount + page.capacity.recordCount,
+      totalBytes: summary.totalBytes + page.capacity.totalBytes,
+      maxRecords: summary.maxRecords + page.capacity.maxRecords,
+      maxBytes: summary.maxBytes + page.capacity.maxBytes,
+    }), { recordCount: 0, totalBytes: 0, maxRecords: 0, maxBytes: 0 } satisfies SandboxModelRequestCapacity),
+  }
+}
+
+export function resolveModelRequestOrder(input: Pick<GetSandboxModelRequestRecordsInput, 'order'>): 'asc' | 'desc' {
+  return input.order === 'asc' ? 'asc' : 'desc'
+}
+
+function compareModelRequestSequence(left: number, right: number, order: 'asc' | 'desc'): number {
+  return order === 'asc' ? left - right : right - left
+}
+
+function isBeforeModelRequestPageCursor(
+  record: Pick<SandboxModelRequestRecord, 'id' | 'sequence' | 'createdAt'>,
+  input: GetSandboxModelRequestRecordsInput,
+): boolean {
+  const order = resolveModelRequestOrder(input)
+  if (input.beforeSequence !== undefined) {
+    return order === 'asc' ? record.sequence > input.beforeSequence : record.sequence < input.beforeSequence
+  }
+  if (!input.beforeCreatedAt) return true
+  const created = record.createdAt.localeCompare(input.beforeCreatedAt)
+  if (created !== 0) return order === 'asc' ? created > 0 : created < 0
+  if (!input.beforeId) return true
+  const id = record.id.localeCompare(input.beforeId)
+  return order === 'asc' ? id > 0 : id < 0
 }

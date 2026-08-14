@@ -7,9 +7,15 @@ import {
   parseAccountProfileFromUnknown,
 } from '../account-profile'
 import type { SandboxControlService } from '../control-service'
-import { MAIN_MODEL_REQUEST_SCOPE_ID, type SandboxModelRequestStore } from '../model-request'
+import {
+  DEFAULT_MODEL_REQUEST_PAGE_SIZE,
+  MAIN_MODEL_REQUEST_SCOPE_ID,
+  MAX_MODEL_REQUEST_PAGE_SIZE,
+  mergeModelRequestRecordPages,
+  type SandboxModelRequestStore,
+} from '../model-request'
 import type { SandboxTestSpaceService } from '../test-spaces'
-import type { SandboxForwardNodeInput, SandboxMedia, SandboxImplementationProfile, SandboxSnapshot } from '../types'
+import type { GetSandboxModelRequestRecordsInput, SandboxForwardNodeInput, SandboxMedia, SandboxImplementationProfile, SandboxSnapshot } from '../types'
 import { createDirectConversationId, createGroupConversationId, isRecalledMessage, SandboxModelRequestCursorExpiredError, SandboxOneBotDebugCursorExpiredError } from '../types'
 import { getOneBotCapabilityMatrix } from '../onebot-profiles'
 import { SandboxMcpError, type SandboxMcpCallRecord, type SandboxMcpCreatedCredential, type SandboxMcpCredential, type SandboxMcpEvent, type SandboxMcpEventCursor, type SandboxMcpExport, type SandboxMcpScope } from './types'
@@ -489,15 +495,18 @@ const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
   list_model_request_records: {
     type: 'object',
     properties: {
-      scope: { type: 'string', enum: ['main', 'space', 'unattributed'], description: 'main 读取主环境，space 读取指定 AI 测试空间，unattributed 读取无法安全归属的记录' },
+      scope: { type: 'string', enum: ['all', 'main', 'space', 'unattributed'], description: 'all 读取全部已归属空间，main 读取主环境，space 读取指定 AI 测试空间，unattributed 读取无法安全归属的记录' },
       spaceId: { type: 'string', description: 'AI 测试空间 ID；scope=space 且省略时读取主环境' },
       botId: { type: 'string' },
       conversationId: { type: 'string' },
       interactionId: { type: 'string' },
       model: { type: 'string' },
       errorsOnly: { type: 'boolean' },
+      order: { type: 'string', enum: ['asc', 'desc'], description: '按创建时间正序或倒序，默认倒序' },
       limit: { type: 'number', description: '每页条数，默认 50，最大 200' },
       beforeSequence: { type: 'number', description: '新到旧分页游标：仅返回 sequence 更小的记录' },
+      beforeCreatedAt: { type: 'string', description: '全部空间视图的时间游标：仅返回更早的记录' },
+      beforeId: { type: 'string', description: '与 beforeCreatedAt 一起用于稳定分页' },
     },
     required: ['scope'],
   },
@@ -1364,26 +1373,38 @@ export class SandboxMcpService {
 
   private resolveModelRequestScope(args: Record<string, unknown>) {
     if (args.scope === 'unattributed') return { kind: 'unattributed' as const }
+    if (args.scope === 'all') return { kind: 'all' as const }
     if (args.scope === 'main') return { kind: 'main' as const }
-    if (args.scope !== 'space') throw new SandboxMcpError('invalid_arguments', 'scope 必须是 main、space 或 unattributed')
+    if (args.scope !== 'space') throw new SandboxMcpError('invalid_arguments', 'scope 必须是 all、main、space 或 unattributed')
     const spaceId = typeof args.spaceId === 'string' && args.spaceId.trim() ? args.spaceId.trim() : MAIN_MODEL_REQUEST_SCOPE_ID
     if (spaceId === MAIN_MODEL_REQUEST_SCOPE_ID) return { kind: 'main' as const }
     return { kind: 'space' as const, spaceId }
   }
 
   private listModelRequestRecords(args: Record<string, unknown>) {
-    const query = {
+    const query: GetSandboxModelRequestRecordsInput = {
       botId: typeof args.botId === 'string' ? args.botId : undefined,
       conversationId: typeof args.conversationId === 'string' ? args.conversationId : undefined,
       interactionId: typeof args.interactionId === 'string' ? args.interactionId : undefined,
       model: typeof args.model === 'string' ? args.model : undefined,
       errorsOnly: args.errorsOnly === true ? true : undefined,
+      order: args.order === 'asc' ? 'asc' : args.order === 'desc' ? 'desc' : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
       beforeSequence: typeof args.beforeSequence === 'number' ? args.beforeSequence : undefined,
+      beforeCreatedAt: typeof args.beforeCreatedAt === 'string' ? args.beforeCreatedAt : undefined,
+      beforeId: typeof args.beforeId === 'string' ? args.beforeId : undefined,
     }
     try {
       const scope = this.resolveModelRequestScope(args)
       if (scope.kind === 'unattributed') return this.requireUnattributedModelRequests().getRecords(query)
+      if (scope.kind === 'all') {
+        const limit = Math.min(Math.max(Number(query.limit ?? DEFAULT_MODEL_REQUEST_PAGE_SIZE) || DEFAULT_MODEL_REQUEST_PAGE_SIZE, 1), MAX_MODEL_REQUEST_PAGE_SIZE)
+        const federatedQuery = { ...query, beforeSequence: undefined }
+        return mergeModelRequestRecordPages([
+          this.control.getModelRequestRecords(federatedQuery),
+          ...(this.testSpaces?.listSpaces() ?? []).map((space) => this.resolveControl({ spaceId: space.id }, false).getModelRequestRecords(federatedQuery)),
+        ], limit, query.order === 'asc' ? 'asc' : 'desc')
+      }
       if (scope.kind === 'main') return this.control.getModelRequestRecords(query)
       return this.resolveControl({ spaceId: scope.spaceId }, false).getModelRequestRecords(query)
     } catch (error) {

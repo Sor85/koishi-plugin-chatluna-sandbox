@@ -19,6 +19,8 @@ export type ClearModelRequestRecordsQuery = SandboxModelRequestScope
 export interface ModelRequestRecordsPageState {
   hasMore: boolean
   nextCursor?: number
+  nextCreatedAt?: string
+  nextId?: string
   earliestCursor?: number
   capacity: SandboxModelRequestCapacity
 }
@@ -26,7 +28,7 @@ export interface ModelRequestRecordsPageState {
 export const emptyModelRequestCapacity: SandboxModelRequestCapacity = {
   recordCount: 0,
   totalBytes: 0,
-  maxRecords: 5000,
+  maxRecords: 500,
   maxBytes: 50 * 1024 * 1024,
 }
 
@@ -34,6 +36,10 @@ export const emptyModelRequestRecordsPage: SandboxModelRequestRecordsPage = {
   records: [],
   hasMore: false,
   capacity: emptyModelRequestCapacity,
+}
+
+export function createAllModelRequestScope(): Extract<SandboxModelRequestScope, { scope: 'all' }> {
+  return { scope: 'all' }
 }
 
 export function createSpaceModelRequestScope(spaceId: string): Extract<SandboxModelRequestScope, { scope: 'space' }> {
@@ -45,12 +51,12 @@ export function createUnattributedModelRequestScope(): Extract<SandboxModelReque
 }
 
 export function resolveModelRequestScope(
-  category: 'space' | 'unattributed',
+  category: 'all' | 'space' | 'unattributed',
   spaceId = MAIN_MODEL_REQUEST_SPACE_ID,
 ): SandboxModelRequestScope {
-  return category === 'unattributed'
-    ? createUnattributedModelRequestScope()
-    : createSpaceModelRequestScope(spaceId || MAIN_MODEL_REQUEST_SPACE_ID)
+  if (category === 'unattributed') return createUnattributedModelRequestScope()
+  if (category === 'all') return createAllModelRequestScope()
+  return createSpaceModelRequestScope(spaceId || MAIN_MODEL_REQUEST_SPACE_ID)
 }
 
 export function createModelRequestRecordsQuery(

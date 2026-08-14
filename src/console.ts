@@ -5,7 +5,13 @@ import type { SandboxControlService } from './control-service'
 import type { SandboxMcpService } from './mcp/service'
 import type { SandboxMcpScope } from './mcp/types'
 import { trimSnapshotMessages, type SandboxTestSpaceService, type SandboxTestSpaceSummary } from './test-spaces'
-import { MAIN_MODEL_REQUEST_SCOPE_ID, type SandboxModelRequestStore } from './model-request'
+import {
+  DEFAULT_MODEL_REQUEST_PAGE_SIZE,
+  MAIN_MODEL_REQUEST_SCOPE_ID,
+  MAX_MODEL_REQUEST_PAGE_SIZE,
+  mergeModelRequestRecordPages,
+  type SandboxModelRequestStore,
+} from './model-request'
 import type {
   DeleteGroupAnnouncementInput,
   ClearSandboxOneBotDebugRecordsResult,
@@ -16,6 +22,7 @@ import type {
   GetSandboxBotDeliveriesInput,
   GetSandboxOneBotDebugRecordInput,
   GetSandboxOneBotDebugRecordsInput,
+  GetSandboxModelRequestRecordsInput,
   GetSandboxWorkspaceInput,
   ListSandboxModelRequestRecordsInput,
   ReadSandboxModelRequestRecordInput,
@@ -362,21 +369,53 @@ export function registerConsole(
   }
   const resolveModelRequestSource = (input: SandboxModelRequestScope): SandboxModelRequestSource => {
     if (input.scope === 'unattributed') return { type: 'unattributed', name: '未归属' }
+    if (input.scope === 'all') return { type: 'main', name: '全部空间' }
     if (input.scope === 'main' || input.spaceId === MAIN_MODEL_REQUEST_SCOPE_ID) return { type: 'main', name: '主环境' }
-    if (input.scope !== 'space' || !input.spaceId?.trim()) throw new Error('必须指定 main、space 或 unattributed')
+    if (input.scope !== 'space' || !input.spaceId?.trim()) throw new Error('必须指定 all、main、space 或 unattributed')
     if (!testSpaces) throw new Error('AI 测试空间服务不可用')
     const space = testSpaces.getSpace(input.spaceId)
     return { type: 'test-space', spaceId: space.id, name: space.name }
   }
   const resolveModelRequestControl = (input: SandboxModelRequestScope) => {
-    if (input.scope === 'unattributed') return
+    if (input.scope === 'unattributed' || input.scope === 'all') return
     if (input.scope === 'main') return control
-    if (input.scope !== 'space' || !input.spaceId?.trim()) throw new Error('必须指定 main、space 或 unattributed')
+    if (input.scope !== 'space' || !input.spaceId?.trim()) throw new Error('必须指定 all、main、space 或 unattributed')
     if (input.spaceId === MAIN_MODEL_REQUEST_SCOPE_ID) return control
     if (!testSpaces) throw new Error('AI 测试空间服务不可用')
     return testSpaces.getControl(input.spaceId)
   }
+  const listAttributedModelRequestPages = (input: GetSandboxModelRequestRecordsInput) => {
+    const query: GetSandboxModelRequestRecordsInput = {
+      botId: input.botId,
+      conversationId: input.conversationId,
+      interactionId: input.interactionId,
+      model: input.model,
+      errorsOnly: input.errorsOnly,
+      order: input.order,
+      limit: input.limit,
+      beforeCreatedAt: input.beforeCreatedAt,
+      beforeId: input.beforeId,
+    }
+    const withSource = (
+      page: SandboxModelRequestRecordsPage,
+      source: SandboxModelRequestSource,
+    ): SandboxModelRequestRecordsPage<SandboxConsoleModelRequestListItem> => ({
+      ...page,
+      records: page.records.map((record) => ({ ...record, source })),
+    })
+    return [
+      withSource(control.getModelRequestRecords(query), { type: 'main', name: '主环境' }),
+      ...(testSpaces?.listSpaces() ?? []).map((space) => withSource(
+        testSpaces!.getControl(space.id).getModelRequestRecords(query),
+        { type: 'test-space', spaceId: space.id, name: space.name },
+      )),
+    ]
+  }
   const listModelRequestRecords = (input: ListSandboxModelRequestRecordsInput): SandboxModelRequestRecordsPage<SandboxConsoleModelRequestListItem> => {
+    if (input.scope === 'all') {
+      const limit = Math.min(Math.max(Number(input.limit ?? DEFAULT_MODEL_REQUEST_PAGE_SIZE) || DEFAULT_MODEL_REQUEST_PAGE_SIZE, 1), MAX_MODEL_REQUEST_PAGE_SIZE)
+      return mergeModelRequestRecordPages(listAttributedModelRequestPages(input), limit, input.order === 'asc' ? 'asc' : 'desc')
+    }
     const source = resolveModelRequestSource(input)
     const page = input.scope === 'unattributed'
       ? requireUnattributedModelRequests().getRecords(input)
@@ -387,6 +426,23 @@ export function registerConsole(
     }
   }
   const getModelRequestRecord = (input: ReadSandboxModelRequestRecordInput): SandboxConsoleModelRequestDetail => {
+    if (input.scope === 'all') {
+      try {
+        return { ...control.getModelRequestRecord(input), source: { type: 'main', name: '主环境' } }
+      } catch (error) {
+        for (const space of testSpaces?.listSpaces() ?? []) {
+          try {
+            return {
+              ...testSpaces!.getControl(space.id).getModelRequestRecord(input),
+              source: { type: 'test-space', spaceId: space.id, name: space.name },
+            }
+          } catch {
+            // 继续在其他已归属空间查找。
+          }
+        }
+        throw error
+      }
+    }
     const source = resolveModelRequestSource(input)
     if (input.scope === 'unattributed') {
       const record = requireUnattributedModelRequests().getRecord(input.recordId)
@@ -396,6 +452,7 @@ export function registerConsole(
     return { ...resolveModelRequestControl(input)!.getModelRequestRecord(input), source }
   }
   const clearModelRequestRecords = (input: SandboxModelRequestScope): ClearSandboxModelRequestRecordsResult => {
+    if (input.scope === 'all') throw new Error('全部空间视图不支持一次性清理')
     if (input.scope === 'unattributed') return { cleared: requireUnattributedModelRequests().clear() }
     return { cleared: resolveModelRequestControl(input)!.clearModelRequestRecords() }
   }

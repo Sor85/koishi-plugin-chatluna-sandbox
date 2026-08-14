@@ -504,6 +504,8 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
       modelRequestRecordsPageState.value = {
         hasMore: page.hasMore,
         nextCursor: page.nextCursor,
+        nextCreatedAt: page.nextCreatedAt,
+        nextId: page.nextId,
         earliestCursor: page.earliestCursor,
         capacity: page.capacity,
       }
