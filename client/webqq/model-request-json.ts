@@ -1,8 +1,10 @@
 export type ModelRequestJsonKind = 'object' | 'array' | 'value'
+export type ModelRequestJsonValueKind = 'string' | 'number' | 'boolean' | 'null' | 'undefined' | 'other'
 
 export interface ModelRequestJsonNode {
   key: string
   kind: ModelRequestJsonKind
+  valueKind?: ModelRequestJsonValueKind
   preview: string
   value?: unknown
   children: ModelRequestJsonNode[]
@@ -19,12 +21,32 @@ export function formatModelRequestJsonPrimitive(value: unknown): string {
   }
 }
 
+export function getModelRequestJsonValueKind(value: unknown): ModelRequestJsonValueKind {
+  if (value === null) return 'null'
+  if (value === undefined) return 'undefined'
+  if (typeof value === 'string') return 'string'
+  if (typeof value === 'number') return 'number'
+  if (typeof value === 'boolean') return 'boolean'
+  return 'other'
+}
+
+export function normalizeModelRequestJsonString(value: string): string {
+  const expanded = value.replace(/\t/g, '  ')
+  const lines = expanded.split('\n')
+  if (lines.length < 2) return expanded
+  const continuation = lines.slice(1).filter((line) => line.trim())
+  if (!continuation.length) return expanded
+  const commonIndent = Math.min(...continuation.map((line) => line.match(/^\s*/)?.[0].length ?? 0))
+  if (!commonIndent) return expanded
+  return [lines[0], ...lines.slice(1).map((line) => line.slice(Math.min(commonIndent, line.length)))].join('\n')
+}
+
 export function buildModelRequestJsonTree(value: unknown, key = 'root'): ModelRequestJsonNode {
   if (Array.isArray(value)) {
     return {
       key,
       kind: 'array',
-      preview: `Array(${value.length})`,
+      preview: `${value.length} items`,
       children: value.map((item, index) => buildModelRequestJsonTree(item, String(index))),
     }
   }
@@ -33,13 +55,14 @@ export function buildModelRequestJsonTree(value: unknown, key = 'root'): ModelRe
     return {
       key,
       kind: 'object',
-      preview: `{${entries.length}}`,
+      preview: `${entries.length} items`,
       children: entries.map(([childKey, child]) => buildModelRequestJsonTree(child, childKey)),
     }
   }
   return {
     key,
     kind: 'value',
+    valueKind: getModelRequestJsonValueKind(value),
     preview: formatModelRequestJsonPrimitive(value),
     value,
     children: [],

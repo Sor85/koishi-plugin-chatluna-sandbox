@@ -152,11 +152,34 @@
             {{ detail.error.message }} · trace {{ detail.error.traceId }}
           </p>
           <section class="webqq-model-request-body">
-            <h2>请求体</h2>
+            <div class="webqq-model-request-body-header">
+              <div>
+                <h2>请求体</h2>
+                <p>JSON 原文</p>
+              </div>
+              <Button
+                v-if="detail.requestBodyAvailable && detail.requestBody !== undefined"
+                variant="outline"
+                size="sm"
+                :aria-pressed="stringsExpanded"
+                @click="stringsExpanded = !stringsExpanded"
+              >
+                <IconArrowsDiagonalMinimize2 v-if="stringsExpanded" :size="16" aria-hidden="true" />
+                <IconArrowsDiagonal v-else :size="16" aria-hidden="true" />
+                {{ stringsExpanded ? '收起长字符串' : '展开长字符串' }}
+              </Button>
+            </div>
             <p v-if="!detail.requestBodyAvailable || detail.requestBody === undefined" class="webqq-model-request-empty">
               请求体不可用
             </p>
-            <ModelRequestJsonTree v-else :node="detailTree" :open="true" />
+            <div v-else class="webqq-model-request-json-viewer">
+              <ModelRequestJsonTree
+                :node="detailTree"
+                :open="true"
+                :root="true"
+                :strings-expanded="stringsExpanded"
+              />
+            </div>
           </section>
         </article>
       </section>
@@ -183,7 +206,7 @@
 </template>
 
 <script setup lang="ts">
-import { IconRefresh, IconTrash } from '@tabler/icons-vue'
+import { IconArrowsDiagonal, IconArrowsDiagonalMinimize2, IconRefresh, IconTrash } from '@tabler/icons-vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
@@ -242,6 +265,7 @@ const liveRefresh = ref(false)
 const selectedRecordId = ref('')
 const clearDialogOpen = ref(false)
 const clearStep = ref<1 | 2>(1)
+const stringsExpanded = ref(false)
 
 const liveRefreshController = createModelRequestLiveRefresh({
   isEnabled: () => liveRefresh.value,
@@ -265,6 +289,10 @@ watch(() => props.defaultSpaceId, (value) => {
 watch([category, spaceId], () => {
   selectedRecordId.value = ''
   refresh()
+})
+
+watch(() => props.detail?.id, () => {
+  stringsExpanded.value = false
 })
 
 watch(liveRefresh, () => liveRefreshController.sync())
