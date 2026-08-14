@@ -424,6 +424,8 @@ export class SandboxModelRequestCursorExpiredError extends Error {
 }
 
 export type SandboxModelRequestStatus = 'pending' | 'success' | 'error'
+export type SandboxModelResponseBodyStatus = 'pending' | 'complete' | 'unavailable' | 'error'
+export type SandboxModelResponseBodyFormat = 'json' | 'text' | 'sse'
 export type SandboxModelRequestAttribution = 'attributed' | 'unattributed'
 
 export interface SandboxModelRequestError {
@@ -460,11 +462,16 @@ export interface SandboxModelRequestRecord {
   entities: SandboxModelRequestEntities
   requestBodyAvailable: boolean
   requestBody?: unknown
+  responseBodyStatus: SandboxModelResponseBodyStatus
+  responseBodyFormat?: SandboxModelResponseBodyFormat
+  responseStatus?: number
+  responseBodyRaw?: string
+  responseBodyError?: string
   interactionId?: string
   error?: SandboxModelRequestError
 }
 
-export type SandboxModelRequestListItem = Omit<SandboxModelRequestRecord, 'requestBody'> & {
+export type SandboxModelRequestListItem = Omit<SandboxModelRequestRecord, 'requestBody' | 'responseBodyRaw'> & {
   summary: SandboxModelRequestSummary
 }
 export type SandboxModelRequestDetail = SandboxModelRequestRecord & { summary: SandboxModelRequestSummary }

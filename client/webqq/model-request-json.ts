@@ -41,6 +41,64 @@ export function normalizeModelRequestJsonString(value: string): string {
   return [lines[0], ...lines.slice(1).map((line) => line.slice(Math.min(commonIndent, line.length)))].join('\n')
 }
 
+export interface ModelResponseBodyPreview {
+  kind: 'json' | 'sse' | 'text' | 'empty'
+  value?: unknown
+}
+
+export function parseModelResponseBody(
+  raw: string | undefined,
+  format: 'json' | 'text' | 'sse' | undefined,
+): ModelResponseBodyPreview {
+  if (raw === undefined || raw === '') return { kind: 'empty' }
+  if (format === 'sse') return { kind: 'sse', value: parseModelResponseSse(raw) }
+  if (format === 'json') {
+    try {
+      return { kind: 'json', value: JSON.parse(raw) }
+    } catch {
+      return { kind: 'text', value: raw }
+    }
+  }
+  try {
+    return { kind: 'json', value: JSON.parse(raw) }
+  } catch {
+    return { kind: 'text', value: raw }
+  }
+}
+
+export function parseModelResponseSse(raw: string): Array<Record<string, unknown>> {
+  return raw.replace(/\r\n/g, '\n').split(/\n\n+/).flatMap((block) => {
+    if (!block.trim()) return []
+    const data: string[] = []
+    let event = 'message'
+    let id: string | undefined
+    for (const line of block.split('\n')) {
+      if (line.startsWith(':')) continue
+      const separator = line.indexOf(':')
+      const field = separator < 0 ? line : line.slice(0, separator)
+      const value = separator < 0 ? '' : line.slice(separator + 1).replace(/^ /, '')
+      if (field === 'data') data.push(value)
+      else if (field === 'event') event = value || 'message'
+      else if (field === 'id') id = value
+    }
+    const rawData = data.join('\n')
+    if (!rawData && event === 'message' && id === undefined) return []
+    let parsedData: unknown = rawData
+    if (rawData !== '[DONE]') {
+      try {
+        parsedData = JSON.parse(rawData)
+      } catch {
+        // 非 JSON data 仍按 SSE 原文保留，不影响其他事件的结构化预览。
+      }
+    }
+    return [{
+      ...(id !== undefined ? { id } : {}),
+      event,
+      data: parsedData,
+    }]
+  })
+}
+
 export function buildModelRequestJsonTree(value: unknown, key = 'root'): ModelRequestJsonNode {
   if (Array.isArray(value)) {
     return {

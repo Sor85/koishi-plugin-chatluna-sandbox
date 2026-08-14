@@ -3,14 +3,14 @@
     <header class="webqq-model-request-header">
       <div>
         <h1>模型请求</h1>
-        <p>查看实际上游对话模型请求的只读证据。列表只提供摘要，完整请求体需打开单条详情。</p>
+        <p>查看实际上游对话模型交互的只读证据。列表只提供摘要，完整请求体和响应体需打开单条详情。</p>
       </div>
       <div class="webqq-model-request-actions">
         <label class="webqq-model-request-live">
           <Checkbox v-model="liveRefresh" aria-label="实时刷新" />
           <span>实时刷新</span>
         </label>
-        <Button variant="outline" :disabled="loading" @click="refresh">
+        <Button variant="outline" :disabled="loading" @click="refresh()">
           <IconRefresh :size="16" aria-hidden="true" />
           刷新
         </Button>
@@ -65,7 +65,7 @@
               v-model="model"
               class="webqq-model-request-control"
               placeholder="例如 gpt-4.1"
-              @keyup.enter="refresh"
+              @keyup.enter="refresh()"
             />
           </label>
           <label class="webqq-model-request-error-filter">
@@ -124,7 +124,7 @@
 
       <section class="webqq-model-request-detail-pane" aria-label="模型请求详情">
         <div v-if="detailLoading && !detail" class="webqq-model-request-empty">正在读取请求详情…</div>
-        <div v-else-if="!detail" class="webqq-model-request-empty">选择一条记录查看结构化请求体</div>
+        <div v-else-if="!detail" class="webqq-model-request-empty">选择一条记录查看请求体和响应体</div>
         <article v-else v-webqq-scrollbar class="webqq-model-request-detail">
           <header>
             <div class="webqq-model-request-item-title">
@@ -155,33 +155,108 @@
           </p>
           <section class="webqq-model-request-body">
             <div class="webqq-model-request-body-header">
-              <div>
-                <h2>请求体</h2>
-                <p>JSON 原文</p>
+              <div class="webqq-model-request-body-tabs" role="tablist" aria-label="模型请求内容">
+                <Button
+                  size="sm"
+                  :variant="bodyView === 'request' ? 'secondary' : 'ghost'"
+                  role="tab"
+                  :aria-selected="bodyView === 'request'"
+                  @click="bodyView = 'request'"
+                >
+                  请求
+                </Button>
+                <Button
+                  size="sm"
+                  :variant="bodyView === 'response' ? 'secondary' : 'ghost'"
+                  role="tab"
+                  :aria-selected="bodyView === 'response'"
+                  @click="bodyView = 'response'"
+                >
+                  响应
+                </Button>
               </div>
-              <Button
-                v-if="detail.requestBodyAvailable && detail.requestBody !== undefined"
-                variant="outline"
-                size="sm"
-                :aria-pressed="stringsExpanded"
-                @click="stringsExpanded = !stringsExpanded"
-              >
-                <IconArrowsDiagonalMinimize2 v-if="stringsExpanded" :size="16" aria-hidden="true" />
-                <IconArrowsDiagonal v-else :size="16" aria-hidden="true" />
-                {{ stringsExpanded ? '收起长字符串' : '展开长字符串' }}
-              </Button>
+              <div class="webqq-model-request-body-actions">
+                <div
+                  v-if="bodyView === 'response' && detail.responseBodyStatus === 'complete'"
+                  class="webqq-model-request-response-tabs"
+                  role="tablist"
+                  aria-label="响应体显示方式"
+                >
+                  <Button
+                    size="xs"
+                    :variant="responseView === 'content' ? 'secondary' : 'ghost'"
+                    role="tab"
+                    :aria-selected="responseView === 'content'"
+                    @click="responseView = 'content'"
+                  >
+                    内容预览
+                  </Button>
+                  <Button
+                    size="xs"
+                    :variant="responseView === 'json' ? 'secondary' : 'ghost'"
+                    role="tab"
+                    :aria-selected="responseView === 'json'"
+                    @click="responseView = 'json'"
+                  >
+                    {{ detail.responseBodyFormat === 'sse' ? '事件原文' : 'JSON 原文' }}
+                  </Button>
+                </div>
+                <Button
+                  v-if="canExpandBodyStrings"
+                  variant="outline"
+                  size="sm"
+                  :aria-pressed="stringsExpanded"
+                  @click="stringsExpanded = !stringsExpanded"
+                >
+                  <IconArrowsDiagonalMinimize2 v-if="stringsExpanded" :size="16" aria-hidden="true" />
+                  <IconArrowsDiagonal v-else :size="16" aria-hidden="true" />
+                  {{ stringsExpanded ? '收起长字符串' : '展开长字符串' }}
+                </Button>
+              </div>
             </div>
-            <p v-if="!detail.requestBodyAvailable || detail.requestBody === undefined" class="webqq-model-request-empty">
-              请求体不可用
-            </p>
-            <div v-else class="webqq-model-request-json-viewer">
-              <ModelRequestJsonTree
-                :node="detailTree"
-                :open="true"
-                :root="true"
-                :strings-expanded="stringsExpanded"
+
+            <template v-if="bodyView === 'request'">
+              <p v-if="!detail.requestBodyAvailable || detail.requestBody === undefined" class="webqq-model-request-empty">
+                请求体不可用
+              </p>
+              <div v-else class="webqq-model-request-json-viewer">
+                <ModelRequestJsonTree
+                  :node="requestTree"
+                  :open="true"
+                  :root="true"
+                  :strings-expanded="stringsExpanded"
+                />
+              </div>
+            </template>
+
+            <template v-else>
+              <p class="webqq-model-request-response-meta">{{ responseBodyLabel }}</p>
+              <p v-if="detail.responseBodyStatus === 'pending'" class="webqq-model-request-empty">
+                正在采集响应体…
+              </p>
+              <p v-else-if="detail.responseBodyStatus === 'error'" class="webqq-model-request-error">
+                响应体采集失败{{ detail.responseBodyError ? `：${detail.responseBodyError}` : '' }}
+              </p>
+              <p v-else-if="detail.responseBodyStatus !== 'complete'" class="webqq-model-request-empty">
+                响应体不可用
+              </p>
+              <ModelResponseContentPreview
+                v-else-if="responseView === 'content'"
+                :preview="responseContent"
               />
-            </div>
+              <template v-else>
+                <div v-if="responsePreview.kind === 'json' || responsePreview.kind === 'sse'" class="webqq-model-request-json-viewer">
+                  <ModelRequestJsonTree
+                    :node="responseTree"
+                    :open="true"
+                    :root="true"
+                    :strings-expanded="stringsExpanded"
+                  />
+                </div>
+                <pre v-else-if="responsePreview.kind === 'text'" class="webqq-model-request-response-raw">{{ detail.responseBodyRaw }}</pre>
+                <p v-else class="webqq-model-request-empty">响应体为空</p>
+              </template>
+            </template>
           </section>
         </article>
       </section>
@@ -217,8 +292,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from './components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
 import ModelRequestJsonTree from './model-request-json-tree.vue'
+import ModelResponseContentPreview from './model-response-content-preview.vue'
 import WebqqAvatar from './webqq-avatar.vue'
-import { buildModelRequestJsonTree } from './webqq/model-request-json'
+import { extractModelResponseContent } from './webqq/model-response-content'
+import { buildModelRequestJsonTree, parseModelResponseBody } from './webqq/model-request-json'
 import { createModelRequestLiveRefresh } from './webqq/model-request-live-refresh'
 import {
   createModelRequestRecordsQuery,
@@ -268,14 +345,37 @@ const selectedRecordId = ref('')
 const clearDialogOpen = ref(false)
 const clearStep = ref<1 | 2>(1)
 const stringsExpanded = ref(false)
+const bodyView = ref<'request' | 'response'>('request')
+const responseView = ref<'content' | 'json'>('content')
 
 const liveRefreshController = createModelRequestLiveRefresh({
   isEnabled: () => liveRefresh.value,
   isVisible: () => typeof document === 'undefined' || document.visibilityState === 'visible',
-  refresh: () => emitQuery(Math.min(Math.max(props.records.length, MODEL_REQUEST_PAGE_SIZE), 200)),
+  refresh: () => refresh(Math.min(Math.max(props.records.length, MODEL_REQUEST_PAGE_SIZE), 200)),
 })
 
-const detailTree = computed(() => buildModelRequestJsonTree(props.detail?.requestBody, 'requestBody'))
+const requestTree = computed(() => buildModelRequestJsonTree(props.detail?.requestBody, 'requestBody'))
+const responsePreview = computed(() => parseModelResponseBody(
+  props.detail?.responseBodyRaw,
+  props.detail?.responseBodyFormat,
+))
+const responseTree = computed(() => buildModelRequestJsonTree(responsePreview.value.value, 'responseBody'))
+const responseContent = computed(() => extractModelResponseContent(responsePreview.value.value))
+const canExpandBodyStrings = computed(() => {
+  if (bodyView.value === 'request') return props.detail?.requestBodyAvailable && props.detail.requestBody !== undefined
+  return responseView.value === 'json' && (
+    responsePreview.value.kind === 'json' || responsePreview.value.kind === 'sse'
+  )
+})
+const responseBodyLabel = computed(() => {
+  const detail = props.detail
+  if (!detail) return ''
+  const parts = [
+    detail.responseStatus !== undefined ? `HTTP ${detail.responseStatus}` : undefined,
+    detail.responseBodyFormat?.toUpperCase(),
+  ].filter(Boolean)
+  return parts.join(' · ') || '响应体'
+})
 const capacityText = computed(() => {
   const capacity = props.capacity
   if (!capacity) return ''
@@ -295,6 +395,8 @@ watch([category, spaceId], () => {
 
 watch(() => props.detail?.id, () => {
   stringsExpanded.value = false
+  bodyView.value = 'request'
+  responseView.value = 'content'
 })
 
 watch(liveRefresh, () => liveRefreshController.sync())
@@ -311,8 +413,11 @@ function emitQuery(limit = MODEL_REQUEST_PAGE_SIZE) {
   }))
 }
 
-function refresh() {
-  emitQuery()
+function refresh(limit = MODEL_REQUEST_PAGE_SIZE) {
+  emitQuery(limit)
+  if (selectedRecordId.value) {
+    emit('open', { ...currentScope(), recordId: selectedRecordId.value })
+  }
 }
 
 function loadMore() {

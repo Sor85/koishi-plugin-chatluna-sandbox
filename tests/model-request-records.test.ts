@@ -20,6 +20,10 @@ function appendRecord(
     entities: { scopeId: 'main', botId: '20001', conversationId: 'private:10001:20001' },
     requestBodyAvailable: true,
     requestBody: { model: 'gpt-4o', messages: [{ role: 'user', content: 'hi' }], tools: [{ type: 'function' }] },
+    responseBodyStatus: 'complete',
+    responseBodyFormat: 'json',
+    responseStatus: 200,
+    responseBodyRaw: JSON.stringify({ choices: [{ message: { content: 'hello' } }] }),
     ...overrides,
   })
 }
@@ -31,6 +35,7 @@ describe('模型请求记录库', () => {
     const page = store.getRecords()
     expect(page.records).toHaveLength(1)
     expect(page.records[0]).not.toHaveProperty('requestBody')
+    expect(page.records[0]).not.toHaveProperty('responseBodyRaw')
     expect(page.records[0]).toMatchObject({
       id: created.id,
       status: 'success',
@@ -40,15 +45,38 @@ describe('模型请求记录库', () => {
     expect(store.getRecord(created.id)).toMatchObject({
       id: created.id,
       requestBody: { model: 'gpt-4o', messages: [{ role: 'user', content: 'hi' }] },
+      responseBodyStatus: 'complete',
+      responseBodyFormat: 'json',
+      responseStatus: 200,
+      responseBodyRaw: JSON.stringify({ choices: [{ message: { content: 'hello' } }] }),
       summary: { messageCount: 1, toolCount: 1, bodyAvailable: true },
     })
   })
 
   it('同一条记录从 pending 更新为 success 或 error，不新增序号', () => {
     const store = new SandboxModelRequestStore()
-    const pending = appendRecord(store, { status: 'pending', durationMs: 0 })
-    const success = store.update(pending.id, { status: 'success', durationMs: 40 })
-    expect(success).toMatchObject({ id: pending.id, sequence: pending.sequence, status: 'success', durationMs: 40 })
+    const pending = appendRecord(store, {
+      status: 'pending',
+      durationMs: 0,
+      responseBodyStatus: 'pending',
+      responseBodyRaw: undefined,
+    })
+    const success = store.update(pending.id, {
+      status: 'success',
+      durationMs: 40,
+      responseBodyStatus: 'complete',
+      responseBodyFormat: 'text',
+      responseStatus: 200,
+      responseBodyRaw: 'done',
+    })
+    expect(success).toMatchObject({
+      id: pending.id,
+      sequence: pending.sequence,
+      status: 'success',
+      durationMs: 40,
+      responseBodyStatus: 'complete',
+      responseBodyRaw: 'done',
+    })
     expect(store.getRecords().records).toHaveLength(1)
 
     const failed = appendRecord(store, { status: 'pending', durationMs: 0, model: 'gpt-4.1' })

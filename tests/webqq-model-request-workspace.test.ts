@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { buildModelRequestJsonTree } from '../client/webqq/model-request-json'
+import { extractModelResponseContent } from '../client/webqq/model-response-content'
+import { buildModelRequestJsonTree, parseModelResponseBody } from '../client/webqq/model-request-json'
 import { createModelRequestLiveRefresh, MODEL_REQUEST_LIVE_REFRESH_INTERVAL_MS } from '../client/webqq/model-request-live-refresh'
 
 describe('WebQQ 模型请求工作台', () => {
@@ -10,6 +11,7 @@ describe('WebQQ 模型请求工作台', () => {
     const sidebarSource = readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
     const workspaceSource = readFileSync(resolve('client/model-request-workspace.vue'), 'utf8')
     const jsonSource = readFileSync(resolve('client/model-request-json-tree.vue'), 'utf8')
+    const responsePreviewSource = readFileSync(resolve('client/model-response-content-preview.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
 
     expect(sidebarSource).toMatch(/label:\s*['"]模型请求['"]/)
@@ -51,6 +53,21 @@ describe('WebQQ 模型请求工作台', () => {
     expect(workspaceSource).not.toContain('download')
     expect(workspaceSource).not.toContain("emit('copy'")
     expect(workspaceSource).toContain('展开长字符串')
+    expect(workspaceSource).toContain("bodyView = ref<'request' | 'response'>('request')")
+    expect(workspaceSource).toContain("responseView = ref<'content' | 'json'>('content')")
+    expect(workspaceSource).toMatch(/role="tab"[\s\S]*请求[\s\S]*role="tab"[\s\S]*响应/)
+    expect(workspaceSource).toContain('正在采集响应体…')
+    expect(workspaceSource).toContain('响应体采集失败')
+    expect(workspaceSource).toContain('detail.responseBodyRaw')
+    expect(workspaceSource).toContain('parseModelResponseBody')
+    expect(workspaceSource).toContain('extractModelResponseContent')
+    expect(workspaceSource).toContain('<ModelResponseContentPreview')
+    expect(workspaceSource).toContain('内容预览')
+    expect(workspaceSource).toContain('JSON 原文')
+    expect(responsePreviewSource).toContain('模型输出')
+    expect(responsePreviewSource).toContain('思考内容')
+    expect(responsePreviewSource).toContain('工具调用')
+    expect(responsePreviewSource).toContain('结束原因')
     expect(workspaceSource).toContain(':strings-expanded="stringsExpanded"')
     expect(workspaceSource).toContain(':root="true"')
     expect(jsonSource).toContain('IconChevronDown')
@@ -75,6 +92,9 @@ describe('WebQQ 模型请求工作台', () => {
     expect(styles).toMatch(/data-value-kind="null"[^}]*color:\s*#e11d48/s)
     expect(styles).toMatch(/\.webqq-model-request-json-string\s*\{[^}]*text-overflow:\s*ellipsis[^}]*white-space:\s*nowrap/s)
     expect(styles).toMatch(/\.webqq-model-request-json-string-expanded\s*\{[^}]*white-space:\s*pre-wrap/s)
+    expect(styles).toMatch(/\.webqq-model-request-response-raw\s*\{[^}]*overflow:\s*auto[^}]*white-space:\s*pre-wrap[^}]*user-select:\s*text/s)
+    expect(styles).toMatch(/\.webqq-model-response-preview\s*\{[^}]*display:\s*grid[^}]*overflow:\s*auto/s)
+    expect(styles).toMatch(/\.webqq-model-response-section\.is-content\s*\{[^}]*border-left-color:\s*#2563eb/s)
     expect(styles).toMatch(/\.webqq-model-request-workspace\s*\{[^}]*grid-template-rows:\s*auto auto minmax\(0, 1fr\)/s)
     expect(styles).toMatch(/\.webqq-model-request-list-pane\s*\{[^}]*display:\s*grid[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\)/s)
     expect(styles).toMatch(/\.webqq-model-request-filters\s*\{[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)[^}]*border-bottom:\s*1px solid var\(--webqq-border\)/s)
@@ -92,6 +112,76 @@ describe('WebQQ 模型请求工作台', () => {
     expect(tree.children.map(({ key }) => key)).toEqual(['model', 'messages'])
     expect(tree.children[0]).toMatchObject({ key: 'model', kind: 'value', valueKind: 'string', preview: '"gpt-4.1"' })
     expect(tree.children[1]).toMatchObject({ key: 'messages', kind: 'array', preview: '1 items' })
+  })
+
+  it('将 JSON 与 SSE 原始响应派生为结构化预览', () => {
+    expect(parseModelResponseBody('{"content":"你好"}', 'json')).toEqual({
+      kind: 'json',
+      value: { content: '你好' },
+    })
+    expect(parseModelResponseBody([
+      'event: message',
+      'data: {"delta":"你"}',
+      '',
+      'data: {"delta":"好"}',
+      '',
+      'data: [DONE]',
+      '',
+    ].join('\n'), 'sse')).toEqual({
+      kind: 'sse',
+      value: [
+        { event: 'message', data: { delta: '你' } },
+        { event: 'message', data: { delta: '好' } },
+        { event: 'message', data: '[DONE]' },
+      ],
+    })
+  })
+
+  it('从 OpenAI、Anthropic 和 Gemini 响应提取内容预览', () => {
+    expect(extractModelResponseContent({
+      choices: [{
+        message: {
+          content: '最终回复',
+          reasoning_content: '思考过程',
+          tool_calls: [{ id: 'call-1', function: { name: 'search', arguments: '{"q":"test"}' } }],
+        },
+        finish_reason: 'tool_calls',
+      }],
+      usage: { prompt_tokens: 10, completion_tokens: 5 },
+    })).toMatchObject({
+      content: ['最终回复'],
+      reasoning: ['思考过程'],
+      toolCalls: [{ id: 'call-1', name: 'search', arguments: '{"q":"test"}' }],
+      finishReasons: ['tool_calls'],
+      usage: { prompt_tokens: 10, completion_tokens: 5 },
+    })
+
+    expect(extractModelResponseContent({
+      content: [
+        { type: 'thinking', thinking: '分析' },
+        { type: 'text', text: '答案' },
+        { type: 'tool_use', id: 'tool-1', name: 'lookup', input: { id: 1 } },
+      ],
+      stop_reason: 'end_turn',
+    })).toMatchObject({
+      content: ['答案'],
+      reasoning: ['分析'],
+      toolCalls: [{ id: 'tool-1', name: 'lookup' }],
+      finishReasons: ['end_turn'],
+    })
+
+    expect(extractModelResponseContent({
+      candidates: [{
+        content: { parts: [{ text: 'Gemini 回复' }, { text: '内部思考', thought: true }] },
+        finishReason: 'STOP',
+      }],
+      usageMetadata: { promptTokenCount: 8 },
+    })).toMatchObject({
+      content: ['Gemini 回复'],
+      reasoning: ['内部思考'],
+      finishReasons: ['STOP'],
+      usage: { promptTokenCount: 8 },
+    })
   })
 
   it('实时刷新默认关闭，仅在开关打开且页面可见时按 2 秒轮询', () => {

@@ -39,6 +39,8 @@ describe('模型请求 MCP 工具', () => {
       status: 'success', durationMs: 2, model: 'space-model',
       attribution: 'attributed', entities: { scopeId: created.spaceId },
       requestBodyAvailable: true, requestBody: { model: 'space-model', messages: [{ role: 'user', content: 'hi' }] },
+      responseBodyStatus: 'complete', responseBodyFormat: 'json', responseStatus: 200,
+      responseBodyRaw: JSON.stringify({ content: 'hello' }),
     })
     const lost = unattributed.append({
       status: 'error', durationMs: 3, model: 'lost-model',
@@ -53,6 +55,7 @@ describe('模型请求 MCP 工具', () => {
     }) as { records: Array<{ id: string, model: string }> }
     expect(spacePage.records).toEqual([expect.objectContaining({ id: spaceRecord.id, model: 'space-model' })])
     expect(spacePage.records[0]).not.toHaveProperty('requestBody')
+    expect(spacePage.records[0]).not.toHaveProperty('responseBodyRaw')
     expect(await service.callTool(credential.token, 'get_model_request_record', {
       scope: 'space',
       spaceId: created.spaceId,
@@ -60,6 +63,10 @@ describe('模型请求 MCP 工具', () => {
     })).toMatchObject({
       id: spaceRecord.id,
       requestBody: { model: 'space-model', messages: [{ role: 'user', content: 'hi' }] },
+      responseBodyStatus: 'complete',
+      responseBodyFormat: 'json',
+      responseStatus: 200,
+      responseBodyRaw: JSON.stringify({ content: 'hello' }),
     })
     expect(await service.callTool(credential.token, 'list_model_request_records', { scope: 'unattributed' })).toMatchObject({
       records: [expect.objectContaining({ id: lost.id, model: 'lost-model' })],

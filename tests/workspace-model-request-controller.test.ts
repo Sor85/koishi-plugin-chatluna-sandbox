@@ -39,6 +39,9 @@ const listItem: SandboxModelRequestListItem = {
   attribution: 'unattributed',
   entities: {},
   requestBodyAvailable: true,
+  responseBodyStatus: 'complete',
+  responseBodyFormat: 'json',
+  responseStatus: 200,
   summary: { keys: 3, messageCount: 2, toolCount: 1, bodyAvailable: true },
 }
 

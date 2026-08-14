@@ -10,6 +10,8 @@ import type {
   SandboxModelRequestRecordsPage,
   SandboxModelRequestStatus,
   SandboxModelRequestSummary,
+  SandboxModelResponseBodyFormat,
+  SandboxModelResponseBodyStatus,
 } from './types'
 import { SandboxModelRequestCursorExpiredError } from './types'
 
@@ -38,6 +40,11 @@ export interface AppendModelRequestRecordInput {
   entities: SandboxModelRequestEntities
   requestBody?: unknown
   requestBodyAvailable: boolean
+  responseBodyStatus?: SandboxModelResponseBodyStatus
+  responseBodyFormat?: SandboxModelResponseBodyFormat
+  responseStatus?: number
+  responseBodyRaw?: string
+  responseBodyError?: string
   interactionId?: string
   error?: SandboxModelRequestError
 }
@@ -45,6 +52,11 @@ export interface AppendModelRequestRecordInput {
 export interface UpdateModelRequestRecordInput {
   status?: SandboxModelRequestStatus
   durationMs?: number
+  responseBodyStatus?: SandboxModelResponseBodyStatus
+  responseBodyFormat?: SandboxModelResponseBodyFormat
+  responseStatus?: number
+  responseBodyRaw?: string
+  responseBodyError?: string
   error?: SandboxModelRequestError
 }
 
@@ -86,7 +98,11 @@ export function presentModelRequestRecord(record: SandboxModelRequestRecord, vie
     summary: summary(record),
   }
   if (view === 'list') {
-    const { requestBody: _requestBody, ...listItem } = item
+    const {
+      requestBody: _requestBody,
+      responseBodyRaw: _responseBodyRaw,
+      ...listItem
+    } = item
     return listItem
   }
   return item
@@ -102,6 +118,7 @@ export class SandboxModelRequestStore {
   private persistenceQueue = Promise.resolve()
   private ready = Promise.resolve()
   private persistenceAuthoritative = true
+  private readonly pendingUpdates = new Set<Promise<void>>()
 
   constructor(options: SandboxModelRequestStoreOptions = {}) {
     this.maxRecords = options.maxRecords ?? DEFAULT_MODEL_REQUEST_RECORD_LIMIT
@@ -133,7 +150,17 @@ export class SandboxModelRequestStore {
   }
 
   waitForReady(): Promise<void> { return this.ready }
-  waitForPersistence(): Promise<void> { return this.persistenceQueue }
+
+  async waitForPersistence(): Promise<void> {
+    await this.ready
+    while (this.pendingUpdates.size) await Promise.all([...this.pendingUpdates])
+    await this.persistenceQueue
+  }
+
+  trackUpdate(task: Promise<void>): void {
+    const tracked = task.finally(() => this.pendingUpdates.delete(tracked))
+    this.pendingUpdates.add(tracked)
+  }
 
   getCapacity(): SandboxModelRequestCapacity {
     return { recordCount: this.records.length, totalBytes: this.totalBytes, maxRecords: this.maxRecords, maxBytes: this.maxBytes }
@@ -154,6 +181,11 @@ export class SandboxModelRequestStore {
       entities: structuredClone(input.entities),
       requestBodyAvailable: input.requestBodyAvailable,
       ...(input.requestBody !== undefined ? { requestBody: structuredClone(input.requestBody) } : {}),
+      responseBodyStatus: input.responseBodyStatus ?? 'unavailable',
+      ...(input.responseBodyFormat ? { responseBodyFormat: input.responseBodyFormat } : {}),
+      ...(input.responseStatus !== undefined ? { responseStatus: input.responseStatus } : {}),
+      ...(input.responseBodyRaw !== undefined ? { responseBodyRaw: input.responseBodyRaw } : {}),
+      ...(input.responseBodyError ? { responseBodyError: input.responseBodyError } : {}),
       ...(input.interactionId ? { interactionId: input.interactionId } : {}),
       ...(input.error ? { error: structuredClone(input.error) } : {}),
     }
@@ -173,9 +205,15 @@ export class SandboxModelRequestStore {
       ...previous,
       ...(input.status ? { status: input.status } : {}),
       ...(input.durationMs !== undefined ? { durationMs: input.durationMs } : {}),
+      ...(input.responseBodyStatus ? { responseBodyStatus: input.responseBodyStatus } : {}),
+      ...(input.responseBodyFormat ? { responseBodyFormat: input.responseBodyFormat } : {}),
+      ...(input.responseStatus !== undefined ? { responseStatus: input.responseStatus } : {}),
+      ...(input.responseBodyRaw !== undefined ? { responseBodyRaw: input.responseBodyRaw } : {}),
+      ...(input.responseBodyError ? { responseBodyError: input.responseBodyError } : {}),
     }
     if (input.status === 'success') delete next.error
     else if (input.error) next.error = structuredClone(input.error)
+    if (input.responseBodyStatus === 'complete') delete next.responseBodyError
     this.records[index] = next
     this.totalBytes += estimateBytes(next)
     this.reclaimOverflow()

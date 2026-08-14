@@ -503,6 +503,7 @@ const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
   },
   get_model_request_record: {
     type: 'object',
+    description: '按记录 ID 读取完整模型请求与原始响应体；流式响应以 SSE 原文返回。',
     properties: {
       scope: { type: 'string', enum: ['main', 'space', 'unattributed'] },
       spaceId: { type: 'string', description: 'AI 测试空间 ID；scope=space 且省略时读取主环境' },
@@ -558,7 +559,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   ['get_onebot_debug_record', 'debug', '读取单条 OneBot 调试记录，可显式展开大型值'],
   ['clear_onebot_debug_records', 'debug', '清理 OneBot 调试记录'],
   ['list_model_request_records', 'debug', '读取模型请求记录'],
-  ['get_model_request_record', 'debug', '读取单条模型请求记录，含完整请求体'],
+  ['get_model_request_record', 'debug', '读取单条模型请求记录，含完整请求体和原始响应体'],
   ['clear_model_request_records', 'debug', '清理指定 AI 测试空间的模型请求记录'],
   ['list_mcp_call_records', 'debug', '读取 MCP 调用记录'],
   ['clear_mcp_call_records', 'debug', '清理 MCP 调用记录'],

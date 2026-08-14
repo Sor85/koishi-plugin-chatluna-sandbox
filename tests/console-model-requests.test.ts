@@ -51,6 +51,8 @@ describe('模型请求 Console 协议', () => {
       status: 'error', durationMs: 5, model: 'lost-model',
       attribution: 'unattributed', entities: {}, requestBodyAvailable: true,
       requestBody: { model: 'lost-model', messages: [] },
+      responseBodyStatus: 'complete', responseBodyFormat: 'json', responseStatus: 500,
+      responseBodyRaw: JSON.stringify({ error: 'failed' }),
     })
 
     const listRecords = listeners.get('onebot-sandbox/model-request-records')
@@ -69,9 +71,14 @@ describe('模型请求 Console 协议', () => {
     const unattributedPage = Reflect.apply(listRecords, undefined, [{ scope: 'unattributed' }]) as { records: Array<{ id: string }> }
     expect(unattributedPage.records[0]).toMatchObject({ id: unattributedRecord.id, model: 'lost-model' })
     expect(unattributedPage.records[0]).not.toHaveProperty('requestBody')
+    expect(unattributedPage.records[0]).not.toHaveProperty('responseBodyRaw')
     expect(Reflect.apply(getRecord, undefined, [{ scope: 'unattributed', recordId: unattributedRecord.id }])).toMatchObject({
       id: unattributedRecord.id,
       requestBody: { model: 'lost-model', messages: [] },
+      responseBodyStatus: 'complete',
+      responseBodyFormat: 'json',
+      responseStatus: 500,
+      responseBodyRaw: JSON.stringify({ error: 'failed' }),
     })
 
     expect(Reflect.apply(clearRecords, undefined, [{ scope: 'space', spaceId: space.id }])).toEqual({ cleared: 1 })

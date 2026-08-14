@@ -23,6 +23,7 @@ describe('模型请求记录持久化与生命周期', () => {
       attribution: 'attributed',
       entities: { scopeId: 'main' },
       requestBodyAvailable: false,
+      responseBodyStatus: 'unavailable',
     }
     let database: {
       get: (table: 'onebot-sandbox.model-requests', query: { scopeId: string }) => Promise<Array<{

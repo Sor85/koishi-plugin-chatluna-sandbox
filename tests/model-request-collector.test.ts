@@ -72,8 +72,16 @@ describe('模型请求采集', () => {
     let status: 'ok' | 'http' | 'throw' = 'ok'
     const plugin = createFakePlugin(async () => {
       if (status === 'throw') throw new Error('upstream timeout')
-      if (status === 'http') return { ok: false, status: 429 }
-      return { ok: true, status: 200 }
+      if (status === 'http') {
+        return new Response(JSON.stringify({ error: { message: 'rate limited' } }), {
+          status: 429,
+          headers: { 'content-type': 'application/json' },
+        })
+      }
+      return new Response(JSON.stringify({ choices: [{ message: { content: '你好' } }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
     })
     disposers.push(installModelRequestCollector({
       plugin,
@@ -81,11 +89,12 @@ describe('模型请求采集', () => {
       getCandidates: () => [],
     }))
 
-    await plugin.fetch('https://api.openai.com/v1/chat/completions?api_key=secret', {
+    const originalResponse = await plugin.fetch('https://api.openai.com/v1/chat/completions?api_key=secret', {
       method: 'POST',
       headers: { authorization: 'Bearer secret' },
       body: chatBody(),
-    })
+    }) as Response
+    await unattributed.waitForPersistence()
     const [success] = unattributed.getRecords().records
     expect(success).toMatchObject({
       status: 'success',
@@ -95,14 +104,21 @@ describe('模型请求采集', () => {
       model: 'gpt-4o',
       attribution: 'unattributed',
       requestBodyAvailable: true,
+      responseStatus: 200,
+      responseBodyStatus: 'complete',
+      responseBodyFormat: 'json',
     })
     expect(success).not.toHaveProperty('headers')
     expect(JSON.stringify(success)).not.toContain('secret')
     expect(JSON.stringify(success)).not.toContain('Bearer')
-    expect(unattributed.getRecord(success!.id)?.requestBody).toEqual({
-      model: 'gpt-4o',
-      messages: [{ role: 'user', content: '你好' }],
+    expect(unattributed.getRecord(success!.id)).toMatchObject({
+      requestBody: {
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: '你好' }],
+      },
+      responseBodyRaw: JSON.stringify({ choices: [{ message: { content: '你好' } }] }),
     })
+    await expect(originalResponse.json()).resolves.toEqual({ choices: [{ message: { content: '你好' } }] })
     expect(plugin.lastInit).toMatchObject({ headers: { authorization: 'Bearer secret' } })
 
     status = 'throw'
@@ -118,10 +134,53 @@ describe('模型请求采集', () => {
 
     status = 'http'
     await plugin.fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', body: chatBody('gpt-5') })
+    await unattributed.waitForPersistence()
     expect(unattributed.getRecords({ model: 'gpt-5' }).records[0]).toMatchObject({
       status: 'error',
+      responseStatus: 429,
+      responseBodyStatus: 'complete',
+      responseBodyFormat: 'json',
       error: { message: 'HTTP 429' },
     })
+  })
+
+  it('旁路采集流式 SSE，且不会等待完整响应后才把原始流交给 ChatLuna', async () => {
+    const unattributed = new SandboxModelRequestStore()
+    const encoder = new TextEncoder()
+    let controller: ReadableStreamDefaultController<Uint8Array> | undefined
+    const response = new Response(new ReadableStream<Uint8Array>({
+      start(value) {
+        controller = value
+        value.enqueue(encoder.encode('data: {"delta":"你"}\n\n'))
+      },
+    }), {
+      headers: { 'content-type': 'text/event-stream' },
+    })
+    const plugin = createFakePlugin(async () => response)
+    disposers.push(installModelRequestCollector({
+      plugin,
+      unattributed,
+      getCandidates: () => [],
+    }))
+
+    const originalResponse = await plugin.fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      body: chatBody('stream-model'),
+    }) as Response
+    expect(unattributed.getRecords().records[0]).toMatchObject({
+      status: 'success',
+      responseBodyStatus: 'pending',
+    })
+
+    controller?.enqueue(encoder.encode('data: {"delta":"好"}\n\ndata: [DONE]\n\n'))
+    controller?.close()
+    await unattributed.waitForPersistence()
+    expect(unattributed.getRecord(unattributed.getRecords().records[0]!.id)).toMatchObject({
+      responseBodyStatus: 'complete',
+      responseBodyFormat: 'sse',
+      responseBodyRaw: 'data: {"delta":"你"}\n\ndata: {"delta":"好"}\n\ndata: [DONE]\n\n',
+    })
+    await expect(originalResponse.text()).resolves.toContain('data: {"delta":"你"}')
   })
 
   it('忽略未知路径，并在销毁后恢复原始 fetch', async () => {

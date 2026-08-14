@@ -87,6 +87,24 @@ export interface InstallModelRequestCollectorOptions {
   getCandidates: () => ModelRequestAttributionCandidate[]
 }
 
+interface CloneableModelResponse {
+  ok?: boolean
+  status?: number
+  bodyUsed?: boolean
+  headers?: { get?: (name: string) => string | null }
+  clone?: () => { text?: () => Promise<string>, headers?: { get?: (name: string) => string | null } }
+}
+
+export function inferModelResponseBodyFormat(contentType: string | undefined, raw: string): 'json' | 'text' | 'sse' {
+  if (contentType?.toLowerCase().includes('text/event-stream') || /^(?:event|data|id|retry):/m.test(raw)) return 'sse'
+  try {
+    JSON.parse(raw)
+    return 'json'
+  } catch {
+    return 'text'
+  }
+}
+
 export function installModelRequestCollector(options: InstallModelRequestCollectorOptions): () => void {
   const plugin = options.plugin ?? resolveChatLunaPluginClass(options.baseDir)
   if (!plugin) return () => {}
@@ -121,25 +139,54 @@ export function installModelRequestCollector(options: InstallModelRequestCollect
       entities: resolved.entities,
       requestBodyAvailable: body.available,
       ...(body.available ? { requestBody: body.value } : {}),
+      responseBodyStatus: 'pending',
     })
 
     try {
-      const response = await original.call(this, info, init, proxy) as { ok?: boolean, status?: number }
+      const response = await original.call(this, info, init, proxy) as CloneableModelResponse
       const durationMs = Date.now() - startedAt
+      const responseStatus = typeof response?.status === 'number' ? response.status : undefined
+      const capture = prepareModelResponseCapture(response)
       if (response && typeof response === 'object' && response.ok === false) {
         store.update(pending.id, {
           status: 'error',
           durationMs,
+          responseBodyStatus: capture ? 'pending' : 'unavailable',
+          ...(responseStatus !== undefined ? { responseStatus } : {}),
           error: createModelRequestError(new Error(`HTTP ${response.status ?? 'error'}`)),
         })
       } else {
-        store.update(pending.id, { status: 'success', durationMs })
+        store.update(pending.id, {
+          status: 'success',
+          durationMs,
+          responseBodyStatus: capture ? 'pending' : 'unavailable',
+          ...(responseStatus !== undefined ? { responseStatus } : {}),
+        })
+      }
+      if (capture) {
+        // clone 必须在返回给 requester 前同步完成，并立即消费旁路流；否则 requester
+        // 锁定原流后无法再 clone，或未消费的 tee 分支持续缓冲并拖慢模型输出。
+        store.trackUpdate(capture.then(({ raw, format }) => {
+          store.update(pending.id, {
+            durationMs: Date.now() - startedAt,
+            responseBodyStatus: 'complete',
+            responseBodyFormat: format,
+            responseBodyRaw: raw,
+          })
+        }).catch((error) => {
+          store.update(pending.id, {
+            durationMs: Date.now() - startedAt,
+            responseBodyStatus: 'error',
+            responseBodyError: error instanceof Error ? error.message : String(error),
+          })
+        }))
       }
       return response
     } catch (error) {
       store.update(pending.id, {
         status: 'error',
         durationMs: Date.now() - startedAt,
+        responseBodyStatus: 'unavailable',
         error: createModelRequestError(error),
       })
       throw error
@@ -149,6 +196,25 @@ export function installModelRequestCollector(options: InstallModelRequestCollect
   plugin.prototype.fetch = wrapped
   return () => {
     if (plugin.prototype.fetch === wrapped) plugin.prototype.fetch = original
+  }
+}
+
+function prepareModelResponseCapture(
+  response: CloneableModelResponse | undefined,
+): Promise<{ raw: string, format: 'json' | 'text' | 'sse' }> | undefined {
+  if (!response || typeof response.clone !== 'function' || response.bodyUsed) return
+  try {
+    const clone = response.clone()
+    if (typeof clone.text !== 'function') return
+    const contentType = clone.headers?.get?.('content-type') ?? response.headers?.get?.('content-type') ?? undefined
+    // 这里立即调用 text()，而不是把 clone 留到下一个 tick，确保 tee 的旁路分支
+    // 与 ChatLuna 原始分支同时被消费，避免流式响应在未读取分支上无限缓冲。
+    return clone.text().then((raw) => ({
+      raw,
+      format: inferModelResponseBodyFormat(contentType ?? undefined, raw),
+    }))
+  } catch {
+    return
   }
 }
 
