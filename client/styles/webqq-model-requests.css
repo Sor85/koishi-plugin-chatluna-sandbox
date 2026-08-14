@@ -65,6 +65,29 @@
   white-space: nowrap;
 }
 
+.webqq-model-request-timing,
+.webqq-model-request-timing > time,
+.webqq-model-request-timing > span {
+  display: flex;
+  align-items: center;
+}
+
+.webqq-model-request-timing {
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: var(--webqq-muted);
+}
+
+.webqq-model-request-timing > time,
+.webqq-model-request-timing > span {
+  gap: 4px;
+  min-width: 0;
+}
+
+.webqq-model-request-timing svg {
+  flex: 0 0 auto;
+}
+
 .webqq-model-request-bot-name {
   min-width: 0;
   flex-wrap: wrap;
@@ -197,27 +220,191 @@
 .webqq-model-request-meta,
 .webqq-model-request-trace,
 .webqq-model-request-detail time,
-.webqq-model-request-item time {
+.webqq-model-request-item time,
+.webqq-model-request-timing {
   font-size: 13px;
 }
 
-.webqq-model-request-status-success {
+.webqq-model-request-overview,
+.webqq-model-request-usage {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--webqq-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--webqq-surface-muted) 36%, transparent);
+}
+
+.webqq-model-request-section-heading,
+.webqq-model-request-section-heading > span {
+  display: flex;
+  align-items: center;
+}
+
+.webqq-model-request-section-heading {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.webqq-model-request-section-heading > span {
+  gap: 7px;
+}
+
+.webqq-model-request-section-heading svg,
+.webqq-model-request-overview-grid article > svg {
+  flex: 0 0 auto;
+  color: var(--webqq-accent);
+}
+
+.webqq-model-request-overview-grid,
+.webqq-model-request-usage-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.webqq-model-request-overview-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.webqq-model-request-overview-grid article {
+  display: grid;
+  grid-template-columns: 17px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 9px 10px;
+  border: 1px solid var(--webqq-border);
+  border-radius: 9px;
+  background: var(--webqq-surface);
+}
+
+.webqq-model-request-overview-grid article > span,
+.webqq-model-request-usage-grid article > span {
+  color: var(--webqq-muted);
+  font-size: 12px;
+}
+
+.webqq-model-request-overview-grid article > strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--webqq-text);
+  font-size: 13px;
+  text-align: right;
+  user-select: text;
+}
+
+.webqq-model-request-usage-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.webqq-model-request-usage-grid article {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--webqq-border);
+  border-radius: 9px;
+  background: var(--webqq-surface);
+}
+
+.webqq-model-request-usage-grid article > strong {
+  overflow: hidden;
+  color: var(--webqq-text);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webqq-model-request-meta-list {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--webqq-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--webqq-surface-muted) 52%, transparent);
+}
+
+.webqq-model-request-meta-list .webqq-model-request-meta {
+  display: grid;
+  grid-template-columns: 17px minmax(64px, auto) minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+}
+
+.webqq-model-request-meta-list .webqq-model-request-meta + .webqq-model-request-meta {
+  border-top: 1px solid var(--webqq-border);
+}
+
+.webqq-model-request-meta svg,
+.webqq-model-request-trace svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.webqq-model-request-meta-label {
+  color: var(--webqq-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.webqq-model-request-meta-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--webqq-text);
+  user-select: text;
+}
+
+.webqq-model-request-endpoint {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.webqq-model-request-endpoint strong {
+  color: var(--webqq-accent);
+  font-size: 12px;
+  letter-spacing: 0.03em;
+}
+
+.webqq-model-request-trace {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+/* 必须带 .webqq-workspace 前缀。工作区默认徽章
+   `.webqq-workspace [data-slot="badge"][data-variant="default"]`
+   特异度为 (0,3,0)，会把浅色完成态盖成主题蓝；深色选择器原先多一层
+   [data-color-mode="dark"]，所以只有深色看起来是绿的。 */
+.webqq-workspace .sandbox-badge.webqq-model-request-complete,
+.webqq-workspace .sandbox-badge.webqq-model-request-status-success {
   color: #047857;
   background: #d1fae5;
 }
 
-.webqq-model-request-status-pending {
+.webqq-workspace[data-color-mode="dark"] .sandbox-badge.webqq-model-request-complete,
+.webqq-workspace[data-color-mode="dark"] .sandbox-badge.webqq-model-request-status-success {
+  color: #a7f3d0;
+  background: #064e3b;
+}
+
+.webqq-workspace .sandbox-badge.webqq-model-request-status-pending {
   color: #b45309;
   background: #fef3c7;
 }
 
-.webqq-model-request-status-error,
 .webqq-model-request-error,
 .webqq-model-request-trace {
   color: #b91c1c;
 }
 
-.webqq-model-request-status-error {
+.webqq-workspace .sandbox-badge.webqq-model-request-status-error {
+  color: #b91c1c;
   background: #fee2e2;
 }
 
@@ -605,6 +792,11 @@
 }
 
 @media (max-width: 720px) {
+  .webqq-model-request-overview-grid,
+  .webqq-model-request-usage-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .webqq-model-request-header {
     align-items: flex-start;
     flex-direction: column;

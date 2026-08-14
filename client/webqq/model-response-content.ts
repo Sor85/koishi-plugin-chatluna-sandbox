@@ -12,6 +12,14 @@ export interface ModelResponseContentPreview {
   usage?: Record<string, unknown>
 }
 
+export interface NormalizedModelResponseUsage {
+  inputTokens?: number
+  outputTokens?: number
+  reasoningTokens?: number
+  cachedTokens?: number
+  totalTokens?: number
+}
+
 interface MutableModelResponseContentPreview extends ModelResponseContentPreview {
   toolCallKeys: Map<string, number>
 }
@@ -36,6 +44,51 @@ export function extractModelResponseContent(value: unknown): ModelResponseConten
     finishReasons: [...new Set(preview.finishReasons.filter(Boolean))],
     ...(preview.usage ? { usage: preview.usage } : {}),
   }
+}
+
+export function normalizeModelResponseUsage(usage: Record<string, unknown> | undefined): NormalizedModelResponseUsage | undefined {
+  if (!usage) return undefined
+
+  const cacheReadTokens = readUsageNumber(usage, ['cache_read_input_tokens']) ?? 0
+  const cacheCreationTokens = readUsageNumber(usage, ['cache_creation_input_tokens']) ?? 0
+  const cachedTokens = firstUsageNumber(usage, [
+    ['prompt_tokens_details', 'cached_tokens'],
+    ['input_tokens_details', 'cached_tokens'],
+    ['cachedContentTokenCount'],
+  ]) ?? (cacheReadTokens + cacheCreationTokens || undefined)
+  const reasoningTokens = firstUsageNumber(usage, [
+    ['completion_tokens_details', 'reasoning_tokens'],
+    ['output_tokens_details', 'reasoning_tokens'],
+    ['thoughtsTokenCount'],
+    ['reasoning_tokens'],
+  ])
+
+  let inputTokens = firstUsageNumber(usage, [
+    ['prompt_tokens'],
+    ['promptTokenCount'],
+  ])
+  if (inputTokens === undefined) {
+    const uncachedInputTokens = readUsageNumber(usage, ['input_tokens'])
+    inputTokens = uncachedInputTokens === undefined
+      ? undefined
+      : uncachedInputTokens + cacheReadTokens + cacheCreationTokens
+  }
+
+  let outputTokens = firstUsageNumber(usage, [
+    ['completion_tokens'],
+    ['output_tokens'],
+    ['candidatesTokenCount'],
+  ])
+  if (outputTokens !== undefined && reasoningTokens !== undefined && 'completion_tokens' in usage) {
+    outputTokens = Math.max(0, outputTokens - reasoningTokens)
+  }
+
+  const totalTokens = firstUsageNumber(usage, [
+    ['total_tokens'],
+    ['totalTokenCount'],
+  ]) ?? sumUsageTokens(inputTokens, outputTokens, reasoningTokens)
+  const normalized = { inputTokens, outputTokens, reasoningTokens, cachedTokens, totalTokens }
+  return Object.values(normalized).some((value) => value !== undefined) ? normalized : undefined
 }
 
 export function hasModelResponseContent(preview: ModelResponseContentPreview): boolean {
@@ -203,6 +256,27 @@ function readFirstString(value: Record<string, unknown>, keys: string[]): string
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === 'string' && value ? value : undefined
+}
+
+function firstUsageNumber(usage: Record<string, unknown>, paths: readonly (readonly string[])[]): number | undefined {
+  for (const path of paths) {
+    const value = readUsageNumber(usage, path)
+    if (value !== undefined) return value
+  }
+}
+
+function readUsageNumber(usage: Record<string, unknown>, path: readonly string[]): number | undefined {
+  let value: unknown = usage
+  for (const key of path) {
+    if (!isRecord(value)) return undefined
+    value = value[key]
+  }
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined
+}
+
+function sumUsageTokens(...values: Array<number | undefined>): number | undefined {
+  const available = values.filter((value): value is number => value !== undefined)
+  return available.length ? available.reduce((total, value) => total + value, 0) : undefined
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

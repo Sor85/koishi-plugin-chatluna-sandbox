@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { extractModelResponseContent } from '../client/webqq/model-response-content'
+import { formatDuration } from '../client/webqq/format-duration'
+import { extractModelResponseContent, normalizeModelResponseUsage } from '../client/webqq/model-response-content'
 import { buildModelRequestJsonTree, parseModelResponseBody } from '../client/webqq/model-request-json'
 import { createModelRequestLiveRefresh, MODEL_REQUEST_LIVE_REFRESH_INTERVAL_MS } from '../client/webqq/model-request-live-refresh'
 
@@ -13,6 +14,7 @@ describe('WebQQ 模型请求工作台', () => {
     const jsonSource = readFileSync(resolve('client/model-request-json-tree.vue'), 'utf8')
     const responsePreviewSource = readFileSync(resolve('client/model-response-content-preview.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const detailHeader = workspaceSource.match(/<article v-else[\s\S]*?<header>([\s\S]*?)<\/header>/)?.[1] ?? ''
 
     expect(sidebarSource).toMatch(/label:\s*['"]模型请求['"]/)
     expect(sidebarSource).toContain('IconBrain')
@@ -33,15 +35,36 @@ describe('WebQQ 模型请求工作台', () => {
     expect(workspaceSource).toContain('buildModelRequestJsonTree')
     expect(workspaceSource).toContain('<WebqqAvatar')
     expect(workspaceSource).toContain('resolveRequestBot(record).name')
-    expect(workspaceSource).toMatch(/webqq-model-request-bot-copy[\s\S]*webqq-model-request-bot-name[\s\S]*resolveRequestBot\(record\)\.name[\s\S]*statusLabel\(record\.status\)[\s\S]*record\.provider[\s\S]*formatTime\(record\.createdAt\)[\s\S]*record\.durationMs/)
-    expect(workspaceSource).toMatch(/webqq-model-request-bot-copy[\s\S]*webqq-model-request-bot-name[\s\S]*resolveRequestBot\(detail\)\.name[\s\S]*statusLabel\(detail\.status\)[\s\S]*detail\.provider[\s\S]*formatTime\(detail\.createdAt\)[\s\S]*detail\.durationMs/)
+    expect(workspaceSource).toMatch(/webqq-model-request-bot-copy[\s\S]*webqq-model-request-bot-name[\s\S]*resolveRequestBot\(record\)\.name[\s\S]*statusLabel\(record\.status\)[\s\S]*record\.provider[\s\S]*formatTime\(record\.createdAt\)[\s\S]*formatDuration\(record\.durationMs\)/)
+    expect(workspaceSource).toMatch(/webqq-model-request-bot-copy[\s\S]*webqq-model-request-bot-name[\s\S]*resolveRequestBot\(detail\)\.name[\s\S]*formatTime\(detail\.createdAt\)/)
+    expect(workspaceSource).toMatch(/date\.getFullYear\(\)[\s\S]*date\.getMonth\(\)[\s\S]*date\.getDate\(\)[\s\S]*date\.getHours\(\)/)
+    expect(detailHeader).not.toContain('detail.durationMs')
+    expect(workspaceSource).toContain('IconCalendarTime')
+    expect(workspaceSource).toContain('IconClock')
+    expect(workspaceSource).toContain('IconWorld')
+    expect(workspaceSource).toContain('IconTopologyStar3')
+    expect(workspaceSource).toContain("return '已完成'")
+    expect(workspaceSource).not.toContain("return '成功'")
+    expect(workspaceSource).toContain('formatDuration(detail.durationMs)')
+    expect(workspaceSource).not.toContain('durationMs }} ms')
+    expect(workspaceSource).toMatch(/webqq-model-request-overview[\s\S]*statusLabel\(detail\.status\)[\s\S]*渠道[\s\S]*模型 ID[\s\S]*耗时[\s\S]*字段[\s\S]*消息[\s\S]*工具/)
+    expect(workspaceSource).not.toContain('API 密钥名称')
+    expect(workspaceSource).toMatch(/webqq-model-request-usage[\s\S]*输入[\s\S]*输出[\s\S]*推理[\s\S]*缓存[\s\S]*总 Token/)
+    expect(workspaceSource).not.toContain('usageStateLabel')
+    expect(workspaceSource).not.toContain('字段 {{ record.summary.keys }}')
+    expect(workspaceSource).toMatch(/webqq-model-request-meta-list[\s\S]*请求地址[\s\S]*关联实体/)
+    expect(styles).toMatch(/\.webqq-model-request-overview-grid\s*\{[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/s)
+    expect(styles).toMatch(/\.webqq-model-request-usage-grid\s*\{[^}]*grid-template-columns:\s*repeat\(5, minmax\(0, 1fr\)\)/s)
+    expect(styles).toMatch(/\.webqq-workspace \.sandbox-badge\.webqq-model-request-complete(?:,\s*\.webqq-workspace \.sandbox-badge\.webqq-model-request-status-success)?\s*\{[^}]*color:\s*#047857[^}]*background:\s*#d1fae5/s)
+    expect(styles).toMatch(/\.webqq-model-request-meta-list\s*\{[^}]*display:\s*grid[^}]*border:\s*1px solid var\(--webqq-border\)/s)
+    expect(styles).toMatch(/\.webqq-model-request-meta-list \.webqq-model-request-meta\s*\{[^}]*grid-template-columns:\s*17px minmax\(64px, auto\) minmax\(0, 1fr\)/s)
     expect(styles).toMatch(/\.webqq-model-request-bot-copy\s*\{[^}]*display:\s*grid[^}]*gap:\s*2px/s)
     expect(styles).toMatch(/\.webqq-model-request-bot-name\s*\{[^}]*flex-wrap:\s*wrap/s)
     expect(workspaceSource).toContain("'未归属机器人'")
     expect(workspaceSource).not.toContain("record.model || '未知模型'")
-    expect(workspaceSource).not.toContain("detail.model || '未知模型'")
+    expect(workspaceSource).toContain('detailModel')
     expect(workspaceSource).toMatch(/<Badge v-if="record\.provider" variant="outline" class="webqq-model-request-provider">/)
-    expect(workspaceSource).toMatch(/<Badge v-if="detail\.provider" variant="outline" class="webqq-model-request-provider">/)
+    expect(workspaceSource).not.toMatch(/<Badge v-if="detail\.provider" variant="outline" class="webqq-model-request-provider">/)
     expect(styles).toMatch(/\.sandbox-badge\.webqq-model-request-provider\s*\{[^}]*border-color:\s*#c4b5fd[^}]*color:\s*#6d28d9[^}]*background:\s*#ede9fe/s)
     expect(styles).toMatch(/\.webqq-workspace\[data-color-mode="dark"\] \.sandbox-badge\.webqq-model-request-provider\s*\{[^}]*border-color:\s*#6d28d9[^}]*color:\s*#ddd6fe[^}]*background:\s*#4c1d95/s)
     expect(workspaceSource).toContain('createModelRequestLiveRefresh')
@@ -49,10 +72,14 @@ describe('WebQQ 模型请求工作台', () => {
     expect(workspaceSource).toContain("clearStep === 1")
     expect(workspaceSource).toContain('确认清理')
     expect(workspaceSource).toContain("visibilitychange")
-    expect(workspaceSource).not.toContain('clipboard')
-    expect(workspaceSource).not.toContain('download')
-    expect(workspaceSource).not.toContain("emit('copy'")
-    expect(workspaceSource).toContain('展开长字符串')
+    expect(workspaceSource).toContain('navigator.clipboard?.writeText')
+    expect(workspaceSource).toContain("document.execCommand('copy')")
+    expect(workspaceSource).toContain('copyCurrentBody')
+    expect(workspaceSource).toContain('downloadCurrentBody')
+    expect(workspaceSource).toContain('<IconCopy')
+    expect(workspaceSource).toContain('<IconDownload')
+    expect(workspaceSource).not.toContain('展开长字符串')
+    expect(workspaceSource).not.toContain('收起长字符串')
     expect(workspaceSource).toContain("bodyView = ref<'request' | 'response'>('request')")
     expect(workspaceSource).toContain("responseView = ref<'content' | 'json'>('content')")
     expect(workspaceSource).toMatch(/role="tab"[\s\S]*请求[\s\S]*role="tab"[\s\S]*响应/)
@@ -68,7 +95,9 @@ describe('WebQQ 模型请求工作台', () => {
     expect(responsePreviewSource).toContain('思考内容')
     expect(responsePreviewSource).toContain('工具调用')
     expect(responsePreviewSource).toContain('结束原因')
-    expect(workspaceSource).toContain(':strings-expanded="stringsExpanded"')
+    expect(workspaceSource).toContain(':strings-expanded="true"')
+    expect(workspaceSource).not.toContain('stringsExpanded')
+    expect(workspaceSource).not.toContain('canExpandBodyStrings')
     expect(workspaceSource).toContain(':root="true"')
     expect(jsonSource).toContain('IconChevronDown')
     expect(jsonSource).toContain('IconChevronRight')
@@ -181,6 +210,61 @@ describe('WebQQ 模型请求工作台', () => {
       reasoning: ['内部思考'],
       finishReasons: ['STOP'],
       usage: { promptTokenCount: 8 },
+    })
+  })
+
+  it('按数量级将耗时切换为 ms、s、min、h', () => {
+    expect(formatDuration(0)).toBe('0 ms')
+    expect(formatDuration(842)).toBe('842 ms')
+    expect(formatDuration(1000)).toBe('1 s')
+    expect(formatDuration(1240)).toBe('1.24 s')
+    expect(formatDuration(12400)).toBe('12.4 s')
+    expect(formatDuration(60_000)).toBe('1 min')
+    expect(formatDuration(83_400)).toBe('1 min 23 s')
+    expect(formatDuration(3_600_000)).toBe('1 h')
+    expect(formatDuration(3_723_000)).toBe('1 h 2 min 3 s')
+  })
+
+  it('将 OpenAI、Anthropic 和 Gemini 用量统一为顶部统计', () => {
+    expect(normalizeModelResponseUsage({
+      prompt_tokens: 26512,
+      completion_tokens: 705,
+      total_tokens: 27217,
+      prompt_tokens_details: { cached_tokens: 20607 },
+      completion_tokens_details: { reasoning_tokens: 483 },
+    })).toEqual({
+      inputTokens: 26512,
+      outputTokens: 222,
+      reasoningTokens: 483,
+      cachedTokens: 20607,
+      totalTokens: 27217,
+    })
+
+    expect(normalizeModelResponseUsage({
+      input_tokens: 100,
+      output_tokens: 40,
+      cache_read_input_tokens: 80,
+      cache_creation_input_tokens: 20,
+    })).toEqual({
+      inputTokens: 200,
+      outputTokens: 40,
+      reasoningTokens: undefined,
+      cachedTokens: 100,
+      totalTokens: 240,
+    })
+
+    expect(normalizeModelResponseUsage({
+      promptTokenCount: 1000,
+      candidatesTokenCount: 200,
+      thoughtsTokenCount: 50,
+      cachedContentTokenCount: 700,
+      totalTokenCount: 1250,
+    })).toEqual({
+      inputTokens: 1000,
+      outputTokens: 200,
+      reasoningTokens: 50,
+      cachedTokens: 700,
+      totalTokens: 1250,
     })
   })
 

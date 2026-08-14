@@ -99,15 +99,20 @@
                       <Badge :class="statusClass(record.status)">{{ statusLabel(record.status) }}</Badge>
                       <Badge v-if="record.provider" variant="outline" class="webqq-model-request-provider">{{ record.provider }}</Badge>
                     </span>
-                    <time>{{ formatTime(record.createdAt) }} · {{ record.durationMs }} ms</time>
+                    <span class="webqq-model-request-timing">
+                      <time>
+                        <IconCalendarTime :size="14" aria-hidden="true" />
+                        {{ formatTime(record.createdAt) }}
+                      </time>
+                      <span>
+                        <IconClock :size="14" aria-hidden="true" />
+                        {{ formatDuration(record.durationMs) }}
+                      </span>
+                    </span>
                   </span>
                 </span>
               </div>
             </header>
-            <p class="webqq-model-request-summary">
-              字段 {{ record.summary.keys }} · 消息 {{ record.summary.messageCount }} · 工具 {{ record.summary.toolCount }}
-              <template v-if="!record.summary.bodyAvailable"> · 请求体不可用</template>
-            </p>
             <p v-if="record.error" class="webqq-model-request-trace">{{ record.error.message }}</p>
           </button>
           <Button
@@ -137,21 +142,97 @@
                 <span class="webqq-model-request-bot-copy">
                   <span class="webqq-model-request-bot-name">
                     <strong>{{ resolveRequestBot(detail).name }}</strong>
-                    <Badge :class="statusClass(detail.status)">{{ statusLabel(detail.status) }}</Badge>
-                    <Badge v-if="detail.provider" variant="outline" class="webqq-model-request-provider">{{ detail.provider }}</Badge>
                   </span>
-                  <time>{{ formatTime(detail.createdAt) }} · {{ detail.durationMs }} ms</time>
+                  <span class="webqq-model-request-timing">
+                    <time>
+                      <IconCalendarTime :size="14" aria-hidden="true" />
+                      {{ formatTime(detail.createdAt) }}
+                    </time>
+                  </span>
                 </span>
               </span>
             </div>
           </header>
-          <p v-if="detail.method || detail.url" class="webqq-model-request-meta">
-            {{ [detail.method, detail.url].filter(Boolean).join(' ') }}
-          </p>
-          <p class="webqq-model-request-meta">{{ formatEntities(detail) }}</p>
-          <p v-if="detail.interactionId" class="webqq-model-request-meta">interaction {{ detail.interactionId }}</p>
+          <section class="webqq-model-request-overview" aria-label="请求概览">
+            <header class="webqq-model-request-section-heading">
+              <span>
+                <IconLayoutGrid :size="17" aria-hidden="true" />
+                <strong>概览</strong>
+              </span>
+              <Badge :class="statusClass(detail.status)">
+                {{ statusLabel(detail.status) }}
+              </Badge>
+            </header>
+            <div class="webqq-model-request-overview-grid">
+              <article>
+                <IconRoute :size="17" aria-hidden="true" />
+                <span>渠道</span>
+                <strong>{{ detail.provider || '未识别' }}</strong>
+              </article>
+              <article>
+                <IconCpu :size="17" aria-hidden="true" />
+                <span>模型 ID</span>
+                <strong>{{ detailModel }}</strong>
+              </article>
+              <article>
+                <IconClock :size="17" aria-hidden="true" />
+                <span>耗时</span>
+                <strong>{{ formatDuration(detail.durationMs) }}</strong>
+              </article>
+              <article>
+                <IconBraces :size="17" aria-hidden="true" />
+                <span>字段</span>
+                <strong>{{ detail.summary.keys }}</strong>
+              </article>
+              <article>
+                <IconMessages :size="17" aria-hidden="true" />
+                <span>消息</span>
+                <strong>{{ detail.summary.messageCount }}</strong>
+              </article>
+              <article>
+                <IconTools :size="17" aria-hidden="true" />
+                <span>工具</span>
+                <strong>{{ detail.summary.toolCount }}</strong>
+              </article>
+            </div>
+          </section>
+          <section class="webqq-model-request-usage" aria-label="Token 用量">
+            <header class="webqq-model-request-section-heading">
+              <span>
+                <IconChartBar :size="17" aria-hidden="true" />
+                <strong>用量</strong>
+              </span>
+            </header>
+            <div class="webqq-model-request-usage-grid">
+              <article v-for="item in usageItems" :key="item.label">
+                <span>{{ item.label }}</span>
+                <strong>{{ formatTokenCount(item.value) }}</strong>
+              </article>
+            </div>
+          </section>
+          <div class="webqq-model-request-meta-list">
+            <p v-if="detail.method || detail.url" class="webqq-model-request-meta">
+              <IconWorld :size="17" aria-hidden="true" />
+              <span class="webqq-model-request-meta-label">请求地址</span>
+              <span class="webqq-model-request-meta-value webqq-model-request-endpoint">
+                <strong v-if="detail.method">{{ detail.method }}</strong>
+                <span v-if="detail.url">{{ detail.url }}</span>
+              </span>
+            </p>
+            <p class="webqq-model-request-meta">
+              <IconTopologyStar3 :size="17" aria-hidden="true" />
+              <span class="webqq-model-request-meta-label">关联实体</span>
+              <span class="webqq-model-request-meta-value">{{ formatEntities(detail) }}</span>
+            </p>
+            <p v-if="detail.interactionId" class="webqq-model-request-meta">
+              <IconFingerprint :size="17" aria-hidden="true" />
+              <span class="webqq-model-request-meta-label">交互标识</span>
+              <span class="webqq-model-request-meta-value">{{ detail.interactionId }}</span>
+            </p>
+          </div>
           <p v-if="detail.error" class="webqq-model-request-trace">
-            {{ detail.error.message }} · trace {{ detail.error.traceId }}
+            <IconAlertCircle :size="17" aria-hidden="true" />
+            <span>{{ detail.error.message }} · trace {{ detail.error.traceId }}</span>
           </p>
           <section class="webqq-model-request-body">
             <div class="webqq-model-request-body-header">
@@ -202,15 +283,22 @@
                   </Button>
                 </div>
                 <Button
-                  v-if="canExpandBodyStrings"
                   variant="outline"
                   size="sm"
-                  :aria-pressed="stringsExpanded"
-                  @click="stringsExpanded = !stringsExpanded"
+                  :disabled="!currentBodyText"
+                  @click="copyCurrentBody"
                 >
-                  <IconArrowsDiagonalMinimize2 v-if="stringsExpanded" :size="16" aria-hidden="true" />
-                  <IconArrowsDiagonal v-else :size="16" aria-hidden="true" />
-                  {{ stringsExpanded ? '收起长字符串' : '展开长字符串' }}
+                  <IconCopy :size="16" aria-hidden="true" />
+                  {{ copyState === 'success' ? '已复制' : copyState === 'error' ? '复制失败' : '复制' }}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  :disabled="!currentBodyText"
+                  @click="downloadCurrentBody"
+                >
+                  <IconDownload :size="16" aria-hidden="true" />
+                  下载
                 </Button>
               </div>
             </div>
@@ -224,7 +312,7 @@
                   :node="requestTree"
                   :open="true"
                   :root="true"
-                  :strings-expanded="stringsExpanded"
+                  :strings-expanded="true"
                 />
               </div>
             </template>
@@ -250,7 +338,7 @@
                     :node="responseTree"
                     :open="true"
                     :root="true"
-                    :strings-expanded="stringsExpanded"
+                    :strings-expanded="true"
                   />
                 </div>
                 <pre v-else-if="responsePreview.kind === 'text'" class="webqq-model-request-response-raw">{{ detail.responseBodyRaw }}</pre>
@@ -283,7 +371,25 @@
 </template>
 
 <script setup lang="ts">
-import { IconArrowsDiagonal, IconArrowsDiagonalMinimize2, IconRefresh, IconTrash } from '@tabler/icons-vue'
+import {
+  IconAlertCircle,
+  IconBraces,
+  IconCalendarTime,
+  IconChartBar,
+  IconClock,
+  IconCpu,
+  IconCopy,
+  IconDownload,
+  IconFingerprint,
+  IconLayoutGrid,
+  IconMessages,
+  IconRefresh,
+  IconRoute,
+  IconTools,
+  IconTopologyStar3,
+  IconTrash,
+  IconWorld,
+} from '@tabler/icons-vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
@@ -294,7 +400,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import ModelRequestJsonTree from './model-request-json-tree.vue'
 import ModelResponseContentPreview from './model-response-content-preview.vue'
 import WebqqAvatar from './webqq-avatar.vue'
-import { extractModelResponseContent } from './webqq/model-response-content'
+import { formatDuration } from './webqq/format-duration'
+import { extractModelResponseContent, normalizeModelResponseUsage } from './webqq/model-response-content'
 import { buildModelRequestJsonTree, parseModelResponseBody } from './webqq/model-request-json'
 import { createModelRequestLiveRefresh } from './webqq/model-request-live-refresh'
 import {
@@ -344,9 +451,10 @@ const liveRefresh = ref(false)
 const selectedRecordId = ref('')
 const clearDialogOpen = ref(false)
 const clearStep = ref<1 | 2>(1)
-const stringsExpanded = ref(false)
 const bodyView = ref<'request' | 'response'>('request')
 const responseView = ref<'content' | 'json'>('content')
+const copyState = ref<'idle' | 'success' | 'error'>('idle')
+let copyStateTimer: number | undefined
 
 const liveRefreshController = createModelRequestLiveRefresh({
   isEnabled: () => liveRefresh.value,
@@ -361,11 +469,32 @@ const responsePreview = computed(() => parseModelResponseBody(
 ))
 const responseTree = computed(() => buildModelRequestJsonTree(responsePreview.value.value, 'responseBody'))
 const responseContent = computed(() => extractModelResponseContent(responsePreview.value.value))
-const canExpandBodyStrings = computed(() => {
-  if (bodyView.value === 'request') return props.detail?.requestBodyAvailable && props.detail.requestBody !== undefined
-  return responseView.value === 'json' && (
-    responsePreview.value.kind === 'json' || responsePreview.value.kind === 'sse'
-  )
+const responseUsage = computed(() => normalizeModelResponseUsage(responseContent.value.usage))
+const detailModel = computed(() => {
+  const detail = props.detail
+  if (!detail) return '未识别'
+  if (detail.model) return detail.model
+  if (detail.requestBody && typeof detail.requestBody === 'object' && !Array.isArray(detail.requestBody)) {
+    const model = (detail.requestBody as Record<string, unknown>).model
+    if (typeof model === 'string' && model) return model
+  }
+  return '未识别'
+})
+const usageItems = computed(() => [
+  { label: '输入', value: responseUsage.value?.inputTokens },
+  { label: '输出', value: responseUsage.value?.outputTokens },
+  { label: '推理', value: responseUsage.value?.reasoningTokens },
+  { label: '缓存', value: responseUsage.value?.cachedTokens },
+  { label: '总 Token', value: responseUsage.value?.totalTokens },
+])
+const currentBodyText = computed(() => {
+  const detail = props.detail
+  if (!detail) return ''
+  if (bodyView.value === 'request') {
+    if (!detail.requestBodyAvailable || detail.requestBody === undefined) return ''
+    return serializeBody(detail.requestBody)
+  }
+  return detail.responseBodyStatus === 'complete' ? detail.responseBodyRaw ?? '' : ''
 })
 const responseBodyLabel = computed(() => {
   const detail = props.detail
@@ -394,11 +523,12 @@ watch([category, spaceId], () => {
 })
 
 watch(() => props.detail?.id, () => {
-  stringsExpanded.value = false
   bodyView.value = 'request'
   responseView.value = 'content'
+  resetCopyState()
 })
 
+watch(bodyView, resetCopyState)
 watch(liveRefresh, () => liveRefreshController.sync())
 
 function currentScope() {
@@ -465,23 +595,101 @@ function resolveRequestBot(record: SandboxModelRequestListItem | SandboxModelReq
 function statusLabel(status: SandboxModelRequestStatus) {
   if (status === 'error') return '错误'
   if (status === 'pending') return '进行中'
-  return '成功'
+  return '已完成'
 }
 
 function statusClass(status: SandboxModelRequestStatus) {
   if (status === 'error') return 'webqq-model-request-status-error'
   if (status === 'pending') return 'webqq-model-request-status-pending'
-  return 'webqq-model-request-status-success'
+  return 'webqq-model-request-complete'
+}
+
+async function copyCurrentBody() {
+  const text = currentBodyText.value
+  if (!text) return
+  try {
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(text)
+        setCopyState('success')
+        return
+      } catch {
+        // 局域网 HTTP 不属于安全上下文，Clipboard API 会被禁用，因此继续使用同步复制后备。
+      }
+    }
+    copyTextForHttp(text)
+    setCopyState('success')
+  } catch {
+    setCopyState('error')
+  }
+}
+
+function copyTextForHttp(text: string) {
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', '')
+  Object.assign(textarea.style, {
+    position: 'fixed',
+    top: '0',
+    left: '-9999px',
+    opacity: '0',
+  })
+  document.body.append(textarea)
+  textarea.select()
+  textarea.setSelectionRange(0, textarea.value.length)
+  const copied = document.execCommand('copy')
+  textarea.remove()
+  if (!copied) throw new Error('浏览器拒绝复制')
+}
+
+function downloadCurrentBody() {
+  const detail = props.detail
+  const text = currentBodyText.value
+  if (!detail || !text) return
+  const isRequest = bodyView.value === 'request'
+  const isJson = isRequest || detail.responseBodyFormat === 'json'
+  const extension = isJson ? 'json' : 'txt'
+  const section = isRequest ? 'request' : 'response'
+  const safeId = detail.id.replace(/[^a-zA-Z0-9_-]+/g, '-')
+  const blob = new Blob([text], { type: isJson ? 'application/json;charset=utf-8' : 'text/plain;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `model-request-${safeId}-${section}.${extension}`
+  document.body.append(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
+function setCopyState(state: 'success' | 'error') {
+  if (copyStateTimer) clearTimeout(copyStateTimer)
+  copyState.value = state
+  copyStateTimer = window.setTimeout(() => {
+    copyState.value = 'idle'
+    copyStateTimer = undefined
+  }, 1600)
+}
+
+function resetCopyState() {
+  if (copyStateTimer) clearTimeout(copyStateTimer)
+  copyStateTimer = undefined
+  copyState.value = 'idle'
+}
+
+function serializeBody(value: unknown) {
+  if (typeof value === 'string') return value
+  return JSON.stringify(value, null, 2) ?? String(value)
+}
+
+function formatTokenCount(value: number | undefined) {
+  return value === undefined ? '—' : new Intl.NumberFormat('zh-CN').format(value)
 }
 
 function formatTime(value: string) {
-  return new Intl.DateTimeFormat('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).format(new Date(value))
+  const date = new Date(value)
+  const pad = (part: number) => String(part).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 
 function formatEntities(record: SandboxModelRequestDetail) {
@@ -501,5 +709,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', onVisibilityChange)
   liveRefreshController.dispose()
+  resetCopyState()
 })
 </script>
