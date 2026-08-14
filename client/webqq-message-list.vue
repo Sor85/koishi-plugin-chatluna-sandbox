@@ -86,12 +86,9 @@
                   </ContextMenuItem>
                   <ContextMenuItem v-else-if="getFriendMenuState(message.authorId).pendingOutgoing" disabled><IconClock :size="16" aria-hidden="true" /> 等待对方处理</ContextMenuItem>
                   <ContextMenuItem v-else-if="getFriendMenuState(message.authorId).pendingIncoming" disabled><IconBell :size="16" aria-hidden="true" /> 请在通知中处理申请</ContextMenuItem>
-                  <ContextMenuSub v-if="!model.currentGroup && getChatFriendActions(message.authorId).includes('poke')">
-                    <ContextMenuSubTrigger><IconHandClick :size="16" aria-hidden="true" /> 好友互动</ContextMenuSubTrigger>
-                    <ContextMenuSubContent>
-                      <ContextMenuItem @select="emit('pokeFriend', message.authorId)"><IconHandClick :size="16" aria-hidden="true" /> 戳一戳</ContextMenuItem>
-                    </ContextMenuSubContent>
-                  </ContextMenuSub>
+                  <ContextMenuItem v-if="!model.currentGroup && getChatFriendActions(message.authorId).includes('poke')" @select="emit('pokeFriend', message.authorId)">
+                    <IconHandClick :size="16" aria-hidden="true" /> 戳一戳
+                  </ContextMenuItem>
                   <ContextMenuItem v-if="!model.currentGroup && getChatFriendActions(message.authorId).includes('remark')" @select="emit('setRemark', message.authorId)"><IconTag :size="16" aria-hidden="true" /> 设置好友备注 <WebqqMenuExtensionMark /></ContextMenuItem>
                   <ContextMenuItem v-if="!model.currentGroup && getChatFriendActions(message.authorId).includes('delete')" class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="emit('deleteFriend', message.authorId)"><IconUserMinus :size="16" aria-hidden="true" /> 删除好友</ContextMenuItem>
                 </ContextMenuContent>

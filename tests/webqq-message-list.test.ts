@@ -271,6 +271,8 @@ describe('WebQQ 消息列表', () => {
     expect(source).toContain("emit('setMessageReaction', message.id, emojiId, enabled)")
     expect(source).toContain("getMessageGroupMemberActions(message.authorId).includes('mention')")
     expect(source).toContain("getMessageGroupMemberActions(message.authorId).includes('poke')")
+    expect(source).toMatch(/<ContextMenuItem v-if="!model\.currentGroup && getChatFriendActions\(message\.authorId\)\.includes\('poke'\)" @select="emit\('pokeFriend', message\.authorId\)">/)
+    expect(source).not.toContain('好友互动')
     expect(source).toContain('hasMessageGroupMemberManagementActions(message.authorId)')
     expect(source).toContain('management-only')
     expect(reactionsSource).toContain('class="webqq-message-reaction"')

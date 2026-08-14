@@ -26,52 +26,54 @@
       </div>
     </header>
 
-    <section class="webqq-model-request-filters" aria-label="模型请求分类">
-      <label>
-        <span>分类</span>
-        <Select v-model="category">
-          <SelectTrigger class="webqq-model-request-control" aria-label="按分类筛选">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="space">空间</SelectItem>
-            <SelectItem value="unattributed">未归属</SelectItem>
-          </SelectContent>
-        </Select>
-      </label>
-      <label v-if="category === 'space'">
-        <span>空间</span>
-        <Select v-model="spaceId">
-          <SelectTrigger class="webqq-model-request-control" aria-label="按空间筛选">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem v-for="space in spaces" :key="space.id" :value="space.id">
-              {{ space.name }}
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </label>
-      <label>
-        <span>模型</span>
-        <Input
-          v-model="model"
-          class="webqq-model-request-control"
-          placeholder="例如 gpt-4.1"
-          @keyup.enter="refresh"
-        />
-      </label>
-      <label class="webqq-model-request-error-filter">
-        <Checkbox v-model="errorsOnly" />
-        <span>仅显示错误</span>
-      </label>
-    </section>
-
-    <p v-if="capacityText" class="webqq-model-request-capacity">{{ capacityText }}</p>
-    <p v-if="error" class="webqq-model-request-error" role="alert">{{ error }}</p>
+    <div v-if="capacityText || error" class="webqq-model-request-status">
+      <p v-if="capacityText" class="webqq-model-request-capacity">{{ capacityText }}</p>
+      <p v-if="error" class="webqq-model-request-error" role="alert">{{ error }}</p>
+    </div>
 
     <div class="webqq-model-request-split">
       <section class="webqq-model-request-list-pane" aria-label="模型请求列表">
+        <section class="webqq-model-request-filters" aria-label="模型请求分类">
+          <label>
+            <span>分类</span>
+            <Select v-model="category">
+              <SelectTrigger class="webqq-model-request-control" aria-label="按分类筛选">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="space">空间</SelectItem>
+                <SelectItem value="unattributed">未归属</SelectItem>
+              </SelectContent>
+            </Select>
+          </label>
+          <label v-if="category === 'space'">
+            <span>空间</span>
+            <Select v-model="spaceId">
+              <SelectTrigger class="webqq-model-request-control" aria-label="按空间筛选">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="space in spaces" :key="space.id" :value="space.id">
+                  {{ space.name }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </label>
+          <label>
+            <span>模型</span>
+            <Input
+              v-model="model"
+              class="webqq-model-request-control"
+              placeholder="例如 gpt-4.1"
+              @keyup.enter="refresh"
+            />
+          </label>
+          <label class="webqq-model-request-error-filter">
+            <Checkbox v-model="errorsOnly" />
+            <span>仅显示错误</span>
+          </label>
+        </section>
+
         <div v-if="loading && !records.length" class="webqq-model-request-empty">正在读取模型请求记录…</div>
         <div v-else-if="!records.length" class="webqq-model-request-empty">暂无符合条件的模型请求记录</div>
         <div v-else v-webqq-scrollbar class="webqq-model-request-list">

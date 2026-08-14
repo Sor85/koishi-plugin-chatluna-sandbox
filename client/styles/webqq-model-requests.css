@@ -1,5 +1,5 @@
 .webqq-model-request-workspace {
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 16px;
   min-width: 0;
   overflow: hidden;
@@ -76,12 +76,11 @@
 
 .webqq-model-request-filters {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
-  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
   padding: 16px;
-  border: 1px solid var(--webqq-border);
-  border-radius: 16px;
-  background: var(--webqq-surface);
+  border-bottom: 1px solid var(--webqq-border);
+  background: var(--webqq-surface-muted);
 }
 
 .webqq-model-request-filters > label:not(.webqq-model-request-error-filter) {
@@ -102,10 +101,27 @@
   white-space: nowrap;
 }
 
+.webqq-model-request-error-filter {
+  grid-column: 1 / -1;
+}
+
+.webqq-model-request-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 20px;
+}
+
 .webqq-model-request-capacity {
   margin: 0;
   color: var(--webqq-muted);
   font-size: 13px;
+}
+
+.webqq-model-request-status .webqq-model-request-error {
+  padding: 0;
+  text-align: left;
 }
 
 .webqq-model-request-split {
@@ -119,9 +135,15 @@
 .webqq-model-request-detail-pane {
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
   border: 1px solid var(--webqq-border);
   border-radius: 16px;
   background: var(--webqq-surface);
+}
+
+.webqq-model-request-list-pane {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .webqq-model-request-list,
@@ -430,7 +452,7 @@
   }
 
   .webqq-model-request-filters {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .webqq-model-request-split {
