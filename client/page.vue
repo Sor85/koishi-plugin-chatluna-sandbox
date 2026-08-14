@@ -60,6 +60,7 @@
           :records="modelRequestWorkspaceModel.records"
           :detail="modelRequestWorkspaceModel.detail"
           :spaces="modelRequestSpaces"
+          :bots="modelRequestBots"
           :default-space-id="activeSpaceId ?? 'main'"
           :has-more="modelRequestWorkspaceModel.hasMore"
           :next-cursor="modelRequestWorkspaceModel.nextCursor"
@@ -247,7 +248,7 @@ const modelRequestSpaces = computed(() => [
   { id: 'main', name: '主环境' },
   ...testSpaces.value.map((space) => ({ id: space.id, name: space.name })),
 ])
-const debugBots = computed<SandboxDirectoryBot[]>(() => [
+const modelRequestBots = computed<SandboxDirectoryBot[]>(() => [
   ...getSandboxBots(mainSnapshot.value).map((bot) => ({
     ...bot,
     avatar: resolveAvatar(bot.avatar),
@@ -255,9 +256,11 @@ const debugBots = computed<SandboxDirectoryBot[]>(() => [
   })),
   ...testSpaces.value.flatMap((space) => getSandboxBots(space.snapshot).map((bot) => ({
     ...bot,
+    avatar: resolveAvatar(bot.avatar),
     source: { type: 'test-space' as const, spaceId: space.id, name: space.name },
   }))),
 ])
+const debugBots = modelRequestBots
 const resolvedColorMode = useResolvedColorMode(appearance)
 const disposeSceneMutationSync = createSceneMutationSync(workspaceController, () => activeSpaceId.value)
 onBeforeUnmount(disposeSceneMutationSync)

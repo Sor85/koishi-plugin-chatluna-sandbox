@@ -85,11 +85,22 @@
           >
             <header>
               <div class="webqq-model-request-item-title">
-                <strong>{{ record.model || '未知模型' }}</strong>
-                <Badge :class="statusClass(record.status)">{{ statusLabel(record.status) }}</Badge>
-                <Badge v-if="record.provider" variant="secondary">{{ record.provider }}</Badge>
+                <span class="webqq-model-request-bot">
+                  <WebqqAvatar
+                    kind="bot"
+                    :name="resolveRequestBot(record).name"
+                    :avatar="resolveRequestBot(record).avatar"
+                  />
+                  <span class="webqq-model-request-bot-copy">
+                    <span class="webqq-model-request-bot-name">
+                      <strong>{{ resolveRequestBot(record).name }}</strong>
+                      <Badge :class="statusClass(record.status)">{{ statusLabel(record.status) }}</Badge>
+                      <Badge v-if="record.provider" variant="outline" class="webqq-model-request-provider">{{ record.provider }}</Badge>
+                    </span>
+                    <time>{{ formatTime(record.createdAt) }} · {{ record.durationMs }} ms</time>
+                  </span>
+                </span>
               </div>
-              <time>{{ formatTime(record.createdAt) }} · {{ record.durationMs }} ms</time>
             </header>
             <p class="webqq-model-request-summary">
               字段 {{ record.summary.keys }} · 消息 {{ record.summary.messageCount }} · 工具 {{ record.summary.toolCount }}
@@ -115,11 +126,22 @@
         <article v-else v-webqq-scrollbar class="webqq-model-request-detail">
           <header>
             <div class="webqq-model-request-item-title">
-              <strong>{{ detail.model || '未知模型' }}</strong>
-              <Badge :class="statusClass(detail.status)">{{ statusLabel(detail.status) }}</Badge>
-              <Badge v-if="detail.provider" variant="secondary">{{ detail.provider }}</Badge>
+              <span class="webqq-model-request-bot">
+                <WebqqAvatar
+                  kind="bot"
+                  :name="resolveRequestBot(detail).name"
+                  :avatar="resolveRequestBot(detail).avatar"
+                />
+                <span class="webqq-model-request-bot-copy">
+                  <span class="webqq-model-request-bot-name">
+                    <strong>{{ resolveRequestBot(detail).name }}</strong>
+                    <Badge :class="statusClass(detail.status)">{{ statusLabel(detail.status) }}</Badge>
+                    <Badge v-if="detail.provider" variant="outline" class="webqq-model-request-provider">{{ detail.provider }}</Badge>
+                  </span>
+                  <time>{{ formatTime(detail.createdAt) }} · {{ detail.durationMs }} ms</time>
+                </span>
+              </span>
             </div>
-            <time>{{ formatTime(detail.createdAt) }} · {{ detail.durationMs }} ms</time>
           </header>
           <p v-if="detail.method || detail.url" class="webqq-model-request-meta">
             {{ [detail.method, detail.url].filter(Boolean).join(' ') }}
@@ -170,6 +192,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from './components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
 import ModelRequestJsonTree from './model-request-json-tree.vue'
+import WebqqAvatar from './webqq-avatar.vue'
 import { buildModelRequestJsonTree } from './webqq/model-request-json'
 import { createModelRequestLiveRefresh } from './webqq/model-request-live-refresh'
 import {
@@ -187,12 +210,14 @@ import type {
   SandboxModelRequestDetail,
   SandboxModelRequestListItem,
   SandboxModelRequestStatus,
+  SandboxDirectoryBot,
 } from '../src/types'
 
 const props = defineProps<{
   records: readonly SandboxModelRequestListItem[]
   detail?: SandboxModelRequestDetail
   spaces: readonly { id: string, name: string }[]
+  bots: readonly SandboxDirectoryBot[]
   defaultSpaceId?: string
   hasMore: boolean
   nextCursor?: number
@@ -288,6 +313,18 @@ function confirmClear() {
   emit('clear', { scope: 'unattributed' })
   selectedRecordId.value = ''
   cancelClear()
+}
+
+function resolveRequestBot(record: SandboxModelRequestListItem | SandboxModelRequestDetail): Pick<SandboxDirectoryBot, 'name' | 'avatar'> {
+  const scopeId = record.entities.scopeId
+  const botId = record.entities.botId
+  const bot = props.bots.find((candidate) => candidate.id === botId && (
+    candidate.source.type === 'main'
+      ? scopeId === MAIN_MODEL_REQUEST_SPACE_ID
+      : candidate.source.spaceId === scopeId
+  ))
+  if (bot) return bot
+  return { name: botId ? `机器人 ${botId}` : '未归属机器人' }
 }
 
 function statusLabel(status: SandboxModelRequestStatus) {

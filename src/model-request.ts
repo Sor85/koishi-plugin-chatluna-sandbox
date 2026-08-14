@@ -101,6 +101,7 @@ export class SandboxModelRequestStore {
   private readonly persistence?: SandboxModelRequestPersistence
   private persistenceQueue = Promise.resolve()
   private ready = Promise.resolve()
+  private persistenceAuthoritative = true
 
   constructor(options: SandboxModelRequestStoreOptions = {}) {
     this.maxRecords = options.maxRecords ?? DEFAULT_MODEL_REQUEST_RECORD_LIMIT
@@ -108,11 +109,26 @@ export class SandboxModelRequestStore {
     this.persistence = options.persistence
     if (this.persistence) {
       this.ready = this.persistence.load().then((state) => {
-        this.records = state.records.slice().sort((a, b) => a.sequence - b.sequence)
-        this.nextSequence = Math.max(state.nextSequence, this.records.reduce((max, record) => Math.max(max, record.sequence + 1), 1))
+        const capturedDuringLoad = this.records
+        const persisted = state.records.slice().sort((a, b) => a.sequence - b.sequence)
+        let nextSequence = Math.max(
+          state.nextSequence,
+          persisted.reduce((max, record) => Math.max(max, record.sequence + 1), 1),
+        )
+        // 数据库恢复是异步的，ChatLuna 可能在恢复完成前就发起请求。不能用加载结果
+        // 直接覆盖启动期记录，否则一次正常重启就可能同时丢掉旧记录和刚捕获的新请求。
+        const captured = capturedDuringLoad.map((record) => ({
+          ...record,
+          sequence: nextSequence++,
+        }))
+        this.records = [...persisted, ...captured]
+        this.nextSequence = nextSequence
         this.totalBytes = this.records.reduce((sum, record) => sum + estimateBytes(record), 0)
         this.reclaimOverflow()
-      }).catch(() => undefined)
+      }).catch(() => {
+        // 加载失败时不能把当前空内存状态当成权威数据回写，否则会覆盖数据库历史记录。
+        this.persistenceAuthoritative = false
+      })
     }
   }
 
@@ -224,10 +240,18 @@ export class SandboxModelRequestStore {
 
   private queuePersist(clear = false): void {
     if (!this.persistence) return
-    const records = structuredClone(this.records)
-    const nextSequence = this.nextSequence
-    this.persistenceQueue = this.persistenceQueue.then(() => clear
-      ? this.persistence!.clear().then(() => this.persistence!.replaceAll(nextSequence, []))
-      : this.persistence!.replaceAll(nextSequence, records)).catch(() => undefined)
+    // 所有整表写入都必须排在首次恢复之后；否则数据库慢于 ChatLuna 启动时，
+    // 启动期捕获的一条请求会用不完整数组覆盖重启前的全部历史。
+    this.persistenceQueue = Promise.all([this.ready, this.persistenceQueue]).then(async () => {
+      if (!this.persistenceAuthoritative) return
+      const records = structuredClone(this.records)
+      const nextSequence = this.nextSequence
+      if (clear) {
+        await this.persistence!.clear()
+        await this.persistence!.replaceAll(nextSequence, [])
+      } else {
+        await this.persistence!.replaceAll(nextSequence, records)
+      }
+    }).catch(() => undefined)
   }
 }

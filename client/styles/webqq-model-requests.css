@@ -11,6 +11,8 @@
 .webqq-model-request-item > header,
 .webqq-model-request-detail > header,
 .webqq-model-request-item-title,
+.webqq-model-request-bot,
+.webqq-model-request-bot-name,
 .webqq-model-request-actions,
 .webqq-model-request-live,
 .webqq-model-request-error-filter {
@@ -38,9 +40,38 @@
 
 .webqq-model-request-actions,
 .webqq-model-request-item-title,
+.webqq-model-request-bot,
+.webqq-model-request-bot-name,
 .webqq-model-request-live,
 .webqq-model-request-error-filter {
   gap: 8px;
+}
+
+.webqq-model-request-bot {
+  --webqq-avatar-size: 36px;
+  min-width: 0;
+}
+
+.webqq-model-request-bot-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.webqq-model-request-bot-copy strong,
+.webqq-model-request-bot-copy time {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webqq-model-request-bot-name {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.webqq-model-request-bot-name strong {
+  min-width: 0;
 }
 
 .webqq-model-request-filters {
@@ -168,6 +199,18 @@
   background: #fee2e2;
 }
 
+.sandbox-badge.webqq-model-request-provider {
+  border-color: #c4b5fd;
+  color: #6d28d9;
+  background: #ede9fe;
+}
+
+.webqq-workspace[data-color-mode="dark"] .sandbox-badge.webqq-model-request-provider {
+  border-color: #6d28d9;
+  color: #ddd6fe;
+  background: #4c1d95;
+}
+
 .webqq-model-request-more {
   width: 100%;
 }
@@ -237,9 +280,7 @@
 }
 
 @media (max-width: 720px) {
-  .webqq-model-request-header,
-  .webqq-model-request-item > header,
-  .webqq-model-request-detail > header {
+  .webqq-model-request-header {
     align-items: flex-start;
     flex-direction: column;
   }

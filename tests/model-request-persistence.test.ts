@@ -1,7 +1,8 @@
 import { App } from '@koishijs/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SandboxControlService, SandboxRuntimeBotRegistry } from '../src/control-service'
-import { MemoryModelRequestPersistence } from '../src/persistence'
+import { MemoryModelRequestPersistence, KoishiDatabaseModelRequestPersistence } from '../src/persistence'
+import type { SandboxModelRequestRecord } from '../src/types'
 import { SandboxTestSpaceService } from '../src/test-spaces'
 
 const runningApps: App[] = []
@@ -11,6 +12,72 @@ afterEach(async () => {
 })
 
 describe('模型请求记录持久化与生命周期', () => {
+  it('Database 服务晚到时合并历史与启动期请求，且不会用空状态覆盖历史', async () => {
+    const historical: SandboxModelRequestRecord = {
+      id: 'historical',
+      sequence: 7,
+      createdAt: '2026-08-13T00:00:00.000Z',
+      status: 'success',
+      durationMs: 5,
+      model: 'historical-model',
+      attribution: 'attributed',
+      entities: { scopeId: 'main' },
+      requestBodyAvailable: false,
+    }
+    let database: {
+      get: (table: 'onebot-sandbox.model-requests', query: { scopeId: string }) => Promise<Array<{
+        scopeId: string
+        nextSequence: number
+        records: SandboxModelRequestRecord[]
+        updatedAt: Date
+      }>>
+      upsert: (table: 'onebot-sandbox.model-requests', rows: Array<{
+        scopeId: string
+        nextSequence: number
+        records: SandboxModelRequestRecord[]
+        updatedAt: Date
+      }>) => Promise<void>
+      remove: (table: 'onebot-sandbox.model-requests', query: { scopeId: string }) => Promise<void>
+    } | undefined
+    const writes: Array<{ nextSequence: number, records: SandboxModelRequestRecord[] }> = []
+    const persistence = new KoishiDatabaseModelRequestPersistence('main', () => database)
+    const app = new App()
+    runningApps.push(app)
+    const control = new SandboxControlService(app, { modelRequestPersistence: persistence })
+
+    control.recordModelRequest({
+      status: 'success', durationMs: 1, model: 'startup-model',
+      attribution: 'attributed', entities: { scopeId: 'main' }, requestBodyAvailable: false,
+    })
+    setTimeout(() => {
+      database = {
+        get: async () => [{
+          scopeId: 'main',
+          nextSequence: 8,
+          records: [historical],
+          updatedAt: new Date(),
+        }],
+        upsert: async (_table, rows) => {
+          writes.push({ nextSequence: rows[0]!.nextSequence, records: structuredClone(rows[0]!.records) })
+        },
+        remove: async () => {},
+      }
+    }, 30)
+
+    await control.waitForPersistence()
+    expect(control.getModelRequestRecords().records.map(({ id, model, sequence }) => ({ id, model, sequence }))).toEqual([
+      expect.objectContaining({ model: 'startup-model', sequence: 8 }),
+      { id: 'historical', model: 'historical-model', sequence: 7 },
+    ])
+    expect(writes.at(-1)).toMatchObject({
+      nextSequence: 9,
+      records: [
+        expect.objectContaining({ id: 'historical', sequence: 7 }),
+        expect.objectContaining({ model: 'startup-model', sequence: 8 }),
+      ],
+    })
+  })
+
   it('共享内存 Adapter 后跨控制服务实例恢复记录，且 sequence 不回退', async () => {
     const app = new App()
     runningApps.push(app)
