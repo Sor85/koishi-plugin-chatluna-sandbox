@@ -2,9 +2,8 @@
   <section class="environment-manager" aria-label="模拟 QQ 环境管理">
     <header class="environment-header">
       <div>
-        <small>环境管理</small>
-        <h1>模拟 QQ 环境</h1>
-        <p>集中查看模拟 QQ 环境中的普通用户、机器人和群组。</p>
+        <h1>环境管理</h1>
+        <p>查看模拟 QQ 环境中的普通用户、机器人和群组</p>
       </div>
     </header>
 
@@ -114,25 +113,19 @@ function getBotKey(bot: SandboxDirectoryBot) {
   border-bottom: 1px solid var(--webqq-border);
 }
 
-.environment-header small,
 .environment-header p,
 .directory-copy small {
   color: var(--webqq-muted);
 }
 
-.environment-header h1,
+.environment-header h1 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 700;
+}
+
 .environment-header p {
   margin: 0;
-}
-
-.environment-header h1 {
-  margin-top: 4px;
-  font-size: 22px;
-}
-
-.environment-header p {
-  margin-top: 7px;
-  font-size: 12px;
 }
 
 .environment-tabs {

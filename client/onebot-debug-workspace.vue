@@ -3,7 +3,7 @@
     <header class="webqq-debug-header">
       <div>
         <h1>OneBot 调试</h1>
-        <p>查看最近的 action、原始事件和错误。调试记录仅保存在内存中，不能重放。</p>
+        <p>查看最近的 action、原始事件和错误</p>
       </div>
       <div class="webqq-debug-actions">
         <Button variant="outline" :disabled="loading" @click="applyFilters">
