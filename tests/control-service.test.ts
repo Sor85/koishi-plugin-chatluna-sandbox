@@ -29,6 +29,7 @@ describe('模拟 QQ 环境消息闭环', () => {
       content?: string
       elementType?: string
       elementSource?: unknown
+      elementUrl?: unknown
       rawMessage?: Array<{ type: string, data: Record<string, string> }>
     } | undefined
     app.middleware((session) => {
@@ -39,6 +40,7 @@ describe('模拟 QQ 环境消息闭环', () => {
         content: session.content,
         elementType: session.elements?.[0]?.type,
         elementSource: session.elements?.[0]?.attrs.src,
+        elementUrl: session.elements?.[0]?.attrs.url,
         rawMessage: onebot?.message,
       }
     })
@@ -70,7 +72,8 @@ describe('模拟 QQ 环境消息闭环', () => {
     expect(receivedSession).toEqual(expect.objectContaining({
       content: expect.stringContaining('<img'),
       elementType: 'img',
-      elementSource: message?.media?.[0].reference,
+      elementSource: expect.stringMatching(/^data:image\/png;base64,aW1hZ2UtY29udGVudA==$/),
+      elementUrl: expect.stringMatching(/^data:image\/png;base64,aW1hZ2UtY29udGVudA==$/),
       rawMessage: [{ type: 'image', data: { file: message?.media?.[0].reference } }],
     }))
     expect(control.getBotDeliveries()).toEqual([

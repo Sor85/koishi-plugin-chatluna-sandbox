@@ -487,13 +487,18 @@ export class SandboxControlService {
     const text = input.content.trim()
     const content = text || input.media.map((item) => `[${this.getMediaLabel(item)}] ${item.name}`).join(' ')
     const message = this.appendMessage(input.operatorId, context.conversation.id, content, input.replyToMessageId, input.media)
-    const elements = input.media.map((media) => h(media.type === 'image' ? 'img' : media.type, {
-      src: media.reference,
-      file: media.reference,
-      title: media.name,
-      mime: media.mimeType,
-      size: media.size,
-    }))
+    const elements = input.media.map((media) => {
+      const source = media.type === 'image'
+        ? `data:${media.mimeType};base64,${this.mediaStorage.read(media).dataBase64}`
+        : media.reference
+      return h(media.type === 'image' ? 'img' : media.type, {
+        src: source,
+        ...(media.type === 'image' ? { url: source } : { file: media.reference }),
+        title: media.name,
+        mime: media.mimeType,
+        size: media.size,
+      })
+    })
     if (text) elements.push(h.text(text))
     const onebotMessage: Array<{ type: string; data: Record<string, string> }> = input.media.map((media) => ({
       type: media.type === 'audio' ? 'record' : media.type,
@@ -1664,13 +1669,20 @@ export class SandboxControlService {
     // 占位 content 仅用于会话预览与历史可读性，派发给机器人的消息只携带媒体段与用户真实文本。
     const content = text || media.map((item) => `[${this.getMediaLabel(item)}] ${item.name}`).join(' ')
     const message = this.appendMessage(input.operatorId, context.conversation.id, content, input.replyToMessageId, media)
-    const elements = media.map((item) => h(item.type === 'image' ? 'img' : item.type, {
-      src: item.reference,
-      file: item.reference,
-      title: item.name,
-      mime: item.mimeType,
-      size: item.size,
-    }))
+    const elements = media.map((item) => {
+      // ChatLuna 的图片转换器只读取 img.src/url，不会解析 sandbox-media RPC 引用；
+      // 因此这里必须把受控媒体正文转成 Data URL，避免模型只收到媒体 ID 或哈希文本。
+      const source = item.type === 'image'
+        ? `data:${item.mimeType};base64,${this.mediaStorage.read(item).dataBase64}`
+        : item.reference
+      return h(item.type === 'image' ? 'img' : item.type, {
+        src: source,
+        ...(item.type === 'image' ? { url: source } : { file: item.reference }),
+        title: item.name,
+        mime: item.mimeType,
+        size: item.size,
+      })
+    })
     if (text) elements.push(h.text(text))
     const onebotMessage: Array<{ type: string; data: Record<string, string> }> = [
       ...(context.reply ? [{ type: 'reply', data: { id: String(getOneBotMessageSequence(context.reply.id)) } }] : []),
