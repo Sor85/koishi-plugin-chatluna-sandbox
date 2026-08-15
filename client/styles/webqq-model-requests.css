@@ -418,6 +418,48 @@
   user-select: text;
 }
 
+.webqq-model-request-header-value {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+.webqq-model-request-header-toggle {
+  justify-content: flex-start;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
+  color: var(--webqq-muted);
+  font-size: 12px;
+}
+
+.webqq-model-request-header-toggle svg {
+  transition: transform 0.16s ease;
+}
+
+.webqq-model-request-header-toggle svg.is-expanded {
+  transform: rotate(180deg);
+}
+
+.webqq-model-request-header-json {
+  max-height: 320px;
+  min-width: 0;
+  margin: 0;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--webqq-border);
+  border-radius: 8px;
+  color: var(--webqq-text);
+  background: var(--webqq-surface);
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  tab-size: 2;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
 .webqq-model-request-endpoint {
   display: flex;
   align-items: baseline;

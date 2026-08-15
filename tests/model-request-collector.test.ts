@@ -1,5 +1,6 @@
 import { App, Universal } from '@koishijs/core'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -87,7 +88,7 @@ describe('模型请求采集', () => {
 
     expect(unattributed.getRecords().records[0]).toMatchObject({ model: 'gemini-3.6-flash' })
   })
-  it('包装公共 fetch：记录 JSON 请求体、不存 headers，并在完成后从 pending 变为 success/error', async () => {
+  it('包装公共 fetch：记录 JSON 请求体和原始 headers，并在完成后从 pending 变为 success/error', async () => {
     const unattributed = new SandboxModelRequestStore()
     let status: 'ok' | 'http' | 'throw' = 'ok'
     const plugin = createFakePlugin(async () => {
@@ -128,9 +129,10 @@ describe('模型请求采集', () => {
       responseBodyStatus: 'complete',
       responseBodyFormat: 'json',
     })
-    expect(success).not.toHaveProperty('headers')
-    expect(JSON.stringify(success)).not.toContain('secret')
-    expect(JSON.stringify(success)).not.toContain('Bearer')
+    expect(success).toHaveProperty('headers', {
+      authorization: 'Bearer secret',
+    })
+    expect(JSON.stringify(success)).toContain('Bearer secret')
     expect(unattributed.getRecord(success!.id)).toMatchObject({
       requestBody: {
         model: 'gpt-4o',
@@ -162,6 +164,49 @@ describe('模型请求采集', () => {
       responseBodyFormat: 'json',
       error: { message: 'HTTP 429' },
     })
+  })
+
+  it('记录 Undici 实际派发的完整请求头，而不只记录 init.headers', async () => {
+    const server = createServer((_request, response) => {
+      response.setHeader('content-type', 'application/json')
+      response.end('{"choices":[]}')
+    })
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const address = server.address()
+    if (!address || typeof address === 'string') throw new Error('测试服务器未监听 TCP 端口')
+
+    try {
+      const unattributed = new SandboxModelRequestStore()
+      const plugin = createFakePlugin(async (info, init) => fetch(info as string, init as RequestInit))
+      disposers.push(installModelRequestCollector({ plugin, unattributed, getCandidates: () => [] }))
+
+      const body = chatBody()
+      await plugin.fetch(`http://127.0.0.1:${address.port}/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer secret',
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://github.com/ChatLunaLab/chatluna',
+          'X-Title': 'ChatLuna',
+        },
+        body,
+      })
+      await unattributed.waitForPersistence()
+
+      expect(unattributed.getRecords().records[0]?.headers).toMatchObject({
+        Authorization: 'Bearer secret',
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://github.com/ChatLunaLab/chatluna',
+        'X-Title': 'ChatLuna',
+        accept: '*/*',
+        'accept-language': '*',
+        'sec-fetch-mode': 'cors',
+        'accept-encoding': 'gzip, deflate',
+        'Content-Length': String(Buffer.byteLength(body)),
+      })
+    } finally {
+      await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()))
+    }
   })
 
   it('旁路采集流式 SSE，且不会等待完整响应后才把原始流交给 ChatLuna', async () => {

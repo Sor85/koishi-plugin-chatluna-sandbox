@@ -37,6 +37,7 @@ describe('WebQQ OneBot 调试工作台', () => {
 
   it('使用独立网格和统一控件基线，避免筛选器溢出与黑色描边', () => {
     const debugSource = readFileSync(resolve('client/onebot-debug-workspace.vue'), 'utf8')
+    const modelRequestSource = readFileSync(resolve('client/model-request-workspace.vue'), 'utf8')
     const debugStyles = readFileSync(resolve('client/styles/webqq-debug.css'), 'utf8')
     const primitives = readFileSync(resolve('client/styles/webqq-primitives.css'), 'utf8')
 
@@ -44,8 +45,11 @@ describe('WebQQ OneBot 调试工作台', () => {
     expect(debugStyles).toMatch(/\.webqq-debug-bot-avatar\s*\{[^}]*border-radius:\s*50%/s)
     expect(debugStyles).toMatch(/\.webqq-debug-workspace\s*\{[^}]*grid-template-rows:\s*auto auto minmax\(0, 1fr\)/s)
     expect(debugStyles).toMatch(/\.webqq-debug-records\s*\{[^}]*height:\s*100%/s)
-    // 控件颜色统一由 shadcn 控件基线接管：devMode 缺失按需工具类时也不会退化成黑描边或无底色
+    // 控件颜色统一由 shadcn 控件基线接管：devMode 缺失按需工具类时也不会退化成黑描边或无底色。
     expect(primitives).toContain('[data-slot="select-trigger"]')
     expect(primitives).toMatch(/\[data-variant="destructive"\][^}]*\{[^}]*background:\s*#dc2626/s)
+    // Reka 的 as-child 会把 Button 的 data-slot 覆盖成 popover-trigger；基线必须覆盖最终 DOM 属性。
+    expect(modelRequestSource).toMatch(/<PopoverTrigger as-child>[\s\S]*?<Button[\s\S]*?variant="outline"/)
+    expect(primitives).toMatch(/\[data-slot="popover-trigger"\][^}]*\[data-variant="outline"\]/)
   })
 })

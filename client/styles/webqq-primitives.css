@@ -184,11 +184,13 @@
    这里用组件自带的 data-slot / data-variant 属性把控件观感固定到 webqq 令牌上；
    本文件不在 @layer 内，天然优先于 @layer utilities 里的工具类，两种模式下观感一致。 */
 
-:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) [data-slot="button"] {
+/* Reka PopoverTrigger 的 as-child 会把内部 Button 的 data-slot 改成 popover-trigger；
+   必须同时覆盖最终 DOM，否则 outline 按钮的 border-color 会回退为 currentColor，重新出现近黑描边。 */
+:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) :is([data-slot="button"], [data-slot="popover-trigger"][data-variant]) {
   border: 1px solid transparent;
 }
 
-:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) [data-slot="button"]:disabled {
+:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) :is([data-slot="button"], [data-slot="popover-trigger"][data-variant]):disabled {
   opacity: 0.5;
 }
 
@@ -201,14 +203,14 @@
   background: color-mix(in srgb, var(--webqq-accent) 88%, #000);
 }
 
-:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) [data-slot="button"][data-variant="outline"] {
+:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) :is([data-slot="button"][data-variant="outline"], [data-slot="popover-trigger"][data-variant="outline"]) {
   border-color: var(--webqq-border);
   color: var(--webqq-text);
   background: var(--webqq-bg);
   box-shadow: none;
 }
 
-:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) [data-slot="button"][data-variant="outline"]:hover:not(:disabled) {
+:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) :is([data-slot="button"][data-variant="outline"], [data-slot="popover-trigger"][data-variant="outline"]):hover:not(:disabled) {
   color: var(--webqq-text);
   background: var(--webqq-hover);
 }

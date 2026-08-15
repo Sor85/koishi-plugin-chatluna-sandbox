@@ -36,6 +36,7 @@ export interface AppendModelRequestRecordInput {
   url?: string
   provider?: string
   model?: string
+  headers?: Record<string, string>
   attribution: 'attributed' | 'unattributed'
   entities: SandboxModelRequestEntities
   requestBody?: unknown
@@ -52,6 +53,7 @@ export interface AppendModelRequestRecordInput {
 export interface UpdateModelRequestRecordInput {
   status?: SandboxModelRequestStatus
   durationMs?: number
+  headers?: Record<string, string>
   responseBodyStatus?: SandboxModelResponseBodyStatus
   responseBodyFormat?: SandboxModelResponseBodyFormat
   responseStatus?: number
@@ -188,6 +190,7 @@ export class SandboxModelRequestStore {
       ...(input.url ? { url: input.url } : {}),
       ...(input.provider ? { provider: input.provider } : {}),
       ...(input.model ? { model: input.model } : {}),
+      ...(input.headers ? { headers: structuredClone(input.headers) } : {}),
       attribution: input.attribution,
       entities: structuredClone(input.entities),
       requestBodyAvailable: input.requestBodyAvailable,
@@ -216,6 +219,7 @@ export class SandboxModelRequestStore {
       ...previous,
       ...(input.status ? { status: input.status } : {}),
       ...(input.durationMs !== undefined ? { durationMs: input.durationMs } : {}),
+      ...(input.headers ? { headers: structuredClone(input.headers) } : {}),
       ...(input.responseBodyStatus ? { responseBodyStatus: input.responseBodyStatus } : {}),
       ...(input.responseBodyFormat ? { responseBodyFormat: input.responseBodyFormat } : {}),
       ...(input.responseStatus !== undefined ? { responseStatus: input.responseStatus } : {}),

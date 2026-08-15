@@ -458,6 +458,7 @@ export interface SandboxModelRequestRecord {
   url?: string
   provider?: string
   model?: string
+  headers?: Record<string, string>
   attribution: SandboxModelRequestAttribution
   entities: SandboxModelRequestEntities
   requestBodyAvailable: boolean

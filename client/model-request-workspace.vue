@@ -262,6 +262,24 @@
               <span class="webqq-model-request-meta-label">关联实体</span>
               <span class="webqq-model-request-meta-value">{{ formatEntities(detail) }}</span>
             </p>
+            <div v-if="detail.headers && Object.keys(detail.headers).length" class="webqq-model-request-meta webqq-model-request-headers">
+              <IconBraces :size="17" aria-hidden="true" />
+              <span class="webqq-model-request-meta-label">请求头</span>
+              <div class="webqq-model-request-header-value">
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  class="webqq-model-request-header-toggle"
+                  :aria-expanded="headersExpanded"
+                  @click="headersExpanded = !headersExpanded"
+                >
+                  {{ headersExpanded ? '收起 JSON' : `展开 JSON（${Object.keys(detail.headers).length} 项）` }}
+                  <IconChevronDown :size="14" :class="{ 'is-expanded': headersExpanded }" aria-hidden="true" />
+                </Button>
+                <pre v-if="headersExpanded" class="webqq-model-request-header-json">{{ formattedHeaders }}</pre>
+              </div>
+            </div>
+
             <p v-if="detail.interactionId" class="webqq-model-request-meta">
               <IconFingerprint :size="17" aria-hidden="true" />
               <span class="webqq-model-request-meta-label">交互标识</span>
@@ -502,6 +520,7 @@ const clearDialogOpen = ref(false)
 const clearStep = ref<1 | 2>(1)
 const bodyView = ref<'request' | 'response'>('request')
 const responseView = ref<'content' | 'json'>('content')
+const headersExpanded = ref(false)
 const copyState = ref<'idle' | 'success' | 'error'>('idle')
 let copyStateTimer: number | undefined
 
@@ -512,6 +531,7 @@ const liveRefreshController = createModelRequestLiveRefresh({
 })
 
 const requestTree = computed(() => buildModelRequestJsonTree(props.detail?.requestBody, 'requestBody'))
+const formattedHeaders = computed(() => props.detail?.headers ? JSON.stringify(props.detail.headers, null, 2) : '')
 const responsePreview = computed(() => parseModelResponseBody(
   props.detail?.responseBodyRaw,
   props.detail?.responseBodyFormat,
@@ -594,6 +614,7 @@ watch(filterOpen, (open, wasOpen) => {
 watch(() => props.detail?.id, () => {
   bodyView.value = 'request'
   responseView.value = 'content'
+  headersExpanded.value = false
   resetCopyState()
 })
 
