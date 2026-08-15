@@ -276,7 +276,16 @@
                   {{ headersExpanded ? '收起 JSON' : `展开 JSON（${Object.keys(detail.headers).length} 项）` }}
                   <IconChevronDown :size="14" :class="{ 'is-expanded': headersExpanded }" aria-hidden="true" />
                 </Button>
-                <pre v-if="headersExpanded" class="webqq-model-request-header-json">{{ formattedHeaders }}</pre>
+                <div v-if="headersExpanded" class="webqq-model-request-header-json">
+                  <div class="webqq-model-request-json-viewer">
+                    <ModelRequestJsonTree
+                      :node="headersTree"
+                      :open="true"
+                      :root="true"
+                      :strings-expanded="true"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -531,7 +540,7 @@ const liveRefreshController = createModelRequestLiveRefresh({
 })
 
 const requestTree = computed(() => buildModelRequestJsonTree(props.detail?.requestBody, 'requestBody'))
-const formattedHeaders = computed(() => props.detail?.headers ? JSON.stringify(props.detail.headers, null, 2) : '')
+const headersTree = computed(() => buildModelRequestJsonTree(props.detail?.headers ?? {}, 'requestHeaders'))
 const responsePreview = computed(() => parseModelResponseBody(
   props.detail?.responseBodyRaw,
   props.detail?.responseBodyFormat,
