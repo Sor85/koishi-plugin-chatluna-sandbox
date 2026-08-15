@@ -63,7 +63,7 @@ export class SandboxTestSpaceService {
       try {
         for (const record of await this.persistence.loadAll()) this.restoreSpace(record)
       } catch (error) {
-        ctx.logger('onebot-sandbox').error('AI 测试空间恢复失败。', error)
+        ctx.logger('chatluna-sandbox').error('AI 测试空间恢复失败。', error)
       }
     })
     ctx.on('dispose', () => this.persistenceQueue)
@@ -206,7 +206,7 @@ export class SandboxTestSpaceService {
       initialScene: scene,
       runtimeActive,
       runtimeBots: this.runtimeBots,
-      mediaDirectory: resolve(this.ctx.baseDir, 'data/onebot-sandbox/spaces', id, 'media'),
+      mediaDirectory: resolve(this.ctx.baseDir, 'data/chatluna-sandbox/spaces', id, 'media'),
       debugPersistence: this.createDebugPersistence?.(id),
       modelRequestPersistence: this.createModelRequestPersistence?.(id),
       modelRequestRecordLimit: this.modelRequestRecordLimit,
@@ -254,7 +254,7 @@ export class SandboxTestSpaceService {
 
   private queuePersistenceTask(task: () => Promise<void>): void {
     this.persistenceQueue = this.persistenceQueue.then(task).catch((error) => {
-      this.ctx.logger('onebot-sandbox').error('AI 测试空间持久化失败。', error)
+      this.ctx.logger('chatluna-sandbox').error('AI 测试空间持久化失败。', error)
     })
   }
 

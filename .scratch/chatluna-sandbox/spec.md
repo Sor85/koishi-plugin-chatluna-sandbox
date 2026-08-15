@@ -19,7 +19,7 @@ Koishi 原版 sandbox 适合快速发送消息和观察插件回复，但不足�
 
 ## Solution
 
-创建 `onebot-sandbox` Koishi 插件，在服务端持有的沙盒场景中模拟参与者、好友关系、群组、成员角色、逻辑会话、消息、申请、通知、媒体和权限。插件同时提供：
+创建 `chatluna-sandbox` Koishi 插件，在服务端持有的沙盒场景中模拟参与者、好友关系、群组、成员角色、逻辑会话、消息、申请、通知、媒体和权限。插件同时提供：
 
 - 一个以 `onebot-webqq` 当前界面为视觉基线、使用 Vue、Tailwind CSS 和 shadcn-vue 重写的 WebQQ 工作台
 - 一个兼容标准 Koishi 行为、OneBot 原始事件、`bot.internal` 和底层 action 调用的虚拟 OneBot 机器人层

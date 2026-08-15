@@ -32,7 +32,7 @@
 .sandbox-dialog-content,
 .sandbox-popover-content,
 .sandbox-select-content,
-.webqq-secondary-page {
+.chatluna-sandbox-secondary-page {
   --webqq-accent: #2563eb;
   --webqq-bg: #fff;
   --webqq-surface: #f8fafc;
@@ -50,7 +50,7 @@
 body[data-sandbox-color-scheme="dark"] .sandbox-dialog-content,
 body[data-sandbox-color-scheme="dark"] .sandbox-popover-content,
 body[data-sandbox-color-scheme="dark"] .sandbox-select-content,
-body[data-sandbox-color-scheme="dark"] .webqq-secondary-page {
+body[data-sandbox-color-scheme="dark"] .chatluna-sandbox-secondary-page {
   --webqq-bg: #2c2c30;
   --webqq-surface: #2c2c30;
   --webqq-surface-muted: #323238;

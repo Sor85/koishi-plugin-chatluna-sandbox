@@ -52,43 +52,43 @@ export interface SandboxModelRequestPersistenceRecord {
 
 declare module '@koishijs/core' {
   interface Tables {
-    'onebot-sandbox.scene': SandboxSceneRecord
-    'onebot-sandbox.test-space': SandboxTestSpacePersistenceRecord
-    'onebot-sandbox.debug-records': SandboxOneBotDebugPersistenceRecord
-    'onebot-sandbox.model-requests': SandboxModelRequestPersistenceRecord
+    'chatluna-sandbox.scene': SandboxSceneRecord
+    'chatluna-sandbox.test-space': SandboxTestSpacePersistenceRecord
+    'chatluna-sandbox.debug-records': SandboxOneBotDebugPersistenceRecord
+    'chatluna-sandbox.model-requests': SandboxModelRequestPersistenceRecord
   }
 }
 
 interface SandboxSceneDatabase {
-  get(table: 'onebot-sandbox.scene', query: { id: string }): Promise<SandboxSceneRecord[]>
-  upsert(table: 'onebot-sandbox.scene', rows: SandboxSceneRecord[]): Promise<unknown>
+  get(table: 'chatluna-sandbox.scene', query: { id: string }): Promise<SandboxSceneRecord[]>
+  upsert(table: 'chatluna-sandbox.scene', rows: SandboxSceneRecord[]): Promise<unknown>
 }
 
 interface SandboxTestSpaceDatabase {
-  get(table: 'onebot-sandbox.test-space', query: { id?: string }): Promise<SandboxTestSpacePersistenceRecord[]>
-  upsert(table: 'onebot-sandbox.test-space', rows: SandboxTestSpacePersistenceRecord[]): Promise<unknown>
-  remove(table: 'onebot-sandbox.test-space', query: { id: string }): Promise<unknown>
+  get(table: 'chatluna-sandbox.test-space', query: { id?: string }): Promise<SandboxTestSpacePersistenceRecord[]>
+  upsert(table: 'chatluna-sandbox.test-space', rows: SandboxTestSpacePersistenceRecord[]): Promise<unknown>
+  remove(table: 'chatluna-sandbox.test-space', query: { id: string }): Promise<unknown>
 }
 
 interface SandboxOneBotDebugDatabase {
-  get(table: 'onebot-sandbox.debug-records', query: { scopeId: string }): Promise<SandboxOneBotDebugPersistenceRecord[]>
-  upsert(table: 'onebot-sandbox.debug-records', rows: SandboxOneBotDebugPersistenceRecord[]): Promise<unknown>
-  remove(table: 'onebot-sandbox.debug-records', query: { scopeId: string }): Promise<unknown>
+  get(table: 'chatluna-sandbox.debug-records', query: { scopeId: string }): Promise<SandboxOneBotDebugPersistenceRecord[]>
+  upsert(table: 'chatluna-sandbox.debug-records', rows: SandboxOneBotDebugPersistenceRecord[]): Promise<unknown>
+  remove(table: 'chatluna-sandbox.debug-records', query: { scopeId: string }): Promise<unknown>
 }
 
 interface SandboxModelRequestDatabase {
-  get(table: 'onebot-sandbox.model-requests', query: { scopeId: string }): Promise<SandboxModelRequestPersistenceRecord[]>
-  upsert(table: 'onebot-sandbox.model-requests', rows: SandboxModelRequestPersistenceRecord[]): Promise<unknown>
-  remove(table: 'onebot-sandbox.model-requests', query: { scopeId: string }): Promise<unknown>
+  get(table: 'chatluna-sandbox.model-requests', query: { scopeId: string }): Promise<SandboxModelRequestPersistenceRecord[]>
+  upsert(table: 'chatluna-sandbox.model-requests', rows: SandboxModelRequestPersistenceRecord[]): Promise<unknown>
+  remove(table: 'chatluna-sandbox.model-requests', query: { scopeId: string }): Promise<unknown>
 }
 
-// 表名使用 "onebot-sandbox." 前缀：dataview-next 等工具按点号前缀归属插件；
+// 表名使用 "chatluna-sandbox." 前缀：dataview-next 等工具按点号前缀归属插件；
 // ctx.inject 回调里的 model.extend 拿不到插件运行时名称，仅靠上下文会被归为未知来源。
-const SCENE_TABLE = 'onebot-sandbox.scene'
+const SCENE_TABLE = 'chatluna-sandbox.scene'
 const SCENE_ID = 'main'
-const TEST_SPACE_TABLE = 'onebot-sandbox.test-space'
-const DEBUG_TABLE = 'onebot-sandbox.debug-records'
-const MODEL_REQUEST_TABLE = 'onebot-sandbox.model-requests'
+const TEST_SPACE_TABLE = 'chatluna-sandbox.test-space'
+const DEBUG_TABLE = 'chatluna-sandbox.debug-records'
+const MODEL_REQUEST_TABLE = 'chatluna-sandbox.model-requests'
 
 export function registerSandboxSceneModel(ctx: Context): void {
   ctx.model.extend(SCENE_TABLE, {

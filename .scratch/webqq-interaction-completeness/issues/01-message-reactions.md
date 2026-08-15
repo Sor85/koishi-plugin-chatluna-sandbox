@@ -22,7 +22,7 @@
 ### 实现摘要
 
 - 领域层：`setMessageReaction` 对机器人走 `set_msg_emoji_like`，对普通用户直接 `applyMessageReaction`；限制群聊、撤回后只读、能力禁用生效。
-- Console RPC：新增 `onebot-sandbox/set-message-reaction`。
+- Console RPC：新增 `chatluna-sandbox/set-message-reaction`。
 - WebQQ：TIM 风格 chip（表情、回应者头像叠层、总数）、右键“贴表情”、完整 qface 目录 + 常用区 + 搜索；私聊无主动入口；点击 chip 切换自己的回应。
 - 依赖：新增 `qface@1.4.1`。
 

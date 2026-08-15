@@ -567,7 +567,7 @@
 }
 
 /* mention 作为行内原子节点，复用 onebot-webqq 的紧凑胶囊视觉，不额外创建换行。 */
-.webqq-composer-mention {
+.chatluna-sandbox-composer-mention {
   display: inline-flex;
   max-width: 100%;
   align-items: center;
@@ -584,8 +584,8 @@
   user-select: none;
 }
 
-.webqq-composer-mention-menu,
-.webqq-mention-menu {
+.chatluna-sandbox-composer-mention-menu,
+.chatluna-sandbox-mention-menu {
   position: absolute;
   right: 0;
   bottom: calc(100% + 8px);
@@ -603,7 +603,7 @@
   box-shadow: 0 10px 24px rgb(15 23 42 / 12%);
 }
 
-.webqq-mention-menu-item {
+.chatluna-sandbox-mention-menu-item {
   display: flex;
   min-width: 0;
   align-items: center;
@@ -616,14 +616,14 @@
   text-align: left;
 }
 
-.webqq-mention-menu-item.is-active,
-.webqq-mention-menu-item:hover,
-.webqq-mention-menu-item:focus-visible {
+.chatluna-sandbox-mention-menu-item.is-active,
+.chatluna-sandbox-mention-menu-item:hover,
+.chatluna-sandbox-mention-menu-item:focus-visible {
   outline: none;
   background: color-mix(in srgb, var(--webqq-accent) 12%, var(--webqq-hover));
 }
 
-.webqq-mention-menu-avatar {
+.chatluna-sandbox-mention-menu-avatar {
   --webqq-avatar-size: 28px;
 
   width: 28px;
@@ -632,7 +632,7 @@
   font-size: 11px;
 }
 
-.webqq-mention-menu-meta {
+.chatluna-sandbox-mention-menu-meta {
   display: flex;
   min-width: 0;
   flex: 1 1 auto;
@@ -640,7 +640,7 @@
   gap: 2px;
 }
 
-.webqq-mention-menu-meta strong {
+.chatluna-sandbox-mention-menu-meta strong {
   overflow: hidden;
   font-size: 13px;
   font-weight: 600;
@@ -649,7 +649,7 @@
   white-space: nowrap;
 }
 
-.webqq-mention-menu-meta small {
+.chatluna-sandbox-mention-menu-meta small {
   overflow: hidden;
   color: var(--webqq-muted);
   font-size: 11px;
@@ -658,7 +658,7 @@
   white-space: nowrap;
 }
 
-.webqq-mention-menu-empty {
+.chatluna-sandbox-mention-menu-empty {
   padding: 10px 8px;
   color: var(--webqq-muted);
   font-size: 12px;

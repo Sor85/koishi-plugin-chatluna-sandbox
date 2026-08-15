@@ -495,7 +495,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
         return result
       } catch (error) {
         const debugError = createOneBotDebugError(error)
-        this.ctx.logger('onebot-sandbox').error(`OneBot action 调用失败 [${debugError.traceId}]`, error)
+        this.ctx.logger('chatluna-sandbox').error(`OneBot action 调用失败 [${debugError.traceId}]`, error)
         this.control.recordOneBotDebug({
           botId: this.selfId,
           implementation: this.implementation,

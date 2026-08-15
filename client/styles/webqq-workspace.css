@@ -6,15 +6,15 @@ body,
 
 /* Koishi 的布局容器以 --footer-height 预留全局状态栏空间；此工作台需要完整视口，
    因此同时清零预留高度并隐藏同级 footer，避免只隐藏底栏后仍留下空白。 */
-.onebot-sandbox-layout {
+.chatluna-sandbox-layout {
   --footer-height: 0px;
 }
 
-body:has(.onebot-sandbox-layout) > #app > .layout-status {
+body:has(.chatluna-sandbox-layout) > #app > .layout-status {
   display: none;
 }
 
-.onebot-sandbox-page {
+.chatluna-sandbox-page {
   height: 100vh;
   min-height: 0;
   overflow: hidden;
@@ -22,23 +22,23 @@ body:has(.onebot-sandbox-layout) > #app > .layout-status {
 }
 
 /* 页面容器在 .webqq-workspace 之外拿不到 data-color-mode，跟随 body 上的解析配色。 */
-body[data-sandbox-color-scheme="dark"] .onebot-sandbox-page {
+body[data-sandbox-color-scheme="dark"] .chatluna-sandbox-page {
   background: rgb(37 37 41);
 }
 
-.onebot-sandbox-layout .layout-header {
+.chatluna-sandbox-layout .layout-header {
   display: none;
 }
 
-.onebot-sandbox-page .el-scrollbar,
-.onebot-sandbox-page .el-scrollbar__wrap,
-.onebot-sandbox-page .el-scrollbar__view,
-.onebot-sandbox-page .k-content {
+.chatluna-sandbox-page .el-scrollbar,
+.chatluna-sandbox-page .el-scrollbar__wrap,
+.chatluna-sandbox-page .el-scrollbar__view,
+.chatluna-sandbox-page .k-content {
   height: 100%;
   min-height: 0;
 }
 
-.onebot-sandbox-page .k-content {
+.chatluna-sandbox-page .k-content {
   width: 100%;
   max-width: none;
   margin: 0;
@@ -64,7 +64,7 @@ body[data-sandbox-color-scheme="dark"] .onebot-sandbox-page {
   grid-template-columns: 72px minmax(0, 1fr);
 }
 
-.webqq-workspace.is-standalone-view .webqq-chat {
+.webqq-workspace.is-standalone-view .chatluna-sandbox-chat {
   grid-column: 2;
 }
 
@@ -74,7 +74,7 @@ body[data-sandbox-color-scheme="dark"] .onebot-sandbox-page {
 
 .webqq-rail,
 .webqq-conversations,
-.webqq-chat,
+.chatluna-sandbox-chat,
 .webqq-profile {
   min-width: 0;
   min-height: 0;
@@ -87,7 +87,7 @@ body[data-sandbox-color-scheme="dark"] .onebot-sandbox-page {
    只写无前缀声明时构建器反而会自动补全 -webkit- 前缀，Safari 也能覆盖。 */
 .webqq-workspace.is-frosted .webqq-rail,
 .webqq-workspace.is-frosted .webqq-conversations,
-.webqq-workspace.is-frosted .webqq-chat,
+.webqq-workspace.is-frosted .chatluna-sandbox-chat,
 .webqq-workspace.is-frosted .webqq-profile {
   background: rgb(248 250 252 / 34%);
   backdrop-filter: saturate(180%) blur(20px);
@@ -103,8 +103,8 @@ body[data-sandbox-color-scheme="dark"] .onebot-sandbox-page {
   background: rgb(37 37 41);
 }
 
-.webqq-workspace.is-frosted[data-color-mode="dark"] .webqq-chat,
-.webqq-workspace.is-frosted[data-color-mode="dark"] .webqq-chat-header {
+.webqq-workspace.is-frosted[data-color-mode="dark"] .chatluna-sandbox-chat,
+.webqq-workspace.is-frosted[data-color-mode="dark"] .chatluna-sandbox-chat-header {
   background: rgb(44 44 48);
 }
 
@@ -122,8 +122,8 @@ body[data-sandbox-color-scheme="dark"] .onebot-sandbox-page {
   flex-direction: column;
 }
 
-.webqq-workspace[data-color-mode="dark"] .webqq-chat,
-.webqq-workspace[data-color-mode="dark"] .webqq-chat-header {
+.webqq-workspace[data-color-mode="dark"] .chatluna-sandbox-chat,
+.webqq-workspace[data-color-mode="dark"] .chatluna-sandbox-chat-header {
   background: rgb(44 44 48);
 }
 

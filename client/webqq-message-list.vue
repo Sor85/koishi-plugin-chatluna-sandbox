@@ -2,7 +2,7 @@
   <section
     ref="messagesElement"
     v-webqq-scrollbar="{ disabled: preview, tone: 'accent' }"
-    class="webqq-messages"
+    class="chatluna-sandbox-messages"
     :class="{ 'is-selecting': model.selectionMode }"
     aria-label="消息记录"
     @scroll="handleMessagesScroll"
@@ -22,11 +22,11 @@
         </button>
       </li>
       <template v-for="(message, messageIndex) in model.messages" :key="message.id">
-        <li v-if="shouldRenderAsEvent(message)" class="webqq-message-event">{{ getEventMessageText(message) }}</li>
+        <li v-if="shouldRenderAsEvent(message)" class="chatluna-sandbox-message-event">{{ getEventMessageText(message) }}</li>
         <ContextMenu v-else>
           <ContextMenuTrigger as-child :disabled="isRecalledMessage(message) || model.selectionMode">
             <li
-              class="webqq-message-row"
+              class="chatluna-sandbox-message-row"
               :class="[
                 message.authorId === model.currentOperatorId ? 'is-outgoing' : 'is-incoming',
                 getMessageClusterClass(model.messages, messageIndex, model.currentOperatorId),
@@ -43,17 +43,17 @@
             >
               <span
                 v-if="model.selectionMode && isMessageSelectable(message)"
-                class="webqq-message-select-marker"
+                class="chatluna-sandbox-message-select-marker"
                 :class="{ 'is-checked': isMessageSelected(message.id) }"
                 aria-hidden="true"
               >
                 <IconCheck :size="12" stroke-width="3" />
               </span>
-              <div class="webqq-message-select-body">
+              <div class="chatluna-sandbox-message-select-body">
               <ContextMenu v-if="message.authorId !== model.currentOperatorId">
                 <ContextMenuTrigger as-child :disabled="model.selectionMode">
-                  <button type="button" class="webqq-message-avatar-wrap webqq-message-avatar-trigger" :aria-label="`查看 ${getMessageAuthorName(message.authorId)} 的资料`" @click="handleMessageAvatarClick(message, $event)" @contextmenu.stop>
-                    <WebqqAvatar class="webqq-message-avatar" :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'" :name="getMessageAuthorName(message.authorId)" :avatar="getParticipantAvatar(message.authorId)" />
+                  <button type="button" class="chatluna-sandbox-message-avatar-wrap chatluna-sandbox-message-avatar-trigger" :aria-label="`查看 ${getMessageAuthorName(message.authorId)} 的资料`" @click="handleMessageAvatarClick(message, $event)" @contextmenu.stop>
+                    <WebqqAvatar class="chatluna-sandbox-message-avatar" :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'" :name="getMessageAuthorName(message.authorId)" :avatar="getParticipantAvatar(message.authorId)" />
                   </button>
                 </ContextMenuTrigger>
                 <ContextMenuContent style="z-index: 140">
@@ -95,8 +95,8 @@
               </ContextMenu>
               <ContextMenu v-else>
                 <ContextMenuTrigger as-child :disabled="model.selectionMode">
-                  <button type="button" class="webqq-message-avatar-wrap webqq-message-avatar-trigger" :aria-label="`查看 ${getMessageAuthorName(message.authorId)} 的资料`" @click="handleMessageAvatarClick(message, $event)" @contextmenu.stop>
-                    <WebqqAvatar class="webqq-message-avatar" :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'" :name="getMessageAuthorName(message.authorId)" :avatar="getParticipantAvatar(message.authorId)" />
+                  <button type="button" class="chatluna-sandbox-message-avatar-wrap chatluna-sandbox-message-avatar-trigger" :aria-label="`查看 ${getMessageAuthorName(message.authorId)} 的资料`" @click="handleMessageAvatarClick(message, $event)" @contextmenu.stop>
+                    <WebqqAvatar class="chatluna-sandbox-message-avatar" :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'" :name="getMessageAuthorName(message.authorId)" :avatar="getParticipantAvatar(message.authorId)" />
                   </button>
                 </ContextMenuTrigger>
                 <ContextMenuContent style="z-index: 140">
@@ -105,54 +105,54 @@
                   </ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>
-              <div class="webqq-message-content">
-                <div v-if="!isMergedMessage(model.messages, messageIndex, model.currentOperatorId)" class="webqq-sender-line">
-                  <span class="webqq-message-author">{{ getMessageAuthorName(message.authorId) }}</span>
+              <div class="chatluna-sandbox-message-content">
+                <div v-if="!isMergedMessage(model.messages, messageIndex, model.currentOperatorId)" class="chatluna-sandbox-sender-line">
+                  <span class="chatluna-sandbox-message-author">{{ getMessageAuthorName(message.authorId) }}</span>
                   <span
                     v-if="getMessageRoleBadge(message.authorId)"
                     class="webqq-role-badge"
                     :class="`is-${getMessageRoleBadge(message.authorId)!.kind}`"
                   >{{ getMessageRoleBadge(message.authorId)!.text }}</span>
                 </div>
-                <div class="webqq-message-body">
-                  <div class="webqq-message-stack">
-                    <div class="webqq-message-bubble" @click.capture="handleMessageBubbleClick(message, $event)">
-                      <button v-if="getReplyMessage(message)" class="webqq-message-quote is-clickable" type="button" aria-label="跳转到引用消息" @click.stop="scrollToQuotedMessage(getReplyMessage(message)!.id)">
-                        <strong class="webqq-message-quote-title">{{ getMessageAuthorName(getReplyMessage(message)!.authorId) }}</strong>
+                <div class="chatluna-sandbox-message-body">
+                  <div class="chatluna-sandbox-message-stack">
+                    <div class="chatluna-sandbox-message-bubble" @click.capture="handleMessageBubbleClick(message, $event)">
+                      <button v-if="getReplyMessage(message)" class="chatluna-sandbox-message-quote is-clickable" type="button" aria-label="跳转到引用消息" @click.stop="scrollToQuotedMessage(getReplyMessage(message)!.id)">
+                        <strong class="chatluna-sandbox-message-quote-title">{{ getMessageAuthorName(getReplyMessage(message)!.authorId) }}</strong>
                         <span>{{ getMessageText(getReplyMessage(message)!) }}</span>
                       </button>
                       <button
                         v-if="message.forwardId"
-                        class="webqq-message-quote webqq-message-forward"
+                        class="chatluna-sandbox-message-quote chatluna-sandbox-message-forward"
                         type="button"
                         :disabled="!getForwardPreview(message)"
                         aria-label="查看合并转发消息"
                         @click.stop="openForwardMessage(message)"
                       >
-                        <strong class="webqq-message-quote-title">{{ getForwardPreview(message)?.title || '合并转发' }}</strong>
+                        <strong class="chatluna-sandbox-message-quote-title">{{ getForwardPreview(message)?.title || '合并转发' }}</strong>
                         <template v-if="getForwardPreview(message)">
                           <span
                             v-for="(line, lineIndex) in getForwardPreview(message)!.lines"
                             :key="`${message.id}:forward:${lineIndex}`"
                           >{{ line }}</span>
-                          <span class="webqq-message-forward-entry">查看{{ getForwardPreview(message)!.total }}条转发消息</span>
+                          <span class="chatluna-sandbox-message-forward-entry">查看{{ getForwardPreview(message)!.total }}条转发消息</span>
                         </template>
                         <span v-else>{{ getMessageText(message) || '[合并转发]' }}</span>
                       </button>
                       <template v-else>
-                        <div v-for="media in message.media" :key="media.id" class="webqq-message-media">
+                        <div v-for="media in message.media" :key="media.id" class="chatluna-sandbox-message-media">
                           <img v-if="media.type === 'image' && getMediaSource(media.id)" :src="getMediaSource(media.id)" :alt="media.name">
                           <audio v-else-if="media.type === 'audio' && getMediaSource(media.id)" :src="getMediaSource(media.id)" controls preload="metadata" />
                           <video v-else-if="media.type === 'video' && getMediaSource(media.id)" :src="getMediaSource(media.id)" controls preload="metadata" />
-                          <a v-else-if="media.type === 'file' && getMediaSource(media.id)" :href="getMediaSource(media.id)" :download="media.name" class="webqq-message-file">
+                          <a v-else-if="media.type === 'file' && getMediaSource(media.id)" :href="getMediaSource(media.id)" :download="media.name" class="chatluna-sandbox-message-file">
                             <IconPaperclip :size="18" aria-hidden="true" />
                             <span><strong>{{ media.name }}</strong><small>{{ formatMediaSize(media.size) }}</small></span>
                           </a>
-                          <span v-else class="webqq-message-media-loading">{{ model.mediaLoadFailures[media.id] ? '媒体不可用' : '媒体加载中...' }}</span>
+                          <span v-else class="chatluna-sandbox-message-media-loading">{{ model.mediaLoadFailures[media.id] ? '媒体不可用' : '媒体加载中...' }}</span>
                         </div>
-                        <span v-if="getMessageText(message)" class="webqq-message-text">{{ getMessageText(message) }}</span>
+                        <span v-if="getMessageText(message)" class="chatluna-sandbox-message-text">{{ getMessageText(message) }}</span>
                       </template>
-                      <span v-if="isRecalledMessage(message)" class="webqq-message-recalled-label">已撤回</span>
+                      <span v-if="isRecalledMessage(message)" class="chatluna-sandbox-message-recalled-label">已撤回</span>
                       <WebqqMessageReactions
                         v-if="message.reactions?.length"
                         :reactions="message.reactions"
@@ -163,7 +163,7 @@
                       />
                     </div>
                   </div>
-                  <time class="webqq-message-time">{{ formatMessageTime(message.createdAt) }}</time>
+                  <time class="chatluna-sandbox-message-time">{{ formatMessageTime(message.createdAt) }}</time>
                 </div>
               </div>
               </div>
@@ -188,7 +188,7 @@
         <li
           v-if="shouldShowThinking(message)"
           :key="`${message.id}:thinking`"
-          class="webqq-thinking-row"
+          class="chatluna-sandbox-thinking-row"
           :class="[
             message.authorId === model.currentOperatorId ? 'is-outgoing' : 'is-incoming',
             { 'is-recalled': isRecalledMessage(message) },
@@ -196,23 +196,23 @@
         >
           <button
             type="button"
-            class="webqq-thinking-toggle"
+            class="chatluna-sandbox-thinking-toggle"
             :aria-expanded="isThinkingExpanded(message)"
             @click="toggleThinking(message)"
           >
             <span
               v-if="getMessageThinking(message)!.usage"
-              class="webqq-thinking-usage"
+              class="chatluna-sandbox-thinking-usage"
               aria-label="本次 ChatLuna 调用指标"
             >
-              <span class="webqq-thinking-usage-group">
-                <svg class="webqq-thinking-usage-icon is-input" viewBox="0 0 24 24" aria-hidden="true">
+              <span class="chatluna-sandbox-thinking-usage-group">
+                <svg class="chatluna-sandbox-thinking-usage-icon is-input" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M12 20V8" />
                   <path d="m7 13 5-5 5 5" />
                   <path d="M5 4h14" />
                 </svg>
                 <span>{{ getMessageThinking(message)!.usage!.inputTokens }}</span>
-                <svg class="webqq-thinking-usage-icon is-output" viewBox="0 0 24 24" aria-hidden="true">
+                <svg class="chatluna-sandbox-thinking-usage-icon is-output" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M12 4v12" />
                   <path d="m7 11 5 5 5-5" />
                   <path d="M5 20h14" />
@@ -220,9 +220,9 @@
                 <span>{{ getMessageThinking(message)!.usage!.outputTokens }}</span>
               </span>
             </span>
-            <span class="webqq-thinking-duration">{{ formatThinkingDuration(getMessageThinking(message)!.thoughtDurationMs) }}</span>
+            <span class="chatluna-sandbox-thinking-duration">{{ formatThinkingDuration(getMessageThinking(message)!.thoughtDurationMs) }}</span>
             <svg
-              class="webqq-thinking-chevron"
+              class="chatluna-sandbox-thinking-chevron"
               :class="{ 'is-expanded': isThinkingExpanded(message) }"
               viewBox="0 0 16 16"
               aria-hidden="true"
@@ -230,30 +230,30 @@
               <path d="M6 3.5 10.5 8 6 12.5" />
             </svg>
           </button>
-          <Transition name="webqq-thinking" @before-leave="prepareThinkingPanelLeave">
-            <div v-if="isThinkingExpanded(message)" class="webqq-thinking-panel">
-              <div class="webqq-thinking-content">{{ getMessageThinking(message)!.thought }}</div>
+          <Transition name="chatluna-sandbox-thinking" @before-leave="prepareThinkingPanelLeave">
+            <div v-if="isThinkingExpanded(message)" class="chatluna-sandbox-thinking-panel">
+              <div class="chatluna-sandbox-thinking-content">{{ getMessageThinking(message)!.thought }}</div>
             </div>
           </Transition>
         </li>
         <li
           v-else-if="shouldShowUsage(message)"
           :key="`${message.id}:usage`"
-          class="webqq-thinking-row is-usage-only"
+          class="chatluna-sandbox-thinking-row is-usage-only"
           :class="[
             message.authorId === model.currentOperatorId ? 'is-outgoing' : 'is-incoming',
             { 'is-recalled': isRecalledMessage(message) },
           ]"
         >
-          <div class="webqq-thinking-usage" aria-label="本次 ChatLuna 调用指标">
-            <span class="webqq-thinking-usage-group">
-              <svg class="webqq-thinking-usage-icon is-input" viewBox="0 0 24 24" aria-hidden="true">
+          <div class="chatluna-sandbox-thinking-usage" aria-label="本次 ChatLuna 调用指标">
+            <span class="chatluna-sandbox-thinking-usage-group">
+              <svg class="chatluna-sandbox-thinking-usage-icon is-input" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M12 20V8" />
                 <path d="m7 13 5-5 5 5" />
                 <path d="M5 4h14" />
               </svg>
               <span>{{ getMessageUsage(message)!.usage!.inputTokens }}</span>
-              <svg class="webqq-thinking-usage-icon is-output" viewBox="0 0 24 24" aria-hidden="true">
+              <svg class="chatluna-sandbox-thinking-usage-icon is-output" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M12 4v12" />
                 <path d="m7 11 5 5 5-5" />
                 <path d="M5 20h14" />
@@ -267,26 +267,26 @@
         v-for="state in model.chatLunaStates"
         v-show="state.thinking"
         :key="`${state.botParticipantId}:${state.conversationId}`"
-        class="webqq-message-row webqq-chatluna-state"
+        class="chatluna-sandbox-message-row webqq-chatluna-state"
         :class="state.botParticipantId === model.currentOperatorId ? 'is-outgoing' : 'is-incoming'"
       >
-        <span class="webqq-message-avatar-wrap">
+        <span class="chatluna-sandbox-message-avatar-wrap">
           <WebqqAvatar
-            class="webqq-message-avatar"
+            class="chatluna-sandbox-message-avatar"
             kind="bot"
             :name="getParticipantName(state.botParticipantId)"
             :avatar="getParticipantAvatar(state.botParticipantId)"
           />
         </span>
-        <div class="webqq-message-content">
+        <div class="chatluna-sandbox-message-content">
           <!-- 等待气泡必须复用普通消息的 sender-line + message-body 结构：
-               少了包裹层会丢掉 .webqq-sender-line + .webqq-message-body 的 6px 间距，
+               少了包裹层会丢掉 .chatluna-sandbox-sender-line + .chatluna-sandbox-message-body 的 6px 间距，
                等待气泡会比真实消息更贴近名字，被替换成真实消息时还会整体下跳。 -->
-          <div class="webqq-sender-line">
-            <span class="webqq-message-author">{{ getParticipantName(state.botParticipantId) }}</span>
+          <div class="chatluna-sandbox-sender-line">
+            <span class="chatluna-sandbox-message-author">{{ getParticipantName(state.botParticipantId) }}</span>
           </div>
-          <div class="webqq-message-body">
-            <div class="webqq-message-bubble" aria-label="机器人正在思考">
+          <div class="chatluna-sandbox-message-body">
+            <div class="chatluna-sandbox-message-bubble" aria-label="机器人正在思考">
               <span class="webqq-chatluna-thinking-dots">
                 <span v-for="dot in 3" :key="dot" class="webqq-chatluna-thinking-dot" />
               </span>
@@ -753,7 +753,7 @@ function handleMessageBubbleClick(message: SandboxMessage, event: MouseEvent) {
 function handleMessageClick(message: SandboxMessage, event: MouseEvent) {
   if (!props.model.selectionMode || !isMessageSelectable(message)) return
   // 气泡由捕获处理器统一接管；这里只覆盖头像、发送者信息和行内空白区域。
-  if ((event.target as HTMLElement | null)?.closest('.webqq-message-bubble')) return
+  if ((event.target as HTMLElement | null)?.closest('.chatluna-sandbox-message-bubble')) return
   emit('toggleSelection', message.id)
 }
 

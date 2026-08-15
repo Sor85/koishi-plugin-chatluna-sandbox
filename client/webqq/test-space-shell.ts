@@ -37,8 +37,8 @@ export function createAiTestSpaceShell(
 
   async function loadTestSpaces() {
     const [spaces, mainWorkspace] = await Promise.all([
-      send('onebot-sandbox/test-spaces'),
-      send('onebot-sandbox/workspace', {}),
+      send('chatluna-sandbox/test-spaces'),
+      send('chatluna-sandbox/workspace', {}),
     ])
     testSpaces.value = spaces
     mainSnapshot.value = mainWorkspace.snapshot
@@ -85,17 +85,17 @@ export function createAiTestSpaceShell(
   }
 
   async function createTestSpace() {
-    const space = await send('onebot-sandbox/create-test-space', {})
+    const space = await send('chatluna-sandbox/create-test-space', {})
     await loadTestSpaces()
     await enterTestSpace(space.id)
   }
 
   async function handleTestSpaceAction(action: 'take-over' | 'return' | 'terminate' | 'reactivate' | 'delete', spaceId: string) {
-    if (action === 'take-over') await send('onebot-sandbox/take-over-test-space', { spaceId })
-    if (action === 'return') await send('onebot-sandbox/return-test-space', { spaceId })
-    if (action === 'terminate') await send('onebot-sandbox/terminate-test-space', { spaceId })
-    if (action === 'reactivate') await send('onebot-sandbox/reactivate-test-space', { spaceId })
-    if (action === 'delete') await send('onebot-sandbox/delete-test-space', { spaceId })
+    if (action === 'take-over') await send('chatluna-sandbox/take-over-test-space', { spaceId })
+    if (action === 'return') await send('chatluna-sandbox/return-test-space', { spaceId })
+    if (action === 'terminate') await send('chatluna-sandbox/terminate-test-space', { spaceId })
+    if (action === 'reactivate') await send('chatluna-sandbox/reactivate-test-space', { spaceId })
+    if (action === 'delete') await send('chatluna-sandbox/delete-test-space', { spaceId })
     if (action === 'delete' && activeSpaceId.value === spaceId) await enterTestSpace()
     await loadTestSpaces()
   }

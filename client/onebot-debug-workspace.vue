@@ -1,5 +1,5 @@
 <template>
-  <main class="webqq-chat webqq-debug-workspace" aria-label="OneBot 调试工作台">
+  <main class="chatluna-sandbox-chat webqq-debug-workspace" aria-label="OneBot 调试工作台">
     <header class="webqq-debug-header">
       <div>
         <h1>OneBot 调试</h1>

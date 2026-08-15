@@ -60,7 +60,7 @@ export function searchSandboxEmojiFaces(query: string): SandboxEmojiFace[] {
   })
 }
 
-const recentStorageKey = 'onebot-sandbox.webqq.recent-emoji-ids'
+const recentStorageKey = 'chatluna-sandbox.webqq.recent-emoji-ids'
 
 export function loadRecentSandboxEmojiIds(storage: Pick<Storage, 'getItem'> = localStorage): string[] {
   try {

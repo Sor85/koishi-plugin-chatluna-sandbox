@@ -139,40 +139,40 @@
           </div>
         </template>
 
-        <section v-if="target?.type === 'group'" class="webqq-secondary-divider webqq-group-members-editor">
-          <div class="webqq-group-members-heading">
+        <section v-if="target?.type === 'group'" class="webqq-secondary-divider chatluna-sandbox-group-members-editor">
+          <div class="chatluna-sandbox-group-members-heading">
             <div>
               <strong>群成员</strong>
               <p class="webqq-secondary-hint">点击头像添加或移除群成员。</p>
             </div>
-            <span class="webqq-group-members-count">{{ draft.members.length }} / {{ participants.length }}</span>
+            <span class="chatluna-sandbox-group-members-count">{{ draft.members.length }} / {{ participants.length }}</span>
           </div>
-          <div class="webqq-group-member-grid">
+          <div class="chatluna-sandbox-group-member-grid">
             <article
               v-for="participant in participants"
               :key="participant.id"
-              :class="['webqq-group-member-card', { 'is-selected': memberOf(participant.id) }]"
+              :class="['chatluna-sandbox-group-member-card', { 'is-selected': memberOf(participant.id) }]"
             >
               <button
                 type="button"
-                class="webqq-group-member-select"
+                class="chatluna-sandbox-group-member-select"
                 :aria-pressed="!!memberOf(participant.id)"
                 :aria-label="`${memberOf(participant.id) ? '移除' : '添加'}${participant.name}（${participant.id}）`"
                 @click="toggleGroupMember(participant.id)"
               >
-                <span class="webqq-group-member-avatar-wrap">
+                <span class="chatluna-sandbox-group-member-avatar-wrap">
                   <WebqqAvatar
-                    class="webqq-group-member-avatar"
+                    class="chatluna-sandbox-group-member-avatar"
                     :kind="participant.type"
                     :name="participant.name"
                     :avatar="participant.avatar"
                   />
-                  <span class="webqq-group-member-state" aria-hidden="true">
+                  <span class="chatluna-sandbox-group-member-state" aria-hidden="true">
                     <IconCheck v-if="memberOf(participant.id)" />
                     <IconPlus v-else />
                   </span>
                 </span>
-                <span class="webqq-group-member-copy">
+                <span class="chatluna-sandbox-group-member-copy">
                   <strong>{{ participant.name }}</strong>
                   <small>{{ participant.id }}</small>
                   <template v-if="memberOf(participant.id)">
@@ -185,7 +185,7 @@
               <button
                 v-if="memberOf(participant.id)"
                 type="button"
-                class="webqq-group-member-edit"
+                class="chatluna-sandbox-group-member-edit"
                 :aria-label="`编辑${participant.name}的群资料`"
                 @click="editingMemberId = participant.id"
               >
@@ -193,8 +193,8 @@
               </button>
             </article>
           </div>
-          <div v-if="editingParticipant && editingMember" class="webqq-group-member-editor">
-            <div class="webqq-group-member-editor-heading">
+          <div v-if="editingParticipant && editingMember" class="chatluna-sandbox-group-member-editor">
+            <div class="chatluna-sandbox-group-member-editor-heading">
               <WebqqAvatar
                 :kind="editingParticipant.type"
                 :name="editingParticipant.name"
@@ -208,7 +208,7 @@
                 <IconX aria-hidden="true" />
               </Button>
             </div>
-            <div class="webqq-group-member-controls">
+            <div class="chatluna-sandbox-group-member-controls">
               <div class="webqq-secondary-field">
                 <Label :for="`${fieldPrefix}-member-card`">群昵称</Label>
                 <Input

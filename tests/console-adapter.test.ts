@@ -25,9 +25,9 @@ afterEach(async () => {
 
 describe('Koishi 控制台适配器', () => {
   it('本地软链接安装时保留 node_modules 资源路径', async () => {
-    const workspace = await mkdtemp(join(tmpdir(), 'onebot-sandbox-console-entry-'))
+    const workspace = await mkdtemp(join(tmpdir(), 'chatluna-sandbox-console-entry-'))
     temporaryDirectories.push(workspace)
-    const packageDirectory = join(workspace, 'node_modules', 'koishi-plugin-onebot-sandbox')
+    const packageDirectory = join(workspace, 'node_modules', 'koishi-plugin-chatluna-sandbox')
     await mkdir(join(workspace, 'node_modules'), { recursive: true })
     await symlink(resolve('.'), packageDirectory)
 
@@ -39,7 +39,7 @@ describe('Koishi 控制台适配器', () => {
 
   it('注册 Vue 页面入口并通过共享服务返回消息闭环结果', async () => {
     const app = new App()
-    const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-console-media-'))
+    const mediaDirectory = await mkdtemp(join(tmpdir(), 'chatluna-sandbox-console-media-'))
     temporaryDirectories.push(mediaDirectory)
     let control: SandboxControlService | undefined
     app.plugin((ctx) => {
@@ -91,20 +91,20 @@ describe('Koishi 控制台适配器', () => {
       prod: expect.stringContaining('dist'),
     }])
 
-    const snapshotListener = listeners.get('onebot-sandbox/workspace')
-    const historyListener = listeners.get('onebot-sandbox/message-history')
-    const searchConversationMessagesListener = listeners.get('onebot-sandbox/search-conversation-messages')
-    const sendMessageListener = listeners.get('onebot-sandbox/send-message')
-    const sendMediaMessageListener = listeners.get('onebot-sandbox/send-media-message')
-    const sendForwardMessageListener = listeners.get('onebot-sandbox/send-forward-message')
-    const getForwardMessageListener = listeners.get('onebot-sandbox/get-forward-message')
-    const getMediaContentListener = listeners.get('onebot-sandbox/media-content')
-    const setGroupAnnouncementListener = listeners.get('onebot-sandbox/set-group-announcement')
-    const deleteGroupAnnouncementListener = listeners.get('onebot-sandbox/delete-group-announcement')
-    const manageEnvironmentListener = listeners.get('onebot-sandbox/manage-environment')
-    const friendActionListener = listeners.get('onebot-sandbox/friend-action')
-    const groupActionListener = listeners.get('onebot-sandbox/group-action')
-    const botDeliveriesListener = listeners.get('onebot-sandbox/bot-deliveries')
+    const snapshotListener = listeners.get('chatluna-sandbox/workspace')
+    const historyListener = listeners.get('chatluna-sandbox/message-history')
+    const searchConversationMessagesListener = listeners.get('chatluna-sandbox/search-conversation-messages')
+    const sendMessageListener = listeners.get('chatluna-sandbox/send-message')
+    const sendMediaMessageListener = listeners.get('chatluna-sandbox/send-media-message')
+    const sendForwardMessageListener = listeners.get('chatluna-sandbox/send-forward-message')
+    const getForwardMessageListener = listeners.get('chatluna-sandbox/get-forward-message')
+    const getMediaContentListener = listeners.get('chatluna-sandbox/media-content')
+    const setGroupAnnouncementListener = listeners.get('chatluna-sandbox/set-group-announcement')
+    const deleteGroupAnnouncementListener = listeners.get('chatluna-sandbox/delete-group-announcement')
+    const manageEnvironmentListener = listeners.get('chatluna-sandbox/manage-environment')
+    const friendActionListener = listeners.get('chatluna-sandbox/friend-action')
+    const groupActionListener = listeners.get('chatluna-sandbox/group-action')
+    const botDeliveriesListener = listeners.get('chatluna-sandbox/bot-deliveries')
     if (typeof snapshotListener !== 'function'
       || typeof historyListener !== 'function'
       || typeof searchConversationMessagesListener !== 'function'
@@ -190,7 +190,7 @@ describe('Koishi 控制台适配器', () => {
     })
     const replyRevision = control.getSnapshot().revision
     expect(broadcasts).toContainEqual({
-      type: 'onebot-sandbox/scene-mutated',
+      type: 'chatluna-sandbox/scene-mutated',
       body: { revision: replyRevision },
     })
     const refreshedWorkspace = await snapshotListener({ operatorId: '10001' })

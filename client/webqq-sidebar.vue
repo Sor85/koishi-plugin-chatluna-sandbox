@@ -72,7 +72,7 @@
               </PopoverContent>
             </Popover>
           </header>
-          <label v-if="sidebarTab !== 'recent'" class="webqq-search">
+          <label v-if="sidebarTab !== 'recent'" class="chatluna-sandbox-search">
             <IconSearch :size="18" aria-hidden="true" />
             <span class="sr-only">搜索会话</span>
             <input

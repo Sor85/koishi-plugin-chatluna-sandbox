@@ -11,7 +11,7 @@ describe('环境管理组件传输边界', () => {
 
     for (const source of sources) {
       expect(source).not.toContain("from '@koishijs/client'")
-      expect(source).not.toContain('onebot-sandbox/manage-environment')
+      expect(source).not.toContain('chatluna-sandbox/manage-environment')
       expect(source).toContain('submit: [')
     }
   })
@@ -46,7 +46,7 @@ describe('环境管理组件传输边界', () => {
     expect(overlaySource).not.toContain('SandboxSnapshot')
     expect(overlaySource).not.toContain('snapshot')
     expect(overlaySource).toContain('<EnvironmentEntityDialog')
-    expect(overlaySource).toContain('class="webqq-secondary-page webqq-profile-card-page webqq-solid-secondary-surface onebot-sandbox-secondary-page onebot-sandbox-profile-card-page"')
+    expect(overlaySource).toContain('class="chatluna-sandbox-secondary-page chatluna-sandbox-profile-card-page chatluna-sandbox-solid-secondary-surface"')
     expect(overlaySource).not.toContain('<Dialog v-model:open="profileOpen">')
     expect(overlaySource.match(/<Dialog /g)).toHaveLength(2)
   })
@@ -84,22 +84,22 @@ describe('环境管理组件传输边界', () => {
     const styles = readFileSync(resolve('client/styles/webqq-overlays.css'), 'utf8')
 
     expect(source).toContain('v-for="participant in participants"')
-    expect(source).toContain('class="webqq-group-member-avatar"')
+    expect(source).toContain('class="chatluna-sandbox-group-member-avatar"')
     expect(source).not.toContain('show-bot-badge')
     expect(source).toContain('{{ participant.id }}')
-    expect(source).toContain('class="webqq-group-member-controls"')
-    expect(source).toContain('class="webqq-group-member-edit"')
-    expect(source).toContain('class="webqq-group-member-editor"')
+    expect(source).toContain('class="chatluna-sandbox-group-member-controls"')
+    expect(source).toContain('class="chatluna-sandbox-group-member-edit"')
+    expect(source).toContain('class="chatluna-sandbox-group-member-editor"')
     expect(source).toContain('editingMemberId')
     expect(source).toContain('memberRoleLabel')
     expect(source).toContain('@click="toggleGroupMember(participant.id)"')
     expect(source).toContain('`${editingParticipant.name}的群身份`')
     expect(source).toContain('`${editingParticipant.name}的群昵称`')
-    expect(styles).toContain('.webqq-group-member-grid')
+    expect(styles).toContain('.chatluna-sandbox-group-member-grid')
     expect(styles).not.toContain('--webqq-bot-badge')
     expect(styles).not.toContain('.webqq-avatar-bot-badge')
-    expect(styles).toMatch(/\.webqq-group-member-state\s*\{[^}]*z-index:\s*2/s)
-    expect(styles).toContain('.webqq-group-member-card.is-selected')
+    expect(styles).toMatch(/\.chatluna-sandbox-group-member-state\s*\{[^}]*z-index:\s*2/s)
+    expect(styles).toContain('.chatluna-sandbox-group-member-card.is-selected')
     expect(styles).toContain('@media (max-width: 640px)')
   })
 
@@ -153,14 +153,14 @@ describe('环境管理组件传输边界', () => {
     const primitives = readFileSync(resolve('client/styles/webqq-primitives.css'), 'utf8')
 
     expect(entityDialog).toContain('variant="destructive"')
-    expect(dialogContent).toContain('sandbox-dialog-content webqq-solid-secondary-surface')
-    expect(popoverContent).toContain('sandbox-popover-content webqq-solid-secondary-surface')
+    expect(dialogContent).toContain('sandbox-dialog-content chatluna-sandbox-solid-secondary-surface')
+    expect(popoverContent).toContain('sandbox-popover-content chatluna-sandbox-solid-secondary-surface')
     expect(selectContent).toContain('z-[200]')
-    expect(selectContent).toContain('sandbox-select-content webqq-solid-secondary-surface')
+    expect(selectContent).toContain('sandbox-select-content chatluna-sandbox-solid-secondary-surface')
     expect(selectContent).toContain('v-webqq-scrollbar="{ showOverlay: false }"')
     expect(primitives).toContain('.sandbox-select-content')
     const dialogPopoverRule = primitives.slice(primitives.indexOf('.sandbox-dialog-content,\n.sandbox-popover-content {')).split('}')[0]
-    const solidSurfaceRule = primitives.slice(primitives.indexOf('.webqq-solid-secondary-surface:not(.is-frosted) {')).split('}')[0]
+    const solidSurfaceRule = primitives.slice(primitives.indexOf('.chatluna-sandbox-solid-secondary-surface:not(.is-frosted) {')).split('}')[0]
     expect(dialogPopoverRule).toContain('border-color: transparent')
     expect(solidSurfaceRule).toContain('border-color: var(--webqq-secondary-outline)')
     expect(solidSurfaceRule).toContain('box-shadow: var(--webqq-secondary-shadow)')
@@ -191,7 +191,7 @@ describe('环境管理组件传输边界', () => {
     expect(tokens).toContain('--webqq-secondary-outline: color-mix(in srgb, var(--webqq-border) 72%, transparent)')
     expect(tokens).toContain('--webqq-secondary-shadow: 0 18px 42px rgb(15 23 42 / 18%)')
     expect(tokens).toContain('--webqq-secondary-shadow: 0 18px 42px rgb(9 9 11 / 42%)')
-    const solidSurfaceRule = primitives.slice(primitives.indexOf('.webqq-solid-secondary-surface:not(.is-frosted) {')).split('}')[0]
+    const solidSurfaceRule = primitives.slice(primitives.indexOf('.chatluna-sandbox-solid-secondary-surface:not(.is-frosted) {')).split('}')[0]
     expect(solidSurfaceRule).toContain('border-color: var(--webqq-secondary-outline)')
     expect(solidSurfaceRule).toContain('box-shadow: var(--webqq-secondary-shadow)')
   })

@@ -26,19 +26,19 @@ describe('模型请求记录持久化与生命周期', () => {
       responseBodyStatus: 'unavailable',
     }
     let database: {
-      get: (table: 'onebot-sandbox.model-requests', query: { scopeId: string }) => Promise<Array<{
+      get: (table: 'chatluna-sandbox.model-requests', query: { scopeId: string }) => Promise<Array<{
         scopeId: string
         nextSequence: number
         records: SandboxModelRequestRecord[]
         updatedAt: Date
       }>>
-      upsert: (table: 'onebot-sandbox.model-requests', rows: Array<{
+      upsert: (table: 'chatluna-sandbox.model-requests', rows: Array<{
         scopeId: string
         nextSequence: number
         records: SandboxModelRequestRecord[]
         updatedAt: Date
       }>) => Promise<void>
-      remove: (table: 'onebot-sandbox.model-requests', query: { scopeId: string }) => Promise<void>
+      remove: (table: 'chatluna-sandbox.model-requests', query: { scopeId: string }) => Promise<void>
     } | undefined
     const writes: Array<{ nextSequence: number, records: SandboxModelRequestRecord[] }> = []
     const persistence = new KoishiDatabaseModelRequestPersistence('main', () => database)

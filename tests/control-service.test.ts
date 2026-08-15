@@ -17,7 +17,7 @@ afterEach(async () => {
 describe('模拟 QQ 环境消息闭环', () => {
   it('发送图片时只在场景保存安全引用，并生成 Koishi 与 OneBot 媒体消息', async () => {
     const app = new App()
-    const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-media-'))
+    const mediaDirectory = await mkdtemp(join(tmpdir(), 'chatluna-sandbox-media-'))
     temporaryDirectories.push(mediaDirectory)
     let control: SandboxControlService | undefined
     app.plugin((ctx) => {
@@ -89,7 +89,7 @@ describe('模拟 QQ 环境消息闭环', () => {
 
   it('一条消息携带多个附件与文本，按附件在前文本在后派发', async () => {
     const app = new App()
-    const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-media-'))
+    const mediaDirectory = await mkdtemp(join(tmpdir(), 'chatluna-sandbox-media-'))
     temporaryDirectories.push(mediaDirectory)
     let control: SandboxControlService | undefined
     app.plugin((ctx) => {
@@ -124,7 +124,7 @@ describe('模拟 QQ 环境消息闭环', () => {
 
   it('拒绝不支持或超限的媒体内容', async () => {
     const app = new App()
-    const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-media-'))
+    const mediaDirectory = await mkdtemp(join(tmpdir(), 'chatluna-sandbox-media-'))
     temporaryDirectories.push(mediaDirectory)
     let control: SandboxControlService | undefined
     app.plugin((ctx) => {
@@ -158,7 +158,7 @@ describe('模拟 QQ 环境消息闭环', () => {
 
   it('将文件、语音和视频映射为对应的 Koishi 元素与 OneBot 消息段', async () => {
     const app = new App()
-    const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-media-'))
+    const mediaDirectory = await mkdtemp(join(tmpdir(), 'chatluna-sandbox-media-'))
     temporaryDirectories.push(mediaDirectory)
     let control: SandboxControlService | undefined
     app.plugin((ctx) => {
@@ -200,7 +200,7 @@ describe('模拟 QQ 环境消息闭环', () => {
 
   it('删除媒体消息所属会话并重新启动内存场景时清理媒体文件', async () => {
     const app = new App()
-    const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-media-'))
+    const mediaDirectory = await mkdtemp(join(tmpdir(), 'chatluna-sandbox-media-'))
     temporaryDirectories.push(mediaDirectory)
     let control: SandboxControlService | undefined
     app.plugin((ctx) => {
@@ -729,7 +729,7 @@ describe('模拟 QQ 环境消息闭环', () => {
 
   it('嵌套合并转发的节点媒体对可达操作者可读，删除会话后级联清理孤儿资源', async () => {
     const app = new App()
-    const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-forward-media-'))
+    const mediaDirectory = await mkdtemp(join(tmpdir(), 'chatluna-sandbox-forward-media-'))
     temporaryDirectories.push(mediaDirectory)
     let control: SandboxControlService | undefined
     app.plugin((ctx) => {

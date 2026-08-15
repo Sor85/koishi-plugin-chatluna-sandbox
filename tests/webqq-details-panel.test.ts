@@ -21,6 +21,6 @@ describe('WebQQ 右侧信息栏', () => {
     expect(source).not.toContain('useMediaQuery')
     expect(pageSource).toContain('<WebqqDetailsPanel')
     expect(pageSource).toContain('openProfile')
-    expect(pageSource).not.toContain('class="webqq-group-info-body"')
+    expect(pageSource).not.toContain('class="chatluna-sandbox-group-info-body"')
   })
 })

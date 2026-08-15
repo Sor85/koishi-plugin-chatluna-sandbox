@@ -57,7 +57,7 @@ async function createControl(
 
 describe('沙盒场景持久化', () => {
   it('默认使用服务端内存且重启后恢复默认场景', async () => {
-    const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-memory-media-'))
+    const mediaDirectory = await mkdtemp(join(tmpdir(), 'chatluna-sandbox-memory-media-'))
     temporaryDirectories.push(mediaDirectory)
     const { app: firstApp, control: first } = await createControl(undefined, mediaDirectory)
     first.createUser({ id: '10099', name: '临时用户' })
@@ -136,7 +136,7 @@ describe('沙盒场景持久化', () => {
   })
 
   it('Database 服务永不出现时有界结束且不覆盖旧场景或清理媒体', async () => {
-    const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-database-timeout-media-'))
+    const mediaDirectory = await mkdtemp(join(tmpdir(), 'chatluna-sandbox-database-timeout-media-'))
     temporaryDirectories.push(mediaDirectory)
     await writeFile(join(mediaDirectory, 'preserved'), 'preserved')
     let saveCalls = 0
@@ -158,7 +158,7 @@ describe('沙盒场景持久化', () => {
 
   it('Database 模式在控制服务重启后恢复场景', async () => {
     const persistence = new TestScenePersistence()
-    const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-database-media-'))
+    const mediaDirectory = await mkdtemp(join(tmpdir(), 'chatluna-sandbox-database-media-'))
     temporaryDirectories.push(mediaDirectory)
     const { app: firstApp, control: first } = await createControl(persistence, mediaDirectory)
     const persistedDefaultAvatars = first.getSnapshot().participants.map(({ avatar }) => avatar)
@@ -279,7 +279,7 @@ describe('沙盒场景持久化', () => {
 
   it('内置头像文件丢失后按原引用重新物化，不随机换脸', async () => {
     const persistence = new TestScenePersistence()
-    const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-avatar-restore-media-'))
+    const mediaDirectory = await mkdtemp(join(tmpdir(), 'chatluna-sandbox-avatar-restore-media-'))
     temporaryDirectories.push(mediaDirectory)
     const { app: firstApp, control: first } = await createControl(persistence, mediaDirectory)
     const reference = first.getSnapshot().participants.find(({ id }) => id === '10001')!.avatar!
@@ -296,7 +296,7 @@ describe('沙盒场景持久化', () => {
   })
 
   it('查询失败时不保存默认场景也不清理共享媒体', async () => {
-    const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-failed-load-media-'))
+    const mediaDirectory = await mkdtemp(join(tmpdir(), 'chatluna-sandbox-failed-load-media-'))
     temporaryDirectories.push(mediaDirectory)
     await writeFile(join(mediaDirectory, 'preserved'), 'preserved')
     let saveCalls = 0
@@ -321,7 +321,7 @@ describe('沙盒场景持久化', () => {
   })
 
   it('Database 服务不可用时明确报告状态且不清理可能仍被旧场景引用的媒体', async () => {
-    const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-unavailable-media-'))
+    const mediaDirectory = await mkdtemp(join(tmpdir(), 'chatluna-sandbox-unavailable-media-'))
     temporaryDirectories.push(mediaDirectory)
     await writeFile(join(mediaDirectory, 'orphan'), 'orphan')
 

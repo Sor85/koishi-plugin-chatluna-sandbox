@@ -159,7 +159,7 @@ describe('MCP 折叠大型调试值', () => {
   it('列表禁止 includeLargeValues，单条可显式展开；wait 始终折叠', async () => {
     const app = new App()
     runningApps.push(app)
-    const directory = mkdtempSync(join(tmpdir(), 'onebot-sandbox-fold-'))
+    const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-fold-'))
     const control = new SandboxControlService(app)
     const service = new SandboxMcpService(control, { dataDirectory: directory })
     const credential = service.createCredential('调试凭证', ['debug', 'read'])
@@ -266,7 +266,7 @@ describe('控制服务与 Console 单条详情', () => {
       webQQMarkRecalledMessages: true,
     })
 
-    const getRecord = listeners.get('onebot-sandbox/debug-record')
+    const getRecord = listeners.get('chatluna-sandbox/debug-record')
     expect(getRecord).toBeTypeOf('function')
     expect(getRecord?.({ recordId: projected.id })).toMatchObject({
       id: projected.id,
@@ -276,7 +276,7 @@ describe('控制服务与 Console 单条详情', () => {
     expect(getRecord?.({ recordId: projected.id, includeLargeValues: true })).toMatchObject({
       payload: { file: body },
     })
-    expect(listeners.get('onebot-sandbox/debug-records')?.({})).toMatchObject({
+    expect(listeners.get('chatluna-sandbox/debug-records')?.({})).toMatchObject({
       capacity: expect.objectContaining({ recordCount: 1, totalBytes: expect.any(Number) }),
     })
   })

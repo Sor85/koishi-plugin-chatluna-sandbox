@@ -4,7 +4,7 @@ import { animate, cubicBezier, stagger } from 'animejs'
 const zoomEase = cubicBezier(0.32, 0.72, 0, 1)
 const ZOOM_DURATION = 440
 const CARD_RADIUS = 18
-const ZOOMING_CLASS = 'onebot-sandbox-workspace-zooming'
+const ZOOMING_CLASS = 'chatluna-sandbox-workspace-zooming'
 
 let activeZoom: ReturnType<typeof animate> | undefined
 

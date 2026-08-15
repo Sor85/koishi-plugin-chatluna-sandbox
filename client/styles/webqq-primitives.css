@@ -1,4 +1,4 @@
-.onebot-sandbox-page .sr-only {
+.chatluna-sandbox-page .sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -10,23 +10,23 @@
   border: 0;
 }
 
-[data-webqq-scrollbar="true"] {
+[data-chatluna-sandbox-scrollbar="true"] {
   scrollbar-width: none;
   scrollbar-color: transparent transparent;
 }
 
-[data-webqq-scrollbar="true"]::-webkit-scrollbar {
+[data-chatluna-sandbox-scrollbar="true"]::-webkit-scrollbar {
   width: 0;
   height: 0;
 }
 
-[data-webqq-scrollbar="true"]::-webkit-scrollbar-button {
+[data-chatluna-sandbox-scrollbar="true"]::-webkit-scrollbar-button {
   display: none;
   width: 0;
   height: 0;
 }
 
-.webqq-scrollbar-overlay {
+.chatluna-sandbox-scrollbar-overlay {
   position: fixed;
   z-index: 100;
   width: 10px;
@@ -35,17 +35,17 @@
   transition: opacity 0.14s ease;
 }
 
-.webqq-scrollbar-overlay.is-visible {
+.chatluna-sandbox-scrollbar-overlay.is-visible {
   opacity: 1;
 }
 
 /* 空间缩放只变换工作区，body 级滚动条不会随动；动画期间隐藏可避免滑块悬在过渡画面中。 */
-.onebot-sandbox-workspace-zooming .webqq-scrollbar-overlay {
+.chatluna-sandbox-workspace-zooming .chatluna-sandbox-scrollbar-overlay {
   opacity: 0 !important;
   transition: none;
 }
 
-.webqq-scrollbar-thumb {
+.chatluna-sandbox-scrollbar-thumb {
   position: absolute;
   top: var(--webqq-scrollbar-thumb-top);
   right: 2px;
@@ -58,12 +58,12 @@
   transition: width 0.14s ease, right 0.14s ease, background 0.14s ease;
 }
 
-.webqq-scrollbar-overlay.is-accent .webqq-scrollbar-thumb {
+.chatluna-sandbox-scrollbar-overlay.is-accent .chatluna-sandbox-scrollbar-thumb {
   background: color-mix(in srgb, var(--webqq-accent) 78%, #60a5fa 22%);
 }
 
-.webqq-scrollbar-overlay.is-wide .webqq-scrollbar-thumb,
-.webqq-scrollbar-thumb:hover {
+.chatluna-sandbox-scrollbar-overlay.is-wide .chatluna-sandbox-scrollbar-thumb,
+.chatluna-sandbox-scrollbar-thumb:hover {
   right: 2px;
   width: 6px;
 }
@@ -296,7 +296,7 @@
   background: var(--webqq-bg);
 }
 
-.webqq-solid-secondary-surface:not(.is-frosted) {
+.chatluna-sandbox-solid-secondary-surface:not(.is-frosted) {
   border-color: var(--webqq-secondary-outline);
   box-shadow: var(--webqq-secondary-shadow);
   backdrop-filter: none;

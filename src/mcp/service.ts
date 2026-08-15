@@ -575,12 +575,12 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
 ].map(([name, scope, description]) => ({ name, scope, description, inputSchema: TOOL_SCHEMAS[name as string] ?? { type: 'object', properties: {} } }) as ToolDefinition)
 
 const READ_RESOURCES = [
-  { uri: 'onebot-sandbox://guide', name: 'MCP 测试指南' },
-  { uri: 'onebot-sandbox://scene-schema', name: '场景 JSON Schema' },
-  { uri: 'onebot-sandbox://capabilities/napcat', name: 'NapCat 能力基线' },
-  { uri: 'onebot-sandbox://capabilities/llbot', name: 'LLBot 能力基线' },
-  { uri: 'onebot-sandbox://errors', name: '稳定错误码' },
-  { uri: 'onebot-sandbox://examples', name: '工具调用示例' },
+  { uri: 'chatluna-sandbox://guide', name: 'MCP 测试指南' },
+  { uri: 'chatluna-sandbox://scene-schema', name: '场景 JSON Schema' },
+  { uri: 'chatluna-sandbox://capabilities/napcat', name: 'NapCat 能力基线' },
+  { uri: 'chatluna-sandbox://capabilities/llbot', name: 'LLBot 能力基线' },
+  { uri: 'chatluna-sandbox://errors', name: '稳定错误码' },
+  { uri: 'chatluna-sandbox://examples', name: '工具调用示例' },
 ]
 
 function digestToken(token: string): string {
@@ -739,12 +739,12 @@ export class SandboxMcpService {
 
   readResource(token: string, uri: string): unknown {
     this.requireScope(this.requireCredential(token), 'read')
-    if (uri === 'onebot-sandbox://guide') return { testApiVersion: 1, tools: TOOL_DEFINITIONS }
-    if (uri === 'onebot-sandbox://scene-schema') return { testApiVersion: { const: 1 }, scene: { type: 'object' } }
-    if (uri === 'onebot-sandbox://capabilities/napcat') return this.getCapabilityMatrix(this.control, 'napcat')
-    if (uri === 'onebot-sandbox://capabilities/llbot') return this.getCapabilityMatrix(this.control, 'llbot')
-    if (uri === 'onebot-sandbox://errors') return ['unauthorized', 'permission_denied', 'invalid_arguments', 'idempotency_conflict', 'cursor_expired', 'confirmation_required', 'revision_conflict', 'rate_limited', 'space_id_required', 'space_taken_over', 'space_not_found', 'space_unavailable', 'test_spaces_unavailable', 'internal_error']
-    if (uri === 'onebot-sandbox://examples') return {
+    if (uri === 'chatluna-sandbox://guide') return { testApiVersion: 1, tools: TOOL_DEFINITIONS }
+    if (uri === 'chatluna-sandbox://scene-schema') return { testApiVersion: { const: 1 }, scene: { type: 'object' } }
+    if (uri === 'chatluna-sandbox://capabilities/napcat') return this.getCapabilityMatrix(this.control, 'napcat')
+    if (uri === 'chatluna-sandbox://capabilities/llbot') return this.getCapabilityMatrix(this.control, 'llbot')
+    if (uri === 'chatluna-sandbox://errors') return ['unauthorized', 'permission_denied', 'invalid_arguments', 'idempotency_conflict', 'cursor_expired', 'confirmation_required', 'revision_conflict', 'rate_limited', 'space_id_required', 'space_taken_over', 'space_not_found', 'space_unavailable', 'test_spaces_unavailable', 'internal_error']
+    if (uri === 'chatluna-sandbox://examples') return {
       create_test_space: {
         name: '退群公告测试',
         idempotencyKey: 'example-space-1',
@@ -850,7 +850,7 @@ export class SandboxMcpService {
   }
 
   private async executeTool(credential: SandboxMcpCredential, tool: string, args: Record<string, unknown>): Promise<unknown> {
-    if (tool === 'get_server_info') return { name: 'onebot-sandbox', testApiVersion: 1, transport: 'streamable-http', stateless: true, cursor: this.currentCursor() }
+    if (tool === 'get_server_info') return { name: 'chatluna-sandbox', testApiVersion: 1, transport: 'streamable-http', stateless: true, cursor: this.currentCursor() }
     if (tool === 'list_test_spaces') return this.requireTestSpaces().listSpaces()
     if (tool === 'get_test_space') return this.getTestSpace(args)
     if (tool === 'create_test_space') return this.withIdempotency(credential, tool, args, async () => {

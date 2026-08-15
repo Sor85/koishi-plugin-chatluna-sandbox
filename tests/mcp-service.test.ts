@@ -12,7 +12,7 @@ const apps: App[] = []
 function createService(scopes: Array<'read' | 'interact' | 'manage' | 'debug'> = ['read'], enableTestSpaces = false) {
   const app = new App()
   apps.push(app)
-  const directory = mkdtempSync(join(tmpdir(), 'onebot-sandbox-mcp-'))
+  const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-mcp-'))
   const runtimeBots = new SandboxRuntimeBotRegistry()
   const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media'), runtimeBots })
   const testSpaces = new SandboxTestSpaceService(app, runtimeBots)
@@ -259,7 +259,7 @@ describe('SandboxMcpService', () => {
   it('按凭证限制调用频率并记录脱敏 MCP 调用', async () => {
     const app = new App()
     apps.push(app)
-    const directory = mkdtempSync(join(tmpdir(), 'onebot-sandbox-mcp-limit-'))
+    const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-mcp-limit-'))
     const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media') })
     const service = new SandboxMcpService(control, { dataDirectory: directory, readPerMinute: 1 })
     const credential = service.createCredential('限流凭证', ['read', 'debug'])
@@ -273,14 +273,14 @@ describe('SandboxMcpService', () => {
 
   it('在显式 spaceId 中准备隔离环境并保留完成结果', async () => {
     const { control, service, credential, testSpaces } = createService(['read', 'manage'], true)
-    expect(service.readResource(credential.token, 'onebot-sandbox://errors')).toEqual(expect.arrayContaining([
+    expect(service.readResource(credential.token, 'chatluna-sandbox://errors')).toEqual(expect.arrayContaining([
       'space_id_required',
       'space_taken_over',
       'space_not_found',
       'space_unavailable',
       'test_spaces_unavailable',
     ]))
-    expect(service.readResource(credential.token, 'onebot-sandbox://examples')).toMatchObject({
+    expect(service.readResource(credential.token, 'chatluna-sandbox://examples')).toMatchObject({
       create_test_space: {
         name: '退群公告测试',
         idempotencyKey: 'example-space-1',

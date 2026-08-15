@@ -1,10 +1,10 @@
 /* 返回会话列表按钮只在窄屏单栏布局下显形（见 webqq-responsive.css）。 */
-.webqq-chat-back {
+.chatluna-sandbox-chat-back {
   display: none;
   flex: none;
 }
 
-.webqq-chat-header {
+.chatluna-sandbox-chat-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -13,12 +13,12 @@
   border-bottom: 1px solid var(--webqq-border);
 }
 
-.webqq-chat-title > div > strong,
-.webqq-chat-title > div > span {
+.chatluna-sandbox-chat-title > div > strong,
+.chatluna-sandbox-chat-title > div > span {
   margin: 0;
 }
 
-.webqq-chat {
+.chatluna-sandbox-chat {
   position: relative;
   grid-column: 3;
   grid-row: 1;
@@ -28,11 +28,11 @@
   background: var(--webqq-bg);
 }
 
-.webqq-chat.is-environment {
+.chatluna-sandbox-chat.is-environment {
   grid-template-rows: minmax(0, 1fr);
 }
 
-.webqq-chat-header-actions {
+.chatluna-sandbox-chat-header-actions {
   position: relative;
   display: inline-flex;
   min-width: 0;
@@ -41,7 +41,7 @@
   gap: 4px;
 }
 
-.webqq-chat-search-shell {
+.chatluna-sandbox-chat-search-shell {
   position: relative;
   width: 36px;
   min-width: 0;
@@ -49,33 +49,33 @@
   transition: width 180ms ease;
 }
 
-.webqq-chat-search-shell.is-expanded {
+.chatluna-sandbox-chat-search-shell.is-expanded {
   width: clamp(200px, 32vw, 320px);
 }
 
-.webqq-chat-search-trigger {
+.chatluna-sandbox-chat-search-trigger {
   width: 100%;
   color: var(--webqq-accent);
 }
 
-.webqq-chat-search-trigger:hover,
-.webqq-chat-search-trigger:focus-visible,
-.webqq-chat-search-trigger.is-active {
+.chatluna-sandbox-chat-search-trigger:hover,
+.chatluna-sandbox-chat-search-trigger:focus-visible,
+.chatluna-sandbox-chat-search-trigger.is-active {
   color: var(--webqq-accent);
 }
 
-.webqq-chat-search-trigger:disabled {
+.chatluna-sandbox-chat-search-trigger:disabled {
   color: var(--webqq-muted);
 }
 
-.webqq-message-search {
+.chatluna-sandbox-message-search {
   position: relative;
   width: 100%;
   min-width: 0;
 }
 
 /* 输入框在搜索图标原位置向左展开，内部图标维持展开前后的视觉连续性。 */
-.webqq-message-search-field {
+.chatluna-sandbox-message-search-field {
   position: relative;
   display: grid;
   width: 100%;
@@ -93,18 +93,18 @@
   transition: border-color 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease;
 }
 
-.webqq-message-search-field:focus-within {
+.chatluna-sandbox-message-search-field:focus-within {
   border-color: color-mix(in srgb, var(--webqq-accent) 58%, var(--webqq-border));
   background: var(--webqq-panel, var(--webqq-bg));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--webqq-accent) 14%, transparent);
 }
 
-.webqq-message-search-field > svg {
+.chatluna-sandbox-message-search-field > svg {
   flex: none;
   color: color-mix(in srgb, var(--webqq-accent) 84%, var(--webqq-muted));
 }
 
-.webqq-message-search-field input {
+.chatluna-sandbox-message-search-field input {
   width: 100%;
   min-width: 0;
   height: 34px;
@@ -116,13 +116,13 @@
   font-size: 13px;
 }
 
-.webqq-message-search-field input::placeholder {
+.chatluna-sandbox-message-search-field input::placeholder {
   color: color-mix(in srgb, var(--webqq-muted) 84%, transparent);
   opacity: 1;
 }
 
-.webqq-message-search-clear,
-.webqq-message-search-date-trigger {
+.chatluna-sandbox-message-search-clear,
+.chatluna-sandbox-message-search-date-trigger {
   display: inline-flex;
   width: 28px;
   height: 28px;
@@ -136,10 +136,10 @@
   background: transparent;
 }
 
-.webqq-message-search-clear:hover,
-.webqq-message-search-clear:focus-visible,
-.webqq-message-search-date-trigger:hover,
-.webqq-message-search-date-trigger:focus-visible {
+.chatluna-sandbox-message-search-clear:hover,
+.chatluna-sandbox-message-search-clear:focus-visible,
+.chatluna-sandbox-message-search-date-trigger:hover,
+.chatluna-sandbox-message-search-date-trigger:focus-visible {
   color: var(--webqq-text);
   background: var(--webqq-hover);
   /* 只关 outline-style，不能写 outline: none 简写：简写会把 outline-color/width
@@ -150,7 +150,7 @@
   outline-style: none;
 }
 
-.webqq-message-search-date-trigger.is-active {
+.chatluna-sandbox-message-search-date-trigger.is-active {
   color: var(--webqq-accent);
   background: color-mix(in srgb, var(--webqq-accent) 12%, transparent);
 }
@@ -159,7 +159,7 @@
    （含暗色，--webqq-* 会随 body[data-sandbox-color-scheme] 翻转）。
    尺寸/间距/圆角一律交给 registry 自带的 Tailwind 工具类，不在这里复刻——
    本文件不在 @layer 内，任何复刻声明都会永远压过工具类，反而破坏 1:1 还原。 */
-.webqq-message-search-date-popover {
+.chatluna-sandbox-message-search-date-popover {
   --background: var(--webqq-bg);
   --foreground: var(--webqq-text);
   --popover: var(--webqq-bg);
@@ -174,7 +174,7 @@
   --ring: var(--webqq-accent);
 }
 
-.webqq-message-search-results {
+.chatluna-sandbox-message-search-results {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
@@ -195,7 +195,7 @@
   backdrop-filter: saturate(160%) blur(16px);
 }
 
-.webqq-message-search-status {
+.chatluna-sandbox-message-search-status {
   margin: 0;
   padding: 10px 4px 4px;
   color: var(--webqq-muted);
@@ -203,7 +203,7 @@
   text-align: center;
 }
 
-.webqq-message-search-hit {
+.chatluna-sandbox-message-search-hit {
   display: grid;
   width: 100%;
   grid-template-columns: 32px minmax(0, 1fr);
@@ -218,23 +218,23 @@
   transition: background-color 0.12s ease, border-color 0.12s ease;
 }
 
-.webqq-message-search-hit:hover,
-.webqq-message-search-hit:focus-visible {
+.chatluna-sandbox-message-search-hit:hover,
+.chatluna-sandbox-message-search-hit:focus-visible {
   border-color: color-mix(in srgb, var(--webqq-accent) 22%, transparent);
   background: color-mix(in srgb, var(--webqq-accent) 10%, transparent);
   outline: none;
 }
 
-.webqq-message-search-hit.is-active {
+.chatluna-sandbox-message-search-hit.is-active {
   border-color: color-mix(in srgb, var(--webqq-accent) 34%, transparent);
   background: color-mix(in srgb, var(--webqq-accent) 14%, transparent);
 }
 
-.webqq-message-search-hit:disabled {
+.chatluna-sandbox-message-search-hit:disabled {
   opacity: 0.72;
 }
 
-.webqq-message-search-avatar {
+.chatluna-sandbox-message-search-avatar {
   --webqq-avatar-size: 32px;
 
   width: 32px;
@@ -243,13 +243,13 @@
   font-size: 10.667px;
 }
 
-.webqq-message-search-hit-body {
+.chatluna-sandbox-message-search-hit-body {
   display: grid;
   min-width: 0;
   gap: 4px;
 }
 
-.webqq-message-search-hit-meta {
+.chatluna-sandbox-message-search-hit-meta {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -257,7 +257,7 @@
   min-width: 0;
 }
 
-.webqq-message-search-hit-meta strong {
+.chatluna-sandbox-message-search-hit-meta strong {
   min-width: 0;
   overflow: hidden;
   color: var(--webqq-text);
@@ -267,13 +267,13 @@
   white-space: nowrap;
 }
 
-.webqq-message-search-hit-meta time {
+.chatluna-sandbox-message-search-hit-meta time {
   flex: none;
   color: var(--webqq-muted);
   font-size: 11px;
 }
 
-.webqq-message-search-hit-summary {
+.chatluna-sandbox-message-search-hit-summary {
   overflow: hidden;
   color: var(--webqq-muted);
   font-size: 12px;
@@ -282,7 +282,7 @@
   white-space: nowrap;
 }
 
-.webqq-message-search-more {
+.chatluna-sandbox-message-search-more {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -295,37 +295,37 @@
   font-size: 12px;
 }
 
-.webqq-message-search-more:hover,
-.webqq-message-search-more:focus-visible {
+.chatluna-sandbox-message-search-more:hover,
+.chatluna-sandbox-message-search-more:focus-visible {
   color: var(--webqq-text);
   border-color: color-mix(in srgb, var(--webqq-accent) 40%, transparent);
   background: color-mix(in srgb, var(--webqq-accent) 8%, transparent);
   outline: none;
 }
 
-.webqq-message-search-more:disabled {
+.chatluna-sandbox-message-search-more:disabled {
   opacity: 0.7;
 }
 
-.webqq-chat-title {
+.chatluna-sandbox-chat-title {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.webqq-chat-title-avatar {
+.chatluna-sandbox-chat-title-avatar {
   display: inline-flex;
   padding: 0;
   border: 0;
   background: transparent;
 }
 
-.webqq-chat-title > div > strong,
-.webqq-chat-title > div > span {
+.chatluna-sandbox-chat-title > div > strong,
+.chatluna-sandbox-chat-title > div > span {
   display: block;
 }
 
-.webqq-chat-title > div > span {
+.chatluna-sandbox-chat-title > div > span {
   margin-top: 2px;
   color: var(--webqq-muted);
   font-size: 12px;

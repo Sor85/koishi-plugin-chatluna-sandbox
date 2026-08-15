@@ -41,7 +41,7 @@ function chatBody(model = 'gpt-4o') {
 
 describe('模型请求采集', () => {
   it('从 Koishi baseDir 解析 portal 安装下的 ChatLuna 运行时', () => {
-    const baseDir = mkdtempSync(join(tmpdir(), 'onebot-sandbox-chatluna-'))
+    const baseDir = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-chatluna-'))
     try {
       const packageDir = join(baseDir, 'node_modules/koishi-plugin-chatluna')
       mkdirSync(packageDir, { recursive: true })

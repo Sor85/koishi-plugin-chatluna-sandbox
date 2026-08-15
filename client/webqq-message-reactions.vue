@@ -1,10 +1,10 @@
 <template>
-  <div v-if="reactions.length" class="webqq-message-reactions" :class="{ 'is-readonly': readonly }">
+  <div v-if="reactions.length" class="chatluna-sandbox-message-reactions" :class="{ 'is-readonly': readonly }">
     <button
       v-for="reaction in reactions"
       :key="reaction.emojiId"
       type="button"
-      class="webqq-message-reaction"
+      class="chatluna-sandbox-message-reaction"
       :class="{ 'is-readonly': readonly }"
       :disabled="readonly"
       :aria-label="reactionLabel(reaction)"
@@ -12,21 +12,21 @@
     >
       <img
         v-if="getFace(reaction.emojiId)?.url"
-        class="webqq-message-reaction-emoji"
+        class="chatluna-sandbox-message-reaction-emoji"
         :src="getFace(reaction.emojiId)!.url"
         :alt="getFace(reaction.emojiId)!.label"
       >
-      <span v-else class="webqq-message-reaction-label">{{ getFace(reaction.emojiId)?.label ?? reaction.emojiId }}</span>
-      <span v-if="reaction.participantIds.length" class="webqq-message-reaction-users">
+      <span v-else class="chatluna-sandbox-message-reaction-label">{{ getFace(reaction.emojiId)?.label ?? reaction.emojiId }}</span>
+      <span v-if="reaction.participantIds.length" class="chatluna-sandbox-message-reaction-users">
         <span
           v-for="(participantId, userIndex) in visibleParticipants(reaction)"
           :key="participantId"
-          class="webqq-message-reaction-avatar"
+          class="chatluna-sandbox-message-reaction-avatar"
           :title="getParticipantName(participantId)"
           :style="{ zIndex: visibleParticipants(reaction).length - userIndex }"
         >
           <WebqqAvatar
-            class="webqq-message-reaction-avatar-image"
+            class="chatluna-sandbox-message-reaction-avatar-image"
             :kind="isBotParticipant(participantId) ? 'bot' : 'user'"
             :name="getParticipantName(participantId)"
             :avatar="getParticipantAvatar(participantId)"

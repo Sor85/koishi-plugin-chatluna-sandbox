@@ -22,8 +22,8 @@
       </dl>
     </div>
 
-    <div v-else-if="model.group" class="webqq-group-info-body">
-      <section v-webqq-scrollbar="{ disabled: preview, tone: 'accent' }" class="webqq-group-announcements">
+    <div v-else-if="model.group" class="chatluna-sandbox-group-info-body">
+      <section v-webqq-scrollbar="{ disabled: preview, tone: 'accent' }" class="chatluna-sandbox-group-announcements">
         <div class="webqq-info-section-title">
           <h3>群公告</h3>
           <button type="button" :aria-label="announcementEditorOpen ? '取消添加群公告' : '添加群公告'" :class="{ 'is-active': announcementEditorOpen }" @click="toggleAnnouncementEditor">
@@ -35,8 +35,8 @@
           <textarea v-model="announcementInput" rows="3" placeholder="发布一条群公告" />
           <div><button type="submit" :disabled="announcementSending || !announcementInput.trim()">{{ announcementSending ? '发布中' : '发布' }}</button></div>
         </form>
-        <p v-if="!model.group.announcements.length" class="webqq-group-empty">暂无群公告</p>
-        <article v-for="announcement in model.group.announcements" :key="announcement.id" class="webqq-group-announcement">
+        <p v-if="!model.group.announcements.length" class="chatluna-sandbox-group-empty">暂无群公告</p>
+        <article v-for="announcement in model.group.announcements" :key="announcement.id" class="chatluna-sandbox-group-announcement">
           <button type="button" class="webqq-announcement-delete" :aria-label="`删除群公告：${announcement.content}`" :disabled="deletingAnnouncementId === announcement.id" @click="deleteAnnouncement(announcement.id)">
             <IconTrash :size="15" aria-hidden="true" />
           </button>
@@ -44,17 +44,17 @@
           <time>{{ getParticipant(announcement.authorId).name }} · {{ formatDateTime(announcement.createdAt) }}</time>
         </article>
       </section>
-      <section class="webqq-group-members">
+      <section class="chatluna-sandbox-group-members">
         <h3>群成员 {{ model.group.members.length }}</h3>
         <input v-model="groupMemberSearch" type="search" placeholder="搜索群昵称或 QQ 号">
-        <div v-if="!visibleGroupMembers.length" class="webqq-group-empty">暂无群成员</div>
-        <div v-else v-webqq-scrollbar="{ disabled: preview, tone: 'accent' }" class="webqq-group-member-list">
+        <div v-if="!visibleGroupMembers.length" class="chatluna-sandbox-group-empty">暂无群成员</div>
+        <div v-else v-webqq-scrollbar="{ disabled: preview, tone: 'accent' }" class="chatluna-sandbox-group-member-list">
           <ContextMenu v-for="member in visibleGroupMembers" :key="member.participantId">
             <ContextMenuTrigger as-child>
-              <article class="webqq-group-member">
+              <article class="chatluna-sandbox-group-member">
                 <WebqqAvatar class="webqq-menu-avatar" :kind="getParticipant(member.participantId).isBot ? 'bot' : 'user'" :name="getGroupMemberName(member)" :avatar="getParticipant(member.participantId).avatar" />
                 <span><strong>{{ getGroupMemberName(member) }}</strong><small>{{ member.participantId }}</small></span>
-                <span class="webqq-group-member-badges">
+                <span class="chatluna-sandbox-group-member-badges">
                   <em v-if="member.title" class="is-title">{{ member.title }}</em>
                   <em>{{ getGroupRoleLabel(member.role) }}</em>
                 </span>

@@ -18,7 +18,7 @@ describe('模型请求 MCP 工具', () => {
   it('按 scope 读取主环境、测试空间和未归属记录，且不能清理未归属库', async () => {
     const app = new App()
     apps.push(app)
-    const directory = mkdtempSync(join(tmpdir(), 'onebot-sandbox-mcp-model-'))
+    const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-mcp-model-'))
     const runtimeBots = new SandboxRuntimeBotRegistry()
     const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media'), runtimeBots })
     const testSpaces = new SandboxTestSpaceService(app, runtimeBots)

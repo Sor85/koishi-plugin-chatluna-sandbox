@@ -14,7 +14,7 @@ interface WorkspaceStorage {
   setItem(key: string, value: string): void
 }
 
-const STORAGE_KEY = 'onebot-sandbox.workspace'
+const STORAGE_KEY = 'chatluna-sandbox.workspace'
 const DEFAULT_PREFERENCES: SandboxWorkspacePreferences = {
   currentView: 'messages',
 }

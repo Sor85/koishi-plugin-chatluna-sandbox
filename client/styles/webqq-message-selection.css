@@ -1,18 +1,18 @@
 /* 消息多选与合并转发目标选择：独立文件，避免触碰 webqq-messages.css 中的 forward 卡片规则。 */
 
-.webqq-messages.is-selecting .webqq-message-row.is-selectable {
+.chatluna-sandbox-messages.is-selecting .chatluna-sandbox-message-row.is-selectable {
   width: 100%;
   max-width: 100%;
 }
 
-.webqq-message-row.is-selecting {
+.chatluna-sandbox-message-row.is-selecting {
   position: relative;
   align-items: center;
   flex-direction: row;
   text-align: left;
 }
 
-.webqq-message-select-marker {
+.chatluna-sandbox-message-select-marker {
   display: inline-flex;
   width: 20px;
   height: 20px;
@@ -26,13 +26,13 @@
   transition: border-color 0.12s ease, background-color 0.12s ease, color 0.12s ease;
 }
 
-.webqq-message-row.is-selecting .webqq-message-select-marker {
+.chatluna-sandbox-message-row.is-selecting .chatluna-sandbox-message-select-marker {
   margin-top: 10px;
   align-self: flex-start;
 }
 
 /* select-body 始终承接原 message-row 的左右布局，避免非多选时头像与内容叠成一列。 */
-.webqq-message-select-body {
+.chatluna-sandbox-message-select-body {
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -40,23 +40,23 @@
   max-width: 100%;
 }
 
-.webqq-message-row.is-outgoing .webqq-message-select-body {
+.chatluna-sandbox-message-row.is-outgoing .chatluna-sandbox-message-select-body {
   flex-direction: row-reverse;
   text-align: right;
 }
 
 /* 多选态统一为 LTR：marker 固定占据最左列，出站气泡仍由 select-body 内部反转并靠右。 */
-.webqq-message-row.is-selecting.is-outgoing .webqq-message-select-body {
+.chatluna-sandbox-message-row.is-selecting.is-outgoing .chatluna-sandbox-message-select-body {
   margin-left: auto;
 }
 
-.webqq-message-select-marker.is-checked {
+.chatluna-sandbox-message-select-marker.is-checked {
   border-color: var(--webqq-accent);
   color: #fff;
   background: var(--webqq-accent);
 }
 
-.webqq-selection-bar {
+.chatluna-sandbox-selection-bar {
   position: absolute;
   z-index: 20;
   bottom: 16px;
@@ -77,38 +77,38 @@
   transform: translateX(-50%);
 }
 
-.webqq-workspace.is-frosted .webqq-selection-bar {
+.webqq-workspace.is-frosted .chatluna-sandbox-selection-bar {
   background: color-mix(in srgb, var(--webqq-panel, var(--webqq-bg)) 78%, transparent);
 }
 
-.webqq-selection-bar-count {
+.chatluna-sandbox-selection-bar-count {
   flex: none;
   font-size: 14px;
   line-height: 20px;
   white-space: nowrap;
 }
 
-.webqq-selection-bar-actions {
+.chatluna-sandbox-selection-bar-actions {
   display: flex;
   flex: none;
   align-items: center;
   gap: 6px;
 }
 
-.webqq-selection-bar .webqq-selection-bar-button {
+.chatluna-sandbox-selection-bar .chatluna-sandbox-selection-bar-button {
   min-height: 34px;
   padding-right: 14px;
   padding-left: 14px;
   border-radius: 999px;
 }
 
-.webqq-forward-target-dialog {
+.chatluna-sandbox-forward-target-dialog {
   display: grid;
   gap: 12px;
 }
 
-/* Dialog 会 Teleport 到 body；搜索框使用独立结构，避免侧栏 .webqq-search 的 padding 和绝对定位混入。 */
-.webqq-forward-target-search {
+/* Dialog 会 Teleport 到 body；搜索框使用独立结构，避免侧栏 .chatluna-sandbox-search 的 padding 和绝对定位混入。 */
+.chatluna-sandbox-forward-target-search {
   position: relative;
   display: grid;
   width: 100%;
@@ -125,19 +125,19 @@
   transition: border-color 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease;
 }
 
-.webqq-forward-target-search:focus-within {
+.chatluna-sandbox-forward-target-search:focus-within {
   border-color: color-mix(in srgb, var(--webqq-accent) 58%, var(--webqq-border));
   background: var(--webqq-panel, var(--webqq-bg));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--webqq-accent) 14%, transparent);
 }
 
-.webqq-forward-target-search > svg {
+.chatluna-sandbox-forward-target-search > svg {
   position: static;
   flex: none;
   transform: none;
 }
 
-.webqq-forward-target-search input {
+.chatluna-sandbox-forward-target-search input {
   position: static;
   width: 100%;
   min-width: 0;
@@ -149,17 +149,17 @@
   background: transparent;
 }
 
-.webqq-forward-target-search input::placeholder {
+.chatluna-sandbox-forward-target-search input::placeholder {
   color: color-mix(in srgb, var(--webqq-muted) 84%, transparent);
   opacity: 1;
 }
 
-.webqq-forward-target-tabs {
+.chatluna-sandbox-forward-target-tabs {
   display: flex;
   gap: 8px;
 }
 
-.webqq-forward-target-tab {
+.chatluna-sandbox-forward-target-tab {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -173,13 +173,13 @@
   transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 
-.webqq-forward-target-tab.is-active {
+.chatluna-sandbox-forward-target-tab.is-active {
   color: var(--webqq-accent);
   border-color: color-mix(in srgb, var(--webqq-accent) 28%, transparent);
   background: color-mix(in srgb, var(--webqq-accent) 12%, transparent);
 }
 
-.webqq-forward-target-list {
+.chatluna-sandbox-forward-target-list {
   display: flex;
   max-height: min(360px, 50vh);
   flex-direction: column;
@@ -188,7 +188,7 @@
   padding-right: 2px;
 }
 
-.webqq-forward-target-item {
+.chatluna-sandbox-forward-target-item {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -202,16 +202,16 @@
   transition: background-color 0.12s ease, border-color 0.12s ease;
 }
 
-.webqq-forward-target-item:hover {
+.chatluna-sandbox-forward-target-item:hover {
   background: color-mix(in srgb, var(--webqq-accent) 8%, transparent);
 }
 
-.webqq-forward-target-item.is-active {
+.chatluna-sandbox-forward-target-item.is-active {
   border-color: color-mix(in srgb, var(--webqq-accent) 30%, transparent);
   background: color-mix(in srgb, var(--webqq-accent) 12%, transparent);
 }
 
-.webqq-forward-target-copy {
+.chatluna-sandbox-forward-target-copy {
   display: flex;
   min-width: 0;
   flex: 1;
@@ -219,7 +219,7 @@
   gap: 2px;
 }
 
-.webqq-forward-target-copy strong {
+.chatluna-sandbox-forward-target-copy strong {
   overflow: hidden;
   font-size: 14px;
   line-height: 20px;
@@ -227,7 +227,7 @@
   white-space: nowrap;
 }
 
-.webqq-forward-target-copy small {
+.chatluna-sandbox-forward-target-copy small {
   overflow: hidden;
   color: var(--webqq-muted);
   font-size: 12px;
@@ -236,7 +236,7 @@
   white-space: nowrap;
 }
 
-.webqq-forward-target-empty {
+.chatluna-sandbox-forward-target-empty {
   display: flex;
   min-height: 120px;
   align-items: center;
@@ -245,7 +245,7 @@
   font-size: 13px;
 }
 
-.webqq-forward-target-radio {
+.chatluna-sandbox-forward-target-radio {
   display: inline-flex;
   width: 18px;
   height: 18px;
@@ -256,19 +256,19 @@
   border-radius: 50%;
 }
 
-.webqq-forward-target-item.is-active .webqq-forward-target-radio {
+.chatluna-sandbox-forward-target-item.is-active .chatluna-sandbox-forward-target-radio {
   border-color: var(--webqq-accent);
   background: var(--webqq-accent);
 }
 
 @media (max-width: 520px) {
-  .webqq-selection-bar {
+  .chatluna-sandbox-selection-bar {
     max-width: calc(100% - 16px);
     gap: 8px;
     padding-left: 12px;
   }
 
-  .webqq-selection-bar .webqq-selection-bar-button {
+  .chatluna-sandbox-selection-bar .chatluna-sandbox-selection-bar-button {
     padding-right: 10px;
     padding-left: 10px;
   }

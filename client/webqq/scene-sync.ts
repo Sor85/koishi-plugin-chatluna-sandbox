@@ -15,18 +15,18 @@ function installMutationReceiver() {
   if (receiverInstalled) return
   receiverInstalled = true
   // Koishi receive 对同名事件只保存一个回调；页面反复挂载时若直接注册，后卸载的页面会留下失效回调并覆盖存活页面。
-  receive<SceneMutationPayload>('onebot-sandbox/scene-mutated', notifyMutationListeners)
+  receive<SceneMutationPayload>('chatluna-sandbox/scene-mutated', notifyMutationListeners)
 }
 
 interface SceneMutationContext {
-  on(event: 'onebot-sandbox/scene-mutated', callback: SceneMutationListener): unknown
+  on(event: 'chatluna-sandbox/scene-mutated', callback: SceneMutationListener): unknown
 }
 
 export function installContextMutationReceiver(ctx: unknown) {
   const context = ctx as SceneMutationContext
   // Console 的预构建入口与插件源码可能各自持有一份 @koishijs/client；主 Context 事件总线
   // 才是服务端广播实际抵达的位置，不能只依赖模块级 receive 单例。
-  context.on('onebot-sandbox/scene-mutated', notifyMutationListeners)
+  context.on('chatluna-sandbox/scene-mutated', notifyMutationListeners)
 }
 
 // 服务端在每次场景变更时广播 revision；发送 RPC 即时返回后，机器人稍后写入的回复靠这里增量刷新。

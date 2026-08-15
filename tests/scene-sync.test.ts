@@ -42,7 +42,7 @@ describe('场景变更实时同步', () => {
         return () => true
       },
     })
-    contextListeners.get('onebot-sandbox/scene-mutated')?.({ revision: 9 })
+    contextListeners.get('chatluna-sandbox/scene-mutated')?.({ revision: 9 })
 
     expect(controller.notifySceneRevision).toHaveBeenCalledWith(9)
     dispose()

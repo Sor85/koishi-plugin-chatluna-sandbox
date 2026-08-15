@@ -1,6 +1,6 @@
 {
   "verifiedAt": "2026-07-23",
-  "route": "http://127.0.0.1:5140/onebot-sandbox",
+  "route": "http://127.0.0.1:5140/chatluna-sandbox",
   "identityColors": {
     "user": "rgb(37, 99, 235)",
     "bot": "rgb(71, 85, 105)",

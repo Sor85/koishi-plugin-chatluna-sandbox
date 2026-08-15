@@ -68,7 +68,7 @@ async function resolveSnapshotMedia() {
     const cached = thumbnailMediaCache.get(cacheKey)
     if (cached) return [mediaId, cached] as const
     try {
-      const content = await send('onebot-sandbox/media-content', { spaceId: props.spaceId, operatorId: previewOperatorId(), mediaId })
+      const content = await send('chatluna-sandbox/media-content', { spaceId: props.spaceId, operatorId: previewOperatorId(), mediaId })
       const source = `data:${content.mimeType};base64,${content.dataBase64}`
       thumbnailMediaCache.set(cacheKey, source)
       return [mediaId, source] as const

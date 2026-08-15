@@ -15,7 +15,7 @@ afterEach(async () => {
 
 async function createControl() {
   const app = new App()
-  const directory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-stable-avatar-'))
+  const directory = await mkdtemp(join(tmpdir(), 'chatluna-sandbox-stable-avatar-'))
   directories.push(directory)
   apps.push(app)
   const control = new SandboxControlService(app, { mediaDirectory: directory })

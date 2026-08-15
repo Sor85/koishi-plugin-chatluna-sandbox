@@ -1,6 +1,6 @@
 {
   "capturedAt": "2026-07-23T04:35:27.777Z",
-  "route": "http://127.0.0.1:5140/onebot-sandbox",
+  "route": "http://127.0.0.1:5140/chatluna-sandbox",
   "scenario": {
     "activeConversation": "Koishi",
     "currentOperator": "测试用户3",
@@ -16,7 +16,7 @@
       "height": 900,
       "screenshot": "light-1400x900.png",
       "state": {
-        "url": "http://127.0.0.1:5140/onebot-sandbox",
+        "url": "http://127.0.0.1:5140/chatluna-sandbox",
         "title": "OneBot 沙盒 | Koishi 控制台",
         "viewport": {
           "width": 1400,
@@ -63,7 +63,7 @@
       "height": 900,
       "screenshot": "light-1000x900.png",
       "state": {
-        "url": "http://127.0.0.1:5140/onebot-sandbox",
+        "url": "http://127.0.0.1:5140/chatluna-sandbox",
         "title": "OneBot 沙盒 | Koishi 控制台",
         "viewport": {
           "width": 1000,
@@ -110,7 +110,7 @@
       "height": 900,
       "screenshot": "light-700x900.png",
       "state": {
-        "url": "http://127.0.0.1:5140/onebot-sandbox",
+        "url": "http://127.0.0.1:5140/chatluna-sandbox",
         "title": "OneBot 沙盒 | Koishi 控制台",
         "viewport": {
           "width": 700,
@@ -157,7 +157,7 @@
       "height": 900,
       "screenshot": "dark-1400x900.png",
       "state": {
-        "url": "http://127.0.0.1:5140/onebot-sandbox",
+        "url": "http://127.0.0.1:5140/chatluna-sandbox",
         "title": "OneBot 沙盒 | Koishi 控制台",
         "viewport": {
           "width": 1400,
@@ -204,7 +204,7 @@
       "height": 900,
       "screenshot": "dark-1000x900.png",
       "state": {
-        "url": "http://127.0.0.1:5140/onebot-sandbox",
+        "url": "http://127.0.0.1:5140/chatluna-sandbox",
         "title": "OneBot 沙盒 | Koishi 控制台",
         "viewport": {
           "width": 1000,
@@ -251,7 +251,7 @@
       "height": 900,
       "screenshot": "dark-700x900.png",
       "state": {
-        "url": "http://127.0.0.1:5140/onebot-sandbox",
+        "url": "http://127.0.0.1:5140/chatluna-sandbox",
         "title": "OneBot 沙盒 | Koishi 控制台",
         "viewport": {
           "width": 700,

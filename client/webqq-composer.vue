@@ -141,10 +141,10 @@
         </div>
       </div>
       <div class="webqq-composer-main">
-        <label class="sr-only" for="onebot-sandbox-input">消息内容</label>
+        <label class="sr-only" for="chatluna-sandbox-input">消息内容</label>
         <span v-if="isDraftEmpty" class="webqq-composer-placeholder" aria-hidden="true">发送消息</span>
         <div
-          id="onebot-sandbox-input"
+          id="chatluna-sandbox-input"
           ref="inputRef"
           v-webqq-scrollbar="{ tone: 'accent' }"
           class="webqq-composer-editor"
@@ -165,7 +165,7 @@
         />
         <WebqqMentionMenu
           v-if="mentionMenuOpen"
-          class="webqq-composer-mention-menu"
+          class="chatluna-sandbox-composer-mention-menu"
           :candidates="filteredMentionCandidates"
           :active-index="mentionMenuIndex"
           aria-label="提及成员"
@@ -525,7 +525,7 @@ function renderDraftToEditor(current: ComposerDraft) {
       continue
     }
     const chip = document.createElement('span')
-    chip.className = 'webqq-composer-mention'
+    chip.className = 'chatluna-sandbox-composer-mention'
     chip.contentEditable = 'false'
     chip.dataset.mentionId = token.id
     chip.dataset.mentionName = token.name

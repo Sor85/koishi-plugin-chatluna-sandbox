@@ -19,7 +19,7 @@ afterEach(async () => {
 describe('MCP Streamable HTTP', () => {
   it('按凭证权限发现 39 个工具并拒绝不受信 Origin', async () => {
     const app = new App()
-    const directory = mkdtempSync(join(tmpdir(), 'onebot-sandbox-mcp-http-'))
+    const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-mcp-http-'))
     const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media') })
     const service = new SandboxMcpService(control, { dataDirectory: directory })
     const credential = service.createCredential('端到端凭证', ['read', 'interact', 'manage', 'debug'])
@@ -58,7 +58,7 @@ describe('MCP Streamable HTTP', () => {
     })
     expect(unauthorized.status).toBe(401)
 
-    const client = new Client({ name: 'onebot-sandbox-test', version: '1.0.0' })
+    const client = new Client({ name: 'chatluna-sandbox-test', version: '1.0' })
     const transport = new StreamableHTTPClientTransport(url, {
       requestInit: { headers: { authorization: `Bearer ${credential.token}`, origin: 'https://allowed.example' } },
     })
@@ -82,7 +82,7 @@ describe('MCP Streamable HTTP', () => {
     })
 
     const app = new App()
-    const directory = mkdtempSync(join(tmpdir(), 'onebot-sandbox-mcp-legacy-'))
+    const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-mcp-legacy-'))
     const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media') })
     const service = new SandboxMcpService(control, { dataDirectory: directory })
     const credential = service.createCredential('旧版 SDK 凭证', ['read'])
@@ -103,12 +103,12 @@ describe('MCP Streamable HTTP', () => {
     })
 
     expect(response.headers.get('content-type')).toContain('application/json')
-    expect(await response.json()).toMatchObject({ result: { serverInfo: { name: 'koishi-plugin-onebot-sandbox' } } })
+    expect(await response.json()).toMatchObject({ result: { serverInfo: { name: 'koishi-plugin-chatluna-sandbox' } } })
   })
 
   it('非回环监听缺少 TLS 时拒绝启动', async () => {
     const app = new App()
-    const directory = mkdtempSync(join(tmpdir(), 'onebot-sandbox-mcp-tls-'))
+    const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-mcp-tls-'))
     const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media') })
     const service = new SandboxMcpService(control, { dataDirectory: directory })
     const server = new SandboxMcpHttpServer(app, service, {

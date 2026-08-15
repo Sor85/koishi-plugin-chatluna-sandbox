@@ -19,7 +19,7 @@
 - 发送与媒体发送输入只保留操作者、逻辑会话和内容或媒体数据；`senderId`、`botId`、`actorUserId`、`userId` 与 `currentUserId` 在运行时统一拒绝
 - 环境管理合同不含操作者字段；创建测试用户不会触发 Koishi 消息中间件，确保环境准备不会伪造参与者交互
 - 工作区返回单份逻辑会话和消息，并按操作者可见会话过滤 ChatLuna 状态，避免向无权参与者泄露机器人思考或 Token 状态
-- 新增 `onebot-sandbox/bot-deliveries` 查询接口，使用 `recipientBotId` 和可选 `messageId` 过滤机器人投递，为后续 MCP 读取事件提供稳定合同
+- 新增 `chatluna-sandbox/bot-deliveries` 查询接口，使用 `recipientBotId` 和可选 `messageId` 过滤机器人投递，为后续 MCP 读取事件提供稳定合同
 - 类型定义删除消息级 `botId`，控制台适配器回归测试覆盖旧字段拒绝、稳定工作区、状态可见性、环境静默和机器人投递过滤
 - Standards 审查 0 项问题；Spec 审查 0 项问题。当前会话禁止派生子代理，因此由主线程按同样两个维度核对
 - 验证通过：`yarn test`（30 个文件、116 个测试）、`yarn typecheck`、`yarn build`、`git diff --check`

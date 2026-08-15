@@ -22,4 +22,4 @@
 - 活动逻辑会话的 ChatLuna 状态现已传入消息列表；每个机器人状态按 `botParticipantId + conversationId` 渲染思考点和输入/输出 Token，消息方向始终与当前操作者比较决定
 - 头像种类继续只由参与者或会话种类决定；消息列表与侧栏不再依据当前操作者是否为机器人改变头像、强调色或菜单
 - Standards 审查 0 项问题；Spec 审查 0 项问题。当前会话禁止派生子代理，因此由主线程按同样两个维度核对
-- 验证通过：`yarn test`（30 个文件、120 个测试）、`yarn typecheck`、`yarn build`、`git diff --check`；Ego Browser 在 `http://127.0.0.1:5140/onebot-sandbox` 验证机器人切换、好友目录和右键菜单，页面无控制台错误
+- 验证通过：`yarn test`（30 个文件、120 个测试）、`yarn typecheck`、`yarn build`、`git diff --check`；Ego Browser 在 `http://127.0.0.1:5140/chatluna-sandbox` 验证机器人切换、好友目录和右键菜单，页面无控制台错误

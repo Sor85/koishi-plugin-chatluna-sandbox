@@ -1,5 +1,5 @@
 <template>
-  <main class="webqq-chat webqq-model-request-workspace" aria-label="模型请求工作台">
+  <main class="chatluna-sandbox-chat webqq-model-request-workspace" aria-label="模型请求工作台">
     <header class="webqq-model-request-header">
       <div>
         <h1>模型请求</h1>
@@ -516,8 +516,8 @@ const responsePreview = computed(() => parseModelResponseBody(
   props.detail?.responseBodyRaw,
   props.detail?.responseBodyFormat,
 ))
-const responseTree = computed(() => buildModelRequestJsonTree(responsePreview.value.value, 'responseBody'))
-const responseContent = computed(() => extractModelResponseContent(responsePreview.value.value))
+const responseTree = computed(() => buildModelRequestJsonTree(responsePreview.value, 'responseBody'))
+const responseContent = computed(() => extractModelResponseContent(responsePreview.value))
 const responseUsage = computed(() => normalizeModelResponseUsage(responseContent.value.usage))
 const detailModel = computed(() => {
   const detail = props.detail

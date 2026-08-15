@@ -2,7 +2,7 @@
   <Teleport to="body">
     <div
       ref="backdropRef"
-      class="webqq-forward-modal-backdrop"
+      class="chatluna-sandbox-forward-modal-backdrop"
       role="dialog"
       aria-modal="true"
       aria-label="合并转发消息"
@@ -10,8 +10,8 @@
       @click.self="emit('close')"
       @keydown.esc="emit('close')"
     >
-      <div class="webqq-forward-modal" @click.stop>
-        <header class="webqq-forward-modal-header">
+      <div class="chatluna-sandbox-forward-modal" @click.stop>
+        <header class="chatluna-sandbox-forward-modal-header">
           <button
             v-if="canNavigateBack"
             type="button"
@@ -20,57 +20,57 @@
           >
             <IconChevronLeft :size="18" aria-hidden="true" />
           </button>
-          <span v-else class="webqq-forward-modal-header-placeholder" aria-hidden="true" />
+          <span v-else class="chatluna-sandbox-forward-modal-header-placeholder" aria-hidden="true" />
           <strong>{{ title || '合并转发' }}</strong>
           <button type="button" aria-label="关闭合并转发消息" @click="emit('close')">
             <IconX :size="18" aria-hidden="true" />
           </button>
         </header>
-        <div v-webqq-scrollbar="{ showOverlay: false }" class="webqq-forward-modal-body">
+        <div v-webqq-scrollbar="{ showOverlay: false }" class="chatluna-sandbox-forward-modal-body">
           <article
             v-for="(item, itemIndex) in items"
             :key="`forward:${itemIndex}`"
-            class="webqq-message-row is-incoming"
+            class="chatluna-sandbox-message-row is-incoming"
             :class="[getForwardNodeClusterClass(items, itemIndex), { 'is-merged': isMergedForwardNode(items, itemIndex) }]"
           >
             <!-- TIM 合并项依赖 wrapper 保留头像占位并隐藏重复头像，弹窗需和普通消息保持同一结构。 -->
-            <span class="webqq-message-avatar-wrap">
+            <span class="chatluna-sandbox-message-avatar-wrap">
               <WebqqAvatar
-                class="webqq-message-avatar"
+                class="chatluna-sandbox-message-avatar"
                 :kind="isBotParticipant(item.userId) ? 'bot' : 'user'"
                 :name="item.nickname"
                 :avatar="getParticipantAvatar(item.userId)"
               />
             </span>
-            <div class="webqq-message-content">
-              <div v-if="!isMergedForwardNode(items, itemIndex)" class="webqq-sender-line">
-                <span class="webqq-message-author">{{ item.nickname }}</span>
+            <div class="chatluna-sandbox-message-content">
+              <div v-if="!isMergedForwardNode(items, itemIndex)" class="chatluna-sandbox-sender-line">
+                <span class="chatluna-sandbox-message-author">{{ item.nickname }}</span>
               </div>
-              <div class="webqq-message-body">
-                <div class="webqq-message-stack">
-                  <div class="webqq-message-bubble">
+              <div class="chatluna-sandbox-message-body">
+                <div class="chatluna-sandbox-message-stack">
+                  <div class="chatluna-sandbox-message-bubble">
                     <button
                       v-if="item.forwardId"
-                      class="webqq-message-quote webqq-message-forward"
+                      class="chatluna-sandbox-message-quote chatluna-sandbox-message-forward"
                       type="button"
                       aria-label="查看合并转发消息"
                       @click.stop="emit('openForward', item.forwardId)"
                     >
-                      <strong class="webqq-message-quote-title">{{ getNestedForwardTitle(item) }}</strong>
+                      <strong class="chatluna-sandbox-message-quote-title">{{ getNestedForwardTitle(item) }}</strong>
                       <template v-if="getNestedForwardLines(item).length">
                         <span
                           v-for="(line, lineIndex) in getNestedForwardLines(item)"
                           :key="`forward:${itemIndex}:line:${lineIndex}`"
                         >{{ line }}</span>
-                        <span class="webqq-message-forward-entry">查看{{ getNestedForwardTotal(item) }}条转发消息</span>
+                        <span class="chatluna-sandbox-message-forward-entry">查看{{ getNestedForwardTotal(item) }}条转发消息</span>
                       </template>
                       <span v-else>{{ item.content || '[合并转发]' }}</span>
                     </button>
                     <template v-else>
-                      <div v-for="media in item.media ?? []" :key="media.id" class="webqq-message-media">
+                      <div v-for="media in item.media ?? []" :key="media.id" class="chatluna-sandbox-message-media">
                         <button
                           v-if="media.type === 'image' && getMediaSource(media.id)"
-                          class="webqq-message-image"
+                          class="chatluna-sandbox-message-image"
                           type="button"
                           aria-label="查看大图"
                           @click="emit('openImage', getMediaSource(media.id))"
@@ -79,21 +79,21 @@
                         </button>
                         <audio v-else-if="media.type === 'audio' && getMediaSource(media.id)" :src="getMediaSource(media.id)" controls preload="metadata" />
                         <video v-else-if="media.type === 'video' && getMediaSource(media.id)" :src="getMediaSource(media.id)" controls preload="metadata" />
-                        <a v-else-if="media.type === 'file' && getMediaSource(media.id)" :href="getMediaSource(media.id)" :download="media.name" class="webqq-message-file">
+                        <a v-else-if="media.type === 'file' && getMediaSource(media.id)" :href="getMediaSource(media.id)" :download="media.name" class="chatluna-sandbox-message-file">
                           <IconPaperclip :size="18" aria-hidden="true" />
                           <span><strong>{{ media.name }}</strong><small>{{ formatMediaSize(media.size) }}</small></span>
                         </a>
-                        <span v-else class="webqq-message-media-loading">{{ mediaLoadFailures[media.id] ? '媒体不可用' : '媒体加载中...' }}</span>
+                        <span v-else class="chatluna-sandbox-message-media-loading">{{ mediaLoadFailures[media.id] ? '媒体不可用' : '媒体加载中...' }}</span>
                       </div>
-                      <span v-if="getNodeText(item)" class="webqq-message-text">{{ getNodeText(item) }}</span>
-                      <span v-else-if="!item.media?.length" class="webqq-message-text">[消息]</span>
+                      <span v-if="getNodeText(item)" class="chatluna-sandbox-message-text">{{ getNodeText(item) }}</span>
+                      <span v-else-if="!item.media?.length" class="chatluna-sandbox-message-text">[消息]</span>
                     </template>
                   </div>
                 </div>
               </div>
             </div>
           </article>
-          <div v-if="!items.length" class="webqq-forward-modal-empty">暂无消息</div>
+          <div v-if="!items.length" class="chatluna-sandbox-forward-modal-empty">暂无消息</div>
         </div>
       </div>
     </div>

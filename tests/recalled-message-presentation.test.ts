@@ -20,7 +20,7 @@ afterEach(async () => {
 
 async function createControl() {
   const app = new App()
-  const mediaDirectory = mkdtempSync(join(tmpdir(), 'onebot-sandbox-recall-media-'))
+  const mediaDirectory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-recall-media-'))
   temporaryDirectories.push(mediaDirectory)
   let control: SandboxControlService | undefined
   app.plugin((ctx) => {
@@ -169,7 +169,7 @@ describe('撤回消息生命周期与呈现', () => {
 
   it('撤回发出 message.recalled 与 scene.changed，且不销毁场景数据', async () => {
     const { control } = await createControl()
-    const directory = mkdtempSync(join(tmpdir(), 'onebot-sandbox-recall-mcp-'))
+    const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-recall-mcp-'))
     temporaryDirectories.push(directory)
     const mcp = new SandboxMcpService(control, { dataDirectory: directory })
     const credential = mcp.createCredential('撤回事件', ['read', 'interact'])
@@ -253,7 +253,7 @@ describe('撤回消息生命周期与呈现', () => {
 
   it('场景导入导出与持久化重启保留撤回生命周期和权威原文', async () => {
     const persistence = new TestScenePersistence()
-    const mediaDirectory = mkdtempSync(join(tmpdir(), 'onebot-sandbox-recall-persistence-'))
+    const mediaDirectory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-recall-persistence-'))
     temporaryDirectories.push(mediaDirectory)
     const { app: firstApp, control: first } = await createPersistedControl(persistence, mediaDirectory)
     const sent = await first.sendMessage({

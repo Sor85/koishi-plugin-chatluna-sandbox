@@ -12,7 +12,7 @@ describe('Koishi 工作区端口', () => {
 
     await koishiWorkspacePort.getWorkspace()
 
-    expect(send).toHaveBeenCalledWith('onebot-sandbox/workspace', {})
+    expect(send).toHaveBeenCalledWith('chatluna-sandbox/workspace', {})
   })
 
   it('为 AI 测试空间的所有工作区调用附加显式 spaceId', async () => {
@@ -33,20 +33,20 @@ describe('Koishi 工作区端口', () => {
       limit: 10,
     })
 
-    expect(send).toHaveBeenNthCalledWith(1, 'onebot-sandbox/workspace', { operatorId: '11001', spaceId: 'space-1' })
-    expect(send).toHaveBeenNthCalledWith(2, 'onebot-sandbox/manage-environment', { action: 'create-user', data: { id: '11002', name: '用户' }, spaceId: 'space-1' })
-    expect(send).toHaveBeenNthCalledWith(3, 'onebot-sandbox/send-forward-message', {
+    expect(send).toHaveBeenNthCalledWith(1, 'chatluna-sandbox/workspace', { operatorId: '11001', spaceId: 'space-1' })
+    expect(send).toHaveBeenNthCalledWith(2, 'chatluna-sandbox/manage-environment', { action: 'create-user', data: { id: '11002', name: '用户' }, spaceId: 'space-1' })
+    expect(send).toHaveBeenNthCalledWith(3, 'chatluna-sandbox/send-forward-message', {
       operatorId: '11001',
       conversationId: 'private:11001:12001',
       messageIds: ['message-1'],
       spaceId: 'space-1',
     })
-    expect(send).toHaveBeenNthCalledWith(4, 'onebot-sandbox/get-forward-message', {
+    expect(send).toHaveBeenNthCalledWith(4, 'chatluna-sandbox/get-forward-message', {
       operatorId: '11001',
       forwardId: 'forward-1',
       spaceId: 'space-1',
     })
-    expect(send).toHaveBeenNthCalledWith(5, 'onebot-sandbox/search-conversation-messages', {
+    expect(send).toHaveBeenNthCalledWith(5, 'chatluna-sandbox/search-conversation-messages', {
       operatorId: '11001',
       conversationId: 'private:11001:12001',
       query: 'hello',
@@ -66,8 +66,8 @@ describe('Koishi 工作区端口', () => {
     await port.getModelRequestRecord({ scope: 'space', spaceId: 'main', recordId: 'record-1' })
     await port.clearModelRequestRecords({ scope: 'unattributed' })
 
-    expect(send).toHaveBeenNthCalledWith(1, 'onebot-sandbox/model-request-records', { scope: 'unattributed', limit: 50 })
-    expect(send).toHaveBeenNthCalledWith(2, 'onebot-sandbox/model-request-record', { scope: 'space', spaceId: 'main', recordId: 'record-1' })
-    expect(send).toHaveBeenNthCalledWith(3, 'onebot-sandbox/clear-model-request-records', { scope: 'unattributed' })
+    expect(send).toHaveBeenNthCalledWith(1, 'chatluna-sandbox/model-request-records', { scope: 'unattributed', limit: 50 })
+    expect(send).toHaveBeenNthCalledWith(2, 'chatluna-sandbox/model-request-record', { scope: 'space', spaceId: 'main', recordId: 'record-1' })
+    expect(send).toHaveBeenNthCalledWith(3, 'chatluna-sandbox/clear-model-request-records', { scope: 'unattributed' })
   })
 })

@@ -1,12 +1,12 @@
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
-    <DialogContent class="webqq-forward-target-dialog" :style="{ '--webqq-accent': accentColor }">
+    <DialogContent class="chatluna-sandbox-forward-target-dialog" :style="{ '--webqq-accent': accentColor }">
       <DialogHeader>
         <DialogTitle>选择转发目标</DialogTitle>
         <DialogDescription>将已选消息合并转发到一个最近会话、好友或群组。</DialogDescription>
       </DialogHeader>
 
-      <label class="webqq-forward-target-search">
+      <label class="chatluna-sandbox-forward-target-search">
         <IconSearch :size="18" aria-hidden="true" />
         <input
           v-model="searchQuery"
@@ -17,13 +17,13 @@
         >
       </label>
 
-      <div class="webqq-forward-target-tabs" role="tablist" aria-label="目标分类">
+      <div class="chatluna-sandbox-forward-target-tabs" role="tablist" aria-label="目标分类">
         <button
           v-for="tab in tabs"
           :key="tab.id"
           type="button"
           role="tab"
-          class="webqq-forward-target-tab"
+          class="chatluna-sandbox-forward-target-tab"
           :class="{ 'is-active': activeTab === tab.id }"
           :aria-selected="activeTab === tab.id"
           @click="activeTab = tab.id"
@@ -34,7 +34,7 @@
 
       <div
         v-webqq-scrollbar="{ showOverlay: false, tone: 'accent' }"
-        class="webqq-forward-target-list"
+        class="chatluna-sandbox-forward-target-list"
         role="listbox"
         aria-label="目标会话"
       >
@@ -43,7 +43,7 @@
           :key="target.conversationId"
           type="button"
           role="option"
-          class="webqq-forward-target-item"
+          class="chatluna-sandbox-forward-target-item"
           :class="{ 'is-active': selectedConversationId === target.conversationId }"
           :aria-selected="selectedConversationId === target.conversationId"
           @click="selectedConversationId = target.conversationId"
@@ -54,13 +54,13 @@
             :name="target.title"
             :avatar="target.avatar"
           />
-          <span class="webqq-forward-target-copy">
+          <span class="chatluna-sandbox-forward-target-copy">
             <strong>{{ target.title }}</strong>
             <small>{{ target.subtitle || target.conversationId }}</small>
           </span>
-          <span class="webqq-forward-target-radio" aria-hidden="true" />
+          <span class="chatluna-sandbox-forward-target-radio" aria-hidden="true" />
         </button>
-        <div v-if="!visibleTargets.length" class="webqq-forward-target-empty">
+        <div v-if="!visibleTargets.length" class="chatluna-sandbox-forward-target-empty">
           {{ emptyText }}
         </div>
       </div>

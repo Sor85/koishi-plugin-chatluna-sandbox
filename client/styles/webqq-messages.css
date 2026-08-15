@@ -1,5 +1,5 @@
 
-.webqq-messages {
+.chatluna-sandbox-messages {
   min-height: 0;
   overflow-y: auto;
   /* 底部留白跟随输入区实际高度（含回复/附件浮条与多行输入），由 composer 通过变量上报。 */
@@ -7,7 +7,7 @@
   scroll-padding-bottom: var(--webqq-composer-space, 80px);
 }
 
-.webqq-messages ol {
+.chatluna-sandbox-messages ol {
   display: flex;
   flex-direction: column;
   margin: 0;
@@ -15,7 +15,7 @@
   list-style: none;
 }
 
-.webqq-message-event {
+.chatluna-sandbox-message-event {
   align-self: center;
   width: fit-content;
   max-width: 74%;
@@ -29,35 +29,35 @@
   text-align: center;
 }
 
-.webqq-message-event:last-child {
+.chatluna-sandbox-message-event:last-child {
   margin-bottom: 0;
 }
 
 /* 撤回只弱化气泡内容；文字和媒体分别覆盖撤回线，避免媒体仍被误认成可操作内容。 */
-.webqq-message-row.is-recalled .webqq-message-bubble,
-.webqq-thinking-row.is-recalled {
+.chatluna-sandbox-message-row.is-recalled .chatluna-sandbox-message-bubble,
+.chatluna-sandbox-thinking-row.is-recalled {
   opacity: 0.62;
 }
 
-.webqq-message-row.is-recalled .webqq-message-text {
+.chatluna-sandbox-message-row.is-recalled .chatluna-sandbox-message-text {
   text-decoration-line: line-through;
   text-decoration-thickness: 2px;
   text-decoration-skip-ink: none;
 }
 
-.webqq-message-row.is-recalled .webqq-message-media img,
-.webqq-message-row.is-recalled .webqq-message-media audio,
-.webqq-message-row.is-recalled .webqq-message-media video,
-.webqq-message-row.is-recalled .webqq-message-file {
+.chatluna-sandbox-message-row.is-recalled .chatluna-sandbox-message-media img,
+.chatluna-sandbox-message-row.is-recalled .chatluna-sandbox-message-media audio,
+.chatluna-sandbox-message-row.is-recalled .chatluna-sandbox-message-media video,
+.chatluna-sandbox-message-row.is-recalled .chatluna-sandbox-message-file {
   opacity: 0.72;
   filter: grayscale(0.15);
 }
 
-.webqq-message-row.is-recalled .webqq-message-media {
+.chatluna-sandbox-message-row.is-recalled .chatluna-sandbox-message-media {
   position: relative;
 }
 
-.webqq-message-row.is-recalled .webqq-message-media::after {
+.chatluna-sandbox-message-row.is-recalled .chatluna-sandbox-message-media::after {
   position: absolute;
   top: 50%;
   right: 0;
@@ -70,18 +70,18 @@
   transform: translateY(-50%);
 }
 
-.webqq-message-recalled-label {
+.chatluna-sandbox-message-recalled-label {
   align-self: flex-end;
   color: var(--webqq-muted);
   font-size: 11px;
   line-height: 16px;
 }
 
-.webqq-message-row.is-outgoing .webqq-message-recalled-label {
+.chatluna-sandbox-message-row.is-outgoing .chatluna-sandbox-message-recalled-label {
   color: rgb(255 255 255 / 78%);
 }
 
-.webqq-message-row {
+.chatluna-sandbox-message-row {
   max-width: 74%;
   display: flex;
   align-items: flex-start;
@@ -90,35 +90,35 @@
 }
 
 /* 与 onebot-webqq 对齐：置底时末条消息不再叠加 16px 行距，避免与输入区间隙翻倍。 */
-.webqq-message-row:last-child {
+.chatluna-sandbox-message-row:last-child {
   margin-bottom: 0;
 }
 
-.webqq-message-row.is-outgoing {
+.chatluna-sandbox-message-row.is-outgoing {
   margin-left: auto;
   flex-direction: row-reverse;
   text-align: right;
 }
 
-.webqq-message-row.is-merged {
+.chatluna-sandbox-message-row.is-merged {
   margin-top: -14px;
 }
 
-.webqq-message-avatar-wrap {
+.chatluna-sandbox-message-avatar-wrap {
   position: relative;
   width: 32px;
   height: 32px;
   flex: 0 0 32px;
 }
 
-.webqq-message-avatar-trigger {
+.chatluna-sandbox-message-avatar-trigger {
   padding: 0;
   border: 0;
   color: inherit;
   background: transparent;
 }
 
-.webqq-message-avatar {
+.chatluna-sandbox-message-avatar {
   --webqq-avatar-size: 32px;
 
   display: flex;
@@ -133,11 +133,11 @@
   font-weight: 700;
 }
 
-.webqq-message-row.is-merged .webqq-message-avatar-wrap {
+.chatluna-sandbox-message-row.is-merged .chatluna-sandbox-message-avatar-wrap {
   visibility: hidden;
 }
 
-.webqq-message-content {
+.chatluna-sandbox-message-content {
   display: flex;
   min-width: 0;
   max-width: 100%;
@@ -145,7 +145,7 @@
   align-items: flex-start;
 }
 
-.webqq-message-body {
+.chatluna-sandbox-message-body {
   display: flex;
   min-width: 0;
   max-width: 100%;
@@ -154,11 +154,11 @@
   gap: 6px;
 }
 
-.webqq-message-row.is-outgoing .webqq-message-content {
+.chatluna-sandbox-message-row.is-outgoing .chatluna-sandbox-message-content {
   align-items: flex-end;
 }
 
-.webqq-message-row.is-outgoing .webqq-message-body {
+.chatluna-sandbox-message-row.is-outgoing .chatluna-sandbox-message-body {
   flex-direction: row-reverse;
 }
 
@@ -196,7 +196,7 @@
 /* 以下思考指标区 1:1 移植自 onebot-webqq 的 __thinking-* 规则，仅补充 sandbox 需要的 incoming 方向。
    思考行跟在机器人最后一条消息下方，负上边距抵消消息行的 16px 间距，并让开 40px 头像列。
    宽度上限不用 webqq 的 74%：折叠态下整行宽度只由指标行决定，74% 在窄聊天区会小于指标行宽度并把它压到换行。 */
-.webqq-thinking-row {
+.chatluna-sandbox-thinking-row {
   position: relative;
   max-width: calc(100% - 40px);
   display: flex;
@@ -206,14 +206,14 @@
   text-align: right;
 }
 
-.webqq-thinking-row.is-incoming {
+.chatluna-sandbox-thinking-row.is-incoming {
   align-items: flex-start;
   margin-right: auto;
   margin-left: 40px;
   text-align: left;
 }
 
-.webqq-thinking-toggle {
+.chatluna-sandbox-thinking-toggle {
   max-width: 100%;
   display: inline-flex;
   align-items: center;
@@ -232,24 +232,24 @@
 
 /* 机器人在左侧时整体靠左并镜像 Token 位置，但箭头始终紧跟在思考时长右侧：
    箭头贴到行首会被误读成换行符，也不便点击。 */
-.webqq-thinking-row.is-incoming .webqq-thinking-toggle {
+.chatluna-sandbox-thinking-row.is-incoming .chatluna-sandbox-thinking-toggle {
   justify-content: flex-start;
 }
 
-.webqq-thinking-row.is-incoming .webqq-thinking-duration {
+.chatluna-sandbox-thinking-row.is-incoming .chatluna-sandbox-thinking-duration {
   order: 1;
 }
 
-.webqq-thinking-row.is-incoming .webqq-thinking-chevron {
+.chatluna-sandbox-thinking-row.is-incoming .chatluna-sandbox-thinking-chevron {
   order: 2;
 }
 
-.webqq-thinking-row.is-incoming .webqq-thinking-usage {
+.chatluna-sandbox-thinking-row.is-incoming .chatluna-sandbox-thinking-usage {
   order: 3;
 }
 
 /* Token 指标默认隐藏，悬停或键盘聚焦折叠按钮时淡入，避免常态下与思考时长争抢注意力。 */
-.webqq-thinking-usage {
+.chatluna-sandbox-thinking-usage {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
@@ -265,35 +265,35 @@
 }
 
 /* row 的 Token 排在最右，间距要跟着换边。 */
-.webqq-thinking-row.is-incoming .webqq-thinking-usage {
+.chatluna-sandbox-thinking-row.is-incoming .chatluna-sandbox-thinking-usage {
   margin-right: 0;
   margin-left: 8px;
 }
 
-.webqq-thinking-usage-group {
+.chatluna-sandbox-thinking-usage-group {
   display: inline-flex;
   align-items: center;
   gap: 2px;
   white-space: nowrap;
 }
 
-.webqq-thinking-toggle:hover .webqq-thinking-usage,
-.webqq-thinking-toggle:focus-visible .webqq-thinking-usage {
+.chatluna-sandbox-thinking-toggle:hover .chatluna-sandbox-thinking-usage,
+.chatluna-sandbox-thinking-toggle:focus-visible .chatluna-sandbox-thinking-usage {
   opacity: 1;
   visibility: visible;
 }
 
-.webqq-thinking-row.is-usage-only .webqq-thinking-usage {
+.chatluna-sandbox-thinking-row.is-usage-only .chatluna-sandbox-thinking-usage {
   margin-right: 0;
   opacity: 1;
   visibility: visible;
 }
 
-.webqq-thinking-row.is-usage-only.is-incoming .webqq-thinking-usage {
+.chatluna-sandbox-thinking-row.is-usage-only.is-incoming .chatluna-sandbox-thinking-usage {
   margin-left: 0;
 }
 
-.webqq-thinking-usage-icon {
+.chatluna-sandbox-thinking-usage-icon {
   width: 13px;
   height: 13px;
   fill: none;
@@ -303,11 +303,11 @@
   stroke-width: 1.8;
 }
 
-.webqq-thinking-usage-icon.is-output {
+.chatluna-sandbox-thinking-usage-icon.is-output {
   margin-left: 4px;
 }
 
-.webqq-thinking-chevron {
+.chatluna-sandbox-thinking-chevron {
   width: 13px;
   height: 13px;
   fill: none;
@@ -320,21 +320,21 @@
 }
 
 /* 箭头紧跟时长，两侧朝向一致：折叠指右，展开朝下。 */
-.webqq-thinking-row .webqq-thinking-chevron.is-expanded {
+.chatluna-sandbox-thinking-row .chatluna-sandbox-thinking-chevron.is-expanded {
   transform: rotate(90deg);
 }
 
-.webqq-thinking-panel {
+.chatluna-sandbox-thinking-panel {
   max-width: min(360px, 100%);
   margin-top: 4px;
   transform-origin: top right;
 }
 
-.webqq-thinking-row.is-incoming .webqq-thinking-panel {
+.chatluna-sandbox-thinking-row.is-incoming .chatluna-sandbox-thinking-panel {
   transform-origin: top left;
 }
 
-.webqq-thinking-content {
+.chatluna-sandbox-thinking-content {
   min-height: 0;
   padding: 8px 10px;
   border-left: 2px solid rgb(148 163 184 / 54%);
@@ -349,13 +349,13 @@
   white-space: pre-wrap;
 }
 
-.webqq-thinking-enter-active,
-.webqq-thinking-leave-active {
+.chatluna-sandbox-thinking-enter-active,
+.chatluna-sandbox-thinking-leave-active {
   transition: opacity 0.16s ease, transform 0.16s ease;
 }
 
-.webqq-thinking-enter-from,
-.webqq-thinking-leave-to {
+.chatluna-sandbox-thinking-enter-from,
+.chatluna-sandbox-thinking-leave-to {
   opacity: 0;
   transform: translateY(-4px) scaleY(0.98);
 }
@@ -374,7 +374,7 @@
   }
 }
 
-.webqq-sender-line {
+.chatluna-sandbox-sender-line {
   display: flex;
   max-width: 100%;
   flex-wrap: wrap;
@@ -382,16 +382,16 @@
   gap: 4px;
 }
 
-.webqq-message-row.is-outgoing .webqq-sender-line {
+.chatluna-sandbox-message-row.is-outgoing .chatluna-sandbox-sender-line {
   justify-content: flex-end;
   flex-direction: row-reverse;
 }
 
-.webqq-sender-line + .webqq-message-body {
+.chatluna-sandbox-sender-line + .chatluna-sandbox-message-body {
   margin-top: 6px;
 }
 
-.webqq-message-time {
+.chatluna-sandbox-message-time {
   flex: 0 0 auto;
   align-self: flex-end;
   color: var(--webqq-muted);
@@ -402,7 +402,7 @@
   transition: opacity 0.16s ease;
 }
 
-.webqq-message-row:hover .webqq-message-time {
+.chatluna-sandbox-message-row:hover .chatluna-sandbox-message-time {
   opacity: 1;
 }
 
@@ -434,7 +434,7 @@
   background: rgb(18 183 245 / 10%);
 }
 
-.webqq-message-bubble {
+.chatluna-sandbox-message-bubble {
   --webqq-bubble-bg: rgb(255 255 255 / 90%);
   --webqq-reaction-bg: color-mix(in srgb, var(--webqq-bubble-bg) 88%, #64748b 12%);
 
@@ -483,7 +483,7 @@
   opacity: 0.6;
 }
 
-.webqq-message-quote {
+.chatluna-sandbox-message-quote {
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -502,36 +502,36 @@
   text-align: left;
 }
 
-.webqq-message-quote-title {
+.chatluna-sandbox-message-quote-title {
   color: rgb(30 30 34 / 78%);
   font-weight: 600;
 }
 
-.webqq-message-quote-title,
-.webqq-message-quote span {
+.chatluna-sandbox-message-quote-title,
+.chatluna-sandbox-message-quote span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.webqq-message-row.is-outgoing .webqq-message-bubble .webqq-message-quote {
+.chatluna-sandbox-message-row.is-outgoing .chatluna-sandbox-message-bubble .chatluna-sandbox-message-quote {
   border-left-color: rgb(255 255 255 / 62%);
   color: rgb(255 255 255 / 82%);
   background: rgb(255 255 255 / 16%);
 }
 
-.webqq-message-row.is-outgoing .webqq-message-bubble .webqq-message-quote-title {
+.chatluna-sandbox-message-row.is-outgoing .chatluna-sandbox-message-bubble .chatluna-sandbox-message-quote-title {
   color: #fff;
 }
 
 /* 合并转发卡片：1:1 复刻 onebot-webqq 的 quote + forward 结构/尺寸。 */
-.webqq-message-quote.webqq-message-forward {
+.chatluna-sandbox-message-quote.chatluna-sandbox-message-forward {
   width: 260px;
   max-width: 100%;
   text-align: left;
 }
 
-.webqq-message-forward > span:not(.webqq-message-forward-entry) {
+.chatluna-sandbox-message-forward > span:not(.chatluna-sandbox-message-forward-entry) {
   display: block;
   /* Flex 子项默认可能按内容宽度参与布局，长转发文本不会形成可截断边界；显式限制到卡片内容区才能稳定显示省略号。 */
   width: 100%;
@@ -542,7 +542,7 @@
   text-overflow: ellipsis;
 }
 
-.webqq-message-forward-entry {
+.chatluna-sandbox-message-forward-entry {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -555,33 +555,33 @@
   text-align: left;
 }
 
-.webqq-message-forward-entry::after {
+.chatluna-sandbox-message-forward-entry::after {
   content: "›";
   font-size: 20px;
   line-height: 16px;
 }
 
-.webqq-message-row.is-outgoing .webqq-message-bubble .webqq-message-forward-entry {
+.chatluna-sandbox-message-row.is-outgoing .chatluna-sandbox-message-bubble .chatluna-sandbox-message-forward-entry {
   border-top-color: rgb(255 255 255 / 22%);
   color: rgb(255 255 255 / 78%);
 }
 
-.webqq-message-media {
+.chatluna-sandbox-message-media {
   display: flex;
   max-width: min(280px, 100%);
   flex-direction: column;
 }
 
-.webqq-message-image {
+.chatluna-sandbox-message-image {
   display: block;
   padding: 0;
   border: 0;
   background: transparent;
 }
 
-.webqq-message-image img,
-.webqq-message-media img,
-.webqq-message-media video {
+.chatluna-sandbox-message-image img,
+.chatluna-sandbox-message-media img,
+.chatluna-sandbox-message-media video {
   display: block;
   max-width: 100%;
   max-height: 280px;
@@ -589,12 +589,12 @@
   object-fit: contain;
 }
 
-.webqq-message-media audio {
+.chatluna-sandbox-message-media audio {
   width: min(260px, 100%);
   height: 36px;
 }
 
-.webqq-message-file {
+.chatluna-sandbox-message-file {
   display: flex;
   min-width: 210px;
   max-width: 100%;
@@ -607,35 +607,35 @@
   text-decoration: none;
 }
 
-.webqq-message-row.is-outgoing .webqq-message-file {
+.chatluna-sandbox-message-row.is-outgoing .chatluna-sandbox-message-file {
   background: rgb(255 255 255 / 14%);
 }
 
-.webqq-message-file span {
+.chatluna-sandbox-message-file span {
   display: flex;
   min-width: 0;
   flex-direction: column;
 }
 
-.webqq-message-file strong,
-.webqq-message-file small {
+.chatluna-sandbox-message-file strong,
+.chatluna-sandbox-message-file small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.webqq-message-file small,
-.webqq-message-media-loading {
+.chatluna-sandbox-message-file small,
+.chatluna-sandbox-message-media-loading {
   color: var(--webqq-muted);
   font-size: 11px;
 }
 
-.webqq-message-row.is-outgoing .webqq-message-file small,
-.webqq-message-row.is-outgoing .webqq-message-media-loading {
+.chatluna-sandbox-message-row.is-outgoing .chatluna-sandbox-message-file small,
+.chatluna-sandbox-message-row.is-outgoing .chatluna-sandbox-message-media-loading {
   color: rgb(255 255 255 / 72%);
 }
 
-.webqq-message-row.is-quote-target .webqq-message-bubble::after {
+.chatluna-sandbox-message-row.is-quote-target .chatluna-sandbox-message-bubble::after {
   position: absolute;
   inset: 0;
   border-radius: inherit;
@@ -662,7 +662,7 @@
   }
 }
 
-.webqq-message-row.is-outgoing .webqq-message-bubble {
+.chatluna-sandbox-message-row.is-outgoing .chatluna-sandbox-message-bubble {
   --webqq-bubble-bg: var(--webqq-accent);
   --webqq-reaction-bg: color-mix(in srgb, var(--webqq-bubble-bg) 88%, #0f172a 12%);
 
@@ -671,39 +671,39 @@
   box-shadow: 0 8px 18px var(--webqq-accent-shadow);
 }
 
-.webqq-message-row.is-cluster-first:not(.is-outgoing) .webqq-message-bubble {
+.chatluna-sandbox-message-row.is-cluster-first:not(.is-outgoing) .chatluna-sandbox-message-bubble {
   border-bottom-left-radius: 3px;
 }
 
-.webqq-message-row.is-cluster-middle:not(.is-outgoing) .webqq-message-bubble {
+.chatluna-sandbox-message-row.is-cluster-middle:not(.is-outgoing) .chatluna-sandbox-message-bubble {
   border-radius: 3px 18px 18px 3px;
 }
 
-.webqq-message-row.is-cluster-last:not(.is-outgoing) .webqq-message-bubble {
+.chatluna-sandbox-message-row.is-cluster-last:not(.is-outgoing) .chatluna-sandbox-message-bubble {
   border-top-left-radius: 3px;
 }
 
-.webqq-message-row.is-outgoing.is-cluster-first .webqq-message-bubble {
+.chatluna-sandbox-message-row.is-outgoing.is-cluster-first .chatluna-sandbox-message-bubble {
   border-bottom-right-radius: 3px;
 }
 
-.webqq-message-row.is-outgoing.is-cluster-middle .webqq-message-bubble {
+.chatluna-sandbox-message-row.is-outgoing.is-cluster-middle .chatluna-sandbox-message-bubble {
   border-radius: 18px 3px 3px 18px;
 }
 
-.webqq-message-row.is-outgoing.is-cluster-last .webqq-message-bubble {
+.chatluna-sandbox-message-row.is-outgoing.is-cluster-last .chatluna-sandbox-message-bubble {
   border-top-right-radius: 3px;
 }
 
-.webqq-workspace.has-tim-tail .webqq-message-row:not(.is-outgoing):not(.is-merged) .webqq-message-bubble {
+.webqq-workspace.has-tim-tail .chatluna-sandbox-message-row:not(.is-outgoing):not(.is-merged) .chatluna-sandbox-message-bubble {
   border-top-left-radius: 0;
 }
 
-.webqq-workspace.has-tim-tail .webqq-message-row.is-outgoing:not(.is-merged) .webqq-message-bubble {
+.webqq-workspace.has-tim-tail .chatluna-sandbox-message-row.is-outgoing:not(.is-merged) .chatluna-sandbox-message-bubble {
   border-top-right-radius: 0;
 }
 
-.webqq-workspace.has-tim-tail .webqq-message-row:not(.is-merged) .webqq-message-bubble::before {
+.webqq-workspace.has-tim-tail .chatluna-sandbox-message-row:not(.is-merged) .chatluna-sandbox-message-bubble::before {
   position: absolute;
   top: 0;
   width: 8px;
@@ -712,52 +712,52 @@
   content: "";
 }
 
-.webqq-workspace.has-tim-tail .webqq-message-row:not(.is-outgoing):not(.is-merged) .webqq-message-bubble::before {
+.webqq-workspace.has-tim-tail .chatluna-sandbox-message-row:not(.is-outgoing):not(.is-merged) .chatluna-sandbox-message-bubble::before {
   left: -8px;
   clip-path: path("M 0 0 L 8 0 L 8 14 Q 8 3 0 0 Z");
 }
 
-.webqq-workspace.has-tim-tail .webqq-message-row.is-outgoing:not(.is-merged) .webqq-message-bubble::before {
+.webqq-workspace.has-tim-tail .chatluna-sandbox-message-row.is-outgoing:not(.is-merged) .chatluna-sandbox-message-bubble::before {
   right: -8px;
   clip-path: path("M 8 0 L 0 0 L 0 14 Q 0 3 8 0 Z");
 }
 
-.webqq-workspace[data-color-mode="dark"] .webqq-message-bubble,
+.webqq-workspace[data-color-mode="dark"] .chatluna-sandbox-message-bubble,
 .webqq-workspace[data-color-mode="dark"] .webqq-composer {
   color: #e5edf7;
 }
 
-.webqq-workspace[data-color-mode="dark"] .webqq-message-quote {
+.webqq-workspace[data-color-mode="dark"] .chatluna-sandbox-message-quote {
   border-left-color: rgb(161 161 170 / 62%);
   color: rgb(212 212 216 / 82%);
   background: rgb(39 39 42 / 62%);
 }
 
-.webqq-workspace[data-color-mode="dark"] .webqq-message-quote-title {
+.webqq-workspace[data-color-mode="dark"] .chatluna-sandbox-message-quote-title {
   color: #f4f4f5;
 }
 
-.webqq-workspace[data-color-mode="dark"] .webqq-message-row.is-outgoing .webqq-message-quote {
+.webqq-workspace[data-color-mode="dark"] .chatluna-sandbox-message-row.is-outgoing .chatluna-sandbox-message-quote {
   border-left-color: rgb(255 255 255 / 62%);
   color: rgb(255 255 255 / 82%);
   background: rgb(255 255 255 / 16%);
 }
 
-.webqq-workspace[data-color-mode="dark"] .webqq-message-row.is-outgoing .webqq-message-quote-title {
+.webqq-workspace[data-color-mode="dark"] .chatluna-sandbox-message-row.is-outgoing .chatluna-sandbox-message-quote-title {
   color: #fff;
 }
 
-.webqq-workspace[data-color-mode="dark"] .webqq-message-forward-entry {
+.webqq-workspace[data-color-mode="dark"] .chatluna-sandbox-message-forward-entry {
   border-top-color: rgb(161 161 170 / 28%);
   color: #a1a1aa;
 }
 
-.webqq-workspace[data-color-mode="dark"] .webqq-message-row.is-outgoing .webqq-message-bubble .webqq-message-forward-entry {
+.webqq-workspace[data-color-mode="dark"] .chatluna-sandbox-message-row.is-outgoing .chatluna-sandbox-message-bubble .chatluna-sandbox-message-forward-entry {
   border-top-color: rgb(255 255 255 / 22%);
   color: rgb(255 255 255 / 78%);
 }
 
-.webqq-workspace[data-color-mode="dark"] .webqq-message-bubble {
+.webqq-workspace[data-color-mode="dark"] .chatluna-sandbox-message-bubble {
   --webqq-bubble-bg: rgb(57 57 63);
   --webqq-reaction-bg: rgb(47 47 52);
 
@@ -770,7 +770,7 @@
   background: rgb(51 51 56);
 }
 
-.webqq-workspace[data-color-mode="dark"] .webqq-message-row.is-outgoing .webqq-message-bubble {
+.webqq-workspace[data-color-mode="dark"] .chatluna-sandbox-message-row.is-outgoing .chatluna-sandbox-message-bubble {
   --webqq-bubble-bg: var(--webqq-accent);
   --webqq-reaction-bg: color-mix(in srgb, var(--webqq-bubble-bg) 88%, #0f172a 12%);
 
@@ -779,7 +779,7 @@
   box-shadow: none;
 }
 
-.webqq-message-stack {
+.chatluna-sandbox-message-stack {
   display: flex;
   min-width: 0;
   max-width: 100%;
@@ -788,11 +788,11 @@
   gap: 4px;
 }
 
-.webqq-message-row.is-outgoing .webqq-message-stack {
+.chatluna-sandbox-message-row.is-outgoing .chatluna-sandbox-message-stack {
   align-items: flex-end;
 }
 
-.webqq-message-reactions {
+.chatluna-sandbox-message-reactions {
   display: flex;
   max-width: 100%;
   flex-wrap: wrap;
@@ -801,7 +801,7 @@
   margin-bottom: -5px;
 }
 
-.webqq-message-reaction {
+.chatluna-sandbox-message-reaction {
   --webqq-reaction-avatar-size: 18px;
 
   min-height: unset;
@@ -819,12 +819,12 @@
   white-space: nowrap;
 }
 
-.webqq-message-reaction-users {
+.chatluna-sandbox-message-reaction-users {
   display: inline-flex;
   align-items: center;
 }
 
-.webqq-message-reaction-avatar {
+.chatluna-sandbox-message-reaction-avatar {
   position: relative;
   display: block;
   box-sizing: border-box;
@@ -839,15 +839,15 @@
   box-shadow: none;
 }
 
-.webqq-message-reaction-avatar:not(:only-child):not(:last-child) {
+.chatluna-sandbox-message-reaction-avatar:not(:only-child):not(:last-child) {
   box-shadow: 0 0 0 1px var(--webqq-reaction-bg);
 }
 
-.webqq-message-reaction-avatar + .webqq-message-reaction-avatar {
+.chatluna-sandbox-message-reaction-avatar + .chatluna-sandbox-message-reaction-avatar {
   margin-left: -6px;
 }
 
-.webqq-message-reaction-avatar-image {
+.chatluna-sandbox-message-reaction-avatar-image {
   --webqq-avatar-size: var(--webqq-reaction-avatar-size);
   display: flex;
   width: 100%;
@@ -860,27 +860,27 @@
   font-size: 9px;
 }
 
-.webqq-message-reaction-avatar-image.is-bot {
+.chatluna-sandbox-message-reaction-avatar-image.is-bot {
   background: #475569;
 }
 
-.webqq-workspace[data-color-mode="dark"] .webqq-message-reaction-avatar-image.is-bot {
+.webqq-workspace[data-color-mode="dark"] .chatluna-sandbox-message-reaction-avatar-image.is-bot {
   background: #64748b;
 }
 
-.webqq-message-reaction-emoji {
+.chatluna-sandbox-message-reaction-emoji {
   width: 18px;
   height: 18px;
   flex: 0 0 auto;
   object-fit: contain;
 }
 
-.webqq-message-reaction-label {
+.chatluna-sandbox-message-reaction-label {
   font-size: 12px;
   line-height: 18px;
 }
 
-.webqq-emoji-picker {
+.chatluna-sandbox-emoji-picker {
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -889,29 +889,29 @@
   padding: 12px;
 }
 
-.webqq-emoji-picker-search {
+.chatluna-sandbox-emoji-picker-search {
   width: 100%;
 }
 
-.webqq-emoji-picker-section {
+.chatluna-sandbox-emoji-picker-section {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.webqq-emoji-picker-section > header {
+.chatluna-sandbox-emoji-picker-section > header {
   color: var(--webqq-muted);
   font-size: 12px;
   line-height: 16px;
 }
 
-.webqq-emoji-picker-grid {
+.chatluna-sandbox-emoji-picker-grid {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: 6px;
 }
 
-.webqq-emoji-picker-item {
+.chatluna-sandbox-emoji-picker-item {
   display: flex;
   aspect-ratio: 1 / 1;
   align-items: center;
@@ -923,17 +923,17 @@
   background: color-mix(in srgb, var(--webqq-panel) 88%, transparent);
 }
 
-.webqq-emoji-picker-item:hover {
+.chatluna-sandbox-emoji-picker-item:hover {
   background: color-mix(in srgb, var(--webqq-accent) 14%, transparent);
 }
 
-.webqq-emoji-picker-item img {
+.chatluna-sandbox-emoji-picker-item img {
   width: 24px;
   height: 24px;
   object-fit: contain;
 }
 
-.webqq-emoji-picker-empty {
+.chatluna-sandbox-emoji-picker-empty {
   grid-column: 1 / -1;
   margin: 8px 0;
   color: var(--webqq-muted);
@@ -942,7 +942,7 @@
 }
 
 @media (max-width: 640px) {
-  .webqq-emoji-picker-grid {
+  .chatluna-sandbox-emoji-picker-grid {
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }

@@ -48,7 +48,7 @@ function addListener(
 function setVisible(state: WebQQScrollbarState, visible: boolean) {
   // 工作区缩放会从静止指针下方经过并触发 mouseenter/scroll；若此时保留 is-visible，
   // 全局动画遮罩移除后轨道会在最终位置补闪一次，因此缩放期间必须连可见状态也拒绝写入。
-  const workspaceZooming = document.documentElement.classList.contains('onebot-sandbox-workspace-zooming')
+  const workspaceZooming = document.documentElement.classList.contains('chatluna-sandbox-workspace-zooming')
   state.overlay.classList.toggle('is-visible', visible && state.showOverlay && !workspaceZooming)
 }
 
@@ -154,9 +154,9 @@ function stopDragging(state: WebQQScrollbarState) {
 
 function createOverlay() {
   const overlay = document.createElement('div')
-  overlay.className = 'webqq-scrollbar-overlay'
+  overlay.className = 'chatluna-sandbox-scrollbar-overlay'
   const thumb = document.createElement('div')
-  thumb.className = 'webqq-scrollbar-thumb'
+  thumb.className = 'chatluna-sandbox-scrollbar-thumb'
   overlay.appendChild(thumb)
   document.body.appendChild(overlay)
   return { overlay, thumb }
@@ -198,7 +198,7 @@ export const vWebqqScrollbar: Directive<HTMLElement, WebQQScrollbarOptions | und
     }
 
     states.set(element, state)
-    element.dataset.webqqScrollbar = 'true'
+    element.dataset.chatlunaSandboxScrollbar = 'true'
     applyScrollbarOptions(state, binding)
 
     const enter = () => {
@@ -293,7 +293,7 @@ export const vWebqqScrollbar: Directive<HTMLElement, WebQQScrollbarOptions | und
     const state = states.get(element)
     if (!state) return
     states.delete(element)
-    delete element.dataset.webqqScrollbar
+    delete element.dataset.chatlunaSandboxScrollbar
     clearHideTimer(state)
     if (state.frame) window.cancelAnimationFrame(state.frame)
     state.resizeObserver?.disconnect()

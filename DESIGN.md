@@ -1,6 +1,6 @@
 # WebUI 设计规范
 
-本文档记录 onebot-sandbox WebUI 的稳定视觉约定。新增或调整界面时，应优先复用本文术语、主题令牌和已有语义类，避免为单个页面定义近似但不一致的样式。
+本文档记录 chatluna-sandbox WebUI 的稳定视觉约定。新增或调整界面时，应优先复用本文术语、主题令牌和已有语义类，避免为单个页面定义近似但不一致的样式。
 
 ## 二级面
 
@@ -19,7 +19,7 @@
 
 实现约定：
 
-- 容器使用 `.webqq-solid-secondary-surface`；
+- 容器使用 `.chatluna-sandbox-solid-secondary-surface`；
 - 不得启用背景模糊，使用 `backdrop-filter: none`；
 - 使用 `--webqq-secondary-outline` 作为轻描边；
 - 使用 `--webqq-secondary-shadow` 作为统一阴影；

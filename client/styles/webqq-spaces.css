@@ -27,9 +27,9 @@
 .webqq-space-thumbnail-live-workspace { position: absolute; top: 0; left: 0; margin: 0; transform-origin: 0 0; }
 .webqq-space-thumbnail-workspace { position: absolute; top: 0; left: 0; width: 1440px; height: 760px; grid-template-columns: 72px 300px minmax(360px, 1fr) 280px; transform-origin: 0 0; }
 /* 预览副本只负责绘制；裁掉滚动条、弹层和动态选择态，避免缩放副本污染正文交互。 */
-:is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) :is(.webqq-scrollbar-overlay, [data-reka-popper-content-wrapper]) { display: none !important; }
-:is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) .webqq-messages { scrollbar-width: none; }
-:is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) .webqq-messages::-webkit-scrollbar { display: none; }
+:is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) :is(.chatluna-sandbox-scrollbar-overlay, [data-reka-popper-content-wrapper]) { display: none !important; }
+:is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) .chatluna-sandbox-messages { scrollbar-width: none; }
+:is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) .chatluna-sandbox-messages::-webkit-scrollbar { display: none; }
 
 /* ==== ego lite agent 视觉复刻（边缘效果与光标动画 1:1 取自 ego lite resources.pak 内 Actor Overlay 源码；任务栏按实机截图与 --bg-agent-task-bar: #0009 令牌复刻）==== */
 

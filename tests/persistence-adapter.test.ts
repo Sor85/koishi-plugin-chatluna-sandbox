@@ -81,7 +81,7 @@ describe('Koishi Database 场景仓库', () => {
     registerSandboxSceneModel(app)
     const persistence = new KoishiDatabaseScenePersistence(() => context.database)
 
-    expect(extend).toHaveBeenCalledWith('onebot-sandbox.scene', expect.objectContaining({
+    expect(extend).toHaveBeenCalledWith('chatluna-sandbox.scene', expect.objectContaining({
       id: expect.anything(),
       scene: 'json',
       updatedAt: 'timestamp',
@@ -90,7 +90,7 @@ describe('Koishi Database 场景仓库', () => {
 
     await persistence.save(snapshot)
     expect(await persistence.load()).toEqual({ kind: 'loaded', scene: snapshot })
-    expect(context.database.upsert).toHaveBeenCalledWith('onebot-sandbox.scene', [expect.objectContaining({
+    expect(context.database.upsert).toHaveBeenCalledWith('chatluna-sandbox.scene', [expect.objectContaining({
       id: 'main',
       scene: snapshot,
     })])
@@ -156,7 +156,7 @@ describe('Koishi Database 场景仓库', () => {
       scene: snapshot,
     }
 
-    expect(extend).toHaveBeenCalledWith('onebot-sandbox.test-space', expect.objectContaining({
+    expect(extend).toHaveBeenCalledWith('chatluna-sandbox.test-space', expect.objectContaining({
       id: expect.anything(),
       scene: 'json',
     }), { primary: 'id' })

@@ -319,7 +319,7 @@
   background: rgb(113 113 122 / 24%);
 }
 
-.webqq-search {
+.chatluna-sandbox-search {
   position: relative;
   display: flex;
   align-items: center;
@@ -327,14 +327,14 @@
   color: var(--webqq-muted);
 }
 
-.webqq-search svg {
+.chatluna-sandbox-search svg {
   position: absolute;
   top: 21px;
   left: 23px;
   z-index: 1;
 }
 
-.webqq-search input {
+.chatluna-sandbox-search input {
   width: 100%;
   min-width: 0;
   min-height: 34px;
@@ -347,7 +347,7 @@
   font-size: 13px;
 }
 
-.webqq-search input:focus {
+.chatluna-sandbox-search input:focus {
   border-color: var(--webqq-accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--webqq-accent) 14%, transparent);
 }

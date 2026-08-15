@@ -1,4 +1,4 @@
-# koishi-plugin-onebot-sandbox
+# koishi-plugin-chatluna-sandbox
 
 在 Koishi 控制台中提供可验证 OneBot 插件行为的模拟 QQ 环境。
 

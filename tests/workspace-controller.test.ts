@@ -79,7 +79,7 @@ const workspace: SandboxWorkspaceState = {
 
 function createStorage(value?: string) {
   const values = new Map<string, string>()
-  if (value) values.set('onebot-sandbox.workspace', value)
+  if (value) values.set('chatluna-sandbox.workspace', value)
   return {
     getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, nextValue: string) => values.set(key, nextValue),
@@ -129,7 +129,7 @@ describe('WebQQ 工作区控制模块', () => {
       messages: [],
       forwards: [],
     })
-    expect(JSON.parse(storage.read('onebot-sandbox.workspace') ?? '{}')).toEqual({
+    expect(JSON.parse(storage.read('chatluna-sandbox.workspace') ?? '{}')).toEqual({
       currentOperatorId: '10001',
       activeConversationId: 'group:30001',
       currentView: 'messages',
@@ -267,7 +267,7 @@ describe('WebQQ 工作区控制模块', () => {
     expect(controller.currentOperatorId.value).toBe('10001')
     expect(controller.activeConversationId.value).toBe('private:10001:20001')
     expect(controller.currentView.value).toBe('contacts')
-    expect(JSON.parse(storage.read('onebot-sandbox.workspace') ?? '{}')).toEqual({
+    expect(JSON.parse(storage.read('chatluna-sandbox.workspace') ?? '{}')).toEqual({
       currentOperatorId: '10001',
       activeConversationId: 'private:10001:20001',
       currentView: 'contacts',

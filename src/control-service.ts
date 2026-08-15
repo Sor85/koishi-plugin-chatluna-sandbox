@@ -251,9 +251,9 @@ export class SandboxControlService {
     // Database 模式仍使用共享目录，以便场景引用在重启后继续命中同一媒体文件。
     this.mediaStorage = new SandboxMediaStorage(options.mediaDirectory ?? (
       this.persistence
-        ? resolve(ctx.baseDir, 'data/onebot-sandbox/media')
+        ? resolve(ctx.baseDir, 'data/chatluna-sandbox/media')
         // 内存模式使用独立目录，避免与 Database 共享 media 目录互相回收。
-        : resolve(ctx.baseDir, 'data/onebot-sandbox/ephemeral-media', randomUUID().replaceAll('-', ''))
+        : resolve(ctx.baseDir, 'data/chatluna-sandbox/ephemeral-media', randomUUID().replaceAll('-', ''))
     ))
     // database 服务可能晚于本插件加载，构造时的可用性不可信；数据库模式的清理决策移到 ready 读取场景之后。
     if (!this.persistence) this.mediaStorage.clear()
@@ -2067,7 +2067,7 @@ export class SandboxControlService {
     const reason = result.reason === 'missing-service'
       ? `等待 Koishi Database 服务 ${this.databaseReadyTimeoutMs}ms 后仍不可用`
       : result.error instanceof Error ? result.error.message : '数据库查询失败'
-    this.ctx.logger('onebot-sandbox').warn(`场景持久化暂不可用，已保留当前进程内场景且不会覆盖数据库：${reason}`)
+    this.ctx.logger('chatluna-sandbox').warn(`场景持久化暂不可用，已保留当前进程内场景且不会覆盖数据库：${reason}`)
   }
 
   private async normalizePersistedAvatars(): Promise<boolean> {
@@ -2082,14 +2082,14 @@ export class SandboxControlService {
       if (previous.startsWith('sandbox-media://')) {
         if (this.rematerializeBuiltinAvatar(previous)) changed = true
         else if (!this.hasManagedAvatar(previous)) {
-          this.ctx.logger('onebot-sandbox').warn(`参与者头像媒体不存在，已保留原引用等待恢复：${participant.id}`)
+          this.ctx.logger('chatluna-sandbox').warn(`参与者头像媒体不存在，已保留原引用等待恢复：${participant.id}`)
         }
         continue
       }
       try {
         participant.avatar = await this.importAvatar(participant.kind, participant.id, previous)
       } catch (error) {
-        this.ctx.logger('onebot-sandbox').warn(`参与者头像规范化失败，已替换为默认值：${participant.id}`, error)
+        this.ctx.logger('chatluna-sandbox').warn(`参与者头像规范化失败，已替换为默认值：${participant.id}`, error)
         participant.avatar = this.createDefaultAvatar(participant.kind)
       }
       changed = true
@@ -2104,14 +2104,14 @@ export class SandboxControlService {
       if (previous.startsWith('sandbox-media://')) {
         if (this.rematerializeBuiltinAvatar(previous)) changed = true
         else if (!this.hasManagedAvatar(previous)) {
-          this.ctx.logger('onebot-sandbox').warn(`群头像媒体不存在，已保留原引用等待恢复：${group.id}`)
+          this.ctx.logger('chatluna-sandbox').warn(`群头像媒体不存在，已保留原引用等待恢复：${group.id}`)
         }
         continue
       }
       try {
         group.avatar = await this.importAvatar('group', group.id, previous)
       } catch (error) {
-        this.ctx.logger('onebot-sandbox').warn(`群头像规范化失败，已替换为默认值：${group.id}`, error)
+        this.ctx.logger('chatluna-sandbox').warn(`群头像规范化失败，已替换为默认值：${group.id}`, error)
         group.avatar = this.createDefaultAvatar('group')
       }
       changed = true
@@ -2611,7 +2611,7 @@ export class SandboxControlService {
       })
     } catch (error) {
       const debugError = createOneBotDebugError(error)
-      this.ctx.logger('onebot-sandbox').error(`OneBot 原始事件派发失败 [${debugError.traceId}]`, error)
+      this.ctx.logger('chatluna-sandbox').error(`OneBot 原始事件派发失败 [${debugError.traceId}]`, error)
       this.recordOneBotDebug({
         botId: bot.selfId,
         implementation: profile.implementation,

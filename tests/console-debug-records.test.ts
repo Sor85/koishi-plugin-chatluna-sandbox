@@ -42,16 +42,16 @@ describe('OneBot 调试 Console 协议', () => {
     }
     registerConsole(consoleRegistrar, control, appearance)
 
-    const listRecords = listeners.get('onebot-sandbox/debug-records')
-    const getRecord = listeners.get('onebot-sandbox/debug-record')
-    const clearRecords = listeners.get('onebot-sandbox/clear-debug-records')
+    const listRecords = listeners.get('chatluna-sandbox/debug-records')
+    const getRecord = listeners.get('chatluna-sandbox/debug-record')
+    const clearRecords = listeners.get('chatluna-sandbox/clear-debug-records')
     expect(listRecords).toBeTypeOf('function')
     expect(getRecord).toBeTypeOf('function')
     expect(clearRecords).toBeTypeOf('function')
     if (typeof listRecords !== 'function' || typeof getRecord !== 'function' || typeof clearRecords !== 'function') {
       throw new Error('调试记录监听器未注册')
     }
-    expect(listeners.has('onebot-sandbox/replay-debug-record')).toBe(false)
+    expect(listeners.has('chatluna-sandbox/replay-debug-record')).toBe(false)
     const page = Reflect.apply(listRecords, undefined, [{ direction: 'action', action: 'get_login_info' }]) as {
       records: Array<{ id: string, requestedAction: string }>
       hasMore: boolean
@@ -100,18 +100,18 @@ describe('OneBot 调试 Console 协议', () => {
       status: 'success', durationMs: 2,
     })
 
-    expect(listeners.get('onebot-sandbox/debug-records')?.({})).toMatchObject({
+    expect(listeners.get('chatluna-sandbox/debug-records')?.({})).toMatchObject({
       records: [
         { requestedAction: 'space-event', source: { type: 'test-space', spaceId: first.id, name: '空间 A' } },
         { requestedAction: 'main-action', source: { type: 'main', name: '主环境' } },
       ],
     })
-    expect(listeners.get('onebot-sandbox/debug-records')?.({ spaceId: first.id })).toMatchObject({
+    expect(listeners.get('chatluna-sandbox/debug-records')?.({ spaceId: first.id })).toMatchObject({
       records: [
         { requestedAction: 'space-event', source: { type: 'test-space', spaceId: first.id, name: '空间 A' } },
       ],
     })
-    expect(listeners.get('onebot-sandbox/clear-debug-records')?.({})).toEqual({ cleared: 2 })
+    expect(listeners.get('chatluna-sandbox/clear-debug-records')?.({})).toEqual({ cleared: 2 })
     expect(control.getOneBotDebugRecords()).toMatchObject({ records: [], hasMore: false })
     expect(first.control.getOneBotDebugRecords()).toMatchObject({ records: [], hasMore: false })
   })

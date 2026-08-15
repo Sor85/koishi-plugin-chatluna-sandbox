@@ -190,36 +190,36 @@
   width: min(760px, calc(100vw - 24px));
 }
 
-.webqq-group-members-editor {
+.chatluna-sandbox-group-members-editor {
   display: grid;
   gap: 12px;
   padding-top: 16px;
 }
 
-.webqq-group-members-heading {
+.chatluna-sandbox-group-members-heading {
   display: flex;
   align-items: start;
   justify-content: space-between;
   gap: 16px;
 }
 
-.webqq-group-members-heading strong,
-.webqq-group-members-heading p {
+.chatluna-sandbox-group-members-heading strong,
+.chatluna-sandbox-group-members-heading p {
   margin: 0;
 }
 
-.webqq-group-members-heading strong {
+.chatluna-sandbox-group-members-heading strong {
   font-size: 14px;
   line-height: 20px;
 }
 
-.webqq-group-members-heading p {
+.chatluna-sandbox-group-members-heading p {
   margin-top: 4px;
   font-size: 12px;
   line-height: 18px;
 }
 
-.webqq-group-members-count {
+.chatluna-sandbox-group-members-count {
   flex: none;
   padding: 3px 8px;
   border-radius: 999px;
@@ -230,13 +230,13 @@
   line-height: 18px;
 }
 
-.webqq-group-member-grid {
+.chatluna-sandbox-group-member-grid {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
 }
 
-.webqq-group-member-card {
+.chatluna-sandbox-group-member-card {
   position: relative;
   min-width: 0;
   padding: 10px 8px;
@@ -246,16 +246,16 @@
   transition: background 140ms ease, border-color 140ms ease;
 }
 
-.webqq-group-member-card:hover {
+.chatluna-sandbox-group-member-card:hover {
   background: var(--webqq-surface-muted);
 }
 
-.webqq-group-member-card.is-selected {
+.chatluna-sandbox-group-member-card.is-selected {
   border-color: color-mix(in srgb, var(--webqq-accent) 28%, transparent);
   background: color-mix(in srgb, var(--webqq-accent) 6%, transparent);
 }
 
-.webqq-group-member-select {
+.chatluna-sandbox-group-member-select {
   width: 100%;
   min-width: 0;
   display: grid;
@@ -268,22 +268,22 @@
   text-align: center;
 }
 
-.webqq-group-member-select:hover .webqq-group-member-avatar,
-.webqq-group-member-select:focus-visible .webqq-group-member-avatar {
+.chatluna-sandbox-group-member-select:hover .chatluna-sandbox-group-member-avatar,
+.chatluna-sandbox-group-member-select:focus-visible .chatluna-sandbox-group-member-avatar {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--webqq-accent) 14%, transparent);
 }
 
-.webqq-group-member-select:focus-visible {
+.chatluna-sandbox-group-member-select:focus-visible {
   outline: none;
 }
 
-.webqq-group-member-avatar-wrap {
+.chatluna-sandbox-group-member-avatar-wrap {
   position: relative;
   width: 48px;
   height: 48px;
 }
 
-.webqq-group-member-avatar {
+.chatluna-sandbox-group-member-avatar {
   --webqq-avatar-size: 48px;
 
   width: 48px;
@@ -291,7 +291,7 @@
   transition: box-shadow 140ms ease;
 }
 
-.webqq-group-member-state {
+.chatluna-sandbox-group-member-state {
   position: absolute;
   right: -2px;
   bottom: -2px;
@@ -306,43 +306,43 @@
   background: var(--webqq-surface-muted);
 }
 
-.webqq-group-member-card.is-selected .webqq-group-member-state {
+.chatluna-sandbox-group-member-card.is-selected .chatluna-sandbox-group-member-state {
   color: #fff;
   background: var(--webqq-accent);
 }
 
-.webqq-group-member-state svg {
+.chatluna-sandbox-group-member-state svg {
   width: 11px;
   height: 11px;
   stroke-width: 2.5;
 }
 
-.webqq-group-member-copy {
+.chatluna-sandbox-group-member-copy {
   width: 100%;
   min-width: 0;
   display: grid;
   gap: 1px;
 }
 
-.webqq-group-member-copy strong,
-.webqq-group-member-copy small {
+.chatluna-sandbox-group-member-copy strong,
+.chatluna-sandbox-group-member-copy small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.webqq-group-member-copy strong {
+.chatluna-sandbox-group-member-copy strong {
   font-size: 12px;
   line-height: 17px;
 }
 
-.webqq-group-member-copy small {
+.chatluna-sandbox-group-member-copy small {
   color: var(--webqq-muted);
   font-size: 10px;
   line-height: 14px;
 }
 
-.webqq-group-member-edit {
+.chatluna-sandbox-group-member-edit {
   position: absolute;
   top: 6px;
   right: 6px;
@@ -359,24 +359,24 @@
   transition: background 140ms ease, color 140ms ease, opacity 140ms ease;
 }
 
-.webqq-group-member-card:hover .webqq-group-member-edit,
-.webqq-group-member-edit:focus-visible {
+.chatluna-sandbox-group-member-card:hover .chatluna-sandbox-group-member-edit,
+.chatluna-sandbox-group-member-edit:focus-visible {
   opacity: 1;
 }
 
-.webqq-group-member-edit:hover,
-.webqq-group-member-edit:focus-visible {
+.chatluna-sandbox-group-member-edit:hover,
+.chatluna-sandbox-group-member-edit:focus-visible {
   color: var(--webqq-accent);
   outline: none;
   background: var(--webqq-panel);
 }
 
-.webqq-group-member-edit svg {
+.chatluna-sandbox-group-member-edit svg {
   width: 14px;
   height: 14px;
 }
 
-.webqq-group-member-editor {
+.chatluna-sandbox-group-member-editor {
   display: grid;
   gap: 12px;
   padding: 12px;
@@ -384,43 +384,43 @@
   background: var(--webqq-surface-muted);
 }
 
-.webqq-group-member-editor-heading {
+.chatluna-sandbox-group-member-editor-heading {
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr) 32px;
   align-items: center;
   gap: 10px;
 }
 
-.webqq-group-member-editor-heading .webqq-identity-avatar {
+.chatluna-sandbox-group-member-editor-heading .webqq-identity-avatar {
   --webqq-avatar-size: 40px;
 }
 
-.webqq-group-member-editor-heading > span {
+.chatluna-sandbox-group-member-editor-heading > span {
   min-width: 0;
   display: grid;
 }
 
-.webqq-group-member-editor-heading strong {
+.chatluna-sandbox-group-member-editor-heading strong {
   font-size: 13px;
 }
 
-.webqq-group-member-editor-heading small {
+.chatluna-sandbox-group-member-editor-heading small {
   color: var(--webqq-muted);
   font-size: 11px;
 }
 
-.webqq-group-member-controls {
+.chatluna-sandbox-group-member-controls {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
 }
 
 @media (max-width: 640px) {
-  .webqq-group-member-grid {
+  .chatluna-sandbox-group-member-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .webqq-group-member-controls {
+  .chatluna-sandbox-group-member-controls {
     grid-template-columns: 1fr;
   }
 }
@@ -432,7 +432,7 @@
   padding-left: 36px;
 }
 
-.webqq-secondary-page {
+.chatluna-sandbox-secondary-page {
   position: fixed;
   top: 12px;
   left: 12px;
@@ -452,13 +452,13 @@
   backdrop-filter: saturate(180%) blur(20px);
 }
 
-.webqq-secondary-page.webqq-solid-secondary-surface {
+.chatluna-sandbox-secondary-page.chatluna-sandbox-solid-secondary-surface {
   border-color: var(--webqq-secondary-outline);
   box-shadow: var(--webqq-secondary-shadow);
   backdrop-filter: none;
 }
 
-.webqq-secondary-page-header {
+.chatluna-sandbox-secondary-page-header {
   min-height: 48px;
   display: flex;
   align-items: center;
@@ -469,18 +469,18 @@
   user-select: none;
 }
 
-.webqq-secondary-page-header strong {
+.chatluna-sandbox-secondary-page-header strong {
   font-size: 14px;
   line-height: 20px;
 }
 
-.webqq-profile-card-page {
+.chatluna-sandbox-profile-card-page {
   width: max-content;
   min-width: 260px;
   max-width: min(320px, calc(100vw - 24px));
 }
 
-.webqq-secondary-page.onebot-sandbox-secondary-page > .webqq-secondary-page-header {
+.chatluna-sandbox-secondary-page > .chatluna-sandbox-secondary-page-header {
   /* Koishi 会把各插件样式加载到同一页面；其他插件的同名通用标题栏可能覆盖定位与背景。
      本插件所有浮动二级页都依赖 Grid 首行给标题栏占位，因此统一恢复局部定位和当前主题令牌色。 */
   position: relative;
@@ -490,7 +490,7 @@
   background: var(--webqq-bg);
 }
 
-.webqq-profile-card {
+.chatluna-sandbox-profile-card {
   min-height: 0;
   display: grid;
   gap: 16px;
@@ -499,12 +499,12 @@
   scrollbar-width: none;
 }
 
-.onebot-sandbox-profile-card-page .webqq-profile-card::-webkit-scrollbar {
+.chatluna-sandbox-profile-card-page .chatluna-sandbox-profile-card::-webkit-scrollbar {
   width: 0;
   height: 0;
 }
 
-.webqq-profile-card-hero {
+.chatluna-sandbox-profile-card-hero {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -513,7 +513,7 @@
   text-align: center;
 }
 
-.webqq-profile-card-hero .webqq-avatar-profile {
+.chatluna-sandbox-profile-card-hero .webqq-avatar-profile {
   --webqq-avatar-size: 96px;
 
   width: 96px;
@@ -528,37 +528,37 @@
   mask-image: none;
 }
 
-.webqq-profile-card-hero .webqq-avatar-profile > img {
+.chatluna-sandbox-profile-card-hero .webqq-avatar-profile > img {
   -webkit-mask-image: none;
   mask-image: none;
 }
 
-.webqq-profile-card-hero h2 {
+.chatluna-sandbox-profile-card-hero h2 {
   margin: 0;
   color: var(--webqq-text);
   font-size: 18px;
   line-height: 26px;
 }
 
-.webqq-profile-card-hero p {
+.chatluna-sandbox-profile-card-hero p {
   margin: 4px 0 0;
   color: var(--webqq-muted);
   font-size: 13px;
   line-height: 20px;
 }
 
-.webqq-profile-card-note {
+.chatluna-sandbox-profile-card-note {
   color: var(--webqq-text) !important;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
-.webqq-profile-card-section {
+.chatluna-sandbox-profile-card-section {
   display: grid;
   gap: 8px;
 }
 
-.webqq-profile-card-section h3 {
+.chatluna-sandbox-profile-card-section h3 {
   margin: 0;
   color: var(--webqq-muted);
   font-size: 12px;
@@ -567,13 +567,13 @@
   letter-spacing: 0.02em;
 }
 
-.webqq-profile-card-fields {
+.chatluna-sandbox-profile-card-fields {
   display: grid;
   gap: 8px;
   margin: 0;
 }
 
-.webqq-profile-card-fields > div {
+.chatluna-sandbox-profile-card-fields > div {
   min-height: 28px;
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
@@ -583,11 +583,11 @@
   line-height: 20px;
 }
 
-.webqq-profile-card-fields dt {
+.chatluna-sandbox-profile-card-fields dt {
   color: var(--webqq-muted);
 }
 
-.webqq-profile-card-fields dd {
+.chatluna-sandbox-profile-card-fields dd {
   margin: 0;
   color: var(--webqq-text);
   overflow-wrap: anywhere;
@@ -605,7 +605,7 @@ body[data-sandbox-color-scheme="dark"] .webqq-form-error {
 }
 
 /* 合并转发详情：居中 modal。z-index 落在二级页 130 与菜单 140 之上，图片预览 10002 之下。 */
-.webqq-forward-modal-backdrop {
+.chatluna-sandbox-forward-modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: 160;
@@ -619,7 +619,7 @@ body[data-sandbox-color-scheme="dark"] .webqq-form-error {
   outline: none;
 }
 
-.webqq-forward-modal {
+.chatluna-sandbox-forward-modal {
   display: flex;
   width: min(480px, calc(100vw - 32px));
   max-height: min(80vh, 620px);
@@ -631,7 +631,7 @@ body[data-sandbox-color-scheme="dark"] .webqq-form-error {
   box-shadow: 0 24px 70px rgb(15 23 42 / 32%);
 }
 
-.webqq-forward-modal-header {
+.chatluna-sandbox-forward-modal-header {
   display: grid;
   min-height: 46px;
   flex-shrink: 0;
@@ -642,12 +642,12 @@ body[data-sandbox-color-scheme="dark"] .webqq-form-error {
   border-bottom: 1px solid rgb(226 232 240 / 82%);
 }
 
-.webqq-forward-modal-header-placeholder {
+.chatluna-sandbox-forward-modal-header-placeholder {
   width: 30px;
   height: 30px;
 }
 
-.webqq-forward-modal-header strong {
+.chatluna-sandbox-forward-modal-header strong {
   min-width: 0;
   overflow: hidden;
   color: #334155;
@@ -658,7 +658,7 @@ body[data-sandbox-color-scheme="dark"] .webqq-form-error {
   text-overflow: ellipsis;
 }
 
-.webqq-forward-modal-header button {
+.chatluna-sandbox-forward-modal-header button {
   width: 30px;
   min-height: 30px;
   display: inline-flex;
@@ -671,23 +671,23 @@ body[data-sandbox-color-scheme="dark"] .webqq-form-error {
   background: transparent;
 }
 
-.webqq-forward-modal-header button:hover,
-.webqq-forward-modal-header button:focus-visible {
+.chatluna-sandbox-forward-modal-header button:hover,
+.chatluna-sandbox-forward-modal-header button:focus-visible {
   outline: none;
   background: rgb(148 163 184 / 14%);
 }
 
-.webqq-forward-modal-body {
+.chatluna-sandbox-forward-modal-body {
   min-height: 0;
   overflow-y: auto;
   padding: 14px 16px 28px;
 }
 
-.webqq-forward-modal .webqq-message-row {
+.chatluna-sandbox-forward-modal .chatluna-sandbox-message-row {
   max-width: 74%;
 }
 
-.webqq-forward-modal-empty {
+.chatluna-sandbox-forward-modal-empty {
   padding: 28px 0;
   color: #94a3b8;
   font-size: 13px;
@@ -695,31 +695,31 @@ body[data-sandbox-color-scheme="dark"] .webqq-form-error {
   text-align: center;
 }
 
-body[data-sandbox-color-scheme="dark"] .webqq-forward-modal {
+body[data-sandbox-color-scheme="dark"] .chatluna-sandbox-forward-modal {
   border-color: transparent;
   background: rgb(44 44 48 / 98%);
   box-shadow: 0 24px 70px rgb(9 9 11 / 48%);
 }
 
-body[data-sandbox-color-scheme="dark"] .webqq-forward-modal-header {
+body[data-sandbox-color-scheme="dark"] .chatluna-sandbox-forward-modal-header {
   border-bottom-color: rgb(113 113 122 / 36%);
 }
 
-body[data-sandbox-color-scheme="dark"] .webqq-forward-modal-header strong {
+body[data-sandbox-color-scheme="dark"] .chatluna-sandbox-forward-modal-header strong {
   color: #f4f4f5;
 }
 
-body[data-sandbox-color-scheme="dark"] .webqq-forward-modal-header button {
+body[data-sandbox-color-scheme="dark"] .chatluna-sandbox-forward-modal-header button {
   color: #a1a1aa;
 }
 
-body[data-sandbox-color-scheme="dark"] .webqq-forward-modal-header button:hover,
-body[data-sandbox-color-scheme="dark"] .webqq-forward-modal-header button:focus-visible {
+body[data-sandbox-color-scheme="dark"] .chatluna-sandbox-forward-modal-header button:hover,
+body[data-sandbox-color-scheme="dark"] .chatluna-sandbox-forward-modal-header button:focus-visible {
   background: rgb(113 113 122 / 20%);
 }
 
 /* 图片全屏预览：teleport 到 body，与工作区令牌隔离，遮罩固定深色（亮暗通用）。 */
-.webqq-image-preview {
+.chatluna-sandbox-image-preview {
   position: fixed;
   inset: 0;
   z-index: 10002;
@@ -729,14 +729,14 @@ body[data-sandbox-color-scheme="dark"] .webqq-forward-modal-header button:focus-
   background: rgb(15 23 42 / 78%);
 }
 
-.webqq-image-preview img {
+.chatluna-sandbox-image-preview img {
   max-width: min(92vw, 1080px);
   max-height: 88vh;
   border-radius: 12px;
   object-fit: contain;
 }
 
-.webqq-image-preview-close {
+.chatluna-sandbox-image-preview-close {
   position: absolute;
   top: 18px;
   right: 18px;
@@ -752,8 +752,8 @@ body[data-sandbox-color-scheme="dark"] .webqq-forward-modal-header button:focus-
   background: rgb(15 23 42 / 55%);
 }
 
-.webqq-image-preview-close:hover,
-.webqq-image-preview-close:focus-visible {
+.chatluna-sandbox-image-preview-close:hover,
+.chatluna-sandbox-image-preview-close:focus-visible {
   outline: none;
   background: rgb(15 23 42 / 78%);
 }

@@ -1,11 +1,11 @@
 <template>
   <section
     v-if="open"
-    class="webqq-message-search"
+    class="chatluna-sandbox-message-search"
     role="search"
     aria-label="查找聊天记录"
   >
-    <div class="webqq-message-search-field">
+    <div class="chatluna-sandbox-message-search-field">
       <IconSearch :size="18" aria-hidden="true" />
       <input
         ref="inputElement"
@@ -22,7 +22,7 @@
             type="button"
             variant="ghost"
             size="icon-sm"
-            class="webqq-message-search-date-trigger"
+            class="chatluna-sandbox-message-search-date-trigger"
             :class="{ 'is-active': !!selectedDate }"
             :aria-label="dateTriggerLabel"
             :aria-pressed="!!selectedDate"
@@ -34,9 +34,9 @@
              避免月份弹层打开后年份触发器的点击穿透到 html 并关闭整个日期控件。 -->
         <PopoverContent
           align="end"
-          class="webqq-message-search-date-popover w-auto rounded-md p-0 shadow-md"
+          class="chatluna-sandbox-message-search-date-popover w-auto rounded-md p-0 shadow-md"
           style="pointer-events: auto"
-          data-webqq-message-search-date
+          data-chatluna-sandbox-message-search-date
           @escape-key-down.stop
           @interact-outside="handleDateInteractOutside"
         >
@@ -53,7 +53,7 @@
       </Popover>
       <button
         type="button"
-        class="webqq-message-search-clear"
+        class="chatluna-sandbox-message-search-clear"
         :aria-label="query ? '清空搜索' : '关闭查找聊天记录'"
         @click="query ? clearQuery() : emit('close')"
       >
@@ -63,15 +63,15 @@
 
     <div
       v-if="hasCriteria"
-      id="webqq-message-search-results"
+      id="chatluna-sandbox-message-search-results"
       v-webqq-scrollbar="{ tone: 'accent' }"
-      class="webqq-message-search-results"
+      class="chatluna-sandbox-message-search-results"
       role="listbox"
       aria-label="搜索结果"
     >
       <p
         v-if="statusText"
-        class="webqq-message-search-status"
+        class="chatluna-sandbox-message-search-status"
         role="status"
         aria-live="polite"
       >
@@ -82,30 +82,30 @@
         :key="hit.messageId"
         type="button"
         role="option"
-        class="webqq-message-search-hit"
+        class="chatluna-sandbox-message-search-hit"
         :class="{ 'is-active': activeMessageId === hit.messageId || revealingMessageId === hit.messageId }"
         :disabled="!!revealingMessageId"
         :aria-selected="activeMessageId === hit.messageId"
         @click="emit('select', hit)"
       >
         <WebqqAvatar
-          class="webqq-message-search-avatar"
+          class="chatluna-sandbox-message-search-avatar"
           :kind="participant(hit.authorId).isBot ? 'bot' : 'user'"
           :name="participant(hit.authorId).name"
           :avatar="participant(hit.authorId).avatar"
         />
-        <span class="webqq-message-search-hit-body">
-          <span class="webqq-message-search-hit-meta">
+        <span class="chatluna-sandbox-message-search-hit-body">
+          <span class="chatluna-sandbox-message-search-hit-meta">
             <strong>{{ participant(hit.authorId).name }}</strong>
             <time :datetime="hit.createdAt">{{ formatSearchTime(hit.createdAt) }}</time>
           </span>
-          <span class="webqq-message-search-hit-summary">{{ formatSummary(hit.summary) }}</span>
+          <span class="chatluna-sandbox-message-search-hit-summary">{{ formatSummary(hit.summary) }}</span>
         </span>
       </button>
       <button
         v-if="nextBeforeMessageId && hits.length"
         type="button"
-        class="webqq-message-search-more"
+        class="chatluna-sandbox-message-search-more"
         :disabled="loading || !!revealingMessageId"
         @click="emit('loadMore')"
       >
@@ -244,7 +244,7 @@ function handleDateInteractOutside(event: Event) {
     event.preventDefault()
     return
   }
-  if (document.querySelector('.webqq-chat-search-shell')?.contains(target)) {
+  if (document.querySelector('.chatluna-sandbox-chat-search-shell')?.contains(target)) {
     event.preventDefault()
   }
 }

@@ -33,7 +33,7 @@ export * from './mcp/service'
 export * from './mcp/types'
 export * from './test-spaces'
 
-export const name = 'onebot-sandbox'
+export const name = 'chatluna-sandbox'
 export const inject = {
   required: ['console'],
   optional: ['database'],
@@ -82,7 +82,7 @@ export const Config: Schema<Config> = Schema.object({
 
 declare module 'koishi' {
   interface Context {
-    onebotSandbox: SandboxControlService
+    chatlunaSandbox: SandboxControlService
   }
 }
 
@@ -163,13 +163,13 @@ export function apply(ctx: Context, config: Config) {
         }),
       ],
     })
-    inner.logger('onebot-sandbox').info(chatLunaPlugin
+    inner.logger('chatluna-sandbox').info(chatLunaPlugin
       ? 'ChatLuna 模型请求采集器已安装。'
       : '未找到 ChatLuna 运行时，模型请求采集器未安装。')
-    inner.provide('onebotSandbox', control, true)
+    inner.provide('chatlunaSandbox', control, true)
     try {
       const mcp = new SandboxMcpService(control, {
-        dataDirectory: resolve(inner.baseDir, 'data/onebot-sandbox'),
+        dataDirectory: resolve(inner.baseDir, 'data/chatluna-sandbox'),
         readPerMinute: config.mcp.readPerMinute,
         mutationPerMinute: config.mcp.mutationPerMinute,
         waitPerMinute: config.mcp.waitPerMinute,
@@ -184,7 +184,7 @@ export function apply(ctx: Context, config: Config) {
       registerConsole(inner.console, control, config, mcp, testSpaces, unattributedModelRequests)
       inner.on('ready', async () => {
         await control.waitForSceneReady()
-        await mcpServer.start().catch((error) => inner.logger('onebot-sandbox').error('MCP 监听器启动失败；WebQQ 仍可继续使用。', error))
+        await mcpServer.start().catch((error) => inner.logger('chatluna-sandbox').error('MCP 监听器启动失败；WebQQ 仍可继续使用。', error))
       })
       inner.on('dispose', () => {
         disposeModelRequestCollector()
@@ -192,7 +192,7 @@ export function apply(ctx: Context, config: Config) {
         mcpServer.stop()
       })
     } catch (error) {
-      inner.logger('onebot-sandbox').error('MCP 初始化失败；WebQQ 仍可继续使用。', error)
+      inner.logger('chatluna-sandbox').error('MCP 初始化失败；WebQQ 仍可继续使用。', error)
       registerConsole(inner.console, control, config, undefined, testSpaces, unattributedModelRequests)
       inner.on('dispose', () => {
         disposeModelRequestCollector()

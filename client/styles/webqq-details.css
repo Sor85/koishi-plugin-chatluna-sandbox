@@ -34,14 +34,14 @@
   background: transparent;
 }
 
-.webqq-group-info-body {
+.chatluna-sandbox-group-info-body {
   display: flex;
   min-height: 0;
   flex: 1;
   flex-direction: column;
 }
 
-.webqq-group-announcements {
+.chatluna-sandbox-group-announcements {
   display: flex;
   min-height: 0;
   flex: 0 0 32%;
@@ -53,8 +53,8 @@
   background: var(--webqq-bg);
 }
 
-.webqq-group-announcements h3,
-.webqq-group-members h3 {
+.chatluna-sandbox-group-announcements h3,
+.chatluna-sandbox-group-members h3 {
   margin: 0;
   color: var(--webqq-text);
   font-size: 13px;
@@ -139,7 +139,7 @@
   opacity: 0.45;
 }
 
-.webqq-group-announcement {
+.chatluna-sandbox-group-announcement {
   position: relative;
   padding: 10px;
   padding-right: 36px;
@@ -155,7 +155,7 @@
   opacity: 0;
 }
 
-.webqq-group-announcement:hover .webqq-announcement-delete,
+.chatluna-sandbox-group-announcement:hover .webqq-announcement-delete,
 .webqq-announcement-delete:focus-visible {
   opacity: 1;
 }
@@ -176,27 +176,27 @@
   }
 }
 
-.webqq-group-announcement p,
-.webqq-group-announcement time {
+.chatluna-sandbox-group-announcement p,
+.chatluna-sandbox-group-announcement time {
   display: block;
   margin: 0;
 }
 
-.webqq-group-announcement p {
+.chatluna-sandbox-group-announcement p {
   color: var(--webqq-text);
   font-size: 12px;
   line-height: 17px;
   overflow-wrap: anywhere;
 }
 
-.webqq-group-announcement time {
+.chatluna-sandbox-group-announcement time {
   margin-top: 6px;
   color: var(--webqq-muted);
   font-size: 11px;
   line-height: 16px;
 }
 
-.webqq-group-members {
+.chatluna-sandbox-group-members {
   display: flex;
   min-height: 0;
   flex: 1;
@@ -204,7 +204,7 @@
   padding: 12px;
 }
 
-.webqq-group-members > input {
+.chatluna-sandbox-group-members > input {
   flex: 0 0 auto;
   min-height: 32px;
   margin: 10px 0;
@@ -217,12 +217,12 @@
   font-size: 12px;
 }
 
-.webqq-group-member-list {
+.chatluna-sandbox-group-member-list {
   min-height: 0;
   overflow-y: auto;
 }
 
-.webqq-group-member {
+.chatluna-sandbox-group-member {
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr) auto;
   align-items: center;
@@ -230,39 +230,39 @@
   padding: 8px 0;
 }
 
-.webqq-group-member > span:nth-child(2),
-.webqq-group-member strong,
-.webqq-group-member small {
+.chatluna-sandbox-group-member > span:nth-child(2),
+.chatluna-sandbox-group-member strong,
+.chatluna-sandbox-group-member small {
   min-width: 0;
 }
 
-.webqq-group-member strong,
-.webqq-group-member small {
+.chatluna-sandbox-group-member strong,
+.chatluna-sandbox-group-member small {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.webqq-group-member strong {
+.chatluna-sandbox-group-member strong {
   font-size: 12px;
   line-height: 17px;
 }
 
-.webqq-group-member small {
+.chatluna-sandbox-group-member small {
   color: var(--webqq-muted);
   font-size: 11px;
   line-height: 16px;
 }
 
-.webqq-group-member-badges {
+.chatluna-sandbox-group-member-badges {
   display: inline-flex;
   min-width: 0;
   align-items: center;
   gap: 4px;
 }
 
-.webqq-group-member em {
+.chatluna-sandbox-group-member em {
   padding: 1px 5px;
   border-radius: 5px;
   color: #9a5b00;
@@ -272,7 +272,7 @@
   line-height: 16px;
 }
 
-.webqq-group-member em.is-title {
+.chatluna-sandbox-group-member em.is-title {
   max-width: 96px;
   overflow: hidden;
   color: #0b7fab;
@@ -281,7 +281,7 @@
   text-overflow: ellipsis;
 }
 
-.webqq-group-empty {
+.chatluna-sandbox-group-empty {
   padding: 18px 8px;
   color: var(--webqq-muted);
   text-align: center;
@@ -295,8 +295,8 @@
 }
 
 .webqq-workspace[data-color-mode="dark"] .webqq-announcement-editor,
-.webqq-workspace[data-color-mode="dark"] .webqq-group-announcement,
-.webqq-workspace[data-color-mode="dark"] .webqq-group-members > input {
+.webqq-workspace[data-color-mode="dark"] .chatluna-sandbox-group-announcement,
+.webqq-workspace[data-color-mode="dark"] .chatluna-sandbox-group-members > input {
   border-color: rgb(113 113 122 / 36%);
   background: rgb(57 57 63);
 }

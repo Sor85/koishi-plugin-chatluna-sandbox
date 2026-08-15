@@ -110,7 +110,7 @@ function compile(gl: WebGLRenderingContext, type: number, source: string): WebGL
   gl.shaderSource(shader, source)
   gl.compileShader(shader)
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    console.warn('[onebot-sandbox] overlay shader 编译失败：', gl.getShaderInfoLog(shader))
+    console.warn('[chatluna-sandbox] overlay shader 编译失败：', gl.getShaderInfoLog(shader))
     gl.deleteShader(shader)
     return null
   }
@@ -128,7 +128,7 @@ function createProgram(gl: WebGLRenderingContext, fragment: string): GlProgram |
   gl.bindAttribLocation(program, 0, 'a_Position')
   gl.linkProgram(program)
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    console.warn('[onebot-sandbox] overlay shader 链接失败：', gl.getProgramInfoLog(program))
+    console.warn('[chatluna-sandbox] overlay shader 链接失败：', gl.getProgramInfoLog(program))
     return null
   }
   const uniforms: Record<string, WebGLUniformLocation | null> = {}

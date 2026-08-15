@@ -56,17 +56,17 @@
    无 layer 的规则恢复 shadcn 的 radius 标度，保证 1:1 观感。
    浮层容器（popover/dialog/select）自身也直接携带 .rounded-*，
    所以除后代形式外必须同时写自身命中的形式。 */
-:is(.webqq-workspace, .sandbox-popover-content, .sandbox-dialog-content, .sandbox-select-content, .webqq-secondary-page) .rounded-sm,
+:is(.webqq-workspace, .sandbox-popover-content, .sandbox-dialog-content, .sandbox-select-content, .chatluna-sandbox-secondary-page) .rounded-sm,
 :is(.sandbox-popover-content, .sandbox-dialog-content, .sandbox-select-content).rounded-sm {
   border-radius: calc(var(--radius) - 4px);
 }
 
-:is(.webqq-workspace, .sandbox-popover-content, .sandbox-dialog-content, .sandbox-select-content, .webqq-secondary-page) .rounded-md,
+:is(.webqq-workspace, .sandbox-popover-content, .sandbox-dialog-content, .sandbox-select-content, .chatluna-sandbox-secondary-page) .rounded-md,
 :is(.sandbox-popover-content, .sandbox-dialog-content, .sandbox-select-content).rounded-md {
   border-radius: calc(var(--radius) - 2px);
 }
 
-:is(.webqq-workspace, .sandbox-popover-content, .sandbox-dialog-content, .sandbox-select-content, .webqq-secondary-page) .rounded-lg,
+:is(.webqq-workspace, .sandbox-popover-content, .sandbox-dialog-content, .sandbox-select-content, .chatluna-sandbox-secondary-page) .rounded-lg,
 :is(.sandbox-popover-content, .sandbox-dialog-content, .sandbox-select-content).rounded-lg {
   border-radius: var(--radius);
 }
@@ -78,7 +78,7 @@
    无 layer 压过 @layer utilities。这里只重申 Tailwind v4 的合成 box-shadow 声明，
    各 --tw-* 分量的值仍由 @layer utilities 里的真实工具类与 @property 默认值提供，
    不复刻任何具体阴影数值。 */
-:is(.webqq-workspace, .sandbox-popover-content, .sandbox-dialog-content, .sandbox-select-content, .webqq-secondary-page) :is(.shadow-2xs, .shadow-xs, .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl),
+:is(.webqq-workspace, .sandbox-popover-content, .sandbox-dialog-content, .sandbox-select-content, .chatluna-sandbox-secondary-page) :is(.shadow-2xs, .shadow-xs, .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl),
 :is(.sandbox-popover-content, .sandbox-dialog-content, .sandbox-select-content):is(.shadow-2xs, .shadow-xs, .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl) {
   box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
 }

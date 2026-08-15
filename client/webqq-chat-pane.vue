@@ -1,14 +1,14 @@
 <template>
-  <main class="webqq-chat" :style="{ '--webqq-composer-space': composerSpace ? `${composerSpace}px` : undefined }">
-    <header class="webqq-chat-header" :class="{ 'is-searching': searchOpen }">
+  <main class="chatluna-sandbox-chat" :style="{ '--webqq-composer-space': composerSpace ? `${composerSpace}px` : undefined }">
+    <header class="chatluna-sandbox-chat-header" :class="{ 'is-searching': searchOpen }">
       <!-- 窄屏为单栏互切布局，会话列表被隐藏，必须提供返回入口；宽屏下此按钮不显示。 -->
-      <button type="button" class="webqq-icon-button webqq-chat-back" aria-label="返回会话列表" @click="emit('back')">
+      <button type="button" class="webqq-icon-button chatluna-sandbox-chat-back" aria-label="返回会话列表" @click="emit('back')">
         <IconChevronLeft :size="22" aria-hidden="true" />
       </button>
-      <div class="webqq-chat-title">
+      <div class="chatluna-sandbox-chat-title">
         <ContextMenu v-if="model.profileParticipantId || model.profileGroupId">
           <ContextMenuTrigger as-child>
-            <button type="button" class="webqq-chat-title-avatar" :aria-label="`查看 ${model.title} 的资料`" @click="openTitleProfile">
+            <button type="button" class="chatluna-sandbox-chat-title-avatar" :aria-label="`查看 ${model.title} 的资料`" @click="openTitleProfile">
               <WebqqAvatar class="webqq-avatar" :kind="model.avatarKind" :name="model.title" :avatar="model.avatar" />
             </button>
           </ContextMenuTrigger>
@@ -28,21 +28,21 @@
           <span>{{ model.subtitle }}</span>
         </div>
       </div>
-      <div class="webqq-chat-header-actions">
+      <div class="chatluna-sandbox-chat-header-actions">
         <div
           ref="searchShellRef"
-          class="webqq-chat-search-shell"
+          class="chatluna-sandbox-chat-search-shell"
           :class="{ 'is-expanded': searchOpen }"
         >
           <button
             v-if="!searchOpen"
             ref="searchTriggerRef"
             type="button"
-            class="webqq-icon-button webqq-chat-search-trigger"
+            class="webqq-icon-button chatluna-sandbox-chat-search-trigger"
             :disabled="!model.conversationId"
             aria-label="查找聊天记录"
             :aria-expanded="searchOpen"
-            aria-controls="webqq-message-search-results"
+            aria-controls="chatluna-sandbox-message-search-results"
             @click="toggleSearch"
           >
             <IconSearch :size="22" aria-hidden="true" />
@@ -100,14 +100,14 @@
 
     <div
       v-if="selectionMode"
-      class="webqq-selection-bar"
+      class="chatluna-sandbox-selection-bar"
       role="toolbar"
       aria-label="消息多选操作"
     >
-      <strong class="webqq-selection-bar-count">已选 {{ selectedMessageIds.length }} 条</strong>
-      <div class="webqq-selection-bar-actions">
-        <Button class="webqq-selection-bar-button" variant="outline" @click="exitSelection">取消</Button>
-        <Button class="webqq-selection-bar-button" :disabled="!selectedMessageIds.length" @click="openForwardTargetDialog">
+      <strong class="chatluna-sandbox-selection-bar-count">已选 {{ selectedMessageIds.length }} 条</strong>
+      <div class="chatluna-sandbox-selection-bar-actions">
+        <Button class="chatluna-sandbox-selection-bar-button" variant="outline" @click="exitSelection">取消</Button>
+        <Button class="chatluna-sandbox-selection-bar-button" :disabled="!selectedMessageIds.length" @click="openForwardTargetDialog">
           <IconShare3 :size="16" aria-hidden="true" />
           合并转发
         </Button>
@@ -380,7 +380,7 @@ function handleSearchOutsidePointerDown(event: PointerEvent) {
   if (!searchOpen.value) return
   const target = event.target
   if (target instanceof Node && searchShellRef.value?.contains(target)) return
-  if (target instanceof Element && target.closest('[data-webqq-message-search-date]')) return
+  if (target instanceof Element && target.closest('[data-chatluna-sandbox-message-search-date]')) return
   // 日期弹层里的月/年下拉（shadcn Select）portal 到 body，不在弹层 DOM 子树内；
   // 点击下拉选项不是"搜索外部点击"，否则会把搜索栏连同日期弹层一起关掉。
   if (target instanceof Element && target.closest('.sandbox-select-content')) return

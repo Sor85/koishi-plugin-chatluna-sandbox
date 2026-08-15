@@ -68,14 +68,14 @@ const allScopes = [
   { value: 'debug' as const, label: '调试' },
 ]
 
-async function refresh() { credentials.value = await send('onebot-sandbox/mcp-credentials') }
+async function refresh() { credentials.value = await send('chatluna-sandbox/mcp-credentials') }
 function toggleScope(scope: SandboxMcpScope, enabled: boolean) { scopes.value = enabled ? [...new Set([...scopes.value, scope])] : scopes.value.filter((item) => item !== scope) }
 async function createCredential() {
   error.value = ''
   if (!name.value.trim() || !scopes.value.length) { error.value = '请填写名称并至少选择一项权限。'; return }
   creating.value = true
   try {
-    const result = await send('onebot-sandbox/create-mcp-credential', { name: name.value, scopes: scopes.value })
+    const result = await send('chatluna-sandbox/create-mcp-credential', { name: name.value, scopes: scopes.value })
     createdToken.value = result.token
     name.value = ''
     scopes.value = ['read']
@@ -84,8 +84,8 @@ async function createCredential() {
     await refresh()
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '创建凭证失败' } finally { creating.value = false }
 }
-async function toggleCredential(credential: Credential) { await send('onebot-sandbox/set-mcp-credential-enabled', { id: credential.id, enabled: !credential.enabled }); await refresh() }
-async function revokeCredential(id: string) { await send('onebot-sandbox/revoke-mcp-credential', { id }); await refresh() }
+async function toggleCredential(credential: Credential) { await send('chatluna-sandbox/set-mcp-credential-enabled', { id: credential.id, enabled: !credential.enabled }); await refresh() }
+async function revokeCredential(id: string) { await send('chatluna-sandbox/revoke-mcp-credential', { id }); await refresh() }
 onMounted(() => void refresh())
 </script>
 

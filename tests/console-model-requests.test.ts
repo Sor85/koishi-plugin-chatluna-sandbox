@@ -55,9 +55,9 @@ describe('模型请求 Console 协议', () => {
       responseBodyRaw: JSON.stringify({ error: 'failed' }),
     })
 
-    const listRecords = listeners.get('onebot-sandbox/model-request-records')
-    const getRecord = listeners.get('onebot-sandbox/model-request-record')
-    const clearRecords = listeners.get('onebot-sandbox/clear-model-request-records')
+    const listRecords = listeners.get('chatluna-sandbox/model-request-records')
+    const getRecord = listeners.get('chatluna-sandbox/model-request-record')
+    const clearRecords = listeners.get('chatluna-sandbox/clear-model-request-records')
     if (typeof listRecords !== 'function' || typeof getRecord !== 'function' || typeof clearRecords !== 'function') {
       throw new Error('模型请求记录监听器未注册')
     }

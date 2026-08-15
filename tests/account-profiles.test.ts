@@ -374,7 +374,7 @@ describe('类型化账号资料', () => {
 
     const app = new App()
     runningApps.push(app)
-    const directory = mkdtempSync(join(tmpdir(), 'onebot-sandbox-profile-'))
+    const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-profile-'))
     const runtimeBots = new SandboxRuntimeBotRegistry()
     const control = new SandboxControlService(app, { runtimeBots })
     const testSpaces = new SandboxTestSpaceService(app, runtimeBots)
@@ -518,7 +518,7 @@ describe('类型化账号资料', () => {
       return { app, control }
     }
 
-    const mediaDirectory = mkdtempSync(join(tmpdir(), 'onebot-sandbox-profile-media-'))
+    const mediaDirectory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-profile-media-'))
     const persistence = new TestScenePersistence()
     const { app: firstApp, control: first } = await createPersistedControl(persistence, mediaDirectory)
     first.createUser({

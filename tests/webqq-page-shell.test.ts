@@ -40,7 +40,7 @@ describe('WebQQ 主页面装配', () => {
 
     expect(chatPaneSource).not.toContain('class="webqq-avatar webqq-avatar-bot"')
     expect(messageListSource).not.toContain('class="webqq-avatar webqq-avatar-large webqq-avatar-bot"')
-    expect(messageStyles).not.toContain('.webqq-message-row.is-incoming .webqq-message-avatar:not(.is-bot)')
+    expect(messageStyles).not.toContain('.chatluna-sandbox-message-row.is-incoming .chatluna-sandbox-message-avatar:not(.is-bot)')
   })
 
   it('群环境编辑允许机器人承担群主角色', () => {

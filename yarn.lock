@@ -5020,9 +5020,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"koishi-plugin-onebot-sandbox@workspace:.":
+"koishi-plugin-chatluna-sandbox@workspace:.":
   version: 0.0.0-use.local
-  resolution: "koishi-plugin-onebot-sandbox@workspace:."
+  resolution: "koishi-plugin-chatluna-sandbox@workspace:."
   dependencies:
     "@internationalized/date": "npm:3.12.2"
     "@koishijs/client": "npm:^5.30.11"

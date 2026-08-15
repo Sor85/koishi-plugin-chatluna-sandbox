@@ -1,6 +1,6 @@
 <template>
   <div
-    class="webqq-mention-menu"
+    class="chatluna-sandbox-mention-menu"
     role="listbox"
     :aria-label="ariaLabel"
   >
@@ -8,7 +8,7 @@
       v-for="(candidate, index) in candidates"
       :key="candidate.id"
       type="button"
-      class="webqq-mention-menu-item"
+      class="chatluna-sandbox-mention-menu-item"
       role="option"
       :class="{ 'is-active': index === activeIndex }"
       :aria-selected="index === activeIndex"
@@ -16,17 +16,17 @@
       @mouseenter="emit('hover', index)"
     >
       <WebqqAvatar
-        class="webqq-mention-menu-avatar"
+        class="chatluna-sandbox-mention-menu-avatar"
         :kind="candidate.kind"
         :name="candidate.name"
         :avatar="candidate.avatar"
       />
-      <span class="webqq-mention-menu-meta">
+      <span class="chatluna-sandbox-mention-menu-meta">
         <strong>{{ candidate.name }}</strong>
         <small>{{ candidate.id }}</small>
       </span>
     </button>
-    <div v-if="!candidates.length" class="webqq-mention-menu-empty">无匹配成员</div>
+    <div v-if="!candidates.length" class="chatluna-sandbox-mention-menu-empty">无匹配成员</div>
   </div>
 </template>
 

@@ -48,19 +48,19 @@
     <section
       v-if="profileOpen && profileCard"
       ref="profilePanelRef"
-      class="webqq-secondary-page webqq-profile-card-page webqq-solid-secondary-surface onebot-sandbox-secondary-page onebot-sandbox-profile-card-page"
+      class="chatluna-sandbox-secondary-page chatluna-sandbox-profile-card-page chatluna-sandbox-solid-secondary-surface"
       :style="{ '--webqq-accent': accentColor, ...profilePanelStyle }"
       aria-label="查看资料"
     >
       <header
-        class="webqq-secondary-page-header"
+        class="chatluna-sandbox-secondary-page-header"
         :class="{ 'is-dragging': profileDragging }"
         @pointerdown="startProfileDrag"
       >
         <strong>查看资料</strong>
       </header>
-      <div class="webqq-profile-card">
-      <div class="webqq-profile-card-hero">
+      <div class="chatluna-sandbox-profile-card">
+      <div class="chatluna-sandbox-profile-card-hero">
         <WebqqAvatar
           class="webqq-avatar webqq-avatar-profile"
           :kind="profileCard.avatarKind"
@@ -70,16 +70,16 @@
         <div>
           <h2>{{ profileCard.name }}</h2>
           <p>{{ profileCard.identityLabel }} {{ profileCard.participantId }}</p>
-          <p v-if="profileCard.personalNote" class="webqq-profile-card-note">{{ profileCard.personalNote }}</p>
+          <p v-if="profileCard.personalNote" class="chatluna-sandbox-profile-card-note">{{ profileCard.personalNote }}</p>
         </div>
       </div>
       <section
         v-for="section in profileCardSections"
         :key="section.group"
-        class="webqq-profile-card-section"
+        class="chatluna-sandbox-profile-card-section"
       >
         <h3>{{ section.label }}</h3>
-        <dl class="webqq-profile-card-fields">
+        <dl class="chatluna-sandbox-profile-card-fields">
           <div v-for="field in section.fields" :key="`${section.group}:${field.label}:${field.value}`">
             <dt>{{ field.label }}</dt>
             <dd>{{ field.value }}</dd>

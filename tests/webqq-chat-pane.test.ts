@@ -26,7 +26,7 @@ describe('WebQQ 聊天区域', () => {
     const source = readFileSync(resolve('client/webqq-chat-pane.vue'), 'utf8')
     const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
 
-    expect(source).toContain('<main class="webqq-chat"')
+    expect(source).toContain('<main class="chatluna-sandbox-chat"')
     expect(source).toContain('<WebqqMessageList')
     expect(source).toContain('<WebqqComposer')
     expect(source).toContain('formatMentionContent(replyingToMessage.value.content, props.model.participantNames)')
@@ -51,7 +51,7 @@ describe('WebQQ 聊天区域', () => {
     expect(source).toContain(':scroll-scope="scrollScope"')
     expect(pageSource).toContain('@send-forward-message="sendForwardMessage"')
     expect(pageSource).toContain('@get-forward-message="getForwardMessage"')
-    expect(pageSource).not.toContain('class="webqq-chat-header"')
+    expect(pageSource).not.toContain('class="chatluna-sandbox-chat-header"')
   })
 
   it('在顶栏提供查找聊天记录并定位历史消息', () => {
@@ -63,12 +63,12 @@ describe('WebQQ 聊天区域', () => {
     const messageListSource = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
 
     expect(source).toContain('aria-label="查找聊天记录"')
-    expect(source).toContain('class="webqq-chat-search-shell"')
+    expect(source).toContain('class="chatluna-sandbox-chat-search-shell"')
     expect(source).toContain("'is-expanded': searchOpen")
     expect(source).toContain(':aria-expanded="searchOpen"')
-    expect(source).toContain('aria-controls="webqq-message-search-results"')
+    expect(source).toContain('aria-controls="chatluna-sandbox-message-search-results"')
     expect(source).toContain('<WebqqMessageSearch')
-    expect(source.indexOf('class="webqq-chat-header-actions"')).toBeLessThan(source.indexOf('<WebqqMessageSearch'))
+    expect(source.indexOf('class="chatluna-sandbox-chat-header-actions"')).toBeLessThan(source.indexOf('<WebqqMessageSearch'))
     expect(source.indexOf('<WebqqMessageSearch')).toBeLessThan(source.indexOf('</header>'))
     expect(source).toContain('@close="closeSearch(true)"')
     expect(source).toContain('searchTriggerRef.value?.focus()')
@@ -77,7 +77,7 @@ describe('WebQQ 聊天区域', () => {
     expect(source).toContain('messageListRef.value?.revealMessage')
     expect(source).toContain('closeSearch()')
     expect(source).toContain('resetSearchState()')
-    expect(searchSource).toContain('id="webqq-message-search-results"')
+    expect(searchSource).toContain('id="chatluna-sandbox-message-search-results"')
     expect(searchSource).toContain('v-if="hasCriteria"')
     expect(searchSource).toContain('const trimmedQuery = computed(() => query.value.trim())')
     expect(searchSource).toContain('const hasCriteria = computed(() => !!trimmedQuery.value || !!selectedDate.value)')
@@ -94,10 +94,10 @@ describe('WebQQ 聊天区域', () => {
     expect(searchSource).toContain('localDateToCalendarValue(selectedDate.value)')
     expect(searchSource).toContain('calendarValueToLocalDate(value)')
     expect(searchSource).not.toContain('RangeCalendar')
-    expect(searchSource).not.toContain('webqq-message-search-date-actions')
+    expect(searchSource).not.toContain('chatluna-sandbox-message-search-date-actions')
     expect(searchSource).toContain('按日期筛选聊天记录')
     expect(searchSource).toContain(':aria-pressed="!!selectedDate"')
-    expect(searchSource).toContain('data-webqq-message-search-date')
+    expect(searchSource).toContain('data-chatluna-sandbox-message-search-date')
     expect(searchSource).toContain('@interact-outside="handleDateInteractOutside"')
     expect(searchSource).not.toContain('@pointer-down-outside="handleDatePointerDownOutside"')
     expect(searchSource).toContain("search: [criteria: WebqqMessageSearchCriteria]")
@@ -117,7 +117,7 @@ describe('WebQQ 聊天区域', () => {
     expect(source).toContain("document.addEventListener('pointerdown', handleSearchOutsidePointerDown)")
     expect(source).toContain("document.removeEventListener('pointerdown', handleSearchOutsidePointerDown)")
     expect(source).toContain('@date-popover-change="searchDatePopoverOpen = $event"')
-    expect(source).toContain("target.closest('[data-webqq-message-search-date]')")
+    expect(source).toContain("target.closest('[data-chatluna-sandbox-message-search-date]')")
     expect(source).toContain('localDateToMessageSearchRange(criteria.localDate)')
     expect(source).toContain('const searchCriteria = ref<SearchCriteriaSnapshot>')
     expect(source).toContain('...criteria,')
@@ -132,31 +132,31 @@ describe('WebQQ 聊天区域', () => {
     expect(searchSource).toContain('participant(hit.authorId).name')
     expect(searchSource).toContain('formatSearchTime(hit.createdAt)')
     expect(searchSource).toContain('formatSummary(hit.summary)')
-    const chatRule = styles.slice(styles.indexOf('.webqq-chat {')).split('}')[0]
+    const chatRule = styles.slice(styles.indexOf('.chatluna-sandbox-chat {')).split('}')[0]
     expect(chatRule).toContain('grid-template-rows: auto minmax(0, 1fr)')
-    const searchShellRule = styles.slice(styles.indexOf('.webqq-chat-search-shell {')).split('}')[0]
+    const searchShellRule = styles.slice(styles.indexOf('.chatluna-sandbox-chat-search-shell {')).split('}')[0]
     expect(searchShellRule).toContain('width: 36px')
-    expect(styles).toContain('.webqq-chat-search-shell.is-expanded')
-    const resultsRule = styles.slice(styles.indexOf('.webqq-message-search-results {')).split('}')[0]
+    expect(styles).toContain('.chatluna-sandbox-chat-search-shell.is-expanded')
+    const resultsRule = styles.slice(styles.indexOf('.chatluna-sandbox-message-search-results {')).split('}')[0]
     expect(resultsRule).toContain('position: absolute')
     expect(resultsRule).toContain('width: 100%')
     expect(resultsRule).toContain('max-width: 100%')
     expect(resultsRule).toContain('z-index:')
-    const triggerRule = styles.slice(styles.indexOf('.webqq-chat-search-trigger {')).split('}')[0]
+    const triggerRule = styles.slice(styles.indexOf('.chatluna-sandbox-chat-search-trigger {')).split('}')[0]
     expect(triggerRule).toContain('color: var(--webqq-accent)')
-    const fieldIconRule = styles.slice(styles.indexOf('.webqq-message-search-field > svg {')).split('}')[0]
+    const fieldIconRule = styles.slice(styles.indexOf('.chatluna-sandbox-message-search-field > svg {')).split('}')[0]
     expect(fieldIconRule).toContain('var(--webqq-accent)')
-    expect(searchSource).toContain('class="webqq-message-search-date-popover w-auto rounded-md p-0 shadow-md"')
-    expect(styles).toContain('.webqq-message-search-date-trigger.is-active')
+    expect(searchSource).toContain('class="chatluna-sandbox-message-search-date-popover w-auto rounded-md p-0 shadow-md"')
+    expect(styles).toContain('.chatluna-sandbox-message-search-date-trigger.is-active')
     // 悬停/聚焦规则只允许关 outline-style：outline: none 简写会把 outline-color/width
     // 重置为 currentColor/3px，与其他插件无 layer 的 outline: 2px solid transparent
     // 底座叠加按钮的 transition-all，产生"黑圈变大再消失"的闪烁动画。
-    const dateTriggerFocusRule = styles.slice(styles.indexOf('.webqq-message-search-date-trigger:focus-visible {')).split('}')[0]
+    const dateTriggerFocusRule = styles.slice(styles.indexOf('.chatluna-sandbox-message-search-date-trigger:focus-visible {')).split('}')[0]
     expect(dateTriggerFocusRule).toContain('outline-style: none')
     // 带分号匹配声明本身，避免误伤规则内解释"为什么不能用简写"的注释文本。
     expect(dateTriggerFocusRule).not.toContain('outline: none;')
-    expect(styles).not.toContain('.webqq-message-search-date-actions')
-    const datePopoverRule = styles.slice(styles.indexOf('.webqq-message-search-date-popover {')).split('}')[0]
+    expect(styles).not.toContain('.chatluna-sandbox-message-search-date-actions')
+    const datePopoverRule = styles.slice(styles.indexOf('.chatluna-sandbox-message-search-date-popover {')).split('}')[0]
     expect(datePopoverRule).toContain('--popover: var(--webqq-bg)')
     expect(datePopoverRule).toContain('--popover-foreground: var(--webqq-text)')
     expect(datePopoverRule).toContain('--input: var(--webqq-border)')
@@ -166,9 +166,9 @@ describe('WebQQ 聊天区域', () => {
     // 任何手写复刻都会压过 @layer utilities 里的类，破坏 1:1 还原。
     expect(datePopoverRule).not.toContain('border-radius')
     expect(datePopoverRule).not.toContain('box-shadow')
-    expect(styles).not.toContain('.webqq-message-search-date-popover [data-slot="calendar-prev-button"]')
-    expect(styles).not.toContain('.webqq-message-search-date-popover [data-slot="calendar-cell-trigger"]')
-    expect(styles).not.toContain('.webqq-message-search-date-popover [data-slot="native-select"]')
+    expect(styles).not.toContain('.chatluna-sandbox-message-search-date-popover [data-slot="calendar-prev-button"]')
+    expect(styles).not.toContain('.chatluna-sandbox-message-search-date-popover [data-slot="calendar-cell-trigger"]')
+    expect(styles).not.toContain('.chatluna-sandbox-message-search-date-popover [data-slot="native-select"]')
     // 月/年下拉必须用 shadcn-vue Select：原生 <select> 的下拉面板无法定制样式，
     // 且"透明 select + 覆盖文字"的宽度对不齐会让箭头叠在文字上。
     // 年份范围由调用方收紧为近 10 年；下拉面板不显示原生滚动条。
@@ -202,11 +202,11 @@ describe('WebQQ 聊天区域', () => {
     expect(entryStyles).toContain('@import "./styles/tailwind.generated.css"')
     expect(entryStyles).toContain('@import "./styles/shadcn-theme.css"')
     expect(entryStyles).not.toContain('@import "tailwindcss";')
-    const hitRule = styles.slice(styles.indexOf('.webqq-message-search-hit {')).split('}')[0]
+    const hitRule = styles.slice(styles.indexOf('.chatluna-sandbox-message-search-hit {')).split('}')[0]
     expect(hitRule).toContain('grid-template-columns: 32px minmax(0, 1fr)')
-    const avatarRule = styles.slice(styles.indexOf('.webqq-message-search-avatar {')).split('}')[0]
+    const avatarRule = styles.slice(styles.indexOf('.chatluna-sandbox-message-search-avatar {')).split('}')[0]
     expect(avatarRule).toContain('--webqq-avatar-size: 32px')
-    expect(styles).toContain('.webqq-chat-header-actions')
+    expect(styles).toContain('.chatluna-sandbox-chat-header-actions')
     expect(styles).not.toContain('cursor:')
     expect(pageSource).toContain('@search-conversation-messages="searchConversationMessages"')
     expect(shellSource).toContain('async function searchConversationMessages')

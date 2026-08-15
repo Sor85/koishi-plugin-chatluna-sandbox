@@ -144,7 +144,7 @@ describe('WebQQ 模型请求工作台', () => {
     expect(styles).toMatch(/\.webqq-model-request-response-raw\s*\{[^}]*overflow:\s*auto[^}]*white-space:\s*pre-wrap[^}]*user-select:\s*text/s)
     expect(styles).toMatch(/\.webqq-model-response-preview\s*\{[^}]*display:\s*grid[^}]*overflow:\s*auto/s)
     expect(styles).toMatch(/\.webqq-model-response-section\.is-content\s*\{[^}]*border-left-color:\s*#2563eb/s)
-    expect(styles).toMatch(/\.webqq-chat\.webqq-model-request-workspace\s*\{[^}]*grid-template-rows:\s*auto auto minmax\(0, 1fr\)/s)
+    expect(styles).toMatch(/\.chatluna-sandbox-chat\.webqq-model-request-workspace\s*\{[^}]*grid-template-rows:\s*auto auto minmax\(0, 1fr\)/s)
     expect(styles).toMatch(/\.webqq-model-request-split\s*\{[^}]*grid-row:\s*3/s)
     expect(styles).toMatch(/\.webqq-model-request-list-pane\s*\{[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\)/s)
     expect(styles).toMatch(/\.webqq-model-request-list-toolbar\s*\{[^}]*border-bottom:\s*1px solid var\(--webqq-border\)/s)

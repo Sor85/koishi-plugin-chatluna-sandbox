@@ -91,7 +91,7 @@ export class SandboxMcpHttpServer {
       throw new Error('非回环 MCP 监听必须配置 TLS，或显式启用不安全远程监听')
     }
     if (!isLoopback(this.config.host) && this.config.allowInsecureRemote) {
-      this.ctx.logger('onebot-sandbox').warn('MCP 正在非回环地址上使用明文 HTTP；Bearer Token 可能被窃取。')
+      this.ctx.logger('chatluna-sandbox').warn('MCP 正在非回环地址上使用明文 HTTP；Bearer Token 可能被窃取。')
     }
     const listener = (request: IncomingMessage, response: ServerResponse) => void this.handleRequest(request, response)
     this.server = this.config.tlsCertPath && this.config.tlsKeyPath
@@ -138,7 +138,7 @@ export class SandboxMcpHttpServer {
       // 若此时立即关闭 transport，客户端只能收到无正文、无 Content-Type 的 200。
       await waitForResponseCompletion(response)
     } catch (error) {
-      this.ctx.logger('onebot-sandbox').error('MCP 请求处理失败', error)
+      this.ctx.logger('chatluna-sandbox').error('MCP 请求处理失败', error)
       if (!response.headersSent) this.writeJson(response, 500, { jsonrpc: '2.0', error: { code: -32603, message: 'Internal server error' }, id: null })
     } finally {
       await transport.close().catch(() => undefined)
@@ -151,7 +151,7 @@ export class SandboxMcpHttpServer {
   // 得知参数契约）。参数校验本就在 service.executeTool 内完成，这里只需把
   // TOOL_DEFINITIONS 携带的 JSON Schema 原样暴露。
   private createMcpServer(token: string, sourceIp: string): Server {
-    const server = new Server({ name: 'koishi-plugin-onebot-sandbox', version: '0.0.1' }, { capabilities: { tools: {}, resources: {} } })
+    const server = new Server({ name: 'koishi-plugin-chatluna-sandbox', version: '0.0.1' }, { capabilities: { tools: {}, resources: {} } })
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: this.service.listTools(token).map(({ name, description, inputSchema }) => ({ name, description, inputSchema })),
     }))

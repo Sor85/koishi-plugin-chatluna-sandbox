@@ -171,7 +171,7 @@ describe('WebQQ 发送控件', () => {
 
     expect(source).toContain('model.replyingTo || sendFiles.length')
     expect(source).not.toContain('mentions.length')
-    expect(source).toContain('webqq-composer-mention')
+    expect(source).toContain('chatluna-sandbox-composer-mention')
     expect(source).toContain('serializeComposerDraft')
     expect(contextIndex).toBeGreaterThan(-1)
     expect(replyIndex).toBeGreaterThan(contextIndex)
@@ -193,7 +193,7 @@ describe('WebQQ 发送控件', () => {
     expect(css).not.toContain('.webqq-composer-attachments')
     expect(css).not.toContain('.webqq-composer-attachments.has-reply')
     expect(css).not.toContain('bottom: calc(100% + 54px)')
-    expect(css).toContain('.webqq-composer-mention')
+    expect(css).toContain('.chatluna-sandbox-composer-mention')
     expect(css).toContain('display: inline')
     expect(source).toContain('ref="composerContextRef"')
     expect(source).toContain('const context = composerContextRef.value')

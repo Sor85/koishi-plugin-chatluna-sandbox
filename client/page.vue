@@ -1,5 +1,5 @@
 <template>
-  <k-layout container="onebot-sandbox-layout" main="onebot-sandbox-page">
+  <k-layout container="chatluna-sandbox-layout" main="chatluna-sandbox-page">
     <k-content>
       <div
         class="webqq-workspace"
@@ -43,7 +43,7 @@
           @create="createTestSpace"
           @action="handleTestSpaceAction"
         />
-        <main v-else-if="currentView === 'profile'" class="webqq-chat is-environment">
+        <main v-else-if="currentView === 'profile'" class="chatluna-sandbox-chat is-environment">
           <EnvironmentManager :snapshot="environmentModel" :test-spaces="testSpaces" />
         </main>
         <OneBotDebugWorkspace

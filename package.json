@@ -1,5 +1,5 @@
 {
-  "name": "koishi-plugin-onebot-sandbox",
+  "name": "koishi-plugin-chatluna-sandbox",
   "description": "在 Koishi 控制台中提供可验证 OneBot 插件行为的模拟 QQ 环境",
   "version": "0.0.1",
   "type": "commonjs",
@@ -17,10 +17,10 @@
     "lib",
     "dist"
   ],
-  "homepage": "https://github.com/Sor85/koishi-plugin-onebot-sandbox",
+  "homepage": "https://github.com/Sor85/koishi-plugin-chatluna-sandbox",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Sor85/koishi-plugin-onebot-sandbox.git"
+    "url": "https://github.com/Sor85/koishi-plugin-chatluna-sandbox.git"
   },
   "license": "MIT",
   "scripts": {

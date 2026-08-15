@@ -25,7 +25,7 @@ afterEach(async () => {
 
 async function createControl() {
   const app = new App()
-  const mediaDirectory = await mkdtemp(join(tmpdir(), 'onebot-sandbox-reactions-'))
+  const mediaDirectory = await mkdtemp(join(tmpdir(), 'chatluna-sandbox-reactions-'))
   temporaryDirectories.push(mediaDirectory)
   let control: SandboxControlService | undefined
   app.plugin((ctx) => {
@@ -249,7 +249,7 @@ describe('消息表情回应', () => {
     }
     registerConsole(consoleRegistrar, control, appearance)
 
-    const setReaction = listeners.get('onebot-sandbox/set-message-reaction')
+    const setReaction = listeners.get('chatluna-sandbox/set-message-reaction')
     if (typeof setReaction !== 'function') throw new Error('未注册 set-message-reaction')
 
     const workspace = await setReaction({
