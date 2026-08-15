@@ -6,7 +6,33 @@
     :data-value-kind="node.valueKind"
   >
     <template v-if="node.kind === 'value'">
+      <template v-if="imageSource && imageView === 'image'">
+        <div class="webqq-model-request-json-image-node">
+          <div class="webqq-model-request-json-image-row">
+            <span v-if="showKey" class="webqq-model-request-json-key">{{ node.key }}</span>
+            <span v-if="showKey" class="webqq-model-request-json-sep">:</span>
+            <span class="webqq-model-request-json-image-summary">image - {{ formatImageSize(imageSource.source) }}</span>
+            <button
+              type="button"
+              class="webqq-model-request-json-image-mode"
+              aria-label="切换为原始 Base64"
+              @click.stop="imageView = 'raw'"
+            >raw</button>
+          </div>
+          <figure class="webqq-model-request-json-image-preview">
+            <img
+              class="webqq-model-request-json-image"
+              :src="imageSource.source"
+              :alt="`${node.key} 图片预览`"
+              loading="lazy"
+              decoding="async"
+              @error="imageView = 'raw'"
+            >
+          </figure>
+        </div>
+      </template>
       <div
+        v-else
         class="webqq-model-request-json-row webqq-model-request-json-leaf"
         @pointerdown="startRowPointer"
         @pointerup="finishRowPointer"
@@ -34,6 +60,13 @@
           <IconChevronDown v-if="stringExpanded" :size="14" aria-hidden="true" />
           <IconChevronRight v-else :size="14" aria-hidden="true" />
         </button>
+        <button
+          v-if="imageSource"
+          type="button"
+          class="webqq-model-request-json-image-mode"
+          aria-label="切换为图片"
+          @click.stop="imageView = 'image'"
+        >image</button>
       </div>
     </template>
 
@@ -70,6 +103,7 @@
             :open="open"
             :parent-kind="node.kind"
             :strings-expanded="stringsExpanded"
+            :images-preview="imagesPreview"
           />
         </div>
         <span class="webqq-model-request-json-closing">{{ closingBracket }}</span>
@@ -92,30 +126,49 @@ const props = withDefaults(defineProps<{
   parentKind?: ModelRequestJsonKind
   root?: boolean
   stringsExpanded?: boolean
+  imagesPreview?: boolean
 }>(), {
   open: true,
   root: false,
   stringsExpanded: false,
+  imagesPreview: false,
 })
 
 const expanded = ref(props.open)
 const localStringExpanded = ref<boolean>()
+const imageView = ref<'image' | 'raw'>('image')
 let rowPointerOrigin: { x: number, y: number } | undefined
 let suppressRowClick = false
 
 const showKey = computed(() => !props.root && props.parentKind !== 'array')
 const openingBracket = computed(() => props.node.kind === 'array' ? '[' : '{')
 const closingBracket = computed(() => props.node.kind === 'array' ? ']' : '}')
-const stringExpanded = computed(() => localStringExpanded.value ?? props.stringsExpanded)
+const imageSource = computed(() => props.imagesPreview ? props.node.imageSource : undefined)
+const stringExpanded = computed(() => {
+  if (imageSource.value && imageView.value === 'raw') return true
+  return localStringExpanded.value ?? props.stringsExpanded
+})
 const expandedString = computed(() => {
   const value = normalizeModelRequestJsonString(String(props.node.value ?? ''))
   return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+})
+
+watch(() => props.node.value, () => {
+  imageView.value = 'image'
 })
 
 watch(() => props.stringsExpanded, () => {
   localStringExpanded.value = undefined
 })
 
+function formatImageSize(source: string) {
+  const base64 = source.slice(source.indexOf(',') + 1).replace(/\s/g, '')
+  const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0
+  const bytes = Math.max(0, Math.floor(base64.length * 3 / 4) - padding)
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
 function toggleString() {
   localStringExpanded.value = !stringExpanded.value
 }

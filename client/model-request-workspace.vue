@@ -378,6 +378,7 @@
                   :open="true"
                   :root="true"
                   :strings-expanded="true"
+                  :images-preview="true"
                 />
               </div>
             </template>

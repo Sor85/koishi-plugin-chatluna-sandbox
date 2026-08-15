@@ -836,6 +836,67 @@
   tab-size: 2;
 }
 
+.webqq-model-request-json-image-node {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 2px 8px;
+}
+
+.webqq-model-request-json-image-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  min-height: 24px;
+}
+
+.webqq-model-request-json-image-summary {
+  color: var(--webqq-muted);
+  font-style: italic;
+}
+
+.webqq-model-request-json-image-preview {
+  display: grid;
+  justify-items: start;
+  min-width: 0;
+  max-width: min(100%, 520px);
+  margin: 0 0 0 17px;
+  padding: 8px;
+  overflow: hidden;
+  border: 1px solid var(--webqq-border);
+  border-radius: 8px;
+  background: var(--webqq-surface);
+}
+
+.webqq-model-request-json-image {
+  display: block;
+  max-width: 100%;
+  max-height: 360px;
+  border-radius: 6px;
+  object-fit: contain;
+}
+
+.webqq-model-request-json-image-mode {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  color: var(--webqq-muted);
+  background: transparent;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.webqq-model-request-json-image-mode:hover,
+.webqq-model-request-json-image-mode:focus-visible {
+  color: var(--webqq-accent);
+}
+
 .webqq-model-request-json-node[data-value-kind="number"] .webqq-model-request-json-value {
   color: #d97706;
 }

@@ -3,7 +3,11 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { formatDuration } from '../client/webqq/format-duration'
 import { extractModelResponseContent, normalizeModelResponseUsage } from '../client/webqq/model-response-content'
-import { buildModelRequestJsonTree, parseModelResponseBody } from '../client/webqq/model-request-json'
+import {
+  buildModelRequestJsonTree,
+  parseModelRequestImageSource,
+  parseModelResponseBody,
+} from '../client/webqq/model-request-json'
 import { createModelRequestLiveRefresh, MODEL_REQUEST_LIVE_REFRESH_INTERVAL_MS } from '../client/webqq/model-request-live-refresh'
 
 describe('WebQQ 模型请求工作台', () => {
@@ -122,6 +126,9 @@ describe('WebQQ 模型请求工作台', () => {
     expect(responsePreviewSource).toContain('工具调用')
     expect(responsePreviewSource).toContain('结束原因')
     expect(workspaceSource).toContain(':strings-expanded="true"')
+    expect(workspaceSource).toMatch(/:node="requestTree"[\s\S]*:images-preview="true"/)
+    expect(workspaceSource).not.toMatch(/:node="headersTree"[\s\S]{0,180}:images-preview="true"/)
+    expect(workspaceSource).not.toMatch(/:node="responseTree"[\s\S]{0,180}:images-preview="true"/)
     expect(workspaceSource).not.toContain('stringsExpanded')
     expect(workspaceSource).not.toContain('canExpandBodyStrings')
     expect(workspaceSource).toContain(':root="true"')
@@ -129,6 +136,13 @@ describe('WebQQ 模型请求工作台', () => {
     expect(jsonSource).toContain('IconChevronRight')
     expect(jsonSource).toContain("parentKind !== 'array'")
     expect(jsonSource).toContain('normalizeModelRequestJsonString')
+    expect(jsonSource).toContain('imageSource')
+    expect(jsonSource).toContain('webqq-model-request-json-image')
+    expect(jsonSource).toContain('图片预览')
+    expect(jsonSource).toContain('imageView')
+    expect(jsonSource).toContain('image - {{ formatImageSize(imageSource.source) }}')
+    expect(jsonSource).toContain('>raw<')
+    expect(jsonSource).toContain('>image<')
     expect(jsonSource).toContain('localStringExpanded')
     expect(jsonSource).not.toContain('clipboard')
     expect(jsonSource).not.toContain(':title=')
@@ -147,6 +161,10 @@ describe('WebQQ 模型请求工作台', () => {
     expect(styles).toMatch(/data-value-kind="null"[^}]*color:\s*#e11d48/s)
     expect(styles).toMatch(/\.webqq-model-request-json-string\s*\{[^}]*text-overflow:\s*ellipsis[^}]*white-space:\s*nowrap/s)
     expect(styles).toMatch(/\.webqq-model-request-json-string-expanded\s*\{[^}]*white-space:\s*pre-wrap/s)
+    expect(styles).toMatch(/\.webqq-model-request-json-image\s*\{[^}]*max-width:\s*100%[^}]*max-height:\s*360px/s)
+    expect(styles).toMatch(/\.webqq-model-request-json-image-preview\s*\{[^}]*display:\s*grid/s)
+    expect(styles).toMatch(/\.webqq-model-request-json-image-summary\s*\{[^}]*font-style:\s*italic/s)
+    expect(styles).toMatch(/\.webqq-model-request-json-image-mode\s*\{[^}]*text-decoration:\s*underline/s)
     expect(styles).toMatch(/\.webqq-model-request-response-raw\s*\{[^}]*overflow:\s*auto[^}]*white-space:\s*pre-wrap[^}]*user-select:\s*text/s)
     expect(styles).toMatch(/\.webqq-model-response-preview\s*\{[^}]*display:\s*grid[^}]*overflow:\s*auto/s)
     expect(styles).toMatch(/\.webqq-model-response-section\.is-content\s*\{[^}]*border-left-color:\s*#2563eb/s)
@@ -168,6 +186,34 @@ describe('WebQQ 模型请求工作台', () => {
     expect(tree.children.map(({ key }) => key)).toEqual(['model', 'messages'])
     expect(tree.children[0]).toMatchObject({ key: 'model', kind: 'value', valueKind: 'string', preview: '"gpt-4.1"' })
     expect(tree.children[1]).toMatchObject({ key: 'messages', kind: 'array', preview: '1 items' })
+  })
+
+  it('识别 Data URL、Anthropic 裸 Base64 和 b64_json 图片，并拒绝普通 Base64', () => {
+    const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB'
+    const dataUrl = `data:image/png;base64,${png}`
+    const anthropic = { media_type: 'image/png', data: png }
+
+    expect(parseModelRequestImageSource(dataUrl)).toEqual({
+      source: dataUrl,
+      mimeType: 'image/png',
+    })
+    expect(parseModelRequestImageSource(anthropic.data, 'data', anthropic)).toEqual({
+      source: dataUrl,
+      mimeType: 'image/png',
+    })
+    expect(parseModelRequestImageSource(png, 'b64_json', {})).toEqual({
+      source: dataUrl,
+      mimeType: 'image/png',
+    })
+    expect(parseModelRequestImageSource(png, 'data', {})).toBeUndefined()
+    expect(parseModelRequestImageSource(png, 'image', { mime_type: 'text/plain' })).toBeUndefined()
+    expect(parseModelRequestImageSource('data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=')).toBeUndefined()
+    expect(parseModelRequestImageSource('data:text/html;base64,PGgxPng8L2gxPg==')).toBeUndefined()
+    expect(parseModelRequestImageSource('https://example.com/image.png')).toBeUndefined()
+
+    expect(buildModelRequestJsonTree({ image: anthropic }).children[0]?.children[1]).toMatchObject({
+      imageSource: { source: dataUrl, mimeType: 'image/png' },
+    })
   })
 
   it('将 JSON 与 SSE 原始响应派生为结构化预览', () => {
