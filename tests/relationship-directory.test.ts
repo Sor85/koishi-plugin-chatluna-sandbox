@@ -46,6 +46,26 @@ describe('当前操作者关系目录', () => {
     ])
   })
 
+  it('移除最近会话后保留底层会话，并在新消息到达时恢复入口', () => {
+    const conversations: SandboxConversation[] = [
+      { id: 'group:30001', type: 'group', groupId: '30001', messageIds: ['message-1'] },
+      { id: 'private:10001:20001', type: 'direct', participantIds: ['10001', '20001'], messageIds: [] },
+    ]
+
+    expect(getVisibleRecentConversations(conversations, {
+      'group:30001': 'message-1',
+    }).map(({ id }) => id)).toEqual(['private:10001:20001'])
+    expect(conversations).toHaveLength(2)
+
+    conversations[0]!.messageIds.push('message-2')
+    expect(getVisibleRecentConversations(conversations, {
+      'group:30001': 'message-1',
+    }).map(({ id }) => id)).toEqual([
+      'group:30001',
+      'private:10001:20001',
+    ])
+  })
+
   it('展示除当前操作者外的全部用户和机器人并标记好友关系', () => {
     const directory = getFriendDirectory(snapshot, '10001')
 

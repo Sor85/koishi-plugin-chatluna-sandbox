@@ -21,7 +21,7 @@ import { buildForwardPreviewMap } from './forward-preview'
 import { formatMentionContent } from './mention'
 import { getIncomingNotificationRequests } from './notification-requests'
 import { buildGroupProfileCardModel, buildProfileCardModel } from './profile-card'
-import { getConversationPeerId, getFriendDirectory, getGroupDirectory, getVisibleRecentConversations } from './relationship-directory'
+import { getConversationPeerId, getFriendDirectory, getGroupDirectory } from './relationship-directory'
 import type { createWorkspaceController } from './workspace-controller'
 import type { createWorkspaceLayout } from './workspace-layout'
 import type {
@@ -229,9 +229,7 @@ export function createWebqqWorkspaceShell(
     persistence: workspace.value.persistence,
     participants: participants.value,
   }))
-  const sidebarConversations = computed(() => getVisibleRecentConversations(
-    visibleConversations.value,
-  ).map((conversation) => {
+  const sidebarConversations = computed(() => visibleConversations.value.map((conversation) => {
     const group = conversation.type === 'group'
       ? snapshot.value.groups.find(({ id }) => id === conversation.groupId)
       : undefined
@@ -511,6 +509,10 @@ export function createWebqqWorkspaceShell(
     workspaceController.selectConversation(conversationId)
   }
 
+  function removeRecentConversation(conversationId: string) {
+    workspaceController.removeRecentConversation(conversationId)
+  }
+
   function selectNavigation(view: SandboxWorkspaceView) {
     workspaceController.selectView(view)
     if (view === 'debug') void loadOneBotDebugRecords()
@@ -769,6 +771,7 @@ export function createWebqqWorkspaceShell(
     pokeGroupMember,
     publishAnnouncement,
     recallMessage,
+    removeRecentConversation,
     setMessageReaction,
     requestFriend,
     resolveAvatar,

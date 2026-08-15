@@ -53,12 +53,22 @@ describe('WebQQ 浏览器工作台状态', () => {
       currentOperatorId: '20001',
       activeConversationId: 'private:10002:20001',
       currentView: 'profile',
+      hiddenRecentConversations: {
+        '20001': {
+          'private:10001:20001': 'message-1',
+        },
+      },
     })
 
     expect(loadWorkspacePreferences(storage)).toEqual({
       currentOperatorId: '20001',
       activeConversationId: 'private:10002:20001',
       currentView: 'profile',
+      hiddenRecentConversations: {
+        '20001': {
+          'private:10001:20001': 'message-1',
+        },
+      },
     })
 
     saveWorkspacePreferences(storage, {

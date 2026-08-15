@@ -267,6 +267,12 @@
                   <IconUserMinus :size="16" aria-hidden="true" />
                   {{ conversation.actorRole === 'owner' ? '群主不能直接退群' : '退出群组' }}
                 </ContextMenuItem>
+                <ContextMenuItem
+                  class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40"
+                  @select="emit('removeRecentConversation', conversation.id)"
+                >
+                  <IconTrash :size="16" aria-hidden="true" /> 删除会话
+                </ContextMenuItem>
                 <ContextMenuItem @select="openEntityDialog('edit', conversation.entityTarget)">
                   <IconEdit :size="16" aria-hidden="true" /> 编辑{{ conversation.entityLabel }}
                   <WebqqMenuExtensionMark />
@@ -378,6 +384,7 @@ const preview = computed(() => props.preview)
 const emit = defineEmits<{
   selectView: [view: WebqqSidebarModel['currentView']]
   selectConversation: [conversationId: string]
+  removeRecentConversation: [conversationId: string]
   manageEnvironment: [input: ManageSandboxEnvironmentInput, resolve: () => void, reject: (error: unknown) => void]
   friendAction: [input: SandboxFriendAction]
   groupAction: [input: SandboxGroupAction]

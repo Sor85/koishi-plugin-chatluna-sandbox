@@ -136,6 +136,48 @@ describe('WebQQ 工作区控制模块', () => {
     })
   })
 
+  it('从最近移除会话时不删除场景数据，并回退到下一条最近会话', async () => {
+    const port = createFakeWorkspacePort(workspace)
+    const storage = createStorage(JSON.stringify({
+      currentOperatorId: '10001',
+      activeConversationId: 'private:10001:20001',
+      currentView: 'messages',
+    }))
+    const controller = createWorkspaceController(port, storage)
+    await controller.load()
+
+    controller.removeRecentConversation('private:10001:20001')
+
+    expect(controller.workspace.value.snapshot.conversations).toHaveLength(4)
+    expect(controller.workspace.value.snapshot.messages).toHaveLength(1)
+    expect(controller.sidebar.value.conversations.map(({ id }) => id)).toEqual([
+      'private:10001:10002',
+      'group:30001',
+    ])
+    expect(controller.activeConversationId.value).toBe('private:10001:10002')
+    expect(JSON.parse(storage.read('chatluna-sandbox.workspace') ?? '{}')).toMatchObject({
+      currentOperatorId: '10001',
+      activeConversationId: 'private:10001:10002',
+      hiddenRecentConversations: {
+        '10001': {
+          'private:10001:20001': 'message-1',
+        },
+      },
+    })
+  })
+
+  it('移除空会话时用空标记隐藏，并允许重新选择该逻辑会话', async () => {
+    const controller = createWorkspaceController(createFakeWorkspacePort(workspace), createStorage())
+    await controller.load()
+
+    controller.removeRecentConversation('private:10001:10002')
+    expect(controller.sidebar.value.conversations.map(({ id }) => id)).not.toContain('private:10001:10002')
+
+    controller.selectConversation('private:10001:10002')
+    expect(controller.sidebar.value.conversations.map(({ id }) => id)).toContain('private:10001:10002')
+    expect(controller.activeConversationId.value).toBe('private:10001:10002')
+  })
+
   it('快速切换会话时只显示当前逻辑会话的 ChatLuna 状态', async () => {
     const controller = createWorkspaceController(createFakeWorkspacePort(workspace), createStorage())
     await controller.load()

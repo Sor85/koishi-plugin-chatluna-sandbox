@@ -22,6 +22,7 @@
           :color-mode="resolvedColorMode"
           @select-view="selectNavigation"
           @select-conversation="selectConversation"
+          @remove-recent-conversation="removeRecentConversation"
           @manage-environment="manageEnvironment"
           @friend-action="performFriendAction"
           @group-action="performGroupAction"
@@ -203,6 +204,7 @@ const {
   pokeGroupMember,
   publishAnnouncement,
   recallMessage,
+  removeRecentConversation,
   setMessageReaction,
   requestFriend,
   resolveAvatar,
