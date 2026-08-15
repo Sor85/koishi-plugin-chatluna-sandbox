@@ -60,6 +60,8 @@ describe('WebQQ 模型请求工作台', () => {
     expect(workspaceSource).toContain('<WebqqAvatar')
     expect(workspaceSource).toContain('resolveRequestBot(record).name')
     expect(workspaceSource).toMatch(/webqq-model-request-bot-copy[\s\S]*webqq-model-request-bot-name[\s\S]*resolveRequestBot\(record\)\.name[\s\S]*statusLabel\(record\.status\)[\s\S]*record\.provider[\s\S]*formatTime\(record\.createdAt\)[\s\S]*formatDuration\(record\.durationMs\)/)
+    expect(workspaceSource).not.toMatch(/class="webqq-model-request-item"[\s\S]*record\.error\.message/)
+    expect(workspaceSource).toContain('detail.error.message')
     expect(workspaceSource).toMatch(/webqq-model-request-bot-copy[\s\S]*webqq-model-request-bot-name[\s\S]*resolveRequestBot\(detail\)\.name[\s\S]*formatTime\(detail\.createdAt\)/)
     expect(workspaceSource).toMatch(/date\.getFullYear\(\)[\s\S]*date\.getMonth\(\)[\s\S]*date\.getDate\(\)[\s\S]*date\.getHours\(\)/)
     expect(detailHeader).not.toContain('detail.durationMs')

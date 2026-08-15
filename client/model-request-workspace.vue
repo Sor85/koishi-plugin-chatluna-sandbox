@@ -151,7 +151,6 @@
                 </span>
               </div>
             </header>
-            <p v-if="record.error" class="webqq-model-request-trace">{{ record.error.message }}</p>
           </button>
           <Button
             v-if="hasMore"
