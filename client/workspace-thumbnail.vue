@@ -7,12 +7,12 @@
       inert
       class="webqq-workspace webqq-space-thumbnail-workspace is-details-open"
       :class="{
-        'is-frosted': appearance.enableWebQQFrostedGlass,
-        'has-tim-tail': appearance.webQQTimBubbleTail,
+        'is-frosted': appearance.enableSandboxFrostedGlass,
+        'has-tim-tail': appearance.sandboxTimBubbleTail,
       }"
       :data-color-mode="colorMode"
       data-mobile-view="messages"
-      :style="{ '--webqq-accent': appearance.webQQAccentColor }"
+      :style="{ '--webqq-accent': appearance.sandboxAccentColor }"
     >
       <WebqqSidebar :model="models.sidebar" :color-mode="colorMode" preview />
       <WebqqChatPane :model="models.chatPane" preview />

@@ -19,11 +19,11 @@ const workspace: SandboxWorkspaceState = {
   },
   chatLunaStates: [],
   appearance: {
-    enableWebQQFrostedGlass: true,
-    webQQTimBubbleTail: true,
-    webQQColorMode: 'auto',
-    webQQAccentColor: '#2563eb',
-    webQQMarkRecalledMessages: true,
+    enableSandboxFrostedGlass: true,
+    sandboxTimBubbleTail: true,
+    sandboxColorMode: 'auto',
+    sandboxAccentColor: '#2563eb',
+    sandboxMarkRecalledMessages: true,
   },
   persistence: { mode: 'memory', available: true, persisted: false },
 }

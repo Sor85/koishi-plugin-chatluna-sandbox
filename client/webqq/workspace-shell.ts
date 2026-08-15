@@ -129,7 +129,7 @@ export function createWebqqWorkspaceShell(
     hasMoreMessages: !!currentConversation.value?.hasMoreMessages,
     mediaSources: mediaSources.value,
     mediaLoadFailures: mediaLoadFailures.value,
-    markRecalledMessages: appearance.value.webQQMarkRecalledMessages,
+    markRecalledMessages: appearance.value.sandboxMarkRecalledMessages,
   }))
   const mentionCandidates = computed(() => {
     const group = currentGroup.value
@@ -155,9 +155,9 @@ export function createWebqqWorkspaceShell(
     currentOperatorId: currentOperatorId.value,
     conversationId: currentConversation.value?.id,
     mentionCandidates: mentionCandidates.value,
-    accentColor: appearance.value.webQQAccentColor,
+    accentColor: appearance.value.sandboxAccentColor,
     // page.vue 会用 Koishi 已解析的响应式明暗模式覆盖此值；这里仍提供确定值，保证基础模型契约完整。
-    colorMode: appearance.value.webQQColorMode === 'dark' ? 'dark' : 'light',
+    colorMode: appearance.value.sandboxColorMode === 'dark' ? 'dark' : 'light',
     externalError: errorMessage.value,
   }))
   const participantNames = computed(() => Object.fromEntries([
@@ -292,7 +292,7 @@ export function createWebqqWorkspaceShell(
     users: users.value.map((user) => ({ ...user, avatar: resolveAvatar(user.avatar) })),
     bots: bots.value.map((bot) => ({ ...bot, avatar: resolveAvatar(bot.avatar) })),
     groups: snapshot.value.groups.map((group) => ({ ...group, avatar: resolveAvatar(group.avatar) })),
-    accentColor: appearance.value.webQQAccentColor,
+    accentColor: appearance.value.sandboxAccentColor,
   }))
   const environmentModel = computed(() => ({
     ...snapshot.value,

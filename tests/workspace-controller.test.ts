@@ -69,11 +69,11 @@ const workspace: SandboxWorkspaceState = {
     updatedAt: '2026-07-23T00:00:02.000Z',
   }],
   appearance: {
-    enableWebQQFrostedGlass: true,
-    webQQTimBubbleTail: true,
-    webQQColorMode: 'auto',
-    webQQAccentColor: '#2563eb',
-    webQQMarkRecalledMessages: true,
+    enableSandboxFrostedGlass: true,
+    sandboxTimBubbleTail: true,
+    sandboxColorMode: 'auto',
+    sandboxAccentColor: '#2563eb',
+    sandboxMarkRecalledMessages: true,
   },
 }
 

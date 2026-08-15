@@ -169,6 +169,13 @@ describe('WebQQ 模型请求工作台', () => {
       kind: 'json',
       value: { content: '你好' },
     })
+    expect(extractModelResponseContent(parseModelResponseBody(JSON.stringify({
+      candidates: [{ content: { parts: [{ text: 'Gemini 回复' }] } }],
+      usageMetadata: { promptTokenCount: 8 },
+    }), 'json').value)).toMatchObject({
+      content: ['Gemini 回复'],
+      usage: { promptTokenCount: 8 },
+    })
     expect(parseModelResponseBody([
       'event: message',
       'data: {"delta":"你"}',
@@ -286,6 +293,20 @@ describe('WebQQ 模型请求工作台', () => {
       reasoningTokens: 50,
       cachedTokens: 700,
       totalTokens: 1250,
+    })
+
+    expect(normalizeModelResponseUsage({
+      promptTokenCount: 10664,
+      candidatesTokenCount: 125,
+      totalTokenCount: 11511,
+      cachedContentTokenCount: 8051,
+      thoughtsTokenCount: 722,
+    })).toEqual({
+      inputTokens: 10664,
+      outputTokens: 125,
+      reasoningTokens: 722,
+      cachedTokens: 8051,
+      totalTokens: 11511,
     })
   })
 

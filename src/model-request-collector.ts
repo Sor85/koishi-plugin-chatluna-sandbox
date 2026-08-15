@@ -134,7 +134,7 @@ export function installModelRequestCollector(options: InstallModelRequestCollect
       method: request.method,
       url: sanitizeModelRequestUrl(request.url),
       ...(inferProvider(request.url) ? { provider: inferProvider(request.url) } : {}),
-      ...(inferModel(body.value) ? { model: inferModel(body.value) } : {}),
+      ...(inferModel(body.value, request.url) ? { model: inferModel(body.value, request.url) } : {}),
       attribution: resolved.attribution,
       entities: resolved.entities,
       requestBodyAvailable: body.available,
@@ -263,10 +263,23 @@ function parseJsonBody(body: unknown): { available: boolean, value?: unknown } {
   }
 }
 
-function inferModel(body: unknown): string | undefined {
-  if (!body || typeof body !== 'object') return
-  const model = Reflect.get(body, 'model')
-  return typeof model === 'string' && model ? model : undefined
+function inferModel(body: unknown, rawUrl?: string): string | undefined {
+  if (body && typeof body === 'object') {
+    const directModel = Reflect.get(body, 'model')
+    if (typeof directModel === 'string' && directModel) return directModel
+    const modelVersion = Reflect.get(body, 'modelVersion')
+    if (typeof modelVersion === 'string' && modelVersion) return modelVersion
+  }
+  if (rawUrl) {
+    try {
+      // Gemini 请求通常没有 body.model；从 /models/<id>:generateContent
+      // 回退提取模型，避免详情页把可识别的模型显示为“未识别”。
+      const match = new URL(rawUrl).pathname.match(/\/models\/([^/:]+)(?::|$)/i)
+      if (match?.[1]) return decodeURIComponent(match[1])
+    } catch {
+      // 非标准 URL 无法提取模型名时，保留未识别状态。
+    }
+  }
 }
 
 function inferProvider(url: string): string | undefined {

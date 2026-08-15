@@ -248,7 +248,7 @@ describe('WebQQ 消息列表', () => {
     expect(mediaRecallLine).toContain('pointer-events: none')
     expect(styles).toContain('.chatluna-sandbox-message-recalled-label')
     expect(styles).toContain('.chatluna-sandbox-thinking-row.is-recalled')
-    expect(shellSource).toContain('markRecalledMessages: appearance.value.webQQMarkRecalledMessages')
+    expect(shellSource).toContain('markRecalledMessages: appearance.value.sandboxMarkRecalledMessages')
   })
 
   it('私聊与群聊展示表情回应，并在聊天区打开二级选择页', () => {

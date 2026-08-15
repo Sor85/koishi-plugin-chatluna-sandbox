@@ -53,6 +53,29 @@ describe('模型请求记录库', () => {
     })
   })
 
+  it('按 Gemini generateContent 结构统计消息和函数声明工具', () => {
+    const store = new SandboxModelRequestStore()
+    const created = appendRecord(store, {
+      url: 'http://192.168.5.3/v1beta/models/gemini:generateContent',
+      provider: '192.168.5.3',
+      model: undefined,
+      requestBody: {
+        contents: [{ role: 'user', parts: [{ text: '你好' }] }],
+        safetySettings: [],
+        generationConfig: {},
+        systemInstruction: { role: 'user', parts: [{ text: '系统提示' }] },
+        tools: [{ functionDeclarations: [
+          { name: 'music_voice' },
+          { name: 'jmcomic_search' },
+        ] }],
+      },
+    })
+
+    expect(store.getRecord(created.id)).toMatchObject({
+      summary: { keys: 5, messageCount: 1, toolCount: 2, bodyAvailable: true },
+    })
+  })
+
   it('同一条记录从 pending 更新为 success 或 error，不新增序号', () => {
     const store = new SandboxModelRequestStore()
     const pending = appendRecord(store, {

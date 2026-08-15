@@ -106,11 +106,11 @@ export interface DetailsWorkspaceModel {
 }
 
 const defaultAppearance: SandboxAppearance = {
-  enableWebQQFrostedGlass: true,
-  webQQTimBubbleTail: true,
-  webQQColorMode: 'auto',
-  webQQAccentColor: '#2563eb',
-  webQQMarkRecalledMessages: true,
+  enableSandboxFrostedGlass: true,
+  sandboxTimBubbleTail: true,
+  sandboxColorMode: 'auto',
+  sandboxAccentColor: '#2563eb',
+  sandboxMarkRecalledMessages: true,
 }
 
 const emptySnapshot: SandboxSnapshot = {

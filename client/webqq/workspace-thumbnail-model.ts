@@ -157,7 +157,7 @@ export function buildWorkspaceThumbnailModels(
         hasMoreMessages: !!currentConversation?.hasMoreMessages,
         mediaSources: {},
         mediaLoadFailures: {},
-        markRecalledMessages: appearance.webQQMarkRecalledMessages,
+        markRecalledMessages: appearance.sandboxMarkRecalledMessages,
       },
       composer: {
         senders: snapshot.participants.map((participant) => ({
@@ -173,7 +173,7 @@ export function buildWorkspaceThumbnailModels(
           if (!participant) return []
           return [{ id: participant.id, name: member.card?.trim() || participant.name, avatar: participant.avatar, kind: participant.kind }]
         }) ?? [],
-        accentColor: appearance.webQQAccentColor,
+        accentColor: appearance.sandboxAccentColor,
         colorMode,
       },
       forwardTargets,

@@ -50,15 +50,15 @@ export const Config: Schema<Config> = Schema.object({
     Schema.const('memory').description('服务端内存'),
     Schema.const('database').description('Koishi Database'),
   ]).default('memory').role('radio').description('模拟 QQ 环境状态存储方式'),
-  enableWebQQFrostedGlass: Schema.boolean().default(true).description('启用 WebQQ 毛玻璃效果'),
-  webQQTimBubbleTail: Schema.boolean().default(true).description('显示气泡小尖角'),
-  webQQColorMode: Schema.union([
+  enableSandboxFrostedGlass: Schema.boolean().default(true).description('启用 Sandbox 毛玻璃效果'),
+  sandboxTimBubbleTail: Schema.boolean().default(true).description('显示气泡小尖角'),
+  sandboxColorMode: Schema.union([
     Schema.const('auto').description('自动'),
     Schema.const('light').description('明亮'),
     Schema.const('dark').description('暗色'),
-  ]).default('auto').role('radio').description('WebQQ 颜色模式'),
-  webQQAccentColor: Schema.string().default('#2563eb').role('color').description('WebQQ 强调色'),
-  webQQMarkRecalledMessages: Schema.boolean().default(true).description('仅影响 WebQQ 展示：开启时保留撤回气泡并显示撤回线，关闭时只显示撤回事件'),
+  ]).default('auto').role('radio').description('Sandbox 颜色模式'),
+  sandboxAccentColor: Schema.string().default('#2563eb').role('color').description('Sandbox 强调色'),
+  sandboxMarkRecalledMessages: Schema.boolean().default(true).description('仅影响 Sandbox 展示：开启时保留撤回气泡并显示撤回线，关闭时只显示撤回事件'),
   modelRequestRecordLimit: Schema.number().min(1).default(500).description('每个空间保留的模型请求记录上限'),
   mcp: Schema.object({
     enabled: Schema.boolean().default(false).description('启用独立 MCP Streamable HTTP 端点'),
@@ -78,7 +78,7 @@ export const Config: Schema<Config> = Schema.object({
     maxConcurrentWaits: Schema.number().min(1).default(8).description('每个凭证最大并发等待数'),
     maxConcurrentUploads: Schema.number().min(1).default(2).description('每个凭证最大并发上传数'),
   }).description('MCP 测试端点'),
-}).description('OneBot 沙盒')
+}).description('ChatLuna 沙盒')
 
 declare module 'koishi' {
   interface Context {

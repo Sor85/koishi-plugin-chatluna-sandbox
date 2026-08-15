@@ -259,11 +259,11 @@ describe('控制服务与 Console 单条详情', () => {
       addListener(event, callback) { listeners.set(event, callback as never) },
       broadcast() {},
     }, control, {
-      enableWebQQFrostedGlass: true,
-      webQQTimBubbleTail: true,
-      webQQColorMode: 'auto',
-      webQQAccentColor: '#2563eb',
-      webQQMarkRecalledMessages: true,
+      enableSandboxFrostedGlass: true,
+      sandboxTimBubbleTail: true,
+      sandboxColorMode: 'auto',
+      sandboxAccentColor: '#2563eb',
+      sandboxMarkRecalledMessages: true,
     })
 
     const getRecord = listeners.get('chatluna-sandbox/debug-record')

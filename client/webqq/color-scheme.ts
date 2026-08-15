@@ -9,7 +9,7 @@ import { resolveSandboxColorMode } from './resolve-color-mode'
 export function useResolvedColorMode(appearance: Ref<SandboxAppearance>): Ref<'light' | 'dark'> {
   const koishiColorMode = useColorMode()
   const resolved = computed<'light' | 'dark'>(() => resolveSandboxColorMode(
-    appearance.value.webQQColorMode,
+    appearance.value.sandboxColorMode,
     koishiColorMode.value,
   ))
   watchEffect(() => {

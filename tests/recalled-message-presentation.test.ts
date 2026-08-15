@@ -292,9 +292,9 @@ describe('撤回消息生命周期与呈现', () => {
     }))
   })
 
-  it('配置 webQQMarkRecalledMessages 默认开启且只影响外观', () => {
+  it('配置 sandboxMarkRecalledMessages 默认开启且只影响外观', () => {
     if (!Config.dict) throw new Error('配置 Schema 缺少字段定义')
-    expect(Config.dict.webQQMarkRecalledMessages.meta.default).toBe(true)
-    expect(Config.dict.webQQMarkRecalledMessages.meta.description).toMatch(/撤回/)
+    expect(Config.dict.sandboxMarkRecalledMessages.meta.default).toBe(true)
+    expect(Config.dict.sandboxMarkRecalledMessages.meta.description).toMatch(/撤回/)
   })
 })

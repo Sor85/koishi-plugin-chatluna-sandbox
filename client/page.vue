@@ -4,15 +4,15 @@
       <div
         class="webqq-workspace"
         :class="{
-          'is-frosted': appearance.enableWebQQFrostedGlass,
-          'has-tim-tail': appearance.webQQTimBubbleTail,
+          'is-frosted': appearance.enableSandboxFrostedGlass,
+          'has-tim-tail': appearance.sandboxTimBubbleTail,
           'is-details-open': detailsVisible && isWebqqView,
           'is-details-closed': !detailsVisible || !isWebqqView,
           'is-standalone-view': !isWebqqView,
         }"
         :data-color-mode="resolvedColorMode"
         :data-mobile-view="currentView"
-        :style="{ '--webqq-accent': appearance.webQQAccentColor }"
+        :style="{ '--webqq-accent': appearance.sandboxAccentColor }"
         @click.capture="rememberFloatingPanelAnchor"
         @contextmenu.capture="rememberFloatingPanelAnchor"
       >

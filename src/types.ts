@@ -609,12 +609,12 @@ export interface PerformGroupActionResult {
 }
 
 export interface SandboxAppearance {
-  enableWebQQFrostedGlass: boolean
-  webQQTimBubbleTail: boolean
-  webQQColorMode: 'auto' | 'light' | 'dark'
-  webQQAccentColor: string
+  enableSandboxFrostedGlass: boolean
+  sandboxTimBubbleTail: boolean
+  sandboxColorMode: 'auto' | 'light' | 'dark'
+  sandboxAccentColor: string
   // 只控制 WebQQ 呈现；关闭时隐藏原气泡并显示撤回事件，底层数据仍保留。
-  webQQMarkRecalledMessages: boolean
+  sandboxMarkRecalledMessages: boolean
 }
 
 export interface SandboxWorkspaceState {

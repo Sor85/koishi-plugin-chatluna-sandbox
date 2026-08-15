@@ -6,11 +6,11 @@ import { SandboxTestSpaceService } from '../src/test-spaces'
 import type { SandboxAppearance } from '../src/types'
 
 const appearance: SandboxAppearance = {
-  enableWebQQFrostedGlass: true,
-  webQQTimBubbleTail: true,
-  webQQColorMode: 'auto',
-  webQQAccentColor: '#2563eb',
-  webQQMarkRecalledMessages: true,
+  enableSandboxFrostedGlass: true,
+  sandboxTimBubbleTail: true,
+  sandboxColorMode: 'auto',
+  sandboxAccentColor: '#2563eb',
+  sandboxMarkRecalledMessages: true,
 }
 
 const runningApps: App[] = []

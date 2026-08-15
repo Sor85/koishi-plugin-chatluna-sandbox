@@ -517,15 +517,24 @@ const responsePreview = computed(() => parseModelResponseBody(
   props.detail?.responseBodyFormat,
 ))
 const responseTree = computed(() => buildModelRequestJsonTree(responsePreview.value, 'responseBody'))
-const responseContent = computed(() => extractModelResponseContent(responsePreview.value))
+const responseContent = computed(() => extractModelResponseContent(responsePreview.value.value))
 const responseUsage = computed(() => normalizeModelResponseUsage(responseContent.value.usage))
 const detailModel = computed(() => {
   const detail = props.detail
   if (!detail) return '未识别'
   if (detail.model) return detail.model
   if (detail.requestBody && typeof detail.requestBody === 'object' && !Array.isArray(detail.requestBody)) {
-    const model = (detail.requestBody as Record<string, unknown>).model
+    const body = detail.requestBody as Record<string, unknown>
+    const model = body.model ?? body.modelVersion
     if (typeof model === 'string' && model) return model
+  }
+  if (detail.url) {
+    try {
+      const match = new URL(detail.url).pathname.match(/\/models\/([^/:]+)(?::|$)/i)
+      if (match?.[1]) return decodeURIComponent(match[1])
+    } catch {
+      // 历史记录中的地址可能不是标准 URL，无法回退提取模型名时继续显示未识别。
+    }
   }
   return '未识别'
 })

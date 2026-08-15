@@ -53,11 +53,11 @@
               <PopoverContent
                 align="center"
                 :class="['webqq-notification-popover', {
-                  'is-frosted': appearance.enableWebQQFrostedGlass,
-                  'is-plain': !appearance.enableWebQQFrostedGlass,
+                  'is-frosted': appearance.enableSandboxFrostedGlass,
+                  'is-plain': !appearance.enableSandboxFrostedGlass,
                   'is-color-dark': colorMode === 'dark',
                 }]"
-                :style="{ '--webqq-accent': appearance.webQQAccentColor, '--webqq-muted': '#64748b' }"
+                :style="{ '--webqq-accent': appearance.sandboxAccentColor, '--webqq-muted': '#64748b' }"
               >
                 <NotificationMenu
                   v-model:tab="notificationTab"
@@ -89,7 +89,7 @@
               :current-operator="model.currentOperator"
               :bots="model.bots"
               :color-mode="colorMode"
-              :accent-color="appearance.webQQAccentColor"
+              :accent-color="appearance.sandboxAccentColor"
               @submit="manageEnvironment"
             >
               <template #trigger>

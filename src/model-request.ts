@@ -74,12 +74,23 @@ function summary(record: Pick<SandboxModelRequestRecord, 'requestBody'>): Sandbo
   const body = record.requestBody
   if (!body || typeof body !== 'object') return { keys: 0, messageCount: 0, toolCount: 0, bodyAvailable: record.requestBody !== undefined }
   const object = body as Record<string, unknown>
-  const messages = Array.isArray(object.messages) ? object.messages : []
+  // ChatLuna 的 Gemini 网关使用 contents/functionDeclarations；只读 OpenAI
+  // 字段会把真实请求误报成 0 条消息、1 个工具，导致详情页统计失真。
+  const messages = Array.isArray(object.messages)
+    ? object.messages
+    : Array.isArray(object.contents)
+      ? object.contents
+      : []
   const tools = Array.isArray(object.tools) ? object.tools : []
+  const toolCount = tools.reduce((count, tool) => {
+    if (!tool || typeof tool !== 'object') return count + 1
+    const declarations = Reflect.get(tool, 'functionDeclarations')
+    return count + (Array.isArray(declarations) ? declarations.length : 1)
+  }, 0)
   return {
     keys: Object.keys(object).length,
     messageCount: messages.length,
-    toolCount: tools.length,
+    toolCount,
     bodyAvailable: record.requestBody !== undefined,
   }
 }

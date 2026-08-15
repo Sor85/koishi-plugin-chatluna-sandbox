@@ -67,6 +67,26 @@ describe('模型请求采集', () => {
     )
   })
 
+  it('从 Gemini generateContent URL 提取请求模型 ID', async () => {
+    const unattributed = new SandboxModelRequestStore()
+    const plugin = createFakePlugin(async () => new Response(JSON.stringify({
+      candidates: [],
+      usageMetadata: { promptTokenCount: 1 },
+    }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    disposers.push(installModelRequestCollector({
+      plugin,
+      unattributed,
+      getCandidates: () => [],
+    }))
+
+    await plugin.fetch('http://192.168.5.3/v1beta/models/gemini-3.6-flash:generateContent', {
+      method: 'POST',
+      body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: '你好' }] }] }),
+    })
+    await unattributed.waitForPersistence()
+
+    expect(unattributed.getRecords().records[0]).toMatchObject({ model: 'gemini-3.6-flash' })
+  })
   it('包装公共 fetch：记录 JSON 请求体、不存 headers，并在完成后从 pending 变为 success/error', async () => {
     const unattributed = new SandboxModelRequestStore()
     let status: 'ok' | 'http' | 'throw' = 'ok'

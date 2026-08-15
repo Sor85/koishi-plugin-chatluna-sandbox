@@ -10,7 +10,7 @@ icons.register('activity:chatluna-sandbox', SandboxActivityIcon)
 export default (ctx: Context) => {
   installContextMutationReceiver(ctx)
   ctx.page({
-    name: 'OneBot 沙盒',
+    name: 'ChatLuna 沙盒',
     path: '/chatluna-sandbox',
     icon: 'activity:chatluna-sandbox',
     order: 300,
