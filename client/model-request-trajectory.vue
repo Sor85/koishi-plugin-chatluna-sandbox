@@ -101,7 +101,6 @@
                 </TooltipTrigger>
                 <TooltipContent side="top">
                   <strong>{{ promptKindLabel(segment.kind) }} · {{ formatPercentage(segment.percentage) }}</strong>
-                  <span>{{ segment.characters.toLocaleString('zh-CN') }} 个序列化字符</span>
                 </TooltipContent>
               </Tooltip>
             </div>
