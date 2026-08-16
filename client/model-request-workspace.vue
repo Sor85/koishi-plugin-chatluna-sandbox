@@ -572,8 +572,12 @@ const headersExpanded = ref(false)
 const copyState = ref<'idle' | 'success' | 'error'>('idle')
 let copyStateTimer: number | undefined
 
+const hasPendingRequest = computed(() => (
+  props.records.some(({ status }) => status === 'pending')
+  || props.detail?.status === 'pending'
+))
 const liveRefreshController = createModelRequestLiveRefresh({
-  isEnabled: () => liveRefresh.value,
+  isEnabled: () => liveRefresh.value || hasPendingRequest.value,
   isVisible: () => typeof document === 'undefined' || document.visibilityState === 'visible',
   refresh: () => refresh(Math.min(Math.max(props.records.length, MODEL_REQUEST_PAGE_SIZE), 200)),
 })
@@ -669,7 +673,7 @@ watch(() => props.detail?.id, () => {
 })
 
 watch(bodyView, resetCopyState)
-watch(liveRefresh, () => liveRefreshController.sync())
+watch([liveRefresh, hasPendingRequest], () => liveRefreshController.sync(), { immediate: true })
 watch(() => props.visitKey, () => {
   enterRefresh.schedule()
 })
@@ -691,10 +695,10 @@ function refresh(limit = MODEL_REQUEST_PAGE_SIZE) {
   emitQuery(limit)
   if (selectedRecordId.value) {
     const record = props.records.find(({ id }) => id === selectedRecordId.value) ?? props.detail
-    emit('open', {
-      ...(record ? resolveRecordScope(record) : currentScope()),
-      recordId: selectedRecordId.value,
-    })
+    const scope = record ? resolveRecordScope(record) : currentScope()
+    emit('open', { ...scope, recordId: selectedRecordId.value })
+    // 同一条记录从进行中变为已完成时 id 不变，不能只靠详情 id watcher 重拉轨迹。
+    emit('trajectory', { ...scope, recordId: selectedRecordId.value, mode: trajectoryMode.value })
   }
 }
 
