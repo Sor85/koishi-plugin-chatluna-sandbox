@@ -57,8 +57,9 @@ describe('模型请求 Console 协议', () => {
 
     const listRecords = listeners.get('chatluna-sandbox/model-request-records')
     const getRecord = listeners.get('chatluna-sandbox/model-request-record')
+    const getTrajectory = listeners.get('chatluna-sandbox/model-request-trajectory')
     const clearRecords = listeners.get('chatluna-sandbox/clear-model-request-records')
-    if (typeof listRecords !== 'function' || typeof getRecord !== 'function' || typeof clearRecords !== 'function') {
+    if (typeof listRecords !== 'function' || typeof getRecord !== 'function' || typeof getTrajectory !== 'function' || typeof clearRecords !== 'function') {
       throw new Error('模型请求记录监听器未注册')
     }
 
@@ -79,6 +80,11 @@ describe('模型请求 Console 协议', () => {
       responseBodyFormat: 'json',
       responseStatus: 500,
       responseBodyRaw: JSON.stringify({ error: 'failed' }),
+    })
+    expect(Reflect.apply(getTrajectory, undefined, [{ scope: 'unattributed', recordId: unattributedRecord.id, mode: 'request' }])).toMatchObject({
+      mode: 'request',
+      records: [expect.objectContaining({ id: unattributedRecord.id })],
+      rows: [expect.objectContaining({ kind: 'request', requestId: unattributedRecord.id })],
     })
 
     const allPage = Reflect.apply(listRecords, undefined, [{ scope: 'all' }]) as { records: Array<{ model: string, source: { type: string } }> }

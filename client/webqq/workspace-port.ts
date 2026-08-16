@@ -20,6 +20,7 @@ import type {
   SandboxMessageSearchResult,
   SandboxModelRequestDetail,
   SandboxModelRequestRecordsPage,
+  SandboxModelRequestTrajectory,
   SandboxOneBotDebugRecordsPage,
   SandboxWorkspaceState,
   SendForwardMessageInput,
@@ -31,6 +32,7 @@ import type {
   ClearModelRequestRecordsQuery,
   ModelRequestRecordQuery,
   ModelRequestRecordsQuery,
+  ModelRequestTrajectoryQuery,
 } from './model-request-query'
 
 export interface WorkspacePort {
@@ -53,5 +55,6 @@ export interface WorkspacePort {
   clearOneBotDebugRecords(): Promise<ClearSandboxOneBotDebugRecordsResult>
   getModelRequestRecords(input: ModelRequestRecordsQuery): Promise<SandboxModelRequestRecordsPage>
   getModelRequestRecord(input: ModelRequestRecordQuery): Promise<SandboxModelRequestDetail>
+  getModelRequestTrajectory(input: ModelRequestTrajectoryQuery): Promise<SandboxModelRequestTrajectory>
   clearModelRequestRecords(input: ClearModelRequestRecordsQuery): Promise<ClearSandboxModelRequestRecordsResult>
 }

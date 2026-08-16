@@ -67,6 +67,12 @@ describe('WebQQ 模型请求控制器', () => {
       capacity: { recordCount: 2, totalBytes: 128, maxRecords: 5000, maxBytes: 50 * 1024 * 1024 },
     }
     port.modelRequestRecordResult = detail
+    port.modelRequestTrajectoryResult = {
+      mode: 'request',
+      records: [listItem],
+      rows: [{ id: 'record-1:request', index: 1, kind: 'request', preview: 'openai / gpt-4.1', requestId: 'record-1' }],
+      complete: true,
+    }
     const controller = createWorkspaceController(port, {
       getItem: () => null,
       setItem: () => undefined,
@@ -94,6 +100,13 @@ describe('WebQQ 模型请求控制器', () => {
     expect(port.calls.at(-1)).toEqual({
       operation: 'getModelRequestRecord',
       input: { scope: 'space', spaceId: 'main', recordId: 'record-1' },
+    })
+
+    await controller.loadModelRequestTrajectory({ scope: 'space', spaceId: 'main', recordId: 'record-1', mode: 'request' })
+    expect(controller.modelRequestTrajectory.value).toEqual(port.modelRequestTrajectoryResult)
+    expect(port.calls.at(-1)).toEqual({
+      operation: 'getModelRequestTrajectory',
+      input: { scope: 'space', spaceId: 'main', recordId: 'record-1', mode: 'request' },
     })
   })
 

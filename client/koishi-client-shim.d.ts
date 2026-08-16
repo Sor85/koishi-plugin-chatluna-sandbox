@@ -22,6 +22,7 @@ declare module '@koishijs/client' {
     SandboxModelRequestDetail,
     SandboxModelRequestRecordsPage,
     SandboxModelRequestScope,
+    SandboxModelRequestTrajectory,
     SandboxForward,
     SandboxMediaContent,
     SandboxMessageHistory,
@@ -73,6 +74,7 @@ declare module '@koishijs/client' {
   export function send(event: 'chatluna-sandbox/clear-debug-records', input?: { spaceId?: string }): Promise<ClearSandboxOneBotDebugRecordsResult>
   export function send(event: 'chatluna-sandbox/model-request-records', input: GetSandboxModelRequestRecordsInput & SandboxModelRequestScope): Promise<SandboxModelRequestRecordsPage>
   export function send(event: 'chatluna-sandbox/model-request-record', input: GetSandboxModelRequestRecordInput & SandboxModelRequestScope): Promise<SandboxModelRequestDetail>
+  export function send(event: 'chatluna-sandbox/model-request-trajectory', input: GetSandboxModelRequestRecordInput & SandboxModelRequestScope & { mode: 'request' | 'conversation' }): Promise<SandboxModelRequestTrajectory>
   export function send(event: 'chatluna-sandbox/clear-model-request-records', input: SandboxModelRequestScope): Promise<ClearSandboxModelRequestRecordsResult>
   export function send(event: 'chatluna-sandbox/mcp-credentials'): Promise<Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string }>>
   export function send(event: 'chatluna-sandbox/create-mcp-credential', input: { name: string; scopes: SandboxMcpScope[] }): Promise<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }>

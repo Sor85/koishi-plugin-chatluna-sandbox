@@ -29,6 +29,7 @@ export function createKoishiWorkspacePort(resolveSpaceId: () => string | undefin
   // 未归属分类没有 spaceId，切到其他空间时也不应被当前观察的测试空间覆盖。
   getModelRequestRecords: (input) => send('chatluna-sandbox/model-request-records', input),
   getModelRequestRecord: (input) => send('chatluna-sandbox/model-request-record', input),
+  getModelRequestTrajectory: (input) => send('chatluna-sandbox/model-request-trajectory', input),
   clearModelRequestRecords: (input) => send('chatluna-sandbox/clear-model-request-records', input),
   }
 }

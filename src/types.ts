@@ -507,6 +507,38 @@ export interface SandboxModelRequestRecordsPage<T extends SandboxModelRequestLis
   capacity: SandboxModelRequestCapacity
 }
 
+export type SandboxModelRequestTrajectoryKind = 'system' | 'user' | 'assistant' | 'tool' | 'request'
+
+export interface SandboxModelRequestTrajectoryRow {
+  id: string
+  index: number
+  kind: SandboxModelRequestTrajectoryKind
+  preview: string
+  detail?: unknown
+  callId?: string
+  toolName?: string
+  durationMs?: number
+  startedAt?: string
+  requestId?: string
+  status?: SandboxModelRequestStatus
+}
+
+export type SandboxModelRequestPromptKind = 'system' | 'user' | 'assistant' | 'tool'
+
+export interface SandboxModelRequestPromptCompositionItem {
+  kind: SandboxModelRequestPromptKind
+  characters: number
+}
+
+export interface SandboxModelRequestTrajectory {
+  mode: 'request' | 'conversation'
+  conversationId?: string
+  records: readonly SandboxModelRequestListItem[]
+  rows: readonly SandboxModelRequestTrajectoryRow[]
+  promptComposition?: readonly SandboxModelRequestPromptCompositionItem[]
+  complete: boolean
+}
+
 export interface GetSandboxModelRequestRecordInput { recordId: string }
 export interface ClearSandboxModelRequestRecordsResult { cleared: number }
 
@@ -526,6 +558,10 @@ export type SandboxModelRequestScope =
 
 export type ListSandboxModelRequestRecordsInput = SandboxModelRequestScope & GetSandboxModelRequestRecordsInput
 export type ReadSandboxModelRequestRecordInput = SandboxModelRequestScope & GetSandboxModelRequestRecordInput
+export type ReadSandboxModelRequestTrajectoryInput = SandboxModelRequestScope & {
+  recordId: string
+  mode: 'request' | 'conversation'
+}
 
 export type SandboxMediaType = 'image' | 'file' | 'audio' | 'video'
 

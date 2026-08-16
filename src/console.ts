@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type {} from '@koishijs/console'
+import { buildSandboxModelRequestTrajectory } from './model-request-trajectory'
 import type { SandboxControlService } from './control-service'
 import type { SandboxMcpService } from './mcp/service'
 import type { SandboxMcpScope } from './mcp/types'
@@ -26,10 +27,12 @@ import type {
   GetSandboxWorkspaceInput,
   ListSandboxModelRequestRecordsInput,
   ReadSandboxModelRequestRecordInput,
+  ReadSandboxModelRequestTrajectoryInput,
   SandboxConsoleModelRequestDetail,
   SandboxConsoleModelRequestListItem,
   SandboxModelRequestRecordsPage,
   SandboxModelRequestScope,
+  SandboxModelRequestTrajectory,
   SandboxModelRequestSource,
   ManageSandboxEnvironmentInput,
   PerformFriendActionInput,
@@ -78,6 +81,7 @@ interface ConsoleEventMap {
   'chatluna-sandbox/clear-debug-records': (input?: { spaceId?: string }) => ClearSandboxOneBotDebugRecordsResult
   'chatluna-sandbox/model-request-records': (input: ListSandboxModelRequestRecordsInput) => SandboxModelRequestRecordsPage<SandboxConsoleModelRequestListItem>
   'chatluna-sandbox/model-request-record': (input: ReadSandboxModelRequestRecordInput) => SandboxConsoleModelRequestDetail
+  'chatluna-sandbox/model-request-trajectory': (input: ReadSandboxModelRequestTrajectoryInput) => SandboxModelRequestTrajectory
   'chatluna-sandbox/clear-model-request-records': (input: SandboxModelRequestScope) => ClearSandboxModelRequestRecordsResult
   'chatluna-sandbox/mcp-credentials': () => Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string }>
   'chatluna-sandbox/create-mcp-credential': (input: { name: string; scopes: SandboxMcpScope[] }) => { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
@@ -279,48 +283,56 @@ export function registerConsole(
     }
   }
 
-  console.addListener('chatluna-sandbox/workspace', (input) => getWorkspace(input), { authority: 4 })
-  console.addListener('chatluna-sandbox/message-history', async (input) => (await resolveReadyControl(input, false)).getMessageHistory(assertInteractionInput(withoutSpaceId(input)) as GetMessageHistoryInput), { authority: 4 })
-  console.addListener('chatluna-sandbox/search-conversation-messages', async (input) => (
+  // Koishi 的 Events 映射规模较大，直接调用泛型 addListener 会让 TypeScript
+  // 展开整个事件联合并触发 TS2590；这里保留事件名约束，回调由各领域函数自身类型校验。
+  const registerListener = console.addListener.bind(console) as (
+    event: keyof ConsoleEventMap,
+    callback: (...args: any[]) => any,
+    options: { authority: number },
+  ) => unknown
+  const workspaceListener = (input?: SpaceScoped<GetSandboxWorkspaceInput>) => getWorkspace(input)
+  registerListener('chatluna-sandbox/workspace', workspaceListener, { authority: 4 })
+  registerListener('chatluna-sandbox/message-history', async (input) => (await resolveReadyControl(input, false)).getMessageHistory(assertInteractionInput(withoutSpaceId(input)) as GetMessageHistoryInput), { authority: 4 })
+  registerListener('chatluna-sandbox/search-conversation-messages', async (input) => (
     await resolveReadyControl(input, false)
   ).searchConversationMessages(assertInteractionInput(withoutSpaceId(input)) as SearchConversationMessagesInput), { authority: 4 })
-  console.addListener('chatluna-sandbox/send-message', async (input) => {
+  registerListener('chatluna-sandbox/send-message', async (input) => {
     // 消息同步落库后立即返回，机器人投递在后台继续；派发失败已写入调试记录与日志。
     const { delivery } = (await resolveReadyControl(input, true)).startMessageSend(assertInteractionInput(withoutSpaceId(input)) as SendMessageInput)
     delivery.catch(() => {})
     return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
-  console.addListener('chatluna-sandbox/send-media-message', async (input) => {
+  registerListener('chatluna-sandbox/send-media-message', async (input) => {
     const { delivery } = (await resolveReadyControl(input, true)).startMediaMessageSend(assertInteractionInput(withoutSpaceId(input)) as SendMediaMessageInput)
     delivery.catch(() => {})
     return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
-  console.addListener('chatluna-sandbox/send-forward-message', async (input) => {
+  registerListener('chatluna-sandbox/send-forward-message', async (input) => {
     // 合并转发领域路径会等待机器人投递，保证返回的工作区已包含外层 forward 卡片。
     await (await resolveReadyControl(input, true)).sendForwardMessage(assertInteractionInput(withoutSpaceId(input)) as SendForwardMessageInput)
     return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
-  console.addListener('chatluna-sandbox/get-forward-message', async (input) => (
+  registerListener('chatluna-sandbox/get-forward-message', async (input) => (
     await resolveReadyControl(input, false)
   ).getForwardMessage(assertInteractionInput(withoutSpaceId(input)) as GetForwardMessageInput), { authority: 4 })
-  console.addListener('chatluna-sandbox/recall-message', async (input) => {
+  registerListener('chatluna-sandbox/recall-message', async (input) => {
     await (await resolveReadyControl(input, true)).recallMessage(assertInteractionInput(withoutSpaceId(input)) as RecallMessageInput)
     return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
-  console.addListener('chatluna-sandbox/set-message-reaction', async (input) => {
+  registerListener('chatluna-sandbox/set-message-reaction', async (input) => {
     await (await resolveReadyControl(input, true)).setMessageReaction(assertInteractionInput(withoutSpaceId(input)) as SetMessageReactionInput)
     return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
-  console.addListener('chatluna-sandbox/media-content', async (input) => (await resolveReadyControl(input, false)).getMediaContent(assertInteractionInput(withoutSpaceId(input)) as GetMediaContentInput), { authority: 4 })
-  console.addListener('chatluna-sandbox/set-group-announcement', async (input) => {
+  registerListener('chatluna-sandbox/media-content', async (input) => (await resolveReadyControl(input, false)).getMediaContent(assertInteractionInput(withoutSpaceId(input)) as GetMediaContentInput), { authority: 4 })
+  registerListener('chatluna-sandbox/set-group-announcement', async (input) => {
     (await resolveReadyControl(input, true)).setGroupAnnouncement(assertInteractionInput(withoutSpaceId(input)) as SetGroupAnnouncementInput)
     return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
-  console.addListener('chatluna-sandbox/delete-group-announcement', async (input) => {
+  registerListener('chatluna-sandbox/delete-group-announcement', async (input) => {
     (await resolveReadyControl(input, true)).deleteGroupAnnouncement(assertInteractionInput(withoutSpaceId(input)) as DeleteGroupAnnouncementInput)
     return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
-  console.addListener('chatluna-sandbox/manage-environment', async (input) => {
+  registerListener('chatluna-sandbox/manage-environment', async (input) => {
     const activeControl = await resolveReadyControl(input, true)
     const command = assertEnvironmentInput(withoutSpaceId(input) as ManageSandboxEnvironmentInput)
     switch (command.action) {
@@ -354,15 +366,15 @@ export function registerConsole(
     }
     return getWorkspace({ spaceId: input.spaceId })
   }, { authority: 4 })
-  console.addListener('chatluna-sandbox/friend-action', async (input) => {
+  registerListener('chatluna-sandbox/friend-action', async (input) => {
     await (await resolveReadyControl(input, true)).performFriendAction(assertInteractionInput(withoutSpaceId(input)) as PerformFriendActionInput)
     return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
-  console.addListener('chatluna-sandbox/group-action', async (input) => {
+  registerListener('chatluna-sandbox/group-action', async (input) => {
     await (await resolveReadyControl(input, true)).performGroupAction(assertInteractionInput(withoutSpaceId(input)) as PerformGroupActionInput)
     return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
-  console.addListener('chatluna-sandbox/bot-deliveries', async (input = {}) => (await resolveReadyControl(input, false)).getBotDeliveries(assertInteractionInput(withoutSpaceId(input)) as GetSandboxBotDeliveriesInput), { authority: 4 })
+  registerListener('chatluna-sandbox/bot-deliveries', async (input = {}) => (await resolveReadyControl(input, false)).getBotDeliveries(assertInteractionInput(withoutSpaceId(input)) as GetSandboxBotDeliveriesInput), { authority: 4 })
   const requireUnattributedModelRequests = () => {
     if (!unattributedModelRequests) throw new Error('未归属模型请求库不可用')
     return unattributedModelRequests
@@ -451,36 +463,50 @@ export function registerConsole(
     }
     return { ...resolveModelRequestControl(input)!.getModelRequestRecord(input), source }
   }
+  const getModelRequestTrajectory = (input: ReadSandboxModelRequestTrajectoryInput): SandboxModelRequestTrajectory => {
+    const detail = getModelRequestRecord(input)
+    const store = input.scope === 'all'
+      ? detail.source.type === 'main'
+        ? control.getModelRequestStore()
+        : detail.source.type === 'test-space'
+          ? testSpaces?.getControl(detail.source.spaceId).getModelRequestStore()
+          : undefined
+      : input.scope === 'unattributed'
+        ? requireUnattributedModelRequests()
+        : resolveModelRequestControl(input)?.getModelRequestStore()
+    return buildSandboxModelRequestTrajectory({ record: detail, mode: input.mode, store })
+  }
   const clearModelRequestRecords = (input: SandboxModelRequestScope): ClearSandboxModelRequestRecordsResult => {
     if (input.scope === 'all') throw new Error('全部空间视图不支持一次性清理')
     if (input.scope === 'unattributed') return { cleared: requireUnattributedModelRequests().clear() }
     return { cleared: resolveModelRequestControl(input)!.clearModelRequestRecords() }
   }
 
-  console.addListener('chatluna-sandbox/debug-records', listDebugRecords, { authority: 4 })
-  console.addListener('chatluna-sandbox/debug-record', getDebugRecord, { authority: 4 })
-  console.addListener('chatluna-sandbox/clear-debug-records', clearDebugRecords, { authority: 4 })
-  console.addListener('chatluna-sandbox/model-request-records', listModelRequestRecords, { authority: 4 })
-  console.addListener('chatluna-sandbox/model-request-record', getModelRequestRecord, { authority: 4 })
-  console.addListener('chatluna-sandbox/clear-model-request-records', clearModelRequestRecords, { authority: 4 })
+  registerListener('chatluna-sandbox/debug-records', listDebugRecords, { authority: 4 })
+  registerListener('chatluna-sandbox/debug-record', getDebugRecord, { authority: 4 })
+  registerListener('chatluna-sandbox/clear-debug-records', clearDebugRecords, { authority: 4 })
+  registerListener('chatluna-sandbox/model-request-records', listModelRequestRecords, { authority: 4 })
+  registerListener('chatluna-sandbox/model-request-record', getModelRequestRecord, { authority: 4 })
+  registerListener('chatluna-sandbox/model-request-trajectory', getModelRequestTrajectory, { authority: 4 })
+  registerListener('chatluna-sandbox/clear-model-request-records', clearModelRequestRecords, { authority: 4 })
   if (mcp) {
-    console.addListener('chatluna-sandbox/mcp-credentials', () => mcp.listCredentials(), { authority: 4 })
-    console.addListener('chatluna-sandbox/create-mcp-credential', (input) => mcp.createCredential(input.name, input.scopes), { authority: 4 })
-    console.addListener('chatluna-sandbox/set-mcp-credential-enabled', (input) => mcp.setCredentialEnabled(input.id, input.enabled), { authority: 4 })
-    console.addListener('chatluna-sandbox/revoke-mcp-credential', (input) => mcp.revokeCredential(input.id), { authority: 4 })
+    registerListener('chatluna-sandbox/mcp-credentials', () => mcp.listCredentials(), { authority: 4 })
+    registerListener('chatluna-sandbox/create-mcp-credential', (input) => mcp.createCredential(input.name, input.scopes), { authority: 4 })
+    registerListener('chatluna-sandbox/set-mcp-credential-enabled', (input) => mcp.setCredentialEnabled(input.id, input.enabled), { authority: 4 })
+    registerListener('chatluna-sandbox/revoke-mcp-credential', (input) => mcp.revokeCredential(input.id), { authority: 4 })
   }
   if (testSpaces) {
-    console.addListener('chatluna-sandbox/test-spaces', () => testSpaces.listSpaces()
+    registerListener('chatluna-sandbox/test-spaces', () => testSpaces.listSpaces()
       .map((space) => ({ ...space, snapshot: trimSnapshotMessages(space.snapshot, 10) })), { authority: 4 })
-    console.addListener('chatluna-sandbox/create-test-space', ({ name }) => {
+    registerListener('chatluna-sandbox/create-test-space', ({ name }) => {
       const space = testSpaces.createSpace({ name })
       return testSpaces.takeOver(space.id)
     }, { authority: 4 })
-    console.addListener('chatluna-sandbox/take-over-test-space', ({ spaceId }) => testSpaces.takeOver(spaceId), { authority: 4 })
-    console.addListener('chatluna-sandbox/return-test-space', ({ spaceId }) => testSpaces.returnControl(spaceId), { authority: 4 })
-    console.addListener('chatluna-sandbox/terminate-test-space', ({ spaceId }) => testSpaces.terminateSpace(spaceId), { authority: 4 })
-    console.addListener('chatluna-sandbox/reactivate-test-space', ({ spaceId }) => testSpaces.reactivateSpace(spaceId), { authority: 4 })
-    console.addListener('chatluna-sandbox/delete-test-space', ({ spaceId }) => testSpaces.deleteSpace(spaceId), { authority: 4 })
+    registerListener('chatluna-sandbox/take-over-test-space', ({ spaceId }) => testSpaces.takeOver(spaceId), { authority: 4 })
+    registerListener('chatluna-sandbox/return-test-space', ({ spaceId }) => testSpaces.returnControl(spaceId), { authority: 4 })
+    registerListener('chatluna-sandbox/terminate-test-space', ({ spaceId }) => testSpaces.terminateSpace(spaceId), { authority: 4 })
+    registerListener('chatluna-sandbox/reactivate-test-space', ({ spaceId }) => testSpaces.reactivateSpace(spaceId), { authority: 4 })
+    registerListener('chatluna-sandbox/delete-test-space', ({ spaceId }) => testSpaces.deleteSpace(spaceId), { authority: 4 })
   }
 }
 
@@ -507,6 +533,7 @@ declare module '@koishijs/console' {
     'chatluna-sandbox/clear-debug-records'(input?: { spaceId?: string }): ClearSandboxOneBotDebugRecordsResult
     'chatluna-sandbox/model-request-records'(input: ListSandboxModelRequestRecordsInput): SandboxModelRequestRecordsPage<SandboxConsoleModelRequestListItem>
     'chatluna-sandbox/model-request-record'(input: ReadSandboxModelRequestRecordInput): SandboxConsoleModelRequestDetail
+    'chatluna-sandbox/model-request-trajectory'(input: ReadSandboxModelRequestTrajectoryInput): SandboxModelRequestTrajectory
     'chatluna-sandbox/clear-model-request-records'(input: SandboxModelRequestScope): ClearSandboxModelRequestRecordsResult
     'chatluna-sandbox/mcp-credentials'(): Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string }>
     'chatluna-sandbox/create-mcp-credential'(input: { name: string; scopes: SandboxMcpScope[] }): { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }

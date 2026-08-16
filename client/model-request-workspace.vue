@@ -190,6 +190,35 @@
               </span>
             </div>
           </header>
+          <section class="webqq-model-request-view-switch" aria-label="详情显示方式">
+            <Button
+              size="sm"
+              :variant="detailView === 'trajectory' ? 'secondary' : 'ghost'"
+              @click="detailView = 'trajectory'"
+            >
+              <IconTimelineEvent data-icon="inline-start" aria-hidden="true" />
+              轨迹
+            </Button>
+            <Button
+              size="sm"
+              :variant="detailView === 'evidence' ? 'secondary' : 'ghost'"
+              @click="detailView = 'evidence'"
+            >
+              <IconBraces data-icon="inline-start" aria-hidden="true" />
+              原始证据
+            </Button>
+          </section>
+
+          <ModelRequestTrajectory
+            v-if="detailView === 'trajectory'"
+            :trajectory="trajectory"
+            :mode="trajectoryMode"
+            :loading="detailLoading"
+            :conversation-available="Boolean(detail.entities.conversationId)"
+            @update:mode="setTrajectoryMode"
+            @open-request="openRelatedRequest"
+          />
+          <template v-else>
           <section class="webqq-model-request-overview" aria-label="请求概览">
             <header class="webqq-model-request-section-heading">
               <span>
@@ -411,6 +440,7 @@
               </template>
             </template>
           </section>
+          </template>
         </article>
       </section>
     </div>
@@ -454,6 +484,7 @@ import {
   IconRefresh,
   IconRoute,
   IconTools,
+  IconTimelineEvent,
   IconTopologyStar3,
   IconTrash,
   IconWorld,
@@ -468,6 +499,7 @@ import { Input } from './components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
 import ModelRequestJsonTree from './model-request-json-tree.vue'
+import ModelRequestTrajectory from './model-request-trajectory.vue'
 import ModelResponseContentPreview from './model-response-content-preview.vue'
 import WebqqAvatar from './webqq-avatar.vue'
 import { formatDuration } from './webqq/format-duration'
@@ -484,6 +516,7 @@ import {
   type ClearModelRequestRecordsQuery,
   type ModelRequestRecordQuery,
   type ModelRequestRecordsQuery,
+  type ModelRequestTrajectoryQuery,
 } from './webqq/model-request-query'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type {
@@ -491,12 +524,14 @@ import type {
   SandboxModelRequestScope,
   SandboxModelRequestListItem,
   SandboxModelRequestStatus,
+  SandboxModelRequestTrajectory,
   SandboxDirectoryBot,
 } from '../src/types'
 
 const props = defineProps<{
   records: readonly SandboxModelRequestListItem[]
   detail?: SandboxModelRequestDetail
+  trajectory?: SandboxModelRequestTrajectory
   spaces: readonly { id: string, name: string }[]
   bots: readonly SandboxDirectoryBot[]
   defaultSpaceId?: string
@@ -514,6 +549,7 @@ const emit = defineEmits<{
   query: [input: ModelRequestRecordsQuery]
   loadMore: [input: ModelRequestRecordsQuery]
   open: [input: ModelRequestRecordQuery]
+  trajectory: [input: ModelRequestTrajectoryQuery]
   clear: [input: ClearModelRequestRecordsQuery]
 }>()
 
@@ -526,6 +562,8 @@ const filterOpen = ref(false)
 const filterSelectPortalTarget = ref<HTMLElement>()
 const liveRefresh = ref(false)
 const selectedRecordId = ref('')
+const detailView = ref<'trajectory' | 'evidence'>('trajectory')
+const trajectoryMode = ref<'request' | 'conversation'>('request')
 const clearDialogOpen = ref(false)
 const clearStep = ref<1 | 2>(1)
 const bodyView = ref<'request' | 'response'>('request')
@@ -626,6 +664,7 @@ watch(() => props.detail?.id, () => {
   bodyView.value = 'request'
   responseView.value = 'content'
   headersExpanded.value = false
+  if (props.detail) requestTrajectory(trajectoryMode.value)
   resetCopyState()
 })
 
@@ -679,10 +718,32 @@ function toggleSortOrder() {
 function openRecord(recordId: string) {
   selectedRecordId.value = recordId
   const record = props.records.find(({ id }) => id === recordId)
-  emit('open', {
-    ...(record ? resolveRecordScope(record) : currentScope()),
-    recordId,
+  const scope = record ? resolveRecordScope(record) : currentScope()
+  emit('open', { ...scope, recordId })
+  emit('trajectory', { ...scope, recordId, mode: trajectoryMode.value })
+}
+
+function requestTrajectory(mode: 'request' | 'conversation') {
+  const detail = props.detail
+  if (!detail) return
+  emit('trajectory', {
+    ...resolveRecordScope(detail),
+    recordId: detail.id,
+    mode,
   })
+}
+
+function setTrajectoryMode(mode: 'request' | 'conversation') {
+  trajectoryMode.value = mode
+  requestTrajectory(mode)
+}
+
+function openRelatedRequest(recordId: string) {
+  selectedRecordId.value = recordId
+  const record = props.trajectory?.records.find(({ id }) => id === recordId)
+  const scope = record ? resolveRecordScope(record) : currentScope()
+  emit('open', { ...scope, recordId })
+  emit('trajectory', { ...scope, recordId, mode: trajectoryMode.value })
 }
 
 function resetFilters() {

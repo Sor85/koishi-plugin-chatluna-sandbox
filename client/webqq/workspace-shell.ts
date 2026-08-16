@@ -28,6 +28,7 @@ import type {
   ClearModelRequestRecordsQuery,
   ModelRequestRecordQuery,
   ModelRequestRecordsQuery,
+  ModelRequestTrajectoryQuery,
 } from './model-request-query'
 
 type WorkspaceController = ReturnType<typeof createWorkspaceController>
@@ -316,6 +317,7 @@ export function createWebqqWorkspaceShell(
     nextCursor: workspaceController.modelRequestRecordsPage.value.nextCursor,
     nextCreatedAt: workspaceController.modelRequestRecordsPage.value.nextCreatedAt,
     nextId: workspaceController.modelRequestRecordsPage.value.nextId,
+    trajectory: workspaceController.modelRequestTrajectory.value,
     loading: modelRequestLoading.value,
     detailLoading: modelRequestDetailLoading.value,
     error: modelRequestError.value,
@@ -572,6 +574,18 @@ export function createWebqqWorkspaceShell(
     }
   }
 
+  async function loadModelRequestTrajectory(input: ModelRequestTrajectoryQuery) {
+    modelRequestDetailLoading.value = true
+    modelRequestError.value = ''
+    try {
+      await workspaceController.loadModelRequestTrajectory(input)
+    } catch (error) {
+      modelRequestError.value = error instanceof Error ? error.message : '读取模型请求轨迹失败'
+    } finally {
+      modelRequestDetailLoading.value = false
+    }
+  }
+
   async function clearModelRequestRecords(input: ClearModelRequestRecordsQuery) {
     modelRequestLoading.value = true
     modelRequestError.value = ''
@@ -760,6 +774,7 @@ export function createWebqqWorkspaceShell(
     loadModelRequestRecords,
     loadMoreModelRequestRecords,
     loadModelRequestRecord,
+    loadModelRequestTrajectory,
     manageEnvironment,
     openComposerParticipantDialog,
     openEntityDialog,

@@ -60,6 +60,7 @@
           v-else-if="currentView === 'model-requests'"
           :records="modelRequestWorkspaceModel.records"
           :detail="modelRequestWorkspaceModel.detail"
+          :trajectory="modelRequestWorkspaceModel.trajectory"
           :spaces="modelRequestSpaces"
           :bots="modelRequestBots"
           :default-space-id="activeSpaceId ?? 'main'"
@@ -74,6 +75,7 @@
           @query="loadModelRequestRecords"
           @load-more="loadMoreModelRequestRecords"
           @open="loadModelRequestRecord"
+          @trajectory="loadModelRequestTrajectory"
           @clear="clearModelRequestRecords"
         />
         <WebqqChatPane
@@ -192,6 +194,7 @@ const {
   loadModelRequestRecords,
   loadMoreModelRequestRecords,
   loadModelRequestRecord,
+  loadModelRequestTrajectory,
   manageEnvironment,
   openComposerParticipantDialog,
   openEntityDialog,

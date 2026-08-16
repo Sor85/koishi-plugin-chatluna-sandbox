@@ -277,6 +277,19 @@ export class SandboxModelRequestStore {
     return record ? presentModelRequestRecord(record, 'detail') as SandboxModelRequestDetail : undefined
   }
 
+  getRawRecords(input: GetSandboxModelRequestRecordsInput = {}): SandboxModelRequestRecord[] {
+    const limit = Math.min(Math.max(Number(input.limit ?? MAX_MODEL_REQUEST_PAGE_SIZE) || MAX_MODEL_REQUEST_PAGE_SIZE, 1), MAX_MODEL_REQUEST_PAGE_SIZE)
+    return this.records.filter((record) => (
+      (!input.botId || record.entities.botId === input.botId)
+      && (!input.conversationId || record.entities.conversationId === input.conversationId)
+      && (!input.interactionId || record.interactionId === input.interactionId)
+      && (!input.model || record.model === input.model)
+      && (!input.errorsOnly || record.status === 'error')
+    )).sort((left, right) => compareModelRequestSequence(left.sequence, right.sequence, resolveModelRequestOrder(input)))
+      .slice(0, limit)
+      .map((record) => structuredClone(record))
+  }
+
   clear(): number {
     const count = this.records.length
     this.records = []

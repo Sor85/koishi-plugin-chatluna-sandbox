@@ -20,6 +20,7 @@ import type {
   SandboxMessage,
   SandboxModelRequestDetail,
   SandboxModelRequestListItem,
+  SandboxModelRequestTrajectory,
   SandboxParticipant,
   SandboxSnapshot,
   SandboxWorkspaceState,
@@ -42,6 +43,7 @@ import {
   type ModelRequestRecordQuery,
   type ModelRequestRecordsPageState,
   type ModelRequestRecordsQuery,
+  type ModelRequestTrajectoryQuery,
 } from './model-request-query'
 
 type WorkspaceStorage = {
@@ -139,6 +141,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   const oneBotDebugRecordsState = ref<SandboxConsoleOneBotDebugRecord[]>([])
   const modelRequestRecordsState = ref<SandboxModelRequestListItem[]>([])
   const modelRequestRecordState = ref<SandboxModelRequestDetail>()
+  const modelRequestTrajectoryState = ref<SandboxModelRequestTrajectory>()
   const modelRequestRecordsPageState = ref<ModelRequestRecordsPageState>({
     hasMore: false,
     capacity: emptyModelRequestCapacity,
@@ -563,11 +566,20 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     }
   }
 
+  async function loadModelRequestTrajectory(input: ModelRequestTrajectoryQuery) {
+    try {
+      modelRequestTrajectoryState.value = await port.getModelRequestTrajectory(input)
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '读取模型请求轨迹失败')
+    }
+  }
+
   async function clearModelRequestRecords(input: ClearModelRequestRecordsQuery) {
     try {
       await port.clearModelRequestRecords(input)
       modelRequestRecordsState.value = []
       modelRequestRecordState.value = undefined
+      modelRequestTrajectoryState.value = undefined
       modelRequestRecordsPageState.value = {
         hasMore: false,
         capacity: emptyModelRequestCapacity,
@@ -599,6 +611,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     oneBotDebugRecords: readonly(oneBotDebugRecordsState),
     modelRequestRecords: readonly(modelRequestRecordsState),
     modelRequestRecord: readonly(modelRequestRecordState),
+    modelRequestTrajectory: readonly(modelRequestTrajectoryState),
     modelRequestRecordsPage: readonly(modelRequestRecordsPageState),
     sidebar,
     chat,
@@ -613,6 +626,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     loadOneBotDebugRecords,
     loadModelRequestRecords,
     loadModelRequestRecord,
+    loadModelRequestTrajectory,
     manageEnvironment,
     notifySceneRevision,
     performFriendAction,

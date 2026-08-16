@@ -20,6 +20,7 @@ import type {
   SandboxMessageSearchResult,
   SandboxModelRequestDetail,
   SandboxModelRequestRecordsPage,
+  SandboxModelRequestTrajectory,
   SandboxOneBotDebugRecordsPage,
   SandboxWorkspaceState,
   SendForwardMessageInput,
@@ -32,6 +33,7 @@ import type {
   ClearModelRequestRecordsQuery,
   ModelRequestRecordQuery,
   ModelRequestRecordsQuery,
+  ModelRequestTrajectoryQuery,
 } from './model-request-query'
 import { emptyModelRequestRecordsPage } from './model-request-query'
 
@@ -76,6 +78,7 @@ export class FakeWorkspacePort implements WorkspacePort {
   clearDebugRecordsResult: ClearSandboxOneBotDebugRecordsResult = { cleared: 0 }
   modelRequestRecordsResult: SandboxModelRequestRecordsPage = emptyModelRequestRecordsPage
   modelRequestRecordResult?: SandboxModelRequestDetail
+  modelRequestTrajectoryResult?: SandboxModelRequestTrajectory
   clearModelRequestRecordsResult: ClearSandboxModelRequestRecordsResult = { cleared: 0 }
   private readonly failures = new Map<WorkspacePortOperation, unknown[]>()
 
@@ -176,6 +179,16 @@ export class FakeWorkspacePort implements WorkspacePort {
       requestBody: record && 'requestBody' in record ? record.requestBody : undefined,
       summary: record?.summary ?? { keys: 0, messageCount: 0, toolCount: 0, bodyAvailable: false },
     } as SandboxModelRequestDetail)
+  }
+
+  getModelRequestTrajectory(input: ModelRequestTrajectoryQuery) {
+    const trajectory = this.modelRequestTrajectoryResult ?? {
+      mode: input.mode,
+      records: [],
+      rows: [],
+      complete: true,
+    }
+    return this.invoke('getModelRequestTrajectory', input, trajectory)
   }
 
   clearModelRequestRecords(input: ClearModelRequestRecordsQuery) {

@@ -7,6 +7,7 @@ import type {
   SandboxModelRequestListItem,
   SandboxModelRequestRecordsPage,
   SandboxModelRequestScope,
+  SandboxModelRequestTrajectory,
 } from '../../src/types'
 
 export const MODEL_REQUEST_PAGE_SIZE = 50
@@ -14,6 +15,7 @@ export const MAIN_MODEL_REQUEST_SPACE_ID = 'main'
 
 export type ModelRequestRecordsQuery = GetSandboxModelRequestRecordsInput & SandboxModelRequestScope
 export type ModelRequestRecordQuery = GetSandboxModelRequestRecordInput & SandboxModelRequestScope
+export type ModelRequestTrajectoryQuery = GetSandboxModelRequestRecordInput & SandboxModelRequestScope & { mode: 'request' | 'conversation' }
 export type ClearModelRequestRecordsQuery = SandboxModelRequestScope
 
 export interface ModelRequestRecordsPageState {
@@ -72,4 +74,5 @@ export type {
   SandboxModelRequestListItem,
   SandboxModelRequestRecordsPage,
   SandboxModelRequestScope,
+  SandboxModelRequestTrajectory,
 }
