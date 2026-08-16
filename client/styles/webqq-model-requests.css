@@ -662,17 +662,19 @@
 }
 
 .webqq-model-trajectory-composition-tracks {
+  position: relative;
   padding-right: 6px;
   border-left: 1px solid var(--webqq-border);
 }
 
 .webqq-model-trajectory-composition-track {
-  display: flex;
-  align-items: center;
+  position: relative;
   min-width: 0;
 }
 
 .webqq-model-trajectory-composition-bar {
+  position: absolute;
+  top: 3px;
   min-width: 2px;
   height: 8px;
   padding: 0;
@@ -695,6 +697,11 @@
 
 .webqq-model-trajectory-composition-bar.is-tool-interaction {
   background: var(--webqq-trajectory-tool-interaction);
+}
+
+.webqq-model-trajectory-composition-bar.is-selected {
+  outline: 2px solid var(--webqq-surface);
+  box-shadow: 0 0 0 3px var(--webqq-text);
 }
 
 .webqq-model-trajectory-composition-empty {

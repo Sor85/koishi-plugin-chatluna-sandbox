@@ -67,11 +67,52 @@ describe('模型请求轨迹投影', () => {
       toolEvent: 'result',
     })
     expect(trajectory.rows.some(({ preview }) => preview.includes('北京今天晴朗'))).toBe(true)
+    expect(trajectory.promptComposition?.map(({ kind }) => kind)).toEqual([
+      'system',
+      'user',
+      'tool-definition',
+      'tool-interaction',
+      'tool-interaction',
+    ])
+    expect(trajectory.promptComposition?.[0]).toEqual({ kind: 'system', characters: 6 })
+    expect(trajectory.promptComposition?.[1]).toEqual({ kind: 'user', characters: 4 })
+    expect(trajectory.promptComposition?.[2]).toEqual({ kind: 'tool-definition', characters: 81 })
+    expect(
+      trajectory.promptComposition
+        ?.filter(({ kind }) => kind === 'tool-interaction')
+        .reduce((sum, item) => sum + item.characters, 0),
+    ).toBe(79)
+  })
+
+  it('按提示词出现顺序拆成多段，不把同类消息合并成一条轨道', () => {
+    const store = new SandboxModelRequestStore()
+    const record = store.append({
+      status: 'success',
+      durationMs: 10,
+      attribution: 'unattributed',
+      entities: {},
+      requestBodyAvailable: true,
+      requestBody: {
+        messages: [
+          { role: 'system', content: '系统' },
+          { role: 'user', content: '第一问' },
+          { role: 'assistant', content: '先答' },
+          { role: 'user', content: '第二问' },
+        ],
+      },
+      responseBodyStatus: 'unavailable',
+    })
+    const trajectory = buildSandboxModelRequestTrajectory({
+      record: store.getRecord(record.id)!,
+      mode: 'request',
+      store,
+    })
+
     expect(trajectory.promptComposition).toEqual([
-      { kind: 'system', characters: 6 },
-      { kind: 'user', characters: 4 },
-      { kind: 'tool-definition', characters: 81 },
-      { kind: 'tool-interaction', characters: 79 },
+      { kind: 'system', characters: 2 },
+      { kind: 'user', characters: 3 },
+      { kind: 'assistant', characters: 2 },
+      { kind: 'user', characters: 3 },
     ])
   })
 

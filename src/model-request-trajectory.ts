@@ -83,29 +83,32 @@ export function buildSandboxModelRequestTrajectory(
 
 function projectPromptComposition(body: unknown): SandboxModelRequestPromptCompositionItem[] {
   if (!isRecord(body)) return []
-  const sizes = new Map<SandboxModelRequestPromptKind, number>()
-  const add = (kind: SandboxModelRequestPromptKind, value: unknown) => {
+  const prefix: SandboxModelRequestPromptCompositionItem[] = []
+  const sequence: SandboxModelRequestPromptCompositionItem[] = []
+  const push = (
+    target: SandboxModelRequestPromptCompositionItem[],
+    kind: SandboxModelRequestPromptKind,
+    value: unknown,
+  ) => {
     const characters = serializedCharacters(value)
-    if (characters > 0) sizes.set(kind, (sizes.get(kind) ?? 0) + characters)
+    if (characters > 0) target.push({ kind, characters })
   }
 
-  add('tool-definition', body.tools)
-  add('tool-definition', body.functions)
-  add('system', body.system ?? body.systemInstruction ?? body.system_instruction)
+  push(prefix, 'system', body.system ?? body.systemInstruction ?? body.system_instruction)
 
   if (Array.isArray(body.messages)) {
     for (const message of body.messages) {
       if (!isRecord(message)) continue
       const role = stringValue(message.role)?.toLowerCase() ?? 'user'
       if (role === 'assistant') {
-        add('assistant', message.content)
-        add('tool-interaction', message.tool_calls ?? message.function_call)
+        push(sequence, 'assistant', message.content)
+        push(sequence, 'tool-interaction', message.tool_calls ?? message.function_call)
       } else if (role === 'tool' || role === 'function') {
-        add('tool-interaction', message.content ?? message)
+        push(sequence, 'tool-interaction', message.content ?? message)
       } else if (role === 'system' || role === 'developer') {
-        add('system', message.content ?? message)
+        push(sequence, 'system', message.content ?? message)
       } else {
-        add('user', message.content ?? message)
+        push(sequence, 'user', message.content ?? message)
       }
     }
   }
@@ -116,31 +119,41 @@ function projectPromptComposition(body: unknown): SandboxModelRequestPromptCompo
       const role: SandboxModelRequestPromptKind = content.role === 'model' ? 'assistant' : 'user'
       const parts = Array.isArray(content.parts) ? content.parts : []
       for (const part of parts) {
-        if (isRecord(part) && ('functionCall' in part || 'functionResponse' in part)) add('tool-interaction', part)
-        else add(role, part)
+        if (isRecord(part) && ('functionCall' in part || 'functionResponse' in part)) {
+          push(sequence, 'tool-interaction', part)
+        } else {
+          push(sequence, role, part)
+        }
       }
     }
   }
 
-  if (typeof body.input === 'string') add('user', body.input)
+  if (typeof body.input === 'string') push(sequence, 'user', body.input)
   else if (Array.isArray(body.input)) {
     for (const item of body.input) {
       if (!isRecord(item)) {
-        add('user', item)
+        push(sequence, 'user', item)
         continue
       }
       const role = stringValue(item.role)?.toLowerCase()
-      if (item.type === 'function_call' || item.type === 'function_call_output') add('tool-interaction', item)
-      else if (role === 'assistant') add('assistant', item.content ?? item)
-      else if (role === 'system' || role === 'developer') add('system', item.content ?? item)
-      else add('user', item.content ?? item)
+      if (item.type === 'function_call' || item.type === 'function_call_output') push(sequence, 'tool-interaction', item)
+      else if (role === 'assistant') push(sequence, 'assistant', item.content ?? item)
+      else if (role === 'system' || role === 'developer') push(sequence, 'system', item.content ?? item)
+      else push(sequence, 'user', item.content ?? item)
     }
   }
 
-  return (['system', 'user', 'assistant', 'tool-definition', 'tool-interaction'] as const).flatMap((kind) => {
-    const characters = sizes.get(kind) ?? 0
-    return characters > 0 ? [{ kind, characters }] : []
-  })
+  const tools: SandboxModelRequestPromptCompositionItem[] = []
+  const toolCharacters = serializedCharacters(body.tools) + serializedCharacters(body.functions)
+  if (toolCharacters > 0) tools.push({ kind: 'tool-definition', characters: toolCharacters })
+
+  // 工具声明不是对话轮次，但属于请求前缀。插在 leading system/user 之后，
+  // 让单请求轨道按 System → User → Tool Defs 顺序铺开，而不是每种各从 0 起一条。
+  let split = 0
+  while (split < sequence.length && (sequence[split].kind === 'system' || sequence[split].kind === 'user')) {
+    split += 1
+  }
+  return [...prefix, ...sequence.slice(0, split), ...tools, ...sequence.slice(split)]
 }
 
 function serializedCharacters(value: unknown): number {

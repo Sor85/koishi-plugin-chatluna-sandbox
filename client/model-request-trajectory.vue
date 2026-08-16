@@ -75,36 +75,39 @@
 
       <TooltipProvider :delay-duration="500">
         <section
-          v-if="mode === 'request'"
+          v-if="mode === 'request' && compositionTracks.length"
           class="webqq-model-trajectory-composition"
-          :style="{ minHeight: `${Math.max(50, promptComposition.length * 14 + 8)}px` }"
+          :style="{ minHeight: `${Math.max(50, compositionTracks.length * 14 + 8)}px` }"
           aria-label="请求体提示词内容占比"
         >
           <div class="webqq-model-trajectory-composition-labels" aria-hidden="true">
-            <span v-for="item in promptComposition" :key="item.kind">{{ promptKindLabel(item.kind) }}</span>
+            <span v-for="track in compositionTracks" :key="track.kind">{{ promptKindLabel(track.kind) }}</span>
           </div>
           <div class="webqq-model-trajectory-composition-tracks">
-            <div v-for="item in promptComposition" :key="item.kind" class="webqq-model-trajectory-composition-track">
-              <Tooltip>
+            <div v-for="track in compositionTracks" :key="track.kind" class="webqq-model-trajectory-composition-track">
+              <Tooltip v-for="segment in track.segments" :key="segment.id">
                 <TooltipTrigger as-child>
                   <button
                     type="button"
                     class="webqq-model-trajectory-composition-bar"
-                    :class="promptBarClass(item.kind)"
-                    :style="{ width: `${item.percentage}%` }"
-                    :aria-label="`${promptKindLabel(item.kind)} 占请求体提示内容的 ${formatPercentage(item.percentage)}`"
-                    @click="selectFirstPromptRow(item.kind)"
+                    :class="[
+                      promptBarClass(segment.kind),
+                      { 'is-selected': isCompositionSegmentSelected(segment) },
+                    ]"
+                    :style="{ left: `${segment.left}%`, width: `${segment.width}%` }"
+                    :aria-label="`${promptKindLabel(segment.kind)} 占请求体提示内容的 ${formatPercentage(segment.percentage)}`"
+                    @click="selectPromptSegment(segment)"
                   />
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  <strong>{{ promptKindLabel(item.kind) }} · {{ formatPercentage(item.percentage) }}</strong>
-                  <span>{{ item.characters.toLocaleString('zh-CN') }} 个序列化字符</span>
+                  <strong>{{ promptKindLabel(segment.kind) }} · {{ formatPercentage(segment.percentage) }}</strong>
+                  <span>{{ segment.characters.toLocaleString('zh-CN') }} 个序列化字符</span>
                 </TooltipContent>
               </Tooltip>
             </div>
           </div>
         </section>
-        <div v-if="mode === 'request' && !promptComposition.length" class="webqq-model-trajectory-composition-empty">
+        <div v-else-if="mode === 'request'" class="webqq-model-trajectory-composition-empty">
           当前请求体没有可统计的提示词内容
         </div>
 
@@ -307,6 +310,30 @@ const promptComposition = computed(() => {
     percentage: (item.characters / total) * 100,
   }))
 })
+const compositionTracks = computed(() => {
+  let offset = 0
+  const seen: Partial<Record<SandboxModelRequestPromptKind, number>> = {}
+  const segments = promptComposition.value.map((item, index) => {
+    const left = offset
+    offset += item.percentage
+    const indexInKind = seen[item.kind] ?? 0
+    seen[item.kind] = indexInKind + 1
+    const gap = index < promptComposition.value.length - 1 ? 0.35 : 0
+    return {
+      id: `${item.kind}:${index}`,
+      kind: item.kind,
+      characters: item.characters,
+      percentage: item.percentage,
+      left,
+      width: Math.min(Math.max(item.percentage - gap, 0.35), Math.max(100 - left, 0.35)),
+      indexInKind,
+    }
+  })
+  return (['system', 'user', 'assistant', 'tool-definition', 'tool-interaction'] as const).flatMap((kind) => {
+    const kindSegments = segments.filter((segment) => segment.kind === kind)
+    return kindSegments.length ? [{ kind, segments: kindSegments }] : []
+  })
+})
 const ledgerRows = computed(() => props.trajectory?.rows.filter((row) => {
   if (requestsCollapsed.value && row.kind !== 'request') return false
   if (toolsCollapsed.value && row.kind === 'tool') return false
@@ -388,13 +415,24 @@ function selectRow(rowId: string) {
   selectedRowId.value = rowId
 }
 
-function selectFirstPromptRow(kind: SandboxModelRequestPromptKind) {
-  const row = props.trajectory?.rows.find((candidate) => {
+function promptRowsForKind(kind: SandboxModelRequestPromptKind) {
+  return (props.trajectory?.rows ?? []).filter((candidate) => {
     if (kind === 'tool-definition') return candidate.kind === 'tool' && candidate.toolEvent === 'definition'
     if (kind === 'tool-interaction') return candidate.kind === 'tool' && candidate.toolEvent !== 'definition'
     return candidate.kind === kind
   })
+}
+
+function selectPromptSegment(segment: { kind: SandboxModelRequestPromptKind, indexInKind: number }) {
+  const row = promptRowsForKind(segment.kind)[segment.indexInKind] ?? promptRowsForKind(segment.kind)[0]
   if (row) selectedRowId.value = row.id
+}
+
+function isCompositionSegmentSelected(segment: { kind: SandboxModelRequestPromptKind, indexInKind: number }) {
+  const selected = selectedRow.value
+  if (!selected) return false
+  const rows = promptRowsForKind(segment.kind)
+  return rows[segment.indexInKind]?.id === selected.id
 }
 
 function promptKindLabel(kind: SandboxModelRequestPromptKind) {
