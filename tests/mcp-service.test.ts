@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { App, h } from '@koishijs/core'
@@ -26,11 +26,12 @@ afterEach(async () => {
 })
 
 describe('SandboxMcpService', () => {
-  it('只持久化凭证摘要并按权限发现工具', () => {
+  it('持久化明文 Token 供控制台再次查看，并按权限发现工具', () => {
     const { service, credential, directory } = createService()
 
     expect(credential.token).toMatch(/^[A-Za-z0-9_-]{43}$/)
     expect(service.authenticate(credential.token)?.name).toBe('测试凭证')
+    expect(service.getCredential(credential.id).token).toBe(credential.token)
     expect(service.listTools(credential.token).map(({ name }) => name)).toEqual([
       'get_server_info',
       'list_test_spaces',
@@ -43,7 +44,59 @@ describe('SandboxMcpService', () => {
       'get_capability_matrix',
       'export_scene',
     ])
-    expect(readFileSync(join(directory, 'mcp-credentials.json'), 'utf8')).not.toContain(credential.token)
+    expect(readFileSync(join(directory, 'mcp-credentials.json'), 'utf8')).toContain(credential.token)
+    expect(service.listCredentials()[0]).not.toHaveProperty('tokenDigest')
+  })
+
+  it('允许查看并修改已创建凭证的名称、权限和 Token', () => {
+    const { service, credential, directory, control } = createService(['read'])
+
+    expect(service.getCredential(credential.id)).toMatchObject({
+      id: credential.id,
+      name: '测试凭证',
+      scopes: ['read'],
+      enabled: true,
+      token: credential.token,
+    })
+    expect(service.listCredentials()[0]).not.toHaveProperty('tokenDigest')
+
+    const updated = service.updateCredential(credential.id, { name: '联调凭证', scopes: ['read', 'debug'] })
+    expect(updated).toMatchObject({ id: credential.id, name: '联调凭证', scopes: ['read', 'debug'], token: credential.token })
+    expect(service.authenticate(credential.token)?.name).toBe('联调凭证')
+    expect(service.listTools(credential.token).map(({ name }) => name)).toContain('list_onebot_debug_records')
+
+    const reloaded = new SandboxMcpService(control, { dataDirectory: directory })
+    expect(reloaded.getCredential(credential.id)).toMatchObject({ name: '联调凭证', scopes: ['read', 'debug'], token: credential.token })
+    expect(readFileSync(join(directory, 'mcp-credentials.json'), 'utf8')).toContain(credential.token)
+    expect(() => service.updateCredential('missing', { name: 'x' })).toThrow(/凭证不存在/)
+    expect(() => service.updateCredential(credential.id, { name: '  ' })).toThrow(/凭证名称/)
+    expect(() => service.updateCredential(credential.id, { scopes: [] })).toThrow(/至少选择一项有效权限/)
+  })
+
+  it('保留只有摘要的旧凭证，并允许重新生成可查看的 Token', () => {
+    const { directory, control, service, credential } = createService(['read'])
+    writeFileSync(join(directory, 'mcp-credentials.json'), `${JSON.stringify([{
+      id: 'legacy-credential',
+      name: '旧摘要凭证',
+      scopes: ['read'],
+      enabled: true,
+      tokenDigest: 'abc',
+      createdAt: new Date().toISOString(),
+    }], null, 2)}\n`)
+
+    const reloaded = new SandboxMcpService(control, { dataDirectory: directory })
+    expect(reloaded.listCredentials()).toEqual([expect.objectContaining({
+      id: 'legacy-credential',
+      name: '旧摘要凭证',
+    })])
+    expect(reloaded.listCredentials()[0]).not.toHaveProperty('token')
+
+    const rotated = service.rotateCredentialToken(credential.id)
+    expect(rotated.token).toMatch(/^[A-Za-z0-9_-]{43}$/)
+    expect(rotated.token).not.toBe(credential.token)
+    expect(service.authenticate(credential.token)).toBeUndefined()
+    expect(service.authenticate(rotated.token)?.id).toBe(credential.id)
+    expect(service.getCredential(credential.id).token).toBe(rotated.token)
   })
 
   it('只读工具返回共享场景且拒绝越权调用', async () => {

@@ -76,8 +76,10 @@ declare module '@koishijs/client' {
   export function send(event: 'chatluna-sandbox/model-request-record', input: GetSandboxModelRequestRecordInput & SandboxModelRequestScope): Promise<SandboxModelRequestDetail>
   export function send(event: 'chatluna-sandbox/model-request-trajectory', input: GetSandboxModelRequestRecordInput & SandboxModelRequestScope & { mode: 'request' | 'conversation' }): Promise<SandboxModelRequestTrajectory>
   export function send(event: 'chatluna-sandbox/clear-model-request-records', input: SandboxModelRequestScope): Promise<ClearSandboxModelRequestRecordsResult>
-  export function send(event: 'chatluna-sandbox/mcp-credentials'): Promise<Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string }>>
+  export function send(event: 'chatluna-sandbox/mcp-credentials'): Promise<Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }>>
   export function send(event: 'chatluna-sandbox/create-mcp-credential', input: { name: string; scopes: SandboxMcpScope[] }): Promise<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }>
+  export function send(event: 'chatluna-sandbox/update-mcp-credential', input: { id: string; name?: string; scopes?: SandboxMcpScope[] }): Promise<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }>
+  export function send(event: 'chatluna-sandbox/rotate-mcp-credential-token', input: { id: string }): Promise<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }>
   export function send(event: 'chatluna-sandbox/set-mcp-credential-enabled', input: { id: string; enabled: boolean }): Promise<void>
   export function send(event: 'chatluna-sandbox/revoke-mcp-credential', input: { id: string }): Promise<void>
   export function send(event: 'chatluna-sandbox/test-spaces'): Promise<SandboxTestSpaceSummary[]>

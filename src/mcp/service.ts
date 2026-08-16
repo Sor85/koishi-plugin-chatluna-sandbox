@@ -583,8 +583,49 @@ const READ_RESOURCES = [
   { uri: 'chatluna-sandbox://examples', name: '工具调用示例' },
 ]
 
+const ALL_SCOPES: SandboxMcpScope[] = ['read', 'interact', 'manage', 'debug']
+
 function digestToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
+}
+
+function isSandboxMcpScope(value: unknown): value is SandboxMcpScope {
+  return typeof value === 'string' && ALL_SCOPES.includes(value as SandboxMcpScope)
+}
+
+function normalizeScopes(scopes: unknown, fallback?: SandboxMcpScope[]): SandboxMcpScope[] {
+  const source = Array.isArray(scopes) ? scopes : []
+  const normalized = [...new Set(source.filter(isSandboxMcpScope))]
+  if (normalized.length) return normalized
+  if (fallback?.length) return [...fallback]
+  throw new SandboxMcpError('invalid_arguments', '至少选择一项有效权限')
+}
+
+function toPublicCredential(credential: SandboxMcpCredential): Omit<SandboxMcpCredential, 'tokenDigest'> {
+  const { tokenDigest: _tokenDigest, ...publicCredential } = credential
+  return structuredClone(publicCredential)
+}
+
+function toCreatedCredential(credential: SandboxMcpCredential): SandboxMcpCreatedCredential {
+  if (!credential.token) throw new SandboxMcpError('internal_error', '凭证缺少明文 Token')
+  return { ...toPublicCredential(credential), token: credential.token }
+}
+
+function normalizeStoredCredential(value: unknown): SandboxMcpCredential | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const record = value as Record<string, unknown>
+  if (typeof record.id !== 'string' || typeof record.name !== 'string' || typeof record.tokenDigest !== 'string' || typeof record.createdAt !== 'string') return undefined
+  if (!Array.isArray(record.scopes)) return undefined
+  return {
+    id: record.id,
+    name: record.name,
+    scopes: normalizeScopes(record.scopes, ['read']),
+    enabled: record.enabled !== false,
+    // 旧记录只有摘要，明文无法恢复；新记录必须带 token，供控制台再次查看。
+    ...(typeof record.token === 'string' && record.token ? { token: record.token } : {}),
+    tokenDigest: record.tokenDigest,
+    createdAt: record.createdAt,
+  }
 }
 
 function stableValue(value: unknown): string {
@@ -693,23 +734,44 @@ export class SandboxMcpService {
     const credential: SandboxMcpCredential = {
       id: randomUUID(),
       name: normalizedName,
-      scopes: [...new Set<SandboxMcpScope>(scopes.length ? scopes : ['read'])],
+      scopes: normalizeScopes(scopes, ['read']),
       enabled: true,
+      token,
       tokenDigest: digestToken(token),
       createdAt: new Date().toISOString(),
     }
     this.credentials.push(credential)
     this.saveCredentials()
-    return { id: credential.id, name: credential.name, scopes: credential.scopes, enabled: true, createdAt: credential.createdAt, token }
+    return toCreatedCredential(credential)
   }
 
   listCredentials(): Array<Omit<SandboxMcpCredential, 'tokenDigest'>> {
-    return structuredClone(this.credentials.map(({ tokenDigest: _tokenDigest, ...credential }) => credential))
+    return this.credentials.map((credential) => toPublicCredential(credential))
+  }
+
+  getCredential(id: string): Omit<SandboxMcpCredential, 'tokenDigest'> {
+    return toPublicCredential(this.requireStoredCredential(id))
+  }
+
+  updateCredential(id: string, input: { name?: string; scopes?: SandboxMcpScope[] }): Omit<SandboxMcpCredential, 'tokenDigest'> {
+    const credential = this.requireStoredCredential(id)
+    if (input.name !== undefined) credential.name = requireString(input.name, '凭证名称')
+    if (input.scopes !== undefined) credential.scopes = normalizeScopes(input.scopes)
+    this.saveCredentials()
+    return toPublicCredential(credential)
+  }
+
+  rotateCredentialToken(id: string): SandboxMcpCreatedCredential {
+    const credential = this.requireStoredCredential(id)
+    const token = randomBytes(32).toString('base64url')
+    credential.token = token
+    credential.tokenDigest = digestToken(token)
+    this.saveCredentials()
+    return toCreatedCredential(credential)
   }
 
   setCredentialEnabled(id: string, enabled: boolean): void {
-    const credential = this.credentials.find((item) => item.id === id)
-    if (!credential) throw new SandboxMcpError('credential_not_found', `凭证不存在：${id}`)
+    const credential = this.requireStoredCredential(id)
     credential.enabled = enabled
     this.saveCredentials()
   }
@@ -1486,6 +1548,12 @@ export class SandboxMcpService {
     this.confirmations.clear()
   }
 
+  private requireStoredCredential(id: string): SandboxMcpCredential {
+    const credential = this.credentials.find((item) => item.id === id)
+    if (!credential) throw new SandboxMcpError('credential_not_found', `凭证不存在：${id}`)
+    return credential
+  }
+
   private requireCredential(token: string) {
     const credential = this.authenticate(token)
     if (!credential) throw new SandboxMcpError('unauthorized', 'Bearer 凭证无效或已禁用')
@@ -1531,7 +1599,12 @@ export class SandboxMcpService {
   private loadCredentials() {
     try {
       const credentials = JSON.parse(readFileSync(this.credentialFile, 'utf8'))
-      this.credentials = Array.isArray(credentials) ? credentials : []
+      this.credentials = Array.isArray(credentials)
+        ? credentials.flatMap((item) => {
+          const credential = normalizeStoredCredential(item)
+          return credential ? [credential] : []
+        })
+        : []
     } catch {
       // 凭证存储损坏时必须安全地回到“无有效凭证”，不能让可选 MCP 能力阻断 WebQQ。
       this.credentials = []

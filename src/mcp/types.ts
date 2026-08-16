@@ -7,11 +7,14 @@ export interface SandboxMcpCredential {
   name: string
   scopes: SandboxMcpScope[]
   enabled: boolean
+  token?: string
   tokenDigest: string
   createdAt: string
 }
 
-export interface SandboxMcpCreatedCredential extends Omit<SandboxMcpCredential, 'tokenDigest'> {
+export type SandboxMcpPublicCredential = Omit<SandboxMcpCredential, 'tokenDigest'>
+
+export interface SandboxMcpCreatedCredential extends SandboxMcpPublicCredential {
   token: string
 }
 

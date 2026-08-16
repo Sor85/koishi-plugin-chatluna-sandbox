@@ -195,4 +195,22 @@ describe('环境管理组件传输边界', () => {
     expect(solidSurfaceRule).toContain('border-color: var(--webqq-secondary-outline)')
     expect(solidSurfaceRule).toContain('box-shadow: var(--webqq-secondary-shadow)')
   })
+
+  it('已创建的 MCP 凭证可以查看并修改名称和权限', () => {
+    const source = readFileSync(resolve('client/mcp-credential-manager.vue'), 'utf8')
+    const shim = readFileSync(resolve('client/koishi-client-shim.d.ts'), 'utf8')
+
+    expect(source).toContain('openEdit(credential)')
+    expect(source).toContain('查看 MCP 凭证')
+    expect(source).toContain('可查看 Token，并修改名称和权限范围。')
+    expect(source).toContain('class="credential-token"')
+    expect(source).toContain('editing.token')
+    expect(source).toContain("send('chatluna-sandbox/rotate-mcp-credential-token'")
+    expect(source).toContain("send('chatluna-sandbox/update-mcp-credential'")
+    expect(source).toContain('{{ editing ? \'保存\' : \'创建\' }}')
+    expect(source).not.toContain('createOpen')
+    expect(source).not.toContain('明文 Token 无法再次查看')
+    expect(shim).toContain("'chatluna-sandbox/update-mcp-credential'")
+    expect(shim).toContain("'chatluna-sandbox/rotate-mcp-credential-token'")
+  })
 })

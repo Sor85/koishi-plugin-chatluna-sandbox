@@ -83,8 +83,10 @@ interface ConsoleEventMap {
   'chatluna-sandbox/model-request-record': (input: ReadSandboxModelRequestRecordInput) => SandboxConsoleModelRequestDetail
   'chatluna-sandbox/model-request-trajectory': (input: ReadSandboxModelRequestTrajectoryInput) => SandboxModelRequestTrajectory
   'chatluna-sandbox/clear-model-request-records': (input: SandboxModelRequestScope) => ClearSandboxModelRequestRecordsResult
-  'chatluna-sandbox/mcp-credentials': () => Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string }>
+  'chatluna-sandbox/mcp-credentials': () => Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }>
   'chatluna-sandbox/create-mcp-credential': (input: { name: string; scopes: SandboxMcpScope[] }) => { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
+  'chatluna-sandbox/update-mcp-credential': (input: { id: string; name?: string; scopes?: SandboxMcpScope[] }) => { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }
+  'chatluna-sandbox/rotate-mcp-credential-token': (input: { id: string }) => { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
   'chatluna-sandbox/set-mcp-credential-enabled': (input: { id: string; enabled: boolean }) => void
   'chatluna-sandbox/revoke-mcp-credential': (input: { id: string }) => void
   'chatluna-sandbox/test-spaces': () => SandboxTestSpaceSummary[]
@@ -492,6 +494,8 @@ export function registerConsole(
   if (mcp) {
     registerListener('chatluna-sandbox/mcp-credentials', () => mcp.listCredentials(), { authority: 4 })
     registerListener('chatluna-sandbox/create-mcp-credential', (input) => mcp.createCredential(input.name, input.scopes), { authority: 4 })
+    registerListener('chatluna-sandbox/update-mcp-credential', (input) => mcp.updateCredential(input.id, input), { authority: 4 })
+    registerListener('chatluna-sandbox/rotate-mcp-credential-token', (input) => mcp.rotateCredentialToken(input.id), { authority: 4 })
     registerListener('chatluna-sandbox/set-mcp-credential-enabled', (input) => mcp.setCredentialEnabled(input.id, input.enabled), { authority: 4 })
     registerListener('chatluna-sandbox/revoke-mcp-credential', (input) => mcp.revokeCredential(input.id), { authority: 4 })
   }
@@ -535,8 +539,10 @@ declare module '@koishijs/console' {
     'chatluna-sandbox/model-request-record'(input: ReadSandboxModelRequestRecordInput): SandboxConsoleModelRequestDetail
     'chatluna-sandbox/model-request-trajectory'(input: ReadSandboxModelRequestTrajectoryInput): SandboxModelRequestTrajectory
     'chatluna-sandbox/clear-model-request-records'(input: SandboxModelRequestScope): ClearSandboxModelRequestRecordsResult
-    'chatluna-sandbox/mcp-credentials'(): Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string }>
+    'chatluna-sandbox/mcp-credentials'(): Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }>
     'chatluna-sandbox/create-mcp-credential'(input: { name: string; scopes: SandboxMcpScope[] }): { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
+    'chatluna-sandbox/update-mcp-credential'(input: { id: string; name?: string; scopes?: SandboxMcpScope[] }): { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }
+    'chatluna-sandbox/rotate-mcp-credential-token'(input: { id: string }): { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
     'chatluna-sandbox/set-mcp-credential-enabled'(input: { id: string; enabled: boolean }): void
     'chatluna-sandbox/revoke-mcp-credential'(input: { id: string }): void
     'chatluna-sandbox/test-spaces'(): SandboxTestSpaceSummary[]

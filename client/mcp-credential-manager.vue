@@ -1,15 +1,16 @@
 <template>
   <section v-webqq-scrollbar class="credential-list">
     <header class="credential-toolbar">
-      <p>Token 仅在创建成功后展示一次，服务端只保存 SHA-256 摘要。</p>
-      <Button size="sm" @click="createOpen = true"><IconPlus />创建凭证</Button>
+      <p>已创建的凭证可以再次查看 Token，并修改名称和权限。调用记录和日志不会输出明文。</p>
+      <Button size="sm" @click="openCreate"><IconPlus />创建凭证</Button>
     </header>
     <article v-for="credential in credentials" :key="credential.id" class="credential-card">
-      <div>
+      <button type="button" class="credential-summary" @click="openEdit(credential)">
         <strong>{{ credential.name }}</strong>
-        <small>{{ credential.scopes.join(' · ') }} · {{ credential.enabled ? '已启用' : '已停用' }}</small>
-      </div>
+        <small>{{ formatScopes(credential.scopes) }} · {{ credential.enabled ? '已启用' : '已停用' }} · {{ formatTime(credential.createdAt) }}</small>
+      </button>
       <div class="credential-actions">
+        <Button size="sm" variant="outline" @click="openEdit(credential)">查看</Button>
         <Button size="sm" variant="outline" @click="toggleCredential(credential)">{{ credential.enabled ? '停用' : '启用' }}</Button>
         <Button size="sm" variant="destructive" @click="revokeCredential(credential.id)">撤销</Button>
       </div>
@@ -17,23 +18,38 @@
     <p v-if="!credentials.length" class="credential-empty">尚未创建 MCP 测试凭证。</p>
   </section>
 
-  <Dialog v-model:open="createOpen">
+  <Dialog v-model:open="formOpen">
     <DialogContent>
-      <DialogHeader><DialogTitle>创建 MCP 凭证</DialogTitle><DialogDescription>选择最小必要权限。Token 关闭后无法再次查看。</DialogDescription></DialogHeader>
+      <DialogHeader>
+        <DialogTitle>{{ editing ? '查看 MCP 凭证' : '创建 MCP 凭证' }}</DialogTitle>
+        <DialogDescription>{{ editing ? '可查看 Token，并修改名称和权限范围。' : '选择最小必要权限。创建后仍可再次查看 Token。' }}</DialogDescription>
+      </DialogHeader>
       <Label for="mcp-credential-name">凭证名称</Label>
       <Input id="mcp-credential-name" v-model="name" autocomplete="off" />
       <fieldset class="scope-grid">
         <legend>权限范围</legend>
         <label v-for="scope in allScopes" :key="scope.value"><Checkbox :model-value="scopes.includes(scope.value)" @update:model-value="toggleScope(scope.value, $event === true)" />{{ scope.label }}</label>
       </fieldset>
+      <template v-if="editing">
+        <div class="credential-token-field">
+          <Label>Token</Label>
+          <code v-if="editing.token" class="credential-token">{{ editing.token }}</code>
+          <p v-else class="credential-meta">此凭证创建时未保存明文，无法再次查看。重新生成后可查看，旧 Token 会立即失效。</p>
+          <Button size="sm" variant="outline" :disabled="saving" @click="rotateToken">{{ editing.token ? '重新生成 Token' : '生成可查看的 Token' }}</Button>
+        </div>
+        <p class="credential-meta">创建于 {{ formatTime(editing.createdAt) }} · {{ editing.enabled ? '已启用' : '已停用' }}</p>
+      </template>
       <p v-if="error" class="credential-error">{{ error }}</p>
-      <DialogFooter><Button variant="outline" @click="createOpen = false">取消</Button><Button :disabled="creating" @click="createCredential">创建</Button></DialogFooter>
+      <DialogFooter>
+        <Button variant="outline" @click="formOpen = false">取消</Button>
+        <Button :disabled="saving" @click="submitForm">{{ editing ? '保存' : '创建' }}</Button>
+      </DialogFooter>
     </DialogContent>
   </Dialog>
 
   <Dialog v-model:open="tokenOpen">
     <DialogContent>
-      <DialogHeader><DialogTitle>保存 MCP Token</DialogTitle><DialogDescription>这是唯一一次明文展示，请立即复制到测试控制器。</DialogDescription></DialogHeader>
+      <DialogHeader><DialogTitle>保存 MCP Token</DialogTitle><DialogDescription>请复制到测试控制器。之后仍可在凭证详情中再次查看。</DialogDescription></DialogHeader>
       <Input :model-value="createdToken" readonly />
       <DialogFooter><Button @click="tokenOpen = false">我已保存</Button></DialogFooter>
     </DialogContent>
@@ -52,11 +68,12 @@ import { Label } from './components/ui/label'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type { SandboxMcpScope } from '../src/mcp/types'
 
-type Credential = { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string }
+type Credential = { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }
 const credentials = ref<Credential[]>([])
-const createOpen = ref(false)
+const formOpen = ref(false)
 const tokenOpen = ref(false)
-const creating = ref(false)
+const saving = ref(false)
+const editing = ref<Credential | null>(null)
 const name = ref('')
 const scopes = ref<SandboxMcpScope[]>(['read'])
 const createdToken = ref('')
@@ -69,20 +86,74 @@ const allScopes = [
 ]
 
 async function refresh() { credentials.value = await send('chatluna-sandbox/mcp-credentials') }
-function toggleScope(scope: SandboxMcpScope, enabled: boolean) { scopes.value = enabled ? [...new Set([...scopes.value, scope])] : scopes.value.filter((item) => item !== scope) }
-async function createCredential() {
+function formatScopes(values: SandboxMcpScope[]) {
+  return values.map((scope) => allScopes.find((item) => item.value === scope)?.label ?? scope).join(' · ')
+}
+function formatTime(value: string) {
+  return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
+}
+function resetForm() {
+  name.value = ''
+  scopes.value = ['read']
   error.value = ''
-  if (!name.value.trim() || !scopes.value.length) { error.value = '请填写名称并至少选择一项权限。'; return }
-  creating.value = true
+}
+function openCreate() {
+  editing.value = null
+  resetForm()
+  formOpen.value = true
+}
+function openEdit(credential: Credential) {
+  editing.value = credential
+  name.value = credential.name
+  scopes.value = [...credential.scopes]
+  error.value = ''
+  formOpen.value = true
+}
+function toggleScope(scope: SandboxMcpScope, enabled: boolean) { scopes.value = enabled ? [...new Set([...scopes.value, scope])] : scopes.value.filter((item) => item !== scope) }
+function validateForm() {
+  error.value = ''
+  if (!name.value.trim() || !scopes.value.length) {
+    error.value = '请填写名称并至少选择一项权限。'
+    return false
+  }
+  return true
+}
+async function submitForm() {
+  if (editing.value) await saveCredential()
+  else await createCredential()
+}
+async function createCredential() {
+  if (!validateForm()) return
+  saving.value = true
   try {
     const result = await send('chatluna-sandbox/create-mcp-credential', { name: name.value, scopes: scopes.value })
     createdToken.value = result.token
-    name.value = ''
-    scopes.value = ['read']
-    createOpen.value = false
+    resetForm()
+    formOpen.value = false
     tokenOpen.value = true
     await refresh()
-  } catch (cause) { error.value = cause instanceof Error ? cause.message : '创建凭证失败' } finally { creating.value = false }
+  } catch (cause) { error.value = cause instanceof Error ? cause.message : '创建凭证失败' } finally { saving.value = false }
+}
+async function saveCredential() {
+  if (!editing.value || !validateForm()) return
+  saving.value = true
+  try {
+    await send('chatluna-sandbox/update-mcp-credential', { id: editing.value.id, name: name.value, scopes: scopes.value })
+    formOpen.value = false
+    editing.value = null
+    await refresh()
+  } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存凭证失败' } finally { saving.value = false }
+}
+async function rotateToken() {
+  if (!editing.value) return
+  saving.value = true
+  error.value = ''
+  try {
+    const updated = await send('chatluna-sandbox/rotate-mcp-credential-token', { id: editing.value.id })
+    editing.value = updated
+    createdToken.value = updated.token
+    await refresh()
+  } catch (cause) { error.value = cause instanceof Error ? cause.message : '重新生成 Token 失败' } finally { saving.value = false }
 }
 async function toggleCredential(credential: Credential) { await send('chatluna-sandbox/set-mcp-credential-enabled', { id: credential.id, enabled: !credential.enabled }); await refresh() }
 async function revokeCredential(id: string) { await send('chatluna-sandbox/revoke-mcp-credential', { id }); await refresh() }
@@ -93,15 +164,17 @@ onMounted(() => void refresh())
 .credential-list { min-height: 0; overflow: auto; padding: 20px 28px 28px; }
 .credential-toolbar, .credential-card, .credential-actions { display: flex; align-items: center; }
 .credential-toolbar { justify-content: space-between; gap: 16px; margin-bottom: 12px; }
-.credential-toolbar p, .credential-card small, .credential-empty { margin: 0; color: var(--webqq-muted); font-size: 12px; }
+.credential-toolbar p, .credential-card small, .credential-empty, .credential-meta { margin: 0; color: var(--webqq-muted); font-size: 12px; }
 .credential-card { justify-content: space-between; gap: 16px; padding: 12px; border: 1px solid var(--webqq-border); border-radius: 12px; }
 .credential-card + .credential-card { margin-top: 8px; }
+.credential-summary { display: grid; gap: 4px; min-width: 0; padding: 0; border: 0; background: transparent; text-align: left; }
 .credential-card strong, .credential-card small { display: block; }
-.credential-card small { margin-top: 4px; }
-.credential-actions { gap: 8px; }
+.credential-actions { gap: 8px; flex-shrink: 0; }
 .scope-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; border: 0; }
 .scope-grid legend { margin-bottom: 8px; font-weight: 600; }
 .scope-grid label { display: flex; align-items: center; gap: 8px; }
+.credential-token-field { display: grid; gap: 8px; }
+.credential-token { display: block; overflow-wrap: anywhere; padding: 8px 12px; border: 1px solid var(--webqq-border); border-radius: 8px; background: var(--webqq-surface-muted, transparent); font-size: 12px; }
 .credential-error { color: #dc2626; font-size: 12px; }
 @media (max-width: 560px) { .credential-list { padding-right: 14px; padding-left: 14px; } .credential-toolbar, .credential-card { align-items: flex-start; flex-direction: column; } }
 </style>
