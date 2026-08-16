@@ -474,6 +474,80 @@ describe('模拟 QQ 环境消息闭环', () => {
     ])
   })
 
+  it('群聊引用机器人消息时补齐 quote.user，且不自动插入 @', async () => {
+    const app = new App()
+    let control: SandboxControlService | undefined
+    app.plugin((ctx) => {
+      control = new SandboxControlService(ctx)
+    })
+    runningApps.push(app)
+
+    const sessions: Array<{
+      selfId?: string
+      userId?: string
+      content?: string
+      quoteUserId?: string
+      quoteUserName?: string
+      quoteTimestamp?: number
+      atSelf?: boolean
+      atIds?: string[]
+      rawMessage?: Array<{ type: string, data: Record<string, string> }>
+    }> = []
+    app.middleware((session) => {
+      const onebot = (session as typeof session & {
+        onebot?: { message?: Array<{ type: string, data: Record<string, string> }> }
+      }).onebot
+      sessions.push({
+        selfId: session.selfId,
+        userId: session.bot.userId,
+        content: session.content,
+        quoteUserId: session.quote?.user?.id,
+        quoteUserName: session.quote?.user?.name,
+        quoteTimestamp: session.quote?.timestamp,
+        atSelf: session.stripped.atSelf,
+        atIds: (session.elements ?? []).filter(({ type }) => type === 'at').map(({ attrs }) => String(attrs.id)),
+        rawMessage: onebot?.message,
+      })
+    })
+    await app.start()
+    if (!control) throw new Error('沙盒控制服务未注册')
+
+    const botMessage = await control.sendMessage({
+      operatorId: '20001',
+      conversationId: 'group:30001',
+      content: '机器人原话',
+    })
+    await control.sendMessage({
+      operatorId: '10001',
+      conversationId: 'group:30001',
+      content: '引用机器人',
+      replyToMessageId: botMessage.messageId,
+    })
+
+    const storedBotMessage = control.getSnapshot().messages.find(({ id }) => id === botMessage.messageId)
+    expect(sessions).toEqual([
+      expect.objectContaining({
+        selfId: '20001',
+        userId: '20001',
+        content: '引用机器人',
+        quoteUserId: '20001',
+        quoteUserName: 'Koishi',
+        quoteTimestamp: storedBotMessage ? new Date(storedBotMessage.createdAt).getTime() : undefined,
+        atSelf: false,
+        atIds: [],
+        rawMessage: [
+          { type: 'reply', data: { id: String(getOneBotMessageSequence(botMessage.messageId)) } },
+          { type: 'text', data: { text: '引用机器人' } },
+        ],
+      }),
+    ])
+    expect(sessions[0]?.quoteUserId).toBe(sessions[0]?.userId)
+    expect(storedBotMessage).toMatchObject({
+      authorId: '20001',
+      content: '机器人原话',
+    })
+  })
+
   it('普通用户发送文本后，被测插件收到正确 Session 并回复到同一会话', async () => {
     const app = new App()
     let control: SandboxControlService | undefined

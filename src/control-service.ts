@@ -1743,6 +1743,8 @@ export class SandboxControlService {
   ): Promise<void> {
     const runtimeBot = this.runtimeBots.get(recipientBot.id)
     if (!runtimeBot) throw new Error(`机器人运行时不存在：${recipientBot.id}`)
+    // ChatLuna allowQuoteReply / character 只认 session.quote.user.id === bot.userId|selfId，
+    // 不依赖 @。quote 必须带齐 user 与 timestamp，character 才能拼出和真 QQ 一样的引用 XML。
     const session = runtimeBot.session({
       type: 'message',
       timestamp: Date.now(),
@@ -1757,12 +1759,7 @@ export class SandboxControlService {
         messageId: message.id,
         content: elements.join(''),
         elements,
-        quote: context.reply ? {
-          id: context.reply.id,
-          messageId: context.reply.id,
-          content: context.reply.content,
-          user: { id: context.reply.authorId },
-        } : undefined,
+        quote: context.reply ? this.resolveInboundQuote(context.reply) : undefined,
       },
     })
     Object.assign(session, {
@@ -2208,6 +2205,22 @@ export class SandboxControlService {
     }
     const group = this.scene.groups.find(({ id }) => id === conversation.groupId)
     return !!group?.members.some(({ participantId }) => participantId === operatorId)
+  }
+
+  private resolveInboundQuote(reply: SandboxMessage) {
+    const author = this.scene.participants.find(({ id }) => id === reply.authorId)
+    return {
+      id: reply.id,
+      messageId: reply.id,
+      content: reply.content,
+      elements: h.parse(reply.content),
+      timestamp: new Date(reply.createdAt).getTime(),
+      user: {
+        id: reply.authorId,
+        name: author?.name,
+        isBot: author?.kind === 'bot',
+      },
+    }
   }
 
   private getMessageContext(input: Pick<SendMessageInput, 'operatorId' | 'conversationId' | 'replyToMessageId'>): SandboxMessageContext {
