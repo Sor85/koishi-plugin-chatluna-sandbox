@@ -8,12 +8,13 @@ import {
   parseModelRequestImageSource,
   parseModelResponseBody,
 } from '../client/webqq/model-request-json'
-import { createModelRequestLiveRefresh, MODEL_REQUEST_LIVE_REFRESH_INTERVAL_MS } from '../client/webqq/model-request-live-refresh'
+import { createModelRequestEnterRefresh, createModelRequestLiveRefresh, MODEL_REQUEST_LIVE_REFRESH_INTERVAL_MS } from '../client/webqq/model-request-live-refresh'
 
 describe('WebQQ 模型请求工作台', () => {
   it('从最左侧导航进入独立视图，并提供分类、分页摘要、详情和未归属二次确认', () => {
     const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
     const sidebarSource = readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
+    const shellSource = readFileSync(resolve('client/webqq/workspace-shell.ts'), 'utf8')
     const workspaceSource = readFileSync(resolve('client/model-request-workspace.vue'), 'utf8')
     const jsonSource = readFileSync(resolve('client/model-request-json-tree.vue'), 'utf8')
     const responsePreviewSource = readFileSync(resolve('client/model-response-content-preview.vue'), 'utf8')
@@ -25,6 +26,9 @@ describe('WebQQ 模型请求工作台', () => {
     expect(pageSource).toContain("currentView === 'model-requests'")
     expect(pageSource).toContain('<ModelRequestWorkspace')
     expect(pageSource).toContain(':bots="modelRequestBots"')
+    expect(pageSource).toContain(':visit-key="modelRequestVisitKey"')
+    expect(pageSource).toContain('modelRequestVisitKey')
+    expect(shellSource).toContain("if (view === 'model-requests') modelRequestVisitKey.value += 1")
     expect(pageSource).not.toContain(':capacity=')
     expect(workspaceSource).not.toContain('capacityText')
     expect(workspaceSource).not.toContain('maxRecords')
@@ -100,6 +104,9 @@ describe('WebQQ 模型请求工作台', () => {
     expect(styles).toMatch(/\.sandbox-badge\.webqq-model-request-provider\s*\{[^}]*border-color:\s*#c4b5fd[^}]*color:\s*#6d28d9[^}]*background:\s*#ede9fe/s)
     expect(styles).toMatch(/\.webqq-workspace\[data-color-mode="dark"\] \.sandbox-badge\.webqq-model-request-provider\s*\{[^}]*border-color:\s*#6d28d9[^}]*color:\s*#ddd6fe[^}]*background:\s*#4c1d95/s)
     expect(workspaceSource).toContain('createModelRequestLiveRefresh')
+    expect(workspaceSource).toContain('createModelRequestEnterRefresh')
+    expect(workspaceSource).toContain('onActivated')
+    expect(workspaceSource).toContain('enterRefresh.schedule()')
     expect(workspaceSource).toContain("liveRefresh = ref(false)")
     expect(workspaceSource).toContain("clearStep === 1")
     expect(workspaceSource).toContain('确认清理')
@@ -404,5 +411,23 @@ describe('WebQQ 模型请求工作台', () => {
 
     live.dispose()
     expect(live.isRunning()).toBe(false)
+  })
+
+  it('进入页面时把 onMounted 与 onActivated 合并为一次刷新', async () => {
+    let refreshCount = 0
+    const enter = createModelRequestEnterRefresh(() => {
+      refreshCount += 1
+    })
+
+    enter.schedule()
+    enter.schedule()
+    expect(refreshCount).toBe(0)
+
+    await Promise.resolve()
+    expect(refreshCount).toBe(1)
+
+    enter.schedule()
+    await Promise.resolve()
+    expect(refreshCount).toBe(2)
   })
 })

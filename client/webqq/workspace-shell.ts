@@ -63,6 +63,7 @@ export function createWebqqWorkspaceShell(
   const modelRequestLoading = ref(false)
   const modelRequestDetailLoading = ref(false)
   const modelRequestError = ref('')
+  const modelRequestVisitKey = ref(0)
   const snapshot = computed(() => workspace.value.snapshot)
   const users = computed(() => getSandboxUsers(snapshot.value))
   const bots = computed(() => getSandboxBots(snapshot.value))
@@ -516,6 +517,7 @@ export function createWebqqWorkspaceShell(
   function selectNavigation(view: SandboxWorkspaceView) {
     workspaceController.selectView(view)
     if (view === 'debug') void loadOneBotDebugRecords()
+    if (view === 'model-requests') modelRequestVisitKey.value += 1
   }
 
   async function loadOneBotDebugRecords(input: GetSandboxOneBotDebugRecordsInput = {}) {
@@ -748,6 +750,7 @@ export function createWebqqWorkspaceShell(
     detailsVisible,
     debugWorkspaceModel,
     environmentModel,
+    modelRequestVisitKey,
     modelRequestWorkspaceModel,
     handleSidebarNotification,
     kickGroupMember,

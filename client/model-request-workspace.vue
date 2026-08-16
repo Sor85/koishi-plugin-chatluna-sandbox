@@ -458,7 +458,7 @@ import {
   IconTrash,
   IconWorld,
 } from '@tabler/icons-vue'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
 import { Checkbox } from './components/ui/checkbox'
@@ -473,7 +473,7 @@ import WebqqAvatar from './webqq-avatar.vue'
 import { formatDuration } from './webqq/format-duration'
 import { extractModelResponseContent, normalizeModelResponseUsage } from './webqq/model-response-content'
 import { buildModelRequestJsonTree, parseModelResponseBody } from './webqq/model-request-json'
-import { createModelRequestLiveRefresh } from './webqq/model-request-live-refresh'
+import { createModelRequestEnterRefresh, createModelRequestLiveRefresh } from './webqq/model-request-live-refresh'
 import {
   createModelRequestRecordsQuery,
   createSpaceModelRequestScope,
@@ -507,6 +507,7 @@ const props = defineProps<{
   loading: boolean
   detailLoading: boolean
   error: string
+  visitKey?: number
 }>()
 
 const emit = defineEmits<{
@@ -538,6 +539,7 @@ const liveRefreshController = createModelRequestLiveRefresh({
   isVisible: () => typeof document === 'undefined' || document.visibilityState === 'visible',
   refresh: () => refresh(Math.min(Math.max(props.records.length, MODEL_REQUEST_PAGE_SIZE), 200)),
 })
+const enterRefresh = createModelRequestEnterRefresh(() => refresh())
 
 const requestTree = computed(() => buildModelRequestJsonTree(props.detail?.requestBody, 'requestBody'))
 const headersTree = computed(() => buildModelRequestJsonTree(props.detail?.headers ?? {}, 'requestHeaders'))
@@ -629,6 +631,9 @@ watch(() => props.detail?.id, () => {
 
 watch(bodyView, resetCopyState)
 watch(liveRefresh, () => liveRefreshController.sync())
+watch(() => props.visitKey, () => {
+  enterRefresh.schedule()
+})
 
 function currentScope() {
   return resolveModelRequestScope(category.value, spaceId.value)
@@ -850,7 +855,11 @@ function onVisibilityChange() {
 
 onMounted(() => {
   document.addEventListener('visibilitychange', onVisibilityChange)
-  refresh()
+  enterRefresh.schedule()
+})
+
+onActivated(() => {
+  enterRefresh.schedule()
 })
 
 onBeforeUnmount(() => {

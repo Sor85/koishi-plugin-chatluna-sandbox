@@ -70,6 +70,7 @@
           :loading="modelRequestWorkspaceModel.loading"
           :detail-loading="modelRequestWorkspaceModel.detailLoading"
           :error="modelRequestWorkspaceModel.error"
+          :visit-key="modelRequestVisitKey"
           @query="loadModelRequestRecords"
           @load-more="loadMoreModelRequestRecords"
           @open="loadModelRequestRecord"
@@ -180,6 +181,7 @@ const {
   detailsPanelModel,
   detailsVisible,
   debugWorkspaceModel,
+  modelRequestVisitKey,
   modelRequestWorkspaceModel,
   environmentModel,
   handleSidebarNotification,
