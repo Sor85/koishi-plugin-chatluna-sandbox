@@ -75,7 +75,7 @@
 
       <TooltipProvider :delay-duration="500">
         <section
-          v-if="mode === 'request' && compositionTracks.length"
+          v-if="compositionTracks.length"
           class="webqq-model-trajectory-composition"
           :style="{ minHeight: `${Math.max(50, compositionTracks.length * 14 + 8)}px` }"
           aria-label="请求体提示词内容占比"
@@ -84,6 +84,13 @@
             <span v-for="track in compositionTracks" :key="track.kind">{{ promptKindLabel(track.kind) }}</span>
           </div>
           <div class="webqq-model-trajectory-composition-tracks">
+            <span
+              v-for="boundary in compositionBoundaries"
+              :key="boundary.id"
+              class="webqq-model-trajectory-boundary"
+              :style="{ left: `${boundary.left}%` }"
+              aria-hidden="true"
+            />
             <div v-for="track in compositionTracks" :key="track.kind" class="webqq-model-trajectory-composition-track">
               <Tooltip v-for="segment in track.segments" :key="segment.id">
                 <TooltipTrigger as-child>
@@ -106,80 +113,9 @@
             </div>
           </div>
         </section>
-        <div v-else-if="mode === 'request'" class="webqq-model-trajectory-composition-empty">
-          当前请求体没有可统计的提示词内容
+        <div v-else class="webqq-model-trajectory-composition-empty">
+          {{ mode === 'conversation' ? '当前会话没有可投影的请求组成' : '当前请求体没有可统计的提示词内容' }}
         </div>
-
-        <section v-else class="webqq-model-trajectory-timeline" aria-label="请求时间线">
-          <div class="webqq-model-trajectory-lane-labels" aria-hidden="true">
-            <span>上下文</span>
-            <span>请求</span>
-            <span>工具</span>
-          </div>
-          <div class="webqq-model-trajectory-lanes">
-            <span
-              v-for="boundary in requestBoundaries"
-              :key="boundary.id"
-              class="webqq-model-trajectory-boundary"
-              :style="{ left: `${boundary.left}%` }"
-              aria-hidden="true"
-            />
-            <Tooltip v-for="segment in timingSegments" :key="segment.id">
-              <TooltipTrigger as-child>
-                <button
-                  type="button"
-                  class="webqq-model-trajectory-span is-request"
-                  :class="[
-                    statusClass(segment.status),
-                    {
-                      'is-selected': selectedRow?.requestId === segment.id,
-                      'is-search-muted': isRequestSearchMuted(segment.id),
-                    },
-                  ]"
-                  :style="{ left: `${segment.left}%`, width: `${segment.width}%` }"
-                  :aria-label="`${segment.label}，${formatDuration(segment.durationMs)}`"
-                  @click="selectRequest(segment.id)"
-                />
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                <strong>{{ segment.label }}</strong>
-                <span>{{ formatClock(segment.startedAt) }} · {{ formatDuration(segment.durationMs) }}</span>
-              </TooltipContent>
-            </Tooltip>
-            <Tooltip v-for="marker in contextMarkers" :key="marker.id">
-              <TooltipTrigger as-child>
-                <button
-                  type="button"
-                  class="webqq-model-trajectory-span is-context is-marker"
-                  :class="{ 'is-search-muted': isRowSearchMuted(marker.row) }"
-                  :style="{ left: `${marker.left}%` }"
-                  :aria-label="`${marker.label}，未记录独立耗时`"
-                  @click="selectRow(marker.row.id)"
-                />
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                <strong>{{ kindLabel(marker.row.kind, marker.row.toolEvent) }}</strong>
-                <span>{{ marker.label }} · 无独立耗时</span>
-              </TooltipContent>
-            </Tooltip>
-            <Tooltip v-for="marker in toolMarkers" :key="marker.id">
-              <TooltipTrigger as-child>
-                <button
-                  type="button"
-                  class="webqq-model-trajectory-span is-tools is-marker"
-                  :class="{ 'is-search-muted': isRowSearchMuted(marker.row) }"
-                  :style="{ left: `${marker.left}%` }"
-                  :aria-label="`${marker.label}，未记录独立耗时`"
-                  @click="selectRow(marker.row.id)"
-                />
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                <strong>TOOL</strong>
-                <span>{{ marker.label }} · 无独立耗时</span>
-              </TooltipContent>
-            </Tooltip>
-          </div>
-        </section>
       </TooltipProvider>
 
       <p v-if="mode === 'conversation' && hasUnknownTiming" class="webqq-model-trajectory-timing-note">
@@ -312,7 +248,17 @@ const promptComposition = computed(() => {
     percentage: (item.characters / total) * 100,
   }))
 })
-const compositionTracks = computed(() => {
+const REQUEST_COMPOSITION_KINDS = ['system', 'user', 'assistant', 'tool-definition', 'tool-interaction'] as const
+const CONVERSATION_COMPOSITION_KINDS = ['system', 'user', 'tool-definition'] as const
+
+function isConversationCompositionKind(kind: SandboxModelRequestPromptKind): kind is typeof CONVERSATION_COMPOSITION_KINDS[number] {
+  return (CONVERSATION_COMPOSITION_KINDS as readonly SandboxModelRequestPromptKind[]).includes(kind)
+}
+
+const compositionTracks = computed(() => (
+  props.mode === 'conversation' ? conversationCompositionTracks.value : requestCompositionTracks.value
+))
+const requestCompositionTracks = computed(() => {
   let offset = 0
   const seen: Partial<Record<SandboxModelRequestPromptKind, number>> = {}
   const segments = promptComposition.value.map((item, index) => {
@@ -331,7 +277,70 @@ const compositionTracks = computed(() => {
       indexInKind,
     }
   })
-  return (['system', 'user', 'assistant', 'tool-definition', 'tool-interaction'] as const).flatMap((kind) => {
+  return REQUEST_COMPOSITION_KINDS.flatMap((kind) => {
+    const kindSegments = segments.filter((segment) => segment.kind === kind)
+    return kindSegments.length ? [{ kind, segments: kindSegments }] : []
+  })
+})
+function resolveConversationCompositionItems() {
+  const projected = (props.trajectory?.promptComposition ?? []).filter((item) => (
+    Boolean(item.requestId) && isConversationCompositionKind(item.kind)
+  ))
+  if (projected.length) return projected
+  // 旧会话轨迹或请求体缺失时，没有带 requestId 的组成；用账本行预览长度回退，避免整条轨道空白。
+  return (props.trajectory?.rows ?? []).flatMap((row) => {
+    if (!row.requestId || row.kind === 'request' || row.kind === 'assistant' || row.kind === 'tool') return []
+    const kind: SandboxModelRequestPromptKind = row.preview.startsWith('工具目录') ? 'tool-definition' : row.kind
+    if (!isConversationCompositionKind(kind)) return []
+    return [{ kind, characters: Math.max(row.preview.length, 1), requestId: row.requestId }]
+  })
+}
+
+const conversationCompositionTracks = computed(() => {
+  const itemsByRequest = new Map<string, { kind: SandboxModelRequestPromptKind, characters: number }[]>()
+  for (const item of resolveConversationCompositionItems()) {
+    if (!item.requestId) continue
+    const items = itemsByRequest.get(item.requestId) ?? []
+    items.push(item)
+    itemsByRequest.set(item.requestId, items)
+  }
+  const segments: Array<{
+    id: string
+    kind: SandboxModelRequestPromptKind
+    characters: number
+    percentage: number
+    left: number
+    width: number
+    indexInKind: number
+    requestId: string
+  }> = []
+  for (const slot of timingSegments.value) {
+    const items = itemsByRequest.get(slot.id) ?? []
+    const total = items.reduce((sum, item) => sum + item.characters, 0)
+    if (!total) continue
+    const seen: Partial<Record<SandboxModelRequestPromptKind, number>> = {}
+    let used = 0
+    items.forEach((item, index) => {
+      const percentage = (item.characters / total) * 100
+      const left = slot.left + (used / 100) * slot.width
+      const rawWidth = (percentage / 100) * slot.width
+      const gap = index < items.length - 1 ? Math.min(0.25, rawWidth / 4) : 0
+      used += percentage
+      const indexInKind = seen[item.kind] ?? 0
+      seen[item.kind] = indexInKind + 1
+      segments.push({
+        id: `${slot.id}:${item.kind}:${index}`,
+        kind: item.kind,
+        characters: item.characters,
+        percentage,
+        left,
+        width: Math.min(Math.max(rawWidth - gap, 0.35), Math.max(slot.left + slot.width - left, 0.35)),
+        indexInKind,
+        requestId: slot.id,
+      })
+    })
+  }
+  return CONVERSATION_COMPOSITION_KINDS.flatMap((kind) => {
     const kindSegments = segments.filter((segment) => segment.kind === kind)
     return kindSegments.length ? [{ kind, segments: kindSegments }] : []
   })
@@ -380,16 +389,7 @@ const timingSegments = computed(() => requestRows.value.map((row) => {
   }
 }))
 const requestBoundaries = computed(() => timingSegments.value.slice(1).map(({ id, left }) => ({ id, left })))
-const timelinePosition = (row: SandboxModelRequestTrajectoryRow) => {
-  const start = row.startedAt ? Date.parse(row.startedAt) : timingBounds.value.start
-  return Math.min(Math.max(((start - timingBounds.value.start) / totalDuration.value) * 100, 0), 100)
-}
-const contextMarkers = computed(() => (props.trajectory?.rows ?? [])
-  .filter((row) => row.kind === 'system' || row.kind === 'user')
-  .map((row) => ({ id: row.id, label: row.preview, left: timelinePosition(row), row })))
-const toolMarkers = computed(() => (props.trajectory?.rows ?? [])
-  .filter((row) => row.kind === 'tool')
-  .map((row) => ({ id: row.id, label: row.preview, left: timelinePosition(row), row })))
+const compositionBoundaries = computed(() => props.mode === 'conversation' ? requestBoundaries.value : [])
 const hasUnknownTiming = computed(() => requestRows.value.some(({ status, durationMs }) => status === 'pending' || durationMs === undefined))
 
 function rowMatchesSearch(row: SandboxModelRequestTrajectoryRow) {
@@ -403,37 +403,25 @@ function isRowSearchMuted(row: SandboxModelRequestTrajectoryRow) {
   return normalizedSearch.value.length > 0 && !rowMatchesSearch(row)
 }
 
-function isRequestSearchMuted(requestId: string) {
-  if (!normalizedSearch.value) return false
-  return !(props.trajectory?.rows ?? []).some((row) => row.requestId === requestId && rowMatchesSearch(row))
-}
-
-function selectRequest(requestId: string) {
-  const row = requestRows.value.find((candidate) => candidate.requestId === requestId)
-  if (row) selectedRowId.value = row.id
-}
-
-function selectRow(rowId: string) {
-  selectedRowId.value = rowId
-}
-
-function promptRowsForKind(kind: SandboxModelRequestPromptKind) {
+function promptRowsForKind(kind: SandboxModelRequestPromptKind, requestId?: string) {
   return (props.trajectory?.rows ?? []).filter((candidate) => {
+    if (requestId && candidate.requestId !== requestId) return false
     if (kind === 'tool-definition') return candidate.kind === 'tool' && candidate.toolEvent === 'definition'
     if (kind === 'tool-interaction') return candidate.kind === 'tool' && candidate.toolEvent !== 'definition'
     return candidate.kind === kind
   })
 }
 
-function selectPromptSegment(segment: { kind: SandboxModelRequestPromptKind, indexInKind: number }) {
-  const row = promptRowsForKind(segment.kind)[segment.indexInKind] ?? promptRowsForKind(segment.kind)[0]
+function selectPromptSegment(segment: { kind: SandboxModelRequestPromptKind, indexInKind: number, requestId?: string }) {
+  const rows = promptRowsForKind(segment.kind, segment.requestId)
+  const row = rows[segment.indexInKind] ?? rows[0]
   if (row) selectedRowId.value = row.id
 }
 
-function isCompositionSegmentSelected(segment: { kind: SandboxModelRequestPromptKind, indexInKind: number }) {
+function isCompositionSegmentSelected(segment: { kind: SandboxModelRequestPromptKind, indexInKind: number, requestId?: string }) {
   const selected = selectedRow.value
   if (!selected) return false
-  const rows = promptRowsForKind(segment.kind)
+  const rows = promptRowsForKind(segment.kind, segment.requestId)
   return rows[segment.indexInKind]?.id === selected.id
 }
 
@@ -492,16 +480,5 @@ function statusClass(status: SandboxModelRequestStatus | undefined) {
 function formatTime(value: string | undefined) {
   if (!value) return '—'
   return new Date(value).toLocaleString('zh-CN', { hour12: false })
-}
-
-function formatClock(value: string | undefined) {
-  if (!value) return '时间未知'
-  return new Date(value).toLocaleTimeString('zh-CN', {
-    hour12: false,
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    fractionalSecondDigits: 3,
-  })
 }
 </script>

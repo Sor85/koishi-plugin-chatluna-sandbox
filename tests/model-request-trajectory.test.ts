@@ -185,6 +185,13 @@ describe('模型请求轨迹投影', () => {
     expect(trajectory.rows.filter(({ kind }) => kind === 'request')).toHaveLength(2)
     expect(trajectory.rows.some(({ toolEvent }) => toolEvent !== undefined)).toBe(false)
     expect(trajectory.rows.some(({ preview }) => preview.startsWith('工具目录'))).toBe(true)
-    expect(trajectory.promptComposition).toBeUndefined()
+    expect(trajectory.promptComposition?.map(({ kind, requestId }) => ({ kind, requestId }))).toEqual([
+      { kind: 'system', requestId: trajectory.records[0]?.id },
+      { kind: 'user', requestId: trajectory.records[0]?.id },
+      { kind: 'tool-definition', requestId: trajectory.records[0]?.id },
+      { kind: 'tool-interaction', requestId: trajectory.records[0]?.id },
+      { kind: 'tool-interaction', requestId: trajectory.records[0]?.id },
+      { kind: 'user', requestId: trajectory.records[1]?.id },
+    ])
   })
 })

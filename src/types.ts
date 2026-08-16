@@ -534,6 +534,7 @@ export type SandboxModelRequestPromptKind =
 export interface SandboxModelRequestPromptCompositionItem {
   kind: SandboxModelRequestPromptKind
   characters: number
+  requestId?: string
 }
 
 export interface SandboxModelRequestTrajectory {

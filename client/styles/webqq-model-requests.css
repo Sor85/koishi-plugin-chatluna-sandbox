@@ -717,7 +717,7 @@
 .webqq-model-trajectory-timeline {
   display: grid;
   grid-template-columns: 56px minmax(0, 1fr);
-  height: 50px;
+  height: 28px;
   overflow: hidden;
   border-bottom: 1px solid var(--webqq-border);
   background: color-mix(in srgb, var(--webqq-surface-muted) 64%, var(--webqq-surface));
@@ -732,6 +732,7 @@
 
 .webqq-model-trajectory-lane-labels span {
   position: absolute;
+  top: 10px;
   right: 6px;
   display: flex;
   align-items: center;
@@ -739,10 +740,6 @@
   height: 8px;
   white-space: nowrap;
 }
-
-.webqq-model-trajectory-lane-labels span:nth-child(1) { top: 7px; }
-.webqq-model-trajectory-lane-labels span:nth-child(2) { top: 21px; }
-.webqq-model-trajectory-lane-labels span:nth-child(3) { top: 35px; }
 
 .webqq-model-trajectory-lanes {
   position: relative;
@@ -769,24 +766,9 @@
   opacity: 0.88;
 }
 
-.webqq-model-trajectory-span.is-context {
-  top: 5px;
-  background: var(--webqq-trajectory-context);
-}
-
 .webqq-model-trajectory-span.is-request {
-  top: 19px;
+  top: 10px;
   background: var(--webqq-trajectory-request);
-}
-
-.webqq-model-trajectory-span.is-tools {
-  top: 33px;
-  background: var(--webqq-trajectory-tool);
-}
-
-.webqq-model-trajectory-span.is-marker {
-  width: 5px;
-  border-radius: 1px;
 }
 
 .webqq-model-trajectory-span.is-selected {

@@ -74,9 +74,11 @@ export function buildSandboxModelRequestTrajectory(
       : {}),
     records,
     rows,
-    ...(options.mode === 'request'
-      ? { promptComposition: projectPromptComposition(options.record.requestBody) }
-      : {}),
+    promptComposition: sourceRecords.flatMap((record) => (
+      projectPromptComposition(record.requestBody).map((item) => (
+        options.mode === 'conversation' ? { ...item, requestId: record.id } : item
+      ))
+    )),
     complete: options.mode === 'request' || !options.store || sourceRecords.length < 200,
   }
 }
