@@ -51,18 +51,75 @@ describe('模型请求轨迹投影', () => {
 
     expect(trajectory.records).toHaveLength(1)
     expect(trajectory.rows.map(({ kind }) => kind)).toEqual([
-      'request', 'system', 'system', 'user', 'tool', 'tool', 'assistant', 'assistant',
+      'request', 'tool', 'system', 'user', 'tool', 'tool', 'assistant', 'assistant',
     ])
+    expect(trajectory.rows.find(({ preview }) => preview.startsWith('工具声明'))).toMatchObject({
+      kind: 'tool',
+      toolEvent: 'definition',
+    })
     expect(trajectory.rows.find(({ callId }) => callId === 'call-1')).toMatchObject({
       kind: 'tool',
       toolName: 'lookup',
+      toolEvent: 'call',
+    })
+    expect(trajectory.rows.find(({ toolEvent }) => toolEvent === 'result')).toMatchObject({
+      kind: 'tool',
+      toolEvent: 'result',
     })
     expect(trajectory.rows.some(({ preview }) => preview.includes('北京今天晴朗'))).toBe(true)
     expect(trajectory.promptComposition).toEqual([
       { kind: 'system', characters: 6 },
       { kind: 'user', characters: 4 },
-      { kind: 'tool', characters: 160 },
+      { kind: 'tool-definition', characters: 81 },
+      { kind: 'tool-interaction', characters: 79 },
     ])
+  })
+
+  it('区分 Gemini 与 Responses 请求中的工具声明和工具交互', () => {
+    const store = new SandboxModelRequestStore()
+    const gemini = store.append({
+      status: 'success',
+      durationMs: 10,
+      attribution: 'unattributed',
+      entities: {},
+      requestBodyAvailable: true,
+      requestBody: {
+        systemInstruction: { parts: [{ text: '系统' }] },
+        tools: [{ functionDeclarations: [{ name: 'lookup', description: '查询' }] }],
+        contents: [
+          { role: 'user', parts: [{ text: '查询天气' }] },
+          { role: 'model', parts: [{ functionCall: { name: 'lookup', args: { city: '北京' } } }] },
+          { role: 'user', parts: [{ functionResponse: { name: 'lookup', response: { weather: '晴' } } }] },
+        ],
+      },
+      responseBodyStatus: 'unavailable',
+    })
+    const responses = store.append({
+      status: 'success',
+      durationMs: 10,
+      attribution: 'unattributed',
+      entities: {},
+      requestBodyAvailable: true,
+      requestBody: {
+        tools: [{ type: 'function', name: 'search', parameters: { type: 'object' } }],
+        input: [
+          { role: 'user', content: '搜索新闻' },
+          { type: 'function_call', name: 'search', arguments: '{"q":"新闻"}' },
+          { type: 'function_call_output', call_id: 'call-1', output: '结果' },
+        ],
+      },
+      responseBodyStatus: 'unavailable',
+    })
+
+    for (const record of [gemini, responses]) {
+      const trajectory = buildSandboxModelRequestTrajectory({
+        record: store.getRecord(record.id)!,
+        mode: 'request',
+        store,
+      })
+      expect(trajectory.promptComposition?.find(({ kind }) => kind === 'tool-definition')?.characters).toBeGreaterThan(0)
+      expect(trajectory.promptComposition?.find(({ kind }) => kind === 'tool-interaction')?.characters).toBeGreaterThan(0)
+    }
   })
 
   it('按同一记录库和 conversationId 组成完整会话 Step，不混入其他会话', () => {
@@ -85,6 +142,8 @@ describe('模型请求轨迹投影', () => {
     expect(trajectory.records).toHaveLength(2)
     expect(trajectory.records.map(({ sequence }) => sequence)).toEqual([1, 2])
     expect(trajectory.rows.filter(({ kind }) => kind === 'request')).toHaveLength(2)
+    expect(trajectory.rows.some(({ toolEvent }) => toolEvent !== undefined)).toBe(false)
+    expect(trajectory.rows.some(({ preview }) => preview.startsWith('工具目录'))).toBe(true)
     expect(trajectory.promptComposition).toBeUndefined()
   })
 })

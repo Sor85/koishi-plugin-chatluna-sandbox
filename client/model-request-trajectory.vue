@@ -90,7 +90,7 @@
                   <button
                     type="button"
                     class="webqq-model-trajectory-composition-bar"
-                    :class="`is-${item.kind}`"
+                    :class="promptBarClass(item.kind)"
                     :style="{ width: `${item.percentage}%` }"
                     :aria-label="`${promptKindLabel(item.kind)} 占请求体提示内容的 ${formatPercentage(item.percentage)}`"
                     @click="selectFirstPromptRow(item.kind)"
@@ -156,7 +156,7 @@
                 />
               </TooltipTrigger>
               <TooltipContent side="top">
-                <strong>{{ kindLabel(marker.row.kind) }}</strong>
+                <strong>{{ kindLabel(marker.row.kind, marker.row.toolEvent) }}</strong>
                 <span>{{ marker.label }} · 无独立耗时</span>
               </TooltipContent>
             </Tooltip>
@@ -210,7 +210,7 @@
               role="row"
               @click="selectedRowId = row.id"
             >
-              <span role="cell" class="webqq-model-trajectory-kind">{{ kindLabel(row.kind) }}</span>
+              <span role="cell" class="webqq-model-trajectory-kind">{{ kindLabel(row.kind, row.toolEvent) }}</span>
               <span role="cell" class="webqq-model-trajectory-preview">{{ row.preview }}</span>
             </button>
           </template>
@@ -219,14 +219,12 @@
         <aside v-if="selectedRow" v-webqq-scrollbar class="webqq-model-trajectory-inspector" aria-label="轨迹事件检查器">
           <header>
             <div>
-              <Badge variant="outline">{{ kindLabel(selectedRow.kind) }}</Badge>
-              <strong>{{ selectedLocation }}</strong>
+              <Badge variant="outline">{{ kindLabel(selectedRow.kind, selectedRow.toolEvent) }}</Badge>
             </div>
             <Button variant="ghost" size="icon-sm" aria-label="关闭检查器" @click="selectedRowId = ''">
               <IconX aria-hidden="true" />
             </Button>
           </header>
-          <p class="webqq-model-trajectory-inspector-preview">{{ selectedRow.preview }}</p>
           <dl v-if="selectedRow.kind === 'request'" class="webqq-model-trajectory-facts">
             <div><dt>状态</dt><dd>{{ statusLabel(selectedRow.status) }}</dd></div>
             <div><dt>开始</dt><dd>{{ formatTime(selectedRow.startedAt) }}</dd></div>
@@ -314,12 +312,6 @@ const ledgerRows = computed(() => props.trajectory?.rows.filter((row) => {
   if (toolsCollapsed.value && row.kind === 'tool') return false
   return true
 }) ?? [])
-const selectedLocation = computed(() => {
-  if (!selectedRow.value) return ''
-  const request = requestOrdinal(selectedRow.value.requestId)
-  return selectedRow.value.kind === 'request' ? request : `${request} · #${selectedRow.value.index}`
-})
-
 watch(() => props.trajectory, () => {
   selectedRowId.value = ''
 })
@@ -374,7 +366,7 @@ const hasUnknownTiming = computed(() => requestRows.value.some(({ status, durati
 function rowMatchesSearch(row: SandboxModelRequestTrajectoryRow) {
   const query = normalizedSearch.value
   if (!query) return true
-  return [row.preview, kindLabel(row.kind), row.toolName, row.callId, requestLabel(row.requestId)]
+  return [row.preview, kindLabel(row.kind, row.toolEvent), row.toolName, row.callId, requestLabel(row.requestId)]
     .some((value) => value?.toLocaleLowerCase('zh-CN').includes(query))
 }
 
@@ -397,8 +389,11 @@ function selectRow(rowId: string) {
 }
 
 function selectFirstPromptRow(kind: SandboxModelRequestPromptKind) {
-  const rowKind = kind === 'tool' ? 'tool' : kind
-  const row = props.trajectory?.rows.find((candidate) => candidate.kind === rowKind)
+  const row = props.trajectory?.rows.find((candidate) => {
+    if (kind === 'tool-definition') return candidate.kind === 'tool' && candidate.toolEvent === 'definition'
+    if (kind === 'tool-interaction') return candidate.kind === 'tool' && candidate.toolEvent !== 'definition'
+    return candidate.kind === kind
+  })
   if (row) selectedRowId.value = row.id
 }
 
@@ -406,7 +401,14 @@ function promptKindLabel(kind: SandboxModelRequestPromptKind) {
   if (kind === 'system') return 'System'
   if (kind === 'user') return 'User'
   if (kind === 'assistant') return 'Assistant'
-  return 'Tools'
+  if (kind === 'tool-definition') return 'Tool Defs'
+  return 'Tool I/O'
+}
+
+function promptBarClass(kind: SandboxModelRequestPromptKind) {
+  if (kind === 'tool-definition') return 'is-tool-definition'
+  if (kind === 'tool-interaction') return 'is-tool-interaction'
+  return `is-${kind}`
 }
 
 function formatPercentage(value: number) {
@@ -423,11 +425,15 @@ function requestLabel(requestId: string | undefined) {
   return [request?.provider, request?.model].filter(Boolean).join(' / ') || '模型请求'
 }
 
-function kindLabel(kind: SandboxModelRequestTrajectoryKind) {
+function kindLabel(kind: SandboxModelRequestTrajectoryKind, toolEvent?: SandboxModelRequestTrajectoryRow['toolEvent']) {
   if (kind === 'system') return 'SYSTEM'
   if (kind === 'user') return 'USER'
   if (kind === 'assistant') return 'ASSISTANT'
-  if (kind === 'tool') return 'TOOL'
+  if (kind === 'tool') {
+    if (toolEvent === 'definition') return 'TOOL DEFS'
+    if (toolEvent === 'result') return 'TOOL RESULT'
+    return 'TOOL CALL'
+  }
   return 'REQUEST'
 }
 

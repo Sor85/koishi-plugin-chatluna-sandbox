@@ -527,6 +527,7 @@
   --webqq-trajectory-user: #2f76c9;
   --webqq-trajectory-assistant: #a13d76;
   --webqq-trajectory-tool: #c46b00;
+  --webqq-trajectory-tool-interaction: #8f5aa8;
   display: grid;
   min-height: 0;
   overflow: hidden;
@@ -543,6 +544,7 @@
   --webqq-trajectory-user: #6aa9ef;
   --webqq-trajectory-assistant: #dd79b2;
   --webqq-trajectory-tool: #bf812f;
+  --webqq-trajectory-tool-interaction: #a87bb8;
 }
 
 .webqq-model-request-view-switch,
@@ -687,8 +689,12 @@
   background: var(--webqq-trajectory-assistant);
 }
 
-.webqq-model-trajectory-composition-bar.is-tool {
+.webqq-model-trajectory-composition-bar.is-tool-definition {
   background: var(--webqq-trajectory-tool);
+}
+
+.webqq-model-trajectory-composition-bar.is-tool-interaction {
+  background: var(--webqq-trajectory-tool-interaction);
 }
 
 .webqq-model-trajectory-composition-empty {
@@ -969,13 +975,6 @@
 .webqq-model-trajectory-inspector > header > div,
 .webqq-model-trajectory-inspector-actions {
   gap: 8px;
-}
-
-.webqq-model-trajectory-inspector-preview {
-  color: var(--webqq-text) !important;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  user-select: text;
 }
 
 .webqq-model-trajectory-facts {

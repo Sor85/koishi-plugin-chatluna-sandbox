@@ -517,13 +517,19 @@ export interface SandboxModelRequestTrajectoryRow {
   detail?: unknown
   callId?: string
   toolName?: string
+  toolEvent?: 'definition' | 'call' | 'result'
   durationMs?: number
   startedAt?: string
   requestId?: string
   status?: SandboxModelRequestStatus
 }
 
-export type SandboxModelRequestPromptKind = 'system' | 'user' | 'assistant' | 'tool'
+export type SandboxModelRequestPromptKind =
+  | 'system'
+  | 'user'
+  | 'assistant'
+  | 'tool-definition'
+  | 'tool-interaction'
 
 export interface SandboxModelRequestPromptCompositionItem {
   kind: SandboxModelRequestPromptKind

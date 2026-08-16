@@ -23,6 +23,7 @@ interface ProjectedMessage {
   detail?: unknown
   callId?: string
   toolName?: string
+  toolEvent?: 'definition' | 'call' | 'result'
 }
 
 export function buildSandboxModelRequestTrajectory(
@@ -48,12 +49,12 @@ export function buildSandboxModelRequestTrajectory(
     }
     rows.push(requestRow)
 
-    for (const message of projectRequestMessages(record.requestBody)) {
+    for (const message of projectRequestMessages(record.requestBody, options.mode === 'request')) {
       rows.push({
         id: `${record.id}:${message.kind}:${index}`,
         index: index++,
         requestId: record.id,
-        ...message,
+        ...presentProjectedMessage(message, options.mode),
       })
     }
     for (const message of projectResponseMessages(record)) {
@@ -61,7 +62,7 @@ export function buildSandboxModelRequestTrajectory(
         id: `${record.id}:${message.kind}:${index}`,
         index: index++,
         requestId: record.id,
-        ...message,
+        ...presentProjectedMessage(message, options.mode),
       })
     }
   }
@@ -88,8 +89,8 @@ function projectPromptComposition(body: unknown): SandboxModelRequestPromptCompo
     if (characters > 0) sizes.set(kind, (sizes.get(kind) ?? 0) + characters)
   }
 
-  add('tool', body.tools)
-  add('tool', body.functions)
+  add('tool-definition', body.tools)
+  add('tool-definition', body.functions)
   add('system', body.system ?? body.systemInstruction ?? body.system_instruction)
 
   if (Array.isArray(body.messages)) {
@@ -98,9 +99,9 @@ function projectPromptComposition(body: unknown): SandboxModelRequestPromptCompo
       const role = stringValue(message.role)?.toLowerCase() ?? 'user'
       if (role === 'assistant') {
         add('assistant', message.content)
-        add('tool', message.tool_calls ?? message.function_call)
+        add('tool-interaction', message.tool_calls ?? message.function_call)
       } else if (role === 'tool' || role === 'function') {
-        add('tool', message.content ?? message)
+        add('tool-interaction', message.content ?? message)
       } else if (role === 'system' || role === 'developer') {
         add('system', message.content ?? message)
       } else {
@@ -115,7 +116,7 @@ function projectPromptComposition(body: unknown): SandboxModelRequestPromptCompo
       const role: SandboxModelRequestPromptKind = content.role === 'model' ? 'assistant' : 'user'
       const parts = Array.isArray(content.parts) ? content.parts : []
       for (const part of parts) {
-        if (isRecord(part) && ('functionCall' in part || 'functionResponse' in part)) add('tool', part)
+        if (isRecord(part) && ('functionCall' in part || 'functionResponse' in part)) add('tool-interaction', part)
         else add(role, part)
       }
     }
@@ -129,14 +130,14 @@ function projectPromptComposition(body: unknown): SandboxModelRequestPromptCompo
         continue
       }
       const role = stringValue(item.role)?.toLowerCase()
-      if (item.type === 'function_call' || item.type === 'function_call_output') add('tool', item)
+      if (item.type === 'function_call' || item.type === 'function_call_output') add('tool-interaction', item)
       else if (role === 'assistant') add('assistant', item.content ?? item)
       else if (role === 'system' || role === 'developer') add('system', item.content ?? item)
       else add('user', item.content ?? item)
     }
   }
 
-  return (['system', 'user', 'assistant', 'tool'] as const).flatMap((kind) => {
+  return (['system', 'user', 'assistant', 'tool-definition', 'tool-interaction'] as const).flatMap((kind) => {
     const characters = sizes.get(kind) ?? 0
     return characters > 0 ? [{ kind, characters }] : []
   })
@@ -146,6 +147,16 @@ function serializedCharacters(value: unknown): number {
   if (value === undefined || value === null) return 0
   if (typeof value === 'string') return value.length
   try { return JSON.stringify(value).length } catch { return String(value).length }
+}
+
+function presentProjectedMessage(
+  message: ProjectedMessage,
+  mode: 'request' | 'conversation',
+): ProjectedMessage {
+  if (mode === 'request' || message.toolEvent === undefined) return message
+  // 完整会话轨迹沿用原有 TOOL 事件契约；细分只服务于单请求上下文占比与检查器。
+  const { toolEvent: _toolEvent, ...legacyMessage } = message
+  return legacyMessage
 }
 
 function resolveConversationRecords(
@@ -165,14 +176,14 @@ function requestPreview(record: SandboxModelRequestRecord): string {
   return `${provider} / ${model} · ${record.durationMs} ms`
 }
 
-function projectRequestMessages(body: unknown): ProjectedMessage[] {
+function projectRequestMessages(body: unknown, splitToolDefinitions: boolean): ProjectedMessage[] {
   if (!isRecord(body)) return []
   const messages = Array.isArray(body.messages)
     ? body.messages.flatMap(projectOpenAiMessage)
     : Array.isArray(body.contents)
       ? body.contents.flatMap(projectGeminiMessage)
       : []
-  const tools = projectToolCatalog(body.tools)
+  const tools = projectToolCatalog(body.tools, splitToolDefinitions)
   return [...tools, ...messages]
 }
 
@@ -198,6 +209,7 @@ function projectOpenAiMessage(value: unknown): ProjectedMessage[] {
       detail: value,
       ...(stringValue(value.tool_call_id) ? { callId: stringValue(value.tool_call_id) } : {}),
       ...(stringValue(value.name) ? { toolName: stringValue(value.name) } : {}),
+      toolEvent: 'result',
     }]
   }
   return [{ kind: 'user', preview: preview || '用户消息', detail: value }]
@@ -215,6 +227,7 @@ function projectOpenAiToolCalls(value: unknown): ProjectedMessage[] {
       preview: `${name} · ${previewValue(args) || '无参数'}`,
       detail: call,
       toolName: name,
+      toolEvent: 'call',
       ...(stringValue(call.id) ? { callId: stringValue(call.id) } : {}),
     }]
   })
@@ -233,6 +246,7 @@ function projectGeminiMessage(value: unknown): ProjectedMessage[] {
       preview: `${name} · ${previewValue(part.functionCall.args) || '无参数'}`,
       detail: part.functionCall,
       toolName: name,
+      toolEvent: 'call' as const,
     }]
   })
   return [
@@ -241,7 +255,7 @@ function projectGeminiMessage(value: unknown): ProjectedMessage[] {
   ]
 }
 
-function projectToolCatalog(value: unknown): ProjectedMessage[] {
+function projectToolCatalog(value: unknown, splitToolDefinitions: boolean): ProjectedMessage[] {
   if (!Array.isArray(value) || !value.length) return []
   const names = value.flatMap((tool) => {
     if (!isRecord(tool)) return []
@@ -251,11 +265,10 @@ function projectToolCatalog(value: unknown): ProjectedMessage[] {
     }
     return []
   })
-  return [{
-    kind: 'system',
-    preview: names.length ? `工具目录 · ${names.join('、')}` : `工具目录 · ${value.length} 项`,
-    detail: value,
-  }]
+  const summary = names.length ? names.join('、') : `${value.length} 项`
+  return splitToolDefinitions
+    ? [{ kind: 'tool', preview: `工具声明 · ${summary}`, detail: value, toolEvent: 'definition' }]
+    : [{ kind: 'system', preview: `工具目录 · ${summary}`, detail: value }]
 }
 
 function projectResponseMessages(record: SandboxModelRequestRecord): ProjectedMessage[] {
@@ -296,7 +309,7 @@ function collectResponse(value: unknown, content: string[], reasoning: string[],
       if (block.type === 'thinking') collectText(block.thinking, reasoning)
       if (block.type === 'tool_use') {
         const name = stringValue(block.name) || '工具调用'
-        tools.push({ kind: 'tool', preview: `${name} · ${previewValue(block.input) || '无参数'}`, detail: block, toolName: name, ...(stringValue(block.id) ? { callId: stringValue(block.id) } : {}) })
+        tools.push({ kind: 'tool', preview: `${name} · ${previewValue(block.input) || '无参数'}`, detail: block, toolName: name, toolEvent: 'call', ...(stringValue(block.id) ? { callId: stringValue(block.id) } : {}) })
       }
     }
   }
@@ -308,7 +321,7 @@ function collectResponse(value: unknown, content: string[], reasoning: string[],
         collectText(part.text, part.thought === true ? reasoning : content)
         if (isRecord(part.functionCall)) {
           const name = stringValue(part.functionCall.name) || '工具调用'
-          tools.push({ kind: 'tool', preview: `${name} · ${previewValue(part.functionCall.args) || '无参数'}`, detail: part.functionCall, toolName: name })
+          tools.push({ kind: 'tool', preview: `${name} · ${previewValue(part.functionCall.args) || '无参数'}`, detail: part.functionCall, toolName: name, toolEvent: 'call' })
         }
       }
     }
@@ -320,7 +333,7 @@ function collectResponse(value: unknown, content: string[], reasoning: string[],
       if (item.type === 'reasoning') collectText(item.summary, reasoning)
       if (item.type === 'function_call') {
         const name = stringValue(item.name) || '工具调用'
-        tools.push({ kind: 'tool', preview: `${name} · ${previewValue(item.arguments) || '无参数'}`, detail: item, toolName: name, ...(stringValue(item.call_id) ? { callId: stringValue(item.call_id) } : {}) })
+        tools.push({ kind: 'tool', preview: `${name} · ${previewValue(item.arguments) || '无参数'}`, detail: item, toolName: name, toolEvent: 'call', ...(stringValue(item.call_id) ? { callId: stringValue(item.call_id) } : {}) })
       }
     }
   }
