@@ -189,25 +189,25 @@
                 </span>
               </span>
             </div>
+            <section class="webqq-model-request-view-switch" aria-label="详情显示方式">
+              <Button
+                size="sm"
+                :variant="detailView === 'evidence' ? 'secondary' : 'ghost'"
+                @click="detailView = 'evidence'"
+              >
+                <IconFileCode data-icon="inline-start" aria-hidden="true" />
+                请求
+              </Button>
+              <Button
+                size="sm"
+                :variant="detailView === 'trajectory' ? 'secondary' : 'ghost'"
+                @click="detailView = 'trajectory'"
+              >
+                <IconTimelineEvent data-icon="inline-start" aria-hidden="true" />
+                轨迹
+              </Button>
+            </section>
           </header>
-          <section class="webqq-model-request-view-switch" aria-label="详情显示方式">
-            <Button
-              size="sm"
-              :variant="detailView === 'trajectory' ? 'secondary' : 'ghost'"
-              @click="detailView = 'trajectory'"
-            >
-              <IconTimelineEvent data-icon="inline-start" aria-hidden="true" />
-              轨迹
-            </Button>
-            <Button
-              size="sm"
-              :variant="detailView === 'evidence' ? 'secondary' : 'ghost'"
-              @click="detailView = 'evidence'"
-            >
-              <IconBraces data-icon="inline-start" aria-hidden="true" />
-              原始证据
-            </Button>
-          </section>
 
           <ModelRequestTrajectory
             v-if="detailView === 'trajectory'"
@@ -496,6 +496,7 @@ import {
   IconCpu,
   IconCopy,
   IconDownload,
+  IconFileCode,
   IconFilter,
   IconFingerprint,
   IconLayoutGrid,
