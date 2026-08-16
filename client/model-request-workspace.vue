@@ -211,11 +211,11 @@
 
           <ModelRequestTrajectory
             v-if="detailView === 'trajectory'"
-            :trajectory="trajectory"
-            :mode="trajectoryMode"
-            :loading="detailLoading"
+            :trajectory="conversationTrajectory"
+            mode="conversation"
+            :show-mode-switch="false"
+            :loading="detailLoading || trajectory?.mode !== 'conversation'"
             :conversation-available="Boolean(detail.entities.conversationId)"
-            @update:mode="setTrajectoryMode"
             @open-request="openRelatedRequest"
           />
           <template v-else>
@@ -348,8 +348,17 @@
                 >
                   响应
                 </Button>
+                <Button
+                  size="sm"
+                  :variant="bodyView === 'analysis' ? 'secondary' : 'ghost'"
+                  role="tab"
+                  :aria-selected="bodyView === 'analysis'"
+                  @click="bodyView = 'analysis'"
+                >
+                  分析
+                </Button>
               </div>
-              <div class="webqq-model-request-body-actions">
+              <div v-if="bodyView !== 'analysis'" class="webqq-model-request-body-actions">
                 <div
                   v-if="bodyView === 'response' && detail.responseBodyStatus === 'complete'"
                   class="webqq-model-request-response-tabs"
@@ -410,6 +419,16 @@
                 />
               </div>
             </template>
+
+            <ModelRequestTrajectory
+              v-else-if="bodyView === 'analysis'"
+              class="webqq-model-request-analysis"
+              :trajectory="requestTrajectory"
+              mode="request"
+              :show-mode-switch="false"
+              :loading="detailLoading || trajectory?.mode !== 'request'"
+              :conversation-available="false"
+            />
 
             <template v-else>
               <p class="webqq-model-request-response-meta">{{ responseBodyLabel }}</p>
@@ -563,10 +582,11 @@ const filterSelectPortalTarget = ref<HTMLElement>()
 const liveRefresh = ref(false)
 const selectedRecordId = ref('')
 const detailView = ref<'trajectory' | 'evidence'>('trajectory')
-const trajectoryMode = ref<'request' | 'conversation'>('request')
 const clearDialogOpen = ref(false)
 const clearStep = ref<1 | 2>(1)
-const bodyView = ref<'request' | 'response'>('request')
+const bodyView = ref<'request' | 'response' | 'analysis'>('request')
+const conversationTrajectory = computed(() => props.trajectory?.mode === 'conversation' ? props.trajectory : undefined)
+const requestTrajectory = computed(() => props.trajectory?.mode === 'request' ? props.trajectory : undefined)
 const responseView = ref<'content' | 'json'>('content')
 const headersExpanded = ref(false)
 const copyState = ref<'idle' | 'success' | 'error'>('idle')
@@ -625,6 +645,7 @@ const currentBodyText = computed(() => {
     if (!detail.requestBodyAvailable || detail.requestBody === undefined) return ''
     return serializeBody(detail.requestBody)
   }
+  if (bodyView.value !== 'response') return ''
   return detail.responseBodyStatus === 'complete' ? detail.responseBodyRaw ?? '' : ''
 })
 const responseBodyLabel = computed(() => {
@@ -668,8 +689,12 @@ watch(() => props.detail?.id, () => {
   bodyView.value = 'request'
   responseView.value = 'content'
   headersExpanded.value = false
-  if (props.detail) requestTrajectory(trajectoryMode.value)
+  if (props.detail) fetchTrajectory(currentTrajectoryMode())
   resetCopyState()
+})
+
+watch(detailView, () => {
+  fetchTrajectory(currentTrajectoryMode())
 })
 
 watch(bodyView, resetCopyState)
@@ -698,7 +723,7 @@ function refresh(limit = MODEL_REQUEST_PAGE_SIZE) {
     const scope = record ? resolveRecordScope(record) : currentScope()
     emit('open', { ...scope, recordId: selectedRecordId.value })
     // 同一条记录从进行中变为已完成时 id 不变，不能只靠详情 id watcher 重拉轨迹。
-    emit('trajectory', { ...scope, recordId: selectedRecordId.value, mode: trajectoryMode.value })
+    emit('trajectory', { ...scope, recordId: selectedRecordId.value, mode: currentTrajectoryMode() })
   }
 }
 
@@ -724,10 +749,14 @@ function openRecord(recordId: string) {
   const record = props.records.find(({ id }) => id === recordId)
   const scope = record ? resolveRecordScope(record) : currentScope()
   emit('open', { ...scope, recordId })
-  emit('trajectory', { ...scope, recordId, mode: trajectoryMode.value })
+  emit('trajectory', { ...scope, recordId, mode: currentTrajectoryMode() })
 }
 
-function requestTrajectory(mode: 'request' | 'conversation') {
+function currentTrajectoryMode() {
+  return detailView.value === 'trajectory' ? 'conversation' : 'request'
+}
+
+function fetchTrajectory(mode: 'request' | 'conversation') {
   const detail = props.detail
   if (!detail) return
   emit('trajectory', {
@@ -737,17 +766,12 @@ function requestTrajectory(mode: 'request' | 'conversation') {
   })
 }
 
-function setTrajectoryMode(mode: 'request' | 'conversation') {
-  trajectoryMode.value = mode
-  requestTrajectory(mode)
-}
-
 function openRelatedRequest(recordId: string) {
   selectedRecordId.value = recordId
   const record = props.trajectory?.records.find(({ id }) => id === recordId)
   const scope = record ? resolveRecordScope(record) : currentScope()
   emit('open', { ...scope, recordId })
-  emit('trajectory', { ...scope, recordId, mode: trajectoryMode.value })
+  emit('trajectory', { ...scope, recordId, mode: currentTrajectoryMode() })
 }
 
 function resetFilters() {

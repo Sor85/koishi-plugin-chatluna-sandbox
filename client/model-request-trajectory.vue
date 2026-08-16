@@ -1,7 +1,7 @@
 <template>
   <section class="webqq-model-trajectory" aria-label="模型请求轨迹">
-    <header class="webqq-model-trajectory-scope">
-      <div class="webqq-model-trajectory-mode" role="tablist" aria-label="轨迹范围">
+    <header v-if="showModeSwitch || mode === 'conversation'" class="webqq-model-trajectory-scope">
+      <div v-if="showModeSwitch" class="webqq-model-trajectory-mode" role="tablist" aria-label="轨迹范围">
         <Button
           size="sm"
           :variant="mode === 'request' ? 'secondary' : 'ghost'"
@@ -279,12 +279,15 @@ import type {
   SandboxModelRequestTrajectoryRow,
 } from '../src/types'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   trajectory?: SandboxModelRequestTrajectory
   mode: 'request' | 'conversation'
   loading: boolean
   conversationAvailable: boolean
-}>()
+  showModeSwitch?: boolean
+}>(), {
+  showModeSwitch: true,
+})
 
 defineEmits<{
   'update:mode': [mode: 'request' | 'conversation']
