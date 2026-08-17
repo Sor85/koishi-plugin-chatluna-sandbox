@@ -167,7 +167,7 @@
       <section class="webqq-model-request-detail-pane" aria-label="模型请求详情">
         <div v-if="detailLoading && !detail" class="webqq-model-request-empty">正在读取请求详情…</div>
         <div v-else-if="!detail" class="webqq-model-request-empty">选择一条记录查看请求体和响应体</div>
-        <article v-else v-webqq-scrollbar class="webqq-model-request-detail">
+        <article v-else ref="detailElement" v-webqq-scrollbar class="webqq-model-request-detail">
           <header>
             <div class="webqq-model-request-item-title">
               <span class="webqq-model-request-bot">
@@ -216,6 +216,7 @@
             :show-mode-switch="false"
             :loading="detailLoading || trajectory?.mode !== 'conversation'"
             :conversation-available="Boolean(detail.entities.conversationId)"
+            :restore-state="trajectoryReturnState"
             @open-request="openRelatedRequest"
           />
           <template v-else>
@@ -516,7 +517,7 @@ import {
   IconTrash,
   IconWorld,
 } from '@tabler/icons-vue'
-import { computed, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
 import { Checkbox } from './components/ui/checkbox'
@@ -600,8 +601,28 @@ const requestTrajectory = computed(() => props.trajectory?.mode === 'request' ? 
 const responseView = ref<'content' | 'json'>('content')
 const headersExpanded = ref(false)
 const copyState = ref<'idle' | 'success' | 'error'>('idle')
+const detailElement = ref<HTMLElement>()
 const requestHighlightPath = ref<string[]>()
 const responseHighlightPath = ref<string[]>()
+const trajectoryReturnState = ref<{
+  rowId: string
+  scrollTop: number
+  token: number
+}>()
+interface ModelRequestReturnState {
+  recordId: string
+  detailView: 'trajectory' | 'evidence'
+  bodyView: 'request' | 'response' | 'analysis'
+  trajectoryMode: 'request' | 'conversation'
+  detailScrollTop: number
+  trajectory: {
+    rowId: string
+    scrollTop: number
+  }
+}
+let returnState: ModelRequestReturnState | undefined
+let pendingReturnState: ModelRequestReturnState | undefined
+let returnStateToken = 0
 let pendingRequestFocus: {
   recordId: string
   kind: SandboxModelRequestTrajectoryKind
@@ -716,6 +737,7 @@ watch(() => props.detail?.id, () => {
   responseView.value = 'content'
   headersExpanded.value = false
   applyPendingRequestFocus()
+  applyPendingReturnState()
   if (props.detail) fetchTrajectory(currentTrajectoryMode())
   resetCopyState()
 })
@@ -801,7 +823,19 @@ function openRelatedRequest(payload: {
   kind: SandboxModelRequestTrajectoryKind
   detail?: unknown
   source?: 'request' | 'response'
+  returnState: {
+    rowId: string
+    scrollTop: number
+  }
 }) {
+  returnState = {
+    recordId: selectedRecordId.value,
+    detailView: detailView.value,
+    bodyView: bodyView.value,
+    trajectoryMode: currentTrajectoryMode(),
+    detailScrollTop: detailElement.value?.scrollTop ?? 0,
+    trajectory: payload.returnState,
+  }
   pendingRequestFocus = payload
   requestHighlightPath.value = undefined
   responseHighlightPath.value = undefined
@@ -839,9 +873,39 @@ function applyPendingRequestFocus() {
 }
 
 function returnToTrajectory() {
+  const state = returnState
+  if (!state) return
   requestHighlightPath.value = undefined
   responseHighlightPath.value = undefined
-  detailView.value = 'trajectory'
+  pendingReturnState = state
+  returnState = undefined
+  selectedRecordId.value = state.recordId
+  detailView.value = state.detailView
+  bodyView.value = state.bodyView
+  const record = props.trajectory?.records.find(({ id }) => id === state.recordId)
+  const scope = record ? resolveRecordScope(record) : currentScope()
+  emit('open', { ...scope, recordId: state.recordId })
+  emit('trajectory', { ...scope, recordId: state.recordId, mode: state.trajectoryMode })
+  applyPendingReturnState()
+}
+
+function applyPendingReturnState() {
+  const state = pendingReturnState
+  if (!state || props.detail?.id !== state.recordId) return
+  // 跨请求返回时 detail.id watcher 会先把页签重置到“请求”；目标详情真正到达后，
+  // 必须连同轨迹和滚动位置再次恢复视图快照，否则同请求测试通过但跨请求仍会落回请求页。
+  detailView.value = state.detailView
+  bodyView.value = state.bodyView
+  trajectoryReturnState.value = {
+    ...state.trajectory,
+    token: ++returnStateToken,
+  }
+  pendingReturnState = undefined
+  nextTick(() => {
+    window.requestAnimationFrame(() => {
+      if (detailElement.value) detailElement.value.scrollTop = state.detailScrollTop
+    })
+  })
 }
 
 function resetFilters() {

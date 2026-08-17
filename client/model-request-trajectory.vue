@@ -123,7 +123,7 @@
       </p>
 
       <div class="webqq-model-trajectory-ledger" :class="{ 'has-inspector': selectedRow }">
-        <div v-webqq-scrollbar class="webqq-model-trajectory-table" role="table" aria-label="轨迹事件账本">
+        <div ref="ledgerElement" v-webqq-scrollbar class="webqq-model-trajectory-table" role="table" aria-label="轨迹事件账本">
           <div v-if="!ledgerRows.length" class="webqq-model-trajectory-filter-empty">当前折叠条件下没有事件</div>
           <template v-for="row in ledgerRows" :key="row.id">
             <div v-if="row.kind === 'request'" class="webqq-model-trajectory-request-boundary" role="row">
@@ -198,7 +198,7 @@ import {
   IconSquarePlus,
   IconX,
 } from '@tabler/icons-vue'
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
@@ -221,6 +221,11 @@ const props = withDefaults(defineProps<{
   loading: boolean
   conversationAvailable: boolean
   showModeSwitch?: boolean
+  restoreState?: {
+    rowId: string
+    scrollTop: number
+    token: number
+  }
 }>(), {
   showModeSwitch: true,
 })
@@ -232,8 +237,14 @@ const emit = defineEmits<{
     kind: SandboxModelRequestTrajectoryKind
     detail?: unknown
     source?: 'request' | 'response'
+    returnState: {
+      rowId: string
+      scrollTop: number
+    }
   }]
 }>()
+
+const ledgerElement = ref<HTMLElement>()
 
 const selectedRowId = ref('')
 const actualDuration = ref(true)
@@ -357,7 +368,22 @@ const ledgerRows = computed(() => props.trajectory?.rows.filter((row) => {
 }) ?? [])
 watch(() => props.trajectory, () => {
   selectedRowId.value = ''
+  restoreTrajectoryPosition()
 })
+
+watch(() => props.restoreState?.token, restoreTrajectoryPosition, { immediate: true })
+
+async function restoreTrajectoryPosition() {
+  const state = props.restoreState
+  if (!state) return
+  selectedRowId.value = state.rowId
+  await nextTick()
+  // 轨迹组件在打开原始字段时会被卸载；恢复必须同时还原账本滚动量和选中行，
+  // 且要在轨迹 RPC 更新后重做一次，否则新数据渲染会把刚恢复的位置再次清空。
+  window.requestAnimationFrame(() => {
+    if (ledgerElement.value) ledgerElement.value.scrollTop = state.scrollTop
+  })
+}
 
 const requestRows = computed(() => props.trajectory?.rows.filter((row) => row.kind === 'request') ?? [])
 const timingBounds = computed(() => {
@@ -438,6 +464,10 @@ function openSelectedRequest() {
     recordId: request.id,
     kind: row.kind,
     source: row.source,
+    returnState: {
+      rowId: row.id,
+      scrollTop: ledgerElement.value?.scrollTop ?? 0,
+    },
     ...(row.detail !== undefined ? { detail: row.detail } : {}),
   })
 }
