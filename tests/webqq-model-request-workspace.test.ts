@@ -87,7 +87,7 @@ describe('WebQQ 模型请求工作台', () => {
     expect(workspaceSource).not.toContain('durationMs }} ms')
     expect(workspaceSource).toMatch(/webqq-model-request-overview[\s\S]*statusLabel\(detail\.status\)[\s\S]*渠道[\s\S]*模型 ID[\s\S]*耗时[\s\S]*字段[\s\S]*消息[\s\S]*工具/)
     expect(workspaceSource).not.toContain('API 密钥名称')
-    expect(workspaceSource).toMatch(/webqq-model-request-usage[\s\S]*输入[\s\S]*输出[\s\S]*推理[\s\S]*缓存[\s\S]*总 Token/)
+    expect(workspaceSource).toMatch(/webqq-model-request-usage[\s\S]*输入[\s\S]*输出[\s\S]*推理[\s\S]*缓存[\s\S]*总 Token[\s\S]*TTFT[\s\S]*TPS[\s\S]*总耗时/)
     expect(workspaceSource).not.toContain('usageStateLabel')
     expect(workspaceSource).not.toContain('字段 {{ record.summary.keys }}')
     expect(workspaceSource).toMatch(/webqq-model-request-meta-list[\s\S]*请求地址[\s\S]*关联实体/)
@@ -98,7 +98,7 @@ describe('WebQQ 模型请求工作台', () => {
     expect(styles).toContain('.webqq-model-request-header-toggle')
     expect(styles).toMatch(/\.webqq-model-request-header-json \.webqq-model-request-json-viewer\s*\{[^}]*min-height:\s*0[^}]*max-height:\s*320px/s)
     expect(styles).toMatch(/\.webqq-model-request-overview-grid\s*\{[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/s)
-    expect(styles).toMatch(/\.webqq-model-request-usage-grid\s*\{[^}]*grid-template-columns:\s*repeat\(5, minmax\(0, 1fr\)\)/s)
+    expect(styles).toMatch(/\.webqq-model-request-usage-grid\s*\{[^}]*grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/s)
     expect(styles).toMatch(/\.webqq-workspace \.sandbox-badge\.webqq-model-request-complete(?:,\s*\.webqq-workspace \.sandbox-badge\.webqq-model-request-status-success)?\s*\{[^}]*color:\s*#047857[^}]*background:\s*#d1fae5/s)
     expect(styles).toMatch(/\.webqq-model-request-meta-list\s*\{[^}]*display:\s*grid[^}]*border:\s*1px solid var\(--webqq-border\)/s)
     expect(styles).toMatch(/\.webqq-model-request-meta-list \.webqq-model-request-meta\s*\{[^}]*grid-template-columns:\s*17px minmax\(64px, auto\) minmax\(0, 1fr\)/s)
@@ -148,7 +148,8 @@ describe('WebQQ 模型请求工作台', () => {
     expect(workspaceSource).toContain('内容预览')
     expect(workspaceSource).toContain('JSON 原文')
     expect(workspaceSource).toContain('<ModelRequestTrajectory')
-    expect(workspaceSource).toContain("detailView = ref<'trajectory' | 'evidence'>('trajectory')")
+    expect(workspaceSource).toContain("detailView = ref<'trajectory' | 'evidence'>('evidence')")
+    expect(workspaceSource).toContain("detailView.value = 'evidence'")
     expect(workspaceSource).toContain("return detailView.value === 'trajectory' ? 'conversation' : 'request'")
     expect(trajectorySource).toContain('单请求')
     expect(trajectorySource).toContain('完整会话')
@@ -422,6 +423,69 @@ describe('WebQQ 模型请求工作台', () => {
       reasoningTokens: 722,
       cachedTokens: 8051,
       totalTokens: 11511,
+    })
+
+    expect(normalizeModelResponseUsage({
+      prompt_tokens: 14228,
+      completion_tokens: 406,
+      total_tokens: 14852,
+      completion_tokens_details: { reasoning_tokens: 406 },
+    })).toEqual({
+      inputTokens: 14228,
+      outputTokens: 218,
+      reasoningTokens: 406,
+      cachedTokens: undefined,
+      totalTokens: 14852,
+    })
+
+    expect(normalizeModelResponseUsage({
+      prompt_tokens: 100,
+      completion_tokens: 40,
+      total_tokens: 140,
+      completion_tokens_details: { reasoning_tokens: 40 },
+    })).toEqual({
+      inputTokens: 100,
+      outputTokens: 0,
+      reasoningTokens: 40,
+      cachedTokens: undefined,
+      totalTokens: 140,
+    })
+  })
+
+  it('合并流式 usage，避免后到的残缺片段把输出覆盖成 0', () => {
+    const preview = extractModelResponseContent([
+      {
+        event: 'chunk',
+        data: {
+          choices: [{ delta: { content: '你好' } }],
+          usage: {
+            prompt_tokens: 14228,
+            completion_tokens: 624,
+            total_tokens: 14852,
+            completion_tokens_details: { reasoning_tokens: 406 },
+          },
+        },
+      },
+      {
+        event: 'chunk',
+        data: {
+          choices: [{ delta: { content: '' } }],
+          usage: {
+            prompt_tokens: 14228,
+            completion_tokens: 406,
+            total_tokens: 14852,
+            completion_tokens_details: { reasoning_tokens: 406 },
+          },
+        },
+      },
+    ])
+    expect(preview.content).toEqual(['你好'])
+    expect(normalizeModelResponseUsage(preview.usage)).toEqual({
+      inputTokens: 14228,
+      outputTokens: 218,
+      reasoningTokens: 406,
+      cachedTokens: undefined,
+      totalTokens: 14852,
     })
   })
 

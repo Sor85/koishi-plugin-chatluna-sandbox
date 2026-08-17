@@ -448,6 +448,19 @@ export interface SandboxModelRequestSummary {
   bodyAvailable: boolean
 }
 
+export interface SandboxModelRequestUsage {
+  inputTokens?: number
+  outputTokens?: number
+  reasoningTokens?: number
+  cachedTokens?: number
+  totalTokens?: number
+  ttftMs?: number
+  totalMs?: number
+  tps?: number
+  estimated?: boolean
+  source: 'chatluna-usage' | 'response'
+}
+
 export interface SandboxModelRequestRecord {
   id: string
   sequence: number
@@ -469,6 +482,8 @@ export interface SandboxModelRequestRecord {
   responseBodyRaw?: string
   responseBodyError?: string
   interactionId?: string
+  chatlunaRequestId?: string
+  usage?: SandboxModelRequestUsage
   error?: SandboxModelRequestError
 }
 

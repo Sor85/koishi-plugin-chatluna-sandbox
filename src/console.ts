@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type {} from '@koishijs/console'
+import { lookupChatLunaUsage, type ChatLunaUsageLookup } from './chatluna-usage'
 import { buildSandboxModelRequestTrajectory } from './model-request-trajectory'
 import type { SandboxControlService } from './control-service'
 import type { SandboxMcpService } from './mcp/service'
@@ -80,7 +81,7 @@ interface ConsoleEventMap {
   'chatluna-sandbox/debug-record': (input: SpaceScoped<GetSandboxOneBotDebugRecordInput>) => SandboxConsoleOneBotDebugRecord
   'chatluna-sandbox/clear-debug-records': (input?: { spaceId?: string }) => ClearSandboxOneBotDebugRecordsResult
   'chatluna-sandbox/model-request-records': (input: ListSandboxModelRequestRecordsInput) => SandboxModelRequestRecordsPage<SandboxConsoleModelRequestListItem>
-  'chatluna-sandbox/model-request-record': (input: ReadSandboxModelRequestRecordInput) => SandboxConsoleModelRequestDetail
+  'chatluna-sandbox/model-request-record': (input: ReadSandboxModelRequestRecordInput) => Promise<SandboxConsoleModelRequestDetail>
   'chatluna-sandbox/model-request-trajectory': (input: ReadSandboxModelRequestTrajectoryInput) => SandboxModelRequestTrajectory
   'chatluna-sandbox/clear-model-request-records': (input: SandboxModelRequestScope) => ClearSandboxModelRequestRecordsResult
   'chatluna-sandbox/mcp-credentials': () => Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }>
@@ -150,6 +151,7 @@ export function registerConsole(
   mcp?: SandboxMcpService,
   testSpaces?: SandboxTestSpaceService,
   unattributedModelRequests?: SandboxModelRequestStore,
+  chatlunaUsage?: ChatLunaUsageLookup,
 ) {
   console.addEntry(resolveConsoleEntry())
 
@@ -439,7 +441,7 @@ export function registerConsole(
       records: page.records.map((record) => ({ ...record, source })),
     }
   }
-  const getModelRequestRecord = (input: ReadSandboxModelRequestRecordInput): SandboxConsoleModelRequestDetail => {
+  const readModelRequestRecord = (input: ReadSandboxModelRequestRecordInput): SandboxConsoleModelRequestDetail => {
     if (input.scope === 'all') {
       try {
         return { ...control.getModelRequestRecord(input), source: { type: 'main', name: '主环境' } }
@@ -465,8 +467,13 @@ export function registerConsole(
     }
     return { ...resolveModelRequestControl(input)!.getModelRequestRecord(input), source }
   }
+  const getModelRequestRecord = async (input: ReadSandboxModelRequestRecordInput): Promise<SandboxConsoleModelRequestDetail> => {
+    const detail = readModelRequestRecord(input)
+    const usage = await lookupChatLunaUsage(chatlunaUsage, detail)
+    return usage ? { ...detail, usage } : detail
+  }
   const getModelRequestTrajectory = (input: ReadSandboxModelRequestTrajectoryInput): SandboxModelRequestTrajectory => {
-    const detail = getModelRequestRecord(input)
+    const detail = readModelRequestRecord(input)
     const store = input.scope === 'all'
       ? detail.source.type === 'main'
         ? control.getModelRequestStore()
@@ -536,7 +543,7 @@ declare module '@koishijs/console' {
     'chatluna-sandbox/debug-record'(input: SpaceScoped<GetSandboxOneBotDebugRecordInput>): SandboxConsoleOneBotDebugRecord
     'chatluna-sandbox/clear-debug-records'(input?: { spaceId?: string }): ClearSandboxOneBotDebugRecordsResult
     'chatluna-sandbox/model-request-records'(input: ListSandboxModelRequestRecordsInput): SandboxModelRequestRecordsPage<SandboxConsoleModelRequestListItem>
-    'chatluna-sandbox/model-request-record'(input: ReadSandboxModelRequestRecordInput): SandboxConsoleModelRequestDetail
+    'chatluna-sandbox/model-request-record'(input: ReadSandboxModelRequestRecordInput): Promise<SandboxConsoleModelRequestDetail>
     'chatluna-sandbox/model-request-trajectory'(input: ReadSandboxModelRequestTrajectoryInput): SandboxModelRequestTrajectory
     'chatluna-sandbox/clear-model-request-records'(input: SandboxModelRequestScope): ClearSandboxModelRequestRecordsResult
     'chatluna-sandbox/mcp-credentials'(): Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }>

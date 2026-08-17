@@ -58,7 +58,8 @@
         "console"
       ],
       "optional": [
-        "database"
+        "database",
+        "chatluna_usage"
       ]
     }
   },

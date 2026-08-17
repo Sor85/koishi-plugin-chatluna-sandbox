@@ -79,14 +79,23 @@ export function normalizeModelResponseUsage(usage: Record<string, unknown> | und
     ['output_tokens'],
     ['candidatesTokenCount'],
   ])
+  // OpenAI 的 completion_tokens 含推理，需要拆出可见输出。
   if (outputTokens !== undefined && reasoningTokens !== undefined && 'completion_tokens' in usage) {
     outputTokens = Math.max(0, outputTokens - reasoningTokens)
   }
 
-  const totalTokens = firstUsageNumber(usage, [
+  const reportedTotal = firstUsageNumber(usage, [
     ['total_tokens'],
     ['totalTokenCount'],
-  ]) ?? sumUsageTokens(inputTokens, outputTokens, reasoningTokens)
+  ])
+  // 部分网关把 completion_tokens 报成与 reasoning 相同，可见输出只体现在 total_tokens。
+  // 例如输入 14228、推理 406、总计 14852 时，扣减后输出会变成 0，实际可见输出是 218。
+  if ((outputTokens === undefined || outputTokens === 0) && inputTokens !== undefined && reportedTotal !== undefined) {
+    const impliedVisible = reportedTotal - inputTokens - (reasoningTokens ?? 0)
+    if (impliedVisible > 0) outputTokens = impliedVisible
+  }
+
+  const totalTokens = reportedTotal ?? sumUsageTokens(inputTokens, outputTokens, reasoningTokens)
   const normalized = { inputTokens, outputTokens, reasoningTokens, cachedTokens, totalTokens }
   return Object.values(normalized).some((value) => value !== undefined) ? normalized : undefined
 }
@@ -103,8 +112,8 @@ export function hasModelResponseContent(preview: ModelResponseContentPreview): b
 
 function extractPayload(value: unknown, preview: MutableModelResponseContentPreview, streaming: boolean): void {
   if (!isRecord(value)) return
-  if (isRecord(value.usage)) preview.usage = value.usage
-  if (isRecord(value.usageMetadata)) preview.usage = value.usageMetadata
+  if (isRecord(value.usage)) preview.usage = mergeUsage(preview.usage, value.usage)
+  if (isRecord(value.usageMetadata)) preview.usage = mergeUsage(preview.usage, value.usageMetadata)
 
   extractOpenAi(value, preview, streaming)
   extractResponsesApi(value, preview, streaming)
@@ -256,6 +265,25 @@ function readFirstString(value: Record<string, unknown>, keys: string[]): string
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === 'string' && value ? value : undefined
+}
+
+function mergeUsage(current: Record<string, unknown> | undefined, incoming: Record<string, unknown>): Record<string, unknown> {
+  if (!current) return { ...incoming }
+  const merged = { ...current }
+  for (const [key, value] of Object.entries(incoming)) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      const existing = merged[key]
+      merged[key] = typeof existing === 'number' ? Math.max(existing, value) : value
+      continue
+    }
+    if (isRecord(value)) {
+      const existing = merged[key]
+      merged[key] = isRecord(existing) ? mergeUsage(existing, value) : { ...value }
+      continue
+    }
+    if (value !== undefined) merged[key] = value
+  }
+  return merged
 }
 
 function firstUsageNumber(usage: Record<string, unknown>, paths: readonly (readonly string[])[]): number | undefined {

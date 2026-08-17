@@ -14,6 +14,7 @@ import {
   registerSandboxTestSpaceModel,
 } from './persistence'
 import type { SandboxOneBotDebugPersistence } from './onebot-debug'
+import { linkChatLunaUsageRequest, type ChatLunaUsageLookup } from './chatluna-usage'
 import { installModelRequestCollector, resolveChatLunaPluginClass } from './model-request-collector'
 import { MAIN_MODEL_REQUEST_SCOPE_ID, SandboxModelRequestStore, UNATTRIBUTED_MODEL_REQUEST_SCOPE_ID, type SandboxModelRequestPersistence } from './model-request'
 import { SandboxMcpHttpServer, type SandboxMcpServerConfig } from './mcp/server'
@@ -36,7 +37,7 @@ export * from './test-spaces'
 export const name = 'chatluna-sandbox'
 export const inject = {
   required: ['console'],
-  optional: ['database'],
+  optional: ['database', 'chatluna_usage'],
 }
 
 export interface Config extends SandboxAppearance {
@@ -83,13 +84,22 @@ export const Config: Schema<Config> = Schema.object({
 declare module 'koishi' {
   interface Context {
     chatlunaSandbox: SandboxControlService
+    chatluna_usage?: ChatLunaUsageLookup
   }
+  interface Events {
+    'chatluna/model-usage'(payload: import('./chatluna-usage').ChatLunaModelUsageEvent): void
+  }
+}
+
+function readChatLunaUsage(ctx: { chatluna_usage?: ChatLunaUsageLookup }): ChatLunaUsageLookup | undefined {
+  return ctx.chatluna_usage
 }
 
 export function apply(ctx: Context, config: Config) {
   ctx.inject({
     console: { required: true },
     database: { required: false },
+    chatluna_usage: { required: false },
   }, (inner) => {
     let persistence: KoishiDatabaseScenePersistence | undefined
     let createDebugPersistence: (scopeId: string) => SandboxOneBotDebugPersistence
@@ -166,6 +176,14 @@ export function apply(ctx: Context, config: Config) {
     inner.logger('chatluna-sandbox').info(chatLunaPlugin
       ? 'ChatLuna 模型请求采集器已安装。'
       : '未找到 ChatLuna 运行时，模型请求采集器未安装。')
+    const modelRequestStores = () => [
+      control.getModelRequestStore(),
+      unattributedModelRequests,
+      ...testSpaces.listSpaces().map((space) => testSpaces.getControl(space.id).getModelRequestStore()),
+    ]
+    inner.on('chatluna/model-usage', (payload) => {
+      linkChatLunaUsageRequest(modelRequestStores(), payload)
+    })
     inner.provide('chatlunaSandbox', control, true)
     try {
       const mcp = new SandboxMcpService(control, {
@@ -181,7 +199,7 @@ export function apply(ctx: Context, config: Config) {
         unattributedModelRequests,
       })
       const mcpServer = new SandboxMcpHttpServer(inner, mcp, config.mcp)
-      registerConsole(inner.console, control, config, mcp, testSpaces, unattributedModelRequests)
+      registerConsole(inner.console, control, config, mcp, testSpaces, unattributedModelRequests, readChatLunaUsage(inner))
       inner.on('ready', async () => {
         await control.waitForSceneReady()
         await mcpServer.start().catch((error) => inner.logger('chatluna-sandbox').error('MCP 监听器启动失败；WebQQ 仍可继续使用。', error))
@@ -193,7 +211,7 @@ export function apply(ctx: Context, config: Config) {
       })
     } catch (error) {
       inner.logger('chatluna-sandbox').error('MCP 初始化失败；WebQQ 仍可继续使用。', error)
-      registerConsole(inner.console, control, config, undefined, testSpaces, unattributedModelRequests)
+      registerConsole(inner.console, control, config, undefined, testSpaces, unattributedModelRequests, readChatLunaUsage(inner))
       inner.on('dispose', () => {
         disposeModelRequestCollector()
         void unattributedModelRequests.waitForPersistence()

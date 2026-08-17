@@ -21,7 +21,7 @@ afterEach(async () => {
 })
 
 describe('模型请求 Console 协议', () => {
-  it('按分类读取和清理主环境、测试空间与未归属记录', () => {
+  it('按分类读取和清理主环境、测试空间与未归属记录', async () => {
     const app = new App()
     runningApps.push(app)
     const runtimeBots = new SandboxRuntimeBotRegistry()
@@ -73,7 +73,7 @@ describe('模型请求 Console 协议', () => {
     expect(unattributedPage.records[0]).toMatchObject({ id: unattributedRecord.id, model: 'lost-model' })
     expect(unattributedPage.records[0]).not.toHaveProperty('requestBody')
     expect(unattributedPage.records[0]).not.toHaveProperty('responseBodyRaw')
-    expect(Reflect.apply(getRecord, undefined, [{ scope: 'unattributed', recordId: unattributedRecord.id }])).toMatchObject({
+    expect(await Reflect.apply(getRecord, undefined, [{ scope: 'unattributed', recordId: unattributedRecord.id }])).toMatchObject({
       id: unattributedRecord.id,
       requestBody: { model: 'lost-model', messages: [] },
       responseBodyStatus: 'complete',

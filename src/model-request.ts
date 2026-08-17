@@ -47,6 +47,7 @@ export interface AppendModelRequestRecordInput {
   responseBodyRaw?: string
   responseBodyError?: string
   interactionId?: string
+  chatlunaRequestId?: string
   error?: SandboxModelRequestError
 }
 
@@ -59,6 +60,7 @@ export interface UpdateModelRequestRecordInput {
   responseStatus?: number
   responseBodyRaw?: string
   responseBodyError?: string
+  chatlunaRequestId?: string
   error?: SandboxModelRequestError
 }
 
@@ -201,6 +203,7 @@ export class SandboxModelRequestStore {
       ...(input.responseBodyRaw !== undefined ? { responseBodyRaw: input.responseBodyRaw } : {}),
       ...(input.responseBodyError ? { responseBodyError: input.responseBodyError } : {}),
       ...(input.interactionId ? { interactionId: input.interactionId } : {}),
+      ...(input.chatlunaRequestId ? { chatlunaRequestId: input.chatlunaRequestId } : {}),
       ...(input.error ? { error: structuredClone(input.error) } : {}),
     }
     this.records.push(record)
@@ -225,6 +228,7 @@ export class SandboxModelRequestStore {
       ...(input.responseStatus !== undefined ? { responseStatus: input.responseStatus } : {}),
       ...(input.responseBodyRaw !== undefined ? { responseBodyRaw: input.responseBodyRaw } : {}),
       ...(input.responseBodyError ? { responseBodyError: input.responseBodyError } : {}),
+      ...(input.chatlunaRequestId ? { chatlunaRequestId: input.chatlunaRequestId } : {}),
     }
     if (input.status === 'success') delete next.error
     else if (input.error) next.error = structuredClone(input.error)

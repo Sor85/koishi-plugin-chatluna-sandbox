@@ -272,7 +272,7 @@
             <div class="webqq-model-request-usage-grid">
               <article v-for="item in usageItems" :key="item.label">
                 <span>{{ item.label }}</span>
-                <strong>{{ formatTokenCount(item.value) }}</strong>
+                <strong>{{ formatUsageValue(item) }}</strong>
               </article>
             </div>
           </section>
@@ -545,6 +545,7 @@ import type {
   SandboxModelRequestListItem,
   SandboxModelRequestStatus,
   SandboxModelRequestTrajectory,
+  SandboxModelRequestUsage,
   SandboxDirectoryBot,
 } from '../src/types'
 
@@ -582,7 +583,7 @@ const filterOpen = ref(false)
 const filterSelectPortalTarget = ref<HTMLElement>()
 const liveRefresh = ref(false)
 const selectedRecordId = ref('')
-const detailView = ref<'trajectory' | 'evidence'>('trajectory')
+const detailView = ref<'trajectory' | 'evidence'>('evidence')
 const clearDialogOpen = ref(false)
 const clearStep = ref<1 | 2>(1)
 const bodyView = ref<'request' | 'response' | 'analysis'>('request')
@@ -612,7 +613,11 @@ const responsePreview = computed(() => parseModelResponseBody(
 ))
 const responseTree = computed(() => buildModelRequestJsonTree(responsePreview.value, 'responseBody'))
 const responseContent = computed(() => extractModelResponseContent(responsePreview.value.value))
-const responseUsage = computed(() => normalizeModelResponseUsage(responseContent.value.usage))
+const responseUsage = computed<SandboxModelRequestUsage | undefined>(() => {
+  const parsed = normalizeModelResponseUsage(responseContent.value.usage)
+  return parsed ? { ...parsed, source: 'response' } : undefined
+})
+const usage = computed<SandboxModelRequestUsage | undefined>(() => props.detail?.usage ?? responseUsage.value)
 const detailModel = computed(() => {
   const detail = props.detail
   if (!detail) return '未识别'
@@ -633,11 +638,14 @@ const detailModel = computed(() => {
   return '未识别'
 })
 const usageItems = computed(() => [
-  { label: '输入', value: responseUsage.value?.inputTokens },
-  { label: '输出', value: responseUsage.value?.outputTokens },
-  { label: '推理', value: responseUsage.value?.reasoningTokens },
-  { label: '缓存', value: responseUsage.value?.cachedTokens },
-  { label: '总 Token', value: responseUsage.value?.totalTokens },
+  { label: '输入', value: usage.value?.inputTokens, format: 'token' as const },
+  { label: '输出', value: usage.value?.outputTokens, format: 'token' as const },
+  { label: '推理', value: usage.value?.reasoningTokens, format: 'token' as const },
+  { label: '缓存', value: usage.value?.cachedTokens, format: 'token' as const },
+  { label: '总 Token', value: usage.value?.totalTokens, format: 'token' as const },
+  { label: 'TTFT', value: usage.value?.ttftMs, format: 'duration' as const },
+  { label: 'TPS', value: usage.value?.tps, format: 'rate' as const },
+  { label: '总耗时', value: usage.value?.totalMs, format: 'duration' as const },
 ])
 const currentBodyText = computed(() => {
   const detail = props.detail
@@ -687,6 +695,7 @@ watch(filterOpen, (open, wasOpen) => {
 })
 
 watch(() => props.detail?.id, () => {
+  detailView.value = 'evidence'
   bodyView.value = 'request'
   responseView.value = 'content'
   headersExpanded.value = false
@@ -926,6 +935,17 @@ function serializeBody(value: unknown) {
 
 function formatTokenCount(value: number | undefined) {
   return value === undefined ? '—' : new Intl.NumberFormat('zh-CN').format(value)
+}
+
+function formatUsageValue(item: { value?: number, format: 'token' | 'duration' | 'rate' }) {
+  if (item.format === 'duration') return formatDuration(item.value ?? Number.NaN)
+  if (item.format === 'rate') return formatTokenRate(item.value)
+  return formatTokenCount(item.value)
+}
+
+function formatTokenRate(value: number | undefined) {
+  if (value === undefined || !Number.isFinite(value)) return '—'
+  return `${new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(value)} /s`
 }
 
 function formatTime(value: string) {
