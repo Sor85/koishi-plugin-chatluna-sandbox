@@ -57,7 +57,7 @@ describe('模型请求轨迹投影', () => {
     expect(trajectory.rows.map(({ kind }) => kind)).toEqual([
       'request', 'tool', 'system', 'user', 'tool', 'tool', 'assistant', 'assistant', 'tool',
     ])
-    expect(trajectory.rows.find(({ preview }) => preview.startsWith('工具声明'))).toMatchObject({
+    expect(trajectory.rows.find(({ preview }) => preview.startsWith('工具目录'))).toMatchObject({
       kind: 'tool',
       toolEvent: 'definition',
     })
@@ -170,6 +170,15 @@ describe('模型请求轨迹投影', () => {
       expect(trajectory.promptComposition?.find(({ kind }) => kind === 'tool-definition')?.characters).toBeGreaterThan(0)
       expect(trajectory.promptComposition?.find(({ kind }) => kind === 'tool-interaction')?.characters).toBeGreaterThan(0)
     }
+
+    const geminiTrajectory = buildSandboxModelRequestTrajectory({
+      record: store.getRecord(gemini.id)!,
+      mode: 'request',
+      store,
+    })
+    expect(geminiTrajectory.rows.some(({ kind }) => kind === 'system')).toBe(false)
+    expect(geminiTrajectory.rows.some(({ kind, preview }) => kind === 'tool' && preview.startsWith('工具目录'))).toBe(true)
+    expect(geminiTrajectory.promptComposition?.some(({ kind }) => kind === 'system')).toBe(false)
   })
 
   it('按同一记录库和 conversationId 组成完整会话 Step，不混入其他会话', () => {
@@ -192,7 +201,7 @@ describe('模型请求轨迹投影', () => {
     expect(trajectory.records).toHaveLength(2)
     expect(trajectory.records.map(({ sequence }) => sequence)).toEqual([1, 2])
     expect(trajectory.rows.filter(({ kind }) => kind === 'request')).toHaveLength(2)
-    expect(trajectory.rows.some(({ toolEvent }) => toolEvent !== undefined)).toBe(false)
+    expect(trajectory.rows.some(({ toolEvent }) => toolEvent !== undefined)).toBe(true)
     expect(trajectory.rows.some(({ preview }) => preview.startsWith('工具目录'))).toBe(true)
     expect(trajectory.promptComposition?.map(({ kind, requestId }) => ({ kind, requestId }))).toEqual([
       { kind: 'system', requestId: trajectory.records[0]?.id },

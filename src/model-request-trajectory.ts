@@ -99,7 +99,10 @@ function projectPromptComposition(body: unknown): SandboxModelRequestPromptCompo
     if (characters > 0) target.push({ kind, characters })
   }
 
-  push(prefix, 'system', body.system ?? body.systemInstruction ?? body.system_instruction)
+  const isGeminiRequest = Array.isArray(body.contents)
+  if (!isGeminiRequest) {
+    push(prefix, 'system', body.system ?? body.systemInstruction ?? body.system_instruction)
+  }
 
   if (Array.isArray(body.messages)) {
     for (const message of body.messages) {
@@ -119,6 +122,8 @@ function projectPromptComposition(body: unknown): SandboxModelRequestPromptCompo
   }
 
   if (Array.isArray(body.contents)) {
+    // Gemini 请求的 contents 轨迹不把 systemInstruction 强行投影为 System；
+    // 否则分析页和轨迹页会展示模型请求体中并不存在的系统提示词。
     for (const content of body.contents) {
       if (!isRecord(content)) continue
       const role: SandboxModelRequestPromptKind = content.role === 'model' ? 'assistant' : 'user'
@@ -173,8 +178,10 @@ function presentProjectedMessage(
 ): ProjectedMessage {
   if (mode === 'request' || message.toolEvent === undefined) return message
   // 完整会话轨迹沿用原有 TOOL 事件契约；细分只服务于单请求上下文占比与检查器。
-  const { toolEvent: _toolEvent, ...legacyMessage } = message
-  return legacyMessage
+  const { toolEvent, ...legacyMessage } = message
+  return toolEvent === 'definition'
+    ? message
+    : legacyMessage
 }
 
 function resolveConversationRecords(
@@ -273,7 +280,7 @@ function projectGeminiMessage(value: unknown): ProjectedMessage[] {
   ]
 }
 
-function projectToolCatalog(value: unknown, splitToolDefinitions: boolean): ProjectedMessage[] {
+function projectToolCatalog(value: unknown, _splitToolDefinitions: boolean): ProjectedMessage[] {
   if (!Array.isArray(value) || !value.length) return []
   const names = value.flatMap((tool) => {
     if (!isRecord(tool)) return []
@@ -284,9 +291,8 @@ function projectToolCatalog(value: unknown, splitToolDefinitions: boolean): Proj
     return []
   })
   const summary = names.length ? names.join('、') : `${value.length} 项`
-  return splitToolDefinitions
-    ? [{ kind: 'tool', preview: `工具声明 · ${summary}`, detail: value, toolEvent: 'definition' }]
-    : [{ kind: 'system', preview: `工具目录 · ${summary}`, detail: value }]
+  // 工具目录属于工具证据，不是系统提示词；否则不支持 system 的 Gemini 请求会被伪造出 System 轨道。
+  return [{ kind: 'tool', preview: `工具目录 · ${summary}`, detail: value, toolEvent: 'definition' }]
 }
 
 function projectResponseMessages(record: SandboxModelRequestRecord): ProjectedMessage[] {
