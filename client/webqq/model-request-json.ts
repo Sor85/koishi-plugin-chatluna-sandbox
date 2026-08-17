@@ -8,6 +8,7 @@ export interface ModelRequestImageSource {
 
 export interface ModelRequestJsonNode {
   key: string
+  path: string[]
   kind: ModelRequestJsonKind
   valueKind?: ModelRequestJsonValueKind
   preview: string
@@ -168,30 +169,73 @@ export function parseModelResponseSse(raw: string): Array<Record<string, unknown
   })
 }
 
+export type ModelRequestJsonPath = string[]
+
+function isModelRequestJsonRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function deepEqualModelRequestJson(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true
+  if (Array.isArray(left) && Array.isArray(right)) {
+    return left.length === right.length
+      && left.every((item, index) => deepEqualModelRequestJson(item, right[index]))
+  }
+  if (!isModelRequestJsonRecord(left) || !isModelRequestJsonRecord(right)) return false
+  const leftKeys = Object.keys(left)
+  const rightKeys = Object.keys(right)
+  return leftKeys.length === rightKeys.length
+    && leftKeys.every((key) => Object.hasOwn(right, key) && deepEqualModelRequestJson(left[key], right[key]))
+}
+
+/**
+ * 轨迹行经过 RPC 后不再与请求体共享对象引用，因此必须按结构匹配原始片段。
+ * 只返回完整节点的路径，避免把相同的短字符串误定位到另一个消息字段。
+ */
+export function findModelRequestJsonPath(value: unknown, target: unknown): ModelRequestJsonPath | undefined {
+  if (deepEqualModelRequestJson(value, target)) return []
+  if (Array.isArray(value)) {
+    for (const [index, child] of value.entries()) {
+      const childPath = findModelRequestJsonPath(child, target)
+      if (childPath) return [String(index), ...childPath]
+    }
+    return undefined
+  }
+  if (!isModelRequestJsonRecord(value)) return undefined
+  for (const [key, child] of Object.entries(value)) {
+    const childPath = findModelRequestJsonPath(child, target)
+    if (childPath) return [key, ...childPath]
+  }
+}
+
 export function buildModelRequestJsonTree(
   value: unknown,
   key = 'root',
   parentData?: Record<string, unknown>,
+  path: string[] = [],
 ): ModelRequestJsonNode {
   if (Array.isArray(value)) {
     return {
       key,
+      path,
       kind: 'array',
       preview: `${value.length} items`,
-      children: value.map((item, index) => buildModelRequestJsonTree(item, String(index), undefined)),
+      children: value.map((item, index) => buildModelRequestJsonTree(item, String(index), undefined, [...path, String(index)])),
     }
   }
   if (value && typeof value === 'object') {
     const entries = Object.entries(value as Record<string, unknown>)
     return {
       key,
+      path,
       kind: 'object',
       preview: `${entries.length} items`,
-      children: entries.map(([childKey, child]) => buildModelRequestJsonTree(child, childKey, value as Record<string, unknown>)),
+      children: entries.map(([childKey, child]) => buildModelRequestJsonTree(child, childKey, value as Record<string, unknown>, [...path, childKey])),
     }
   }
   return {
     key,
+    path,
     kind: 'value',
     valueKind: getModelRequestJsonValueKind(value),
     preview: formatModelRequestJsonPrimitive(value),

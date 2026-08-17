@@ -416,6 +416,9 @@
                   :root="true"
                   :strings-expanded="true"
                   :images-preview="true"
+                  :highlight-path="requestHighlightPath"
+                  highlight-action-label="返回"
+                  @highlight-action="returnToTrajectory"
                 />
               </div>
             </template>
@@ -428,6 +431,7 @@
               :show-mode-switch="false"
               :loading="detailLoading || trajectory?.mode !== 'request'"
               :conversation-available="false"
+              @open-request="openRelatedRequest"
             />
 
             <template v-else>
@@ -452,6 +456,9 @@
                     :open="true"
                     :root="true"
                     :strings-expanded="true"
+                    :highlight-path="responseHighlightPath"
+                    highlight-action-label="返回"
+                    @highlight-action="returnToTrajectory"
                   />
                 </div>
                 <pre v-else-if="responsePreview.kind === 'text'" class="webqq-model-request-response-raw">{{ detail.responseBodyRaw }}</pre>
@@ -524,7 +531,7 @@ import ModelResponseContentPreview from './model-response-content-preview.vue'
 import WebqqAvatar from './webqq-avatar.vue'
 import { formatDuration } from './webqq/format-duration'
 import { extractModelResponseContent, normalizeModelResponseUsage } from './webqq/model-response-content'
-import { buildModelRequestJsonTree, parseModelResponseBody } from './webqq/model-request-json'
+import { buildModelRequestJsonTree, findModelRequestJsonPath, parseModelResponseBody } from './webqq/model-request-json'
 import { createModelRequestEnterRefresh, createModelRequestLiveRefresh } from './webqq/model-request-live-refresh'
 import {
   createModelRequestRecordsQuery,
@@ -545,6 +552,7 @@ import type {
   SandboxModelRequestListItem,
   SandboxModelRequestStatus,
   SandboxModelRequestTrajectory,
+  SandboxModelRequestTrajectoryKind,
   SandboxModelRequestUsage,
   SandboxDirectoryBot,
 } from '../src/types'
@@ -592,6 +600,14 @@ const requestTrajectory = computed(() => props.trajectory?.mode === 'request' ? 
 const responseView = ref<'content' | 'json'>('content')
 const headersExpanded = ref(false)
 const copyState = ref<'idle' | 'success' | 'error'>('idle')
+const requestHighlightPath = ref<string[]>()
+const responseHighlightPath = ref<string[]>()
+let pendingRequestFocus: {
+  recordId: string
+  kind: SandboxModelRequestTrajectoryKind
+  detail?: unknown
+  source?: 'request' | 'response'
+} | undefined
 let copyStateTimer: number | undefined
 
 const hasPendingRequest = computed(() => (
@@ -699,6 +715,7 @@ watch(() => props.detail?.id, () => {
   bodyView.value = 'request'
   responseView.value = 'content'
   headersExpanded.value = false
+  applyPendingRequestFocus()
   if (props.detail) fetchTrajectory(currentTrajectoryMode())
   resetCopyState()
 })
@@ -755,6 +772,9 @@ function toggleSortOrder() {
 }
 
 function openRecord(recordId: string) {
+  pendingRequestFocus = undefined
+  requestHighlightPath.value = undefined
+  responseHighlightPath.value = undefined
   selectedRecordId.value = recordId
   const record = props.records.find(({ id }) => id === recordId)
   const scope = record ? resolveRecordScope(record) : currentScope()
@@ -776,12 +796,52 @@ function fetchTrajectory(mode: 'request' | 'conversation') {
   })
 }
 
-function openRelatedRequest(recordId: string) {
-  selectedRecordId.value = recordId
-  const record = props.trajectory?.records.find(({ id }) => id === recordId)
+function openRelatedRequest(payload: {
+  recordId: string
+  kind: SandboxModelRequestTrajectoryKind
+  detail?: unknown
+  source?: 'request' | 'response'
+}) {
+  pendingRequestFocus = payload
+  requestHighlightPath.value = undefined
+  responseHighlightPath.value = undefined
+  detailView.value = 'evidence'
+  bodyView.value = payload.source === 'response' ? 'response' : 'request'
+  if (payload.source === 'response') responseView.value = 'json'
+  selectedRecordId.value = payload.recordId
+  const record = props.trajectory?.records.find(({ id }) => id === payload.recordId)
   const scope = record ? resolveRecordScope(record) : currentScope()
-  emit('open', { ...scope, recordId })
-  emit('trajectory', { ...scope, recordId, mode: currentTrajectoryMode() })
+  emit('open', { ...scope, recordId: payload.recordId })
+  emit('trajectory', { ...scope, recordId: payload.recordId, mode: 'request' })
+  applyPendingRequestFocus()
+}
+
+function applyPendingRequestFocus() {
+  const pending = pendingRequestFocus
+  const detail = props.detail
+  if (!pending || !detail || detail.id !== pending.recordId) return
+  // 跨请求详情到达时 id watcher 会恢复默认页签，因此在真正应用定位时再次设置来源视图；
+  // 同一请求则由点击路径直接执行，两个时序最终保持一致。
+  detailView.value = 'evidence'
+  bodyView.value = pending.source === 'response' ? 'response' : 'request'
+  if (pending.source === 'response') responseView.value = 'json'
+  // 响应轨迹来自解析后的 JSON/SSE，而请求轨迹来自原始请求体；必须在各自数据树内匹配，
+  // 否则 TOOL CALL 会被错误地带回请求页，或无法定位响应中的完整调用对象。
+  const target = pending.kind === 'request' || pending.detail === undefined
+    ? []
+    : findModelRequestJsonPath(
+        pending.source === 'response' ? responsePreview.value : detail.requestBody,
+        pending.detail,
+      ) ?? []
+  if (pending.source === 'response') responseHighlightPath.value = target
+  else requestHighlightPath.value = target
+  pendingRequestFocus = undefined
+}
+
+function returnToTrajectory() {
+  requestHighlightPath.value = undefined
+  responseHighlightPath.value = undefined
+  detailView.value = 'trajectory'
 }
 
 function resetFilters() {

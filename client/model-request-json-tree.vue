@@ -1,9 +1,11 @@
 <template>
   <div
+    ref="nodeElement"
     class="webqq-model-request-json-node"
-    :class="{ 'is-root': root, 'is-nested': !root }"
+    :class="{ 'is-root': root, 'is-nested': !root, 'is-highlighted': isHighlighted }"
     :data-kind="node.kind"
     :data-value-kind="node.valueKind"
+    :data-json-path="node.path.join('.')"
   >
     <template v-if="node.kind === 'value'">
       <template v-if="imageSource && imageView === 'image'">
@@ -18,6 +20,12 @@
               aria-label="切换为原始 Base64"
               @click.stop="imageView = 'raw'"
             >raw</button>
+            <button
+              v-if="isHighlighted && highlightActionLabel"
+              type="button"
+              class="webqq-model-request-json-image-mode"
+              @click.stop="$emit('highlight-action')"
+            >{{ highlightActionLabel }}</button>
           </div>
           <figure class="webqq-model-request-json-image-preview">
             <img
@@ -67,6 +75,12 @@
           aria-label="切换为图片"
           @click.stop="imageView = 'image'"
         >image</button>
+        <button
+          v-if="isHighlighted && highlightActionLabel"
+          type="button"
+          class="webqq-model-request-json-image-mode"
+          @click.stop="$emit('highlight-action')"
+        >{{ highlightActionLabel }}</button>
       </div>
     </template>
 
@@ -92,6 +106,12 @@
         <span class="webqq-model-request-json-bracket">{{ openingBracket }}</span>
         <span v-if="!expanded" class="webqq-model-request-json-preview">{{ node.preview }}</span>
         <span v-if="!expanded" class="webqq-model-request-json-bracket">{{ closingBracket }}</span>
+        <button
+          v-if="isHighlighted && highlightActionLabel"
+          type="button"
+          class="webqq-model-request-json-image-mode"
+          @click.stop="$emit('highlight-action')"
+        >{{ highlightActionLabel }}</button>
       </div>
 
       <div v-if="expanded" class="webqq-model-request-json-content">
@@ -104,6 +124,9 @@
             :parent-kind="node.kind"
             :strings-expanded="stringsExpanded"
             :images-preview="imagesPreview"
+            :highlight-path="highlightPath"
+            :highlight-action-label="highlightActionLabel"
+            @highlight-action="$emit('highlight-action')"
           />
         </div>
         <span class="webqq-model-request-json-closing">{{ closingBracket }}</span>
@@ -114,7 +137,7 @@
 
 <script setup lang="ts">
 import { IconChevronDown, IconChevronRight } from '@tabler/icons-vue'
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import type { ModelRequestJsonKind, ModelRequestJsonNode } from './webqq/model-request-json'
 import { normalizeModelRequestJsonString } from './webqq/model-request-json'
 
@@ -127,6 +150,8 @@ const props = withDefaults(defineProps<{
   root?: boolean
   stringsExpanded?: boolean
   imagesPreview?: boolean
+  highlightPath?: readonly string[]
+  highlightActionLabel?: string
 }>(), {
   open: true,
   root: false,
@@ -134,7 +159,12 @@ const props = withDefaults(defineProps<{
   imagesPreview: false,
 })
 
+defineEmits<{
+  'highlight-action': []
+}>()
+
 const expanded = ref(props.open)
+const nodeElement = ref<HTMLElement>()
 const localStringExpanded = ref<boolean>()
 const imageView = ref<'image' | 'raw'>('image')
 let rowPointerOrigin: { x: number, y: number } | undefined
@@ -144,6 +174,12 @@ const showKey = computed(() => !props.root && props.parentKind !== 'array')
 const openingBracket = computed(() => props.node.kind === 'array' ? '[' : '{')
 const closingBracket = computed(() => props.node.kind === 'array' ? ']' : '}')
 const imageSource = computed(() => props.imagesPreview ? props.node.imageSource : undefined)
+const isHighlighted = computed(() => {
+  const target = props.highlightPath
+  return Boolean(target)
+    && target?.length === props.node.path.length
+    && target.every((part, index) => part === props.node.path[index])
+})
 const stringExpanded = computed(() => {
   if (imageSource.value && imageView.value === 'raw') return true
   return localStringExpanded.value ?? props.stringsExpanded
@@ -160,6 +196,16 @@ watch(() => props.node.value, () => {
 watch(() => props.stringsExpanded, () => {
   localStringExpanded.value = undefined
 })
+
+watch(isHighlighted, async (highlighted) => {
+  if (!highlighted) return
+  await nextTick()
+  window.requestAnimationFrame(() => {
+    // 消息对象可能比可视区更高，使用 start 才能稳定露出 role/user 和正文开头；
+    // center 会把超高节点的中段居中，看起来像没有定位到目标字段。
+    nodeElement.value?.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' })
+  })
+}, { immediate: true })
 
 function formatImageSize(source: string) {
   const base64 = source.slice(source.indexOf(',') + 1).replace(/\s/g, '')

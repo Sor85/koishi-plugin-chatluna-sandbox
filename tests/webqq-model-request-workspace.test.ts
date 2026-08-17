@@ -5,6 +5,7 @@ import { formatDuration } from '../client/webqq/format-duration'
 import { extractModelResponseContent, normalizeModelResponseUsage } from '../client/webqq/model-response-content'
 import {
   buildModelRequestJsonTree,
+  findModelRequestJsonPath,
   parseModelRequestImageSource,
   parseModelResponseBody,
 } from '../client/webqq/model-request-json'
@@ -169,6 +170,20 @@ describe('WebQQ 模型请求工作台', () => {
     expect(trajectorySource).toContain('TTFT 与解码阶段')
     expect(trajectorySource).toContain('轨迹事件账本')
     expect(trajectorySource).toContain('打开原始请求')
+    expect(trajectorySource).toContain("'open-request': [payload:")
+    expect(workspaceSource).toMatch(/v-else-if="bodyView === 'analysis'"[\s\S]*@open-request="openRelatedRequest"/)
+    expect(workspaceSource).toContain("detailView.value = 'evidence'")
+    expect(workspaceSource).toContain("bodyView.value = pending.source === 'response' ? 'response' : 'request'")
+    expect(workspaceSource).toContain("if (pending.source === 'response') responseView.value = 'json'")
+    expect(workspaceSource).toContain("detailView.value = 'trajectory'")
+    expect(workspaceSource).toContain("mode: 'request'")
+    expect(workspaceSource).toContain(':highlight-path="requestHighlightPath"')
+    expect(workspaceSource).toContain(':highlight-path="responseHighlightPath"')
+    expect(jsonSource).toContain('highlightActionLabel')
+    expect(jsonSource).toContain("$emit('highlight-action')")
+    expect(jsonSource).toContain('scrollIntoView')
+    expect(jsonSource).toContain('data-json-path')
+    expect(styles).toContain('.webqq-model-request-json-node.is-highlighted')
     expect(responsePreviewSource).toContain('模型输出')
     expect(responsePreviewSource).toContain('思考内容')
     expect(responsePreviewSource).toContain('工具调用')
@@ -238,6 +253,24 @@ describe('WebQQ 模型请求工作台', () => {
     expect(trajectorySource).toContain("if (toolsCollapsed.value && row.kind === 'tool') return false")
     expect(styles).toMatch(/\.webqq-model-trajectory-controls\s*\{[^}]*min-height:\s*32px/s)
     expect(styles).not.toContain('cursor:')
+  })
+
+  it('按结构把轨迹片段定位到 OpenAI 与 Gemini 请求体节点', () => {
+    const openAiUser = { role: 'user', content: '第二条用户消息' }
+    const openAiBody = {
+      model: 'gpt-4.1',
+      messages: [
+        { role: 'system', content: '系统提示' },
+        { role: 'user', content: '第一条用户消息' },
+        openAiUser,
+      ],
+    }
+    expect(findModelRequestJsonPath(openAiBody, structuredClone(openAiUser))).toEqual(['messages', '2'])
+
+    const geminiUser = { role: 'user', parts: [{ text: 'Gemini 用户消息' }] }
+    const geminiBody = { contents: [{ role: 'model', parts: [{ text: '模型回复' }] }, geminiUser] }
+    expect(findModelRequestJsonPath(geminiBody, structuredClone(geminiUser))).toEqual(['contents', '1'])
+    expect(findModelRequestJsonPath(openAiBody, { role: 'user', content: '不存在' })).toBeUndefined()
   })
 
   it('结构化 JSON 只展开对象和数组，标量保持为只读节点', () => {

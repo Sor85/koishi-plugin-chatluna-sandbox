@@ -178,7 +178,7 @@
             />
           </div>
           <div v-if="selectedRequest" class="webqq-model-trajectory-inspector-actions">
-            <Button variant="outline" size="sm" @click="$emit('open-request', selectedRequest.id)">
+            <Button variant="outline" size="sm" @click="openSelectedRequest">
               <IconExternalLink data-icon="inline-start" aria-hidden="true" />
               打开原始请求
             </Button>
@@ -225,9 +225,14 @@ const props = withDefaults(defineProps<{
   showModeSwitch: true,
 })
 
-defineEmits<{
+const emit = defineEmits<{
   'update:mode': [mode: 'request' | 'conversation']
-  'open-request': [recordId: string]
+  'open-request': [payload: {
+    recordId: string
+    kind: SandboxModelRequestTrajectoryKind
+    detail?: unknown
+    source?: 'request' | 'response'
+  }]
 }>()
 
 const selectedRowId = ref('')
@@ -423,6 +428,18 @@ function isCompositionSegmentSelected(segment: { kind: SandboxModelRequestPrompt
   if (!selected) return false
   const rows = promptRowsForKind(segment.kind, segment.requestId)
   return rows[segment.indexInKind]?.id === selected.id
+}
+
+function openSelectedRequest() {
+  const request = selectedRequest.value
+  const row = selectedRow.value
+  if (!request || !row) return
+  emit('open-request', {
+    recordId: request.id,
+    kind: row.kind,
+    source: row.source,
+    ...(row.detail !== undefined ? { detail: row.detail } : {}),
+  })
 }
 
 function promptKindLabel(kind: SandboxModelRequestPromptKind) {

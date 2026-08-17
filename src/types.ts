@@ -533,6 +533,7 @@ export interface SandboxModelRequestTrajectoryRow {
   callId?: string
   toolName?: string
   toolEvent?: 'definition' | 'call' | 'result'
+  source?: 'request' | 'response'
   durationMs?: number
   startedAt?: string
   requestId?: string

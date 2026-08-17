@@ -1242,6 +1242,14 @@
   background: color-mix(in srgb, var(--webqq-hover) 56%, transparent);
 }
 
+.webqq-model-request-json-node.is-highlighted > .webqq-model-request-json-row,
+.webqq-model-request-json-node.is-highlighted > .webqq-model-request-json-image-node {
+  outline: 2px solid var(--webqq-accent);
+  outline-offset: -2px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--webqq-accent) 15%, var(--webqq-surface));
+}
+
 .webqq-model-request-json-toggle {
   display: inline-flex;
   flex: 0 0 14px;

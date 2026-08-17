@@ -25,7 +25,11 @@ function createStore() {
     responseBodyStatus: 'complete',
     responseBodyFormat: 'json',
     responseBodyRaw: JSON.stringify({
-      choices: [{ message: { content: '北京今天晴朗', reasoning_content: '读取工具结果' } }],
+      choices: [{ message: {
+        content: '北京今天晴朗',
+        reasoning_content: '读取工具结果',
+        tool_calls: [{ id: 'call-2', function: { name: 'forecast', arguments: '{"city":"北京"}' } }],
+      } }],
       usage: { prompt_tokens: 20, completion_tokens: 8 },
     }),
   })
@@ -51,7 +55,7 @@ describe('模型请求轨迹投影', () => {
 
     expect(trajectory.records).toHaveLength(1)
     expect(trajectory.rows.map(({ kind }) => kind)).toEqual([
-      'request', 'tool', 'system', 'user', 'tool', 'tool', 'assistant', 'assistant',
+      'request', 'tool', 'system', 'user', 'tool', 'tool', 'assistant', 'assistant', 'tool',
     ])
     expect(trajectory.rows.find(({ preview }) => preview.startsWith('工具声明'))).toMatchObject({
       kind: 'tool',
@@ -61,10 +65,15 @@ describe('模型请求轨迹投影', () => {
       kind: 'tool',
       toolName: 'lookup',
       toolEvent: 'call',
+      source: 'request',
     })
     expect(trajectory.rows.find(({ toolEvent }) => toolEvent === 'result')).toMatchObject({
       kind: 'tool',
       toolEvent: 'result',
+      source: 'request',
+    })
+    expect(trajectory.rows.filter(({ toolEvent }) => toolEvent === 'call').at(-1)).toMatchObject({
+      source: 'response',
     })
     expect(trajectory.rows.some(({ preview }) => preview.includes('北京今天晴朗'))).toBe(true)
     expect(trajectory.promptComposition?.map(({ kind }) => kind)).toEqual([

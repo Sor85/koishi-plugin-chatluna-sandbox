@@ -24,6 +24,7 @@ interface ProjectedMessage {
   callId?: string
   toolName?: string
   toolEvent?: 'definition' | 'call' | 'result'
+  source?: 'request' | 'response'
 }
 
 export function buildSandboxModelRequestTrajectory(
@@ -54,6 +55,7 @@ export function buildSandboxModelRequestTrajectory(
         id: `${record.id}:${message.kind}:${index}`,
         index: index++,
         requestId: record.id,
+        source: 'request',
         ...presentProjectedMessage(message, options.mode),
       })
     }
@@ -62,6 +64,7 @@ export function buildSandboxModelRequestTrajectory(
         id: `${record.id}:${message.kind}:${index}`,
         index: index++,
         requestId: record.id,
+        source: 'response',
         ...presentProjectedMessage(message, options.mode),
       })
     }
