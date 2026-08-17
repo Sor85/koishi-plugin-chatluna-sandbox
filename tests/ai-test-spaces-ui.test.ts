@@ -10,7 +10,7 @@ describe('AI 测试空间总览', () => {
 
     expect(sidebar).toContain("label: 'AI 测试空间'")
     expect(sidebar).toContain('visibleNavigationItems')
-    expect(sidebar).toContain("'is-rail-pin-bottom': item.id === 'spaces'")
+    expect(sidebar).toContain("'is-rail-pin-end': item.id === 'spaces'")
     expect(overview).toContain('主模拟 QQ 环境')
     expect(overview).toContain('filteredSpaces')
     expect(overview).toContain('创建测试空间')
@@ -76,7 +76,7 @@ describe('AI 测试空间总览', () => {
     expect(capture).toContain("node.removeAttribute('id')")
     expect(styles).toContain('.webqq-space-thumbnail-live-workspace')
     expect(responsiveStyles).toContain(':is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace).is-details-open .chatluna-sandbox-chat')
-    expect(responsiveStyles).toContain('grid-column: 3')
+    expect(responsiveStyles).toContain('grid-column: 2')
   })
 
   it('复刻 ego lite 的 agent 光标与被控空间观察覆盖层', () => {

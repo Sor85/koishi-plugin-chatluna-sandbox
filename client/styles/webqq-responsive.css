@@ -1,6 +1,6 @@
 @media (max-width: 1180px) {
   .webqq-workspace {
-    grid-template-columns: 72px minmax(220px, 280px) minmax(360px, 1fr);
+    grid-template-columns: minmax(220px, 280px) minmax(360px, 1fr);
   }
 
   .webqq-profile {
@@ -11,8 +11,8 @@
     z-index: 4;
     display: flex;
     width: 100%;
-    grid-column: 3;
-    grid-row: 1;
+    grid-column: 2;
+    grid-row: 2;
     justify-self: stretch;
     border-left: 1px solid var(--webqq-border);
   }
@@ -33,23 +33,40 @@
   }
 
   /* 补上 is-details-closed / is-standalone-view 两个高特异度变体，
-     否则基线的三列 grid 定义会压过这里，产生溢出视口的幽灵列。 */
+     否则基线的多列 grid 定义会压过这里，产生溢出视口的幽灵列。 */
   .webqq-workspace,
   .webqq-workspace.is-details-closed,
   .webqq-workspace.is-standalone-view {
-    grid-template-columns: 60px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .webqq-rail {
     grid-column: 1;
     grid-row: 1;
+    gap: 4px;
     padding: 10px 8px;
   }
 
-  /* 触控目标不低于 44px（列宽 60 = 44 按钮 + 两侧 8px 内边距）。 */
+  .webqq-brand {
+    gap: 7px;
+    padding-right: 10px;
+    padding-left: 4px;
+  }
+
+  .webqq-brand-logo {
+    width: 28px;
+    height: 28px;
+  }
+
+  .webqq-brand strong {
+    font-size: 13px;
+  }
+
+  /* 顶栏保持 44px 触控目标，并收紧文字按钮的横向间距以适配 Koishi 活动栏后的窄视口。 */
   .webqq-rail-button {
-    width: 44px;
     height: 44px;
+    gap: 5px;
+    padding: 0 9px;
   }
 
   /* 单栏互切时会话列表被隐藏，聊天头部显示返回入口。 */
@@ -86,8 +103,8 @@
   .chatluna-sandbox-chat,
   .webqq-profile {
     display: none;
-    grid-column: 2;
-    grid-row: 1;
+    grid-column: 1;
+    grid-row: 2;
   }
 
   .webqq-workspace[data-mobile-view="contacts"] .webqq-conversations,
@@ -106,8 +123,8 @@
     z-index: 4;
     display: flex;
     width: 100%;
-    grid-column: 2;
-    grid-row: 1;
+    grid-column: 1;
+    grid-row: 2;
     justify-self: stretch;
   }
 
@@ -163,33 +180,35 @@
 :is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace),
 :is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace).is-details-open,
 :is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace).is-details-closed {
-  grid-template-columns: 72px 300px minmax(360px, 1fr) 280px;
+  grid-template-columns: 300px minmax(360px, 1fr) 280px;
+  grid-template-rows: 64px minmax(0, 1fr);
 }
 
 :is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) .webqq-rail {
-  grid-column: 1;
-  padding: 10px 8px;
+  grid-column: 1 / -1;
+  grid-row: 1;
+  padding: 10px 12px;
 }
 
 :is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) .webqq-conversations {
   display: flex;
-  grid-column: 2;
-  grid-row: 1;
+  grid-column: 1;
+  grid-row: 2;
 }
 
 :is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace).is-details-open .chatluna-sandbox-chat {
   display: grid;
   visibility: visible;
-  grid-column: 3;
-  grid-row: 1;
+  grid-column: 2;
+  grid-row: 2;
 }
 
 :is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace).is-details-open .webqq-profile {
   z-index: auto;
   display: flex;
   width: auto;
-  grid-column: 4;
-  grid-row: 1;
+  grid-column: 3;
+  grid-row: 2;
   justify-self: stretch;
 }
 

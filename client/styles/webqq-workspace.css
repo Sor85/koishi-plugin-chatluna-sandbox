@@ -47,7 +47,8 @@ body[data-sandbox-color-scheme="dark"] .chatluna-sandbox-page {
 
 .webqq-workspace {
   display: grid;
-  grid-template-columns: 72px minmax(230px, 300px) minmax(360px, 1fr) 280px;
+  grid-template-columns: minmax(230px, 300px) minmax(360px, 1fr) 280px;
+  grid-template-rows: 64px minmax(0, 1fr);
   width: 100%;
   height: 100%;
   min-height: 0;
@@ -57,15 +58,16 @@ body[data-sandbox-color-scheme="dark"] .chatluna-sandbox-page {
 }
 
 .webqq-workspace.is-details-closed {
-  grid-template-columns: 72px minmax(230px, 300px) minmax(360px, 1fr);
+  grid-template-columns: minmax(230px, 300px) minmax(360px, 1fr);
 }
 
 .webqq-workspace.is-standalone-view {
-  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .webqq-workspace.is-standalone-view .chatluna-sandbox-chat {
-  grid-column: 2;
+  grid-column: 1;
+  grid-row: 2;
 }
 
 .webqq-workspace.is-details-closed .webqq-profile {
@@ -79,6 +81,11 @@ body[data-sandbox-color-scheme="dark"] .chatluna-sandbox-page {
   min-width: 0;
   min-height: 0;
   border-right: 1px solid var(--webqq-border);
+}
+
+.webqq-rail {
+  border-right: 0;
+  border-bottom: 1px solid var(--webqq-border);
 }
 
 /* 毛玻璃声明只写无前缀 backdrop-filter，禁止手写 -webkit-backdrop-filter：

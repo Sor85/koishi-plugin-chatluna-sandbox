@@ -1,11 +1,17 @@
 <template>
         <nav class="webqq-rail" aria-label="WebQQ 主导航">
+          <div class="webqq-brand" aria-label="ChatLuna Sandbox">
+            <span class="webqq-brand-logo" aria-hidden="true">
+              <SandboxActivityIcon />
+            </span>
+            <strong>ChatLuna Sandbox</strong>
+          </div>
           <TooltipProvider>
             <Tooltip v-for="item in visibleNavigationItems" :key="item.id">
               <TooltipTrigger as-child>
                 <span
                   class="webqq-rail-tooltip-trigger"
-                  :class="{ 'is-rail-pin-bottom': item.id === 'spaces' }"
+                  :class="{ 'is-rail-pin-end': item.id === 'spaces' }"
                 >
                   <button
                     type="button"
@@ -16,10 +22,11 @@
                     @click="selectNavigation(item.id)"
                   >
                     <component :is="item.icon" :size="22" stroke-width="1.8" aria-hidden="true" />
+                    <span v-if="item.id !== 'spaces'" class="webqq-rail-label">{{ item.label }}</span>
                   </button>
                 </span>
               </TooltipTrigger>
-              <TooltipContent side="right">{{ item.label }}</TooltipContent>
+              <TooltipContent side="bottom">{{ item.label }}</TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </nav>
@@ -306,6 +313,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip'
 import EnvironmentCreatePopover from './environment-create-popover.vue'
 import NotificationMenu from './notification-menu.vue'
+import SandboxActivityIcon from './sandbox-activity-icon.vue'
 import { getGroupRoleLabel } from './webqq/group-display'
 import WebqqAvatar from './webqq-avatar.vue'
 import WebqqMenuExtensionMark from './webqq-menu-extension-mark.vue'

@@ -1,26 +1,66 @@
 .webqq-rail {
-  grid-column: 1;
+  grid-column: 1 / -1;
   grid-row: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 10px 8px;
+  padding: 10px 12px;
   background: var(--webqq-rail);
 }
 
-.webqq-rail-button {
-  width: 44px;
+.webqq-brand {
+  display: inline-flex;
   height: 44px;
+  flex: none;
+  align-items: center;
+  gap: 9px;
+  padding: 0 14px 0 6px;
+  color: var(--webqq-text);
+  white-space: nowrap;
+}
+
+.webqq-brand-logo {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--webqq-accent);
+}
+
+.webqq-brand-logo > svg {
+  width: 20px;
+  height: 20px;
+}
+
+.webqq-brand strong {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.webqq-rail-button {
+  width: auto;
+  height: 44px;
+  gap: 7px;
+  padding: 0 14px;
   border-radius: 13px;
+  white-space: nowrap;
+}
+
+.webqq-rail-label {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
 }
 
 .webqq-rail-tooltip-trigger {
   display: flex;
 }
 
-.webqq-rail-tooltip-trigger.is-rail-pin-bottom {
-  margin-top: auto;
+.webqq-rail-tooltip-trigger.is-rail-pin-end {
+  margin-left: auto;
 }
 
 .webqq-rail-button.is-active {
@@ -29,8 +69,8 @@
 }
 
 .webqq-conversations {
-  grid-column: 2;
-  grid-row: 1;
+  grid-column: 1;
+  grid-row: 2;
 }
 
 .webqq-sidebar-tabs-row {
