@@ -228,7 +228,7 @@ describe('MCP 折叠大型调试值', () => {
 })
 
 describe('控制服务与 Console 单条详情', () => {
-  it('getOneBotDebugRecord 支持 includeLargeValues，Console 同步暴露 debug-record', async () => {
+  it('getOneBotDebugRecord 支持 includeLargeValues，Console 异步暴露 debug-record', async () => {
     const app = new App()
     runningApps.push(app)
     const control = new SandboxControlService(app)
@@ -268,15 +268,15 @@ describe('控制服务与 Console 单条详情', () => {
 
     const getRecord = listeners.get('chatluna-sandbox/debug-record')
     expect(getRecord).toBeTypeOf('function')
-    expect(getRecord?.({ recordId: projected.id })).toMatchObject({
+    expect(await getRecord?.({ recordId: projected.id })).toMatchObject({
       id: projected.id,
       payload: { file: expect.objectContaining({ kind: 'large-value' }) },
       source: { type: 'main', name: '主环境' },
     })
-    expect(getRecord?.({ recordId: projected.id, includeLargeValues: true })).toMatchObject({
+    expect(await getRecord?.({ recordId: projected.id, includeLargeValues: true })).toMatchObject({
       payload: { file: body },
     })
-    expect(listeners.get('chatluna-sandbox/debug-records')?.({})).toMatchObject({
+    expect(await listeners.get('chatluna-sandbox/debug-records')?.({})).toMatchObject({
       capacity: expect.objectContaining({ recordCount: 1, totalBytes: expect.any(Number) }),
     })
   })

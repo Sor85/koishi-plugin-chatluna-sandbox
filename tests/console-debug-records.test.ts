@@ -52,7 +52,7 @@ describe('OneBot 调试 Console 协议', () => {
       throw new Error('调试记录监听器未注册')
     }
     expect(listeners.has('chatluna-sandbox/replay-debug-record')).toBe(false)
-    const page = Reflect.apply(listRecords, undefined, [{ direction: 'action', action: 'get_login_info' }]) as {
+    const page = await Reflect.apply(listRecords, undefined, [{ direction: 'action', action: 'get_login_info' }]) as {
       records: Array<{ id: string, requestedAction: string }>
       hasMore: boolean
       capacity: { recordCount: number }
@@ -62,16 +62,16 @@ describe('OneBot 调试 Console 协议', () => {
       hasMore: false,
       capacity: expect.objectContaining({ recordCount: 1 }),
     })
-    expect(Reflect.apply(getRecord, undefined, [{ recordId: page.records[0]!.id }])).toMatchObject({
+    expect(await Reflect.apply(getRecord, undefined, [{ recordId: page.records[0]!.id }])).toMatchObject({
       id: page.records[0]!.id,
       requestedAction: 'get_login_info',
       source: { type: 'main', name: '主环境' },
     })
     expect(Reflect.apply(clearRecords, undefined, [])).toEqual({ cleared: 1 })
-    expect(Reflect.apply(listRecords, undefined, [{}])).toMatchObject({ records: [], hasMore: false })
+    expect(await Reflect.apply(listRecords, undefined, [{}])).toMatchObject({ records: [], hasMore: false })
   })
 
-  it('在主环境汇总并清理所有测试空间调试记录，同时保留显式空间读取', () => {
+  it('在主环境汇总并清理所有测试空间调试记录，同时保留显式空间读取', async () => {
     vi.useFakeTimers()
     const app = new App()
     runningApps.push(app)
@@ -100,13 +100,13 @@ describe('OneBot 调试 Console 协议', () => {
       status: 'success', durationMs: 2,
     })
 
-    expect(listeners.get('chatluna-sandbox/debug-records')?.({})).toMatchObject({
+    expect(await listeners.get('chatluna-sandbox/debug-records')?.({})).toMatchObject({
       records: [
         { requestedAction: 'space-event', source: { type: 'test-space', spaceId: first.id, name: '空间 A' } },
         { requestedAction: 'main-action', source: { type: 'main', name: '主环境' } },
       ],
     })
-    expect(listeners.get('chatluna-sandbox/debug-records')?.({ spaceId: first.id })).toMatchObject({
+    expect(await listeners.get('chatluna-sandbox/debug-records')?.({ spaceId: first.id })).toMatchObject({
       records: [
         { requestedAction: 'space-event', source: { type: 'test-space', spaceId: first.id, name: '空间 A' } },
       ],

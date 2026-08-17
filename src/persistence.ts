@@ -159,8 +159,15 @@ export class KoishiDatabaseOneBotDebugPersistence implements SandboxOneBotDebugP
   ) {}
 
   async load() {
-    const database = this.getDatabase()
-    if (!database) return { nextSequence: 1, records: [] }
+    // Database 是可选服务，可能在 Store 构造后才注册；不能把服务未就绪伪装成空库，
+    // 否则重启后的首次调试记录写入会覆盖数据库中的历史记录。
+    const deadline = Date.now() + 10_000
+    let database = this.getDatabase()
+    while (!database && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, Math.min(25, Math.max(1, deadline - Date.now()))))
+      database = this.getDatabase()
+    }
+    if (!database) throw new Error('等待 Koishi Database 服务 10000ms 后仍不可用')
     const [record] = await database.get(DEBUG_TABLE, { scopeId: this.scopeId })
     if (!record) return { nextSequence: 1, records: [] }
     return {

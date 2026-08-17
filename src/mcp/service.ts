@@ -966,6 +966,7 @@ export class SandboxMcpService {
         throw new SandboxMcpError('invalid_argument', '列表接口不允许 includeLargeValues；请使用 get_onebot_debug_record 展开单条记录。')
       }
       try {
+        await activeControl.waitForPersistence()
         return activeControl.getOneBotDebugRecords({
           botId: typeof args.botId === 'string' ? args.botId : undefined,
           direction: args.direction === 'action' || args.direction === 'event' ? args.direction : undefined,
@@ -986,6 +987,7 @@ export class SandboxMcpService {
     }
     if (tool === 'get_onebot_debug_record') {
       try {
+        await activeControl.waitForPersistence()
         return activeControl.getOneBotDebugRecord({
           recordId: requireString(args.recordId, 'recordId'),
           includeLargeValues: args.includeLargeValues === true,

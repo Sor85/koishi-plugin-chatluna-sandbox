@@ -323,7 +323,12 @@ export function createWebqqWorkspaceShell(
     error: modelRequestError.value,
   }))
 
-  onMounted(() => workspaceController.load())
+  onMounted(async () => {
+    await workspaceController.load()
+    // 视图会从本地偏好直接恢复为调试页，此路径不会触发侧栏点击处理器；
+    // 必须在工作区恢复后主动读取，否则重启后的首屏会一直显示空记录。
+    if (currentView.value === 'debug') await loadOneBotDebugRecords()
+  })
 
   watch(activeConversationId, () => {
     workspaceLayout.resetDetails()

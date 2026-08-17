@@ -83,8 +83,8 @@ interface ConsoleEventMap {
   'chatluna-sandbox/friend-action': (input: SpaceScoped<PerformFriendActionInput>) => Promise<SandboxWorkspaceState>
   'chatluna-sandbox/group-action': (input: SpaceScoped<PerformGroupActionInput>) => Promise<SandboxWorkspaceState>
   'chatluna-sandbox/bot-deliveries': (input?: SpaceScoped<GetSandboxBotDeliveriesInput>) => Promise<SandboxBotDelivery[]>
-  'chatluna-sandbox/debug-records': (input?: SpaceScoped<GetSandboxOneBotDebugRecordsInput>) => SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord>
-  'chatluna-sandbox/debug-record': (input: SpaceScoped<GetSandboxOneBotDebugRecordInput>) => SandboxConsoleOneBotDebugRecord
+  'chatluna-sandbox/debug-records': (input?: SpaceScoped<GetSandboxOneBotDebugRecordsInput>) => Promise<SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord>>
+  'chatluna-sandbox/debug-record': (input: SpaceScoped<GetSandboxOneBotDebugRecordInput>) => Promise<SandboxConsoleOneBotDebugRecord>
   'chatluna-sandbox/clear-debug-records': (input?: { spaceId?: string }) => ClearSandboxOneBotDebugRecordsResult
   'chatluna-sandbox/model-request-records': (input: ListSandboxModelRequestRecordsInput) => SandboxModelRequestRecordsPage<SandboxConsoleModelRequestListItem>
   'chatluna-sandbox/model-request-record': (input: ReadSandboxModelRequestRecordInput) => Promise<SandboxConsoleModelRequestDetail>
@@ -197,23 +197,31 @@ export function registerConsole(
       records: page.records.map((record) => ({ ...record, source })),
     }
   }
-  const listDebugRecords = (
+  const listDebugRecords = async (
     input: SpaceScoped<GetSandboxOneBotDebugRecordsInput> = {},
-  ): SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord> => {
+  ): Promise<SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord>> => {
     const query = withoutSpaceId(input)
     if (input.spaceId) {
       if (!testSpaces) throw new Error('AI 测试空间服务不可用')
       const space = testSpaces.getSpace(input.spaceId)
-      return getDebugPage(testSpaces.getControl(space.id), {
+      const spaceControl = testSpaces.getControl(space.id)
+      await spaceControl.waitForPersistence()
+      return getDebugPage(spaceControl, {
         type: 'test-space',
         spaceId: space.id,
         name: space.name,
       }, query)
     }
+    // 联邦视图必须等各空间恢复完成，避免把“仍在加载”误报成空历史。
+    const spaceControls = (testSpaces?.listSpaces() ?? []).map((space) => ({
+      space,
+      control: testSpaces!.getControl(space.id),
+    }))
+    await Promise.all([control.waitForPersistence(), ...spaceControls.map(({ control: activeControl }) => activeControl.waitForPersistence())])
     // 联邦视图跨多个独立 sequence，仅聚合首页；精确游标分页必须带 spaceId。
     const pages = [
       getDebugPage(control, mainSource, { ...query, beforeSequence: undefined }),
-      ...(testSpaces?.listSpaces() ?? []).map((space) => getDebugPage(testSpaces!.getControl(space.id), {
+      ...spaceControls.map(({ space, control: activeControl }) => getDebugPage(activeControl, {
         type: 'test-space',
         spaceId: space.id,
         name: space.name,
@@ -240,23 +248,28 @@ export function registerConsole(
       capacity,
     }
   }
-  const getDebugRecord = (input: SpaceScoped<GetSandboxOneBotDebugRecordInput>): SandboxConsoleOneBotDebugRecord => {
+  const getDebugRecord = async (input: SpaceScoped<GetSandboxOneBotDebugRecordInput>): Promise<SandboxConsoleOneBotDebugRecord> => {
     const query = withoutSpaceId(input)
     if (input.spaceId) {
       if (!testSpaces) throw new Error('AI 测试空间服务不可用')
       const space = testSpaces.getSpace(input.spaceId)
+      const spaceControl = testSpaces.getControl(space.id)
+      await spaceControl.waitForPersistence()
       return {
-        ...testSpaces.getControl(space.id).getOneBotDebugRecord(query),
+        ...spaceControl.getOneBotDebugRecord(query),
         source: { type: 'test-space', spaceId: space.id, name: space.name },
       }
     }
+    await control.waitForPersistence()
     try {
       return { ...control.getOneBotDebugRecord(query), source: mainSource }
     } catch (error) {
       for (const space of testSpaces?.listSpaces() ?? []) {
         try {
+          const spaceControl = testSpaces!.getControl(space.id)
+          await spaceControl.waitForPersistence()
           return {
-            ...testSpaces!.getControl(space.id).getOneBotDebugRecord(query),
+            ...spaceControl.getOneBotDebugRecord(query),
             source: { type: 'test-space', spaceId: space.id, name: space.name },
           }
         } catch {
@@ -546,8 +559,8 @@ declare module '@koishijs/console' {
     'chatluna-sandbox/friend-action'(input: SpaceScoped<PerformFriendActionInput>): Promise<SandboxWorkspaceState>
     'chatluna-sandbox/group-action'(input: SpaceScoped<PerformGroupActionInput>): Promise<SandboxWorkspaceState>
     'chatluna-sandbox/bot-deliveries'(input?: SpaceScoped<GetSandboxBotDeliveriesInput>): Promise<SandboxBotDelivery[]>
-    'chatluna-sandbox/debug-records'(input?: SpaceScoped<GetSandboxOneBotDebugRecordsInput>): SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord>
-    'chatluna-sandbox/debug-record'(input: SpaceScoped<GetSandboxOneBotDebugRecordInput>): SandboxConsoleOneBotDebugRecord
+    'chatluna-sandbox/debug-records'(input?: SpaceScoped<GetSandboxOneBotDebugRecordsInput>): Promise<SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord>>
+    'chatluna-sandbox/debug-record'(input: SpaceScoped<GetSandboxOneBotDebugRecordInput>): Promise<SandboxConsoleOneBotDebugRecord>
     'chatluna-sandbox/clear-debug-records'(input?: { spaceId?: string }): ClearSandboxOneBotDebugRecordsResult
     'chatluna-sandbox/model-request-records'(input: ListSandboxModelRequestRecordsInput): SandboxModelRequestRecordsPage<SandboxConsoleModelRequestListItem>
     'chatluna-sandbox/model-request-record'(input: ReadSandboxModelRequestRecordInput): Promise<SandboxConsoleModelRequestDetail>

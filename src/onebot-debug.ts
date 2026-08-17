@@ -190,6 +190,7 @@ export class SandboxOneBotDebugStore {
   private readonly persistence?: SandboxOneBotDebugPersistence
   private persistenceQueue = Promise.resolve()
   private ready = Promise.resolve()
+  private persistenceAuthoritative = true
 
   constructor(options: SandboxOneBotDebugStoreOptions | number = {}) {
     // 兼容旧构造签名 debugRecordLimit: number。
@@ -203,16 +204,28 @@ export class SandboxOneBotDebugStore {
     this.persistence = options.persistence
     if (this.persistence) {
       this.ready = this.persistence.load().then((state) => {
-        this.records = state.records
+        const capturedDuringLoad = this.records
+        const persisted = state.records
           .slice()
           .sort((left, right) => left.sequence - right.sequence)
-        this.nextSequence = Math.max(
+        let nextSequence = Math.max(
           state.nextSequence,
-          this.records.reduce((max, record) => Math.max(max, record.sequence + 1), 1),
+          persisted.reduce((max, record) => Math.max(max, record.sequence + 1), 1),
         )
+        // 数据库恢复是异步的，启动期可能已经收到 OneBot 记录。不能直接替换内存数组，
+        // 否则恢复完成的瞬间会丢失这些记录，且后续写入可能覆盖数据库历史。
+        const captured = capturedDuringLoad.map((record) => ({
+          ...record,
+          sequence: nextSequence++,
+        }))
+        this.records = [...persisted, ...captured]
+        this.nextSequence = nextSequence
         this.totalBytes = this.records.reduce((sum, record) => sum + estimateRecordBytes(record), 0)
         this.reclaimOverflow()
-      }).catch(() => undefined)
+      }).catch(() => {
+        // 加载失败时不能把当前内存状态当成权威数据回写，否则可能清空数据库历史。
+        this.persistenceAuthoritative = false
+      })
     }
   }
 
@@ -220,8 +233,9 @@ export class SandboxOneBotDebugStore {
     return this.ready
   }
 
-  waitForPersistence(): Promise<void> {
-    return this.persistenceQueue
+  async waitForPersistence(): Promise<void> {
+    await this.ready
+    await this.persistenceQueue
   }
 
   getCapacity(): SandboxOneBotDebugCapacity {
@@ -334,10 +348,18 @@ export class SandboxOneBotDebugStore {
   private queuePersist(clear = false): void {
     const persistence = this.persistence
     if (!persistence) return
-    const nextSequence = this.nextSequence
-    const records = structuredClone(this.records)
-    this.persistenceQueue = this.persistenceQueue
-      .then(() => clear ? persistence.clear().then(() => persistence.replaceAll(nextSequence, [])) : persistence.replaceAll(nextSequence, records))
+    this.persistenceQueue = Promise.all([this.ready, this.persistenceQueue])
+      .then(async () => {
+        if (!this.persistenceAuthoritative) return
+        const nextSequence = this.nextSequence
+        const records = structuredClone(this.records)
+        if (clear) {
+          await persistence.clear()
+          await persistence.replaceAll(nextSequence, [])
+        } else {
+          await persistence.replaceAll(nextSequence, records)
+        }
+      })
       .catch(() => undefined)
   }
 }
