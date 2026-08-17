@@ -249,6 +249,8 @@ describe('WebQQ 模型请求工作台', () => {
     expect(styles).not.toContain('.webqq-model-trajectory-span.is-context')
     expect(styles).not.toContain('.webqq-model-trajectory-span.is-tools')
     expect(styles).toMatch(/\.webqq-model-trajectory-composition-bar\s*\{[^}]*position:\s*absolute/s)
+    expect(styles).toMatch(/\.webqq-model-trajectory-composition-bar\.is-selected\s*\{[^}]*z-index:\s*1[^}]*0 0 0 1px var\(--webqq-trajectory-layer\)[^}]*0 0 0 2px var\(--webqq-accent\)/s)
+    expect(styles).not.toMatch(/\.webqq-model-trajectory-composition-bar\.is-selected\s*\{[^}]*outline:/s)
     expect(trajectorySource).toContain('耗时')
     expect(trajectorySource).toContain('请求')
     expect(trajectorySource).toContain('工具')

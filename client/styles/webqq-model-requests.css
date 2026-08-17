@@ -529,6 +529,7 @@
   --webqq-trajectory-assistant: #a13d76;
   --webqq-trajectory-tool: #c46b00;
   --webqq-trajectory-tool-interaction: #8f5aa8;
+  --webqq-trajectory-layer: color-mix(in srgb, var(--webqq-surface-muted) 64%, var(--webqq-surface));
   display: grid;
   min-height: 0;
   overflow: hidden;
@@ -701,8 +702,10 @@
 }
 
 .webqq-model-trajectory-composition-bar.is-selected {
-  outline: 2px solid var(--webqq-surface);
-  box-shadow: 0 0 0 3px var(--webqq-text);
+  z-index: 1;
+  box-shadow:
+    0 0 0 1px var(--webqq-trajectory-layer),
+    0 0 0 2px var(--webqq-accent);
 }
 
 .webqq-model-trajectory-composition-empty {
@@ -772,8 +775,10 @@
 }
 
 .webqq-model-trajectory-span.is-selected {
-  outline: 2px solid var(--webqq-surface);
-  box-shadow: 0 0 0 3px var(--webqq-text);
+  z-index: 1;
+  box-shadow:
+    0 0 0 1px var(--webqq-trajectory-layer),
+    0 0 0 2px var(--webqq-accent);
   opacity: 1;
 }
 
