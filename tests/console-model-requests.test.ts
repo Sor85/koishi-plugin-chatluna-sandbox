@@ -5,6 +5,7 @@ import { SandboxControlService, SandboxRuntimeBotRegistry } from '../src/control
 import { SandboxModelRequestStore } from '../src/model-request'
 import { SandboxTestSpaceService } from '../src/test-spaces'
 import type { SandboxAppearance } from '../src/types'
+import type { ChatLunaUsageLookup } from '../src/chatluna-usage'
 
 const appearance: SandboxAppearance = {
   enableSandboxFrostedGlass: true,
@@ -97,5 +98,60 @@ describe('模型请求 Console 协议', () => {
     expect(control.getModelRequestRecords().records).toHaveLength(1)
     expect(Reflect.apply(clearRecords, undefined, [{ scope: 'unattributed' }])).toEqual({ cleared: 1 })
     expect(unattributed.getRecords().records).toEqual([])
+  })
+
+  it('在详情读取时解析后加载的 ChatLuna Usage 服务', async () => {
+    const app = new App()
+    runningApps.push(app)
+    const runtimeBots = new SandboxRuntimeBotRegistry()
+    const control = new SandboxControlService(app, { runtimeBots })
+    const listeners = new Map<string, unknown>()
+    const registrar: SandboxConsoleRegistrar = {
+      addEntry() {},
+      addListener(event, callback) {
+        listeners.set(event, callback)
+      },
+      broadcast() {},
+    }
+    let usageService: ChatLunaUsageLookup | undefined
+    registerConsole(registrar, control, appearance, undefined, undefined, undefined, () => usageService)
+
+    const record = control.recordModelRequest({
+      status: 'success', durationMs: 5613, model: 'gemini-3.7-flash-high',
+      attribution: 'attributed', entities: { scopeId: 'main' }, requestBodyAvailable: false,
+    })
+    usageService = {
+      async list() {
+        return {
+          rows: [{
+            inputTokens: 10469,
+            outputTokens: 696,
+            reasoningTokens: 609,
+            cachedTokens: 0,
+            totalTokens: 11165,
+            model: 'gemini-3.7-flash-high',
+            createdAt: record.createdAt,
+            ttftMs: 5613,
+            totalMs: 5613,
+            tps: 232.495991448423,
+          }],
+        }
+      },
+    }
+
+    const getRecord = listeners.get('chatluna-sandbox/model-request-record')
+    if (typeof getRecord !== 'function') throw new Error('模型请求详情监听器未注册')
+    await expect(Reflect.apply(getRecord, undefined, [{ scope: 'space', spaceId: 'main', recordId: record.id }])).resolves.toMatchObject({
+      usage: {
+        inputTokens: 10469,
+        outputTokens: 696,
+        reasoningTokens: 609,
+        totalTokens: 11165,
+        ttftMs: 5613,
+        totalMs: 5613,
+        tps: 232.495991448423,
+        source: 'chatluna-usage',
+      },
+    })
   })
 })

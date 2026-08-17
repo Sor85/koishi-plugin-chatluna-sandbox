@@ -58,6 +58,12 @@ import type {
 } from './types'
 import { getSandboxUsers } from './types'
 
+type ChatLunaUsageSource = ChatLunaUsageLookup | (() => ChatLunaUsageLookup | undefined)
+
+function resolveChatLunaUsage(source: ChatLunaUsageSource | undefined): ChatLunaUsageLookup | undefined {
+  return typeof source === 'function' ? source() : source
+}
+
 type SpaceScoped<Input> = Input & { spaceId?: string }
 
 interface ConsoleEventMap {
@@ -151,7 +157,7 @@ export function registerConsole(
   mcp?: SandboxMcpService,
   testSpaces?: SandboxTestSpaceService,
   unattributedModelRequests?: SandboxModelRequestStore,
-  chatlunaUsage?: ChatLunaUsageLookup,
+  chatlunaUsage?: ChatLunaUsageSource,
 ) {
   console.addEntry(resolveConsoleEntry())
 
@@ -469,7 +475,8 @@ export function registerConsole(
   }
   const getModelRequestRecord = async (input: ReadSandboxModelRequestRecordInput): Promise<SandboxConsoleModelRequestDetail> => {
     const detail = readModelRequestRecord(input)
-    const usage = await lookupChatLunaUsage(chatlunaUsage, detail)
+    // 可选服务可能晚于本插件加载或被热重载；详情读取时再解析，避免永久缓存初始化阶段的 undefined。
+    const usage = await lookupChatLunaUsage(resolveChatLunaUsage(chatlunaUsage), detail)
     return usage ? { ...detail, usage } : detail
   }
   const getModelRequestTrajectory = (input: ReadSandboxModelRequestTrajectoryInput): SandboxModelRequestTrajectory => {

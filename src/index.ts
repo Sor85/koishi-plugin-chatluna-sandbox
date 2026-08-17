@@ -91,8 +91,11 @@ declare module 'koishi' {
   }
 }
 
-function readChatLunaUsage(ctx: { chatluna_usage?: ChatLunaUsageLookup }): ChatLunaUsageLookup | undefined {
-  return ctx.chatluna_usage
+function findChatLunaUsage(ctx: Context): ChatLunaUsageLookup | undefined {
+  for (const runtime of ctx.registry.values()) {
+    const service = runtime.ctx.get('console.services.chatluna_usage') as ChatLunaUsageLookup | undefined
+    if (service) return service
+  }
 }
 
 export function apply(ctx: Context, config: Config) {
@@ -199,7 +202,9 @@ export function apply(ctx: Context, config: Config) {
         unattributedModelRequests,
       })
       const mcpServer = new SandboxMcpHttpServer(inner, mcp, config.mcp)
-      registerConsole(inner.console, control, config, mcp, testSpaces, unattributedModelRequests, readChatLunaUsage(inner))
+      // chatluna-usage 位于另一个 loader group，Cordis 会为服务建立隔离映射；复用 usage 插件的 Context 才能解析到同一实例。
+      const getChatLunaUsage = () => findChatLunaUsage(inner)
+      registerConsole(inner.console, control, config, mcp, testSpaces, unattributedModelRequests, getChatLunaUsage)
       inner.on('ready', async () => {
         await control.waitForSceneReady()
         await mcpServer.start().catch((error) => inner.logger('chatluna-sandbox').error('MCP 监听器启动失败；WebQQ 仍可继续使用。', error))
@@ -211,7 +216,8 @@ export function apply(ctx: Context, config: Config) {
       })
     } catch (error) {
       inner.logger('chatluna-sandbox').error('MCP 初始化失败；WebQQ 仍可继续使用。', error)
-      registerConsole(inner.console, control, config, undefined, testSpaces, unattributedModelRequests, readChatLunaUsage(inner))
+      const getChatLunaUsage = () => findChatLunaUsage(inner)
+      registerConsole(inner.console, control, config, undefined, testSpaces, unattributedModelRequests, getChatLunaUsage)
       inner.on('dispose', () => {
         disposeModelRequestCollector()
         void unattributedModelRequests.waitForPersistence()
