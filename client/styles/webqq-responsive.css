@@ -44,27 +44,27 @@
     grid-column: 1;
     grid-row: 1;
     gap: 4px;
-    padding: 10px 8px;
+    padding: 8px 8px;
   }
 
   .webqq-brand {
-    gap: 7px;
-    padding-right: 10px;
-    padding-left: 4px;
+    gap: 6px;
+    padding-right: 8px;
+    padding-left: 2px;
   }
 
   .webqq-brand-logo {
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
   }
 
   .webqq-brand strong {
     font-size: 13px;
   }
 
-  /* 顶栏保持 44px 触控目标，并收紧文字按钮的横向间距以适配 Koishi 活动栏后的窄视口。 */
+  /* 顶栏保持 40px 触控目标，并收紧文字按钮的横向间距以适配 Koishi 活动栏后的窄视口。 */
   .webqq-rail-button {
-    height: 44px;
+    height: 40px;
     gap: 5px;
     padding: 0 9px;
   }
@@ -181,13 +181,13 @@
 :is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace).is-details-open,
 :is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace).is-details-closed {
   grid-template-columns: 300px minmax(360px, 1fr) 280px;
-  grid-template-rows: 64px minmax(0, 1fr);
+  grid-template-rows: 56px minmax(0, 1fr);
 }
 
 :is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) .webqq-rail {
   grid-column: 1 / -1;
   grid-row: 1;
-  padding: 10px 12px;
+  padding: 8px 12px;
 }
 
 :is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) .webqq-conversations {

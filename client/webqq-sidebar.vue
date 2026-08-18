@@ -21,7 +21,7 @@
                     :aria-current="isNavigationActive(item.id) ? 'page' : undefined"
                     @click="selectNavigation(item.id)"
                   >
-                    <component :is="item.icon" :size="22" stroke-width="1.8" aria-hidden="true" />
+                    <component :is="item.icon" :size="20" stroke-width="1.8" aria-hidden="true" />
                     <span v-if="item.id !== 'spaces'" class="webqq-rail-label">{{ item.label }}</span>
                   </button>
                 </span>

@@ -48,7 +48,7 @@ body[data-sandbox-color-scheme="dark"] .chatluna-sandbox-page {
 .webqq-workspace {
   display: grid;
   grid-template-columns: minmax(230px, 300px) minmax(360px, 1fr) 280px;
-  grid-template-rows: 64px minmax(0, 1fr);
+  grid-template-rows: 56px minmax(0, 1fr);
   width: 100%;
   height: 100%;
   min-height: 0;
