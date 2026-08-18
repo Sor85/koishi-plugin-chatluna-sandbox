@@ -47,7 +47,6 @@ describe('环境管理组件传输边界', () => {
     expect(overlaySource).not.toContain('snapshot')
     expect(overlaySource).toContain('<EnvironmentEntityDialog')
     expect(overlaySource).toContain('class="chatluna-sandbox-secondary-page chatluna-sandbox-profile-card-page chatluna-sandbox-solid-secondary-surface"')
-    expect(overlaySource).toContain(':class="{ \'is-frosted\': frosted }"')
     expect(overlaySource).not.toContain('<Dialog v-model:open="profileOpen">')
     expect(overlaySource.match(/<Dialog /g)).toHaveLength(2)
   })

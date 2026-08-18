@@ -132,7 +132,6 @@
           :bots="overlayModel.bots"
           :groups="overlayModel.groups"
           :accent-color="overlayModel.accentColor"
-          :frosted="overlayModel.frostedGlass"
           @manage-environment="manageEnvironment"
           @save-remark="saveFriendRemark"
           @save-group-action="saveGroupAction"
@@ -159,7 +158,7 @@ import WebqqChatPane from './webqq-chat-pane.vue'
 import WebqqDetailsPanel from './webqq-details-panel.vue'
 import WebqqSidebar from './webqq-sidebar.vue'
 import WorkspaceOverlayHost from './workspace-overlay-host.vue'
-import { useResolvedColorMode } from './webqq/color-scheme'
+import { useResolvedColorMode, useFrostedSurfaceFlag } from './webqq/color-scheme'
 import { rememberFloatingPanelAnchor } from './webqq/floating-panel'
 import { createKoishiWorkspacePort } from './webqq/koishi-workspace-port'
 import { createSceneMutationSync } from './webqq/scene-sync'
@@ -273,6 +272,7 @@ const modelRequestBots = computed<SandboxDirectoryBot[]>(() => [
 ])
 const debugBots = modelRequestBots
 const resolvedColorMode = useResolvedColorMode(appearance)
+useFrostedSurfaceFlag(appearance)
 const disposeSceneMutationSync = createSceneMutationSync(workspaceController, () => activeSpaceId.value)
 onBeforeUnmount(disposeSceneMutationSync)
 // 正在观察一个仍由 AI 控制的测试空间时，叠加 ego 式被控覆盖层（发光边缘 + 控制条 + agent 光标）。

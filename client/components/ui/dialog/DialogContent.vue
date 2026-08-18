@@ -17,7 +17,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
 
 <template>
   <DialogPortal>
-    <DialogOverlay class="fixed inset-0 z-[150] bg-slate-950/35 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=closed]:animate-out" />
+    <DialogOverlay data-slot="dialog-overlay" class="fixed inset-0 z-[150] bg-slate-950/35 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=closed]:animate-out" />
     <DialogContent
       v-webqq-scrollbar="{ showOverlay: false, zIndex: 160 }"
       data-slot="dialog-content"

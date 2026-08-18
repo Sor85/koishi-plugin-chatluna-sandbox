@@ -454,9 +454,9 @@
 
 /* 实体态必须同时覆盖不透明背景：基类是 92% 半透明 + blur 的雾化外观，
    只关 backdrop-filter 不改背景会穿帮成"透明但不模糊"的中间态。
-   挂 is-frosted（毛玻璃外观开关开启）时本条整体退出，回落基类雾化样式；
-   守卫写法需与 webqq-primitives.css 的通用 solid 规则保持一致。 */
-.chatluna-sandbox-secondary-page.chatluna-sandbox-solid-secondary-surface:not(.is-frosted) {
+   毛玻璃开关统一经 body[data-sandbox-frosted]（useFrostedSurfaceFlag）下发：
+   开启时本条整体退出，回落基类雾化样式，与其他 teleport 面板共用一套机制。 */
+body:not([data-sandbox-frosted]) .chatluna-sandbox-secondary-page.chatluna-sandbox-solid-secondary-surface {
   border-color: var(--webqq-secondary-outline);
   background: var(--webqq-panel);
   box-shadow: var(--webqq-secondary-shadow);

@@ -20,3 +20,19 @@ export function useResolvedColorMode(appearance: Ref<SandboxAppearance>): Ref<'l
   })
   return resolved
 }
+
+// 毛玻璃开关同样写到 body：teleport 到 body 的 Dialog/Popover/Select/右键菜单
+// 和浮动二级页拿不到工作区 DOM 上的状态类，统一由 body[data-sandbox-frosted]
+// 驱动实体/雾化双态，避免给每个浮层组件都穿一条 frosted prop 链。
+export function useFrostedSurfaceFlag(appearance: Ref<SandboxAppearance>): void {
+  watchEffect(() => {
+    if (appearance.value.enableSandboxFrostedGlass) {
+      document.body.dataset.sandboxFrosted = 'true'
+    } else {
+      delete document.body.dataset.sandboxFrosted
+    }
+  })
+  onBeforeUnmount(() => {
+    delete document.body.dataset.sandboxFrosted
+  })
+}

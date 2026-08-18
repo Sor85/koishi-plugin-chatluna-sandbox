@@ -303,7 +303,6 @@ describe('WebQQ 消息列表', () => {
     expect(pickerSource).toContain('常用')
     expect(pickerSource).toContain('搜索表情名称、拼音或 ID')
     expect(pickerSource).toContain('class="chatluna-sandbox-secondary-page chatluna-sandbox-emoji-picker-page chatluna-sandbox-solid-secondary-surface"')
-    expect(pickerSource).toContain(':class="{ \'is-frosted\': frosted }"')
     expect(pickerSource).toContain('<Teleport to="body">')
     expect(pickerSource).toContain("zIndex: 140")
     expect(pickerSource).not.toContain('<Dialog')

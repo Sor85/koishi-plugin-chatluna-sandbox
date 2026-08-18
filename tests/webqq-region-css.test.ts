@@ -46,6 +46,20 @@ describe('WebQQ 区域样式', () => {
     ])
   })
 
+  it('工作区层不声明 backdrop-filter，浮层雾化态由 body 属性统一驱动', () => {
+    const workspace = readFileSync(resolve('client/styles/webqq-workspace.css'), 'utf8')
+    const primitives = readFileSync(resolve('client/styles/webqq-primitives.css'), 'utf8')
+
+    // 工作区本体或一级区域出现 backdrop-filter 声明会成为 Backdrop Root 边界，
+    // 静默杀死其内部控件与其上浮层的全部毛玻璃（ADR 0060）。
+    expect(workspace).not.toMatch(/backdrop-filter\s*:/)
+    const frostedSurfaceRule = primitives.slice(primitives.indexOf('body[data-sandbox-frosted] :is(')).split('}')[0]
+    expect(frostedSurfaceRule).toContain('background: color-mix(in srgb, var(--webqq-panel) 92%, transparent)')
+    expect(frostedSurfaceRule).toContain('backdrop-filter: saturate(180%) blur(20px)')
+    expect(frostedSurfaceRule).toContain('[data-slot="context-menu-content"]')
+    expect(primitives).toContain('body[data-sandbox-frosted] [data-slot="dialog-overlay"]')
+  })
+
   it('暗色模式区分聊天区与侧栏背景', () => {
     const workspace = readFileSync(resolve('client/styles/webqq-workspace.css'), 'utf8')
 

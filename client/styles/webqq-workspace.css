@@ -91,18 +91,23 @@ body[data-sandbox-color-scheme="dark"] .chatluna-sandbox-page {
 /* 毛玻璃声明只写无前缀 backdrop-filter，禁止手写 -webkit-backdrop-filter：
    构建链路（@tailwindcss/vite 内置 Lightning CSS）会把手写前缀对合并成仅剩
    -webkit- 版本输出，而 Chrome/Firefox 不识别该前缀，毛玻璃会退化成纯半透明。
-   只写无前缀声明时构建器反而会自动补全 -webkit- 前缀，Safari 也能覆盖。 */
+   只写无前缀声明时构建器反而会自动补全 -webkit- 前缀，Safari 也能覆盖。
+
+   工作区本体与一级区域禁止使用 backdrop-filter（详见 ADR 0060）：
+   带 backdrop-filter 的元素会成为 Backdrop Root 边界，其内部后代与覆盖其上的
+   浮层的 backdrop-filter 全部采样不到内容（Chromium/Firefox 均按规范如此），
+   通知面板、消息发送控件、右键菜单等所有毛玻璃会静默退化成纯半透明。
+   一级区域的模糊嵌套在工作区内本来就不生效，工作区自身的模糊在控制台纯色
+   背景上没有可见效果，因此这里只保留半透明叠层，把模糊留给浮层与控件层。 */
 .webqq-workspace.is-frosted .webqq-rail,
 .webqq-workspace.is-frosted .webqq-conversations,
 .webqq-workspace.is-frosted .chatluna-sandbox-chat,
 .webqq-workspace.is-frosted .webqq-profile {
   background: rgb(248 250 252 / 34%);
-  backdrop-filter: saturate(180%) blur(20px);
 }
 
 .webqq-workspace.is-frosted {
   background: rgb(244 246 248 / 78%);
-  backdrop-filter: saturate(180%) blur(20px);
 }
 
 /* 暗色工作台以侧栏 rgb(37 37 41) 为基准，聊天区稍微提亮以保留区域层级。 */

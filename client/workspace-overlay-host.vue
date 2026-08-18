@@ -49,7 +49,6 @@
       v-if="profileOpen && profileCard"
       ref="profilePanelRef"
       class="chatluna-sandbox-secondary-page chatluna-sandbox-profile-card-page chatluna-sandbox-solid-secondary-surface"
-      :class="{ 'is-frosted': frosted }"
       :style="{ '--webqq-accent': accentColor, ...profilePanelStyle }"
       aria-label="查看资料"
     >
@@ -125,7 +124,6 @@ defineProps<{
   bots: SandboxBotProfile[]
   groups: SandboxGroup[]
   accentColor: string
-  frosted: boolean
 }>()
 const emit = defineEmits<{
   manageEnvironment: [input: ManageSandboxEnvironmentInput, resolve: Resolve, reject: Reject]

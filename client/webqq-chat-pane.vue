@@ -97,7 +97,7 @@
       @open-profile="emit('openProfile', $event)"
     />
 
-    <WebqqEmojiPicker v-model:open="reactionPickerOpen" :frosted="model.frostedGlass" @select="selectReaction" />
+    <WebqqEmojiPicker v-model:open="reactionPickerOpen" @select="selectReaction" />
 
     <div
       v-if="selectionMode"
@@ -189,8 +189,6 @@ export interface WebqqChatPaneModel {
   profileParticipantId?: string
   profileGroupId?: string
   detailsVisible: boolean
-  /* 毛玻璃外观开关；贴表情等浮动二级页据此在实体态与雾化态之间切换。 */
-  frostedGlass: boolean
   participantNames: Record<string, string>
   messageList: WebqqMessageListModel
   composer: WebqqComposerModel

@@ -310,6 +310,28 @@ body[data-sandbox-color-scheme="dark"] .webqq-environment-create-popover,
   background: rgb(44 44 48);
 }
 
+/* 毛玻璃外观（body[data-sandbox-frosted] 由 useFrostedSurfaceFlag 写入）下，
+   teleport 到 body 的实体二级面统一切换为雾化态：半透明面板色 + 背景模糊。
+   本条必须位于上方所有实体态背景规则之后，靠层叠顺序覆盖同特异性的实心背景；
+   工作区层已禁用 backdrop-filter（ADR 0060），浮层的模糊才能真正采样到内容。 */
+body[data-sandbox-frosted] :is(
+  .sandbox-dialog-content,
+  .sandbox-popover-content,
+  .sandbox-select-content,
+  [data-slot="context-menu-content"],
+  [data-slot="context-menu-sub-content"]
+) {
+  border-color: color-mix(in srgb, var(--webqq-secondary-outline) 64%, transparent);
+  background: color-mix(in srgb, var(--webqq-panel) 92%, transparent);
+  backdrop-filter: saturate(180%) blur(20px);
+}
+
+/* 雾化对话框改由面板自身模糊背景；遮罩若保留 backdrop-filter 会成为
+   Backdrop Root 边界，反而让面板的模糊采样不到工作区内容（详见 ADR 0060）。 */
+body[data-sandbox-frosted] [data-slot="dialog-overlay"] {
+  backdrop-filter: none;
+}
+
 .sandbox-dialog-close {
   color: var(--webqq-muted);
 }
