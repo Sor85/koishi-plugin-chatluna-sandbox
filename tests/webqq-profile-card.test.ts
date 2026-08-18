@@ -156,6 +156,7 @@ describe('WebQQ 个人信息卡入口', () => {
     expect(groupMemberMenu).not.toContain('查看资料')
     expect(groupMemberMenu).not.toContain("'open-profile': []")
     expect(overlay).toContain('class="chatluna-sandbox-secondary-page chatluna-sandbox-profile-card-page chatluna-sandbox-solid-secondary-surface"')
+    expect(overlay).toContain(':class="{ \'is-frosted\': frosted }"')
     expect(styles).toContain('scrollbar-width: none')
     expect(overlay).not.toContain('<Dialog v-model:open="profileOpen">')
     expect(overlay).not.toContain('aria-label="返回聊天"')

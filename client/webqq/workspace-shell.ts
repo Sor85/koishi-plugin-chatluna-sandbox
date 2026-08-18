@@ -202,6 +202,7 @@ export function createWebqqWorkspaceShell(
     profileParticipantId: currentGroup.value ? undefined : currentPeer.value?.id,
     profileGroupId: currentGroup.value?.id,
     detailsVisible: detailsVisible.value,
+    frostedGlass: appearance.value.enableSandboxFrostedGlass,
     participantNames: participantNames.value,
     messageList: messageListModel.value,
     composer: composerModel.value,
@@ -293,6 +294,7 @@ export function createWebqqWorkspaceShell(
     bots: bots.value.map((bot) => ({ ...bot, avatar: resolveAvatar(bot.avatar) })),
     groups: snapshot.value.groups.map((group) => ({ ...group, avatar: resolveAvatar(group.avatar) })),
     accentColor: appearance.value.sandboxAccentColor,
+    frostedGlass: appearance.value.enableSandboxFrostedGlass,
   }))
   const environmentModel = computed(() => ({
     ...snapshot.value,

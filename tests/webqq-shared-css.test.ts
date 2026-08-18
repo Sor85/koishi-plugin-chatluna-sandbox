@@ -38,8 +38,9 @@ describe('WebQQ 共享样式', () => {
     expect(secondaryPageRule).toContain('width: 380px')
     expect(secondaryPageRule).toContain('border: 1px solid transparent')
     expect(secondaryPageRule).not.toContain('inset: 0')
-    const solidSecondaryPageRule = overlays.slice(overlays.indexOf('.chatluna-sandbox-secondary-page.chatluna-sandbox-solid-secondary-surface {')).split('}')[0]
+    const solidSecondaryPageRule = overlays.slice(overlays.indexOf('.chatluna-sandbox-secondary-page.chatluna-sandbox-solid-secondary-surface:not(.is-frosted) {')).split('}')[0]
     expect(solidSecondaryPageRule).toContain('border-color: var(--webqq-secondary-outline)')
+    expect(solidSecondaryPageRule).toContain('background: var(--webqq-panel)')
     expect(solidSecondaryPageRule).toContain('box-shadow: var(--webqq-secondary-shadow)')
     expect(solidSecondaryPageRule).toContain('backdrop-filter: none')
     const profilePageRule = overlays.slice(overlays.indexOf('.chatluna-sandbox-profile-card-page {')).split('}')[0]

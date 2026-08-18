@@ -132,6 +132,7 @@
           :bots="overlayModel.bots"
           :groups="overlayModel.groups"
           :accent-color="overlayModel.accentColor"
+          :frosted="overlayModel.frostedGlass"
           @manage-environment="manageEnvironment"
           @save-remark="saveFriendRemark"
           @save-group-action="saveGroupAction"

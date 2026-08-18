@@ -140,6 +140,7 @@ export function buildWorkspaceThumbnailModels(
       profileParticipantId: currentGroup ? undefined : currentPeer?.id,
       profileGroupId: currentGroup?.id,
       detailsVisible: true,
+      frostedGlass: appearance.enableSandboxFrostedGlass,
       participantNames,
       messageList: {
         messages,

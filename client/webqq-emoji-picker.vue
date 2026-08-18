@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <section ref="panelRef" v-if="open" class="chatluna-sandbox-secondary-page chatluna-sandbox-emoji-picker-page" :style="panelStyle" aria-label="贴表情">
+    <section ref="panelRef" v-if="open" class="chatluna-sandbox-secondary-page chatluna-sandbox-emoji-picker-page chatluna-sandbox-solid-secondary-surface" :class="{ 'is-frosted': frosted }" :style="panelStyle" aria-label="贴表情">
       <header
         class="chatluna-sandbox-secondary-page-header"
         :class="{ 'is-dragging': dragging }"
@@ -86,6 +86,7 @@ import { vWebqqScrollbar } from './webqq-scrollbar'
 
 const props = defineProps<{
   open: boolean
+  frosted: boolean
 }>()
 
 const emit = defineEmits<{
