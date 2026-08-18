@@ -10,10 +10,16 @@
     @touchstart.passive="finishMessageListScrollRestore"
     @pointerdown="finishMessageListScrollRestore"
   >
-    <div v-if="!model.messages.length && !model.chatLunaStates.some((state) => state.thinking)" class="webqq-welcome">
+    <div v-if="!model.messages.length && !model.chatLunaStates.some((state) => state.thinking)" class="webqq-welcome" :class="{ 'is-bot': model.avatarKind === 'bot' }">
       <WebqqAvatar class="webqq-avatar webqq-avatar-large" :kind="model.avatarKind" :name="model.title" :avatar="model.avatar" />
       <strong>{{ model.title }}</strong>
-      <p>发送消息，验证插件在模拟 QQ 环境中的响应</p>
+      <template v-if="model.avatarKind === 'bot'">
+        <span class="webqq-welcome-status"><i aria-hidden="true" />在线 · OneBot 机器人</span>
+        <hr class="webqq-welcome-divider" aria-hidden="true" />
+        <h2>发送一条消息开始测试</h2>
+        <p>在模拟 QQ 环境中体验 OneBot 的消息交互</p>
+      </template>
+      <p v-else>发送消息，验证插件在模拟 QQ 环境中的响应</p>
     </div>
     <ol v-else ref="messagesContentElement">
       <li v-if="model.hasMoreMessages" class="webqq-history-more-row">
