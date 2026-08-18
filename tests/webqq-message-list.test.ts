@@ -69,6 +69,10 @@ describe('WebQQ 消息列表', () => {
     expect(source).toContain('在模拟 QQ 环境中体验 OneBot 的消息交互')
     expect(source).toContain('发送消息，验证插件在模拟 QQ 环境中的响应')
     expect(source).toContain('<ol v-else ref="messagesContentElement">')
+    // 消息操作菜单只能由气泡本身触发，消息行的头像、时间和外部留白不能成为触发区域。
+    const messageActionMenuSource = source.slice(source.indexOf('<ContextMenu v-else>'), source.indexOf('<li\n          v-if="shouldShowThinking(message)"'))
+    expect(messageActionMenuSource).toContain('<ContextMenuTrigger as-child :disabled="isRecalledMessage(message) || model.selectionMode">\n                      <div class="chatluna-sandbox-message-bubble"')
+    expect(messageActionMenuSource).not.toContain('<ContextMenuTrigger as-child :disabled="isRecalledMessage(message) || model.selectionMode">\n            <li')
     expect(chatPaneSource).toContain('<WebqqMessageList')
     expect(chatPaneSource).toContain('<WebqqForwardModal')
     expect(chatPaneSource).toContain('@open-forward="openForwardDialog"')

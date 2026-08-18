@@ -30,9 +30,8 @@
       <template v-for="(message, messageIndex) in model.messages" :key="message.id">
         <li v-if="shouldRenderAsEvent(message)" class="chatluna-sandbox-message-event">{{ getEventMessageText(message) }}</li>
         <ContextMenu v-else>
-          <ContextMenuTrigger as-child :disabled="isRecalledMessage(message) || model.selectionMode">
-            <li
-              class="chatluna-sandbox-message-row"
+          <li
+            class="chatluna-sandbox-message-row"
               :class="[
                 message.authorId === model.currentOperatorId ? 'is-outgoing' : 'is-incoming',
                 getMessageClusterClass(model.messages, messageIndex, model.currentOperatorId),
@@ -122,7 +121,8 @@
                 </div>
                 <div class="chatluna-sandbox-message-body">
                   <div class="chatluna-sandbox-message-stack">
-                    <div class="chatluna-sandbox-message-bubble" @click.capture="handleMessageBubbleClick(message, $event)">
+                    <ContextMenuTrigger as-child :disabled="isRecalledMessage(message) || model.selectionMode">
+                      <div class="chatluna-sandbox-message-bubble" @click.capture="handleMessageBubbleClick(message, $event)">
                       <button v-if="getReplyMessage(message)" class="chatluna-sandbox-message-quote is-clickable" type="button" aria-label="跳转到引用消息" @click.stop="scrollToQuotedMessage(getReplyMessage(message)!.id)">
                         <strong class="chatluna-sandbox-message-quote-title">{{ getMessageAuthorName(getReplyMessage(message)!.authorId) }}</strong>
                         <span>{{ getMessageText(getReplyMessage(message)!) }}</span>
@@ -167,14 +167,14 @@
                         :readonly="isReactionReadonly(message)"
                         @toggle="toggleReaction(message, $event)"
                       />
-                    </div>
+                      </div>
+                    </ContextMenuTrigger>
                   </div>
                   <time class="chatluna-sandbox-message-time">{{ formatMessageTime(message.createdAt) }}</time>
                 </div>
               </div>
               </div>
             </li>
-          </ContextMenuTrigger>
           <ContextMenuContent style="z-index: 140">
             <ContextMenuItem v-if="!isRecalledMessage(message)" @select="emit('reply', message.id)"><IconMessageReply :size="16" aria-hidden="true" /> 回复</ContextMenuItem>
             <ContextMenuItem v-if="canReactToMessage(message)" @select="emit('openReactionPicker', message.id)">
