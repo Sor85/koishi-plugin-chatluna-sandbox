@@ -77,6 +77,7 @@
       :scroll-scope="scrollScope"
       @reply="replyingToMessageId = $event"
       @recall-message="emit('recallMessage', $event)"
+      @clear-conversation="emit('clearConversation')"
       @enter-selection="enterSelection"
       @toggle-selection="toggleSelection"
       @open-forward="openForwardDialog"
@@ -213,6 +214,7 @@ const emit = defineEmits<{
     reject: (error: unknown) => void,
   ]
   recallMessage: [messageId: string]
+  clearConversation: []
   setMessageReaction: [messageId: string, emojiId: string, enabled: boolean]
   sendForwardMessage: [input: { conversationId: string, messageIds: string[] }, resolve: () => void, reject: (error: unknown) => void]
   getForwardMessage: [input: { forwardId?: string, messageId?: string }, resolve: (forward: SandboxForward) => void, reject: (error: unknown) => void]

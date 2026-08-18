@@ -39,6 +39,7 @@ import type {
   PerformFriendActionInput,
   PerformGroupActionInput,
   RecallMessageInput,
+  ClearConversationMessagesInput,
   SearchConversationMessagesInput,
   SetMessageReactionInput,
   SandboxAppearance,
@@ -75,6 +76,7 @@ interface ConsoleEventMap {
   'chatluna-sandbox/send-forward-message': (input: SpaceScoped<SendForwardMessageInput>) => Promise<SandboxWorkspaceState>
   'chatluna-sandbox/get-forward-message': (input: SpaceScoped<GetForwardMessageInput>) => Promise<SandboxForward>
   'chatluna-sandbox/recall-message': (input: SpaceScoped<RecallMessageInput>) => Promise<SandboxWorkspaceState>
+  'chatluna-sandbox/clear-conversation-messages': (input: SpaceScoped<ClearConversationMessagesInput>) => Promise<SandboxWorkspaceState>
   'chatluna-sandbox/set-message-reaction': (input: SpaceScoped<SetMessageReactionInput>) => Promise<SandboxWorkspaceState>
   'chatluna-sandbox/media-content': (input: SpaceScoped<GetMediaContentInput>) => Promise<SandboxMediaContent>
   'chatluna-sandbox/set-group-announcement': (input: SpaceScoped<SetGroupAnnouncementInput>) => Promise<SandboxWorkspaceState>
@@ -342,6 +344,10 @@ export function registerConsole(
     await (await resolveReadyControl(input, true)).recallMessage(assertInteractionInput(withoutSpaceId(input)) as RecallMessageInput)
     return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
+  registerListener('chatluna-sandbox/clear-conversation-messages', async (input) => {
+    (await resolveReadyControl(input, true)).clearConversationMessages(assertInteractionInput(withoutSpaceId(input)) as ClearConversationMessagesInput)
+    return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
+  }, { authority: 4 })
   registerListener('chatluna-sandbox/set-message-reaction', async (input) => {
     await (await resolveReadyControl(input, true)).setMessageReaction(assertInteractionInput(withoutSpaceId(input)) as SetMessageReactionInput)
     return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
@@ -551,6 +557,7 @@ declare module '@koishijs/console' {
     'chatluna-sandbox/send-forward-message'(input: SpaceScoped<SendForwardMessageInput>): Promise<SandboxWorkspaceState>
     'chatluna-sandbox/get-forward-message'(input: SpaceScoped<GetForwardMessageInput>): Promise<SandboxForward>
     'chatluna-sandbox/recall-message'(input: SpaceScoped<RecallMessageInput>): Promise<SandboxWorkspaceState>
+    'chatluna-sandbox/clear-conversation-messages'(input: SpaceScoped<ClearConversationMessagesInput>): Promise<SandboxWorkspaceState>
     'chatluna-sandbox/set-message-reaction'(input: SpaceScoped<SetMessageReactionInput>): Promise<SandboxWorkspaceState>
     'chatluna-sandbox/media-content'(input: SpaceScoped<GetMediaContentInput>): Promise<SandboxMediaContent>
     'chatluna-sandbox/set-group-announcement'(input: SpaceScoped<SetGroupAnnouncementInput>): Promise<SandboxWorkspaceState>

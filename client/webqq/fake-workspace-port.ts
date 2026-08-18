@@ -11,6 +11,7 @@ import type {
   PerformFriendActionInput,
   PerformGroupActionInput,
   RecallMessageInput,
+  ClearConversationMessagesInput,
   SearchConversationMessagesInput,
   SetMessageReactionInput,
   SandboxConsoleOneBotDebugRecord,
@@ -128,6 +129,10 @@ export class FakeWorkspacePort implements WorkspacePort {
 
   recallMessage(input: RecallMessageInput) {
     return this.invoke('recallMessage', input, this.workspaceResult)
+  }
+
+  clearConversationMessages(input: ClearConversationMessagesInput) {
+    return this.invoke('clearConversationMessages', input, this.workspaceResult)
   }
 
   setMessageReaction(input: SetMessageReactionInput) {

@@ -1,15 +1,17 @@
 <template>
-  <section
-    ref="messagesElement"
-    v-webqq-scrollbar="{ disabled: preview, tone: 'accent' }"
-    class="chatluna-sandbox-messages"
-    :class="{ 'is-selecting': model.selectionMode }"
-    aria-label="消息记录"
-    @scroll="handleMessagesScroll"
-    @wheel.passive="finishMessageListScrollRestore"
-    @touchstart.passive="finishMessageListScrollRestore"
-    @pointerdown="finishMessageListScrollRestore"
-  >
+  <ContextMenu>
+    <ContextMenuTrigger as-child :disabled="preview || model.selectionMode || !model.currentConversation">
+      <section
+        ref="messagesElement"
+        v-webqq-scrollbar="{ disabled: preview, tone: 'accent' }"
+        class="chatluna-sandbox-messages"
+        :class="{ 'is-selecting': model.selectionMode }"
+        aria-label="消息记录"
+        @scroll="handleMessagesScroll"
+        @wheel.passive="finishMessageListScrollRestore"
+        @touchstart.passive="finishMessageListScrollRestore"
+        @pointerdown="finishMessageListScrollRestore"
+      >
     <div v-if="!model.messages.length && !model.chatLunaStates.some((state) => state.thinking)" class="webqq-welcome" :class="{ 'is-bot': model.avatarKind === 'bot' }">
       <WebqqAvatar class="webqq-avatar webqq-avatar-large" :kind="model.avatarKind" :name="model.title" :avatar="model.avatar" />
       <strong>{{ model.title }}</strong>
@@ -122,7 +124,7 @@
                 <div class="chatluna-sandbox-message-body">
                   <div class="chatluna-sandbox-message-stack">
                     <ContextMenuTrigger as-child :disabled="isRecalledMessage(message) || model.selectionMode">
-                      <div class="chatluna-sandbox-message-bubble" @click.capture="handleMessageBubbleClick(message, $event)">
+                      <div class="chatluna-sandbox-message-bubble" @contextmenu.stop @click.capture="handleMessageBubbleClick(message, $event)">
                       <button v-if="getReplyMessage(message)" class="chatluna-sandbox-message-quote is-clickable" type="button" aria-label="跳转到引用消息" @click.stop="scrollToQuotedMessage(getReplyMessage(message)!.id)">
                         <strong class="chatluna-sandbox-message-quote-title">{{ getMessageAuthorName(getReplyMessage(message)!.authorId) }}</strong>
                         <span>{{ getMessageText(getReplyMessage(message)!) }}</span>
@@ -302,10 +304,17 @@
       </li>
     </ol>
   </section>
+    </ContextMenuTrigger>
+    <ContextMenuContent style="z-index: 140">
+      <ContextMenuItem class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="emit('clearConversation')">
+        <IconTrash :size="16" aria-hidden="true" /> 清空会话记录
+      </ContextMenuItem>
+    </ContextMenuContent>
+  </ContextMenu>
 </template>
 
 <script setup lang="ts">
-import { IconArrowBackUp, IconAt, IconBell, IconCheck, IconChecks, IconClock, IconHandClick, IconId, IconMessageReply, IconMoodSmile, IconPaperclip, IconTag, IconUserMinus, IconUserPlus, IconUsers } from '@tabler/icons-vue'
+import { IconArrowBackUp, IconAt, IconBell, IconCheck, IconChecks, IconClock, IconHandClick, IconId, IconMessageReply, IconMoodSmile, IconPaperclip, IconTag, IconTrash, IconUserMinus, IconUserPlus, IconUsers } from '@tabler/icons-vue'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from './components/ui/context-menu'
 import { getFriendMenuActions, type FriendMenuState } from './webqq/friend-menu'
@@ -378,6 +387,7 @@ const preview = computed(() => !!props.preview)
 const emit = defineEmits<{
   reply: [messageId: string]
   recallMessage: [messageId: string]
+  clearConversation: []
   enterSelection: [messageId: string]
   toggleSelection: [messageId: string]
   openForward: [input: { messageId: string; forwardId: string }]

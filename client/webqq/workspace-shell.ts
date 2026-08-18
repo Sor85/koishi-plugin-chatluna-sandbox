@@ -461,6 +461,17 @@ export function createWebqqWorkspaceShell(
     }
   }
 
+  async function clearConversationMessages() {
+    const conversationId = currentConversation.value?.id
+    if (!conversationId) return
+    errorMessage.value = ''
+    try {
+      await workspaceController.clearConversationMessages({ conversationId })
+    } catch (error) {
+      errorMessage.value = error instanceof Error ? error.message : '清空会话记录失败'
+    }
+  }
+
   async function setMessageReaction(messageId: string, emojiId: string, enabled: boolean) {
     errorMessage.value = ''
     try {
@@ -794,6 +805,7 @@ export function createWebqqWorkspaceShell(
     pokeGroupMember,
     publishAnnouncement,
     recallMessage,
+    clearConversationMessages,
     removeRecentConversation,
     setMessageReaction,
     requestFriend,

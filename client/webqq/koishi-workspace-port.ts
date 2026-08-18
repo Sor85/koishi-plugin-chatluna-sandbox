@@ -16,6 +16,7 @@ export function createKoishiWorkspacePort(resolveSpaceId: () => string | undefin
   sendForwardMessage: (input) => send('chatluna-sandbox/send-forward-message', scoped(input)),
   getForwardMessage: (input) => send('chatluna-sandbox/get-forward-message', scoped(input)),
   recallMessage: (input) => send('chatluna-sandbox/recall-message', scoped(input)),
+  clearConversationMessages: (input) => send('chatluna-sandbox/clear-conversation-messages', scoped(input)),
   setMessageReaction: (input) => send('chatluna-sandbox/set-message-reaction', scoped(input)),
   getMediaContent: (input) => send('chatluna-sandbox/media-content', scoped(input)),
   setGroupAnnouncement: (input) => send('chatluna-sandbox/set-group-announcement', scoped(input)),

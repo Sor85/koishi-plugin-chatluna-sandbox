@@ -92,6 +92,7 @@
           @load-history="loadEarlierMessages"
           @search-conversation-messages="searchConversationMessages"
           @recall-message="recallMessage"
+          @clear-conversation="clearConversationMessages"
           @set-message-reaction="setMessageReaction"
           @send-forward-message="sendForwardMessage"
           @get-forward-message="getForwardMessage"
@@ -209,6 +210,7 @@ const {
   pokeGroupMember,
   publishAnnouncement,
   recallMessage,
+  clearConversationMessages,
   removeRecentConversation,
   setMessageReaction,
   requestFriend,

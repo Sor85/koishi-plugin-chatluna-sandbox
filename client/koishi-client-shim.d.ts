@@ -16,6 +16,7 @@ declare module '@koishijs/client' {
     PerformFriendActionInput,
     PerformGroupActionInput,
     RecallMessageInput,
+    ClearConversationMessagesInput,
     SearchConversationMessagesInput,
     SetMessageReactionInput,
     SandboxConsoleOneBotDebugRecord,
@@ -62,6 +63,7 @@ declare module '@koishijs/client' {
   export function send(event: 'chatluna-sandbox/send-forward-message', input: SpaceScoped<SendForwardMessageInput>): Promise<SandboxWorkspaceState>
   export function send(event: 'chatluna-sandbox/get-forward-message', input: SpaceScoped<GetForwardMessageInput>): Promise<SandboxForward>
   export function send(event: 'chatluna-sandbox/recall-message', input: SpaceScoped<RecallMessageInput>): Promise<SandboxWorkspaceState>
+  export function send(event: 'chatluna-sandbox/clear-conversation-messages', input: SpaceScoped<ClearConversationMessagesInput>): Promise<SandboxWorkspaceState>
   export function send(event: 'chatluna-sandbox/set-message-reaction', input: SpaceScoped<SetMessageReactionInput>): Promise<SandboxWorkspaceState>
   export function send(event: 'chatluna-sandbox/media-content', input: SpaceScoped<GetMediaContentInput>): Promise<SandboxMediaContent>
   export function send(event: 'chatluna-sandbox/set-group-announcement', input: SpaceScoped<SetGroupAnnouncementInput>): Promise<SandboxWorkspaceState>

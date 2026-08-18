@@ -43,6 +43,7 @@ import {
   type PerformGroupActionInput,
   type PerformGroupActionResult,
   type RecallMessageInput,
+  type ClearConversationMessagesInput,
   type SearchConversationMessagesInput,
   type SetMessageReactionInput,
   type SandboxBotDelivery,
@@ -1907,6 +1908,22 @@ export class SandboxControlService {
     }
     this.getParticipant(input.operatorId)
     await this.recallVisibleMessage(input.operatorId, input.messageId, input.conversationId)
+    return { revision: this.scene.revision }
+  }
+
+  clearConversationMessages(input: ClearConversationMessagesInput): { revision: number } {
+    const conversation = this.getVisibleConversation(input.operatorId, input.conversationId)
+    const removedMessageIds = new Set(this.scene.messages
+      .filter(({ conversationId }) => conversationId === conversation.id)
+      .map(({ id }) => id))
+    conversation.messageIds = []
+    conversation.hasMoreMessages = false
+    this.scene.messages = this.scene.messages.filter(({ conversationId }) => conversationId !== conversation.id)
+    this.chatLunaState.deleteByConversationIds(new Set([conversation.id]))
+    this.botDeliveries = this.botDeliveries.filter(({ messageId }) => !removedMessageIds.has(messageId))
+    this.pruneUnreferencedForwards()
+    // 保留逻辑会话实体，只删除其历史引用，确保下一条消息从空上下文开始。
+    this.commitSceneMutation()
     return { revision: this.scene.revision }
   }
 

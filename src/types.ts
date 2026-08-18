@@ -779,6 +779,11 @@ export interface RecallMessageInput {
   messageId: string
 }
 
+export interface ClearConversationMessagesInput {
+  operatorId: string
+  conversationId: string
+}
+
 export interface SetMessageReactionInput {
   operatorId: string
   messageId: string

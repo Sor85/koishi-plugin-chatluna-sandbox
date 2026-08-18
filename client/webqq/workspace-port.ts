@@ -11,6 +11,7 @@ import type {
   PerformFriendActionInput,
   PerformGroupActionInput,
   RecallMessageInput,
+  ClearConversationMessagesInput,
   SearchConversationMessagesInput,
   SetMessageReactionInput,
   SandboxConsoleOneBotDebugRecord,
@@ -44,6 +45,7 @@ export interface WorkspacePort {
   sendForwardMessage(input: SendForwardMessageInput): Promise<SandboxWorkspaceState>
   getForwardMessage(input: GetForwardMessageInput): Promise<SandboxForward>
   recallMessage(input: RecallMessageInput): Promise<SandboxWorkspaceState>
+  clearConversationMessages(input: ClearConversationMessagesInput): Promise<SandboxWorkspaceState>
   setMessageReaction(input: SetMessageReactionInput): Promise<SandboxWorkspaceState>
   getMediaContent(input: GetMediaContentInput): Promise<SandboxMediaContent>
   setGroupAnnouncement(input: SetGroupAnnouncementInput): Promise<SandboxWorkspaceState>

@@ -6,6 +6,7 @@ import type {
   GetSandboxOneBotDebugRecordsInput,
   ManageSandboxEnvironmentInput,
   RecallMessageInput,
+  ClearConversationMessagesInput,
   SearchConversationMessagesInput,
   SetMessageReactionInput,
   SandboxAppearance,
@@ -393,6 +394,15 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     }
   }
 
+  async function clearConversationMessages(input: Omit<ClearConversationMessagesInput, 'operatorId'>) {
+    const operatorId = getCurrentOperatorId()
+    try {
+      replaceWorkspace(await port.clearConversationMessages({ ...input, operatorId }))
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '清空会话记录失败')
+    }
+  }
+
   async function setMessageReaction(input: Omit<SetMessageReactionInput, 'operatorId'>) {
     const operatorId = getCurrentOperatorId()
     try {
@@ -634,6 +644,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     clearOneBotDebugRecords,
     clearModelRequestRecords,
     recallMessage,
+    clearConversationMessages,
     removeRecentConversation,
     setMessageReaction,
     replaceWorkspace,
