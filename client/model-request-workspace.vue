@@ -432,6 +432,8 @@
               :show-mode-switch="false"
               :loading="detailLoading || trajectory?.mode !== 'request'"
               :conversation-available="false"
+              :analysis="true"
+              :detail="detail"
               @open-request="openRelatedRequest"
             />
 

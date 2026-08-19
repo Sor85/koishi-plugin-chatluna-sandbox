@@ -1,5 +1,5 @@
 <template>
-  <section class="webqq-model-trajectory" aria-label="模型请求轨迹">
+  <section class="webqq-model-trajectory" :class="{ 'is-analysis': analysis }" aria-label="模型请求轨迹">
     <header v-if="showModeSwitch || mode === 'conversation'" class="webqq-model-trajectory-scope">
       <div v-if="showModeSwitch" class="webqq-model-trajectory-mode" role="tablist" aria-label="轨迹范围">
         <Button
@@ -122,7 +122,8 @@
         进行中的请求仅标记开始位置；TTFT 与解码阶段尚无独立时间证据
       </p>
 
-      <div class="webqq-model-trajectory-ledger" :class="{ 'has-inspector': selectedRow }">
+      <ModelRequestConversationAnalysis v-if="analysis && detail" :detail="detail" :trajectory="trajectory" :search-query="searchQuery" />
+      <div v-else class="webqq-model-trajectory-ledger" :class="{ 'has-inspector': selectedRow }">
         <div ref="ledgerElement" v-webqq-scrollbar class="webqq-model-trajectory-table" role="table" aria-label="轨迹事件账本">
           <div v-if="!ledgerRows.length" class="webqq-model-trajectory-filter-empty">当前折叠条件下没有事件</div>
           <template v-for="row in ledgerRows" :key="row.id">
@@ -203,11 +204,13 @@ import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip'
+import ModelRequestConversationAnalysis from './webqq/analysis-view.vue'
 import ModelRequestJsonTree from './model-request-json-tree.vue'
 import { buildModelRequestJsonTree } from './webqq/model-request-json'
 import { formatDuration } from './webqq/format-duration'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type {
+  SandboxModelRequestDetail,
   SandboxModelRequestPromptKind,
   SandboxModelRequestStatus,
   SandboxModelRequestTrajectory,
@@ -217,10 +220,12 @@ import type {
 
 const props = withDefaults(defineProps<{
   trajectory?: SandboxModelRequestTrajectory
+  detail?: SandboxModelRequestDetail
   mode: 'request' | 'conversation'
   loading: boolean
   conversationAvailable: boolean
   showModeSwitch?: boolean
+  analysis?: boolean
   restoreState?: {
     rowId: string
     scrollTop: number
@@ -228,6 +233,7 @@ const props = withDefaults(defineProps<{
   }
 }>(), {
   showModeSwitch: true,
+  analysis: false,
 })
 
 const emit = defineEmits<{
