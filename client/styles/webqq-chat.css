@@ -46,6 +46,8 @@
   width: 36px;
   min-width: 0;
   flex: none;
+  overflow: clip;
+  overflow-clip-margin: 4px;
   transition: width 180ms ease;
 }
 
