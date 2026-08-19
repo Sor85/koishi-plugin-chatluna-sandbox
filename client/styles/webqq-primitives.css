@@ -310,6 +310,15 @@ body[data-sandbox-color-scheme="dark"] .webqq-environment-create-popover,
   background: rgb(44 44 48);
 }
 
+/* 右键菜单的 shadow-2xl 依赖宿主工具类，可能被其他插件的全局产物覆盖；
+   这里直接使用 WebQQ 浮层令牌，确保一级菜单和独立 Portal 二级菜单都有稳定阴影。 */
+:is(
+  [data-slot="chatluna-sandbox-context-menu-content"],
+  [data-slot="chatluna-sandbox-context-menu-sub-content"]
+) {
+  box-shadow: var(--webqq-secondary-shadow);
+}
+
 /* 毛玻璃外观（body[data-sandbox-frosted] 由 useFrostedSurfaceFlag 写入）下，
    teleport 到 body 的实体二级面统一切换为雾化态：半透明面板色 + 背景模糊。
    本条必须位于上方所有实体态背景规则之后，靠层叠顺序覆盖同特异性的实心背景；
@@ -318,11 +327,12 @@ body[data-sandbox-frosted] :is(
   .sandbox-dialog-content,
   .sandbox-popover-content,
   .sandbox-select-content,
-  [data-slot="context-menu-content"],
-  [data-slot="context-menu-sub-content"]
+  [data-slot="chatluna-sandbox-context-menu-content"],
+  [data-slot="chatluna-sandbox-context-menu-sub-content"]
 ) {
   border-color: color-mix(in srgb, var(--webqq-secondary-outline) 64%, transparent);
-  background: color-mix(in srgb, var(--webqq-panel) 92%, transparent);
+  /* 92% 面板填充会把已模糊的背景重新盖成近乎实心；72% 才能保留可辨识的雾化纹理。 */
+  background: color-mix(in srgb, var(--webqq-panel) 72%, transparent);
   backdrop-filter: saturate(180%) blur(20px);
 }
 

@@ -54,9 +54,12 @@ describe('WebQQ 区域样式', () => {
     // 静默杀死其内部控件与其上浮层的全部毛玻璃（ADR 0060）。
     expect(workspace).not.toMatch(/backdrop-filter\s*:/)
     const frostedSurfaceRule = primitives.slice(primitives.indexOf('body[data-sandbox-frosted] :is(')).split('}')[0]
-    expect(frostedSurfaceRule).toContain('background: color-mix(in srgb, var(--webqq-panel) 92%, transparent)')
+    expect(frostedSurfaceRule).toContain('background: color-mix(in srgb, var(--webqq-panel) 72%, transparent)')
     expect(frostedSurfaceRule).toContain('backdrop-filter: saturate(180%) blur(20px)')
-    expect(frostedSurfaceRule).toContain('[data-slot="context-menu-content"]')
+    expect(frostedSurfaceRule).toContain('[data-slot="chatluna-sandbox-context-menu-content"]')
+    expect(frostedSurfaceRule).toContain('[data-slot="chatluna-sandbox-context-menu-sub-content"]')
+    const contextMenuShadowRule = primitives.slice(primitives.indexOf('/* 右键菜单的 shadow-2xl')).split('}')[0]
+    expect(contextMenuShadowRule).toContain('box-shadow: var(--webqq-secondary-shadow)')
     expect(primitives).toContain('body[data-sandbox-frosted] [data-slot="dialog-overlay"]')
   })
 

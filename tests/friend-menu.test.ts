@@ -28,8 +28,9 @@ describe('好友操作菜单', () => {
     expect(subTrigger).toContain('dark:focus:bg-[#494950] dark:data-[state=open]:bg-[#494950]')
   })
 
-  it('子菜单内容不重复使用 Portal', () => {
+  it('子菜单内容通过独立 Portal 脱离一级菜单裁剪边界', () => {
     const source = readFileSync(resolve('client/components/ui/context-menu/ContextMenuSubContent.vue'), 'utf8')
-    expect(source).not.toContain('ContextMenuPortal')
+    expect(source).toContain("import { ContextMenuPortal, ContextMenuSubContent, useForwardPropsEmits } from 'reka-ui'")
+    expect(source).toContain('<ContextMenuPortal>')
   })
 })

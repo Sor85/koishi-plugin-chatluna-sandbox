@@ -13,7 +13,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
 
 <template>
   <ContextMenuItem
-    data-slot="context-menu-item"
+    data-slot="chatluna-sandbox-context-menu-item"
     v-bind="forwarded"
     :class="cn(
       'relative flex cursor-default select-none items-center gap-2 rounded-lg px-2.5 py-2 text-sm outline-none focus:bg-slate-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 dark:focus:bg-[#494950]',

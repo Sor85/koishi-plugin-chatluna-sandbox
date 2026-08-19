@@ -32,8 +32,8 @@
 .sandbox-dialog-content,
 .sandbox-popover-content,
 .sandbox-select-content,
-[data-slot="context-menu-content"],
-[data-slot="context-menu-sub-content"],
+[data-slot="chatluna-sandbox-context-menu-content"],
+[data-slot="chatluna-sandbox-context-menu-sub-content"],
 .chatluna-sandbox-secondary-page {
   --webqq-accent: #2563eb;
   --webqq-bg: #fff;
@@ -52,8 +52,8 @@
 body[data-sandbox-color-scheme="dark"] .sandbox-dialog-content,
 body[data-sandbox-color-scheme="dark"] .sandbox-popover-content,
 body[data-sandbox-color-scheme="dark"] .sandbox-select-content,
-body[data-sandbox-color-scheme="dark"] [data-slot="context-menu-content"],
-body[data-sandbox-color-scheme="dark"] [data-slot="context-menu-sub-content"],
+body[data-sandbox-color-scheme="dark"] [data-slot="chatluna-sandbox-context-menu-content"],
+body[data-sandbox-color-scheme="dark"] [data-slot="chatluna-sandbox-context-menu-sub-content"],
 body[data-sandbox-color-scheme="dark"] .chatluna-sandbox-secondary-page {
   --webqq-bg: #2c2c30;
   --webqq-surface: #2c2c30;
