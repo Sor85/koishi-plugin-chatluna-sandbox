@@ -55,11 +55,7 @@
   line-height: 18px;
 }
 
-.webqq-rail-tooltip-trigger {
-  display: flex;
-}
-
-.webqq-rail-tooltip-trigger.is-rail-pin-end {
+.webqq-rail-button.is-rail-pin-end {
   margin-left: auto;
 }
 

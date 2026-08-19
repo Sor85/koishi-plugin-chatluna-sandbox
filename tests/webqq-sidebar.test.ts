@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 describe('WebQQ 顶部导航与会话栏', () => {
-  it('只在 WebQQ 视图输出会话侧栏，并为顶部导航提供名称提示', () => {
+  it('只在 WebQQ 视图输出会话侧栏，顶部导航不显示悬停提示', () => {
     const source = readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
     const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
 
@@ -22,13 +22,13 @@ describe('WebQQ 顶部导航与会话栏', () => {
     expect(source).toContain('<aside v-if="isWebqqView" class="webqq-conversations"')
     expect(source).toContain("currentView.value === 'messages' || currentView.value === 'contacts'")
     expect(source).not.toContain("{ id: 'contacts' as const, label: '联系人'")
-    expect(source).toContain('<TooltipProvider>')
-    expect(source).toContain('class="webqq-rail-tooltip-trigger"')
+    expect(source).not.toContain('<TooltipProvider>')
+    expect(source).not.toContain('<TooltipContent')
+    expect(source).not.toContain("from './components/ui/tooltip'")
+    expect(source).toContain('v-for="item in visibleNavigationItems"')
     expect(source).toContain('class="webqq-rail-label">{{ item.label }}</span>')
-    expect(source).toContain('<TooltipContent side="bottom">{{ item.label }}</TooltipContent>')
     expect(sidebarStyles).toMatch(/\.webqq-rail-button\s*\{[^}]*gap:\s*7px[^}]*padding:\s*0 14px/s)
     expect(sidebarStyles).toMatch(/\.webqq-rail-label\s*\{[^}]*font-size:\s*13px/s)
-    expect(source).toContain("from './components/ui/tooltip'")
     expect(source).not.toContain('<div class="webqq-sidebar-root"')
     expect(source).toContain("const searchQuery = ref('')")
     expect(source).toContain("const sidebarTab = ref<SidebarTab>('recent')")
@@ -49,7 +49,7 @@ describe('WebQQ 顶部导航与会话栏', () => {
     expect(source.indexOf("label: '调试'")).toBeLessThan(source.indexOf("label: '模型请求'"))
     expect(source.indexOf("label: '模型请求'")).toBeLessThan(source.indexOf("label: '资料'"))
     expect(source).toContain("'is-rail-pin-end': item.id === 'spaces'")
-    expect(sidebarStyles).toMatch(/\.webqq-rail-tooltip-trigger\.is-rail-pin-end\s*\{[^}]*margin-left:\s*auto/s)
+    expect(sidebarStyles).toMatch(/\.webqq-rail-button\.is-rail-pin-end\s*\{[^}]*margin-left:\s*auto/s)
     expect(source.indexOf("label: '调试'")).toBeLessThan(source.indexOf("label: 'AI 测试空间'"))
     expect(source.indexOf("label: '资料'")).toBeLessThan(source.indexOf("label: 'AI 测试空间'"))
     expect(sidebarStyles).toMatch(/\.webqq-sidebar-tabs button\s*\{[^}]*border-radius:\s*8px 8px 0 0/s)

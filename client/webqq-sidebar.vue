@@ -6,29 +6,19 @@
             </span>
             <strong>ChatLuna Sandbox</strong>
           </div>
-          <TooltipProvider>
-            <Tooltip v-for="item in visibleNavigationItems" :key="item.id">
-              <TooltipTrigger as-child>
-                <span
-                  class="webqq-rail-tooltip-trigger"
-                  :class="{ 'is-rail-pin-end': item.id === 'spaces' }"
-                >
-                  <button
-                    type="button"
-                    class="webqq-rail-button"
-                    :class="{ 'is-active': isNavigationActive(item.id) }"
-                    :aria-label="item.label"
-                    :aria-current="isNavigationActive(item.id) ? 'page' : undefined"
-                    @click="selectNavigation(item.id)"
-                  >
-                    <component :is="item.icon" :size="20" stroke-width="1.8" aria-hidden="true" />
-                    <span v-if="item.id !== 'spaces'" class="webqq-rail-label">{{ item.label }}</span>
-                  </button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">{{ item.label }}</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <button
+            v-for="item in visibleNavigationItems"
+            :key="item.id"
+            type="button"
+            class="webqq-rail-button"
+            :class="{ 'is-active': isNavigationActive(item.id), 'is-rail-pin-end': item.id === 'spaces' }"
+            :aria-label="item.label"
+            :aria-current="isNavigationActive(item.id) ? 'page' : undefined"
+            @click="selectNavigation(item.id)"
+          >
+            <component :is="item.icon" :size="20" stroke-width="1.8" aria-hidden="true" />
+            <span v-if="item.id !== 'spaces'" class="webqq-rail-label">{{ item.label }}</span>
+          </button>
         </nav>
 
         <aside v-if="isWebqqView" class="webqq-conversations" aria-label="会话列表">
@@ -310,7 +300,6 @@ import {
 import { computed, ref } from 'vue'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from './components/ui/context-menu'
 import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip'
 import EnvironmentCreatePopover from './environment-create-popover.vue'
 import NotificationMenu from './notification-menu.vue'
 import SandboxActivityIcon from './sandbox-activity-icon.vue'
