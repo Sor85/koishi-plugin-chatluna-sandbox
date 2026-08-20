@@ -379,15 +379,15 @@ import {
   IconTool,
   IconUser,
 } from '@tabler/icons-vue'
-import { computed, defineComponent, h, nextTick, onBeforeUnmount, ref, watch, type Component } from 'vue'
+import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
 import { Button } from '../components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip'
 import ModelRequestJsonTree from '../model-request-json-tree.vue'
 import { formatDuration } from './format-duration'
 import {
   buildModelRequestAnalysisNavigation,
-  collapseAnalysisText,
   compactAnalysisText,
+  exceedsAnalysisLineLimit,
   isPreviewableConversationImage,
   modelAnalysisMessageId,
   modelAnalysisResponseToolCallId,
@@ -679,21 +679,36 @@ const AnalysisTextBlock = defineComponent({
     label: String,
     value: { type: String, default: '' },
     searchQuery: { type: String, default: '' },
-    threshold: { type: Number, default: 1200 },
-    previewLength: { type: Number, default: 600 },
+    maxLines: { type: Number, default: 12 },
     forceExpanded: Boolean,
     compact: Boolean,
   },
   setup(blockProps) {
     const expanded = ref(false)
-    const collapsed = computed(() => collapseAnalysisText(
-      blockProps.value,
-      expanded.value,
-      blockProps.threshold,
-      blockProps.previewLength,
-    ))
-    const collapsible = computed(() => collapsed.value.collapsible)
-    const visible = computed(() => collapsed.value.text)
+    const collapsible = ref(false)
+    const collapsedHeight = ref('')
+    const textElement = ref<HTMLElement>()
+    let resizeObserver: ResizeObserver | undefined
+
+    function measureLines() {
+      const element = textElement.value
+      if (!element) return
+      const lineHeight = Number.parseFloat(getComputedStyle(element).lineHeight)
+      if (!Number.isFinite(lineHeight) || lineHeight <= 0) {
+        collapsible.value = false
+        return
+      }
+      collapsedHeight.value = `${lineHeight * blockProps.maxLines}px`
+      collapsible.value = exceedsAnalysisLineLimit(element.scrollHeight, lineHeight, blockProps.maxLines)
+    }
+
+    watch(
+      [() => blockProps.value, () => blockProps.maxLines],
+      async () => {
+        await nextTick()
+        measureLines()
+      },
+    )
     watch(
       [() => blockProps.searchQuery, () => blockProps.forceExpanded],
       ([query, forceExpanded]) => {
@@ -701,12 +716,24 @@ const AnalysisTextBlock = defineComponent({
       },
       { immediate: true },
     )
+    onMounted(async () => {
+      await nextTick()
+      measureLines()
+      if (typeof ResizeObserver === 'undefined' || !textElement.value) return
+      resizeObserver = new ResizeObserver(measureLines)
+      resizeObserver.observe(textElement.value)
+    })
+    onBeforeUnmount(() => resizeObserver?.disconnect())
+
     return () => h('section', {
       class: ['webqq-model-analysis-section', { 'is-collapsed': collapsible.value && !expanded.value, 'is-compact': blockProps.compact }],
     }, [
       blockProps.label && h('strong', blockProps.label),
       h('div', { class: 'webqq-model-analysis-text-wrap' }, [
-        h('pre', highlightText(visible.value, blockProps.searchQuery)),
+        h('pre', {
+          ref: textElement,
+          style: { '--webqq-model-analysis-collapse-height': collapsedHeight.value },
+        }, highlightText(blockProps.value, blockProps.searchQuery)),
         collapsible.value && h('button', {
           type: 'button',
           class: 'webqq-model-analysis-expand',

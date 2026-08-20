@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildModelRequestAnalysisNavigation,
-  collapseAnalysisText,
+  exceedsAnalysisLineLimit,
   isPreviewableConversationImage,
   normalizeAnalysisQuery,
   prepareModelAnalysisTarget,
@@ -144,19 +144,9 @@ describe('模型请求分析展示模型', () => {
     expect(navigation.searchText).toContain('weather')
   })
 
-  it('内容超过 1200 字符时只预览前 600 字符，边界值不折叠', () => {
-    expect(collapseAnalysisText('a'.repeat(1200), false)).toEqual({
-      text: 'a'.repeat(1200),
-      collapsible: false,
-    })
-    expect(collapseAnalysisText('b'.repeat(1201), false)).toEqual({
-      text: 'b'.repeat(600),
-      collapsible: true,
-    })
-    expect(collapseAnalysisText('b'.repeat(1201), true)).toEqual({
-      text: 'b'.repeat(1201),
-      collapsible: true,
-    })
+  it('按实际排版高度在超过 12 行时折叠，正好 12 行保持完整', () => {
+    expect(exceedsAnalysisLineLimit(12 * 22.1, 22.1)).toBe(false)
+    expect(exceedsAnalysisLineLimit(12 * 22.1 + 1, 22.1)).toBe(true)
   })
 
   it('只允许 HTTP(S) 与非 SVG 图片 Data URL 进入图片预览', () => {

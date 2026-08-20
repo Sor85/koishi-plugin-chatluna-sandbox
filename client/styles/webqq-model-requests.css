@@ -1620,6 +1620,7 @@
 .webqq-model-analysis-section > strong { color: var(--webqq-muted); font-size: 11px; text-transform: uppercase; }
 .webqq-model-analysis-section pre, .webqq-model-analysis-tool-call pre { margin: 0; overflow-wrap: anywhere; color: var(--webqq-text); font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; user-select: text; }
 .webqq-model-analysis-text-wrap { position: relative; }
+.webqq-model-analysis-section.is-collapsed .webqq-model-analysis-text-wrap > pre { max-height: var(--webqq-model-analysis-collapse-height); overflow: hidden; }
 .webqq-model-analysis-section.is-collapsed .webqq-model-analysis-text-wrap::after { position: absolute; right: 0; bottom: 32px; left: 0; height: 48px; background: var(--webqq-surface); opacity: 0.92; content: ''; pointer-events: none; }
 .webqq-model-analysis-expand { position: relative; z-index: 1; padding: 4px 0; border: 0; color: var(--webqq-accent); background: transparent; font-size: 11px; }
 .webqq-model-analysis-tool-call { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--webqq-border); border-radius: 6px; background: var(--webqq-surface-muted); }

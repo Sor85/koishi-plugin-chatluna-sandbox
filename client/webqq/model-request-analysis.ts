@@ -225,17 +225,12 @@ export function shouldExpandAnalysisText(
   return manuallyExpanded || forceExpanded || Boolean(query && value.toLocaleLowerCase('zh-CN').includes(query))
 }
 
-export function collapseAnalysisText(
-  value: string,
-  expanded: boolean,
-  threshold = 1200,
-  previewLength = 600,
-): { text: string, collapsible: boolean } {
-  const collapsible = value.length > threshold
-  return {
-    text: expanded || !collapsible ? value : value.slice(0, previewLength),
-    collapsible,
-  }
+export function exceedsAnalysisLineLimit(
+  renderedHeight: number,
+  lineHeight: number,
+  maxLines = 12,
+): boolean {
+  return renderedHeight > lineHeight * maxLines
 }
 
 export function compactAnalysisText(value: string, length = 80): string {
