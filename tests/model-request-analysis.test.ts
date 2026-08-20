@@ -179,6 +179,19 @@ describe('模型请求分析展示模型', () => {
     expect(exceedsAnalysisLineLimit(12 * 22.1 + 1, 22.1)).toBe(true)
   })
 
+  it('去掉完整请求 JSON 入口，卡片正文不再标「内容」，头部空白可折叠', () => {
+    const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
+
+    expect(view).not.toContain('完整请求 JSON')
+    expect(view).not.toContain('返回对话')
+    expect(view).not.toContain('toggleRawRequest')
+    expect(view).not.toContain('label="内容"')
+    expect(view).not.toContain("index === 0 ? '内容'")
+    expect(view).toContain('@click="toggleCardFromHeader($event, modelAnalysisMessageId(message.index))"')
+    expect(view).toContain('@click="toggleCardFromHeader($event, \'model-analysis-response\')"')
+    expect(view).toContain('event.target.closest(\'button\')')
+  })
+
   it('折叠长文本用渐隐遮罩并居中展开按钮，避免半透明实色透出字形', () => {
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
     const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')

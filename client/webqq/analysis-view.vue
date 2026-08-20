@@ -48,32 +48,11 @@
       <div ref="contentElement" class="webqq-model-analysis-content">
         <header class="webqq-model-analysis-heading">
           <h3>Messages <span>({{ conversation.messages.length }})</span></h3>
-          <TooltipProvider :delay-duration="500">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <Button size="sm" variant="outline" @click="toggleRawRequest">
-                  <IconCode data-icon="inline-start" aria-hidden="true" />
-                  {{ rawRequest ? '返回对话' : '完整请求 JSON' }}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{{ rawRequest ? '返回格式化对话内容' : '查看完整请求 JSON' }}</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
         </header>
 
-        <div v-show="rawRequest" class="webqq-model-analysis-raw">
-          <ModelRequestJsonTree
-            :node="requestTree"
-            :open="true"
-            :root="true"
-            :strings-expanded="true"
-            :images-preview="true"
-          />
-        </div>
-        <div v-show="!rawRequest" class="webqq-model-analysis-conversation">
+        <div class="webqq-model-analysis-conversation">
           <div v-if="conversation.parseError && !conversation.messages.length" class="webqq-model-analysis-empty">
             <p>{{ conversation.parseError }}</p>
-            <Button size="sm" variant="outline" @click="toggleRawRequest">查看完整请求 JSON</Button>
           </div>
 
           <article
@@ -90,7 +69,7 @@
               },
             ]"
           >
-            <header>
+            <header @click="toggleCardFromHeader($event, modelAnalysisMessageId(message.index))">
               <span class="webqq-model-analysis-role"><AnalysisHighlightedText :value="roleLabel(message.role)" :query="normalizedSearch" /></span>
               <span class="webqq-model-analysis-index">#{{ message.index }}</span>
               <span class="webqq-model-analysis-path">{{ formatPath(message.path) }}</span>
@@ -148,7 +127,6 @@
               />
               <AnalysisTextBlock
                 v-else-if="message.content"
-                label="内容"
                 :value="message.content"
                 :search-query="normalizedSearch"
                 :force-expanded="expandedTextTargets.has(modelAnalysisMessageId(message.index))"
@@ -201,7 +179,7 @@
               'is-located': highlightedTarget === 'model-analysis-response',
             }"
           >
-            <header>
+            <header @click="toggleCardFromHeader($event, 'model-analysis-response')">
               <span class="webqq-model-analysis-role">响应</span>
               <span class="webqq-model-analysis-path">{{ responseFormatLabel }}</span>
               <span class="webqq-model-analysis-chars">{{ responseCharacters }} chars</span>
@@ -264,7 +242,6 @@
               />
               <AnalysisTextBlock
                 v-if="response.content.length"
-                label="内容"
                 :value="response.content.join('\n')"
                 :search-query="normalizedSearch"
                 :force-expanded="expandedTextTargets.has('model-analysis-response')"
@@ -437,7 +414,6 @@ const visibleNavigationGroups = computed(() => navigation.value.groups.flatMap((
     : group.items
   return items.length ? [{ ...group, count: items.length, items }] : []
 }))
-const rawRequest = ref(false)
 const responseRaw = ref(false)
 const rawMessages = ref(new Set<number>())
 const collapsedCards = ref(new Set<string>())
@@ -445,8 +421,6 @@ const expandedTools = ref(new Set<string>())
 const expandedTextTargets = ref(new Set<string>())
 const contentElement = ref<HTMLElement>()
 const highlightedTarget = ref('')
-const conversationScrollTop = ref(0)
-const requestTree = computed(() => buildModelRequestJsonTree(props.detail.requestBody, 'requestBody'))
 const responseMatches = computed(() => !normalizedSearch.value || response.value.searchText.toLocaleLowerCase('zh-CN').includes(normalizedSearch.value))
 const responseCharacters = computed(() => [
   ...response.value.content,
@@ -460,7 +434,6 @@ let suppressToolSummary = false
 
 watch(normalizedSearch, async (query) => {
   if (!query) return
-  rawRequest.value = false
   for (const message of conversation.value.messages) {
     if (message.searchText.toLocaleLowerCase('zh-CN').includes(query)) expandCard(modelAnalysisMessageId(message.index))
   }
@@ -481,7 +454,6 @@ watch(() => props.focusRequest?.token, () => {
 
 watch(() => props.detail.id, (next, previous) => {
   if (next === previous) return
-  rawRequest.value = false
   responseRaw.value = false
   rawMessages.value = new Set()
   collapsedCards.value = new Set()
@@ -505,7 +477,6 @@ function messageMatches(message: ModelConversationMessage) {
 
 async function jumpTo(target?: string, emphasize = true) {
   if (!target) return
-  rawRequest.value = false
   const forcedTargets = prepareTarget(target)
   await nextTick()
   expandedTextTargets.value = new Set([...expandedTextTargets.value].filter(candidate => !forcedTargets.includes(candidate)))
@@ -551,18 +522,6 @@ function hasTool(name: string) {
   return conversation.value.tools.some(tool => tool.name === name)
 }
 
-function toggleRawRequest() {
-  if (!rawRequest.value) {
-    conversationScrollTop.value = contentElement.value?.scrollTop ?? 0
-    rawRequest.value = true
-    return
-  }
-  rawRequest.value = false
-  nextTick(() => {
-    if (contentElement.value) contentElement.value.scrollTop = conversationScrollTop.value
-  })
-}
-
 function toggleRaw(index: number) {
   expandCard(modelAnalysisMessageId(index))
   const next = new Set(rawMessages.value)
@@ -584,6 +543,14 @@ function toggleCard(target: string) {
   const next = new Set(collapsedCards.value)
   next.has(target) ? next.delete(target) : next.add(target)
   collapsedCards.value = next
+}
+
+// 头部空白也折叠。JSON / 箭头是独立按钮，closest('button') 避免点它们时再切一次。
+function toggleCardFromHeader(event: MouseEvent, target: string) {
+  const selection = window.getSelection()
+  if (selection && !selection.isCollapsed) return
+  if (event.target instanceof Element && event.target.closest('button')) return
+  toggleCard(target)
 }
 
 function expandCard(target: string) {
@@ -769,7 +736,7 @@ const AnalysisContentParts = defineComponent({
           h('figcaption', part.mimeType || 'image'),
         ])
       }
-      const label = part.kind === 'text' ? index === 0 ? '内容' : undefined : part.kind === 'image' ? '图片加载失败' : part.kind
+      const label = part.kind === 'text' ? undefined : part.kind === 'image' ? '图片加载失败' : part.kind
       return h(AnalysisTextBlock, {
         key: index,
         label,
