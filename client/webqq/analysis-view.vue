@@ -256,12 +256,14 @@
                   :class="{ 'is-located': highlightedTarget === modelAnalysisResponseToolCallId(callIndex) }"
                 >
                   <div><strong><AnalysisHighlightedText :value="call.name" :query="normalizedSearch" /></strong><span><AnalysisHighlightedText :value="call.id || '无调用 ID'" :query="normalizedSearch" /></span></div>
-                  <AnalysisTextBlock
-                    :value="call.arguments || '{}'"
-                    :search-query="normalizedSearch"
-                    :force-expanded="expandedTextTargets.has(modelAnalysisResponseToolCallId(callIndex))"
-                    compact
-                  />
+                  <div class="webqq-model-analysis-tool-schema webqq-model-request-json-viewer">
+                    <ModelRequestJsonTree
+                      :node="buildModelRequestJsonTree(parseAnalysisJson(call.arguments), 'arguments')"
+                      :open="true"
+                      :root="true"
+                      :strings-expanded="true"
+                    />
+                  </div>
                   <button v-if="hasTool(call.name)" type="button" class="webqq-model-analysis-link" @click="locateTool(call.name)">
                     查看工具定义
                   </button>
@@ -329,14 +331,12 @@
               <div v-if="expandedTools.has(tool.path.join('.'))" class="webqq-model-analysis-tool-detail">
                 <p><AnalysisHighlightedText :value="tool.description || '无描述'" :query="normalizedSearch" /></p>
                 <h4>Parameters (JSON Schema) <small>{{ formatPath(tool.path) }}</small></h4>
-                <div class="webqq-model-analysis-tool-schema">
-                  <AnalysisTextBlock
-                    :value="formatJson(tool.parameters || {})"
-                    :search-query="normalizedSearch"
-                    :threshold="1200"
-                    :preview-length="600"
-                    :force-expanded="expandedTextTargets.has(modelAnalysisToolId(tool.path))"
-                    compact
+                <div class="webqq-model-analysis-tool-schema webqq-model-request-json-viewer">
+                  <ModelRequestJsonTree
+                    :node="buildModelRequestJsonTree(tool.parameters || {}, 'parameters')"
+                    :open="true"
+                    :root="true"
+                    :strings-expanded="true"
                   />
                 </div>
               </div>
@@ -615,11 +615,12 @@ function statusLabel(status: SandboxModelRequestStatus) {
   return '已完成'
 }
 
-function formatJson(value: unknown) {
+function parseAnalysisJson(value: string | undefined) {
+  if (!value) return {}
   try {
-    return JSON.stringify(value, null, 2) ?? '{}'
+    return JSON.parse(value)
   } catch {
-    return String(value)
+    return value
   }
 }
 

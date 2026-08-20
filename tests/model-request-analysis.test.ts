@@ -192,12 +192,22 @@ describe('模型请求分析展示模型', () => {
     expect(styles).not.toMatch(/\.webqq-model-analysis-tool-summary \{[^}]*min-height: 58px;/s)
   })
 
-  it('工具 Schema JSON 用独立底和边框与描述隔开', () => {
+  it('工具 Schema 使用请求页 JSON 树，而不是纯文本', () => {
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
     const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
 
-    expect(view).toContain('class="webqq-model-analysis-tool-schema"')
-    expect(styles).toMatch(/\.webqq-model-analysis-tool-schema \{[^}]*border: 1px solid var\(--webqq-border\);[^}]*border-radius: 8px;[^}]*background: var\(--webqq-surface-muted\);/s)
+    expect(view).toContain('class="webqq-model-analysis-tool-schema webqq-model-request-json-viewer"')
+    expect(view).toContain(':node="buildModelRequestJsonTree(tool.parameters || {}, \'parameters\')"')
+    expect(view).not.toContain('formatJson(tool.parameters')
+    expect(styles).toMatch(/\.webqq-model-analysis-tool-schema\.webqq-model-request-json-viewer \{[^}]*min-height: 0;[^}]*padding: 12px;/s)
+  })
+
+  it('响应工具调用参数使用请求页 JSON 树，而不是纯文本', () => {
+    const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
+    const responseSection = view.slice(view.indexOf('response.toolCalls.length'))
+
+    expect(responseSection).toContain(':node="buildModelRequestJsonTree(parseAnalysisJson(call.arguments), \'arguments\')"')
+    expect(responseSection).not.toContain(':value="call.arguments || \'{}\'"')
   })
 
   it('去掉完整请求 JSON 入口，卡片正文不再标「内容」，头部空白可折叠', () => {
