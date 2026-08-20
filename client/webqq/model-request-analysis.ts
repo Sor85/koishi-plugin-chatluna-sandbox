@@ -1,4 +1,10 @@
-import type { SandboxModelRequestDetail, SandboxModelRequestPromptKind, SandboxModelRequestStatus } from '../../src/types'
+import type {
+  SandboxModelRequestDetail,
+  SandboxModelRequestPromptKind,
+  SandboxModelRequestStatus,
+  SandboxModelRequestTrajectoryKind,
+  SandboxModelRequestTrajectoryRow,
+} from '../../src/types'
 import type {
   ModelConversationMessage,
   ModelRequestConversation,
@@ -153,6 +159,40 @@ export function buildModelRequestAnalysisNavigation(
   }
 }
 
+export interface ModelRequestAnalysisFocusRow {
+  id: string
+  kind: SandboxModelRequestTrajectoryKind
+  toolEvent?: SandboxModelRequestTrajectoryRow['toolEvent']
+  source?: 'request' | 'response'
+  indexInKind: number
+}
+
+export function resolveAnalysisTrajectoryTarget(
+  navigation: ModelRequestAnalysisNavigation,
+  row: Pick<ModelRequestAnalysisFocusRow, 'kind' | 'toolEvent' | 'source'>,
+  indexInKind = 0,
+): string | undefined {
+  if (row.kind === 'request') {
+    return navigation.groups[0]?.items[0]?.target ?? navigation.boundary.target
+  }
+  if (row.source === 'response') {
+    const responseItems = navigation.groups.find(group => group.key === 'response')?.items ?? []
+    if (row.kind === 'tool' && row.toolEvent === 'call') {
+      return responseItems.filter(item => item.kind === 'tool-call')[indexInKind]?.target ?? navigation.boundary.target
+    }
+    if (row.kind === 'tool' && row.toolEvent === 'result') {
+      return responseItems.filter(item => item.kind === 'tool-result')[indexInKind]?.target ?? navigation.boundary.target
+    }
+    return navigation.boundary.target
+  }
+  const kind: SandboxModelRequestPromptKind = row.toolEvent === 'definition'
+    ? 'tool-definition'
+    : row.kind === 'tool'
+      ? 'tool-interaction'
+      : row.kind
+  return resolveAnalysisPromptTarget(navigation, kind, indexInKind)
+}
+
 export function resolveAnalysisPromptTarget(
   navigation: ModelRequestAnalysisNavigation,
   kind: SandboxModelRequestPromptKind,
@@ -231,6 +271,15 @@ export function exceedsAnalysisLineLimit(
   maxLines = 12,
 ): boolean {
   return renderedHeight > lineHeight * maxLines
+}
+
+export function analysisTargetScrollTop(
+  elementTop: number,
+  scrollerTop: number,
+  scrollerScrollTop: number,
+  margin = 12,
+): number {
+  return Math.max(0, elementTop - scrollerTop + scrollerScrollTop - margin)
 }
 
 export function compactAnalysisText(value: string, length = 80): string {

@@ -164,34 +164,31 @@
           </template>
         </div>
 
-        <aside v-if="selectedRow" v-webqq-scrollbar class="webqq-model-trajectory-inspector" aria-label="轨迹事件检查器">
+        <aside v-if="selectedRow" class="webqq-model-trajectory-inspector" aria-label="轨迹请求分析">
           <header>
             <div>
               <Badge variant="outline">{{ kindLabel(selectedRow.kind, selectedRow.toolEvent) }}</Badge>
+              <span v-if="selectedRequest" class="webqq-model-trajectory-inspector-title">{{ requestLabel(selectedRow.requestId) }}</span>
             </div>
-            <Button variant="ghost" size="icon-sm" aria-label="关闭检查器" @click="selectedRowId = ''">
-              <IconX aria-hidden="true" />
-            </Button>
+            <div class="webqq-model-trajectory-inspector-actions">
+              <Button v-if="selectedRequest" variant="outline" size="sm" @click="openSelectedRequest">
+                <IconExternalLink data-icon="inline-start" aria-hidden="true" />
+                打开原始请求
+              </Button>
+              <Button variant="ghost" size="icon-sm" aria-label="关闭检查器" @click="selectedRowId = ''">
+                <IconX aria-hidden="true" />
+              </Button>
+            </div>
           </header>
-          <dl v-if="selectedRow.kind === 'request'" class="webqq-model-trajectory-facts">
-            <div><dt>状态</dt><dd>{{ statusLabel(selectedRow.status) }}</dd></div>
-            <div><dt>开始</dt><dd>{{ formatTime(selectedRow.startedAt) }}</dd></div>
-            <div><dt>耗时</dt><dd>{{ selectedRow.durationMs === undefined ? '—' : formatDuration(selectedRow.durationMs) }}</dd></div>
-          </dl>
-          <div v-if="selectedRow.detail !== undefined" class="webqq-model-request-json-viewer webqq-model-trajectory-detail-json">
-            <ModelRequestJsonTree
-              :node="selectedTree"
-              :open="true"
-              :root="true"
-              :strings-expanded="true"
-              :images-preview="true"
+          <div v-webqq-scrollbar="{ showOverlay: false }" class="webqq-model-trajectory-inspector-body">
+            <ModelRequestConversationAnalysis
+              v-if="inspectorDetail"
+              layout="inspector"
+              :detail="inspectorDetail"
+              :search-query="searchQuery"
+              :focus-row="inspectorFocusRow"
             />
-          </div>
-          <div v-if="selectedRequest" class="webqq-model-trajectory-inspector-actions">
-            <Button variant="outline" size="sm" @click="openSelectedRequest">
-              <IconExternalLink data-icon="inline-start" aria-hidden="true" />
-              打开原始请求
-            </Button>
+            <div v-else class="webqq-model-request-empty">正在加载分析…</div>
           </div>
         </aside>
       </div>
@@ -214,9 +211,8 @@ import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip'
 import ModelRequestConversationAnalysis from './webqq/analysis-view.vue'
-import ModelRequestJsonTree from './model-request-json-tree.vue'
-import { buildModelRequestJsonTree } from './webqq/model-request-json'
 import { formatDuration } from './webqq/format-duration'
+import type { ModelRequestAnalysisFocusRow } from './webqq/model-request-analysis'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type {
   SandboxModelRequestDetail,
@@ -257,6 +253,7 @@ const emit = defineEmits<{
       scrollTop: number
     }
   }]
+  'inspect-request': [payload: { recordId: string }]
 }>()
 
 const ledgerElement = ref<HTMLElement>()
@@ -272,8 +269,23 @@ const analysisFocusRequest = ref<{
   token: number
 }>()
 const selectedRow = computed(() => props.trajectory?.rows.find(({ id }) => id === selectedRowId.value))
-const selectedTree = computed(() => buildModelRequestJsonTree(selectedRow.value?.detail, `trajectory.${selectedRow.value?.id ?? 'detail'}`))
 const selectedRequest = computed(() => props.trajectory?.records.find(({ id }) => id === selectedRow.value?.requestId))
+const inspectorDetail = computed(() => {
+  const requestId = selectedRow.value?.requestId
+  if (!requestId || props.detail?.id !== requestId) return undefined
+  return props.detail
+})
+const inspectorFocusRow = computed<ModelRequestAnalysisFocusRow | undefined>(() => {
+  const row = selectedRow.value
+  if (!row) return undefined
+  return {
+    id: row.id,
+    kind: row.kind,
+    indexInKind: indexInKindForRow(row),
+    ...(row.toolEvent ? { toolEvent: row.toolEvent } : {}),
+    ...(row.source ? { source: row.source } : {}),
+  }
+})
 const normalizedSearch = computed(() => searchQuery.value.trim().toLocaleLowerCase('zh-CN'))
 const promptComposition = computed(() => {
   const items = props.trajectory?.promptComposition ?? []
@@ -391,6 +403,12 @@ watch(() => props.trajectory, () => {
   restoreTrajectoryPosition()
 })
 
+watch(() => selectedRow.value?.requestId, (requestId) => {
+  // 会话轨迹可能点到另一条请求；检查器要完整详情才能渲染分析卡片。
+  if (!requestId || props.detail?.id === requestId) return
+  emit('inspect-request', { recordId: requestId })
+})
+
 watch(() => props.restoreState?.token, restoreTrajectoryPosition, { immediate: true })
 
 async function restoreTrajectoryPosition() {
@@ -463,6 +481,22 @@ function promptRowsForKind(kind: SandboxModelRequestPromptKind, requestId?: stri
   })
 }
 
+function indexInKindForRow(row: SandboxModelRequestTrajectoryRow) {
+  if (row.kind === 'request') return 0
+  const rows = row.source === 'response'
+    ? (props.trajectory?.rows ?? []).filter((candidate) => (
+      candidate.requestId === row.requestId
+      && candidate.source === 'response'
+      && candidate.kind === row.kind
+      && candidate.toolEvent === row.toolEvent
+    ))
+    : promptRowsForKind(
+      row.toolEvent === 'definition' ? 'tool-definition' : row.kind === 'tool' ? 'tool-interaction' : row.kind,
+      row.requestId,
+    ).filter((candidate) => candidate.source !== 'response')
+  return Math.max(rows.findIndex((candidate) => candidate.id === row.id), 0)
+}
+
 function selectPromptSegment(segment: { kind: SandboxModelRequestPromptKind, indexInKind: number, requestId?: string }) {
   if (props.analysis) {
     analysisFocusRequest.value = {
@@ -494,13 +528,11 @@ function openSelectedRequest() {
   if (!request || !row) return
   emit('open-request', {
     recordId: request.id,
-    kind: row.kind,
-    source: row.source,
+    kind: 'request',
     returnState: {
       rowId: row.id,
       scrollTop: ledgerElement.value?.scrollTop ?? 0,
     },
-    ...(row.detail !== undefined ? { detail: row.detail } : {}),
   })
 }
 
@@ -544,20 +576,10 @@ function kindLabel(kind: SandboxModelRequestTrajectoryKind, toolEvent?: SandboxM
   return 'REQUEST'
 }
 
-function statusLabel(status: SandboxModelRequestStatus | undefined) {
-  if (status === 'pending') return '进行中'
-  if (status === 'error') return '错误'
-  return status === 'success' ? '已完成' : '—'
-}
-
 function statusClass(status: SandboxModelRequestStatus | undefined) {
   if (status === 'pending') return 'is-pending'
   if (status === 'error') return 'is-error'
   return 'is-success'
 }
 
-function formatTime(value: string | undefined) {
-  if (!value) return '—'
-  return new Date(value).toLocaleString('zh-CN', { hour12: false })
-}
 </script>

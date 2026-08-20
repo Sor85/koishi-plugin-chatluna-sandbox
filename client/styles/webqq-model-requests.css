@@ -553,6 +553,13 @@
   --webqq-trajectory-context: #319979;
 }
 
+.webqq-model-request-detail-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
 .webqq-model-request-view-switch,
 .webqq-model-trajectory-mode {
   display: flex;
@@ -563,10 +570,6 @@
   border: 1px solid var(--webqq-border);
   border-radius: 8px;
   background: var(--webqq-surface-muted);
-}
-
-.webqq-model-request-view-switch {
-  margin-left: auto;
 }
 
 .webqq-model-trajectory-scope,
@@ -970,8 +973,10 @@
 
 .webqq-model-trajectory-inspector {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   align-content: start;
   gap: 12px;
+  overflow: hidden;
   padding: 12px;
   border-left: 1px solid var(--webqq-border);
   background: var(--webqq-surface);
@@ -1010,7 +1015,14 @@
 }
 
 .webqq-model-trajectory-inspector-actions {
+  flex: 0 0 auto;
   justify-content: flex-end;
+}
+
+.webqq-model-trajectory-inspector-body {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
 }
 
 .webqq-model-trajectory [data-slot="tooltip-content"] {
@@ -1586,6 +1598,27 @@
 .webqq-model-analysis-content,
 .webqq-model-analysis-conversation { display: grid; align-content: start; gap: 12px; min-width: 0; }
 .webqq-model-analysis-content { max-height: 720px; overflow: auto; padding: 14px; }
+.webqq-model-analysis.is-inspector,
+.webqq-model-analysis.is-inspector .webqq-model-analysis-main {
+  min-height: 0;
+}
+.webqq-model-analysis.is-inspector .webqq-model-analysis-main {
+  display: block;
+  overflow: visible;
+}
+.webqq-model-analysis.is-inspector .webqq-model-analysis-content {
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+}
+.webqq-model-trajectory-inspector-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--webqq-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .webqq-model-analysis-formatted { min-width: 0; }
 .webqq-model-analysis-heading { justify-content: space-between; gap: 12px; }
 .webqq-model-analysis-heading h3, .webqq-model-analysis-tools h3 { margin: 0; color: var(--webqq-text); font-size: 16px; }
@@ -1629,7 +1662,14 @@
 }
 .webqq-model-analysis-index, .webqq-model-analysis-path, .webqq-model-analysis-chars { color: var(--webqq-muted); font-size: 11px; }
 .webqq-model-analysis-path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.webqq-model-analysis-chars { margin-left: auto; padding: 4px 8px; border: 1px solid var(--webqq-border); border-radius: 999px; }
+.webqq-model-analysis-chars {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 4px 8px;
+  border: 1px solid var(--webqq-border);
+  border-radius: 999px;
+  white-space: nowrap;
+}
 
 .webqq-model-analysis-section { display: grid; gap: 8px; padding: 14px 16px; }
 .webqq-model-analysis-section + .webqq-model-analysis-section { border-top: 1px solid var(--webqq-border); }
@@ -1714,8 +1754,28 @@
 .webqq-model-analysis-response-heading { padding-top: 4px; }
 .webqq-model-analysis-response-heading h3 { margin: 0; color: var(--webqq-text); font-size: 16px; }
 
-.webqq-model-analysis-tools { display: grid; gap: 10px; padding-top: 4px; scroll-margin-top: 12px; }
-.webqq-model-analysis-tool-summary { gap: 8px; width: 100%; min-height: 44px; padding: 8px 12px; border: 0; color: var(--webqq-text); background: transparent; font: inherit; text-align: left; user-select: text; }
+.webqq-model-analysis-tools {
+  display: grid;
+  gap: 10px;
+  padding: 8px;
+  overflow: hidden;
+  border-radius: 8px;
+  scroll-margin-top: 12px;
+}
+.webqq-model-analysis-tool-summary {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 18px;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 0;
+  color: var(--webqq-text);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  user-select: text;
+}
 .webqq-model-analysis-tool-summary:hover,
 .webqq-model-analysis-tool-summary:focus-visible { background: var(--webqq-hover); }
 /* 工具行是 flex。不锁死 SVG 会被描述和 props 挤扁；缩小后扳手看起来像放大镜。 */
@@ -1725,10 +1785,68 @@
   height: 18px;
 }
 .webqq-model-analysis-tool-summary > svg:first-child { color: var(--webqq-role); }
-.webqq-model-analysis-tool-summary > strong { flex: 0 0 auto; color: var(--webqq-role); font-family: "JetBrains Mono", ui-monospace, monospace; }
-.webqq-model-analysis-tool-summary > span { min-width: 0; overflow: hidden; color: var(--webqq-muted); text-overflow: ellipsis; white-space: nowrap; }
-.webqq-model-analysis-tool-summary > small { margin-left: auto; color: var(--webqq-muted); white-space: nowrap; }
-.webqq-model-analysis-tool-card.is-expanded .webqq-model-analysis-tool-summary > svg:last-child { transform: rotate(180deg); }
+.webqq-model-analysis-tool-copy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+/* 名称不收缩。max-width:100% 只在整行只剩名称时才允许省略，避免挤掉箭头。 */
+.webqq-model-analysis-tool-copy > strong {
+  flex: 0 0 auto;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--webqq-role);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 描述吃剩余宽度。container 按自身已分配宽度查询：≤3em 时只能露出 1～2 个字，直接隐藏。 */
+.webqq-model-analysis-tool-copy > .webqq-model-analysis-tool-desc {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  container-type: inline-size;
+}
+.webqq-model-analysis-tool-desc > span {
+  display: block;
+  overflow: hidden;
+  color: var(--webqq-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@container (max-width: 3em) {
+  .webqq-model-analysis-tool-desc > span { display: none; }
+}
+.webqq-model-analysis-tool-copy > small {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--webqq-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 箭头必须最后可见。不锁宽高会被 flex 挤成斜菱形。 */
+.webqq-model-analysis-tool-summary > .webqq-model-analysis-tool-chevron {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  overflow: visible;
+}
+.webqq-model-analysis-collapse {
+  flex: 0 0 auto;
+}
+.webqq-model-analysis-collapse svg {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+}
+.webqq-model-analysis-tool-card.is-expanded .webqq-model-analysis-tool-summary > .webqq-model-analysis-tool-chevron { transform: rotate(180deg); }
 .webqq-model-analysis-tool-detail { display: grid; gap: 12px; padding: 16px; border-top: 1px solid var(--webqq-border); }
 .webqq-model-analysis-tool-detail p, .webqq-model-analysis-tool-detail h4 { margin: 0; }
 .webqq-model-analysis-tool-detail h4 { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; font-weight: 500; }
@@ -1778,7 +1896,7 @@
     flex-direction: column;
   }
 
-  .webqq-model-request-view-switch {
+  .webqq-model-request-detail-nav {
     margin-left: 0;
   }
 

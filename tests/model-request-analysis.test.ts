@@ -2,12 +2,14 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
+  analysisTargetScrollTop,
   buildModelRequestAnalysisNavigation,
   exceedsAnalysisLineLimit,
   isPreviewableConversationImage,
   normalizeAnalysisQuery,
   prepareModelAnalysisTarget,
   resolveAnalysisPromptTarget,
+  resolveAnalysisTrajectoryTarget,
   resolveToolDefinitionLocation,
   shouldExpandAnalysisText,
 } from '../client/webqq/model-request-analysis'
@@ -88,6 +90,28 @@ describe('模型请求分析展示模型', () => {
     for (const item of navigation.groups.flatMap(group => group.items)) item.label = '展示文案已修改'
     expect(resolveAnalysisPromptTarget(navigation, 'tool-definition', 0)).toBe('model-analysis-tools')
     expect(resolveAnalysisPromptTarget(navigation, 'tool-interaction', 0)).toBe('model-analysis-message-2-tool-call-0')
+  })
+
+  it('把轨迹账本行定位到分析卡片，响应事件不误入请求消息', () => {
+    const request = detail()
+    request.responseBodyRaw = JSON.stringify({
+      choices: [{
+        message: {
+          content: '北京晴朗',
+          tool_calls: [{ id: 'call-2', function: { name: 'weather', arguments: '{"city":"上海"}' } }],
+        },
+        finish_reason: 'tool_calls',
+      }],
+    })
+    const navigation = buildModelRequestAnalysisNavigation(parseModelRequestConversationDetail(request), request)
+
+    expect(resolveAnalysisTrajectoryTarget(navigation, { kind: 'request' })).toBe('model-analysis-message-0')
+    expect(resolveAnalysisTrajectoryTarget(navigation, { kind: 'system' }, 0)).toBe('model-analysis-message-0')
+    expect(resolveAnalysisTrajectoryTarget(navigation, { kind: 'user' }, 0)).toBe('model-analysis-message-1')
+    expect(resolveAnalysisTrajectoryTarget(navigation, { kind: 'tool', toolEvent: 'definition' }, 0)).toBe('model-analysis-tools')
+    expect(resolveAnalysisTrajectoryTarget(navigation, { kind: 'tool', toolEvent: 'call' }, 0)).toBe('model-analysis-message-2-tool-call-0')
+    expect(resolveAnalysisTrajectoryTarget(navigation, { kind: 'assistant', source: 'response' })).toBe('model-analysis-response')
+    expect(resolveAnalysisTrajectoryTarget(navigation, { kind: 'tool', toolEvent: 'call', source: 'response' }, 0)).toBe('model-analysis-response-tool-call-0')
   })
 
   it('把 Gemini 组成图 System 分段定位到 systemInstruction.parts', () => {
@@ -207,8 +231,18 @@ describe('模型请求分析展示模型', () => {
 
   it('工具列表图标锁死 18px，避免 flex 把扳手挤成不同大小', () => {
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
 
     expect(styles).toMatch(/\.webqq-model-analysis-tool-summary > svg \{[^}]*flex: 0 0 auto;[^}]*width: 18px;[^}]*height: 18px;/s)
+    expect(view).toContain('class="webqq-model-analysis-tool-copy"')
+    expect(view).toContain('class="webqq-model-analysis-tool-desc"')
+    expect(view).toContain('class="webqq-model-analysis-tool-chevron"')
+    expect(styles).toMatch(/\.webqq-model-analysis-tool-summary \{[^}]*grid-template-columns: 18px minmax\(0, 1fr\) 18px;/s)
+    expect(styles).toMatch(/\.webqq-model-analysis-tool-copy > strong \{[^}]*flex: 0 0 auto;[^}]*max-width: 100%;/s)
+    expect(styles).toMatch(/\.webqq-model-analysis-tool-copy > \.webqq-model-analysis-tool-desc \{[^}]*container-type: inline-size;/s)
+    expect(styles).toMatch(/@container \(max-width: 3em\) \{[^}]*\.webqq-model-analysis-tool-desc > span \{ display: none; \}/s)
+    expect(styles).toMatch(/\.webqq-model-analysis-tool-summary > \.webqq-model-analysis-tool-chevron \{[^}]*flex: 0 0 18px;[^}]*min-width: 18px;[^}]*min-height: 18px;/s)
+    expect(styles).toMatch(/\.webqq-model-analysis-collapse svg \{[^}]*min-width: 16px;[^}]*min-height: 16px;/s)
   })
 
   it('工具列表卡片头与消息卡片头同高，不再额外垫高', () => {
@@ -216,6 +250,33 @@ describe('模型请求分析展示模型', () => {
 
     expect(styles).toMatch(/\.webqq-model-analysis-tool-summary \{[^}]*min-height: 44px;[^}]*padding: 8px 12px;/s)
     expect(styles).not.toMatch(/\.webqq-model-analysis-tool-summary \{[^}]*min-height: 58px;/s)
+  })
+
+  it('检查器按滚动容器对齐目标，等长文本折叠后再定位', () => {
+    const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
+
+    expect(analysisTargetScrollTop(400, 80, 20)).toBe(328)
+    expect(analysisTargetScrollTop(40, 80, 0)).toBe(0)
+    expect(view).toContain('analysisTargetScrollTop')
+    expect(view).toContain("content.closest<HTMLElement>('.webqq-model-trajectory-inspector-body')")
+    expect(view).toContain('await waitForAnimationFrame()')
+    expect(view).toContain('watchRelocate(target, generation)')
+    expect(view).toContain("scrollTarget(target, 'smooth')")
+    expect(view).toContain("measured.scroller.scrollTo({ top: measured.top, behavior: 'auto' })")
+    expect(view).not.toContain("scrollIntoView({ behavior: 'smooth', block: 'start' })")
+  })
+
+  it('TOOL DEFS 强调框与消息卡片一样是圆角矩形', () => {
+    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+
+    expect(styles).toMatch(/\.webqq-model-analysis-tools \{[^}]*overflow: hidden;[^}]*border-radius: 8px;/s)
+    expect(styles).toContain('.webqq-model-analysis-tools.is-located')
+  })
+
+  it('字符数徽章保持单行，不被窄栏折成两行', () => {
+    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+
+    expect(styles).toMatch(/\.webqq-model-analysis-chars \{[^}]*flex: 0 0 auto;[^}]*white-space: nowrap;/s)
   })
 
   it('工具 Schema 使用请求页 JSON 树，而不是纯文本', () => {
@@ -247,6 +308,8 @@ describe('模型请求分析展示模型', () => {
     expect(view).toContain('@click="toggleCardFromHeader($event, modelAnalysisMessageId(message.index))"')
     expect(view).toContain('@click="toggleCardFromHeader($event, \'model-analysis-response\')"')
     expect(view).toContain('event.target.closest(\'button\')')
+    expect(view).toContain("v-if=\"layout !== 'inspector'\"")
+    expect(view).toContain("layout === 'inspector'")
   })
 
   it('折叠长文本用渐隐遮罩并居中展开按钮，避免半透明实色透出字形', () => {

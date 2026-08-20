@@ -1,7 +1,7 @@
 <template>
-  <section class="webqq-model-analysis" aria-label="模型请求分析">
+  <section class="webqq-model-analysis" :class="{ 'is-inspector': layout === 'inspector' }" aria-label="模型请求分析">
     <div class="webqq-model-analysis-main">
-      <aside class="webqq-model-analysis-nav" aria-label="分析导航">
+      <aside v-if="layout !== 'inspector'" class="webqq-model-analysis-nav" aria-label="分析导航">
         <button
           type="button"
           class="webqq-model-analysis-boundary"
@@ -320,13 +320,17 @@
                 @click="toggleToolFromSummary(tool.path.join('.'))"
               >
                 <IconTool :size="18" aria-hidden="true" />
-                <strong><AnalysisHighlightedText :value="tool.name" :query="normalizedSearch" /></strong>
-                <span><AnalysisHighlightedText :value="compactAnalysisText(tool.description || '无描述')" :query="normalizedSearch" /></span>
-                <small>
-                  {{ tool.propertyCount }} props
-                  <span v-if="tool.requiredFields.length"> · required: {{ tool.requiredFields.join(', ') }}</span>
-                </small>
-                <IconChevronDown :size="18" aria-hidden="true" />
+                <span class="webqq-model-analysis-tool-copy">
+                  <strong><AnalysisHighlightedText :value="tool.name" :query="normalizedSearch" /></strong>
+                  <span class="webqq-model-analysis-tool-desc">
+                    <AnalysisHighlightedText :value="compactAnalysisText(tool.description || '无描述')" :query="normalizedSearch" />
+                  </span>
+                  <small>
+                    {{ tool.propertyCount }} props
+                    <span v-if="tool.requiredFields.length"> · required: {{ tool.requiredFields.join(', ') }}</span>
+                  </small>
+                </span>
+                <IconChevronDown class="webqq-model-analysis-tool-chevron" :size="18" aria-hidden="true" />
               </button>
               <div v-if="expandedTools.has(tool.path.join('.'))" class="webqq-model-analysis-tool-detail">
                 <p><AnalysisHighlightedText :value="tool.description || '无描述'" :query="normalizedSearch" /></p>
@@ -374,9 +378,12 @@ import {
   modelAnalysisToolCallId,
   modelAnalysisToolId,
   normalizeAnalysisQuery,
+  analysisTargetScrollTop,
   prepareModelAnalysisTarget,
   resolveAnalysisPromptTarget,
+  resolveAnalysisTrajectoryTarget,
   resolveToolDefinitionLocation,
+  type ModelRequestAnalysisFocusRow,
   shouldExpandAnalysisText,
   type ModelRequestAnalysisGroupKey,
   type ModelRequestAnalysisNavigationItem,
@@ -395,11 +402,13 @@ const props = defineProps<{
   detail: SandboxModelRequestDetail
   trajectory?: SandboxModelRequestTrajectory
   searchQuery?: string
+  layout?: 'page' | 'inspector'
   focusRequest?: {
     kind: SandboxModelRequestPromptKind
     indexInKind: number
     token: number
   }
+  focusRow?: ModelRequestAnalysisFocusRow
   requestsCollapsed?: boolean
   toolsCollapsed?: boolean
 }>()
@@ -431,6 +440,10 @@ const responseCharacters = computed(() => [
   ...response.value.toolResults.map(result => result.content),
 ].join('').length)
 let highlightTimer: ReturnType<typeof setTimeout> | undefined
+let relocateObserver: ResizeObserver | undefined
+let relocateTimer: ReturnType<typeof setTimeout> | undefined
+let locateGeneration = 0
+let pendingScrollTop: number | undefined
 let pointerStart: { x: number, y: number } | undefined
 let suppressToolSummary = false
 
@@ -443,6 +456,8 @@ watch(normalizedSearch, async (query) => {
   for (const tool of conversation.value.tools) {
     if (tool.searchText.toLocaleLowerCase('zh-CN').includes(query)) expandTool(tool.path.join('.'))
   }
+  // 轨迹检查器已经选中了具体账本行，搜索只高亮匹配卡片，不再抢走当前定位。
+  if (props.layout === 'inspector') return
   const first = visibleNavigationGroups.value.flatMap(group => group.items).find(itemMatches)
   if (first) await jumpTo(first.target, false)
 })
@@ -454,6 +469,14 @@ watch(() => props.focusRequest?.token, () => {
   if (target) void jumpTo(target)
 })
 
+watch(() => props.focusRow?.id, () => {
+  void locateFocusRow()
+})
+
+onMounted(() => {
+  void locateFocusRow()
+})
+
 watch(() => props.detail.id, (next, previous) => {
   if (next === previous) return
   responseRaw.value = false
@@ -462,11 +485,13 @@ watch(() => props.detail.id, (next, previous) => {
   expandedTools.value = new Set()
   expandedTextTargets.value = new Set()
   highlightedTarget.value = ''
-  if (contentElement.value) contentElement.value.scrollTop = 0
+  const scroller = findScroller()
+  if (scroller) scroller.scrollTop = 0
 })
 
 onBeforeUnmount(() => {
   if (highlightTimer) clearTimeout(highlightTimer)
+  stopRelocate()
 })
 
 function itemMatches(item: ModelRequestAnalysisNavigationItem) {
@@ -477,15 +502,95 @@ function messageMatches(message: ModelConversationMessage) {
   return !normalizedSearch.value || message.searchText.toLocaleLowerCase('zh-CN').includes(normalizedSearch.value)
 }
 
+async function locateFocusRow() {
+  const row = props.focusRow
+  if (!row) return
+  const target = resolveAnalysisTrajectoryTarget(navigation.value, row, row.indexInKind)
+  if (target) await jumpTo(target)
+}
+
 async function jumpTo(target?: string, emphasize = true) {
   if (!target) return
+  const generation = ++locateGeneration
   const forcedTargets = prepareTarget(target)
   await nextTick()
   expandedTextTargets.value = new Set([...expandedTextTargets.value].filter(candidate => !forcedTargets.includes(candidate)))
-  const element = findTarget(target)
-  element?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  // 长文本折叠发生在下一帧。此时 scrollIntoView 会按未折叠高度把目标算到最底端。
+  await nextTick()
+  await waitForAnimationFrame()
+  await waitForAnimationFrame()
+  if (generation !== locateGeneration) return
+  scrollTarget(target, 'smooth')
+  watchRelocate(target, generation)
   if (emphasize) emphasizeTarget(target)
   emit('locate', target)
+}
+
+function findScroller(): HTMLElement | undefined {
+  const content = contentElement.value
+  if (!content) return undefined
+  // 检查器真正滚动的是 inspector-body。analysis-content 在 inspector 下 overflow:visible，
+  // scrollIntoView 会带动外层工作台一起滚，首次点开位置必然偏掉。
+  if (props.layout === 'inspector') {
+    return content.closest<HTMLElement>('.webqq-model-trajectory-inspector-body') ?? content
+  }
+  return content
+}
+
+function measureTargetTop(target: string) {
+  const element = findTarget(target)
+  const scroller = findScroller()
+  if (!element || !scroller) return undefined
+  return {
+    scroller,
+    top: analysisTargetScrollTop(
+      element.getBoundingClientRect().top,
+      scroller.getBoundingClientRect().top,
+      scroller.scrollTop,
+    ),
+  }
+}
+
+function scrollTarget(target: string, behavior: ScrollBehavior) {
+  const measured = measureTargetTop(target)
+  if (!measured) return
+  pendingScrollTop = measured.top
+  if (Math.abs(measured.scroller.scrollTop - measured.top) < 2) return
+  measured.scroller.scrollTo({ top: measured.top, behavior })
+}
+
+function watchRelocate(target: string, generation: number) {
+  stopRelocate()
+  const content = contentElement.value
+  const scroller = findScroller()
+  if (!content || typeof ResizeObserver === 'undefined') return
+  relocateObserver = new ResizeObserver(() => {
+    if (generation !== locateGeneration) return
+    const measured = measureTargetTop(target)
+    if (!measured) return
+    // 锚点没变就是平滑滚动的中间帧。只有折叠把目标挤走时才瞬时校正。
+    if (pendingScrollTop !== undefined && Math.abs(pendingScrollTop - measured.top) < 8) return
+    pendingScrollTop = measured.top
+    if (Math.abs(measured.scroller.scrollTop - measured.top) < 2) return
+    measured.scroller.scrollTo({ top: measured.top, behavior: 'auto' })
+  })
+  relocateObserver.observe(content)
+  if (scroller && scroller !== content) relocateObserver.observe(scroller)
+  relocateTimer = setTimeout(stopRelocate, 480)
+}
+
+function stopRelocate() {
+  relocateObserver?.disconnect()
+  relocateObserver = undefined
+  if (!relocateTimer) return
+  clearTimeout(relocateTimer)
+  relocateTimer = undefined
+}
+
+function waitForAnimationFrame() {
+  return new Promise<void>(resolve => {
+    requestAnimationFrame(() => resolve())
+  })
 }
 
 function prepareTarget(target: string) {

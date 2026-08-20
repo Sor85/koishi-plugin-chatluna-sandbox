@@ -189,35 +189,49 @@
                 </span>
               </span>
             </div>
-            <section class="webqq-model-request-view-switch" aria-label="详情显示方式">
+            <div class="webqq-model-request-detail-nav">
               <Button
+                v-if="canReturnToTrajectory"
                 size="sm"
-                :variant="detailView === 'evidence' ? 'secondary' : 'ghost'"
-                @click="detailView = 'evidence'"
+                variant="ghost"
+                aria-label="返回轨迹"
+                @click="returnToTrajectory"
               >
-                <IconFileCode data-icon="inline-start" aria-hidden="true" />
-                请求
+                <IconArrowLeft data-icon="inline-start" aria-hidden="true" />
+                返回
               </Button>
-              <Button
-                size="sm"
-                :variant="detailView === 'trajectory' ? 'secondary' : 'ghost'"
-                @click="detailView = 'trajectory'"
-              >
-                <IconTimelineEvent data-icon="inline-start" aria-hidden="true" />
-                轨迹
-              </Button>
-            </section>
+              <section class="webqq-model-request-view-switch" aria-label="详情显示方式">
+                <Button
+                  size="sm"
+                  :variant="detailView === 'evidence' ? 'secondary' : 'ghost'"
+                  @click="detailView = 'evidence'"
+                >
+                  <IconFileCode data-icon="inline-start" aria-hidden="true" />
+                  请求
+                </Button>
+                <Button
+                  size="sm"
+                  :variant="detailView === 'trajectory' ? 'secondary' : 'ghost'"
+                  @click="detailView = 'trajectory'"
+                >
+                  <IconTimelineEvent data-icon="inline-start" aria-hidden="true" />
+                  轨迹
+                </Button>
+              </section>
+            </div>
           </header>
 
           <ModelRequestTrajectory
             v-if="detailView === 'trajectory'"
             :trajectory="conversationTrajectory"
+            :detail="detail"
             mode="conversation"
             :show-mode-switch="false"
             :loading="detailLoading || trajectory?.mode !== 'conversation'"
             :conversation-available="Boolean(detail.entities.conversationId)"
             :restore-state="trajectoryReturnState"
             @open-request="openRelatedRequest"
+            @inspect-request="inspectRelatedRequest"
           />
           <template v-else>
           <section class="webqq-model-request-overview" aria-label="请求概览">
@@ -417,9 +431,6 @@
                   :root="true"
                   :strings-expanded="true"
                   :images-preview="true"
-                  :highlight-path="requestHighlightPath"
-                  highlight-action-label="返回"
-                  @highlight-action="returnToTrajectory"
                 />
               </div>
             </template>
@@ -459,9 +470,6 @@
                     :open="true"
                     :root="true"
                     :strings-expanded="true"
-                    :highlight-path="responseHighlightPath"
-                    highlight-action-label="返回"
-                    @highlight-action="returnToTrajectory"
                   />
                 </div>
                 <pre v-else-if="responsePreview.kind === 'text'" class="webqq-model-request-response-raw">{{ detail.responseBodyRaw }}</pre>
@@ -497,6 +505,7 @@
 <script setup lang="ts">
 import {
   IconAlertCircle,
+  IconArrowLeft,
   IconBraces,
   IconCalendarTime,
   IconChartBar,
@@ -534,7 +543,7 @@ import ModelResponseContentPreview from './model-response-content-preview.vue'
 import WebqqAvatar from './webqq-avatar.vue'
 import { formatDuration } from './webqq/format-duration'
 import { extractModelResponseContent, normalizeModelResponseUsage } from './webqq/model-response-content'
-import { buildModelRequestJsonTree, findModelRequestJsonPath, parseModelResponseBody } from './webqq/model-request-json'
+import { buildModelRequestJsonTree, parseModelResponseBody } from './webqq/model-request-json'
 import { createModelRequestEnterRefresh, createModelRequestLiveRefresh } from './webqq/model-request-live-refresh'
 import {
   createModelRequestRecordsQuery,
@@ -604,8 +613,7 @@ const responseView = ref<'content' | 'json'>('content')
 const headersExpanded = ref(false)
 const copyState = ref<'idle' | 'success' | 'error'>('idle')
 const detailElement = ref<HTMLElement>()
-const requestHighlightPath = ref<string[]>()
-const responseHighlightPath = ref<string[]>()
+const canReturnToTrajectory = ref(false)
 const trajectoryReturnState = ref<{
   rowId: string
   scrollTop: number
@@ -625,12 +633,7 @@ interface ModelRequestReturnState {
 let returnState: ModelRequestReturnState | undefined
 let pendingReturnState: ModelRequestReturnState | undefined
 let returnStateToken = 0
-let pendingRequestFocus: {
-  recordId: string
-  kind: SandboxModelRequestTrajectoryKind
-  detail?: unknown
-  source?: 'request' | 'response'
-} | undefined
+let inspectRecordId: string | undefined
 let copyStateTimer: number | undefined
 
 const hasPendingRequest = computed(() => (
@@ -734,11 +737,15 @@ watch(filterOpen, (open, wasOpen) => {
 })
 
 watch(() => props.detail?.id, () => {
+  if (inspectRecordId && props.detail?.id === inspectRecordId) {
+    inspectRecordId = undefined
+    return
+  }
+  inspectRecordId = undefined
   detailView.value = 'evidence'
   bodyView.value = 'request'
   responseView.value = 'content'
   headersExpanded.value = false
-  applyPendingRequestFocus()
   applyPendingReturnState()
   if (props.detail) fetchTrajectory(currentTrajectoryMode())
   resetCopyState()
@@ -796,9 +803,10 @@ function toggleSortOrder() {
 }
 
 function openRecord(recordId: string) {
-  pendingRequestFocus = undefined
-  requestHighlightPath.value = undefined
-  responseHighlightPath.value = undefined
+  inspectRecordId = undefined
+  canReturnToTrajectory.value = false
+  returnState = undefined
+  pendingReturnState = undefined
   selectedRecordId.value = recordId
   const record = props.records.find(({ id }) => id === recordId)
   const scope = record ? resolveRecordScope(record) : currentScope()
@@ -820,6 +828,17 @@ function fetchTrajectory(mode: 'request' | 'conversation') {
   })
 }
 
+function inspectRelatedRequest(payload: { recordId: string }) {
+  if (props.detail?.id === payload.recordId) return
+  const record = props.trajectory?.records.find(({ id }) => id === payload.recordId)
+    ?? props.records.find(({ id }) => id === payload.recordId)
+  const scope = record ? resolveRecordScope(record) : currentScope()
+  // 轨迹检查器点到同会话另一条请求时，只换详情喂分析卡片，不离开轨迹、不重拉账本。
+  inspectRecordId = payload.recordId
+  selectedRecordId.value = payload.recordId
+  emit('open', { ...scope, recordId: payload.recordId })
+}
+
 function openRelatedRequest(payload: {
   recordId: string
   kind: SandboxModelRequestTrajectoryKind
@@ -830,6 +849,7 @@ function openRelatedRequest(payload: {
     scrollTop: number
   }
 }) {
+  inspectRecordId = undefined
   returnState = {
     recordId: selectedRecordId.value,
     detailView: detailView.value,
@@ -838,47 +858,25 @@ function openRelatedRequest(payload: {
     detailScrollTop: detailElement.value?.scrollTop ?? 0,
     trajectory: payload.returnState,
   }
-  pendingRequestFocus = payload
-  requestHighlightPath.value = undefined
-  responseHighlightPath.value = undefined
+  canReturnToTrajectory.value = true
   detailView.value = 'evidence'
-  bodyView.value = payload.source === 'response' ? 'response' : 'request'
-  if (payload.source === 'response') responseView.value = 'json'
+  bodyView.value = 'request'
+  responseView.value = 'content'
+  headersExpanded.value = false
   selectedRecordId.value = payload.recordId
   const record = props.trajectory?.records.find(({ id }) => id === payload.recordId)
   const scope = record ? resolveRecordScope(record) : currentScope()
   emit('open', { ...scope, recordId: payload.recordId })
   emit('trajectory', { ...scope, recordId: payload.recordId, mode: 'request' })
-  applyPendingRequestFocus()
-}
-
-function applyPendingRequestFocus() {
-  const pending = pendingRequestFocus
-  const detail = props.detail
-  if (!pending || !detail || detail.id !== pending.recordId) return
-  // 跨请求详情到达时 id watcher 会恢复默认页签，因此在真正应用定位时再次设置来源视图；
-  // 同一请求则由点击路径直接执行，两个时序最终保持一致。
-  detailView.value = 'evidence'
-  bodyView.value = pending.source === 'response' ? 'response' : 'request'
-  if (pending.source === 'response') responseView.value = 'json'
-  // 响应轨迹来自解析后的 JSON/SSE，而请求轨迹来自原始请求体；必须在各自数据树内匹配，
-  // 否则 TOOL CALL 会被错误地带回请求页，或无法定位响应中的完整调用对象。
-  const target = pending.kind === 'request' || pending.detail === undefined
-    ? []
-    : findModelRequestJsonPath(
-        pending.source === 'response' ? responsePreview.value : detail.requestBody,
-        pending.detail,
-      ) ?? []
-  if (pending.source === 'response') responseHighlightPath.value = target
-  else requestHighlightPath.value = target
-  pendingRequestFocus = undefined
+  nextTick(() => {
+    if (detailElement.value) detailElement.value.scrollTop = 0
+  })
 }
 
 function returnToTrajectory() {
   const state = returnState
   if (!state) return
-  requestHighlightPath.value = undefined
-  responseHighlightPath.value = undefined
+  canReturnToTrajectory.value = false
   pendingReturnState = state
   returnState = undefined
   selectedRecordId.value = state.recordId
