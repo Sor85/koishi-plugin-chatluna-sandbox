@@ -179,6 +179,7 @@ export interface ModelAnalysisTargetPreparation {
   messageIndex?: number
   response: boolean
   toolPaths: string[][]
+  expandCards: string[]
   expandTargets: string[]
 }
 
@@ -190,10 +191,15 @@ export function prepareModelAnalysisTarget(
   const messageIndex = messageTarget ? Number(messageTarget[1]) : undefined
   const hasMessage = messageIndex !== undefined && conversation.messages.some(message => message.index === messageIndex)
   const tool = conversation.tools.find(candidate => modelAnalysisToolId(candidate.path) === target)
+  const response = target === 'model-analysis-response' || target.startsWith('model-analysis-response-')
   return {
     ...(hasMessage ? { messageIndex } : {}),
-    response: target === 'model-analysis-response' || target.startsWith('model-analysis-response-'),
+    response,
     toolPaths: tool ? [tool.path] : [],
+    expandCards: [
+      ...(hasMessage ? [modelAnalysisMessageId(messageIndex)] : []),
+      ...(response ? ['model-analysis-response'] : []),
+    ],
     expandTargets: [target],
   }
 }

@@ -1607,6 +1607,9 @@
   background: color-mix(in srgb, var(--webqq-accent) 8%, var(--webqq-surface));
 }
 .webqq-model-analysis-card > header { gap: 9px; min-height: 44px; padding: 8px 12px; border-bottom: 1px solid var(--webqq-border); }
+.webqq-model-analysis-card.is-collapsed > header { border-bottom: 0; }
+.webqq-model-analysis-collapse svg { transition: transform 160ms ease; }
+.webqq-model-analysis-card:not(.is-collapsed) .webqq-model-analysis-collapse svg { transform: rotate(180deg); }
 .webqq-model-analysis-role { padding: 4px 8px; border-radius: 6px; color: var(--webqq-accent); background: var(--webqq-surface-muted); font-size: 11px; font-weight: 700; text-transform: lowercase; }
 .webqq-model-analysis-index, .webqq-model-analysis-path, .webqq-model-analysis-chars { color: var(--webqq-muted); font-size: 11px; }
 .webqq-model-analysis-path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1701,9 +1704,13 @@
   --webqq-model-analysis-response: #22d3ee;
 }
 
-@container (max-width: 760px) {
+@container (max-width: 680px) {
+  .webqq-model-analysis-main { grid-template-columns: 190px minmax(0, 1fr); }
+}
+
+@container (max-width: 520px) {
   .webqq-model-analysis-main { grid-template-columns: 1fr; }
-  .webqq-model-analysis-nav { max-height: 220px; border-right: 0; border-bottom: 1px solid var(--webqq-border); }
+  .webqq-model-analysis-nav { max-height: 180px; border-right: 0; border-bottom: 1px solid var(--webqq-border); }
 }
 
 @media (max-width: 960px) {

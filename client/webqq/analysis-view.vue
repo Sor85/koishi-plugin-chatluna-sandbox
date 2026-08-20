@@ -84,6 +84,7 @@
             :class="[
               `is-${message.role}`,
               {
+                'is-collapsed': isCardCollapsed(modelAnalysisMessageId(message.index)),
                 'is-muted': normalizedSearch && !messageMatches(message),
                 'is-located': highlightedTarget === modelAnalysisMessageId(message.index),
               },
@@ -109,9 +110,26 @@
                   <TooltipContent>{{ rawMessages.has(message.index) ? '查看格式化内容' : '查看原始 JSON' }}</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
+              <TooltipProvider :delay-duration="500">
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      class="webqq-model-analysis-collapse"
+                      :aria-expanded="!isCardCollapsed(modelAnalysisMessageId(message.index))"
+                      :aria-label="isCardCollapsed(modelAnalysisMessageId(message.index)) ? `展开第 ${message.index} 条消息卡片` : `收起第 ${message.index} 条消息卡片`"
+                      @click="toggleCard(modelAnalysisMessageId(message.index))"
+                    >
+                      <IconChevronDown :size="16" aria-hidden="true" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{{ isCardCollapsed(modelAnalysisMessageId(message.index)) ? '展开消息卡片' : '收起消息卡片' }}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </header>
 
-            <div v-show="rawMessages.has(message.index)" class="webqq-model-analysis-json">
+            <div v-show="!isCardCollapsed(modelAnalysisMessageId(message.index)) && rawMessages.has(message.index)" class="webqq-model-analysis-json">
               <div class="webqq-model-analysis-source-path">{{ formatPath(message.path) }}</div>
               <ModelRequestJsonTree
                 :node="buildModelRequestJsonTree(message.raw, `message-${message.index}`)"
@@ -121,7 +139,7 @@
                 :images-preview="true"
               />
             </div>
-            <div v-show="!rawMessages.has(message.index)" class="webqq-model-analysis-formatted">
+            <div v-show="!isCardCollapsed(modelAnalysisMessageId(message.index)) && !rawMessages.has(message.index)" class="webqq-model-analysis-formatted">
               <AnalysisContentParts
                 v-if="message.contentParts.length"
                 :parts="message.contentParts"
@@ -178,6 +196,7 @@
             id="model-analysis-response"
             class="webqq-model-analysis-card is-response"
             :class="{
+              'is-collapsed': isCardCollapsed('model-analysis-response'),
               'is-muted': normalizedSearch && !responseMatches,
               'is-located': highlightedTarget === 'model-analysis-response',
             }"
@@ -194,7 +213,7 @@
                       variant="ghost"
                       :disabled="response.raw === undefined"
                       :aria-label="responseRaw ? '查看响应格式化内容' : `查看响应原始 ${responseFormatLabel}`"
-                      @click="responseRaw = !responseRaw"
+                      @click="toggleResponseRaw"
                     >
                       <IconCode :size="16" aria-hidden="true" />
                     </Button>
@@ -202,9 +221,26 @@
                   <TooltipContent>{{ responseRaw ? '查看格式化内容' : `查看原始 ${responseFormatLabel}` }}</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
+              <TooltipProvider :delay-duration="500">
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      class="webqq-model-analysis-collapse"
+                      :aria-expanded="!isCardCollapsed('model-analysis-response')"
+                      :aria-label="isCardCollapsed('model-analysis-response') ? '展开响应卡片' : '收起响应卡片'"
+                      @click="toggleCard('model-analysis-response')"
+                    >
+                      <IconChevronDown :size="16" aria-hidden="true" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{{ isCardCollapsed('model-analysis-response') ? '展开响应卡片' : '收起响应卡片' }}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </header>
 
-            <div v-show="responseRaw && response.raw !== undefined" class="webqq-model-analysis-json">
+            <div v-show="!isCardCollapsed('model-analysis-response') && responseRaw && response.raw !== undefined" class="webqq-model-analysis-json">
               <pre v-if="response.format === 'text'" class="webqq-model-analysis-raw-text">{{ String(response.raw) }}</pre>
               <ModelRequestJsonTree
                 v-else
@@ -215,7 +251,7 @@
                 :images-preview="true"
               />
             </div>
-            <div v-show="!responseRaw" class="webqq-model-analysis-formatted">
+            <div v-show="!isCardCollapsed('model-analysis-response') && !responseRaw" class="webqq-model-analysis-formatted">
               <p v-if="response.status !== 'complete'" class="webqq-model-analysis-empty">
                 {{ response.statusMessage || '响应没有可展示内容' }}
               </p>
@@ -404,6 +440,7 @@ const visibleNavigationGroups = computed(() => navigation.value.groups.flatMap((
 const rawRequest = ref(false)
 const responseRaw = ref(false)
 const rawMessages = ref(new Set<number>())
+const collapsedCards = ref(new Set<string>())
 const expandedTools = ref(new Set<string>())
 const expandedTextTargets = ref(new Set<string>())
 const contentElement = ref<HTMLElement>()
@@ -424,6 +461,10 @@ let suppressToolSummary = false
 watch(normalizedSearch, async (query) => {
   if (!query) return
   rawRequest.value = false
+  for (const message of conversation.value.messages) {
+    if (message.searchText.toLocaleLowerCase('zh-CN').includes(query)) expandCard(modelAnalysisMessageId(message.index))
+  }
+  if (response.value.searchText.toLocaleLowerCase('zh-CN').includes(query)) expandCard('model-analysis-response')
   for (const tool of conversation.value.tools) {
     if (tool.searchText.toLocaleLowerCase('zh-CN').includes(query)) expandTool(tool.path.join('.'))
   }
@@ -443,6 +484,7 @@ watch(() => props.detail.id, (next, previous) => {
   rawRequest.value = false
   responseRaw.value = false
   rawMessages.value = new Set()
+  collapsedCards.value = new Set()
   expandedTools.value = new Set()
   expandedTextTargets.value = new Set()
   highlightedTarget.value = ''
@@ -475,6 +517,7 @@ async function jumpTo(target?: string, emphasize = true) {
 
 function prepareTarget(target: string) {
   const preparation = prepareModelAnalysisTarget(conversation.value, target)
+  for (const card of preparation.expandCards) expandCard(card)
   for (const path of preparation.toolPaths) expandTool(path.join('.'))
   if (preparation.messageIndex !== undefined && rawMessages.value.has(preparation.messageIndex)) {
     toggleRaw(preparation.messageIndex)
@@ -521,9 +564,33 @@ function toggleRawRequest() {
 }
 
 function toggleRaw(index: number) {
+  expandCard(modelAnalysisMessageId(index))
   const next = new Set(rawMessages.value)
   next.has(index) ? next.delete(index) : next.add(index)
   rawMessages.value = next
+}
+
+function toggleResponseRaw() {
+  expandCard('model-analysis-response')
+  responseRaw.value = !responseRaw.value
+}
+
+function isCardCollapsed(target: string) {
+  return collapsedCards.value.has(target)
+}
+
+// 折叠仅隐藏正文而不卸载内容，避免原始模式和长文本展开状态在再次展开时丢失。
+function toggleCard(target: string) {
+  const next = new Set(collapsedCards.value)
+  next.has(target) ? next.delete(target) : next.add(target)
+  collapsedCards.value = next
+}
+
+function expandCard(target: string) {
+  if (!collapsedCards.value.has(target)) return
+  const next = new Set(collapsedCards.value)
+  next.delete(target)
+  collapsedCards.value = next
 }
 
 function expandTool(path: string) {

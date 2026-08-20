@@ -100,11 +100,18 @@ describe('模型请求分析展示模型', () => {
 
     expect(prepareModelAnalysisTarget(conversation, 'model-analysis-message-20')).toMatchObject({
       messageIndex: 20,
+      expandCards: ['model-analysis-message-20'],
       expandTargets: ['model-analysis-message-20'],
     })
     expect(prepareModelAnalysisTarget(conversation, 'model-analysis-message-2-tool-call-0')).toMatchObject({
       messageIndex: 2,
+      expandCards: ['model-analysis-message-2'],
       expandTargets: ['model-analysis-message-2-tool-call-0'],
+    })
+    expect(prepareModelAnalysisTarget(conversation, 'model-analysis-response-tool-call-0')).toMatchObject({
+      response: true,
+      expandCards: ['model-analysis-response'],
+      expandTargets: ['model-analysis-response-tool-call-0'],
     })
     expect(shouldExpandAnalysisText(false, true, '', 'x')).toBe(true)
   })
