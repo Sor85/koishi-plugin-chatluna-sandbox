@@ -329,14 +329,16 @@
               <div v-if="expandedTools.has(tool.path.join('.'))" class="webqq-model-analysis-tool-detail">
                 <p><AnalysisHighlightedText :value="tool.description || '无描述'" :query="normalizedSearch" /></p>
                 <h4>Parameters (JSON Schema) <small>{{ formatPath(tool.path) }}</small></h4>
-                <AnalysisTextBlock
-                  :value="formatJson(tool.parameters || {})"
-                  :search-query="normalizedSearch"
-                  :threshold="1200"
-                  :preview-length="600"
-                  :force-expanded="expandedTextTargets.has(modelAnalysisToolId(tool.path))"
-                  compact
-                />
+                <div class="webqq-model-analysis-tool-schema">
+                  <AnalysisTextBlock
+                    :value="formatJson(tool.parameters || {})"
+                    :search-query="normalizedSearch"
+                    :threshold="1200"
+                    :preview-length="600"
+                    :force-expanded="expandedTextTargets.has(modelAnalysisToolId(tool.path))"
+                    compact
+                  />
+                </div>
               </div>
             </article>
           </section>

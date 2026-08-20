@@ -179,6 +179,27 @@ describe('模型请求分析展示模型', () => {
     expect(exceedsAnalysisLineLimit(12 * 22.1 + 1, 22.1)).toBe(true)
   })
 
+  it('工具列表图标锁死 18px，避免 flex 把扳手挤成不同大小', () => {
+    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+
+    expect(styles).toMatch(/\.webqq-model-analysis-tool-summary > svg \{[^}]*flex: 0 0 auto;[^}]*width: 18px;[^}]*height: 18px;/s)
+  })
+
+  it('工具列表卡片头与消息卡片头同高，不再额外垫高', () => {
+    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+
+    expect(styles).toMatch(/\.webqq-model-analysis-tool-summary \{[^}]*min-height: 44px;[^}]*padding: 8px 12px;/s)
+    expect(styles).not.toMatch(/\.webqq-model-analysis-tool-summary \{[^}]*min-height: 58px;/s)
+  })
+
+  it('工具 Schema JSON 用独立底和边框与描述隔开', () => {
+    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
+
+    expect(view).toContain('class="webqq-model-analysis-tool-schema"')
+    expect(styles).toMatch(/\.webqq-model-analysis-tool-schema \{[^}]*border: 1px solid var\(--webqq-border\);[^}]*border-radius: 8px;[^}]*background: var\(--webqq-surface-muted\);/s)
+  })
+
   it('去掉完整请求 JSON 入口，卡片正文不再标「内容」，头部空白可折叠', () => {
     const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
 
