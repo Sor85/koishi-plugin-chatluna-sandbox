@@ -76,9 +76,166 @@ describe('模型请求对话视图归一化', () => {
     }))
 
     expect(conversation.messages.map(({ role }) => role)).toEqual(['user', 'assistant', 'tool'])
+    expect(conversation.messages[1]?.toolCalls[0]).toMatchObject({ id: 'call-1', name: 'search' })
+    expect(conversation.messages[2]).toMatchObject({ toolCallId: 'call-1', content: '新闻结果' })
     expect(conversation.response).toMatchObject({ format: 'sse', reasoning: ['思考'], content: ['答案'], finishReasons: ['stop'] })
     expect(conversation.response?.raw).toEqual(expect.arrayContaining([expect.objectContaining({ event: 'message' })]))
     expect(conversation.response?.usage).toMatchObject({ inputTokens: 10, outputTokens: 2, source: 'response' })
+  })
+
+  it('归一化 AI SDK typed parts，并只把有证据的工具结果投影为独立消息', () => {
+    const conversation = parseModelRequestConversation({
+      messages: [
+        {
+          role: 'user',
+          parts: [
+            { type: 'text', text: '查询订单' },
+            { type: 'file', mediaType: 'application/pdf', data: 'invoice-data' },
+          ],
+        },
+        {
+          role: 'assistant',
+          parts: [
+            { type: 'reasoning', text: '需要查询工具' },
+            { type: 'tool-call', toolCallId: 'call-1', toolName: 'lookupOrder', input: { id: 42 } },
+          ],
+        },
+        {
+          role: 'tool',
+          parts: [
+            { type: 'tool-result', toolCallId: 'call-1', toolName: 'lookupOrder', output: { type: 'json', value: { status: 'paid' } } },
+          ],
+        },
+      ],
+      tools: {
+        lookupOrder: {
+          description: '查询订单',
+          inputSchema: { type: 'object', properties: { id: { type: 'number' } }, required: ['id'] },
+        },
+      },
+    }, 'ai-sdk')
+
+    expect(conversation.messages[0]).toMatchObject({
+      role: 'user',
+      content: '查询订单',
+      contentParts: [
+        { kind: 'text', value: '查询订单' },
+        { kind: 'file', value: 'invoice-data', mimeType: 'application/pdf' },
+      ],
+    })
+    expect(conversation.messages[1]).toMatchObject({
+      role: 'assistant',
+      reasoning: '需要查询工具',
+      toolCalls: [{ id: 'call-1', name: 'lookupOrder', arguments: '{\n  "id": 42\n}' }],
+    })
+    expect(conversation.messages[2]).toMatchObject({
+      role: 'tool',
+      toolCallId: 'call-1',
+      content: '{\n  "status": "paid"\n}',
+    })
+    expect(conversation.tools[0]).toMatchObject({
+      name: 'lookupOrder',
+      description: '查询订单',
+      parameters: { type: 'object', properties: { id: { type: 'number' } }, required: ['id'] },
+      propertyCount: 1,
+      requiredFields: ['id'],
+      path: ['tools', 'lookupOrder'],
+    })
+  })
+
+  it('保留多个 system 来源、多模态分片和跨字段工具声明的原始顺序', () => {
+    const conversation = parseModelRequestConversation({
+      system_instruction: '第一条系统约束',
+      system: [{ type: 'text', text: '第二条系统约束' }],
+      contents: [{
+        role: 'user',
+        parts: [
+          { text: '识别图片' },
+          { inlineData: { mimeType: 'image/png', data: 'aGVsbG8=' } },
+          { fileData: { mimeType: 'application/pdf', fileUri: 'https://example.com/a.pdf' } },
+        ],
+      }],
+      functions: [{ name: 'legacy', parameters: { type: 'object' } }],
+      tools: [{ functionDeclarations: [{ name: 'gemini', parameters: { type: 'object' } }] }],
+    }, 'gemini')
+
+    expect(conversation.messages.slice(0, 2).map(({ role, content, path }) => ({ role, content, path }))).toEqual([
+      { role: 'system', content: '第一条系统约束', path: ['system_instruction'] },
+      { role: 'system', content: '第二条系统约束', path: ['system'] },
+    ])
+    expect(conversation.messages[2]?.contentParts).toEqual([
+      { kind: 'text', value: '识别图片' },
+      { kind: 'image', value: 'data:image/png;base64,aGVsbG8=', mimeType: 'image/png' },
+      { kind: 'file', value: 'https://example.com/a.pdf', mimeType: 'application/pdf' },
+    ])
+    expect(conversation.tools.map(({ name, path }) => ({ name, path }))).toEqual([
+      { name: 'legacy', path: ['functions', '0'] },
+      { name: 'gemini', path: ['tools', '0', 'functionDeclarations', '0'] },
+    ])
+  })
+
+  it('把纯文本响应作为本次模型正文，同时保留 TEXT 原始证据', () => {
+    const response = parseModelRequestConversationDetail(detail({
+      requestBody: { messages: [{ role: 'user', content: '你好' }] },
+      responseBodyStatus: 'complete',
+      responseBodyFormat: 'text',
+      responseBodyRaw: '<b>原样文本，不执行 HTML</b>',
+    })).response
+
+    expect(response).toMatchObject({
+      status: 'complete',
+      format: 'text',
+      content: ['<b>原样文本，不执行 HTML</b>'],
+      raw: '<b>原样文本，不执行 HTML</b>',
+    })
+  })
+
+  it('仅从响应中的显式证据归一化工具调用与工具结果', () => {
+    const response = parseModelRequestConversationDetail(detail({
+      requestBody: { input: '执行工具' },
+      responseBodyStatus: 'complete',
+      responseBodyFormat: 'json',
+      responseBodyRaw: JSON.stringify({
+        output: [
+          { type: 'function_call', call_id: 'call-7', name: 'lookup', arguments: '{"id":7}' },
+          { type: 'function_call_output', call_id: 'call-7', name: 'lookup', output: { ok: true } },
+        ],
+      }),
+    })).response
+
+    expect(response?.toolCalls).toEqual([{ id: 'call-7', name: 'lookup', arguments: '{"id":7}' }])
+    expect(response?.toolResults).toEqual([{
+      id: 'call-7',
+      name: 'lookup',
+      content: '{\n  "ok": true\n}',
+      path: ['output', '1'],
+      raw: { type: 'function_call_output', call_id: 'call-7', name: 'lookup', output: { ok: true } },
+    }])
+  })
+
+  it('把 pending、不可用、采集错误和损坏 JSON 暴露为可渲染响应状态', () => {
+    expect(parseModelRequestConversationDetail(detail({ responseBodyStatus: 'pending' })).response).toMatchObject({
+      status: 'pending',
+      statusMessage: '响应仍在采集中',
+    })
+    expect(parseModelRequestConversationDetail(detail({ responseBodyStatus: 'unavailable' })).response).toMatchObject({
+      status: 'unavailable',
+      statusMessage: '响应不可用',
+    })
+    expect(parseModelRequestConversationDetail(detail({ responseBodyStatus: 'error', responseBodyError: '读取响应失败' })).response).toMatchObject({
+      status: 'error',
+      statusMessage: '读取响应失败',
+    })
+    expect(parseModelRequestConversationDetail(detail({
+      responseBodyStatus: 'complete',
+      responseBodyFormat: 'json',
+      responseBodyRaw: '{broken',
+    })).response).toMatchObject({
+      status: 'error',
+      format: 'json',
+      raw: '{broken',
+      statusMessage: '响应 JSON 解析失败',
+    })
   })
 
   it('未知请求结构返回明确解析状态而不生成猜测消息', () => {

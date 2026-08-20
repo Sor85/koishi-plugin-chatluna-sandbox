@@ -122,7 +122,15 @@
         进行中的请求仅标记开始位置；TTFT 与解码阶段尚无独立时间证据
       </p>
 
-      <ModelRequestConversationAnalysis v-if="analysis && detail" :detail="detail" :trajectory="trajectory" :search-query="searchQuery" />
+      <ModelRequestConversationAnalysis
+        v-if="analysis && detail"
+        :detail="detail"
+        :trajectory="trajectory"
+        :search-query="searchQuery"
+        :focus-request="analysisFocusRequest"
+        :requests-collapsed="requestsCollapsed"
+        :tools-collapsed="toolsCollapsed"
+      />
       <div v-else class="webqq-model-trajectory-ledger" :class="{ 'has-inspector': selectedRow }">
         <div ref="ledgerElement" v-webqq-scrollbar class="webqq-model-trajectory-table" role="table" aria-label="轨迹事件账本">
           <div v-if="!ledgerRows.length" class="webqq-model-trajectory-filter-empty">当前折叠条件下没有事件</div>
@@ -257,6 +265,11 @@ const actualDuration = ref(true)
 const requestsCollapsed = ref(false)
 const toolsCollapsed = ref(false)
 const searchQuery = ref('')
+const analysisFocusRequest = ref<{
+  kind: SandboxModelRequestPromptKind
+  indexInKind: number
+  token: number
+}>()
 const selectedRow = computed(() => props.trajectory?.rows.find(({ id }) => id === selectedRowId.value))
 const selectedTree = computed(() => buildModelRequestJsonTree(selectedRow.value?.detail, `trajectory.${selectedRow.value?.id ?? 'detail'}`))
 const selectedRequest = computed(() => props.trajectory?.records.find(({ id }) => id === selectedRow.value?.requestId))
@@ -450,12 +463,24 @@ function promptRowsForKind(kind: SandboxModelRequestPromptKind, requestId?: stri
 }
 
 function selectPromptSegment(segment: { kind: SandboxModelRequestPromptKind, indexInKind: number, requestId?: string }) {
+  if (props.analysis) {
+    analysisFocusRequest.value = {
+      kind: segment.kind,
+      indexInKind: segment.indexInKind,
+      token: (analysisFocusRequest.value?.token ?? 0) + 1,
+    }
+    return
+  }
   const rows = promptRowsForKind(segment.kind, segment.requestId)
   const row = rows[segment.indexInKind] ?? rows[0]
   if (row) selectedRowId.value = row.id
 }
 
 function isCompositionSegmentSelected(segment: { kind: SandboxModelRequestPromptKind, indexInKind: number, requestId?: string }) {
+  if (props.analysis) {
+    return analysisFocusRequest.value?.kind === segment.kind
+      && analysisFocusRequest.value.indexInKind === segment.indexInKind
+  }
   const selected = selectedRow.value
   if (!selected) return false
   const rows = promptRowsForKind(segment.kind, segment.requestId)

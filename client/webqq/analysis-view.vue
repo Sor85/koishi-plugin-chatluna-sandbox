@@ -3,147 +3,662 @@
     <div class="webqq-model-analysis-main">
       <aside class="webqq-model-analysis-nav" aria-label="分析导航">
         <button
-          v-for="group in groups"
-          :key="group.key"
           type="button"
-          class="webqq-model-analysis-nav-group"
-          :class="{ 'is-muted': searchQuery && !group.items.some((item) => item.matches) }"
-          @click="jumpTo(group.items[0]?.target)">
-          <span class="webqq-model-analysis-nav-heading"><strong>{{ group.label }}</strong><small>{{ group.items.length }}</small></span>
-          <span v-for="item in group.items" :key="item.id" class="webqq-model-analysis-nav-item" :class="{ 'is-muted': searchQuery && !item.matches }" @click.stop="jumpTo(item.target)">
-            <span class="webqq-model-analysis-nav-kind">{{ item.label }}</span>
-            <span>#{{ item.index }} {{ item.preview }}</span>
+          class="webqq-model-analysis-boundary"
+          :class="`is-${navigation.boundary.status}`"
+          @click="jumpTo(navigation.boundary.target)"
+        >
+          <span class="webqq-model-analysis-boundary-title">
+            <span class="webqq-model-analysis-boundary-dot" aria-hidden="true" />
+            <strong>{{ navigation.boundary.label }}</strong>
+            <small>{{ statusLabel(navigation.boundary.status) }}</small>
+          </span>
+          <span class="webqq-model-analysis-boundary-meta">
+            {{ [navigation.boundary.provider, navigation.boundary.model].filter(Boolean).join(' / ') || '模型请求' }}
+            · {{ formatDuration(navigation.boundary.durationMs) }}
           </span>
         </button>
+
+        <section
+          v-for="group in visibleNavigationGroups"
+          :key="group.key"
+          class="webqq-model-analysis-nav-group"
+          :class="{ 'is-muted': normalizedSearch && !group.items.some(itemMatches) }"
+        >
+          <header class="webqq-model-analysis-nav-heading">
+            <component :is="groupIcon(group.key)" :size="15" aria-hidden="true" />
+            <strong><AnalysisHighlightedText :value="group.label" :query="normalizedSearch" /></strong>
+            <small>{{ group.count }}</small>
+          </header>
+          <button
+            v-for="item in group.items"
+            :key="item.id"
+            type="button"
+            class="webqq-model-analysis-nav-item"
+            :class="{ 'is-muted': normalizedSearch && !itemMatches(item) }"
+            @click="jumpTo(item.target)"
+          >
+            <span class="webqq-model-analysis-nav-kind"><AnalysisHighlightedText :value="item.label" :query="normalizedSearch" /></span>
+            <span v-if="item.index !== undefined" class="webqq-model-analysis-nav-index">#{{ item.index }}</span>
+            <span class="webqq-model-analysis-nav-preview"><AnalysisHighlightedText :value="item.preview" :query="normalizedSearch" /></span>
+          </button>
+        </section>
       </aside>
 
       <div ref="contentElement" class="webqq-model-analysis-content">
         <header class="webqq-model-analysis-heading">
           <h3>Messages <span>({{ conversation.messages.length }})</span></h3>
-          <Button size="sm" variant="outline" @click="rawRequest = !rawRequest">
-            <IconCode data-icon="inline-start" aria-hidden="true" />
-            {{ rawRequest ? '返回对话' : '完整请求 JSON' }}
-          </Button>
+          <TooltipProvider :delay-duration="500">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button size="sm" variant="outline" @click="toggleRawRequest">
+                  <IconCode data-icon="inline-start" aria-hidden="true" />
+                  {{ rawRequest ? '返回对话' : '完整请求 JSON' }}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{{ rawRequest ? '返回格式化对话内容' : '查看完整请求 JSON' }}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </header>
-        <div v-if="conversation.parseError && !conversation.messages.length" class="webqq-model-analysis-empty">
-          <p>{{ conversation.parseError }}</p>
-          <Button size="sm" variant="outline" @click="rawRequest = true">查看完整请求 JSON</Button>
+
+        <div v-show="rawRequest" class="webqq-model-analysis-raw">
+          <ModelRequestJsonTree
+            :node="requestTree"
+            :open="true"
+            :root="true"
+            :strings-expanded="true"
+            :images-preview="true"
+          />
         </div>
-          <div v-else-if="rawRequest" class="webqq-model-analysis-raw">
-          <ModelRequestJsonTree :node="requestTree" :open="true" :root="true" :strings-expanded="true" :images-preview="true" />
-        </div>
-        <template v-else>
-          <article v-for="message in visibleMessages" :id="messageId(message.index)" :key="message.index" class="webqq-model-analysis-card" :class="[`is-${message.role}`, { 'is-muted': searchQuery && !messageMatches(message) }]">
+        <div v-show="!rawRequest" class="webqq-model-analysis-conversation">
+          <div v-if="conversation.parseError && !conversation.messages.length" class="webqq-model-analysis-empty">
+            <p>{{ conversation.parseError }}</p>
+            <Button size="sm" variant="outline" @click="toggleRawRequest">查看完整请求 JSON</Button>
+          </div>
+
+          <article
+            v-for="message in conversation.messages"
+            :id="modelAnalysisMessageId(message.index)"
+            :key="message.index"
+            class="webqq-model-analysis-card"
+            :class="[
+              `is-${message.role}`,
+              {
+                'is-muted': normalizedSearch && !messageMatches(message),
+                'is-located': highlightedTarget === modelAnalysisMessageId(message.index),
+              },
+            ]"
+          >
             <header>
-              <span class="webqq-model-analysis-role">{{ message.role }}</span>
+              <span class="webqq-model-analysis-role"><AnalysisHighlightedText :value="roleLabel(message.role)" :query="normalizedSearch" /></span>
               <span class="webqq-model-analysis-index">#{{ message.index }}</span>
               <span class="webqq-model-analysis-path">{{ formatPath(message.path) }}</span>
               <span class="webqq-model-analysis-chars">{{ messageCharacters(message) }} chars</span>
-              <Button size="icon-sm" variant="ghost" :aria-label="`切换第 ${message.index} 条消息 JSON`" @click="toggleRaw(message.index)"><IconCode :size="16" aria-hidden="true" /></Button>
+              <TooltipProvider :delay-duration="500">
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      :aria-label="rawMessages.has(message.index) ? `查看第 ${message.index} 条消息格式化内容` : `查看第 ${message.index} 条消息原始 JSON`"
+                      @click="toggleRaw(message.index)"
+                    >
+                      <IconCode :size="16" aria-hidden="true" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{{ rawMessages.has(message.index) ? '查看格式化内容' : '查看原始 JSON' }}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </header>
-            <div v-if="rawMessages.has(message.index)" class="webqq-model-analysis-json"><ModelRequestJsonTree :node="buildModelRequestJsonTree(message.raw, `message-${message.index}`)" :open="true" :root="true" :strings-expanded="true" :images-preview="true" /></div>
-            <template v-else>
-              <AnalysisTextBlock label="内容" :value="message.content" :search-query="searchQuery" />
-              <AnalysisTextBlock v-if="message.reasoning" label="思考" :value="message.reasoning" :search-query="searchQuery" />
-              <div v-if="message.toolCalls.length" class="webqq-model-analysis-section">
+
+            <div v-show="rawMessages.has(message.index)" class="webqq-model-analysis-json">
+              <div class="webqq-model-analysis-source-path">{{ formatPath(message.path) }}</div>
+              <ModelRequestJsonTree
+                :node="buildModelRequestJsonTree(message.raw, `message-${message.index}`)"
+                :open="true"
+                :root="true"
+                :strings-expanded="true"
+                :images-preview="true"
+              />
+            </div>
+            <div v-show="!rawMessages.has(message.index)" class="webqq-model-analysis-formatted">
+              <AnalysisContentParts
+                v-if="message.contentParts.length"
+                :parts="message.contentParts"
+                :search-query="normalizedSearch"
+              />
+              <AnalysisTextBlock
+                v-else-if="message.content"
+                label="内容"
+                :value="message.content"
+                :search-query="normalizedSearch"
+              />
+              <AnalysisTextBlock
+                v-if="message.reasoning"
+                label="思考"
+                :value="message.reasoning"
+                :search-query="normalizedSearch"
+              />
+              <section v-if="message.toolCalls.length" class="webqq-model-analysis-section">
                 <strong>工具调用</strong>
-                <div v-for="call in message.toolCalls" :key="`${call.id}-${call.name}`" class="webqq-model-analysis-tool-call">
-                  <div><strong>{{ call.name }}</strong><span>{{ call.id || '无调用 ID' }}</span></div>
-                  <pre>{{ call.arguments || '{}' }}</pre>
-                  <button v-if="findTool(call.name)" type="button" class="webqq-model-analysis-link" @click="jumpTo(`tool-${findTool(call.name)?.path.join('-')}`)">查看工具定义</button>
-                </div>
+                <article
+                  v-for="(call, callIndex) in message.toolCalls"
+                  :id="modelAnalysisToolCallId(message.index, callIndex)"
+                  :key="`${call.id || callIndex}-${call.name}`"
+                  class="webqq-model-analysis-tool-call"
+                  :class="{ 'is-located': highlightedTarget === modelAnalysisToolCallId(message.index, callIndex) }"
+                >
+                  <div><strong><AnalysisHighlightedText :value="call.name" :query="normalizedSearch" /></strong><span><AnalysisHighlightedText :value="call.id || '无调用 ID'" :query="normalizedSearch" /></span></div>
+                  <AnalysisTextBlock :value="call.arguments || '{}'" :search-query="normalizedSearch" compact />
+                  <button
+                    v-if="findTool(call.name)"
+                    type="button"
+                    class="webqq-model-analysis-link"
+                    @click="locateTool(call.name)"
+                  >
+                    查看工具定义
+                  </button>
+                </article>
+              </section>
+            </div>
+          </article>
+
+          <section class="webqq-model-analysis-response-heading">
+            <h3>Response</h3>
+          </section>
+          <article
+            id="model-analysis-response"
+            class="webqq-model-analysis-card is-response"
+            :class="{
+              'is-muted': normalizedSearch && !responseMatches,
+              'is-located': highlightedTarget === 'model-analysis-response',
+            }"
+          >
+            <header>
+              <span class="webqq-model-analysis-role">响应</span>
+              <span class="webqq-model-analysis-path">{{ responseFormatLabel }}</span>
+              <span class="webqq-model-analysis-chars">{{ responseCharacters }} chars</span>
+              <TooltipProvider :delay-duration="500">
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      :disabled="response.raw === undefined"
+                      :aria-label="responseRaw ? '查看响应格式化内容' : `查看响应原始 ${responseFormatLabel}`"
+                      @click="responseRaw = !responseRaw"
+                    >
+                      <IconCode :size="16" aria-hidden="true" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{{ responseRaw ? '查看格式化内容' : `查看原始 ${responseFormatLabel}` }}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </header>
+
+            <div v-show="responseRaw && response.raw !== undefined" class="webqq-model-analysis-json">
+              <pre v-if="response.format === 'text'" class="webqq-model-analysis-raw-text">{{ String(response.raw) }}</pre>
+              <ModelRequestJsonTree
+                v-else
+                :node="buildModelRequestJsonTree(response.raw, 'response')"
+                :open="true"
+                :root="true"
+                :strings-expanded="true"
+                :images-preview="true"
+              />
+            </div>
+            <div v-show="!responseRaw" class="webqq-model-analysis-formatted">
+              <p v-if="response.status !== 'complete'" class="webqq-model-analysis-empty">
+                {{ response.statusMessage || '响应没有可展示内容' }}
+              </p>
+              <AnalysisTextBlock
+                v-if="response.reasoning.length"
+                label="思考"
+                :value="response.reasoning.join('\n')"
+                :search-query="normalizedSearch"
+              />
+              <AnalysisTextBlock
+                v-if="response.content.length"
+                label="内容"
+                :value="response.content.join('\n')"
+                :search-query="normalizedSearch"
+              />
+              <section v-if="response.toolCalls.length" class="webqq-model-analysis-section">
+                <strong>工具调用</strong>
+                <article
+                  v-for="(call, callIndex) in response.toolCalls"
+                  :id="modelAnalysisResponseToolCallId(callIndex)"
+                  :key="`${call.id || callIndex}-${call.name}`"
+                  class="webqq-model-analysis-tool-call"
+                  :class="{ 'is-located': highlightedTarget === modelAnalysisResponseToolCallId(callIndex) }"
+                >
+                  <div><strong><AnalysisHighlightedText :value="call.name" :query="normalizedSearch" /></strong><span><AnalysisHighlightedText :value="call.id || '无调用 ID'" :query="normalizedSearch" /></span></div>
+                  <AnalysisTextBlock :value="call.arguments || '{}'" :search-query="normalizedSearch" compact />
+                  <button v-if="findTool(call.name)" type="button" class="webqq-model-analysis-link" @click="locateTool(call.name)">
+                    查看工具定义
+                  </button>
+                </article>
+              </section>
+              <section v-if="response.toolResults.length" class="webqq-model-analysis-section">
+                <strong>工具结果</strong>
+                <article
+                  v-for="(result, resultIndex) in response.toolResults"
+                  :id="modelAnalysisResponseToolResultId(resultIndex)"
+                  :key="`${result.id || resultIndex}-${result.name || ''}`"
+                  class="webqq-model-analysis-tool-call"
+                  :class="{ 'is-located': highlightedTarget === modelAnalysisResponseToolResultId(resultIndex) }"
+                >
+                  <div><strong><AnalysisHighlightedText :value="result.name || '工具结果'" :query="normalizedSearch" /></strong><span><AnalysisHighlightedText :value="result.id || '无调用 ID'" :query="normalizedSearch" /></span></div>
+                  <AnalysisTextBlock :value="result.content" :search-query="normalizedSearch" compact />
+                </article>
+              </section>
+              <div v-if="response.finishReasons.length || response.usage" class="webqq-model-analysis-response-meta">
+                <span v-if="response.finishReasons.length">结束原因：{{ response.finishReasons.join('、') }}</span>
+                <span v-if="response.usage?.inputTokens !== undefined">输入：{{ response.usage.inputTokens }}</span>
+                <span v-if="response.usage?.outputTokens !== undefined">输出：{{ response.usage.outputTokens }}</span>
+                <span v-if="response.usage?.reasoningTokens !== undefined">推理：{{ response.usage.reasoningTokens }}</span>
+                <span v-if="response.usage?.totalTokens !== undefined">总 Token：{{ response.usage.totalTokens }}</span>
               </div>
-            </template>
+            </div>
           </article>
 
-          <article id="model-analysis-response" class="webqq-model-analysis-card is-response" :class="{ 'is-muted': searchQuery && !responseMatches }">
-            <header><span class="webqq-model-analysis-role">响应</span><span class="webqq-model-analysis-path">{{ response?.format?.toUpperCase() || '未完成' }}</span><span v-if="response" class="webqq-model-analysis-chars">{{ responseCharacters }} chars</span><Button size="icon-sm" variant="ghost" aria-label="切换响应原始 JSON" @click="responseRaw = !responseRaw"><IconCode :size="16" aria-hidden="true" /></Button></header>
-            <div v-if="responseRaw && response" class="webqq-model-analysis-json"><ModelRequestJsonTree :node="buildModelRequestJsonTree(response.raw, 'response')" :open="true" :root="true" :strings-expanded="true" :images-preview="true" /></div>
-            <template v-else-if="response">
-              <AnalysisTextBlock label="内容" :value="response.content.join('\n')" :search-query="searchQuery" />
-              <AnalysisTextBlock v-if="response.reasoning.length" label="思考" :value="response.reasoning.join('\n')" :search-query="searchQuery" />
-              <AnalysisTextBlock v-if="response.toolCalls.length" label="工具调用" :value="response.toolCalls.map((call) => `${call.name}\n${call.arguments || '{}'}`).join('\n\n')" :search-query="searchQuery" />
-              <div v-if="response.finishReasons.length || response.usage" class="webqq-model-analysis-response-meta"><span v-if="response.finishReasons.length">结束原因：{{ response.finishReasons.join('、') }}</span><span v-if="response.usage">Token：{{ response.usage.totalTokens ?? '未知' }}</span></div>
-            </template>
-            <p v-else class="webqq-model-analysis-empty">响应尚未采集或不可用</p>
-          </article>
-
-          <section id="model-analysis-tools" class="webqq-model-analysis-tools"><h3>Tools <span>({{ conversation.tools.length }})</span></h3>
-            <article v-for="tool in conversation.tools" :id="`tool-${tool.path.join('-')}`" :key="tool.path.join('.')" class="webqq-model-analysis-tool-card" :class="{ 'is-expanded': expandedTools.has(tool.path.join('.')) }">
-              <button type="button" class="webqq-model-analysis-tool-summary" @click="toggleTool(tool.path.join('.'))"><IconTool :size="18" aria-hidden="true" /><strong>{{ tool.name }}</strong><span>{{ compact(tool.description) }}</span><small>{{ propertyCount(tool.parameters) }} props<span v-if="requiredCount(tool.parameters)"> · required: {{ requiredFields(tool.parameters) }}</span></small><IconChevronDown :size="18" aria-hidden="true" /></button>
-              <div v-if="expandedTools.has(tool.path.join('.'))" class="webqq-model-analysis-tool-detail"><p>{{ tool.description || '无描述' }}</p><h4>Parameters (JSON Schema) <small>{{ formatPath(tool.path) }}</small></h4><AnalysisTextBlock :value="formatJson(tool.parameters || {})" :search-query="searchQuery" /></div>
+          <section id="model-analysis-tools" class="webqq-model-analysis-tools" :class="{ 'is-located': highlightedTarget === 'model-analysis-tools' }">
+            <h3>Tools <span>({{ conversation.tools.length }})</span></h3>
+            <p v-if="!conversation.tools.length" class="webqq-model-analysis-empty">请求未声明工具定义</p>
+            <article
+              v-for="tool in conversation.tools"
+              :id="modelAnalysisToolId(tool.path)"
+              :key="tool.path.join('.')"
+              class="webqq-model-analysis-tool-card"
+              :class="{
+                'is-expanded': expandedTools.has(tool.path.join('.')),
+                'is-muted': normalizedSearch && !tool.searchText.toLocaleLowerCase('zh-CN').includes(normalizedSearch),
+                'is-located': highlightedTarget === modelAnalysisToolId(tool.path),
+              }"
+            >
+              <button
+                type="button"
+                class="webqq-model-analysis-tool-summary"
+                :aria-expanded="expandedTools.has(tool.path.join('.'))"
+                @pointerdown="startToolPointer"
+                @pointerup="finishToolPointer"
+                @click="toggleToolFromSummary(tool.path.join('.'))"
+              >
+                <IconTool :size="18" aria-hidden="true" />
+                <strong><AnalysisHighlightedText :value="tool.name" :query="normalizedSearch" /></strong>
+                <span><AnalysisHighlightedText :value="compactAnalysisText(tool.description || '无描述')" :query="normalizedSearch" /></span>
+                <small>
+                  {{ tool.propertyCount }} props
+                  <span v-if="tool.requiredFields.length"> · required: {{ tool.requiredFields.join(', ') }}</span>
+                </small>
+                <IconChevronDown :size="18" aria-hidden="true" />
+              </button>
+              <div v-if="expandedTools.has(tool.path.join('.'))" class="webqq-model-analysis-tool-detail">
+                <p><AnalysisHighlightedText :value="tool.description || '无描述'" :query="normalizedSearch" /></p>
+                <h4>Parameters (JSON Schema) <small>{{ formatPath(tool.path) }}</small></h4>
+                <AnalysisTextBlock
+                  :value="formatJson(tool.parameters || {})"
+                  :search-query="normalizedSearch"
+                  :threshold="1200"
+                  :preview-length="600"
+                  compact
+                />
+              </div>
             </article>
           </section>
-        </template>
+        </div>
       </div>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { IconChevronDown, IconCode, IconTool } from '@tabler/icons-vue'
-import { computed, defineComponent, h, ref } from 'vue'
+import {
+  IconChevronDown,
+  IconCode,
+  IconMessage,
+  IconRobot,
+  IconSettings,
+  IconTool,
+  IconUser,
+} from '@tabler/icons-vue'
+import { computed, defineComponent, h, nextTick, onBeforeUnmount, ref, watch, type Component } from 'vue'
 import { Button } from '../components/ui/button'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip'
 import ModelRequestJsonTree from '../model-request-json-tree.vue'
+import { formatDuration } from './format-duration'
+import {
+  buildModelRequestAnalysisNavigation,
+  collapseAnalysisText,
+  compactAnalysisText,
+  isPreviewableConversationImage,
+  modelAnalysisMessageId,
+  modelAnalysisResponseToolCallId,
+  modelAnalysisResponseToolResultId,
+  modelAnalysisToolCallId,
+  modelAnalysisToolId,
+  normalizeAnalysisQuery,
+  resolveAnalysisPromptTarget,
+  type ModelRequestAnalysisGroupKey,
+  type ModelRequestAnalysisNavigationItem,
+} from './model-request-analysis'
 import { buildModelRequestJsonTree } from './model-request-json'
-import { parseModelRequestConversationDetail, type ModelConversationMessage, type ModelRequestConversation } from './model-request-conversation'
-import type { SandboxModelRequestDetail, SandboxModelRequestTrajectory } from '../../src/types'
+import {
+  parseModelRequestConversationDetail,
+  type ModelConversationContentPart,
+  type ModelConversationMessage,
+  type ModelConversationRole,
+  type ModelRequestConversation,
+} from './model-request-conversation'
+import type { SandboxModelRequestDetail, SandboxModelRequestPromptKind, SandboxModelRequestStatus, SandboxModelRequestTrajectory } from '../../src/types'
 
-const props = defineProps<{ detail: SandboxModelRequestDetail; trajectory?: SandboxModelRequestTrajectory; searchQuery?: string }>()
+const props = defineProps<{
+  detail: SandboxModelRequestDetail
+  trajectory?: SandboxModelRequestTrajectory
+  searchQuery?: string
+  focusRequest?: {
+    kind: SandboxModelRequestPromptKind
+    indexInKind: number
+    token: number
+  }
+  requestsCollapsed?: boolean
+  toolsCollapsed?: boolean
+}>()
 const emit = defineEmits<{ locate: [target: string] }>()
-const searchQuery = computed(() => props.searchQuery?.trim().toLowerCase() || '')
+
+const normalizedSearch = computed(() => normalizeAnalysisQuery(props.searchQuery))
 const conversation = computed<ModelRequestConversation>(() => parseModelRequestConversationDetail(props.detail))
-const response = computed(() => conversation.value.response)
+const response = computed(() => conversation.value.response!)
+const navigation = computed(() => buildModelRequestAnalysisNavigation(conversation.value, props.detail))
+const visibleNavigationGroups = computed(() => navigation.value.groups.flatMap((group) => {
+  if (props.requestsCollapsed && group.key !== 'response') return []
+  const items = props.toolsCollapsed
+    ? group.items.filter(item => item.label !== 'TOOL CALL' && item.label !== 'TOOL RESULT' && item.label !== 'TOOL DEFS')
+    : group.items
+  return items.length ? [{ ...group, count: items.length, items }] : []
+}))
 const rawRequest = ref(false)
 const responseRaw = ref(false)
 const rawMessages = ref(new Set<number>())
 const expandedTools = ref(new Set<string>())
 const contentElement = ref<HTMLElement>()
+const highlightedTarget = ref('')
+const conversationScrollTop = ref(0)
 const requestTree = computed(() => buildModelRequestJsonTree(props.detail.requestBody, 'requestBody'))
-const visibleMessages = computed(() => conversation.value.messages)
-const responseMatches = computed(() => !searchQuery.value || response.value?.searchText.toLowerCase().includes(searchQuery.value))
-const responseCharacters = computed(() => response.value ? [...response.value.content, ...response.value.reasoning, ...response.value.toolCalls.map((call) => call.arguments || '')].join('').length : 0)
-const groups = computed(() => {
-  const items = conversation.value.messages.map((message) => ({ id: messageId(message.index), index: message.index, label: message.role.toUpperCase(), preview: compact(message.content || message.reasoning || message.toolCalls[0]?.name || '工具结果'), target: messageId(message.index), matches: messageMatches(message) }))
-  const result = ['system', 'user', 'assistant', 'tool'].map((role) => ({ key: role, label: role.toUpperCase(), items: items.filter((item) => item.label.toLowerCase() === role) })).filter((group) => group.items.length)
-  if (conversation.value.response) result.push({ key: 'response', label: '响应', items: [{ id: 'response', index: -1, label: '响应', preview: compact(response.value?.content.join('') || '本次响应'), target: 'model-analysis-response', matches: Boolean(responseMatches.value) }] })
-  if (conversation.value.tools.length) result.push({ key: 'tools', label: 'TOOL DEFS', items: [{ id: 'tools', index: -1, label: 'TOOL DEFS', preview: `${conversation.value.tools.length} 个工具`, target: 'model-analysis-tools', matches: true }] })
-  return result
+const responseMatches = computed(() => !normalizedSearch.value || response.value.searchText.toLocaleLowerCase('zh-CN').includes(normalizedSearch.value))
+const responseCharacters = computed(() => [
+  ...response.value.content,
+  ...response.value.reasoning,
+  ...response.value.toolCalls.map(call => call.arguments || ''),
+  ...response.value.toolResults.map(result => result.content),
+].join('').length)
+let highlightTimer: ReturnType<typeof setTimeout> | undefined
+let pointerStart: { x: number, y: number } | undefined
+let suppressToolSummary = false
+
+watch(normalizedSearch, async (query) => {
+  if (!query) return
+  rawRequest.value = false
+  for (const tool of conversation.value.tools) {
+    if (tool.searchText.toLocaleLowerCase('zh-CN').includes(query)) expandTool(tool.path.join('.'))
+  }
+  const first = visibleNavigationGroups.value.flatMap(group => group.items).find(itemMatches)
+  if (first) await jumpTo(first.target, false)
 })
 
-function messageId(index: number) { return `model-analysis-message-${index}` }
-function jumpTo(target?: string) { if (!target) return; emit('locate', target); contentElement.value?.querySelector(`#${CSS.escape(target)}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
-function toggleRaw(index: number) { const next = new Set(rawMessages.value); next.has(index) ? next.delete(index) : next.add(index); rawMessages.value = next }
-function toggleTool(path: string) { const next = new Set(expandedTools.value); next.has(path) ? next.delete(path) : next.add(path) }
-function messageMatches(message: ModelConversationMessage) { return !searchQuery.value || message.searchText.toLowerCase().includes(searchQuery.value) }
-function findTool(name: string) { return conversation.value.tools.find((tool) => tool.name === name) }
-function compact(value: string) { const text = value.replace(/\s+/g, ' ').trim(); return text.length > 80 ? `${text.slice(0, 77)}…` : text }
-function formatJson(value: unknown) { try { return JSON.stringify(value, null, 2) ?? '{}' } catch { return String(value) } }
-function formatPath(path: string[]) { return path.reduce((result, part) => /^\d+$/.test(part) ? `${result}[${part}]` : result ? `${result}.${part}` : part, '') }
-function propertySchema(value: unknown): Record<string, unknown> | undefined { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : undefined }
-function propertyCount(value: unknown) { const schema = propertySchema(value); return schema?.properties && typeof schema.properties === 'object' ? Object.keys(schema.properties).length : 0 }
-function requiredFields(value: unknown) { const schema = propertySchema(value); return Array.isArray(schema?.required) ? schema.required.join(', ') : '' }
-function requiredCount(value: unknown) { return requiredFields(value).length > 0 }
-function messageCharacters(message: ModelConversationMessage) { return [message.content, message.reasoning || '', ...message.toolCalls.map((call) => call.arguments || '')].join('').length }
+watch(() => props.focusRequest?.token, () => {
+  const focus = props.focusRequest
+  if (!focus) return
+  const target = resolveAnalysisPromptTarget(navigation.value, focus.kind, focus.indexInKind)
+  if (target) void jumpTo(target)
+})
+
+watch(() => props.detail.id, (next, previous) => {
+  if (next === previous) return
+  rawRequest.value = false
+  responseRaw.value = false
+  rawMessages.value = new Set()
+  expandedTools.value = new Set()
+  highlightedTarget.value = ''
+  if (contentElement.value) contentElement.value.scrollTop = 0
+})
+
+onBeforeUnmount(() => {
+  if (highlightTimer) clearTimeout(highlightTimer)
+})
+
+function itemMatches(item: ModelRequestAnalysisNavigationItem) {
+  return !normalizedSearch.value || item.searchText.includes(normalizedSearch.value)
+}
+
+function messageMatches(message: ModelConversationMessage) {
+  return !normalizedSearch.value || message.searchText.toLocaleLowerCase('zh-CN').includes(normalizedSearch.value)
+}
+
+async function jumpTo(target?: string, emphasize = true) {
+  if (!target) return
+  rawRequest.value = false
+  prepareTarget(target)
+  await nextTick()
+  const element = findTarget(target)
+  element?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  if (emphasize) emphasizeTarget(target)
+  emit('locate', target)
+}
+
+function prepareTarget(target: string) {
+  const tool = conversation.value.tools.find(candidate => modelAnalysisToolId(candidate.path) === target)
+  if (tool) expandTool(tool.path.join('.'))
+  const message = conversation.value.messages.find(candidate => target.startsWith(modelAnalysisMessageId(candidate.index)))
+  if (message && rawMessages.value.has(message.index)) toggleRaw(message.index)
+  if (target.startsWith('model-analysis-response') && responseRaw.value) responseRaw.value = false
+}
+
+function findTarget(target: string): HTMLElement | null {
+  const candidates = contentElement.value?.querySelectorAll<HTMLElement>('[id]') ?? []
+  return [...candidates].find(element => element.id === target) ?? null
+}
+
+function emphasizeTarget(target: string) {
+  highlightedTarget.value = target
+  if (highlightTimer) clearTimeout(highlightTimer)
+  highlightTimer = setTimeout(() => {
+    if (highlightedTarget.value === target) highlightedTarget.value = ''
+  }, 1500)
+}
+
+function locateTool(name: string) {
+  const tool = findTool(name)
+  if (tool) jumpTo(modelAnalysisToolId(tool.path))
+}
+
+function findTool(name: string) {
+  return conversation.value.tools.find(tool => tool.name === name)
+}
+
+function toggleRawRequest() {
+  if (!rawRequest.value) {
+    conversationScrollTop.value = contentElement.value?.scrollTop ?? 0
+    rawRequest.value = true
+    return
+  }
+  rawRequest.value = false
+  nextTick(() => {
+    if (contentElement.value) contentElement.value.scrollTop = conversationScrollTop.value
+  })
+}
+
+function toggleRaw(index: number) {
+  const next = new Set(rawMessages.value)
+  next.has(index) ? next.delete(index) : next.add(index)
+  rawMessages.value = next
+}
+
+function expandTool(path: string) {
+  if (expandedTools.value.has(path)) return
+  expandedTools.value = new Set([...expandedTools.value, path])
+}
+
+function toggleTool(path: string) {
+  const next = new Set(expandedTools.value)
+  next.has(path) ? next.delete(path) : next.add(path)
+  expandedTools.value = next
+}
+
+function startToolPointer(event: PointerEvent) {
+  pointerStart = { x: event.clientX, y: event.clientY }
+  suppressToolSummary = false
+}
+
+function finishToolPointer(event: PointerEvent) {
+  if (!pointerStart) return
+  suppressToolSummary = Math.hypot(event.clientX - pointerStart.x, event.clientY - pointerStart.y) > 3
+  pointerStart = undefined
+}
+
+function toggleToolFromSummary(path: string) {
+  const selection = window.getSelection()
+  if (suppressToolSummary || selection && !selection.isCollapsed) {
+    suppressToolSummary = false
+    return
+  }
+  toggleTool(path)
+}
+
+function roleLabel(role: ModelConversationRole) {
+  if (role === 'system') return 'system'
+  if (role === 'user') return 'user'
+  if (role === 'assistant') return 'assistant'
+  return 'tool'
+}
+
+function groupIcon(group: ModelRequestAnalysisGroupKey): Component {
+  if (group === 'system') return IconSettings
+  if (group === 'user') return IconUser
+  if (group === 'assistant') return IconRobot
+  if (group === 'tool') return IconTool
+  return IconMessage
+}
+
+function statusLabel(status: SandboxModelRequestStatus) {
+  if (status === 'pending') return '进行中'
+  if (status === 'error') return '错误'
+  return '已完成'
+}
+
+function formatJson(value: unknown) {
+  try {
+    return JSON.stringify(value, null, 2) ?? '{}'
+  } catch {
+    return String(value)
+  }
+}
+
+function formatPath(path: string[]) {
+  return path.reduce((result, part) => /^\d+$/.test(part) ? `${result}[${part}]` : result ? `${result}.${part}` : part, '')
+}
+
+function messageCharacters(message: ModelConversationMessage) {
+  return [message.content, message.reasoning || '', ...message.toolCalls.map(call => call.arguments || '')].join('').length
+}
+
+const responseFormatLabel = computed(() => response.value.format?.toUpperCase() || response.value.status.toUpperCase())
+
+const AnalysisHighlightedText = defineComponent({
+  props: {
+    value: { type: String, default: '' },
+    query: { type: String, default: '' },
+  },
+  setup(highlightProps) {
+    return () => h('span', highlightText(highlightProps.value, highlightProps.query))
+  },
+})
 
 const AnalysisTextBlock = defineComponent({
   props: {
     label: String,
     value: { type: String, default: '' },
     searchQuery: { type: String, default: '' },
+    threshold: { type: Number, default: 1200 },
+    previewLength: { type: Number, default: 600 },
+    compact: Boolean,
   },
-  setup(props) {
+  setup(blockProps) {
     const expanded = ref(false)
-    const limit = computed(() => props.label === 'Parameters (JSON Schema)' ? 600 : 1200)
-    const collapsible = computed(() => props.value.length > limit.value)
-    const visible = computed(() => expanded.value || !collapsible.value ? props.value : props.value.slice(0, limit.value))
-    return () => h('section', { class: ['webqq-model-analysis-section', { 'is-collapsed': collapsible.value && !expanded.value }] }, [
-      props.label && h('strong', props.label),
+    const collapsed = computed(() => collapseAnalysisText(
+      blockProps.value,
+      expanded.value,
+      blockProps.threshold,
+      blockProps.previewLength,
+    ))
+    const collapsible = computed(() => collapsed.value.collapsible)
+    const visible = computed(() => collapsed.value.text)
+    watch(() => blockProps.searchQuery, (query) => {
+      if (query && blockProps.value.toLocaleLowerCase('zh-CN').includes(query)) expanded.value = true
+    }, { immediate: true })
+    return () => h('section', {
+      class: ['webqq-model-analysis-section', { 'is-collapsed': collapsible.value && !expanded.value, 'is-compact': blockProps.compact }],
+    }, [
+      blockProps.label && h('strong', blockProps.label),
       h('div', { class: 'webqq-model-analysis-text-wrap' }, [
-        h('pre', visible.value),
-        collapsible.value && h('button', { type: 'button', class: 'webqq-model-analysis-expand', onClick: () => { expanded.value = !expanded.value } }, expanded.value ? '收起' : `展开全部（${props.value.length} 字符）`),
+        h('pre', highlightText(visible.value, blockProps.searchQuery)),
+        collapsible.value && h('button', {
+          type: 'button',
+          class: 'webqq-model-analysis-expand',
+          onClick: () => { expanded.value = !expanded.value },
+        }, expanded.value ? '收起' : `展开全部（${blockProps.value.length} 字符）`),
       ]),
     ])
   },
 })
+
+const AnalysisContentParts = defineComponent({
+  props: {
+    parts: { type: Array as () => ModelConversationContentPart[], required: true },
+    searchQuery: { type: String, default: '' },
+  },
+  setup(contentProps) {
+    const failedImages = ref(new Set<number>())
+    const failImage = (index: number) => {
+      failedImages.value = new Set([...failedImages.value, index])
+    }
+    return () => h('div', { class: 'webqq-model-analysis-parts' }, contentProps.parts.map((part, index) => {
+      if (part.kind === 'image' && isPreviewableConversationImage(part.value) && !failedImages.value.has(index)) {
+        return h('figure', { key: index, class: 'webqq-model-analysis-image' }, [
+          h('img', {
+            src: part.value,
+            alt: `请求图片 ${index + 1}`,
+            onError: () => failImage(index),
+          }),
+          h('figcaption', part.mimeType || 'image'),
+        ])
+      }
+      const label = part.kind === 'text' ? index === 0 ? '内容' : undefined : part.kind === 'image' ? '图片加载失败' : part.kind
+      return h(AnalysisTextBlock, {
+        key: index,
+        label,
+        value: part.value,
+        searchQuery: contentProps.searchQuery,
+      })
+    }))
+  },
+})
+
+function highlightText(value: string, query: string) {
+  if (!query) return value
+  const lower = value.toLocaleLowerCase('zh-CN')
+  const nodes: Array<string | ReturnType<typeof h>> = []
+  let offset = 0
+  while (offset < value.length) {
+    const index = lower.indexOf(query, offset)
+    if (index < 0) {
+      nodes.push(value.slice(offset))
+      break
+    }
+    if (index > offset) nodes.push(value.slice(offset, index))
+    nodes.push(h('mark', value.slice(index, index + query.length)))
+    offset = index + query.length
+  }
+  return nodes
+}
 </script>

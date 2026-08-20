@@ -37,16 +37,29 @@ export interface ModelConversationTool {
   name: string
   description: string
   parameters?: unknown
+  propertyCount: number
+  requiredFields: string[]
   raw: unknown
   path: string[]
   searchText: string
 }
 
+export interface ModelConversationToolResult {
+  id?: string
+  name?: string
+  content: string
+  raw: unknown
+  path: string[]
+}
+
 export interface ModelConversationResponse {
   source: 'response'
+  status: 'pending' | 'complete' | 'empty' | 'unavailable' | 'error'
+  statusMessage?: string
   content: string[]
   reasoning: string[]
   toolCalls: ModelConversationToolCall[]
+  toolResults: ModelConversationToolResult[]
   finishReasons: string[]
   usage?: SandboxModelRequestUsage
   raw: unknown
@@ -79,22 +92,11 @@ export function parseModelRequestConversation(
   }
 
   const protocol = format?.toLowerCase() ?? ''
-  const anthropic = protocol.includes('anthropic') || Array.isArray(body.messages) && hasAnthropicBlocks(body.messages)
-  const gemini = protocol.includes('gemini') || Array.isArray(body.contents)
-  const responses = protocol.includes('responses') || Array.isArray(body.input)
   const aiSdk = protocol.includes('aisdk') || Array.isArray(body.messages) && hasTypedParts(body.messages)
 
-  if (anthropic && body.system !== undefined) {
-    pushMessage(createSystemMessage(body.system, ['system']))
-  }
-  if (gemini && body.systemInstruction !== undefined) {
-    pushMessage(createSystemMessage(body.systemInstruction, ['systemInstruction']))
-  }
-  if (!gemini && !anthropic && body.system_instruction !== undefined) {
-    pushMessage(createSystemMessage(body.system_instruction, ['system_instruction']))
-  }
-  if (body.system !== undefined && !anthropic) {
-    pushMessage(createSystemMessage(body.system, ['system']))
+  const systemFields = new Set(['system', 'systemInstruction', 'system_instruction', 'instructions'])
+  for (const [field, value] of Object.entries(body)) {
+    if (systemFields.has(field) && value !== undefined) pushMessage(createSystemMessage(value, [field]))
   }
 
   if (Array.isArray(body.messages)) {
@@ -123,32 +125,101 @@ export function parseModelRequestConversation(
 }
 
 export function parseModelResponseConversation(
-  record: Pick<SandboxModelRequestDetail, 'responseBodyRaw' | 'responseBodyFormat' | 'responseBodyStatus' | 'usage'>,
-): ModelConversationResponse | undefined {
-  if (record.responseBodyStatus !== 'complete' || record.responseBodyRaw === undefined) return undefined
+  record: Pick<SandboxModelRequestDetail, 'responseBodyRaw' | 'responseBodyFormat' | 'responseBodyStatus' | 'responseBodyError' | 'usage'>,
+): ModelConversationResponse {
+  const empty = (status: ModelConversationResponse['status'], statusMessage: string): ModelConversationResponse => ({
+    source: 'response',
+    status,
+    statusMessage,
+    content: [],
+    reasoning: [],
+    toolCalls: [],
+    toolResults: [],
+    finishReasons: [],
+    ...(record.usage ? { usage: record.usage } : {}),
+    raw: record.responseBodyRaw,
+    ...(record.responseBodyFormat ? { format: record.responseBodyFormat } : {}),
+    searchText: statusMessage,
+  })
+  if (record.responseBodyStatus === 'pending') return empty('pending', '响应仍在采集中')
+  if (record.responseBodyStatus === 'error') return empty('error', record.responseBodyError || '响应采集失败')
+  if (record.responseBodyStatus === 'unavailable' || record.responseBodyRaw === undefined) return empty('unavailable', '响应不可用')
+
   const parsed = parseModelResponseBody(record.responseBodyRaw, record.responseBodyFormat)
-  const preview = extractModelResponseContent(parsed.value)
-  const usage = record.usage ?? (normalizeModelResponseUsage(preview.usage)
-    ? { ...normalizeModelResponseUsage(preview.usage), source: 'response' as const }
-    : undefined)
+  if (record.responseBodyFormat === 'json' && parsed.kind === 'text') {
+    return { ...empty('error', '响应 JSON 解析失败'), raw: record.responseBodyRaw, format: 'json' }
+  }
+  const extracted = extractModelResponseContent(parsed.value)
+  const preview = parsed.kind === 'text' && typeof parsed.value === 'string'
+    ? { ...extracted, content: [parsed.value] }
+    : extracted
+  const toolResults = collectResponseToolResults(parsed.value)
+  const normalizedUsage = normalizeModelResponseUsage(preview.usage)
+  const usage = record.usage ?? (normalizedUsage ? { ...normalizedUsage, source: 'response' as const } : undefined)
+  const hasContent = Boolean(preview.content.length || preview.reasoning.length || preview.toolCalls.length || toolResults.length || preview.finishReasons.length || usage)
+  const statusMessage = hasContent ? undefined : '响应没有可展示的结构化内容'
   const raw = parsed.value ?? record.responseBodyRaw
   return {
     source: 'response',
+    status: hasContent ? 'complete' : 'empty',
+    ...(statusMessage ? { statusMessage } : {}),
     content: preview.content,
     reasoning: preview.reasoning,
     toolCalls: preview.toolCalls.map((call) => ({ id: call.id, name: call.name, arguments: call.arguments })),
+    toolResults,
     finishReasons: preview.finishReasons,
     ...(usage ? { usage } : {}),
     raw,
-    format: parsed.kind === 'empty' ? undefined : parsed.kind,
-    searchText: [preview.content, preview.reasoning, preview.toolCalls.map((call) => `${call.name} ${call.arguments ?? ''}`), preview.finishReasons].flat().join('\n'),
+    format: record.responseBodyFormat ?? (parsed.kind === 'empty' ? undefined : parsed.kind),
+    searchText: [statusMessage ?? '', preview.content, preview.reasoning, preview.toolCalls.map((call) => `${call.name} ${call.arguments ?? ''}`), toolResults.map((result) => `${result.name ?? ''} ${result.content}`), preview.finishReasons].flat().join('\n'),
   }
 }
 
 export function parseModelRequestConversationDetail(detail: SandboxModelRequestDetail): ModelRequestConversation {
-  const conversation = parseModelRequestConversation(detail.requestBody, detail.responseBodyFormat)
+  const conversation = parseModelRequestConversation(detail.requestBody)
   const response = parseModelResponseConversation(detail)
-  return response ? { ...conversation, response, searchText: `${conversation.searchText}\n${response.searchText}` } : conversation
+  return { ...conversation, response, searchText: `${conversation.searchText}\n${response.searchText}` }
+}
+
+function collectResponseToolResults(value: unknown): ModelConversationToolResult[] {
+  const results: ModelConversationToolResult[] = []
+  const visit = (candidate: unknown, path: string[]) => {
+    if (Array.isArray(candidate)) {
+      candidate.forEach((item, index) => visit(item, [...path, String(index)]))
+      return
+    }
+    if (!isRecord(candidate)) return
+    if (isRecord(candidate.functionResponse)) {
+      const result = candidate.functionResponse
+      results.push(createResponseToolResult(result, [...path, 'functionResponse'], result.response ?? result.output ?? result.result))
+      return
+    }
+    const type = typeof candidate.type === 'string' ? candidate.type.toLowerCase() : ''
+    if (type === 'function_call_output' || type === 'tool_result' || type === 'tool-result' || type === 'tool-output') {
+      const output = candidate.output ?? candidate.result ?? candidate.content
+      results.push(createResponseToolResult(candidate, path, output))
+      return
+    }
+    for (const [key, child] of Object.entries(candidate)) visit(child, [...path, key])
+  }
+  visit(value, [])
+  return results
+}
+
+function createResponseToolResult(
+  raw: Record<string, unknown>,
+  path: string[],
+  output: unknown,
+): ModelConversationToolResult {
+  const id = raw.call_id ?? raw.toolCallId ?? raw.tool_call_id ?? raw.id
+  const name = raw.name ?? raw.toolName ?? raw.tool_name
+  return {
+    ...(typeof id === 'string' && id ? { id } : {}),
+    ...(typeof name === 'string' && name ? { name } : {}),
+    content: normalizeAiSdkToolOutput(output),
+    raw,
+    path,
+  }
 }
 
 function projectMessage(
@@ -157,6 +228,10 @@ function projectMessage(
   push: (message: Omit<ModelConversationMessage, 'index' | 'searchText'>) => void,
   aiSdk: boolean,
 ) {
+  if (aiSdk && Array.isArray(value.parts)) {
+    projectAiSdkMessage(value, path, push)
+    return
+  }
   const role = typeof value.role === 'string' ? value.role.toLowerCase() : 'user'
   if (role === 'assistant' || (Array.isArray(value.content) && hasAnthropicContentBlocks(value.content))) {
     const parts: ModelConversationContentPart[] = []
@@ -201,6 +276,69 @@ function projectMessage(
   }
   const parts = normalizeParts(aiSdk ? value.parts ?? value.content : value.content ?? value.parts)
   push(createMessage(role === 'system' || role === 'developer' ? 'system' : 'user', parts.map((part) => part.value).join('\n'), parts, path, value))
+}
+
+function projectAiSdkMessage(
+  value: Record<string, unknown>,
+  path: string[],
+  push: (message: Omit<ModelConversationMessage, 'index' | 'searchText'>) => void,
+) {
+  const role = typeof value.role === 'string' ? value.role.toLowerCase() : 'user'
+  const contentParts: ModelConversationContentPart[] = []
+  const reasoning: string[] = []
+  const toolCalls: ModelConversationToolCall[] = []
+  const toolResults: Array<{ raw: Record<string, unknown>, path: string[], content: string, toolCallId?: string }> = []
+
+  for (const [partIndex, part] of (value.parts as unknown[]).entries()) {
+    if (!isRecord(part)) {
+      contentParts.push(...normalizeParts(part))
+      continue
+    }
+    const partPath = [...path, 'parts', String(partIndex)]
+    const type = typeof part.type === 'string' ? part.type.toLowerCase() : ''
+    if (type === 'reasoning' || type === 'reasoning-part') {
+      if (typeof part.text === 'string' && part.text) reasoning.push(part.text)
+      continue
+    }
+    if (type === 'tool-call' || type === 'tool-invocation' || type === 'dynamic-tool') {
+      const invocation = isRecord(part.toolInvocation) ? part.toolInvocation : part
+      const name = String(invocation.toolName ?? invocation.tool_name ?? invocation.name ?? '工具调用')
+      const argumentsValue = invocation.input ?? invocation.args ?? invocation.arguments
+      toolCalls.push({
+        ...(typeof invocation.toolCallId === 'string' ? { id: invocation.toolCallId } : typeof invocation.tool_call_id === 'string' ? { id: invocation.tool_call_id } : {}),
+        name,
+        ...(argumentsValue !== undefined ? { arguments: stringifyValue(argumentsValue) } : {}),
+        toolPath: partPath,
+      })
+      continue
+    }
+    if (type === 'tool-result' || type === 'tool-output') {
+      const output = part.output ?? part.result ?? part.content
+      toolResults.push({
+        raw: part,
+        path: partPath,
+        content: normalizeAiSdkToolOutput(output),
+        ...(typeof part.toolCallId === 'string' ? { toolCallId: part.toolCallId } : typeof part.tool_call_id === 'string' ? { toolCallId: part.tool_call_id } : {}),
+      })
+      continue
+    }
+    contentParts.push(...normalizeParts([part]))
+  }
+
+  for (const result of toolResults) {
+    push(createMessage('tool', result.content, result.content, result.path, result.raw, undefined, [], result.toolCallId))
+  }
+  if (role !== 'tool' && (contentParts.length || reasoning.length || toolCalls.length)) {
+    push(createMessage(
+      role === 'assistant' ? 'assistant' : role === 'system' ? 'system' : 'user',
+      semanticContent(contentParts),
+      contentParts,
+      path,
+      value,
+      reasoning.join('\n'),
+      toolCalls,
+    ))
+  }
 }
 
 function projectGeminiMessage(
@@ -265,29 +403,55 @@ function projectResponsesInput(
 }
 
 function collectTools(body: Record<string, unknown>, target: ModelConversationTool[]) {
-  const add = (value: unknown, path: string[], gemini = false) => {
-    if (!Array.isArray(value)) return
+  const addArray = (value: unknown[], path: string[]) => {
     for (const [index, item] of value.entries()) {
       if (!isRecord(item)) continue
-      if (gemini && Array.isArray(item.functionDeclarations)) {
+      if (Array.isArray(item.functionDeclarations)) {
         for (const [declarationIndex, declaration] of item.functionDeclarations.entries()) {
           if (isRecord(declaration)) target.push(createTool(declaration, [...path, String(index), 'functionDeclarations', String(declarationIndex)]))
         }
-      } else {
-        const definition = isRecord(item.function) ? item.function : item
-        target.push(createTool(definition, [...path, String(index), ...(isRecord(item.function) ? ['function'] : [])]))
+        continue
       }
+      const definition = isRecord(item.function) ? item.function : item
+      target.push(createTool(definition, [...path, String(index), ...(isRecord(item.function) ? ['function'] : [])]))
     }
   }
-  add(body.tools, ['tools'], true)
-  add(body.functions, ['functions'])
+
+  // 同时出现 tools/functions 等字段时，Object.keys 的插入顺序就是原始请求证据顺序；
+  // 固定先读某个字段会悄悄重排工具目录，导致同名工具无法按原文复盘。
+  for (const [field, value] of Object.entries(body)) {
+    if (field !== 'tools' && field !== 'functions') continue
+    if (Array.isArray(value)) {
+      addArray(value, [field])
+      continue
+    }
+    if (!isRecord(value)) continue
+    for (const [name, definition] of Object.entries(value)) {
+      if (!isRecord(definition)) continue
+      target.push(createTool({ name, ...definition }, [field, name]))
+    }
+  }
 }
 
 function createTool(value: Record<string, unknown>, path: string[]): ModelConversationTool {
   const name = typeof value.name === 'string' ? value.name : '未命名工具'
-  const parameters = value.parameters ?? value.input_schema
+  const parameters = value.parameters ?? value.input_schema ?? value.inputSchema ?? value.parametersJsonSchema
   const description = typeof value.description === 'string' ? value.description : ''
-  return { name, description, ...(parameters !== undefined ? { parameters } : {}), raw: value, path, searchText: `${name}\n${description}\n${JSON.stringify(parameters ?? '')}` }
+  const schema = isRecord(parameters) ? parameters : undefined
+  const properties = isRecord(schema?.properties) ? schema.properties : undefined
+  const requiredFields = Array.isArray(schema?.required)
+    ? schema.required.filter((field): field is string => typeof field === 'string')
+    : []
+  return {
+    name,
+    description,
+    ...(parameters !== undefined ? { parameters } : {}),
+    propertyCount: properties ? Object.keys(properties).length : 0,
+    requiredFields,
+    raw: value,
+    path,
+    searchText: `${name}\n${description}\n${JSON.stringify(parameters ?? '')}`,
+  }
 }
 
 function createSystemMessage(value: unknown, path: string[]) {
@@ -325,8 +489,15 @@ function normalizeToolCalls(value: unknown): ModelConversationToolCall[] {
     const fn = isRecord(item.function) ? item.function : item
     const name = typeof fn.name === 'string' ? fn.name : '工具调用'
     const args = fn.arguments ?? fn.input ?? fn.args
+    const id = typeof item.id === 'string'
+      ? item.id
+      : typeof item.call_id === 'string'
+        ? item.call_id
+        : typeof item.toolCallId === 'string'
+          ? item.toolCallId
+          : undefined
     return [{
-      ...(typeof item.id === 'string' ? { id: item.id } : {}),
+      ...(id ? { id } : {}),
       name,
       ...(args !== undefined ? { arguments: typeof args === 'string' ? args : JSON.stringify(args, null, 2) } : {}),
     }]
@@ -335,24 +506,88 @@ function normalizeToolCalls(value: unknown): ModelConversationToolCall[] {
 
 function normalizeParts(value: unknown): ModelConversationContentPart[] {
   if (typeof value === 'string') return [{ kind: 'text', value }]
-  if (!Array.isArray(value)) return value === undefined ? [] : [{ kind: 'other', value: JSON.stringify(value, null, 2) }]
+  if (isRecord(value)) {
+    if (Array.isArray(value.parts)) return normalizeParts(value.parts)
+    return normalizeParts([value])
+  }
+  if (!Array.isArray(value)) return value === undefined ? [] : [{ kind: 'other', value: stringifyValue(value) }]
   return (value as unknown[]).flatMap((item): ModelConversationContentPart[] => {
-    if (typeof item === 'string') return [{ kind: 'text' as const, value: item }]
+    if (typeof item === 'string') return [{ kind: 'text', value: item }]
     if (!isRecord(item)) return []
     const text = item.text ?? item.output_text ?? item.content
-    if (typeof text === 'string') return [{ kind: 'text' as const, value: text }]
-    const type = typeof item.type === 'string' ? item.type : ''
-    if (type.includes('image') || item.image_url || item.source) return [{ kind: 'image' as const, value: String(item.image_url ?? item.source ?? '[图片]') }]
-    return [{ kind: 'other' as const, value: JSON.stringify(item, null, 2) }]
+    if (typeof text === 'string') return [{ kind: 'text', value: text }]
+    const type = typeof item.type === 'string' ? item.type.toLowerCase() : ''
+    const mimeType = typeof item.mediaType === 'string'
+      ? item.mediaType
+      : typeof item.mimeType === 'string'
+        ? item.mimeType
+        : typeof item.media_type === 'string'
+          ? item.media_type
+          : undefined
+    const source = normalizeMediaSource(item.image_url ?? item.image ?? item.source ?? item.url ?? item.data)
+    if (type.includes('image') || mimeType?.startsWith('image/') || item.image_url || item.image) {
+      return [{ kind: 'image', value: source ?? '[图片]', ...(mimeType ? { mimeType } : {}) }]
+    }
+    if (type.includes('file') || mimeType && !mimeType.startsWith('image/')) {
+      return [{ kind: 'file', value: source ?? '[文件]', ...(mimeType ? { mimeType } : {}) }]
+    }
+    if (type.includes('audio')) return [{ kind: 'audio', value: source ?? '[音频]', ...(mimeType ? { mimeType } : {}) }]
+    if (type.includes('video')) return [{ kind: 'video', value: source ?? '[视频]', ...(mimeType ? { mimeType } : {}) }]
+    return [{ kind: 'other', value: stringifyValue(item) }]
   })
+}
+
+function normalizeMediaSource(value: unknown): string | undefined {
+  if (typeof value === 'string') return value
+  if (!isRecord(value)) return undefined
+  if (typeof value.url === 'string') return value.url
+  if (typeof value.data === 'string') {
+    const mimeType = typeof value.media_type === 'string' ? value.media_type : typeof value.mimeType === 'string' ? value.mimeType : undefined
+    return mimeType ? `data:${mimeType};base64,${value.data}` : value.data
+  }
+}
+
+function semanticContent(parts: ModelConversationContentPart[]): string {
+  return parts
+    .filter((part) => part.kind === 'text' || part.kind === 'other')
+    .map((part) => part.value)
+    .join('\n')
+}
+
+function normalizeAiSdkToolOutput(value: unknown): string {
+  if (isRecord(value) && value.type === 'json' && 'value' in value) return stringifyValue(value.value)
+  if (isRecord(value) && value.type === 'text' && typeof value.value === 'string') return value.value
+  return stringifyValue(value ?? '')
+}
+
+function stringifyValue(value: unknown): string {
+  if (typeof value === 'string') return value
+  try {
+    return JSON.stringify(value, null, 2) ?? String(value)
+  } catch {
+    return String(value)
+  }
 }
 
 function normalizeGeminiPart(value: unknown): ModelConversationContentPart[] {
   if (!isRecord(value)) return []
   if (typeof value.text === 'string') return [{ kind: 'text', value: value.text }]
-  if (isRecord(value.functionCall)) return [{ kind: 'other', value: value.functionCall as unknown as string }]
-  if (isRecord(value.functionResponse)) return [{ kind: 'other', value: JSON.stringify(value.functionResponse, null, 2) }]
-  return [{ kind: 'other', value: JSON.stringify(value, null, 2) }]
+  if (isRecord(value.inlineData)) {
+    const mimeType = typeof value.inlineData.mimeType === 'string' ? value.inlineData.mimeType : undefined
+    const data = typeof value.inlineData.data === 'string' ? value.inlineData.data : ''
+    if (mimeType?.startsWith('image/') && mimeType !== 'image/svg+xml') {
+      return [{ kind: 'image', value: `data:${mimeType};base64,${data}`, mimeType }]
+    }
+    return [{ kind: mimeType?.startsWith('audio/') ? 'audio' : mimeType?.startsWith('video/') ? 'video' : 'file', value: data || '[内联文件]', ...(mimeType ? { mimeType } : {}) }]
+  }
+  if (isRecord(value.fileData)) {
+    const mimeType = typeof value.fileData.mimeType === 'string' ? value.fileData.mimeType : undefined
+    const source = typeof value.fileData.fileUri === 'string' ? value.fileData.fileUri : '[文件]'
+    return [{ kind: mimeType?.startsWith('image/') ? 'image' : mimeType?.startsWith('audio/') ? 'audio' : mimeType?.startsWith('video/') ? 'video' : 'file', value: source, ...(mimeType ? { mimeType } : {}) }]
+  }
+  if (isRecord(value.functionCall)) return [{ kind: 'other', value: stringifyValue(value.functionCall) }]
+  if (isRecord(value.functionResponse)) return [{ kind: 'other', value: stringifyValue(value.functionResponse) }]
+  return [{ kind: 'other', value: stringifyValue(value) }]
 }
 
 function hasAnthropicContentBlocks(content: unknown[]) {
