@@ -47,18 +47,27 @@ describe('模型请求对话视图归一化', () => {
       ],
       tools: [{ name: 'lookup', input_schema: { type: 'object' } }],
     }, 'anthropic/messages')
-    expect(anthropic.messages[0]).toMatchObject({ role: 'system', content: 'Anthropic 系统', path: ['system'] })
+    expect(anthropic.messages[0]).toMatchObject({ role: 'system', content: 'Anthropic 系统', path: ['system', '0'] })
 
     const gemini = parseModelRequestConversation({
-      systemInstruction: { parts: [{ text: 'Gemini 系统' }] },
+      systemInstruction: {
+        parts: [
+          { text: 'Gemini 系统一' },
+          { text: 'Gemini 系统二' },
+        ],
+      },
       contents: [
         { role: 'model', parts: [{ functionCall: { name: 'lookup', args: { id: 1 } } }] },
         { role: 'user', parts: [{ functionResponse: { name: 'lookup', response: { value: '结果' } } }] },
       ],
       tools: [{ functionDeclarations: [{ name: 'lookup', description: '查询', parameters: { type: 'object' } }] }],
     }, 'gemini')
-    expect(gemini.messages.map(({ role }) => role)).toEqual(['system', 'assistant', 'tool'])
-    expect(gemini.messages[1]?.toolCalls[0]).toMatchObject({ name: 'lookup' })
+    expect(gemini.messages.slice(0, 2).map(({ role, content, path }) => ({ role, content, path }))).toEqual([
+      { role: 'system', content: 'Gemini 系统一', path: ['systemInstruction', 'parts', '0'] },
+      { role: 'system', content: 'Gemini 系统二', path: ['systemInstruction', 'parts', '1'] },
+    ])
+    expect(gemini.messages.map(({ role }) => role)).toEqual(['system', 'system', 'assistant', 'tool'])
+    expect(gemini.messages[2]?.toolCalls[0]).toMatchObject({ name: 'lookup' })
     expect(gemini.tools[0]).toMatchObject({ name: 'lookup', path: ['tools', '0', 'functionDeclarations', '0'] })
   })
 
@@ -173,7 +182,10 @@ describe('模型请求对话视图归一化', () => {
   it('保留多个 system 来源、多模态分片和跨字段工具声明的原始顺序', () => {
     const conversation = parseModelRequestConversation({
       system_instruction: '第一条系统约束',
-      system: [{ type: 'text', text: '第二条系统约束' }],
+      system: [
+        { type: 'text', text: '第二条系统约束' },
+        { type: 'text', text: '第三条系统约束' },
+      ],
       contents: [{
         role: 'user',
         parts: [
@@ -186,11 +198,12 @@ describe('模型请求对话视图归一化', () => {
       tools: [{ functionDeclarations: [{ name: 'gemini', parameters: { type: 'object' } }] }],
     }, 'gemini')
 
-    expect(conversation.messages.slice(0, 2).map(({ role, content, path }) => ({ role, content, path }))).toEqual([
+    expect(conversation.messages.slice(0, 3).map(({ role, content, path }) => ({ role, content, path }))).toEqual([
       { role: 'system', content: '第一条系统约束', path: ['system_instruction'] },
-      { role: 'system', content: '第二条系统约束', path: ['system'] },
+      { role: 'system', content: '第二条系统约束', path: ['system', '0'] },
+      { role: 'system', content: '第三条系统约束', path: ['system', '1'] },
     ])
-    expect(conversation.messages[2]?.contentParts).toEqual([
+    expect(conversation.messages[3]?.contentParts).toEqual([
       { kind: 'text', value: '识别图片' },
       { kind: 'image', value: 'data:image/png;base64,aGVsbG8=', mimeType: 'image/png' },
       { kind: 'file', value: 'https://example.com/a.pdf', mimeType: 'application/pdf' },

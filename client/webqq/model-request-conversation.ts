@@ -96,7 +96,7 @@ export function parseModelRequestConversation(
 
   const systemFields = new Set(['system', 'systemInstruction', 'system_instruction', 'instructions'])
   for (const [field, value] of Object.entries(body)) {
-    if (systemFields.has(field) && value !== undefined) pushMessage(createSystemMessage(value, [field]))
+    if (systemFields.has(field) && value !== undefined) projectSystemMessages(value, [field], pushMessage)
   }
 
   if (Array.isArray(body.messages)) {
@@ -485,6 +485,26 @@ function createTool(value: Record<string, unknown>, path: string[]): ModelConver
     raw: value,
     path,
     searchText: `${name}\n${description}\n${JSON.stringify(parameters ?? '')}`,
+  }
+}
+
+function projectSystemMessages(
+  value: unknown,
+  path: string[],
+  push: (message: Omit<ModelConversationMessage, 'index' | 'searchText'>) => void,
+) {
+  const container = isRecord(value) && Array.isArray(value.parts)
+    ? { values: value.parts, path: [...path, 'parts'] }
+    : Array.isArray(value)
+      ? { values: value, path }
+      : undefined
+  if (!container) {
+    push(createSystemMessage(value, path))
+    return
+  }
+  for (const [index, item] of container.values.entries()) {
+    // 顶层 system 数组及 systemInstruction.parts 都是独立原始证据；合并后会让卡片折叠、搜索和定位失去单条边界。
+    push(createSystemMessage(item, [...container.path, String(index)]))
   }
 }
 
