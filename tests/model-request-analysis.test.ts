@@ -90,6 +90,34 @@ describe('模型请求分析展示模型', () => {
     expect(resolveAnalysisPromptTarget(navigation, 'tool-interaction', 0)).toBe('model-analysis-message-2-tool-call-0')
   })
 
+  it('把 Gemini 组成图 System 分段定位到 systemInstruction.parts', () => {
+    const request = detail()
+    request.provider = 'gemini'
+    request.model = 'gemini-pro'
+    request.requestBody = {
+      systemInstruction: {
+        parts: [
+          { text: 'Gemini 系统一' },
+          { text: 'Gemini 系统二' },
+        ],
+      },
+      contents: [{ role: 'user', parts: [{ text: '查询天气' }] }],
+      tools: [{ functionDeclarations: [{ name: 'weather', description: '查询天气' }] }],
+    }
+    const navigation = buildModelRequestAnalysisNavigation(parseModelRequestConversationDetail(request), request)
+
+    expect(navigation.groups.map(({ key, count }) => ({ key, count }))).toEqual([
+      { key: 'system', count: 2 },
+      { key: 'user', count: 1 },
+      { key: 'tool', count: 1 },
+      { key: 'response', count: 1 },
+    ])
+    expect(resolveAnalysisPromptTarget(navigation, 'system', 0)).toBe('model-analysis-message-0')
+    expect(resolveAnalysisPromptTarget(navigation, 'system', 1)).toBe('model-analysis-message-1')
+    expect(resolveAnalysisPromptTarget(navigation, 'user', 0)).toBe('model-analysis-message-2')
+    expect(resolveAnalysisPromptTarget(navigation, 'tool-definition', 0)).toBe('model-analysis-tools')
+  })
+
   it('精确匹配两位数消息目标并把定位状态传给折叠分区', () => {
     const request = detail()
     const conversation = parseModelRequestConversationDetail(request)

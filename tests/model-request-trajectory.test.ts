@@ -176,9 +176,55 @@ describe('模型请求轨迹投影', () => {
       mode: 'request',
       store,
     })
-    expect(geminiTrajectory.rows.some(({ kind }) => kind === 'system')).toBe(false)
+    expect(geminiTrajectory.rows.find(({ kind }) => kind === 'system')).toMatchObject({
+      kind: 'system',
+      preview: '系统',
+    })
     expect(geminiTrajectory.rows.some(({ kind, preview }) => kind === 'tool' && preview.startsWith('工具目录'))).toBe(true)
-    expect(geminiTrajectory.promptComposition?.some(({ kind }) => kind === 'system')).toBe(false)
+    expect(geminiTrajectory.promptComposition?.map(({ kind }) => kind)).toEqual([
+      'system',
+      'user',
+      'tool-definition',
+      'tool-interaction',
+      'tool-interaction',
+    ])
+    expect(geminiTrajectory.promptComposition?.[0]).toEqual({ kind: 'system', characters: 2 })
+  })
+
+  it('把 Gemini systemInstruction.parts 拆成多段 System，对齐分析页导航', () => {
+    const store = new SandboxModelRequestStore()
+    const gemini = store.append({
+      status: 'success',
+      durationMs: 10,
+      attribution: 'unattributed',
+      entities: {},
+      requestBodyAvailable: true,
+      requestBody: {
+        systemInstruction: {
+          parts: [
+            { text: 'Gemini 系统一' },
+            { text: 'Gemini 系统二' },
+          ],
+        },
+        contents: [{ role: 'user', parts: [{ text: '查询天气' }] }],
+      },
+      responseBodyStatus: 'unavailable',
+    })
+    const trajectory = buildSandboxModelRequestTrajectory({
+      record: store.getRecord(gemini.id)!,
+      mode: 'request',
+      store,
+    })
+
+    expect(trajectory.promptComposition).toEqual([
+      { kind: 'system', characters: 10 },
+      { kind: 'system', characters: 10 },
+      { kind: 'user', characters: JSON.stringify({ text: '查询天气' }).length },
+    ])
+    expect(trajectory.rows.filter(({ kind }) => kind === 'system').map(({ preview }) => preview)).toEqual([
+      'Gemini 系统一',
+      'Gemini 系统二',
+    ])
   })
 
   it('按同一记录库和 conversationId 组成完整会话 Step，不混入其他会话', () => {

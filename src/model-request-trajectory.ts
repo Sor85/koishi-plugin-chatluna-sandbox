@@ -99,8 +99,21 @@ function projectPromptComposition(body: unknown): SandboxModelRequestPromptCompo
     if (characters > 0) target.push({ kind, characters })
   }
 
-  const isGeminiRequest = Array.isArray(body.contents)
-  if (!isGeminiRequest) {
+  // Gemini generateContent 把系统提示放在顶层 systemInstruction，contents 只有 user/model。
+  // 按分析页同样的 parts 边界切成 System，不能整坨跳过，否则组成图只剩 User / Tool Defs。
+  const geminiSystem = Array.isArray(body.contents)
+    ? body.systemInstruction ?? body.system_instruction ?? body.system
+    : undefined
+  if (geminiSystem !== undefined) {
+    const parts = isRecord(geminiSystem) && Array.isArray(geminiSystem.parts)
+      ? geminiSystem.parts
+      : Array.isArray(geminiSystem)
+        ? geminiSystem
+        : [geminiSystem]
+    for (const part of parts) {
+      push(prefix, 'system', isRecord(part) && typeof part.text === 'string' ? part.text : part)
+    }
+  } else {
     push(prefix, 'system', body.system ?? body.systemInstruction ?? body.system_instruction)
   }
 
@@ -122,8 +135,6 @@ function projectPromptComposition(body: unknown): SandboxModelRequestPromptCompo
   }
 
   if (Array.isArray(body.contents)) {
-    // Gemini 请求的 contents 轨迹不把 systemInstruction 强行投影为 System；
-    // 否则分析页和轨迹页会展示模型请求体中并不存在的系统提示词。
     for (const content of body.contents) {
       if (!isRecord(content)) continue
       const role: SandboxModelRequestPromptKind = content.role === 'model' ? 'assistant' : 'user'
@@ -206,10 +217,25 @@ function projectRequestMessages(body: unknown, splitToolDefinitions: boolean): P
   const messages = Array.isArray(body.messages)
     ? body.messages.flatMap(projectOpenAiMessage)
     : Array.isArray(body.contents)
-      ? body.contents.flatMap(projectGeminiMessage)
+      ? [...projectGeminiSystem(body), ...body.contents.flatMap(projectGeminiMessage)]
       : []
   const tools = projectToolCatalog(body.tools, splitToolDefinitions)
   return [...tools, ...messages]
+}
+
+function projectGeminiSystem(body: Record<string, unknown>): ProjectedMessage[] {
+  const value = body.systemInstruction ?? body.system_instruction ?? body.system
+  if (value === undefined || value === null) return []
+  const items = isRecord(value) && Array.isArray(value.parts)
+    ? value.parts
+    : Array.isArray(value)
+      ? value
+      : [value]
+  return items.flatMap((item) => {
+    const text = isRecord(item) && typeof item.text === 'string' ? item.text : item
+    const preview = previewValue(text)
+    return preview ? [{ kind: 'system' as const, preview, detail: item }] : []
+  })
 }
 
 function projectOpenAiMessage(value: unknown): ProjectedMessage[] {
