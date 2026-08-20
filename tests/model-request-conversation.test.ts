@@ -143,6 +143,33 @@ describe('模型请求对话视图归一化', () => {
     })
   })
 
+  it('AI SDK 同一消息内的工具结果保持 typed parts 原始顺序', () => {
+    const conversation = parseModelRequestConversation({
+      messages: [{
+        role: 'assistant',
+        parts: [
+          { type: 'text', text: '调用前' },
+          { type: 'tool-result', toolCallId: 'call-2', toolName: 'lookup', output: { type: 'text', value: '工具结果' } },
+          { type: 'text', text: '调用后' },
+        ],
+      }],
+    }, 'ai-sdk')
+
+    expect(conversation.messages.map(({ role, content }) => ({ role, content }))).toEqual([
+      { role: 'assistant', content: '调用前' },
+      { role: 'tool', content: '工具结果' },
+      { role: 'assistant', content: '调用后' },
+    ])
+    expect(conversation.messages[0]).toMatchObject({
+      path: ['messages', '0', 'parts', '0'],
+      raw: { type: 'text', text: '调用前' },
+    })
+    expect(conversation.messages[2]).toMatchObject({
+      path: ['messages', '0', 'parts', '2'],
+      raw: { type: 'text', text: '调用后' },
+    })
+  })
+
   it('保留多个 system 来源、多模态分片和跨字段工具声明的原始顺序', () => {
     const conversation = parseModelRequestConversation({
       system_instruction: '第一条系统约束',
@@ -211,6 +238,26 @@ describe('模型请求对话视图归一化', () => {
       path: ['output', '1'],
       raw: { type: 'function_call_output', call_id: 'call-7', name: 'lookup', output: { ok: true } },
     }])
+  })
+
+  it('SSE 重复快照只保留一条工具结果，且不扫描无关元数据', () => {
+    const response = parseModelRequestConversationDetail(detail({
+      requestBody: { input: '执行工具' },
+      responseBodyStatus: 'complete',
+      responseBodyFormat: 'sse',
+      responseBodyRaw: [
+        'data: {"output":[{"type":"function_call_output","call_id":"call-9","name":"lookup","output":{"ok":true}}],"metadata":{"type":"tool_result","content":"不是模型工具结果"}}',
+        '',
+        'data: {"output":[{"type":"function_call_output","call_id":"call-9","name":"lookup","output":{"ok":true}}]}',
+        '',
+        'data: [DONE]',
+        '',
+      ].join('\n'),
+    })).response
+
+    expect(response?.toolResults).toEqual([
+      expect.objectContaining({ id: 'call-9', name: 'lookup', content: '{\n  "ok": true\n}' }),
+    ])
   })
 
   it('把 pending、不可用、采集错误和损坏 JSON 暴露为可渲染响应状态', () => {

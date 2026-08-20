@@ -5,9 +5,11 @@ import type {
 } from './model-request-conversation'
 
 export type ModelRequestAnalysisGroupKey = 'system' | 'user' | 'assistant' | 'tool' | 'response'
+export type ModelRequestAnalysisItemKind = 'message' | 'tool-call' | 'tool-result' | 'tool-definition' | 'response'
 
 export interface ModelRequestAnalysisNavigationItem {
   id: string
+  kind: ModelRequestAnalysisItemKind
   label: string
   index?: number
   preview: string
@@ -85,6 +87,7 @@ export function buildModelRequestAnalysisNavigation(
     if (message.role === 'assistant') {
       message.toolCalls.forEach((call, callIndex) => add('assistant', {
         id: `message-${message.index}-tool-call-${callIndex}`,
+        kind: 'tool-call',
         label: 'TOOL CALL',
         index: message.index,
         preview: call.name,
@@ -96,6 +99,7 @@ export function buildModelRequestAnalysisNavigation(
 
   conversation.tools.forEach((tool, index) => add('tool', {
     id: `tool-definition-${index}`,
+    kind: 'tool-definition',
     label: 'TOOL DEFS',
     preview: tool.name,
     target: index === 0 ? 'model-analysis-tools' : modelAnalysisToolId(tool.path),
@@ -106,6 +110,7 @@ export function buildModelRequestAnalysisNavigation(
   if (response) {
     add('response', {
       id: 'response',
+      kind: 'response',
       label: '响应',
       preview: compactAnalysisText(response.content.join('\n') || response.statusMessage || '本次响应'),
       target: 'model-analysis-response',
@@ -113,6 +118,7 @@ export function buildModelRequestAnalysisNavigation(
     })
     response.toolCalls.forEach((call, index) => add('response', {
       id: `response-tool-call-${index}`,
+      kind: 'tool-call',
       label: 'TOOL CALL',
       preview: call.name,
       target: modelAnalysisResponseToolCallId(index),
@@ -120,6 +126,7 @@ export function buildModelRequestAnalysisNavigation(
     }))
     response.toolResults.forEach((result, index) => add('response', {
       id: `response-tool-result-${index}`,
+      kind: 'tool-result',
       label: 'TOOL RESULT',
       preview: result.name || result.id || '工具结果',
       target: modelAnalysisResponseToolResultId(index),
@@ -154,18 +161,62 @@ export function resolveAnalysisPromptTarget(
   if (kind === 'tool-definition') {
     return navigation.groups
       .find(group => group.key === 'tool')
-      ?.items.filter(item => item.label === 'TOOL DEFS')[indexInKind]?.target
+      ?.items.filter(item => item.kind === 'tool-definition')[indexInKind]?.target
   }
   if (kind === 'tool-interaction') {
     const interactions = navigation.groups
       .filter(group => group.key !== 'response')
       .flatMap(group => group.items)
-      .filter(item => item.label === 'TOOL CALL' || item.label === 'TOOL RESULT')
+      .filter(item => item.kind === 'tool-call' || item.kind === 'tool-result')
       .sort((left, right) => targetOrder(left.target) - targetOrder(right.target))
     return interactions[indexInKind]?.target
   }
   const group = navigation.groups.find(candidate => candidate.key === kind)
-  return group?.items.filter(item => item.label !== 'TOOL CALL' && item.label !== 'TOOL RESULT')[indexInKind]?.target
+  return group?.items.filter(item => item.kind === 'message')[indexInKind]?.target
+}
+
+export interface ModelAnalysisTargetPreparation {
+  messageIndex?: number
+  response: boolean
+  toolPaths: string[][]
+  expandTargets: string[]
+}
+
+export function prepareModelAnalysisTarget(
+  conversation: ModelRequestConversation,
+  target: string,
+): ModelAnalysisTargetPreparation {
+  const messageTarget = target.match(/^model-analysis-message-(\d+)(?:-tool-call-(\d+))?$/)
+  const messageIndex = messageTarget ? Number(messageTarget[1]) : undefined
+  const hasMessage = messageIndex !== undefined && conversation.messages.some(message => message.index === messageIndex)
+  const tool = conversation.tools.find(candidate => modelAnalysisToolId(candidate.path) === target)
+  return {
+    ...(hasMessage ? { messageIndex } : {}),
+    response: target === 'model-analysis-response' || target.startsWith('model-analysis-response-'),
+    toolPaths: tool ? [tool.path] : [],
+    expandTargets: [target],
+  }
+}
+
+export function resolveToolDefinitionLocation(
+  tools: ModelRequestConversation['tools'],
+  name: string,
+): { target: string, toolPaths: string[][] } | undefined {
+  const matches = tools.filter(tool => tool.name === name)
+  if (!matches.length) return undefined
+  return {
+    target: matches.length === 1 ? modelAnalysisToolId(matches[0]!.path) : 'model-analysis-tools',
+    toolPaths: matches.map(tool => tool.path),
+  }
+}
+
+export function shouldExpandAnalysisText(
+  manuallyExpanded: boolean,
+  forceExpanded: boolean,
+  query: string,
+  value: string,
+): boolean {
+  return manuallyExpanded || forceExpanded || Boolean(query && value.toLocaleLowerCase('zh-CN').includes(query))
 }
 
 export function collapseAnalysisText(
@@ -195,6 +246,7 @@ export function isPreviewableConversationImage(value: string): boolean {
 function messageNavigationItem(message: ModelConversationMessage): ModelRequestAnalysisNavigationItem {
   return {
     id: `message-${message.index}`,
+    kind: message.role === 'tool' ? 'tool-result' : 'message',
     label: message.role === 'tool' ? 'TOOL RESULT' : message.role.toUpperCase(),
     index: message.index,
     preview: compactAnalysisText(message.content || message.reasoning || message.toolCalls[0]?.name || '无文本内容'),

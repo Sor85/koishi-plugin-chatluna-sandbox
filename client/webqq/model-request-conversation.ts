@@ -183,6 +183,18 @@ export function parseModelRequestConversationDetail(detail: SandboxModelRequestD
 
 function collectResponseToolResults(value: unknown): ModelConversationToolResult[] {
   const results: ModelConversationToolResult[] = []
+  const seen = new Set<string>()
+  const evidenceContainers = new Set([
+    'data', 'output', 'outputs', 'content', 'parts', 'candidates', 'choices',
+    'message', 'delta', 'response', 'result', 'results', 'items',
+    'toolResults', 'tool_results',
+  ])
+  const append = (result: ModelConversationToolResult) => {
+    const key = JSON.stringify([result.id ?? '', result.name ?? '', result.content])
+    if (seen.has(key)) return
+    seen.add(key)
+    results.push(result)
+  }
   const visit = (candidate: unknown, path: string[]) => {
     if (Array.isArray(candidate)) {
       candidate.forEach((item, index) => visit(item, [...path, String(index)]))
@@ -191,16 +203,19 @@ function collectResponseToolResults(value: unknown): ModelConversationToolResult
     if (!isRecord(candidate)) return
     if (isRecord(candidate.functionResponse)) {
       const result = candidate.functionResponse
-      results.push(createResponseToolResult(result, [...path, 'functionResponse'], result.response ?? result.output ?? result.result))
+      append(createResponseToolResult(result, [...path, 'functionResponse'], result.response ?? result.output ?? result.result))
       return
     }
     const type = typeof candidate.type === 'string' ? candidate.type.toLowerCase() : ''
     if (type === 'function_call_output' || type === 'tool_result' || type === 'tool-result' || type === 'tool-output') {
       const output = candidate.output ?? candidate.result ?? candidate.content
-      results.push(createResponseToolResult(candidate, path, output))
+      append(createResponseToolResult(candidate, path, output))
       return
     }
-    for (const [key, child] of Object.entries(candidate)) visit(child, [...path, key])
+    // SSE 事件常带累计快照和 metadata；只沿模型输出容器递归，避免重复结果和元数据伪证据。
+    for (const [key, child] of Object.entries(candidate)) {
+      if (evidenceContainers.has(key)) visit(child, [...path, key])
+    }
   }
   visit(value, [])
   return results
@@ -284,18 +299,60 @@ function projectAiSdkMessage(
   push: (message: Omit<ModelConversationMessage, 'index' | 'searchText'>) => void,
 ) {
   const role = typeof value.role === 'string' ? value.role.toLowerCase() : 'user'
-  const contentParts: ModelConversationContentPart[] = []
-  const reasoning: string[] = []
-  const toolCalls: ModelConversationToolCall[] = []
-  const toolResults: Array<{ raw: Record<string, unknown>, path: string[], content: string, toolCallId?: string }> = []
+  const messageRole: ModelConversationRole = role === 'assistant'
+    ? 'assistant'
+    : role === 'system'
+      ? 'system'
+      : role === 'tool'
+        ? 'tool'
+        : 'user'
+  let contentParts: ModelConversationContentPart[] = []
+  let reasoning: string[] = []
+  let toolCalls: ModelConversationToolCall[] = []
+  let rawParts: unknown[] = []
+  let segmentStart = 0
+
+  const flushSegment = () => {
+    if (!contentParts.length && !reasoning.length && !toolCalls.length) return
+    push(createMessage(
+      messageRole,
+      semanticContent(contentParts),
+      contentParts,
+      [...path, 'parts', String(segmentStart)],
+      rawParts.length === 1 ? rawParts[0] : rawParts,
+      reasoning.join('\n'),
+      toolCalls,
+    ))
+    contentParts = []
+    reasoning = []
+    toolCalls = []
+    rawParts = []
+  }
 
   for (const [partIndex, part] of (value.parts as unknown[]).entries()) {
+    if (!rawParts.length) segmentStart = partIndex
+    const partPath = [...path, 'parts', String(partIndex)]
     if (!isRecord(part)) {
+      rawParts.push(part)
       contentParts.push(...normalizeParts(part))
       continue
     }
-    const partPath = [...path, 'parts', String(partIndex)]
     const type = typeof part.type === 'string' ? part.type.toLowerCase() : ''
+    if (type === 'tool-result' || type === 'tool-output') {
+      // typed parts 是有序证据流；工具结果前后必须冲刷语义片段，不能统一移到消息首尾。
+      flushSegment()
+      const output = part.output ?? part.result ?? part.content
+      const toolCallId = typeof part.toolCallId === 'string'
+        ? part.toolCallId
+        : typeof part.tool_call_id === 'string'
+          ? part.tool_call_id
+          : undefined
+      const content = normalizeAiSdkToolOutput(output)
+      push(createMessage('tool', content, content, partPath, part, undefined, [], toolCallId))
+      continue
+    }
+
+    rawParts.push(part)
     if (type === 'reasoning' || type === 'reasoning-part') {
       if (typeof part.text === 'string' && part.text) reasoning.push(part.text)
       continue
@@ -312,33 +369,10 @@ function projectAiSdkMessage(
       })
       continue
     }
-    if (type === 'tool-result' || type === 'tool-output') {
-      const output = part.output ?? part.result ?? part.content
-      toolResults.push({
-        raw: part,
-        path: partPath,
-        content: normalizeAiSdkToolOutput(output),
-        ...(typeof part.toolCallId === 'string' ? { toolCallId: part.toolCallId } : typeof part.tool_call_id === 'string' ? { toolCallId: part.tool_call_id } : {}),
-      })
-      continue
-    }
     contentParts.push(...normalizeParts([part]))
   }
 
-  for (const result of toolResults) {
-    push(createMessage('tool', result.content, result.content, result.path, result.raw, undefined, [], result.toolCallId))
-  }
-  if (role !== 'tool' && (contentParts.length || reasoning.length || toolCalls.length)) {
-    push(createMessage(
-      role === 'assistant' ? 'assistant' : role === 'system' ? 'system' : 'user',
-      semanticContent(contentParts),
-      contentParts,
-      path,
-      value,
-      reasoning.join('\n'),
-      toolCalls,
-    ))
-  }
+  flushSegment()
 }
 
 function projectGeminiMessage(

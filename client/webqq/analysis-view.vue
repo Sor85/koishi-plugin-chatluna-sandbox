@@ -126,18 +126,21 @@
                 v-if="message.contentParts.length"
                 :parts="message.contentParts"
                 :search-query="normalizedSearch"
+                :force-expanded="expandedTextTargets.has(modelAnalysisMessageId(message.index))"
               />
               <AnalysisTextBlock
                 v-else-if="message.content"
                 label="内容"
                 :value="message.content"
                 :search-query="normalizedSearch"
+                :force-expanded="expandedTextTargets.has(modelAnalysisMessageId(message.index))"
               />
               <AnalysisTextBlock
                 v-if="message.reasoning"
                 label="思考"
                 :value="message.reasoning"
                 :search-query="normalizedSearch"
+                :force-expanded="expandedTextTargets.has(modelAnalysisMessageId(message.index))"
               />
               <section v-if="message.toolCalls.length" class="webqq-model-analysis-section">
                 <strong>工具调用</strong>
@@ -149,9 +152,14 @@
                   :class="{ 'is-located': highlightedTarget === modelAnalysisToolCallId(message.index, callIndex) }"
                 >
                   <div><strong><AnalysisHighlightedText :value="call.name" :query="normalizedSearch" /></strong><span><AnalysisHighlightedText :value="call.id || '无调用 ID'" :query="normalizedSearch" /></span></div>
-                  <AnalysisTextBlock :value="call.arguments || '{}'" :search-query="normalizedSearch" compact />
+                  <AnalysisTextBlock
+                    :value="call.arguments || '{}'"
+                    :search-query="normalizedSearch"
+                    :force-expanded="expandedTextTargets.has(modelAnalysisToolCallId(message.index, callIndex))"
+                    compact
+                  />
                   <button
-                    v-if="findTool(call.name)"
+                    v-if="hasTool(call.name)"
                     type="button"
                     class="webqq-model-analysis-link"
                     @click="locateTool(call.name)"
@@ -216,12 +224,14 @@
                 label="思考"
                 :value="response.reasoning.join('\n')"
                 :search-query="normalizedSearch"
+                :force-expanded="expandedTextTargets.has('model-analysis-response')"
               />
               <AnalysisTextBlock
                 v-if="response.content.length"
                 label="内容"
                 :value="response.content.join('\n')"
                 :search-query="normalizedSearch"
+                :force-expanded="expandedTextTargets.has('model-analysis-response')"
               />
               <section v-if="response.toolCalls.length" class="webqq-model-analysis-section">
                 <strong>工具调用</strong>
@@ -233,8 +243,13 @@
                   :class="{ 'is-located': highlightedTarget === modelAnalysisResponseToolCallId(callIndex) }"
                 >
                   <div><strong><AnalysisHighlightedText :value="call.name" :query="normalizedSearch" /></strong><span><AnalysisHighlightedText :value="call.id || '无调用 ID'" :query="normalizedSearch" /></span></div>
-                  <AnalysisTextBlock :value="call.arguments || '{}'" :search-query="normalizedSearch" compact />
-                  <button v-if="findTool(call.name)" type="button" class="webqq-model-analysis-link" @click="locateTool(call.name)">
+                  <AnalysisTextBlock
+                    :value="call.arguments || '{}'"
+                    :search-query="normalizedSearch"
+                    :force-expanded="expandedTextTargets.has(modelAnalysisResponseToolCallId(callIndex))"
+                    compact
+                  />
+                  <button v-if="hasTool(call.name)" type="button" class="webqq-model-analysis-link" @click="locateTool(call.name)">
                     查看工具定义
                   </button>
                 </article>
@@ -249,7 +264,12 @@
                   :class="{ 'is-located': highlightedTarget === modelAnalysisResponseToolResultId(resultIndex) }"
                 >
                   <div><strong><AnalysisHighlightedText :value="result.name || '工具结果'" :query="normalizedSearch" /></strong><span><AnalysisHighlightedText :value="result.id || '无调用 ID'" :query="normalizedSearch" /></span></div>
-                  <AnalysisTextBlock :value="result.content" :search-query="normalizedSearch" compact />
+                  <AnalysisTextBlock
+                    :value="result.content"
+                    :search-query="normalizedSearch"
+                    :force-expanded="expandedTextTargets.has(modelAnalysisResponseToolResultId(resultIndex))"
+                    compact
+                  />
                 </article>
               </section>
               <div v-if="response.finishReasons.length || response.usage" class="webqq-model-analysis-response-meta">
@@ -301,6 +321,7 @@
                   :search-query="normalizedSearch"
                   :threshold="1200"
                   :preview-length="600"
+                  :force-expanded="expandedTextTargets.has(modelAnalysisToolId(tool.path))"
                   compact
                 />
               </div>
@@ -338,7 +359,10 @@ import {
   modelAnalysisToolCallId,
   modelAnalysisToolId,
   normalizeAnalysisQuery,
+  prepareModelAnalysisTarget,
   resolveAnalysisPromptTarget,
+  resolveToolDefinitionLocation,
+  shouldExpandAnalysisText,
   type ModelRequestAnalysisGroupKey,
   type ModelRequestAnalysisNavigationItem,
 } from './model-request-analysis'
@@ -373,7 +397,7 @@ const navigation = computed(() => buildModelRequestAnalysisNavigation(conversati
 const visibleNavigationGroups = computed(() => navigation.value.groups.flatMap((group) => {
   if (props.requestsCollapsed && group.key !== 'response') return []
   const items = props.toolsCollapsed
-    ? group.items.filter(item => item.label !== 'TOOL CALL' && item.label !== 'TOOL RESULT' && item.label !== 'TOOL DEFS')
+    ? group.items.filter(item => item.kind !== 'tool-call' && item.kind !== 'tool-result' && item.kind !== 'tool-definition')
     : group.items
   return items.length ? [{ ...group, count: items.length, items }] : []
 }))
@@ -381,6 +405,7 @@ const rawRequest = ref(false)
 const responseRaw = ref(false)
 const rawMessages = ref(new Set<number>())
 const expandedTools = ref(new Set<string>())
+const expandedTextTargets = ref(new Set<string>())
 const contentElement = ref<HTMLElement>()
 const highlightedTarget = ref('')
 const conversationScrollTop = ref(0)
@@ -419,6 +444,7 @@ watch(() => props.detail.id, (next, previous) => {
   responseRaw.value = false
   rawMessages.value = new Set()
   expandedTools.value = new Set()
+  expandedTextTargets.value = new Set()
   highlightedTarget.value = ''
   if (contentElement.value) contentElement.value.scrollTop = 0
 })
@@ -438,8 +464,9 @@ function messageMatches(message: ModelConversationMessage) {
 async function jumpTo(target?: string, emphasize = true) {
   if (!target) return
   rawRequest.value = false
-  prepareTarget(target)
+  const forcedTargets = prepareTarget(target)
   await nextTick()
+  expandedTextTargets.value = new Set([...expandedTextTargets.value].filter(candidate => !forcedTargets.includes(candidate)))
   const element = findTarget(target)
   element?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   if (emphasize) emphasizeTarget(target)
@@ -447,11 +474,14 @@ async function jumpTo(target?: string, emphasize = true) {
 }
 
 function prepareTarget(target: string) {
-  const tool = conversation.value.tools.find(candidate => modelAnalysisToolId(candidate.path) === target)
-  if (tool) expandTool(tool.path.join('.'))
-  const message = conversation.value.messages.find(candidate => target.startsWith(modelAnalysisMessageId(candidate.index)))
-  if (message && rawMessages.value.has(message.index)) toggleRaw(message.index)
-  if (target.startsWith('model-analysis-response') && responseRaw.value) responseRaw.value = false
+  const preparation = prepareModelAnalysisTarget(conversation.value, target)
+  for (const path of preparation.toolPaths) expandTool(path.join('.'))
+  if (preparation.messageIndex !== undefined && rawMessages.value.has(preparation.messageIndex)) {
+    toggleRaw(preparation.messageIndex)
+  }
+  if (preparation.response && responseRaw.value) responseRaw.value = false
+  expandedTextTargets.value = new Set([...expandedTextTargets.value, ...preparation.expandTargets])
+  return preparation.expandTargets
 }
 
 function findTarget(target: string): HTMLElement | null {
@@ -468,12 +498,14 @@ function emphasizeTarget(target: string) {
 }
 
 function locateTool(name: string) {
-  const tool = findTool(name)
-  if (tool) jumpTo(modelAnalysisToolId(tool.path))
+  const location = resolveToolDefinitionLocation(conversation.value.tools, name)
+  if (!location) return
+  for (const path of location.toolPaths) expandTool(path.join('.'))
+  void jumpTo(location.target)
 }
 
-function findTool(name: string) {
-  return conversation.value.tools.find(tool => tool.name === name)
+function hasTool(name: string) {
+  return conversation.value.tools.some(tool => tool.name === name)
 }
 
 function toggleRawRequest() {
@@ -505,6 +537,7 @@ function toggleTool(path: string) {
   expandedTools.value = next
 }
 
+// 工具摘要同时允许复制文本；拖选结束会触发 click，必须区分位移和折叠操作，避免选中文字时意外收起卡片。
 function startToolPointer(event: PointerEvent) {
   pointerStart = { x: event.clientX, y: event.clientY }
   suppressToolSummary = false
@@ -581,6 +614,7 @@ const AnalysisTextBlock = defineComponent({
     searchQuery: { type: String, default: '' },
     threshold: { type: Number, default: 1200 },
     previewLength: { type: Number, default: 600 },
+    forceExpanded: Boolean,
     compact: Boolean,
   },
   setup(blockProps) {
@@ -593,9 +627,13 @@ const AnalysisTextBlock = defineComponent({
     ))
     const collapsible = computed(() => collapsed.value.collapsible)
     const visible = computed(() => collapsed.value.text)
-    watch(() => blockProps.searchQuery, (query) => {
-      if (query && blockProps.value.toLocaleLowerCase('zh-CN').includes(query)) expanded.value = true
-    }, { immediate: true })
+    watch(
+      [() => blockProps.searchQuery, () => blockProps.forceExpanded],
+      ([query, forceExpanded]) => {
+        if (shouldExpandAnalysisText(expanded.value, forceExpanded, query, blockProps.value)) expanded.value = true
+      },
+      { immediate: true },
+    )
     return () => h('section', {
       class: ['webqq-model-analysis-section', { 'is-collapsed': collapsible.value && !expanded.value, 'is-compact': blockProps.compact }],
     }, [
@@ -616,6 +654,7 @@ const AnalysisContentParts = defineComponent({
   props: {
     parts: { type: Array as () => ModelConversationContentPart[], required: true },
     searchQuery: { type: String, default: '' },
+    forceExpanded: Boolean,
   },
   setup(contentProps) {
     const failedImages = ref(new Set<number>())
@@ -639,6 +678,7 @@ const AnalysisContentParts = defineComponent({
         label,
         value: part.value,
         searchQuery: contentProps.searchQuery,
+        forceExpanded: contentProps.forceExpanded,
       })
     }))
   },

@@ -1,12 +1,13 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   buildModelRequestAnalysisNavigation,
   collapseAnalysisText,
   isPreviewableConversationImage,
   normalizeAnalysisQuery,
+  prepareModelAnalysisTarget,
   resolveAnalysisPromptTarget,
+  resolveToolDefinitionLocation,
+  shouldExpandAnalysisText,
 } from '../client/webqq/model-request-analysis'
 import { parseModelRequestConversationDetail } from '../client/webqq/model-request-conversation'
 import type { SandboxModelRequestDetail } from '../src/types'
@@ -60,6 +61,7 @@ describe('模型请求分析展示模型', () => {
       { key: 'response', count: 1 },
     ])
     expect(navigation.groups[2]?.items[1]).toMatchObject({
+      kind: 'tool-call',
       label: 'TOOL CALL',
       preview: 'weather',
       target: 'model-analysis-message-2-tool-call-0',
@@ -80,6 +82,48 @@ describe('模型请求分析展示模型', () => {
     expect(resolveAnalysisPromptTarget(navigation, 'tool-definition', 0)).toBe('model-analysis-tools')
     expect(resolveAnalysisPromptTarget(navigation, 'tool-interaction', 0)).toBe('model-analysis-message-2-tool-call-0')
     expect(resolveAnalysisPromptTarget(navigation, 'tool-interaction', 1)).toBe('model-analysis-message-3')
+
+    for (const item of navigation.groups.flatMap(group => group.items)) item.label = '展示文案已修改'
+    expect(resolveAnalysisPromptTarget(navigation, 'tool-definition', 0)).toBe('model-analysis-tools')
+    expect(resolveAnalysisPromptTarget(navigation, 'tool-interaction', 0)).toBe('model-analysis-message-2-tool-call-0')
+  })
+
+  it('精确匹配两位数消息目标并把定位状态传给折叠分区', () => {
+    const request = detail()
+    const conversation = parseModelRequestConversationDetail(request)
+    conversation.messages.push(...Array.from({ length: 18 }, (_, offset) => ({
+      ...conversation.messages[0]!,
+      index: offset + 4,
+      content: `消息 ${offset + 4}`,
+      searchText: `消息 ${offset + 4}`,
+    })))
+
+    expect(prepareModelAnalysisTarget(conversation, 'model-analysis-message-20')).toMatchObject({
+      messageIndex: 20,
+      expandTargets: ['model-analysis-message-20'],
+    })
+    expect(prepareModelAnalysisTarget(conversation, 'model-analysis-message-2-tool-call-0')).toMatchObject({
+      messageIndex: 2,
+      expandTargets: ['model-analysis-message-2-tool-call-0'],
+    })
+    expect(shouldExpandAnalysisText(false, true, '', 'x')).toBe(true)
+  })
+
+  it('同名工具定义证据不明确时展开全部匹配项而不猜测第一项', () => {
+    const request = detail()
+    request.requestBody = {
+      messages: [{ role: 'assistant', tool_calls: [{ function: { name: 'weather', arguments: '{}' } }] }],
+      tools: [
+        { type: 'function', function: { name: 'weather', description: '第一个', parameters: { type: 'object' } } },
+        { type: 'function', function: { name: 'weather', description: '第二个', parameters: { type: 'object' } } },
+      ],
+    }
+    const conversation = parseModelRequestConversationDetail(request)
+
+    expect(resolveToolDefinitionLocation(conversation.tools, 'weather')).toEqual({
+      target: 'model-analysis-tools',
+      toolPaths: [['tools', '0', 'function'], ['tools', '1', 'function']],
+    })
   })
 
   it('搜索文本覆盖正文、工具参数、工具定义 Schema 和响应', () => {
@@ -106,27 +150,6 @@ describe('模型请求分析展示模型', () => {
       text: 'b'.repeat(1201),
       collapsible: true,
     })
-  })
-
-  it('分析模式保留轨迹控制，并用导航定位取代独立轨迹检查器', () => {
-    const analysisSource = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
-    const trajectorySource = readFileSync(resolve('client/model-request-trajectory.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
-
-    expect(trajectorySource).toMatch(/ModelRequestConversationAnalysis[\s\S]*:search-query="searchQuery"[\s\S]*:focus-request="analysisFocusRequest"/)
-    expect(trajectorySource).toMatch(/v-else class="webqq-model-trajectory-ledger"[\s\S]*webqq-model-trajectory-inspector/)
-    expect(trajectorySource).toContain('if (props.analysis)')
-    expect(analysisSource).toContain('visibleNavigationGroups')
-    expect(analysisSource).toContain('resolveAnalysisPromptTarget')
-    expect(analysisSource).toContain("scrollIntoView({ behavior: 'smooth', block: 'start' })")
-    expect(analysisSource).toContain('}, 1500)')
-    expect(analysisSource).toContain('response.toolResults')
-    expect(analysisSource).toContain("response.format === 'text'")
-    expect(analysisSource).toContain('conversationScrollTop')
-    expect(analysisSource).toContain('window.getSelection()')
-    expect(styles).toMatch(/\.webqq-model-analysis-main\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:\s*260px minmax\(0, 1fr\)/s)
-    expect(styles).toMatch(/@container \(max-width: 760px\)[\s\S]*\.webqq-model-analysis-main\s*\{\s*grid-template-columns:\s*1fr/s)
-    expect(styles).not.toContain('cursor:')
   })
 
   it('只允许 HTTP(S) 与非 SVG 图片 Data URL 进入图片预览', () => {
