@@ -1,10 +1,24 @@
 .chatluna-sandbox-chat.webqq-model-request-workspace {
+  /* 组成图、轨迹台账、分析页卡片、请求页响应分段共用。不要再给分析页单独开色板。 */
+  --webqq-role-system: #737985;
+  --webqq-role-user: #2f76c9;
+  --webqq-role-assistant: #a13d76;
+  --webqq-role-tool: #c46b00;
+  --webqq-role-tool-interaction: #8f5aa8;
   grid-template-rows: auto auto minmax(0, 1fr);
   gap: 16px;
   min-width: 0;
   overflow: hidden;
   padding: 24px;
   background: var(--webqq-bg);
+}
+
+.webqq-workspace[data-color-mode="dark"] .chatluna-sandbox-chat.webqq-model-request-workspace {
+  --webqq-role-system: #a3a8b2;
+  --webqq-role-user: #6aa9ef;
+  --webqq-role-assistant: #dd79b2;
+  --webqq-role-tool: #bf812f;
+  --webqq-role-tool-interaction: #a87bb8;
 }
 
 .webqq-model-request-header,
@@ -524,11 +538,6 @@
 .webqq-model-trajectory {
   --webqq-trajectory-request: #2f76c9;
   --webqq-trajectory-context: #008f75;
-  --webqq-trajectory-system: #737985;
-  --webqq-trajectory-user: #2f76c9;
-  --webqq-trajectory-assistant: #a13d76;
-  --webqq-trajectory-tool: #c46b00;
-  --webqq-trajectory-tool-interaction: #8f5aa8;
   --webqq-trajectory-layer: color-mix(in srgb, var(--webqq-surface-muted) 64%, var(--webqq-surface));
   display: grid;
   min-height: 0;
@@ -542,11 +551,6 @@
 .webqq-workspace[data-color-mode="dark"] .webqq-model-trajectory {
   --webqq-trajectory-request: #4d8ed3;
   --webqq-trajectory-context: #319979;
-  --webqq-trajectory-system: #a3a8b2;
-  --webqq-trajectory-user: #6aa9ef;
-  --webqq-trajectory-assistant: #dd79b2;
-  --webqq-trajectory-tool: #bf812f;
-  --webqq-trajectory-tool-interaction: #a87bb8;
 }
 
 .webqq-model-request-view-switch,
@@ -682,23 +686,23 @@
   padding: 0;
   border: 0;
   border-radius: 1px;
-  background: var(--webqq-trajectory-system);
+  background: var(--webqq-role-system);
 }
 
 .webqq-model-trajectory-composition-bar.is-user {
-  background: var(--webqq-trajectory-user);
+  background: var(--webqq-role-user);
 }
 
 .webqq-model-trajectory-composition-bar.is-assistant {
-  background: var(--webqq-trajectory-assistant);
+  background: var(--webqq-role-assistant);
 }
 
 .webqq-model-trajectory-composition-bar.is-tool-definition {
-  background: var(--webqq-trajectory-tool);
+  background: var(--webqq-role-tool);
 }
 
 .webqq-model-trajectory-composition-bar.is-tool-interaction {
-  background: var(--webqq-trajectory-tool-interaction);
+  background: var(--webqq-role-tool-interaction);
 }
 
 .webqq-model-trajectory-composition-bar.is-selected {
@@ -934,22 +938,28 @@
 }
 
 .webqq-model-trajectory-row.is-system .webqq-model-trajectory-kind {
-  color: var(--webqq-trajectory-system);
+  color: var(--webqq-role-system);
+  background: color-mix(in srgb, var(--webqq-role-system) 12%, var(--webqq-surface));
 }
 
 .webqq-model-trajectory-row.is-user .webqq-model-trajectory-kind {
-  color: var(--webqq-trajectory-user);
-  background: color-mix(in srgb, var(--webqq-trajectory-user) 12%, var(--webqq-surface));
+  color: var(--webqq-role-user);
+  background: color-mix(in srgb, var(--webqq-role-user) 12%, var(--webqq-surface));
 }
 
 .webqq-model-trajectory-row.is-assistant .webqq-model-trajectory-kind {
-  color: var(--webqq-trajectory-assistant);
-  background: color-mix(in srgb, var(--webqq-trajectory-assistant) 12%, var(--webqq-surface));
+  color: var(--webqq-role-assistant);
+  background: color-mix(in srgb, var(--webqq-role-assistant) 12%, var(--webqq-surface));
 }
 
 .webqq-model-trajectory-row.is-tool .webqq-model-trajectory-kind {
-  color: var(--webqq-trajectory-tool);
-  background: color-mix(in srgb, var(--webqq-trajectory-tool) 13%, var(--webqq-surface));
+  color: var(--webqq-role-tool-interaction);
+  background: color-mix(in srgb, var(--webqq-role-tool-interaction) 13%, var(--webqq-surface));
+}
+
+.webqq-model-trajectory-row.is-tool-definition .webqq-model-trajectory-kind {
+  color: var(--webqq-role-tool);
+  background: color-mix(in srgb, var(--webqq-role-tool) 13%, var(--webqq-surface));
 }
 
 .webqq-model-trajectory-preview {
@@ -1097,16 +1107,13 @@
   background: var(--webqq-panel);
 }
 
-.webqq-model-response-section.is-content {
-  border-left-color: #2563eb;
-}
-
+.webqq-model-response-section.is-content,
 .webqq-model-response-section.is-reasoning {
-  border-left-color: #8b5cf6;
+  border-left-color: var(--webqq-role-assistant);
 }
 
 .webqq-model-response-section.is-tools {
-  border-left-color: #d97706;
+  border-left-color: var(--webqq-role-tool-interaction);
 }
 
 .webqq-model-response-section > header {
@@ -1170,18 +1177,6 @@
   gap: 6px 16px;
   color: var(--webqq-muted);
   font-size: 12px;
-}
-
-.webqq-workspace[data-color-mode="dark"] .webqq-model-response-section.is-content {
-  border-left-color: #60a5fa;
-}
-
-.webqq-workspace[data-color-mode="dark"] .webqq-model-response-section.is-reasoning {
-  border-left-color: #a78bfa;
-}
-
-.webqq-workspace[data-color-mode="dark"] .webqq-model-response-section.is-tools {
-  border-left-color: #fbbf24;
 }
 
 .webqq-model-request-response-raw {
@@ -1458,11 +1453,6 @@
 }
 
 .webqq-model-analysis {
-  --webqq-model-analysis-system: #7c3aed;
-  --webqq-model-analysis-user: #2563eb;
-  --webqq-model-analysis-assistant: #16855b;
-  --webqq-model-analysis-tool: #c46b00;
-  --webqq-model-analysis-response: #0891b2;
   min-width: 0;
 }
 
@@ -1554,8 +1544,13 @@
   align-items: center;
 }
 
+.webqq-model-analysis-nav-group { --webqq-role: var(--webqq-role-system); }
+.webqq-model-analysis-nav-group.is-user { --webqq-role: var(--webqq-role-user); }
+.webqq-model-analysis-nav-group.is-assistant,
+.webqq-model-analysis-nav-group.is-response { --webqq-role: var(--webqq-role-assistant); }
+.webqq-model-analysis-nav-group.is-tool { --webqq-role: var(--webqq-role-tool); }
 .webqq-model-analysis-nav-heading { justify-content: flex-start; gap: 6px; padding: 3px 4px; }
-.webqq-model-analysis-nav-heading svg { flex: 0 0 auto; color: var(--webqq-accent); }
+.webqq-model-analysis-nav-heading svg { flex: 0 0 auto; color: var(--webqq-role); }
 .webqq-model-analysis-nav-heading small { margin-left: auto; color: var(--webqq-muted); }
 .webqq-model-analysis-nav-item {
   gap: 7px;
@@ -1574,7 +1569,18 @@
 .webqq-model-analysis-nav-item:focus-visible { background: var(--webqq-hover); }
 .webqq-model-analysis-nav-index { flex: 0 0 auto; color: var(--webqq-muted); font-variant-numeric: tabular-nums; }
 .webqq-model-analysis-nav-preview { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.webqq-model-analysis-nav-kind { flex: 0 0 auto; padding: 3px 5px; border-radius: 4px; color: var(--webqq-accent); background: var(--webqq-surface); font-weight: 650; }
+.webqq-model-analysis-nav-kind {
+  flex: 0 0 auto;
+  padding: 3px 5px;
+  border-radius: 4px;
+  color: var(--webqq-role);
+  background: color-mix(in srgb, var(--webqq-role) 12%, var(--webqq-surface));
+  font-weight: 650;
+}
+.webqq-model-analysis-nav-kind.is-tool-call,
+.webqq-model-analysis-nav-kind.is-tool-result { --webqq-role: var(--webqq-role-tool-interaction); }
+.webqq-model-analysis-nav-kind.is-tool-definition { --webqq-role: var(--webqq-role-tool); }
+.webqq-model-analysis-nav-kind.is-response { --webqq-role: var(--webqq-role-assistant); }
 .webqq-model-analysis-nav-group.is-muted, .webqq-model-analysis-nav-item.is-muted, .webqq-model-analysis-card.is-muted { opacity: 0.2; }
 
 .webqq-model-analysis-content,
@@ -1587,17 +1593,19 @@
 
 .webqq-model-analysis-card,
 .webqq-model-analysis-tool-card {
+  --webqq-role: var(--webqq-role-system);
   overflow: hidden;
   border: 1px solid var(--webqq-border);
-  border-top: 2px solid var(--webqq-model-analysis-system);
+  border-top: 2px solid var(--webqq-role);
   border-radius: 8px;
   background: var(--webqq-surface);
   scroll-margin-top: 12px;
 }
-.webqq-model-analysis-card.is-user { border-top-color: var(--webqq-model-analysis-user); }
-.webqq-model-analysis-card.is-assistant { border-top-color: var(--webqq-model-analysis-assistant); }
-.webqq-model-analysis-card.is-tool { border-top-color: var(--webqq-model-analysis-tool); }
-.webqq-model-analysis-card.is-response { border-top-color: var(--webqq-model-analysis-response); }
+.webqq-model-analysis-card.is-user { --webqq-role: var(--webqq-role-user); }
+.webqq-model-analysis-card.is-assistant,
+.webqq-model-analysis-card.is-response { --webqq-role: var(--webqq-role-assistant); }
+.webqq-model-analysis-card.is-tool { --webqq-role: var(--webqq-role-tool-interaction); }
+.webqq-model-analysis-tool-card { --webqq-role: var(--webqq-role-tool); }
 .webqq-model-analysis-card.is-located,
 .webqq-model-analysis-tool-card.is-located,
 .webqq-model-analysis-tools.is-located,
@@ -1610,7 +1618,15 @@
 .webqq-model-analysis-card.is-collapsed > header { border-bottom: 0; }
 .webqq-model-analysis-collapse svg { transition: transform 160ms ease; }
 .webqq-model-analysis-card:not(.is-collapsed) .webqq-model-analysis-collapse svg { transform: rotate(180deg); }
-.webqq-model-analysis-role { padding: 4px 8px; border-radius: 6px; color: var(--webqq-accent); background: var(--webqq-surface-muted); font-size: 11px; font-weight: 700; text-transform: lowercase; }
+.webqq-model-analysis-role {
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: var(--webqq-role);
+  background: color-mix(in srgb, var(--webqq-role) 12%, var(--webqq-surface));
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: lowercase;
+}
 .webqq-model-analysis-index, .webqq-model-analysis-path, .webqq-model-analysis-chars { color: var(--webqq-muted); font-size: 11px; }
 .webqq-model-analysis-path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .webqq-model-analysis-chars { margin-left: auto; padding: 4px 8px; border: 1px solid var(--webqq-border); border-radius: 999px; }
@@ -1632,7 +1648,15 @@
 .webqq-model-analysis-expand svg { flex-shrink: 0; transition: transform 160ms ease; }
 .webqq-model-analysis-section:not(.is-collapsed) .webqq-model-analysis-expand svg { transform: rotate(180deg); }
 .webqq-model-analysis-tool-call { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--webqq-border); border-radius: 6px; background: var(--webqq-surface-muted); }
+.webqq-model-analysis-tool-call.is-call,
+.webqq-model-analysis-tool-call.is-result {
+  --webqq-role: var(--webqq-role-tool-interaction);
+  border-top-width: 2px;
+  border-top-color: var(--webqq-role);
+}
 .webqq-model-analysis-tool-call > div { justify-content: space-between; gap: 12px; }
+.webqq-model-analysis-tool-call.is-call > div > strong,
+.webqq-model-analysis-tool-call.is-result > div > strong { color: var(--webqq-role); }
 .webqq-model-analysis-tool-call span { color: var(--webqq-muted); font-size: 11px; }
 .webqq-model-analysis-link { width: max-content; padding: 0; border: 0; color: var(--webqq-accent); background: transparent; font-size: 11px; text-decoration: underline; }
 .webqq-model-analysis-response-meta { gap: 16px; padding: 10px 16px; border-top: 1px solid var(--webqq-border); color: var(--webqq-muted); font-size: 11px; }
@@ -1691,7 +1715,6 @@
 .webqq-model-analysis-response-heading h3 { margin: 0; color: var(--webqq-text); font-size: 16px; }
 
 .webqq-model-analysis-tools { display: grid; gap: 10px; padding-top: 4px; scroll-margin-top: 12px; }
-.webqq-model-analysis-tool-card { border-top-width: 1px; }
 .webqq-model-analysis-tool-summary { gap: 8px; width: 100%; min-height: 44px; padding: 8px 12px; border: 0; color: var(--webqq-text); background: transparent; font: inherit; text-align: left; user-select: text; }
 .webqq-model-analysis-tool-summary:hover,
 .webqq-model-analysis-tool-summary:focus-visible { background: var(--webqq-hover); }
@@ -1701,8 +1724,8 @@
   width: 18px;
   height: 18px;
 }
-.webqq-model-analysis-tool-summary > svg:first-child { color: #0891b2; }
-.webqq-model-analysis-tool-summary > strong { flex: 0 0 auto; color: #087c9f; font-family: "JetBrains Mono", ui-monospace, monospace; }
+.webqq-model-analysis-tool-summary > svg:first-child { color: var(--webqq-role); }
+.webqq-model-analysis-tool-summary > strong { flex: 0 0 auto; color: var(--webqq-role); font-family: "JetBrains Mono", ui-monospace, monospace; }
 .webqq-model-analysis-tool-summary > span { min-width: 0; overflow: hidden; color: var(--webqq-muted); text-overflow: ellipsis; white-space: nowrap; }
 .webqq-model-analysis-tool-summary > small { margin-left: auto; color: var(--webqq-muted); white-space: nowrap; }
 .webqq-model-analysis-tool-card.is-expanded .webqq-model-analysis-tool-summary > svg:last-child { transform: rotate(180deg); }
@@ -1713,14 +1736,6 @@
 .webqq-model-analysis-tool-schema.webqq-model-request-json-viewer {
   min-height: 0;
   padding: 12px;
-}
-
-.webqq-workspace[data-color-mode="dark"] .webqq-model-analysis {
-  --webqq-model-analysis-system: #c4b5fd;
-  --webqq-model-analysis-user: #60a5fa;
-  --webqq-model-analysis-assistant: #4ade80;
-  --webqq-model-analysis-tool: #fbbf24;
-  --webqq-model-analysis-response: #22d3ee;
 }
 
 @container (max-width: 680px) {

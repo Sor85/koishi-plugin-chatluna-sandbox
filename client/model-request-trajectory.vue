@@ -149,6 +149,7 @@
               class="webqq-model-trajectory-row"
               :class="[
                 `is-${row.kind}`,
+                row.toolEvent === 'definition' ? 'is-tool-definition' : '',
                 {
                   'is-selected': row.id === selectedRowId,
                   'is-search-muted': isRowSearchMuted(row),

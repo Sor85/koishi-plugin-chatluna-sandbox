@@ -179,6 +179,32 @@ describe('模型请求分析展示模型', () => {
     expect(exceedsAnalysisLineLimit(12 * 22.1 + 1, 22.1)).toBe(true)
   })
 
+  it('分析页、组成图、轨迹台账和响应分段共用角色色', () => {
+    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
+    const trajectory = readFileSync(resolve('client/model-request-trajectory.vue'), 'utf8')
+
+    expect(styles).toContain('--webqq-role-system: #737985')
+    expect(styles).toContain('--webqq-role-user: #2f76c9')
+    expect(styles).toContain('--webqq-role-assistant: #a13d76')
+    expect(styles).toContain('--webqq-role-tool: #c46b00')
+    expect(styles).toContain('--webqq-role-tool-interaction: #8f5aa8')
+    expect(styles).not.toContain('--webqq-model-analysis-system')
+    expect(styles).not.toContain('#087c9f')
+    expect(styles).not.toContain('#0891b2')
+    expect(styles).toContain('.webqq-model-analysis-card.is-response { --webqq-role: var(--webqq-role-assistant); }')
+    expect(styles).toContain('.webqq-model-analysis-card.is-tool { --webqq-role: var(--webqq-role-tool-interaction); }')
+    expect(styles).toContain('.webqq-model-analysis-tool-card { --webqq-role: var(--webqq-role-tool); }')
+    expect(styles).toContain('color: var(--webqq-role);')
+    expect(styles).toContain('.webqq-model-trajectory-row.is-tool-definition .webqq-model-trajectory-kind')
+    expect(view).toContain('class="webqq-model-analysis-nav-group"')
+    expect(view).toContain('`is-${group.key}`')
+    expect(view).toContain(':class="`is-${item.kind}`"')
+    expect(view).toContain('class="webqq-model-analysis-tool-call is-call"')
+    expect(view).toContain('class="webqq-model-analysis-tool-call is-result"')
+    expect(trajectory).toContain("row.toolEvent === 'definition' ? 'is-tool-definition' : ''")
+  })
+
   it('工具列表图标锁死 18px，避免 flex 把扳手挤成不同大小', () => {
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
 

@@ -23,7 +23,7 @@
           v-for="group in visibleNavigationGroups"
           :key="group.key"
           class="webqq-model-analysis-nav-group"
-          :class="{ 'is-muted': normalizedSearch && !group.items.some(itemMatches) }"
+          :class="[`is-${group.key}`, { 'is-muted': normalizedSearch && !group.items.some(itemMatches) }]"
         >
           <header class="webqq-model-analysis-nav-heading">
             <component :is="groupIcon(group.key)" :size="15" aria-hidden="true" />
@@ -38,7 +38,7 @@
             :class="{ 'is-muted': normalizedSearch && !itemMatches(item) }"
             @click="jumpTo(item.target)"
           >
-            <span class="webqq-model-analysis-nav-kind"><AnalysisHighlightedText :value="item.label" :query="normalizedSearch" /></span>
+            <span class="webqq-model-analysis-nav-kind" :class="`is-${item.kind}`"><AnalysisHighlightedText :value="item.label" :query="normalizedSearch" /></span>
             <span v-if="item.index !== undefined" class="webqq-model-analysis-nav-index">#{{ item.index }}</span>
             <span class="webqq-model-analysis-nav-preview"><AnalysisHighlightedText :value="item.preview" :query="normalizedSearch" /></span>
           </button>
@@ -144,7 +144,7 @@
                   v-for="(call, callIndex) in message.toolCalls"
                   :id="modelAnalysisToolCallId(message.index, callIndex)"
                   :key="`${call.id || callIndex}-${call.name}`"
-                  class="webqq-model-analysis-tool-call"
+                  class="webqq-model-analysis-tool-call is-call"
                   :class="{ 'is-located': highlightedTarget === modelAnalysisToolCallId(message.index, callIndex) }"
                 >
                   <div><strong><AnalysisHighlightedText :value="call.name" :query="normalizedSearch" /></strong><span><AnalysisHighlightedText :value="call.id || '无调用 ID'" :query="normalizedSearch" /></span></div>
@@ -252,7 +252,7 @@
                   v-for="(call, callIndex) in response.toolCalls"
                   :id="modelAnalysisResponseToolCallId(callIndex)"
                   :key="`${call.id || callIndex}-${call.name}`"
-                  class="webqq-model-analysis-tool-call"
+                  class="webqq-model-analysis-tool-call is-call"
                   :class="{ 'is-located': highlightedTarget === modelAnalysisResponseToolCallId(callIndex) }"
                 >
                   <div><strong><AnalysisHighlightedText :value="call.name" :query="normalizedSearch" /></strong><span><AnalysisHighlightedText :value="call.id || '无调用 ID'" :query="normalizedSearch" /></span></div>
@@ -275,7 +275,7 @@
                   v-for="(result, resultIndex) in response.toolResults"
                   :id="modelAnalysisResponseToolResultId(resultIndex)"
                   :key="`${result.id || resultIndex}-${result.name || ''}`"
-                  class="webqq-model-analysis-tool-call"
+                  class="webqq-model-analysis-tool-call is-result"
                   :class="{ 'is-located': highlightedTarget === modelAnalysisResponseToolResultId(resultIndex) }"
                 >
                   <div><strong><AnalysisHighlightedText :value="result.name || '工具结果'" :query="normalizedSearch" /></strong><span><AnalysisHighlightedText :value="result.id || '无调用 ID'" :query="normalizedSearch" /></span></div>
