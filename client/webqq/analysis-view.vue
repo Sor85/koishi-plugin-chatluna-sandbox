@@ -738,7 +738,10 @@ const AnalysisTextBlock = defineComponent({
           type: 'button',
           class: 'webqq-model-analysis-expand',
           onClick: () => { expanded.value = !expanded.value },
-        }, expanded.value ? '收起' : `展开全部（${blockProps.value.length} 字符）`),
+        }, [
+          expanded.value ? '收起' : `展开全部（${blockProps.value.length} 字符）`,
+          h(IconChevronDown, { size: 12, 'aria-hidden': 'true' }),
+        ]),
       ]),
     ])
   },

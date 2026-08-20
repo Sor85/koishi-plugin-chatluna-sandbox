@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   buildModelRequestAnalysisNavigation,
@@ -147,6 +149,21 @@ describe('模型请求分析展示模型', () => {
   it('按实际排版高度在超过 12 行时折叠，正好 12 行保持完整', () => {
     expect(exceedsAnalysisLineLimit(12 * 22.1, 22.1)).toBe(false)
     expect(exceedsAnalysisLineLimit(12 * 22.1 + 1, 22.1)).toBe(true)
+  })
+
+  it('折叠长文本用渐隐遮罩并居中展开按钮，避免半透明实色透出字形', () => {
+    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
+
+    expect(view).toContain("class: 'webqq-model-analysis-expand'")
+    expect(view).toContain('展开全部（${blockProps.value.length} 字符）')
+    expect(view).toContain("h(IconChevronDown, { size: 12, 'aria-hidden': 'true' })")
+    expect(styles).toMatch(/\.webqq-model-analysis-expand \{[^}]*display: flex;[^}]*justify-content: center;/s)
+    expect(styles).toContain('.webqq-model-analysis-section:not(.is-collapsed) .webqq-model-analysis-expand svg { transform: rotate(180deg); }')
+    expect(styles).toContain('-webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 48px), transparent);')
+    expect(styles).toContain('mask-image: linear-gradient(to bottom, #000 calc(100% - 48px), transparent);')
+    expect(styles).not.toContain('.webqq-model-analysis-text-wrap::after')
+    expect(styles).not.toContain('opacity: 0.92')
   })
 
   it('只允许 HTTP(S) 与非 SVG 图片 Data URL 进入图片预览', () => {

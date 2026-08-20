@@ -1620,9 +1620,17 @@
 .webqq-model-analysis-section > strong { color: var(--webqq-muted); font-size: 11px; text-transform: uppercase; }
 .webqq-model-analysis-section pre, .webqq-model-analysis-tool-call pre { margin: 0; overflow-wrap: anywhere; color: var(--webqq-text); font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; user-select: text; }
 .webqq-model-analysis-text-wrap { position: relative; }
-.webqq-model-analysis-section.is-collapsed .webqq-model-analysis-text-wrap > pre { max-height: var(--webqq-model-analysis-collapse-height); overflow: hidden; }
-.webqq-model-analysis-section.is-collapsed .webqq-model-analysis-text-wrap::after { position: absolute; right: 0; bottom: 32px; left: 0; height: 48px; background: var(--webqq-surface); opacity: 0.92; content: ''; pointer-events: none; }
-.webqq-model-analysis-expand { position: relative; z-index: 1; padding: 4px 0; border: 0; color: var(--webqq-accent); background: transparent; font-size: 11px; }
+.webqq-model-analysis-section.is-collapsed .webqq-model-analysis-text-wrap > pre {
+  max-height: var(--webqq-model-analysis-collapse-height);
+  overflow: hidden;
+  /* 用 mask 把裁切末行渐隐到透明。半透明实色遮罩会让被 overflow 裁掉的字形笔画透出来，
+     且卡片表面、工具调用 muted 底和定位高亮底对不齐。 */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 48px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 48px), transparent);
+}
+.webqq-model-analysis-expand { display: flex; width: 100%; align-items: center; justify-content: center; gap: 4px; padding: 4px 0; border: 0; color: var(--webqq-accent); background: transparent; font-size: 11px; }
+.webqq-model-analysis-expand svg { flex-shrink: 0; transition: transform 160ms ease; }
+.webqq-model-analysis-section:not(.is-collapsed) .webqq-model-analysis-expand svg { transform: rotate(180deg); }
 .webqq-model-analysis-tool-call { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--webqq-border); border-radius: 6px; background: var(--webqq-surface-muted); }
 .webqq-model-analysis-tool-call > div { justify-content: space-between; gap: 12px; }
 .webqq-model-analysis-tool-call span { color: var(--webqq-muted); font-size: 11px; }
