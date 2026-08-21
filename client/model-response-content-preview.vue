@@ -1,6 +1,6 @@
 <template>
   <div class="webqq-model-response-preview">
-    <section v-for="(content, index) in preview.content" :key="`content:${index}`" class="webqq-model-response-section is-content">
+    <section v-for="(content, index) in response.content" :key="`content:${index}`" class="webqq-model-response-section is-content">
       <header>
         <IconMessage :size="16" aria-hidden="true" />
         <strong>模型输出</strong>
@@ -8,7 +8,7 @@
       <pre>{{ content }}</pre>
     </section>
 
-    <section v-for="(reasoning, index) in preview.reasoning" :key="`reasoning:${index}`" class="webqq-model-response-section is-reasoning">
+    <section v-for="(reasoning, index) in response.reasoning" :key="`reasoning:${index}`" class="webqq-model-response-section is-reasoning">
       <header>
         <IconBrain :size="16" aria-hidden="true" />
         <strong>思考内容</strong>
@@ -16,14 +16,14 @@
       <pre>{{ reasoning }}</pre>
     </section>
 
-    <section v-if="preview.toolCalls.length" class="webqq-model-response-section is-tools">
+    <section v-if="response.toolCalls.length" class="webqq-model-response-section is-tools">
       <header>
         <IconTool :size="16" aria-hidden="true" />
         <strong>工具调用</strong>
-        <Badge variant="outline">{{ preview.toolCalls.length }}</Badge>
+        <Badge variant="outline">{{ response.toolCalls.length }}</Badge>
       </header>
       <div class="webqq-model-response-tool-list">
-        <article v-for="(tool, index) in preview.toolCalls" :key="tool.id || `${tool.name}:${index}`" class="webqq-model-response-tool">
+        <article v-for="tool in response.toolCalls" :key="tool.evidenceId" class="webqq-model-response-tool">
           <div>
             <strong>{{ tool.name }}</strong>
             <small v-if="tool.id">{{ tool.id }}</small>
@@ -33,12 +33,32 @@
       </div>
     </section>
 
-    <footer v-if="preview.finishReasons.length || preview.usage" class="webqq-model-response-footer">
-      <span v-if="preview.finishReasons.length">结束原因：{{ preview.finishReasons.join('、') }}</span>
-      <span v-for="entry in usageEntries" :key="entry[0]">{{ entry[0] }}：{{ formatUsageValue(entry[1]) }}</span>
+    <section v-if="response.toolResults.length" class="webqq-model-response-section is-tools">
+      <header>
+        <IconTool :size="16" aria-hidden="true" />
+        <strong>工具结果</strong>
+        <Badge variant="outline">{{ response.toolResults.length }}</Badge>
+      </header>
+      <div class="webqq-model-response-tool-list">
+        <article v-for="result in response.toolResults" :key="result.evidenceId" class="webqq-model-response-tool">
+          <div>
+            <strong>{{ result.name || '工具结果' }}</strong>
+            <small v-if="result.id">{{ result.id }}</small>
+          </div>
+          <pre v-if="result.content">{{ result.content }}</pre>
+        </article>
+      </div>
+    </section>
+
+    <footer v-if="response.finishReasons.length || usageEntries.length" class="webqq-model-response-footer">
+      <span v-if="response.finishReasons.length">结束原因：{{ response.finishReasons.join('、') }}</span>
+      <span v-for="entry in usageEntries" :key="entry[0]">{{ entry[0] }}：{{ entry[1] }}</span>
     </footer>
 
-    <p v-if="!hasContent" class="webqq-model-request-empty">
+    <p v-if="response.unrecognizedCount" class="webqq-model-request-empty">
+      有 {{ response.unrecognizedCount }} 个响应事件未被识别，请查看原文核对
+    </p>
+    <p v-else-if="!hasContent" class="webqq-model-request-empty">
       未识别到可预览内容，请查看 JSON 原文
     </p>
   </div>
@@ -48,18 +68,30 @@
 import { IconBrain, IconMessage, IconTool } from '@tabler/icons-vue'
 import { computed } from 'vue'
 import { Badge } from './components/ui/badge'
-import type { ModelResponseContentPreview } from './webqq/model-response-content'
-import { hasModelResponseContent } from './webqq/model-response-content'
+import type { ModelConversationResponse } from './webqq/model-request-conversation'
 
 const props = defineProps<{
-  preview: ModelResponseContentPreview
+  response: ModelConversationResponse
 }>()
 
-const hasContent = computed(() => hasModelResponseContent(props.preview))
-const usageEntries = computed(() => Object.entries(props.preview.usage ?? {}))
+const USAGE_LABELS = [
+  ['inputTokens', '输入'],
+  ['outputTokens', '输出'],
+  ['reasoningTokens', '推理'],
+  ['cachedTokens', '缓存'],
+  ['totalTokens', '总 Token'],
+] as const
 
-function formatUsageValue(value: unknown): string {
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value)
-  return JSON.stringify(value)
-}
+const hasContent = computed(() => Boolean(
+  props.response.content.length
+  || props.response.reasoning.length
+  || props.response.toolCalls.length
+  || props.response.toolResults.length
+  || props.response.finishReasons.length
+  || props.response.usage,
+))
+const usageEntries = computed(() => USAGE_LABELS.flatMap(([key, label]) => {
+  const value = props.response.usage?.[key]
+  return value === undefined ? [] : [[label, value] as const]
+}))
 </script>

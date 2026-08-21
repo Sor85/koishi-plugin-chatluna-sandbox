@@ -529,7 +529,8 @@ export interface SandboxModelRequestTrajectoryRow {
   index: number
   kind: SandboxModelRequestTrajectoryKind
   preview: string
-  detail?: unknown
+  /** 模型证据投影身份。请求边界行没有对应的原始模型证据，因此不带此字段。 */
+  evidenceId?: string
   callId?: string
   toolName?: string
   toolEvent?: 'definition' | 'call' | 'result'
@@ -549,6 +550,8 @@ export type SandboxModelRequestPromptKind =
 
 export interface SandboxModelRequestPromptCompositionItem {
   kind: SandboxModelRequestPromptKind
+  /** 与轨迹行、分析卡片共享的模型证据投影身份，用于跨视图定位。 */
+  evidenceId: string
   characters: number
   requestId?: string
 }
@@ -558,7 +561,7 @@ export interface SandboxModelRequestTrajectory {
   conversationId?: string
   records: readonly SandboxModelRequestListItem[]
   rows: readonly SandboxModelRequestTrajectoryRow[]
-  promptComposition?: readonly SandboxModelRequestPromptCompositionItem[]
+  promptComposition: readonly SandboxModelRequestPromptCompositionItem[]
   complete: boolean
 }
 

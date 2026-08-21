@@ -191,6 +191,7 @@ export class FakeWorkspacePort implements WorkspacePort {
       mode: input.mode,
       records: [],
       rows: [],
+      promptComposition: [],
       complete: true,
     }
     return this.invoke('getModelRequestTrajectory', input, trajectory)

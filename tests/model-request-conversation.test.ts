@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  parseModelRequestConversation,
-  parseModelRequestConversationDetail,
-} from '../client/webqq/model-request-conversation'
+import { parseModelRequestConversationDetail } from '../client/webqq/model-request-conversation'
 import type { SandboxModelRequestDetail } from '../src/types'
 
 function detail(overrides: Partial<SandboxModelRequestDetail>): SandboxModelRequestDetail {
@@ -16,7 +13,7 @@ function detail(overrides: Partial<SandboxModelRequestDetail>): SandboxModelRequ
 
 describe('模型请求对话视图归一化', () => {
   it('归一化 Chat Completions 消息、调用结果与工具定义并保留源路径', () => {
-    const conversation = parseModelRequestConversation({
+    const conversation = parseModelRequestConversationDetail(detail({ requestBody: {
       model: 'gpt-4.1',
       messages: [
         { role: 'system', content: '系统规则' },
@@ -25,7 +22,7 @@ describe('模型请求对话视图归一化', () => {
         { role: 'tool', tool_call_id: 'call-1', content: '{"weather":"晴"}' },
       ],
       tools: [{ type: 'function', function: { name: 'weather', description: '查询天气', parameters: { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] } } }],
-    })
+    } }))
 
     expect(conversation.messages.map(({ index, role, path }) => ({ index, role, path }))).toEqual([
       { index: 0, role: 'system', path: ['messages', '0'] },
@@ -39,17 +36,17 @@ describe('模型请求对话视图归一化', () => {
   })
 
   it('分别归一化 Anthropic 与 Gemini 顶层 system 和工具交互', () => {
-    const anthropic = parseModelRequestConversation({
+    const anthropic = parseModelRequestConversationDetail(detail({ requestBody: {
       system: [{ type: 'text', text: 'Anthropic 系统' }],
       messages: [
         { role: 'assistant', content: [{ type: 'thinking', thinking: '思考' }, { type: 'tool_use', id: 'tool-1', name: 'lookup', input: { id: 1 } }] },
         { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tool-1', content: '结果' }] },
       ],
       tools: [{ name: 'lookup', input_schema: { type: 'object' } }],
-    }, 'anthropic/messages')
+    } }))
     expect(anthropic.messages[0]).toMatchObject({ role: 'system', content: 'Anthropic 系统', path: ['system', '0'] })
 
-    const gemini = parseModelRequestConversation({
+    const gemini = parseModelRequestConversationDetail(detail({ requestBody: {
       systemInstruction: {
         parts: [
           { text: 'Gemini 系统一' },
@@ -61,7 +58,7 @@ describe('模型请求对话视图归一化', () => {
         { role: 'user', parts: [{ functionResponse: { name: 'lookup', response: { value: '结果' } } }] },
       ],
       tools: [{ functionDeclarations: [{ name: 'lookup', description: '查询', parameters: { type: 'object' } }] }],
-    }, 'gemini')
+    } }))
     expect(gemini.messages.slice(0, 2).map(({ role, content, path }) => ({ role, content, path }))).toEqual([
       { role: 'system', content: 'Gemini 系统一', path: ['systemInstruction', 'parts', '0'] },
       { role: 'system', content: 'Gemini 系统二', path: ['systemInstruction', 'parts', '1'] },
@@ -93,7 +90,7 @@ describe('模型请求对话视图归一化', () => {
   })
 
   it('归一化 AI SDK typed parts，并只把有证据的工具结果投影为独立消息', () => {
-    const conversation = parseModelRequestConversation({
+    const conversation = parseModelRequestConversationDetail(detail({ requestBody: {
       messages: [
         {
           role: 'user',
@@ -122,7 +119,7 @@ describe('模型请求对话视图归一化', () => {
           inputSchema: { type: 'object', properties: { id: { type: 'number' } }, required: ['id'] },
         },
       },
-    }, 'ai-sdk')
+    } }))
 
     expect(conversation.messages[0]).toMatchObject({
       role: 'user',
@@ -153,7 +150,7 @@ describe('模型请求对话视图归一化', () => {
   })
 
   it('AI SDK 同一消息内的工具结果保持 typed parts 原始顺序', () => {
-    const conversation = parseModelRequestConversation({
+    const conversation = parseModelRequestConversationDetail(detail({ requestBody: {
       messages: [{
         role: 'assistant',
         parts: [
@@ -162,7 +159,7 @@ describe('模型请求对话视图归一化', () => {
           { type: 'text', text: '调用后' },
         ],
       }],
-    }, 'ai-sdk')
+    } }))
 
     expect(conversation.messages.map(({ role, content }) => ({ role, content }))).toEqual([
       { role: 'assistant', content: '调用前' },
@@ -180,7 +177,7 @@ describe('模型请求对话视图归一化', () => {
   })
 
   it('保留多个 system 来源、多模态分片和跨字段工具声明的原始顺序', () => {
-    const conversation = parseModelRequestConversation({
+    const conversation = parseModelRequestConversationDetail(detail({ requestBody: {
       system_instruction: '第一条系统约束',
       system: [
         { type: 'text', text: '第二条系统约束' },
@@ -196,7 +193,7 @@ describe('模型请求对话视图归一化', () => {
       }],
       functions: [{ name: 'legacy', parameters: { type: 'object' } }],
       tools: [{ functionDeclarations: [{ name: 'gemini', parameters: { type: 'object' } }] }],
-    }, 'gemini')
+    } }))
 
     expect(conversation.messages.slice(0, 3).map(({ role, content, path }) => ({ role, content, path }))).toEqual([
       { role: 'system', content: '第一条系统约束', path: ['system_instruction'] },
@@ -243,8 +240,14 @@ describe('模型请求对话视图归一化', () => {
       }),
     })).response
 
-    expect(response?.toolCalls).toEqual([{ id: 'call-7', name: 'lookup', arguments: '{"id":7}' }])
+    expect(response?.toolCalls).toEqual([{
+      evidenceId: 'res:tool-call:output.0',
+      id: 'call-7',
+      name: 'lookup',
+      arguments: '{"id":7}',
+    }])
     expect(response?.toolResults).toEqual([{
+      evidenceId: 'res:tool-result:output.1',
       id: 'call-7',
       name: 'lookup',
       content: '{\n  "ok": true\n}',
@@ -299,7 +302,7 @@ describe('模型请求对话视图归一化', () => {
   })
 
   it('未知请求结构返回明确解析状态而不生成猜测消息', () => {
-    expect(parseModelRequestConversation({ temperature: 0.3 })).toMatchObject({
+    expect(parseModelRequestConversationDetail(detail({ requestBody: { temperature: 0.3 } }))).toMatchObject({
       messages: [], tools: [], parseError: '未识别请求体中的对话结构',
     })
   })

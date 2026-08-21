@@ -1,9 +1,6 @@
 import type {
   SandboxModelRequestDetail,
-  SandboxModelRequestPromptKind,
   SandboxModelRequestStatus,
-  SandboxModelRequestTrajectoryKind,
-  SandboxModelRequestTrajectoryRow,
 } from '../../src/types'
 import type {
   ModelConversationMessage,
@@ -19,6 +16,8 @@ export interface ModelRequestAnalysisNavigationItem {
   label: string
   index?: number
   preview: string
+  /** 与轨迹行、组成分段共享的模型证据投影身份。响应分组头部本身不是一条证据，因此可缺省。 */
+  evidenceId?: string
   target: string
   searchText: string
 }
@@ -42,6 +41,8 @@ export interface ModelRequestAnalysisBoundary {
 export interface ModelRequestAnalysisNavigation {
   boundary: ModelRequestAnalysisBoundary
   groups: ModelRequestAnalysisNavigationGroup[]
+  /** evidenceId → 分析视图定位目标。跨视图定位只依赖这张表，不再重算角色内序号。 */
+  targets: Record<string, string>
   searchText: string
 }
 
@@ -53,28 +54,20 @@ const GROUP_LABELS: Record<ModelRequestAnalysisGroupKey, string> = {
   response: '响应',
 }
 
+export const MODEL_ANALYSIS_RESPONSE_TARGET = 'model-analysis-response'
+export const MODEL_ANALYSIS_TOOLS_TARGET = 'model-analysis-tools'
+
 export function normalizeAnalysisQuery(value: string | undefined): string {
   return value?.trim().toLocaleLowerCase('zh-CN') ?? ''
 }
 
-export function modelAnalysisMessageId(index: number): string {
-  return `model-analysis-message-${index}`
-}
-
-export function modelAnalysisToolId(path: string[]): string {
-  return `model-analysis-tool-${path.map(encodeTargetPart).join('-')}`
-}
-
-export function modelAnalysisToolCallId(messageIndex: number, callIndex: number): string {
-  return `${modelAnalysisMessageId(messageIndex)}-tool-call-${callIndex}`
-}
-
-export function modelAnalysisResponseToolCallId(callIndex: number): string {
-  return `model-analysis-response-tool-call-${callIndex}`
-}
-
-export function modelAnalysisResponseToolResultId(resultIndex: number): string {
-  return `model-analysis-response-tool-result-${resultIndex}`
+/**
+ * 把模型证据身份编码成分析视图的 DOM 目标。
+ *
+ * evidenceId 已经是确定性的，这里只做 DOM id 允许字符的收敛，不引入第二套排序或序号规则。
+ */
+export function modelAnalysisTargetId(evidenceId: string): string {
+  return `model-analysis-${evidenceId.replace(/[^\w:.-]+/g, '_')}`
 }
 
 export function buildModelRequestAnalysisNavigation(
@@ -82,33 +75,38 @@ export function buildModelRequestAnalysisNavigation(
   detail: Pick<SandboxModelRequestDetail, 'sequence' | 'status' | 'model' | 'provider' | 'durationMs'>,
 ): ModelRequestAnalysisNavigation {
   const grouped = new Map<ModelRequestAnalysisGroupKey, ModelRequestAnalysisNavigationItem[]>()
+  const targets: Record<string, string> = {}
   const add = (key: ModelRequestAnalysisGroupKey, item: ModelRequestAnalysisNavigationItem) => {
     const items = grouped.get(key) ?? []
     items.push({ ...item, searchText: normalizeAnalysisQuery(item.searchText) })
     grouped.set(key, items)
+    if (item.evidenceId) targets[item.evidenceId] = item.target
   }
 
   for (const message of conversation.messages) {
     add(message.role, messageNavigationItem(message))
-    if (message.role === 'assistant') {
-      message.toolCalls.forEach((call, callIndex) => add('assistant', {
-        id: `message-${message.index}-tool-call-${callIndex}`,
+    for (const call of message.toolCalls) {
+      add(message.role, {
+        id: call.evidenceId,
         kind: 'tool-call',
         label: 'TOOL CALL',
         index: message.index,
         preview: call.name,
-        target: modelAnalysisToolCallId(message.index, callIndex),
+        evidenceId: call.evidenceId,
+        target: modelAnalysisTargetId(call.evidenceId),
         searchText: `${call.name}\n${call.id ?? ''}\n${call.arguments ?? ''}`,
-      }))
+      })
     }
   }
 
   conversation.tools.forEach((tool, index) => add('tool', {
-    id: `tool-definition-${index}`,
+    id: tool.evidenceId,
     kind: 'tool-definition',
     label: 'TOOL DEFS',
     preview: tool.name,
-    target: index === 0 ? 'model-analysis-tools' : modelAnalysisToolId(tool.path),
+    evidenceId: tool.evidenceId,
+    // 第一个工具定义定位到 TOOL DEFS 区块头，让整段能力目录一起进入视野。
+    target: index === 0 ? MODEL_ANALYSIS_TOOLS_TARGET : modelAnalysisTargetId(tool.evidenceId),
     searchText: tool.searchText,
   }))
 
@@ -119,25 +117,33 @@ export function buildModelRequestAnalysisNavigation(
       kind: 'response',
       label: '响应',
       preview: compactAnalysisText(response.content.join('\n') || response.statusMessage || '本次响应'),
-      target: 'model-analysis-response',
+      target: MODEL_ANALYSIS_RESPONSE_TARGET,
       searchText: response.searchText,
     })
-    response.toolCalls.forEach((call, index) => add('response', {
-      id: `response-tool-call-${index}`,
-      kind: 'tool-call',
-      label: 'TOOL CALL',
-      preview: call.name,
-      target: modelAnalysisResponseToolCallId(index),
-      searchText: `${call.name}\n${call.id ?? ''}\n${call.arguments ?? ''}`,
-    }))
-    response.toolResults.forEach((result, index) => add('response', {
-      id: `response-tool-result-${index}`,
-      kind: 'tool-result',
-      label: 'TOOL RESULT',
-      preview: result.name || result.id || '工具结果',
-      target: modelAnalysisResponseToolResultId(index),
-      searchText: `${result.name ?? ''}\n${result.id ?? ''}\n${result.content}`,
-    }))
+    // 正文、思考、结束原因和用量都落在同一张响应卡片上。
+    for (const evidenceId of response.cardEvidenceIds) targets[evidenceId] = MODEL_ANALYSIS_RESPONSE_TARGET
+    for (const call of response.toolCalls) {
+      add('response', {
+        id: call.evidenceId,
+        kind: 'tool-call',
+        label: 'TOOL CALL',
+        preview: call.name,
+        evidenceId: call.evidenceId,
+        target: modelAnalysisTargetId(call.evidenceId),
+        searchText: `${call.name}\n${call.id ?? ''}\n${call.arguments ?? ''}`,
+      })
+    }
+    for (const result of response.toolResults) {
+      add('response', {
+        id: result.evidenceId,
+        kind: 'tool-result',
+        label: 'TOOL RESULT',
+        preview: result.name || result.id || '工具结果',
+        evidenceId: result.evidenceId,
+        target: modelAnalysisTargetId(result.evidenceId),
+        searchText: `${result.name ?? ''}\n${result.id ?? ''}\n${result.content}`,
+      })
+    }
   }
 
   const order: ModelRequestAnalysisGroupKey[] = ['system', 'user', 'assistant', 'tool', 'response']
@@ -152,73 +158,27 @@ export function buildModelRequestAnalysisNavigation(
       ...(detail.model ? { model: detail.model } : {}),
       ...(detail.provider ? { provider: detail.provider } : {}),
       durationMs: detail.durationMs,
-      target: 'model-analysis-response',
+      target: MODEL_ANALYSIS_RESPONSE_TARGET,
     },
     groups,
+    targets,
     searchText: normalizeAnalysisQuery(conversation.searchText),
   }
 }
 
-export interface ModelRequestAnalysisFocusRow {
-  id: string
-  kind: SandboxModelRequestTrajectoryKind
-  toolEvent?: SandboxModelRequestTrajectoryRow['toolEvent']
-  source?: 'request' | 'response'
-  indexInKind: number
-}
-
-export function resolveAnalysisTrajectoryTarget(
+/** 轨迹行、组成分段和分析导航共用同一张证据身份表；找不到时退回请求边界。 */
+export function resolveAnalysisEvidenceTarget(
   navigation: ModelRequestAnalysisNavigation,
-  row: Pick<ModelRequestAnalysisFocusRow, 'kind' | 'toolEvent' | 'source'>,
-  indexInKind = 0,
+  evidenceId: string | undefined,
 ): string | undefined {
-  if (row.kind === 'request') {
-    return navigation.groups[0]?.items[0]?.target ?? navigation.boundary.target
-  }
-  if (row.source === 'response') {
-    const responseItems = navigation.groups.find(group => group.key === 'response')?.items ?? []
-    if (row.kind === 'tool' && row.toolEvent === 'call') {
-      return responseItems.filter(item => item.kind === 'tool-call')[indexInKind]?.target ?? navigation.boundary.target
-    }
-    if (row.kind === 'tool' && row.toolEvent === 'result') {
-      return responseItems.filter(item => item.kind === 'tool-result')[indexInKind]?.target ?? navigation.boundary.target
-    }
-    return navigation.boundary.target
-  }
-  const kind: SandboxModelRequestPromptKind = row.toolEvent === 'definition'
-    ? 'tool-definition'
-    : row.kind === 'tool'
-      ? 'tool-interaction'
-      : row.kind
-  return resolveAnalysisPromptTarget(navigation, kind, indexInKind)
-}
-
-export function resolveAnalysisPromptTarget(
-  navigation: ModelRequestAnalysisNavigation,
-  kind: SandboxModelRequestPromptKind,
-  indexInKind: number,
-): string | undefined {
-  if (kind === 'tool-definition') {
-    return navigation.groups
-      .find(group => group.key === 'tool')
-      ?.items.filter(item => item.kind === 'tool-definition')[indexInKind]?.target
-  }
-  if (kind === 'tool-interaction') {
-    const interactions = navigation.groups
-      .filter(group => group.key !== 'response')
-      .flatMap(group => group.items)
-      .filter(item => item.kind === 'tool-call' || item.kind === 'tool-result')
-      .sort((left, right) => targetOrder(left.target) - targetOrder(right.target))
-    return interactions[indexInKind]?.target
-  }
-  const group = navigation.groups.find(candidate => candidate.key === kind)
-  return group?.items.filter(item => item.kind === 'message')[indexInKind]?.target
+  if (!evidenceId) return navigation.groups[0]?.items[0]?.target ?? navigation.boundary.target
+  return navigation.targets[evidenceId]
 }
 
 export interface ModelAnalysisTargetPreparation {
-  messageIndex?: number
+  messageEvidenceId?: string
   response: boolean
-  toolPaths: string[][]
+  toolEvidenceIds: string[]
   expandCards: string[]
   expandTargets: string[]
 }
@@ -227,18 +187,23 @@ export function prepareModelAnalysisTarget(
   conversation: ModelRequestConversation,
   target: string,
 ): ModelAnalysisTargetPreparation {
-  const messageTarget = target.match(/^model-analysis-message-(\d+)(?:-tool-call-(\d+))?$/)
-  const messageIndex = messageTarget ? Number(messageTarget[1]) : undefined
-  const hasMessage = messageIndex !== undefined && conversation.messages.some(message => message.index === messageIndex)
-  const tool = conversation.tools.find(candidate => modelAnalysisToolId(candidate.path) === target)
-  const response = target === 'model-analysis-response' || target.startsWith('model-analysis-response-')
+  const message = conversation.messages.find(candidate => (
+    modelAnalysisTargetId(candidate.evidenceId) === target
+    || candidate.toolCalls.some(call => modelAnalysisTargetId(call.evidenceId) === target)
+  ))
+  const tool = conversation.tools.find(candidate => modelAnalysisTargetId(candidate.evidenceId) === target)
+  const response = target === MODEL_ANALYSIS_RESPONSE_TARGET
+    || Boolean(conversation.response && [
+      ...conversation.response.toolCalls.map(call => call.evidenceId),
+      ...conversation.response.toolResults.map(result => result.evidenceId),
+    ].some(evidenceId => modelAnalysisTargetId(evidenceId) === target))
   return {
-    ...(hasMessage ? { messageIndex } : {}),
+    ...(message ? { messageEvidenceId: message.evidenceId } : {}),
     response,
-    toolPaths: tool ? [tool.path] : [],
+    toolEvidenceIds: tool ? [tool.evidenceId] : [],
     expandCards: [
-      ...(hasMessage ? [modelAnalysisMessageId(messageIndex)] : []),
-      ...(response ? ['model-analysis-response'] : []),
+      ...(message ? [modelAnalysisTargetId(message.evidenceId)] : []),
+      ...(response ? [MODEL_ANALYSIS_RESPONSE_TARGET] : []),
     ],
     expandTargets: [target],
   }
@@ -247,12 +212,13 @@ export function prepareModelAnalysisTarget(
 export function resolveToolDefinitionLocation(
   tools: ModelRequestConversation['tools'],
   name: string,
-): { target: string, toolPaths: string[][] } | undefined {
+): { target: string, toolEvidenceIds: string[] } | undefined {
   const matches = tools.filter(tool => tool.name === name)
   if (!matches.length) return undefined
   return {
-    target: matches.length === 1 ? modelAnalysisToolId(matches[0]!.path) : 'model-analysis-tools',
-    toolPaths: matches.map(tool => tool.path),
+    // 同名工具定义证据不明确时展开全部匹配项，而不是猜测第一项。
+    target: matches.length === 1 ? modelAnalysisTargetId(matches[0]!.evidenceId) : MODEL_ANALYSIS_TOOLS_TARGET,
+    toolEvidenceIds: matches.map(tool => tool.evidenceId),
   }
 }
 
@@ -293,24 +259,19 @@ export function isPreviewableConversationImage(value: string): boolean {
   return /^data:image\/(?!svg\+xml)[a-z0-9.+-]+;base64,[a-z\d+/=\s]+$/i.test(value)
 }
 
+export function formatEvidencePath(path: readonly string[]): string {
+  return path.reduce((result, part) => /^\d+$/.test(part) ? `${result}[${part}]` : result ? `${result}.${part}` : part, '')
+}
+
 function messageNavigationItem(message: ModelConversationMessage): ModelRequestAnalysisNavigationItem {
   return {
-    id: `message-${message.index}`,
+    id: message.evidenceId,
     kind: message.role === 'tool' ? 'tool-result' : 'message',
     label: message.role === 'tool' ? 'TOOL RESULT' : message.role.toUpperCase(),
     index: message.index,
     preview: compactAnalysisText(message.content || message.reasoning || message.toolCalls[0]?.name || '无文本内容'),
-    target: modelAnalysisMessageId(message.index),
+    evidenceId: message.evidenceId,
+    target: modelAnalysisTargetId(message.evidenceId),
     searchText: message.searchText,
   }
-}
-
-function targetOrder(target: string): number {
-  const match = target.match(/^model-analysis-message-(\d+)(?:-tool-call-(\d+))?$/)
-  if (!match) return Number.MAX_SAFE_INTEGER
-  return Number(match[1]) * 100 + (match[2] === undefined ? 50 : Number(match[2]))
-}
-
-function encodeTargetPart(value: string): string {
-  return encodeURIComponent(value).replaceAll('%', '_')
 }

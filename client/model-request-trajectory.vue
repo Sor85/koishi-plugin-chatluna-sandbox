@@ -127,7 +127,7 @@
         :detail="detail"
         :trajectory="trajectory"
         :search-query="searchQuery"
-        :focus-request="analysisFocusRequest"
+        :focus-evidence="analysisFocusEvidence"
         :requests-collapsed="requestsCollapsed"
         :tools-collapsed="toolsCollapsed"
       />
@@ -186,7 +186,7 @@
               layout="inspector"
               :detail="inspectorDetail"
               :search-query="searchQuery"
-              :focus-row="inspectorFocusRow"
+              :focus-evidence="inspectorFocusEvidence"
             />
             <div v-else class="webqq-model-request-empty">正在加载分析…</div>
           </div>
@@ -212,7 +212,6 @@ import { Input } from './components/ui/input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip'
 import ModelRequestConversationAnalysis from './webqq/analysis-view.vue'
 import { formatDuration } from './webqq/format-duration'
-import type { ModelRequestAnalysisFocusRow } from './webqq/model-request-analysis'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type {
   SandboxModelRequestDetail,
@@ -245,9 +244,6 @@ const emit = defineEmits<{
   'update:mode': [mode: 'request' | 'conversation']
   'open-request': [payload: {
     recordId: string
-    kind: SandboxModelRequestTrajectoryKind
-    detail?: unknown
-    source?: 'request' | 'response'
     returnState: {
       rowId: string
       scrollTop: number
@@ -263,11 +259,12 @@ const actualDuration = ref(true)
 const requestsCollapsed = ref(false)
 const toolsCollapsed = ref(false)
 const searchQuery = ref('')
-const analysisFocusRequest = ref<{
-  kind: SandboxModelRequestPromptKind
-  indexInKind: number
+const analysisFocusEvidence = ref<{
+  evidenceId: string
   token: number
 }>()
+// 检查器换行即重新定位；token 只用来触发一次定位，不参与证据身份。
+const inspectorFocusToken = ref(0)
 const selectedRow = computed(() => props.trajectory?.rows.find(({ id }) => id === selectedRowId.value))
 const selectedRequest = computed(() => props.trajectory?.records.find(({ id }) => id === selectedRow.value?.requestId))
 const inspectorDetail = computed(() => {
@@ -275,16 +272,11 @@ const inspectorDetail = computed(() => {
   if (!requestId || props.detail?.id !== requestId) return undefined
   return props.detail
 })
-const inspectorFocusRow = computed<ModelRequestAnalysisFocusRow | undefined>(() => {
+const inspectorFocusEvidence = computed(() => {
   const row = selectedRow.value
   if (!row) return undefined
-  return {
-    id: row.id,
-    kind: row.kind,
-    indexInKind: indexInKindForRow(row),
-    ...(row.toolEvent ? { toolEvent: row.toolEvent } : {}),
-    ...(row.source ? { source: row.source } : {}),
-  }
+  // 请求边界行没有模型证据；用空身份让分析视图回落到第一条卡片。
+  return { evidenceId: row.evidenceId ?? '', token: inspectorFocusToken.value }
 })
 const normalizedSearch = computed(() => searchQuery.value.trim().toLocaleLowerCase('zh-CN'))
 const promptComposition = computed(() => {
@@ -299,6 +291,17 @@ const promptComposition = computed(() => {
 const REQUEST_COMPOSITION_KINDS = ['system', 'user', 'assistant', 'tool-definition', 'tool-interaction'] as const
 const CONVERSATION_COMPOSITION_KINDS = ['system', 'user', 'tool-definition'] as const
 
+interface CompositionSegment {
+  id: string
+  evidenceId: string
+  kind: SandboxModelRequestPromptKind
+  characters: number
+  percentage: number
+  left: number
+  width: number
+  requestId?: string
+}
+
 function isConversationCompositionKind(kind: SandboxModelRequestPromptKind): kind is typeof CONVERSATION_COMPOSITION_KINDS[number] {
   return (CONVERSATION_COMPOSITION_KINDS as readonly SandboxModelRequestPromptKind[]).includes(kind)
 }
@@ -308,65 +311,36 @@ const compositionTracks = computed(() => (
 ))
 const requestCompositionTracks = computed(() => {
   let offset = 0
-  const seen: Partial<Record<SandboxModelRequestPromptKind, number>> = {}
-  const segments = promptComposition.value.map((item, index) => {
+  const segments = promptComposition.value.map((item, index): CompositionSegment => {
     const left = offset
     offset += item.percentage
-    const indexInKind = seen[item.kind] ?? 0
-    seen[item.kind] = indexInKind + 1
     const gap = index < promptComposition.value.length - 1 ? 0.35 : 0
     return {
-      id: `${item.kind}:${index}`,
+      id: item.evidenceId,
+      evidenceId: item.evidenceId,
       kind: item.kind,
       characters: item.characters,
       percentage: item.percentage,
       left,
       width: Math.min(Math.max(item.percentage - gap, 0.35), Math.max(100 - left, 0.35)),
-      indexInKind,
     }
   })
-  return REQUEST_COMPOSITION_KINDS.flatMap((kind) => {
-    const kindSegments = segments.filter((segment) => segment.kind === kind)
-    return kindSegments.length ? [{ kind, segments: kindSegments }] : []
-  })
+  return groupCompositionTracks(REQUEST_COMPOSITION_KINDS, segments)
 })
-function resolveConversationCompositionItems() {
-  const projected = (props.trajectory?.promptComposition ?? []).filter((item) => (
-    Boolean(item.requestId) && isConversationCompositionKind(item.kind)
-  ))
-  if (projected.length) return projected
-  // 旧会话轨迹或请求体缺失时，没有带 requestId 的组成；用账本行预览长度回退，避免整条轨道空白。
-  return (props.trajectory?.rows ?? []).flatMap((row) => {
-    if (!row.requestId || row.kind === 'request' || row.kind === 'assistant' || row.kind === 'tool') return []
-    const kind: SandboxModelRequestPromptKind = row.preview.startsWith('工具目录') ? 'tool-definition' : row.kind
-    if (!isConversationCompositionKind(kind)) return []
-    return [{ kind, characters: Math.max(row.preview.length, 1), requestId: row.requestId }]
-  })
-}
 
 const conversationCompositionTracks = computed(() => {
-  const itemsByRequest = new Map<string, { kind: SandboxModelRequestPromptKind, characters: number }[]>()
-  for (const item of resolveConversationCompositionItems()) {
-    if (!item.requestId) continue
+  const itemsByRequest = new Map<string, typeof promptComposition.value>()
+  for (const item of promptComposition.value) {
+    if (!item.requestId || !isConversationCompositionKind(item.kind)) continue
     const items = itemsByRequest.get(item.requestId) ?? []
     items.push(item)
     itemsByRequest.set(item.requestId, items)
   }
-  const segments: Array<{
-    id: string
-    kind: SandboxModelRequestPromptKind
-    characters: number
-    percentage: number
-    left: number
-    width: number
-    indexInKind: number
-    requestId: string
-  }> = []
+  const segments: CompositionSegment[] = []
   for (const slot of timingSegments.value) {
     const items = itemsByRequest.get(slot.id) ?? []
     const total = items.reduce((sum, item) => sum + item.characters, 0)
     if (!total) continue
-    const seen: Partial<Record<SandboxModelRequestPromptKind, number>> = {}
     let used = 0
     items.forEach((item, index) => {
       const percentage = (item.characters / total) * 100
@@ -374,25 +348,30 @@ const conversationCompositionTracks = computed(() => {
       const rawWidth = (percentage / 100) * slot.width
       const gap = index < items.length - 1 ? Math.min(0.25, rawWidth / 4) : 0
       used += percentage
-      const indexInKind = seen[item.kind] ?? 0
-      seen[item.kind] = indexInKind + 1
       segments.push({
-        id: `${slot.id}:${item.kind}:${index}`,
+        id: `${slot.id}:${item.evidenceId}`,
+        evidenceId: item.evidenceId,
         kind: item.kind,
         characters: item.characters,
         percentage,
         left,
         width: Math.min(Math.max(rawWidth - gap, 0.35), Math.max(slot.left + slot.width - left, 0.35)),
-        indexInKind,
         requestId: slot.id,
       })
     })
   }
-  return CONVERSATION_COMPOSITION_KINDS.flatMap((kind) => {
-    const kindSegments = segments.filter((segment) => segment.kind === kind)
+  return groupCompositionTracks(CONVERSATION_COMPOSITION_KINDS, segments)
+})
+
+function groupCompositionTracks(
+  kinds: readonly SandboxModelRequestPromptKind[],
+  segments: readonly CompositionSegment[],
+) {
+  return kinds.flatMap((kind) => {
+    const kindSegments = segments.filter(segment => segment.kind === kind)
     return kindSegments.length ? [{ kind, segments: kindSegments }] : []
   })
-})
+}
 const ledgerRows = computed(() => props.trajectory?.rows.filter((row) => {
   if (requestsCollapsed.value && row.kind !== 'request') return false
   if (toolsCollapsed.value && row.kind === 'tool') return false
@@ -401,6 +380,10 @@ const ledgerRows = computed(() => props.trajectory?.rows.filter((row) => {
 watch(() => props.trajectory, () => {
   selectedRowId.value = ''
   restoreTrajectoryPosition()
+})
+
+watch(selectedRowId, () => {
+  inspectorFocusToken.value += 1
 })
 
 watch(() => selectedRow.value?.requestId, (requestId) => {
@@ -472,54 +455,28 @@ function isRowSearchMuted(row: SandboxModelRequestTrajectoryRow) {
   return normalizedSearch.value.length > 0 && !rowMatchesSearch(row)
 }
 
-function promptRowsForKind(kind: SandboxModelRequestPromptKind, requestId?: string) {
-  return (props.trajectory?.rows ?? []).filter((candidate) => {
-    if (requestId && candidate.requestId !== requestId) return false
-    if (kind === 'tool-definition') return candidate.kind === 'tool' && candidate.toolEvent === 'definition'
-    if (kind === 'tool-interaction') return candidate.kind === 'tool' && candidate.toolEvent !== 'definition'
-    return candidate.kind === kind
-  })
-}
-
-function indexInKindForRow(row: SandboxModelRequestTrajectoryRow) {
-  if (row.kind === 'request') return 0
-  const rows = row.source === 'response'
-    ? (props.trajectory?.rows ?? []).filter((candidate) => (
-      candidate.requestId === row.requestId
-      && candidate.source === 'response'
-      && candidate.kind === row.kind
-      && candidate.toolEvent === row.toolEvent
-    ))
-    : promptRowsForKind(
-      row.toolEvent === 'definition' ? 'tool-definition' : row.kind === 'tool' ? 'tool-interaction' : row.kind,
-      row.requestId,
-    ).filter((candidate) => candidate.source !== 'response')
-  return Math.max(rows.findIndex((candidate) => candidate.id === row.id), 0)
-}
-
-function selectPromptSegment(segment: { kind: SandboxModelRequestPromptKind, indexInKind: number, requestId?: string }) {
+function selectPromptSegment(segment: CompositionSegment) {
   if (props.analysis) {
-    analysisFocusRequest.value = {
-      kind: segment.kind,
-      indexInKind: segment.indexInKind,
-      token: (analysisFocusRequest.value?.token ?? 0) + 1,
+    analysisFocusEvidence.value = {
+      evidenceId: segment.evidenceId,
+      token: (analysisFocusEvidence.value?.token ?? 0) + 1,
     }
     return
   }
-  const rows = promptRowsForKind(segment.kind, segment.requestId)
-  const row = rows[segment.indexInKind] ?? rows[0]
+  // 组成分段与账本行共享模型证据身份；同一条证据在两个入口一定选中同一行。
+  const row = (props.trajectory?.rows ?? []).find(candidate => (
+    candidate.evidenceId === segment.evidenceId
+    && (!segment.requestId || candidate.requestId === segment.requestId)
+  ))
   if (row) selectedRowId.value = row.id
 }
 
-function isCompositionSegmentSelected(segment: { kind: SandboxModelRequestPromptKind, indexInKind: number, requestId?: string }) {
-  if (props.analysis) {
-    return analysisFocusRequest.value?.kind === segment.kind
-      && analysisFocusRequest.value.indexInKind === segment.indexInKind
-  }
+function isCompositionSegmentSelected(segment: CompositionSegment) {
+  if (props.analysis) return analysisFocusEvidence.value?.evidenceId === segment.evidenceId
   const selected = selectedRow.value
   if (!selected) return false
-  const rows = promptRowsForKind(segment.kind, segment.requestId)
-  return rows[segment.indexInKind]?.id === selected.id
+  return selected.evidenceId === segment.evidenceId
+    && (!segment.requestId || selected.requestId === segment.requestId)
 }
 
 function openSelectedRequest() {
@@ -528,7 +485,6 @@ function openSelectedRequest() {
   if (!request || !row) return
   emit('open-request', {
     recordId: request.id,
-    kind: 'request',
     returnState: {
       rowId: row.id,
       scrollTop: ledgerElement.value?.scrollTop ?? 0,

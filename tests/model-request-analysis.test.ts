@@ -6,10 +6,10 @@ import {
   buildModelRequestAnalysisNavigation,
   exceedsAnalysisLineLimit,
   isPreviewableConversationImage,
+  modelAnalysisTargetId,
   normalizeAnalysisQuery,
   prepareModelAnalysisTarget,
-  resolveAnalysisPromptTarget,
-  resolveAnalysisTrajectoryTarget,
+  resolveAnalysisEvidenceTarget,
   resolveToolDefinitionLocation,
   shouldExpandAnalysisText,
 } from '../client/webqq/model-request-analysis'
@@ -45,7 +45,7 @@ function detail(): SandboxModelRequestDetail {
 }
 
 describe('模型请求分析展示模型', () => {
-  it('把请求边界、角色消息、工具交互和响应映射到稳定定位目标', () => {
+  it('把请求边界、角色消息、工具交互和响应映射到共享证据身份', () => {
     const request = detail()
     const navigation = buildModelRequestAnalysisNavigation(parseModelRequestConversationDetail(request), request)
 
@@ -68,31 +68,37 @@ describe('模型请求分析展示模型', () => {
       kind: 'tool-call',
       label: 'TOOL CALL',
       preview: 'weather',
-      target: 'model-analysis-message-2-tool-call-0',
+      evidenceId: 'req:tool-call:messages.2.tool_calls.0',
+      target: 'model-analysis-req:tool-call:messages.2.tool_calls.0',
     })
     expect(navigation.groups[3]?.items).toEqual(expect.arrayContaining([
-      expect.objectContaining({ label: 'TOOL RESULT', target: 'model-analysis-message-3' }),
+      expect.objectContaining({ label: 'TOOL RESULT', evidenceId: 'req:message:messages.3' }),
       expect.objectContaining({ label: 'TOOL DEFS', target: 'model-analysis-tools' }),
     ]))
+    expect(navigation.groups.every(({ items }) => items.every(({ evidenceId, target }) => (
+      evidenceId === undefined || navigation.targets[evidenceId] === target
+    )))).toBe(true)
   })
 
-  it('把请求组成图分段定位到对应消息、工具定义和工具交互', () => {
+  it('按模型证据身份把轨迹行和组成分段定位到同一分析目标', () => {
     const request = detail()
     const navigation = buildModelRequestAnalysisNavigation(parseModelRequestConversationDetail(request), request)
 
-    expect(resolveAnalysisPromptTarget(navigation, 'system', 0)).toBe('model-analysis-message-0')
-    expect(resolveAnalysisPromptTarget(navigation, 'user', 0)).toBe('model-analysis-message-1')
-    expect(resolveAnalysisPromptTarget(navigation, 'assistant', 0)).toBe('model-analysis-message-2')
-    expect(resolveAnalysisPromptTarget(navigation, 'tool-definition', 0)).toBe('model-analysis-tools')
-    expect(resolveAnalysisPromptTarget(navigation, 'tool-interaction', 0)).toBe('model-analysis-message-2-tool-call-0')
-    expect(resolveAnalysisPromptTarget(navigation, 'tool-interaction', 1)).toBe('model-analysis-message-3')
-
+    expect(resolveAnalysisEvidenceTarget(navigation, 'req:message:messages.0')).toBe('model-analysis-req:message:messages.0')
+    expect(resolveAnalysisEvidenceTarget(navigation, 'req:message:messages.1')).toBe('model-analysis-req:message:messages.1')
+    expect(resolveAnalysisEvidenceTarget(navigation, 'req:message:messages.2')).toBe('model-analysis-req:message:messages.2')
+    expect(resolveAnalysisEvidenceTarget(navigation, 'req:tool-definition:tools.0.function')).toBe('model-analysis-tools')
+    expect(resolveAnalysisEvidenceTarget(navigation, 'req:tool-call:messages.2.tool_calls.0'))
+      .toBe('model-analysis-req:tool-call:messages.2.tool_calls.0')
+    expect(resolveAnalysisEvidenceTarget(navigation, 'req:message:messages.3')).toBe('model-analysis-req:message:messages.3')
+    // 请求边界行没有证据身份；回落到第一条卡片而不是猜测顺序。
+    expect(resolveAnalysisEvidenceTarget(navigation, undefined)).toBe('model-analysis-req:message:messages.0')
+    // 展示文案改变不影响定位：目标来自证据身份表，不来自导航排序或标签。
     for (const item of navigation.groups.flatMap(group => group.items)) item.label = '展示文案已修改'
-    expect(resolveAnalysisPromptTarget(navigation, 'tool-definition', 0)).toBe('model-analysis-tools')
-    expect(resolveAnalysisPromptTarget(navigation, 'tool-interaction', 0)).toBe('model-analysis-message-2-tool-call-0')
+    expect(resolveAnalysisEvidenceTarget(navigation, 'req:tool-definition:tools.0.function')).toBe('model-analysis-tools')
   })
 
-  it('把轨迹账本行定位到分析卡片，响应事件不误入请求消息', () => {
+  it('响应正文、思考与工具事件按证据身份定位到响应卡片和工具卡片', () => {
     const request = detail()
     request.responseBodyRaw = JSON.stringify({
       choices: [{
@@ -103,15 +109,18 @@ describe('模型请求分析展示模型', () => {
         finish_reason: 'tool_calls',
       }],
     })
-    const navigation = buildModelRequestAnalysisNavigation(parseModelRequestConversationDetail(request), request)
+    const conversation = parseModelRequestConversationDetail(request)
+    const navigation = buildModelRequestAnalysisNavigation(conversation, request)
 
-    expect(resolveAnalysisTrajectoryTarget(navigation, { kind: 'request' })).toBe('model-analysis-message-0')
-    expect(resolveAnalysisTrajectoryTarget(navigation, { kind: 'system' }, 0)).toBe('model-analysis-message-0')
-    expect(resolveAnalysisTrajectoryTarget(navigation, { kind: 'user' }, 0)).toBe('model-analysis-message-1')
-    expect(resolveAnalysisTrajectoryTarget(navigation, { kind: 'tool', toolEvent: 'definition' }, 0)).toBe('model-analysis-tools')
-    expect(resolveAnalysisTrajectoryTarget(navigation, { kind: 'tool', toolEvent: 'call' }, 0)).toBe('model-analysis-message-2-tool-call-0')
-    expect(resolveAnalysisTrajectoryTarget(navigation, { kind: 'assistant', source: 'response' })).toBe('model-analysis-response')
-    expect(resolveAnalysisTrajectoryTarget(navigation, { kind: 'tool', toolEvent: 'call', source: 'response' }, 0)).toBe('model-analysis-response-tool-call-0')
+    expect(conversation.response?.cardEvidenceIds).toEqual([
+      'res:content:choices.0.content',
+      'res:finish-reason:choices.0.finish_reason',
+    ])
+    for (const evidenceId of conversation.response!.cardEvidenceIds) {
+      expect(resolveAnalysisEvidenceTarget(navigation, evidenceId)).toBe('model-analysis-response')
+    }
+    expect(resolveAnalysisEvidenceTarget(navigation, 'res:tool-call:choices.0.tool_calls.0'))
+      .toBe('model-analysis-res:tool-call:choices.0.tool_calls.0')
   })
 
   it('把 Gemini 组成图 System 分段定位到 systemInstruction.parts', () => {
@@ -136,36 +145,37 @@ describe('模型请求分析展示模型', () => {
       { key: 'tool', count: 1 },
       { key: 'response', count: 1 },
     ])
-    expect(resolveAnalysisPromptTarget(navigation, 'system', 0)).toBe('model-analysis-message-0')
-    expect(resolveAnalysisPromptTarget(navigation, 'system', 1)).toBe('model-analysis-message-1')
-    expect(resolveAnalysisPromptTarget(navigation, 'user', 0)).toBe('model-analysis-message-2')
-    expect(resolveAnalysisPromptTarget(navigation, 'tool-definition', 0)).toBe('model-analysis-tools')
+    expect(resolveAnalysisEvidenceTarget(navigation, 'req:message:systemInstruction.parts.0'))
+      .toBe(modelAnalysisTargetId('req:message:systemInstruction.parts.0'))
+    expect(resolveAnalysisEvidenceTarget(navigation, 'req:message:systemInstruction.parts.1'))
+      .toBe(modelAnalysisTargetId('req:message:systemInstruction.parts.1'))
+    expect(resolveAnalysisEvidenceTarget(navigation, 'req:message:contents.0'))
+      .toBe(modelAnalysisTargetId('req:message:contents.0'))
+    expect(resolveAnalysisEvidenceTarget(navigation, 'req:tool-definition:tools.0.functionDeclarations.0'))
+      .toBe('model-analysis-tools')
   })
 
-  it('精确匹配两位数消息目标并把定位状态传给折叠分区', () => {
+  it('把定位目标还原成需要展开的卡片、工具定义与响应区块', () => {
     const request = detail()
     const conversation = parseModelRequestConversationDetail(request)
-    conversation.messages.push(...Array.from({ length: 18 }, (_, offset) => ({
-      ...conversation.messages[0]!,
-      index: offset + 4,
-      content: `消息 ${offset + 4}`,
-      searchText: `消息 ${offset + 4}`,
-    })))
 
-    expect(prepareModelAnalysisTarget(conversation, 'model-analysis-message-20')).toMatchObject({
-      messageIndex: 20,
-      expandCards: ['model-analysis-message-20'],
-      expandTargets: ['model-analysis-message-20'],
+    expect(prepareModelAnalysisTarget(conversation, modelAnalysisTargetId('req:message:messages.3'))).toMatchObject({
+      messageEvidenceId: 'req:message:messages.3',
+      response: false,
+      expandCards: [modelAnalysisTargetId('req:message:messages.3')],
+      expandTargets: [modelAnalysisTargetId('req:message:messages.3')],
     })
-    expect(prepareModelAnalysisTarget(conversation, 'model-analysis-message-2-tool-call-0')).toMatchObject({
-      messageIndex: 2,
-      expandCards: ['model-analysis-message-2'],
-      expandTargets: ['model-analysis-message-2-tool-call-0'],
+    expect(prepareModelAnalysisTarget(conversation, modelAnalysisTargetId('req:tool-call:messages.2.tool_calls.0'))).toMatchObject({
+      messageEvidenceId: 'req:message:messages.2',
+      expandCards: [modelAnalysisTargetId('req:message:messages.2')],
+      expandTargets: [modelAnalysisTargetId('req:tool-call:messages.2.tool_calls.0')],
     })
-    expect(prepareModelAnalysisTarget(conversation, 'model-analysis-response-tool-call-0')).toMatchObject({
+    expect(prepareModelAnalysisTarget(conversation, modelAnalysisTargetId('req:tool-definition:tools.0.function'))).toMatchObject({
+      toolEvidenceIds: ['req:tool-definition:tools.0.function'],
+    })
+    expect(prepareModelAnalysisTarget(conversation, 'model-analysis-response')).toMatchObject({
       response: true,
       expandCards: ['model-analysis-response'],
-      expandTargets: ['model-analysis-response-tool-call-0'],
     })
     expect(shouldExpandAnalysisText(false, true, '', 'x')).toBe(true)
   })
@@ -183,7 +193,7 @@ describe('模型请求分析展示模型', () => {
 
     expect(resolveToolDefinitionLocation(conversation.tools, 'weather')).toEqual({
       target: 'model-analysis-tools',
-      toolPaths: [['tools', '0', 'function'], ['tools', '1', 'function']],
+      toolEvidenceIds: ['req:tool-definition:tools.0.function', 'req:tool-definition:tools.1.function'],
     })
   })
 
@@ -305,8 +315,8 @@ describe('模型请求分析展示模型', () => {
     expect(view).not.toContain('toggleRawRequest')
     expect(view).not.toContain('label="内容"')
     expect(view).not.toContain("index === 0 ? '内容'")
-    expect(view).toContain('@click="toggleCardFromHeader($event, modelAnalysisMessageId(message.index))"')
-    expect(view).toContain('@click="toggleCardFromHeader($event, \'model-analysis-response\')"')
+    expect(view).toContain('@click="toggleCardFromHeader($event, modelAnalysisTargetId(message.evidenceId))"')
+    expect(view).toContain('@click="toggleCardFromHeader($event, MODEL_ANALYSIS_RESPONSE_TARGET)"')
     expect(view).toContain('event.target.closest(\'button\')')
     expect(view).toContain("v-if=\"layout !== 'inspector'\"")
     expect(view).toContain("layout === 'inspector'")

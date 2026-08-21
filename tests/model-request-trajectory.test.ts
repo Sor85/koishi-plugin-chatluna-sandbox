@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { SandboxModelRequestStore } from '../src/model-request'
 import { buildSandboxModelRequestTrajectory } from '../src/model-request-trajectory'
+import {
+  geminiGenerateContentRequest,
+  openAiChatJsonResponse,
+  openAiChatRequest,
+  openAiResponsesRequest,
+} from './fixtures/model-protocol-fixtures'
 
 function createStore() {
   const store = new SandboxModelRequestStore()
@@ -12,26 +18,10 @@ function createStore() {
     attribution: 'attributed',
     entities: { scopeId: 'main', botId: 'bot-1', conversationId: 'conversation-1' },
     requestBodyAvailable: true,
-    requestBody: {
-      model: 'gpt-4.1',
-      tools: [{ type: 'function', function: { name: 'lookup', parameters: { type: 'object' } } }],
-      messages: [
-        { role: 'system', content: '遵循系统提示' },
-        { role: 'user', content: '查询天气' },
-        { role: 'assistant', tool_calls: [{ id: 'call-1', function: { name: 'lookup', arguments: '{"city":"北京"}' } }] },
-        { role: 'tool', tool_call_id: 'call-1', name: 'lookup', content: '晴' },
-      ],
-    },
+    requestBody: openAiChatRequest,
     responseBodyStatus: 'complete',
     responseBodyFormat: 'json',
-    responseBodyRaw: JSON.stringify({
-      choices: [{ message: {
-        content: '北京今天晴朗',
-        reasoning_content: '读取工具结果',
-        tool_calls: [{ id: 'call-2', function: { name: 'forecast', arguments: '{"city":"北京"}' } }],
-      } }],
-      usage: { prompt_tokens: 20, completion_tokens: 8 },
-    }),
+    responseBodyRaw: openAiChatJsonResponse,
   })
   const second = store.append({
     status: 'error',
@@ -47,50 +37,79 @@ function createStore() {
   return { store, first, second }
 }
 
+function trajectoryFor(store: SandboxModelRequestStore, recordId: string, mode: 'request' | 'conversation') {
+  return buildSandboxModelRequestTrajectory({ record: store.getRecord(recordId)!, mode, store })
+}
+
 describe('模型请求轨迹投影', () => {
-  it('从单次请求与响应派生语义记录，并保留原始详情', () => {
+  it('把共享模型证据投影映射为请求边界、请求行与响应行', () => {
     const { store, first } = createStore()
-    const detail = store.getRecord(first.id)!
-    const trajectory = buildSandboxModelRequestTrajectory({ record: detail, mode: 'request', store })
+    const trajectory = trajectoryFor(store, first.id, 'request')
 
     expect(trajectory.records).toHaveLength(1)
-    expect(trajectory.rows.map(({ kind }) => kind)).toEqual([
-      'request', 'tool', 'system', 'user', 'tool', 'tool', 'assistant', 'assistant', 'tool',
+    expect(trajectory.rows.map(({ kind, toolEvent, source }) => ({ kind, toolEvent, source }))).toEqual([
+      { kind: 'request', toolEvent: undefined, source: undefined },
+      { kind: 'tool', toolEvent: 'definition', source: 'request' },
+      { kind: 'system', toolEvent: undefined, source: 'request' },
+      { kind: 'user', toolEvent: undefined, source: 'request' },
+      { kind: 'assistant', toolEvent: undefined, source: 'request' },
+      { kind: 'tool', toolEvent: 'call', source: 'request' },
+      { kind: 'tool', toolEvent: 'result', source: 'request' },
+      { kind: 'assistant', toolEvent: undefined, source: 'response' },
+      { kind: 'assistant', toolEvent: undefined, source: 'response' },
+      { kind: 'tool', toolEvent: 'call', source: 'response' },
     ])
-    expect(trajectory.rows.find(({ preview }) => preview.startsWith('工具目录'))).toMatchObject({
-      kind: 'tool',
-      toolEvent: 'definition',
+    expect(trajectory.rows.map(({ index }) => index)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    expect(trajectory.rows[0]).toMatchObject({ preview: 'openai / gpt-4.1 · 120 ms', status: 'success', requestId: first.id })
+    expect(trajectory.rows[0]?.evidenceId).toBeUndefined()
+  })
+
+  it('轨迹行携带模型证据身份，请求与响应工具事件保留调用标识和工具名', () => {
+    const { store, first } = createStore()
+    const trajectory = trajectoryFor(store, first.id, 'request')
+
+    expect(trajectory.rows.find(({ toolEvent }) => toolEvent === 'definition')).toMatchObject({
+      evidenceId: 'req:tool-definition:tools.0.function',
+      toolName: 'lookup',
+      preview: '工具定义 · lookup',
     })
     expect(trajectory.rows.find(({ callId }) => callId === 'call-1')).toMatchObject({
+      evidenceId: 'req:tool-call:messages.2.tool_calls.0',
       kind: 'tool',
-      toolName: 'lookup',
       toolEvent: 'call',
       source: 'request',
+      toolName: 'lookup',
     })
     expect(trajectory.rows.find(({ toolEvent }) => toolEvent === 'result')).toMatchObject({
-      kind: 'tool',
-      toolEvent: 'result',
+      evidenceId: 'req:message:messages.3',
+      toolName: 'lookup',
+      callId: 'call-1',
       source: 'request',
     })
-    expect(trajectory.rows.filter(({ toolEvent }) => toolEvent === 'call').at(-1)).toMatchObject({
-      source: 'response',
-    })
-    expect(trajectory.rows.some(({ preview }) => preview.includes('北京今天晴朗'))).toBe(true)
-    expect(trajectory.promptComposition?.map(({ kind }) => kind)).toEqual([
-      'system',
-      'user',
-      'tool-definition',
-      'tool-interaction',
-      'tool-interaction',
+    expect(trajectory.rows.filter(({ source }) => source === 'response')).toEqual([
+      expect.objectContaining({ evidenceId: 'res:reasoning:choices.0.reasoning', preview: '思考 · 读取工具结果' }),
+      expect.objectContaining({ evidenceId: 'res:content:choices.0.content', preview: '北京今天晴朗' }),
+      expect.objectContaining({ evidenceId: 'res:tool-call:choices.0.tool_calls.0', callId: 'call-9', toolName: 'forecast' }),
     ])
-    expect(trajectory.promptComposition?.[0]).toEqual({ kind: 'system', characters: 6 })
-    expect(trajectory.promptComposition?.[1]).toEqual({ kind: 'user', characters: 4 })
-    expect(trajectory.promptComposition?.[2]).toEqual({ kind: 'tool-definition', characters: 81 })
-    expect(
-      trajectory.promptComposition
-        ?.filter(({ kind }) => kind === 'tool-interaction')
-        .reduce((sum, item) => sum + item.characters, 0),
-    ).toBe(79)
+    expect(trajectory.rows.every(({ id, requestId }) => id.startsWith(`${requestId}:`))).toBe(true)
+  })
+
+  it('请求组成统计与轨迹行共享同一模型证据身份', () => {
+    const { store, first } = createStore()
+    const trajectory = trajectoryFor(store, first.id, 'request')
+
+    expect(trajectory.promptComposition).toEqual([
+      { kind: 'system', evidenceId: 'req:message:messages.0', characters: 6 },
+      { kind: 'user', evidenceId: 'req:message:messages.1', characters: 4 },
+      { kind: 'tool-definition', evidenceId: 'req:tool-definition:tools.0.function', characters: 129 },
+      { kind: 'assistant', evidenceId: 'req:message:messages.2', characters: 4 },
+      { kind: 'tool-interaction', evidenceId: 'req:tool-call:messages.2.tool_calls.0', characters: 13 },
+      { kind: 'tool-interaction', evidenceId: 'req:message:messages.3', characters: 1 },
+    ])
+    const rowEvidenceIds = new Set(trajectory.rows.flatMap(({ evidenceId }) => evidenceId ? [evidenceId] : []))
+    for (const item of trajectory.promptComposition) {
+      expect(rowEvidenceIds.has(item.evidenceId), item.evidenceId).toBe(true)
+    }
   })
 
   it('按提示词出现顺序拆成多段，不把同类消息合并成一条轨道', () => {
@@ -111,119 +130,45 @@ describe('模型请求轨迹投影', () => {
       },
       responseBodyStatus: 'unavailable',
     })
-    const trajectory = buildSandboxModelRequestTrajectory({
-      record: store.getRecord(record.id)!,
-      mode: 'request',
-      store,
-    })
 
-    expect(trajectory.promptComposition).toEqual([
-      { kind: 'system', characters: 2 },
-      { kind: 'user', characters: 3 },
-      { kind: 'assistant', characters: 2 },
-      { kind: 'user', characters: 3 },
+    expect(trajectoryFor(store, record.id, 'request').promptComposition).toEqual([
+      { kind: 'system', evidenceId: 'req:message:messages.0', characters: 2 },
+      { kind: 'user', evidenceId: 'req:message:messages.1', characters: 3 },
+      { kind: 'assistant', evidenceId: 'req:message:messages.2', characters: 2 },
+      { kind: 'user', evidenceId: 'req:message:messages.3', characters: 3 },
     ])
   })
 
-  it('区分 Gemini 与 Responses 请求中的工具声明和工具交互', () => {
+  it('Gemini 与 Responses 请求同样区分工具声明和工具交互', () => {
     const store = new SandboxModelRequestStore()
     const gemini = store.append({
-      status: 'success',
-      durationMs: 10,
-      attribution: 'unattributed',
-      entities: {},
-      requestBodyAvailable: true,
-      requestBody: {
-        systemInstruction: { parts: [{ text: '系统' }] },
-        tools: [{ functionDeclarations: [{ name: 'lookup', description: '查询' }] }],
-        contents: [
-          { role: 'user', parts: [{ text: '查询天气' }] },
-          { role: 'model', parts: [{ functionCall: { name: 'lookup', args: { city: '北京' } } }] },
-          { role: 'user', parts: [{ functionResponse: { name: 'lookup', response: { weather: '晴' } } }] },
-        ],
-      },
-      responseBodyStatus: 'unavailable',
+      status: 'success', durationMs: 10, attribution: 'unattributed', entities: {},
+      requestBodyAvailable: true, requestBody: geminiGenerateContentRequest, responseBodyStatus: 'unavailable',
     })
     const responses = store.append({
-      status: 'success',
-      durationMs: 10,
-      attribution: 'unattributed',
-      entities: {},
-      requestBodyAvailable: true,
-      requestBody: {
-        tools: [{ type: 'function', name: 'search', parameters: { type: 'object' } }],
-        input: [
-          { role: 'user', content: '搜索新闻' },
-          { type: 'function_call', name: 'search', arguments: '{"q":"新闻"}' },
-          { type: 'function_call_output', call_id: 'call-1', output: '结果' },
-        ],
-      },
-      responseBodyStatus: 'unavailable',
+      status: 'success', durationMs: 10, attribution: 'unattributed', entities: {},
+      requestBodyAvailable: true, requestBody: openAiResponsesRequest, responseBodyStatus: 'unavailable',
     })
 
     for (const record of [gemini, responses]) {
-      const trajectory = buildSandboxModelRequestTrajectory({
-        record: store.getRecord(record.id)!,
-        mode: 'request',
-        store,
-      })
-      expect(trajectory.promptComposition?.find(({ kind }) => kind === 'tool-definition')?.characters).toBeGreaterThan(0)
-      expect(trajectory.promptComposition?.find(({ kind }) => kind === 'tool-interaction')?.characters).toBeGreaterThan(0)
+      const { promptComposition } = trajectoryFor(store, record.id, 'request')
+      expect(promptComposition.find(({ kind }) => kind === 'tool-definition')?.characters).toBeGreaterThan(0)
+      expect(promptComposition.find(({ kind }) => kind === 'tool-interaction')?.characters).toBeGreaterThan(0)
     }
 
-    const geminiTrajectory = buildSandboxModelRequestTrajectory({
-      record: store.getRecord(gemini.id)!,
-      mode: 'request',
-      store,
-    })
-    expect(geminiTrajectory.rows.find(({ kind }) => kind === 'system')).toMatchObject({
-      kind: 'system',
-      preview: '系统',
-    })
-    expect(geminiTrajectory.rows.some(({ kind, preview }) => kind === 'tool' && preview.startsWith('工具目录'))).toBe(true)
-    expect(geminiTrajectory.promptComposition?.map(({ kind }) => kind)).toEqual([
+    const geminiTrajectory = trajectoryFor(store, gemini.id, 'request')
+    expect(geminiTrajectory.rows.filter(({ kind }) => kind === 'system').map(({ preview, evidenceId }) => ({ preview, evidenceId }))).toEqual([
+      { preview: 'Gemini 系统一', evidenceId: 'req:message:systemInstruction.parts.0' },
+      { preview: 'Gemini 系统二', evidenceId: 'req:message:systemInstruction.parts.1' },
+    ])
+    expect(geminiTrajectory.rows.some(({ toolEvent }) => toolEvent === 'definition')).toBe(true)
+    expect(geminiTrajectory.promptComposition.map(({ kind }) => kind)).toEqual([
+      'system',
       'system',
       'user',
       'tool-definition',
       'tool-interaction',
       'tool-interaction',
-    ])
-    expect(geminiTrajectory.promptComposition?.[0]).toEqual({ kind: 'system', characters: 2 })
-  })
-
-  it('把 Gemini systemInstruction.parts 拆成多段 System，对齐分析页导航', () => {
-    const store = new SandboxModelRequestStore()
-    const gemini = store.append({
-      status: 'success',
-      durationMs: 10,
-      attribution: 'unattributed',
-      entities: {},
-      requestBodyAvailable: true,
-      requestBody: {
-        systemInstruction: {
-          parts: [
-            { text: 'Gemini 系统一' },
-            { text: 'Gemini 系统二' },
-          ],
-        },
-        contents: [{ role: 'user', parts: [{ text: '查询天气' }] }],
-      },
-      responseBodyStatus: 'unavailable',
-    })
-    const trajectory = buildSandboxModelRequestTrajectory({
-      record: store.getRecord(gemini.id)!,
-      mode: 'request',
-      store,
-    })
-
-    expect(trajectory.promptComposition).toEqual([
-      { kind: 'system', characters: 10 },
-      { kind: 'system', characters: 10 },
-      { kind: 'user', characters: JSON.stringify({ text: '查询天气' }).length },
-    ])
-    expect(trajectory.rows.filter(({ kind }) => kind === 'system').map(({ preview }) => preview)).toEqual([
-      'Gemini 系统一',
-      'Gemini 系统二',
     ])
   })
 
@@ -236,26 +181,31 @@ describe('模型请求轨迹投影', () => {
       entities: { scopeId: 'main', conversationId: 'conversation-other' },
       requestBodyAvailable: false,
     })
-    const trajectory = buildSandboxModelRequestTrajectory({
-      record: store.getRecord(second.id)!,
-      mode: 'conversation',
-      store,
-    })
+    const trajectory = trajectoryFor(store, second.id, 'conversation')
 
     expect(trajectory.mode).toBe('conversation')
     expect(trajectory.conversationId).toBe('conversation-1')
-    expect(trajectory.records).toHaveLength(2)
     expect(trajectory.records.map(({ sequence }) => sequence)).toEqual([1, 2])
     expect(trajectory.rows.filter(({ kind }) => kind === 'request')).toHaveLength(2)
-    expect(trajectory.rows.some(({ toolEvent }) => toolEvent !== undefined)).toBe(true)
-    expect(trajectory.rows.some(({ preview }) => preview.startsWith('工具目录'))).toBe(true)
-    expect(trajectory.promptComposition?.map(({ kind, requestId }) => ({ kind, requestId }))).toEqual([
+    expect(trajectory.rows.some(({ toolEvent }) => toolEvent === 'definition')).toBe(true)
+    expect(trajectory.promptComposition.map(({ kind, requestId }) => ({ kind, requestId }))).toEqual([
       { kind: 'system', requestId: trajectory.records[0]?.id },
       { kind: 'user', requestId: trajectory.records[0]?.id },
       { kind: 'tool-definition', requestId: trajectory.records[0]?.id },
+      { kind: 'assistant', requestId: trajectory.records[0]?.id },
       { kind: 'tool-interaction', requestId: trajectory.records[0]?.id },
       { kind: 'tool-interaction', requestId: trajectory.records[0]?.id },
       { kind: 'user', requestId: trajectory.records[1]?.id },
     ])
+    // 会话轨迹里两条请求会出现同名证据身份；行 id 仍按记录区分，不会互相覆盖。
+    expect(new Set(trajectory.rows.map(({ id }) => id)).size).toBe(trajectory.rows.length)
+  })
+
+  it('响应不可用或采集失败时不生成响应行', () => {
+    const { store, second } = createStore()
+    const trajectory = trajectoryFor(store, second.id, 'request')
+
+    expect(trajectory.rows.some(({ source }) => source === 'response')).toBe(false)
+    expect(trajectory.rows.map(({ kind }) => kind)).toEqual(['request', 'user'])
   })
 })

@@ -461,10 +461,10 @@
               </p>
               <ModelResponseContentPreview
                 v-else-if="responseView === 'content'"
-                :preview="responseContent"
+                :response="responseConversation"
               />
               <template v-else>
-                <div v-if="responsePreview.kind === 'json' || responsePreview.kind === 'sse'" class="webqq-model-request-json-viewer">
+                <div v-if="responseConversation.raw !== undefined && typeof responseConversation.raw !== 'string'" class="webqq-model-request-json-viewer">
                   <ModelRequestJsonTree
                     :node="responseTree"
                     :open="true"
@@ -472,7 +472,7 @@
                     :strings-expanded="true"
                   />
                 </div>
-                <pre v-else-if="responsePreview.kind === 'text'" class="webqq-model-request-response-raw">{{ detail.responseBodyRaw }}</pre>
+                <pre v-else-if="detail.responseBodyRaw" class="webqq-model-request-response-raw">{{ detail.responseBodyRaw }}</pre>
                 <p v-else class="webqq-model-request-empty">响应体为空</p>
               </template>
             </template>
@@ -542,8 +542,8 @@ import ModelRequestTrajectory from './model-request-trajectory.vue'
 import ModelResponseContentPreview from './model-response-content-preview.vue'
 import WebqqAvatar from './webqq-avatar.vue'
 import { formatDuration } from './webqq/format-duration'
-import { extractModelResponseContent, normalizeModelResponseUsage } from './webqq/model-response-content'
-import { buildModelRequestJsonTree, parseModelResponseBody } from './webqq/model-request-json'
+import { parseModelResponseConversation } from './webqq/model-request-conversation'
+import { buildModelRequestJsonTree } from './webqq/model-request-json'
 import { createModelRequestEnterRefresh, createModelRequestLiveRefresh } from './webqq/model-request-live-refresh'
 import {
   createModelRequestRecordsQuery,
@@ -564,7 +564,6 @@ import type {
   SandboxModelRequestListItem,
   SandboxModelRequestStatus,
   SandboxModelRequestTrajectory,
-  SandboxModelRequestTrajectoryKind,
   SandboxModelRequestUsage,
   SandboxDirectoryBot,
 } from '../src/types'
@@ -649,17 +648,17 @@ const enterRefresh = createModelRequestEnterRefresh(() => refresh())
 
 const requestTree = computed(() => buildModelRequestJsonTree(props.detail?.requestBody, 'requestBody'))
 const headersTree = computed(() => buildModelRequestJsonTree(props.detail?.headers ?? {}, 'requestHeaders'))
-const responsePreview = computed(() => parseModelResponseBody(
-  props.detail?.responseBodyRaw,
-  props.detail?.responseBodyFormat,
-))
-const responseTree = computed(() => buildModelRequestJsonTree(responsePreview.value, 'responseBody'))
-const responseContent = computed(() => extractModelResponseContent(responsePreview.value.value))
-const responseUsage = computed<SandboxModelRequestUsage | undefined>(() => {
-  const parsed = normalizeModelResponseUsage(responseContent.value.usage)
-  return parsed ? { ...parsed, source: 'response' } : undefined
-})
-const usage = computed<SandboxModelRequestUsage | undefined>(() => props.detail?.usage ?? responseUsage.value)
+// 响应预览、原文树和用量候选都来自同一份共享模型证据投影，不再各自扫描响应体。
+const responseConversation = computed(() => parseModelResponseConversation({
+  responseBodyStatus: props.detail?.responseBodyStatus ?? 'unavailable',
+  ...(props.detail?.responseBodyRaw !== undefined ? { responseBodyRaw: props.detail.responseBodyRaw } : {}),
+  ...(props.detail?.responseBodyFormat ? { responseBodyFormat: props.detail.responseBodyFormat } : {}),
+  ...(props.detail?.responseBodyError ? { responseBodyError: props.detail.responseBodyError } : {}),
+  ...(props.detail?.usage ? { usage: props.detail.usage } : {}),
+}))
+const responseTree = computed(() => buildModelRequestJsonTree(responseConversation.value.raw, 'responseBody'))
+// ADR-0059 的优先级已经在响应投影 adapter 里应用过：标准化 ChatLuna 用量优先于响应体候选。
+const usage = computed<SandboxModelRequestUsage | undefined>(() => responseConversation.value.usage)
 const detailModel = computed(() => {
   const detail = props.detail
   if (!detail) return '未识别'
@@ -841,9 +840,6 @@ function inspectRelatedRequest(payload: { recordId: string }) {
 
 function openRelatedRequest(payload: {
   recordId: string
-  kind: SandboxModelRequestTrajectoryKind
-  detail?: unknown
-  source?: 'request' | 'response'
   returnState: {
     rowId: string
     scrollTop: number

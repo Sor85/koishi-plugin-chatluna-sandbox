@@ -2,12 +2,9 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { formatDuration } from '../client/webqq/format-duration'
-import { extractModelResponseContent, normalizeModelResponseUsage } from '../client/webqq/model-response-content'
 import {
   buildModelRequestJsonTree,
-  findModelRequestJsonPath,
   parseModelRequestImageSource,
-  parseModelResponseBody,
 } from '../client/webqq/model-request-json'
 import { createModelRequestEnterRefresh, createModelRequestLiveRefresh, MODEL_REQUEST_LIVE_REFRESH_INTERVAL_MS } from '../client/webqq/model-request-live-refresh'
 
@@ -148,8 +145,8 @@ describe('WebQQ 模型请求工作台', () => {
     expect(workspaceSource).toContain('正在采集响应体…')
     expect(workspaceSource).toContain('响应体采集失败')
     expect(workspaceSource).toContain('detail.responseBodyRaw')
-    expect(workspaceSource).toContain('parseModelResponseBody')
-    expect(workspaceSource).toContain('extractModelResponseContent')
+    expect(workspaceSource).toContain('parseModelResponseConversation')
+    expect(workspaceSource).not.toContain('extractModelResponseContent')
     expect(workspaceSource).toContain('<ModelResponseContentPreview')
     expect(workspaceSource).toContain('内容预览')
     expect(workspaceSource).toContain('JSON 原文')
@@ -166,7 +163,6 @@ describe('WebQQ 模型请求工作台', () => {
     expect(trajectorySource).toContain('请求体提示词内容占比')
     expect(trajectorySource).toContain('compositionTracks')
     expect(trajectorySource).toContain('conversationCompositionTracks')
-    expect(trajectorySource).toContain('resolveConversationCompositionItems')
     expect(trajectorySource).toContain("['system', 'user', 'tool-definition']")
     expect(trajectorySource).toContain('promptComposition')
     expect(trajectorySource).toContain('当前会话没有可投影的请求组成')
@@ -179,17 +175,19 @@ describe('WebQQ 模型请求工作台', () => {
     expect(trajectorySource).toContain("'open-request': [payload:")
     expect(trajectorySource).toContain(`emit('open-request', {
     recordId: request.id,
-    kind: 'request',
     returnState: {
       rowId: row.id,
       scrollTop: ledgerElement.value?.scrollTop ?? 0,
     },
   })`)
-    expect(trajectorySource).not.toContain('row.detail !== undefined')
+    // 轨迹行不再携带原始证据副本，也不再靠角色内序号定位。
+    expect(trajectorySource).not.toContain('row.detail')
+    expect(trajectorySource).not.toContain('indexInKind')
     expect(trajectorySource).toContain("'inspect-request': [payload: { recordId: string }]")
     expect(trajectorySource).toContain('layout="inspector"')
     expect(trajectorySource).toContain('v-webqq-scrollbar="{ showOverlay: false }"')
-    expect(trajectorySource).toContain(':focus-row="inspectorFocusRow"')
+    expect(trajectorySource).toContain(':focus-evidence="inspectorFocusEvidence"')
+    expect(trajectorySource).toContain(':focus-evidence="analysisFocusEvidence"')
     expect(trajectorySource).toContain('正在加载分析…')
     expect(trajectorySource).not.toContain('selectedTree')
     expect(trajectorySource).not.toContain('webqq-model-trajectory-facts')
@@ -292,24 +290,6 @@ describe('WebQQ 模型请求工作台', () => {
     expect(styles).not.toContain('cursor:')
   })
 
-  it('按结构把轨迹片段定位到 OpenAI 与 Gemini 请求体节点', () => {
-    const openAiUser = { role: 'user', content: '第二条用户消息' }
-    const openAiBody = {
-      model: 'gpt-4.1',
-      messages: [
-        { role: 'system', content: '系统提示' },
-        { role: 'user', content: '第一条用户消息' },
-        openAiUser,
-      ],
-    }
-    expect(findModelRequestJsonPath(openAiBody, structuredClone(openAiUser))).toEqual(['messages', '2'])
-
-    const geminiUser = { role: 'user', parts: [{ text: 'Gemini 用户消息' }] }
-    const geminiBody = { contents: [{ role: 'model', parts: [{ text: '模型回复' }] }, geminiUser] }
-    expect(findModelRequestJsonPath(geminiBody, structuredClone(geminiUser))).toEqual(['contents', '1'])
-    expect(findModelRequestJsonPath(openAiBody, { role: 'user', content: '不存在' })).toBeUndefined()
-  })
-
   it('结构化 JSON 只展开对象和数组，标量保持为只读节点', () => {
     const tree = buildModelRequestJsonTree({
       model: 'gpt-4.1',
@@ -350,83 +330,6 @@ describe('WebQQ 模型请求工作台', () => {
     })
   })
 
-  it('将 JSON 与 SSE 原始响应派生为结构化预览', () => {
-    expect(parseModelResponseBody('{"content":"你好"}', 'json')).toEqual({
-      kind: 'json',
-      value: { content: '你好' },
-    })
-    expect(extractModelResponseContent(parseModelResponseBody(JSON.stringify({
-      candidates: [{ content: { parts: [{ text: 'Gemini 回复' }] } }],
-      usageMetadata: { promptTokenCount: 8 },
-    }), 'json').value)).toMatchObject({
-      content: ['Gemini 回复'],
-      usage: { promptTokenCount: 8 },
-    })
-    expect(parseModelResponseBody([
-      'event: message',
-      'data: {"delta":"你"}',
-      '',
-      'data: {"delta":"好"}',
-      '',
-      'data: [DONE]',
-      '',
-    ].join('\n'), 'sse')).toEqual({
-      kind: 'sse',
-      value: [
-        { event: 'message', data: { delta: '你' } },
-        { event: 'message', data: { delta: '好' } },
-        { event: 'message', data: '[DONE]' },
-      ],
-    })
-  })
-
-  it('从 OpenAI、Anthropic 和 Gemini 响应提取内容预览', () => {
-    expect(extractModelResponseContent({
-      choices: [{
-        message: {
-          content: '最终回复',
-          reasoning_content: '思考过程',
-          tool_calls: [{ id: 'call-1', function: { name: 'search', arguments: '{"q":"test"}' } }],
-        },
-        finish_reason: 'tool_calls',
-      }],
-      usage: { prompt_tokens: 10, completion_tokens: 5 },
-    })).toMatchObject({
-      content: ['最终回复'],
-      reasoning: ['思考过程'],
-      toolCalls: [{ id: 'call-1', name: 'search', arguments: '{"q":"test"}' }],
-      finishReasons: ['tool_calls'],
-      usage: { prompt_tokens: 10, completion_tokens: 5 },
-    })
-
-    expect(extractModelResponseContent({
-      content: [
-        { type: 'thinking', thinking: '分析' },
-        { type: 'text', text: '答案' },
-        { type: 'tool_use', id: 'tool-1', name: 'lookup', input: { id: 1 } },
-      ],
-      stop_reason: 'end_turn',
-    })).toMatchObject({
-      content: ['答案'],
-      reasoning: ['分析'],
-      toolCalls: [{ id: 'tool-1', name: 'lookup' }],
-      finishReasons: ['end_turn'],
-    })
-
-    expect(extractModelResponseContent({
-      candidates: [{
-        content: { parts: [{ text: 'Gemini 回复' }, { text: '内部思考', thought: true }] },
-        finishReason: 'STOP',
-      }],
-      usageMetadata: { promptTokenCount: 8 },
-    })).toMatchObject({
-      content: ['Gemini 回复'],
-      reasoning: ['内部思考'],
-      finishReasons: ['STOP'],
-      usage: { promptTokenCount: 8 },
-    })
-  })
-
   it('按数量级将耗时切换为 ms、s、min、h', () => {
     expect(formatDuration(0)).toBe('0 ms')
     expect(formatDuration(842)).toBe('842 ms')
@@ -437,126 +340,6 @@ describe('WebQQ 模型请求工作台', () => {
     expect(formatDuration(83_400)).toBe('1 min 23 s')
     expect(formatDuration(3_600_000)).toBe('1 h')
     expect(formatDuration(3_723_000)).toBe('1 h 2 min 3 s')
-  })
-
-  it('将 OpenAI、Anthropic 和 Gemini 用量统一为顶部统计', () => {
-    expect(normalizeModelResponseUsage({
-      prompt_tokens: 26512,
-      completion_tokens: 705,
-      total_tokens: 27217,
-      prompt_tokens_details: { cached_tokens: 20607 },
-      completion_tokens_details: { reasoning_tokens: 483 },
-    })).toEqual({
-      inputTokens: 26512,
-      outputTokens: 222,
-      reasoningTokens: 483,
-      cachedTokens: 20607,
-      totalTokens: 27217,
-    })
-
-    expect(normalizeModelResponseUsage({
-      input_tokens: 100,
-      output_tokens: 40,
-      cache_read_input_tokens: 80,
-      cache_creation_input_tokens: 20,
-    })).toEqual({
-      inputTokens: 200,
-      outputTokens: 40,
-      reasoningTokens: undefined,
-      cachedTokens: 100,
-      totalTokens: 240,
-    })
-
-    expect(normalizeModelResponseUsage({
-      promptTokenCount: 1000,
-      candidatesTokenCount: 200,
-      thoughtsTokenCount: 50,
-      cachedContentTokenCount: 700,
-      totalTokenCount: 1250,
-    })).toEqual({
-      inputTokens: 1000,
-      outputTokens: 200,
-      reasoningTokens: 50,
-      cachedTokens: 700,
-      totalTokens: 1250,
-    })
-
-    expect(normalizeModelResponseUsage({
-      promptTokenCount: 10664,
-      candidatesTokenCount: 125,
-      totalTokenCount: 11511,
-      cachedContentTokenCount: 8051,
-      thoughtsTokenCount: 722,
-    })).toEqual({
-      inputTokens: 10664,
-      outputTokens: 125,
-      reasoningTokens: 722,
-      cachedTokens: 8051,
-      totalTokens: 11511,
-    })
-
-    expect(normalizeModelResponseUsage({
-      prompt_tokens: 14228,
-      completion_tokens: 406,
-      total_tokens: 14852,
-      completion_tokens_details: { reasoning_tokens: 406 },
-    })).toEqual({
-      inputTokens: 14228,
-      outputTokens: 218,
-      reasoningTokens: 406,
-      cachedTokens: undefined,
-      totalTokens: 14852,
-    })
-
-    expect(normalizeModelResponseUsage({
-      prompt_tokens: 100,
-      completion_tokens: 40,
-      total_tokens: 140,
-      completion_tokens_details: { reasoning_tokens: 40 },
-    })).toEqual({
-      inputTokens: 100,
-      outputTokens: 0,
-      reasoningTokens: 40,
-      cachedTokens: undefined,
-      totalTokens: 140,
-    })
-  })
-
-  it('合并流式 usage，避免后到的残缺片段把输出覆盖成 0', () => {
-    const preview = extractModelResponseContent([
-      {
-        event: 'chunk',
-        data: {
-          choices: [{ delta: { content: '你好' } }],
-          usage: {
-            prompt_tokens: 14228,
-            completion_tokens: 624,
-            total_tokens: 14852,
-            completion_tokens_details: { reasoning_tokens: 406 },
-          },
-        },
-      },
-      {
-        event: 'chunk',
-        data: {
-          choices: [{ delta: { content: '' } }],
-          usage: {
-            prompt_tokens: 14228,
-            completion_tokens: 406,
-            total_tokens: 14852,
-            completion_tokens_details: { reasoning_tokens: 406 },
-          },
-        },
-      },
-    ])
-    expect(preview.content).toEqual(['你好'])
-    expect(normalizeModelResponseUsage(preview.usage)).toEqual({
-      inputTokens: 14228,
-      outputTokens: 218,
-      reasoningTokens: 406,
-      cachedTokens: undefined,
-      totalTokens: 14852,
-    })
   })
 
   it('实时刷新默认关闭，仅在开关打开且页面可见时按 2 秒轮询', () => {
