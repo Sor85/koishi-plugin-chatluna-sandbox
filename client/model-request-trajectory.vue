@@ -377,8 +377,10 @@ const ledgerRows = computed(() => props.trajectory?.rows.filter((row) => {
   if (toolsCollapsed.value && row.kind === 'tool') return false
   return true
 }) ?? [])
-watch(() => props.trajectory, () => {
-  selectedRowId.value = ''
+watch(() => props.trajectory, (trajectory) => {
+  // 轨迹行 id 由 evidenceId 派生，刷新后同一条证据仍是同一个 id，因此仍然存在的选中行要保留；
+  // 只有证据真的消失才清空。否则 pending 请求自动刷新每轮都会把用户正在看的行和检查器一起丢掉。
+  if (!trajectory?.rows.some(({ id }) => id === selectedRowId.value)) selectedRowId.value = ''
   restoreTrajectoryPosition()
 })
 
