@@ -2,6 +2,8 @@
 .chatluna-sandbox-messages {
   min-height: 0;
   overflow-y: auto;
+  /* 关闭浏览器滚动锚定，避免新消息把 scrollTop 拽离底部并误触发“用户上滑”。 */
+  overflow-anchor: none;
   /* 底部留白跟随输入区实际高度（含回复/附件浮条与多行输入），由 composer 通过变量上报。 */
   padding: 20px 22px var(--webqq-composer-space, 80px);
   scroll-padding-bottom: var(--webqq-composer-space, 80px);
