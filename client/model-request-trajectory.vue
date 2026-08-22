@@ -45,6 +45,7 @@
             耗时
           </Button>
           <Button
+            v-if="!analysis"
             size="sm"
             variant="ghost"
             :aria-pressed="requestsCollapsed"
@@ -55,16 +56,39 @@
             <IconSquareMinus v-else data-icon="inline-start" aria-hidden="true" />
             请求
           </Button>
+        </div>
+        <div class="webqq-model-trajectory-control-filters" role="group" aria-label="按证据种类过滤">
           <Button
+            v-for="option in MODEL_EVIDENCE_FILTER_KINDS"
+            :key="option.kind"
             size="sm"
             variant="ghost"
-            :aria-pressed="toolsCollapsed"
-            :aria-label="toolsCollapsed ? '显示工具事件' : '隐藏工具事件'"
-            @click="toolsCollapsed = !toolsCollapsed"
+            class="webqq-model-trajectory-filter-toggle"
+            :class="{ 'is-hidden': hiddenKinds.has(option.kind) }"
+            :aria-pressed="hiddenKinds.has(option.kind)"
+            :aria-label="`${hiddenKinds.has(option.kind) ? '显示' : '隐藏'} ${option.label} 证据`"
+            @click="hiddenKinds = toggleFilterMember(hiddenKinds, option.kind)"
           >
-            <IconSquarePlus v-if="toolsCollapsed" data-icon="inline-start" aria-hidden="true" />
+            <IconSquarePlus v-if="hiddenKinds.has(option.kind)" data-icon="inline-start" aria-hidden="true" />
             <IconSquareMinus v-else data-icon="inline-start" aria-hidden="true" />
-            工具
+            {{ option.label }}
+          </Button>
+        </div>
+        <div class="webqq-model-trajectory-control-filters" role="group" aria-label="按证据来源过滤">
+          <Button
+            v-for="option in MODEL_EVIDENCE_FILTER_SOURCES"
+            :key="option.source"
+            size="sm"
+            variant="ghost"
+            class="webqq-model-trajectory-filter-toggle"
+            :class="{ 'is-hidden': hiddenSources.has(option.source) }"
+            :aria-pressed="hiddenSources.has(option.source)"
+            :aria-label="`${hiddenSources.has(option.source) ? '显示' : '隐藏'}${option.label}证据`"
+            @click="hiddenSources = toggleFilterMember(hiddenSources, option.source)"
+          >
+            <IconSquarePlus v-if="hiddenSources.has(option.source)" data-icon="inline-start" aria-hidden="true" />
+            <IconSquareMinus v-else data-icon="inline-start" aria-hidden="true" />
+            {{ option.label }}
           </Button>
         </div>
         <label class="webqq-model-trajectory-search">
@@ -128,12 +152,11 @@
         :trajectory="trajectory"
         :search-query="searchQuery"
         :focus-evidence="analysisFocusEvidence"
-        :requests-collapsed="requestsCollapsed"
-        :tools-collapsed="toolsCollapsed"
+        :filter="evidenceFilter"
       />
       <div v-else class="webqq-model-trajectory-ledger" :class="{ 'has-inspector': selectedRow }">
         <div ref="ledgerElement" v-webqq-scrollbar class="webqq-model-trajectory-table" role="table" aria-label="轨迹事件账本">
-          <div v-if="!ledgerRows.length" class="webqq-model-trajectory-filter-empty">当前折叠条件下没有事件</div>
+          <div v-if="!ledgerRows.length" class="webqq-model-trajectory-filter-empty">当前过滤条件下没有事件</div>
           <template v-for="row in ledgerRows" :key="row.id">
             <div v-if="row.kind === 'request'" class="webqq-model-trajectory-request-boundary" role="row">
               <button type="button" :aria-label="`选择${requestLabel(row.requestId)}`" @click="selectedRowId = row.id">
@@ -187,6 +210,7 @@
               :detail="inspectorDetail"
               :search-query="searchQuery"
               :focus-evidence="inspectorFocusEvidence"
+              :filter="evidenceFilter"
             />
             <div v-else class="webqq-model-request-empty">正在加载分析…</div>
           </div>
@@ -212,6 +236,15 @@ import { Input } from './components/ui/input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip'
 import ModelRequestConversationAnalysis from './webqq/analysis-view.vue'
 import { formatDuration } from './webqq/format-duration'
+import {
+  MODEL_EVIDENCE_FILTER_KINDS,
+  MODEL_EVIDENCE_FILTER_SOURCES,
+  isEvidenceVisible,
+  toggleFilterMember,
+  trajectoryRowFilterKind,
+  type ModelEvidenceFilterKind,
+  type ModelEvidenceFilterSource,
+} from './webqq/model-request-filter'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type {
   SandboxModelRequestDetail,
@@ -257,7 +290,8 @@ const ledgerElement = ref<HTMLElement>()
 const selectedRowId = ref('')
 const actualDuration = ref(true)
 const requestsCollapsed = ref(false)
-const toolsCollapsed = ref(false)
+const hiddenKinds = ref<ReadonlySet<ModelEvidenceFilterKind>>(new Set())
+const hiddenSources = ref<ReadonlySet<ModelEvidenceFilterSource>>(new Set())
 const searchQuery = ref('')
 const analysisFocusEvidence = ref<{
   evidenceId: string
@@ -372,10 +406,13 @@ function groupCompositionTracks(
     return kindSegments.length ? [{ kind, segments: kindSegments }] : []
   })
 }
+const evidenceFilter = computed(() => ({
+  hiddenKinds: hiddenKinds.value,
+  hiddenSources: hiddenSources.value,
+}))
 const ledgerRows = computed(() => props.trajectory?.rows.filter((row) => {
   if (requestsCollapsed.value && row.kind !== 'request') return false
-  if (toolsCollapsed.value && row.kind === 'tool') return false
-  return true
+  return isEvidenceVisible(evidenceFilter.value, trajectoryRowFilterKind(row), row.source)
 }) ?? [])
 watch(() => props.trajectory, (trajectory) => {
   // 轨迹行 id 由 evidenceId 派生，刷新后同一条证据仍是同一个 id，因此仍然存在的选中行要保留；

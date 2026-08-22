@@ -280,13 +280,12 @@ describe('WebQQ 模型请求工作台', () => {
     expect(styles).toMatch(/\.webqq-model-trajectory-composition-bar\.is-selected\s*\{[^}]*z-index:\s*1[^}]*0 0 0 1px var\(--webqq-trajectory-layer\)[^}]*0 0 0 2px var\(--webqq-accent\)/s)
     expect(styles).not.toMatch(/\.webqq-model-trajectory-composition-bar\.is-selected\s*\{[^}]*outline:/s)
     expect(trajectorySource).toContain('耗时')
-    expect(trajectorySource).toContain('请求')
-    expect(trajectorySource).toContain('工具')
     expect(trajectorySource).toContain('placeholder="搜索"')
     expect(trajectorySource).toContain('v-for="row in ledgerRows"')
-    expect(trajectorySource).toContain("if (requestsCollapsed.value && row.kind !== 'request') return false")
-    expect(trajectorySource).toContain("if (toolsCollapsed.value && row.kind === 'tool') return false")
+    // 过滤开关多了之后工具栏必须能换行，否则窄屏会把搜索框挤出容器。
     expect(styles).toMatch(/\.webqq-model-trajectory-controls\s*\{[^}]*min-height:\s*32px/s)
+    expect(styles).toMatch(/\.webqq-model-trajectory-controls\s*\{[^}]*flex-wrap:\s*wrap/s)
+    expect(styles).toMatch(/\.webqq-model-trajectory-filter-toggle\.is-hidden\s*\{[^}]*text-decoration:\s*line-through/s)
     expect(styles).not.toContain('cursor:')
   })
 

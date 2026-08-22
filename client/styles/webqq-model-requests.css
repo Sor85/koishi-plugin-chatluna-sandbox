@@ -614,6 +614,33 @@
   gap: 2px;
 }
 
+/* 种类与来源共 8 个过滤开关；工具栏必须允许换行，否则窄屏会把搜索框挤出容器。 */
+.webqq-model-trajectory-controls {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  row-gap: 4px;
+}
+
+.webqq-model-trajectory-control-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+/* 「种类」与「来源」之间留一道分隔，避免被读成一排同质按钮。 */
+.webqq-model-trajectory-control-filters + .webqq-model-trajectory-control-filters {
+  padding-left: 6px;
+  border-left: 1px solid var(--webqq-border);
+}
+
+/* 被隐藏的种类划掉标签并降饱和；只改文字表现，不动指针样式。 */
+.webqq-model-trajectory-filter-toggle.is-hidden {
+  color: var(--webqq-muted);
+  text-decoration: line-through;
+  opacity: 0.72;
+}
+
 .webqq-model-trajectory-controls [data-slot="button"] {
   height: 22px;
   padding-inline: 6px;
@@ -624,6 +651,8 @@
 .webqq-model-trajectory-search {
   position: relative;
   width: min(164px, 32%);
+  /* 过滤开关左对齐铺开，搜索框始终靠右。 */
+  margin-left: auto;
 }
 
 .webqq-model-trajectory-search > svg {

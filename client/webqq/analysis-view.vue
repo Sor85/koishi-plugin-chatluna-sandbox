@@ -47,16 +47,19 @@
 
       <div ref="contentElement" class="webqq-model-analysis-content">
         <header class="webqq-model-analysis-heading">
-          <h3>Messages <span>({{ conversation.messages.length }})</span></h3>
+          <h3>Messages <span>({{ visibleMessages.length }})</span></h3>
         </header>
 
         <div class="webqq-model-analysis-conversation">
           <div v-if="conversation.parseError && !conversation.messages.length" class="webqq-model-analysis-empty">
             <p>{{ conversation.parseError }}</p>
           </div>
+          <div v-else-if="!visibleMessages.length" class="webqq-model-analysis-empty">
+            <p>当前过滤条件下没有请求消息</p>
+          </div>
 
           <article
-            v-for="message in conversation.messages"
+            v-for="message in visibleMessages"
             :id="modelAnalysisTargetId(message.evidenceId)"
             :key="message.evidenceId"
             class="webqq-model-analysis-card"
@@ -138,7 +141,7 @@
                 :search-query="normalizedSearch"
                 :force-expanded="expandedTextTargets.has(modelAnalysisTargetId(message.evidenceId))"
               />
-              <section v-if="message.toolCalls.length" class="webqq-model-analysis-section">
+              <section v-if="message.toolCalls.length && requestToolCallsVisible" class="webqq-model-analysis-section">
                 <strong>工具调用</strong>
                 <article
                   v-for="(call, callIndex) in message.toolCalls"
@@ -167,6 +170,7 @@
             </div>
           </article>
 
+          <template v-if="responseVisible">
           <section class="webqq-model-analysis-response-heading">
             <h3>Response</h3>
           </section>
@@ -234,19 +238,19 @@
                 {{ response.statusMessage || '响应没有可展示内容' }}
               </p>
               <AnalysisTextBlock
-                v-if="response.reasoning.length"
+                v-if="response.reasoning.length && responseContentVisible"
                 label="思考"
                 :value="response.reasoning.join('\n')"
                 :search-query="normalizedSearch"
                 :force-expanded="expandedTextTargets.has(MODEL_ANALYSIS_RESPONSE_TARGET)"
               />
               <AnalysisTextBlock
-                v-if="response.content.length"
+                v-if="response.content.length && responseContentVisible"
                 :value="response.content.join('\n')"
                 :search-query="normalizedSearch"
                 :force-expanded="expandedTextTargets.has(MODEL_ANALYSIS_RESPONSE_TARGET)"
               />
-              <section v-if="response.toolCalls.length" class="webqq-model-analysis-section">
+              <section v-if="response.toolCalls.length && responseToolCallsVisible" class="webqq-model-analysis-section">
                 <strong>工具调用</strong>
                 <article
                   v-for="(call, callIndex) in response.toolCalls"
@@ -269,7 +273,7 @@
                   </button>
                 </article>
               </section>
-              <section v-if="response.toolResults.length" class="webqq-model-analysis-section">
+              <section v-if="response.toolResults.length && responseToolResultsVisible" class="webqq-model-analysis-section">
                 <strong>工具结果</strong>
                 <article
                   v-for="(result, resultIndex) in response.toolResults"
@@ -296,8 +300,9 @@
               </div>
             </div>
           </article>
+          </template>
 
-          <section :id="MODEL_ANALYSIS_TOOLS_TARGET" class="webqq-model-analysis-tools" :class="{ 'is-located': highlightedTarget === MODEL_ANALYSIS_TOOLS_TARGET }">
+          <section v-if="toolDefinitionsVisible" :id="MODEL_ANALYSIS_TOOLS_TARGET" class="webqq-model-analysis-tools" :class="{ 'is-located': highlightedTarget === MODEL_ANALYSIS_TOOLS_TARGET }">
             <h3>Tools <span>({{ conversation.tools.length }})</span></h3>
             <p v-if="!conversation.tools.length" class="webqq-model-analysis-empty">请求未声明工具定义</p>
             <article
@@ -387,6 +392,14 @@ import {
 } from './model-request-analysis'
 import { buildModelRequestJsonTree } from './model-request-json'
 import {
+  EMPTY_MODEL_EVIDENCE_FILTER,
+  analysisItemFilterKind,
+  analysisItemFilterSource,
+  isEvidenceVisible,
+  messageRoleFilterKind,
+  type ModelEvidenceFilter,
+} from './model-request-filter'
+import {
   parseModelRequestConversationDetail,
   type ModelConversationContentPart,
   type ModelConversationMessage,
@@ -404,8 +417,8 @@ const props = defineProps<{
     evidenceId: string
     token: number
   }
-  requestsCollapsed?: boolean
-  toolsCollapsed?: boolean
+  /** 与轨迹账本共用的显示过滤；同一条证据在两个视图里必须同时出现或同时隐藏。 */
+  filter?: ModelEvidenceFilter
 }>()
 const emit = defineEmits<{ locate: [target: string] }>()
 
@@ -413,13 +426,26 @@ const normalizedSearch = computed(() => normalizeAnalysisQuery(props.searchQuery
 const conversation = computed<ModelRequestConversation>(() => parseModelRequestConversationDetail(props.detail))
 const response = computed(() => conversation.value.response!)
 const navigation = computed(() => buildModelRequestAnalysisNavigation(conversation.value, props.detail))
+const evidenceFilter = computed(() => props.filter ?? EMPTY_MODEL_EVIDENCE_FILTER)
 const visibleNavigationGroups = computed(() => navigation.value.groups.flatMap((group) => {
-  if (props.requestsCollapsed && group.key !== 'response') return []
-  const items = props.toolsCollapsed
-    ? group.items.filter(item => item.kind !== 'tool-call' && item.kind !== 'tool-result' && item.kind !== 'tool-definition')
-    : group.items
+  const items = group.items.filter(item => isEvidenceVisible(
+    evidenceFilter.value,
+    analysisItemFilterKind(item.kind, group.key),
+    analysisItemFilterSource(group.key),
+  ))
   return items.length ? [{ ...group, count: items.length, items }] : []
 }))
+const visibleMessages = computed(() => conversation.value.messages.filter(message => isEvidenceVisible(
+  evidenceFilter.value,
+  messageRoleFilterKind(message.role),
+  'request',
+)))
+const requestToolCallsVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'tool-call', 'request'))
+const toolDefinitionsVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'tool-definition', 'request'))
+const responseVisible = computed(() => isEvidenceVisible(evidenceFilter.value, undefined, 'response'))
+const responseContentVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'assistant', 'response'))
+const responseToolCallsVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'tool-call', 'response'))
+const responseToolResultsVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'tool-result', 'response'))
 const responseRaw = ref(false)
 const rawMessages = ref(new Set<string>())
 const collapsedCards = ref(new Set<string>())
@@ -614,6 +640,8 @@ function locateTool(name: string) {
 }
 
 function hasTool(name: string) {
+  // 工具定义整段被过滤掉时不给跳转入口，否则会定位到一个当前不存在的目标。
+  if (!toolDefinitionsVisible.value) return false
   return conversation.value.tools.some(tool => tool.name === name)
 }
 
