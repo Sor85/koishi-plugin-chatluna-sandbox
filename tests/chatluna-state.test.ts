@@ -149,6 +149,68 @@ describe('ChatLuna 多机器人对话状态', () => {
     expect(control.getChatLunaStates()).toEqual([])
   })
 
+  it('把唯一 ChatLuna 会话的规范错误关联到同一逻辑会话最近的失败模型请求', async () => {
+    const { app, control } = await createControl()
+    const directSession = createDirectSession(control, '20001')
+    const groupSession = createGroupSession(control, '20001')
+
+    await emit(app, 'chatluna/before-chat', 'chatluna:direct', {}, {}, {}, directSession)
+    control.recordModelRequest({
+      status: 'error',
+      durationMs: 10,
+      model: 'direct-model',
+      attribution: 'attributed',
+      entities: { conversationId: 'private:10001:20001' },
+      requestBodyAvailable: true,
+      responseBodyStatus: 'unavailable',
+      error: { code: 'model_request_error', message: 'HTTP 500', retryable: false, traceId: 'direct-trace' },
+    })
+    control.recordModelRequest({
+      status: 'error',
+      durationMs: 10,
+      model: 'group-model',
+      attribution: 'attributed',
+      entities: { conversationId: 'group:30001' },
+      requestBodyAvailable: true,
+      responseBodyStatus: 'unavailable',
+      error: { code: 'model_request_error', message: 'HTTP 500', retryable: false, traceId: 'group-trace' },
+    })
+
+    await emit(app, 'chatluna/after-chat-error', {
+      errorCode: 103,
+      message: 'API 请求失败 (103)',
+      originError: new Error('provider rejected request'),
+    }, 'chatluna:direct')
+
+    expect(control.getModelRequestRecords({ model: 'direct-model' }).records[0]).toMatchObject({
+      chatlunaError: {
+        code: 103,
+        message: 'API 请求失败 (103)',
+        originMessage: 'provider rejected request',
+      },
+    })
+    expect(control.getModelRequestRecords({ model: 'group-model' }).records[0]?.chatlunaError).toBeUndefined()
+  })
+
+  it('ChatLuna 会话同时映射多个机器人时不把错误串到任意模型请求', async () => {
+    const { app, control } = await createControl()
+    await emit(app, 'chatluna/before-chat', 'chatluna:shared-error', {}, {}, {}, createGroupSession(control, '20001'))
+    await emit(app, 'chatluna/before-chat', 'chatluna:shared-error', {}, {}, {}, createGroupSession(control, '20002'))
+    const request = control.recordModelRequest({
+      status: 'error',
+      durationMs: 10,
+      attribution: 'attributed',
+      entities: { conversationId: 'group:30001' },
+      requestBodyAvailable: true,
+      responseBodyStatus: 'unavailable',
+      error: { code: 'model_request_error', message: 'HTTP 500', retryable: false, traceId: 'shared-trace' },
+    })
+
+    await emit(app, 'chatluna/after-chat-error', { errorCode: 103, message: 'API 请求失败 (103)' }, 'chatluna:shared-error')
+
+    expect(control.getModelRequestRecord({ recordId: request.id }).chatlunaError).toBeUndefined()
+  })
+
   it('兼容 chatluna-character 的思考开始与结束事件', async () => {
     const { app, control } = await createControl()
     const session = createGroupSession(control, '20001')

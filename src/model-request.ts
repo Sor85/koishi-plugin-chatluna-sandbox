@@ -1,6 +1,7 @@
 import { Random } from 'koishi'
 import type {
   GetSandboxModelRequestRecordsInput,
+  SandboxChatLunaRequestError,
   SandboxModelRequestCapacity,
   SandboxModelRequestDetail,
   SandboxModelRequestEntities,
@@ -49,6 +50,7 @@ export interface AppendModelRequestRecordInput {
   interactionId?: string
   chatlunaRequestId?: string
   error?: SandboxModelRequestError
+  chatlunaError?: SandboxChatLunaRequestError
 }
 
 export interface UpdateModelRequestRecordInput {
@@ -62,6 +64,7 @@ export interface UpdateModelRequestRecordInput {
   responseBodyError?: string
   chatlunaRequestId?: string
   error?: SandboxModelRequestError
+  chatlunaError?: SandboxChatLunaRequestError
 }
 
 export interface SandboxModelRequestStoreOptions {
@@ -205,6 +208,7 @@ export class SandboxModelRequestStore {
       ...(input.interactionId ? { interactionId: input.interactionId } : {}),
       ...(input.chatlunaRequestId ? { chatlunaRequestId: input.chatlunaRequestId } : {}),
       ...(input.error ? { error: structuredClone(input.error) } : {}),
+      ...(input.chatlunaError ? { chatlunaError: structuredClone(input.chatlunaError) } : {}),
     }
     this.records.push(record)
     this.totalBytes += estimateBytes(record)
@@ -232,6 +236,7 @@ export class SandboxModelRequestStore {
     }
     if (input.status === 'success') delete next.error
     else if (input.error) next.error = structuredClone(input.error)
+    if (input.chatlunaError) next.chatlunaError = structuredClone(input.chatlunaError)
     if (input.responseBodyStatus === 'complete') delete next.responseBodyError
     this.records[index] = next
     this.totalBytes += estimateBytes(next)

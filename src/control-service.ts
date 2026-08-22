@@ -3,7 +3,8 @@ import { Context, h, Random, Universal } from 'koishi'
 import { resolve } from 'node:path'
 import { SandboxBot } from './bot'
 import { BUILTIN_AVATARS, findBuiltinAvatarByReference, getBuiltinAvatarReference, pickUnusedBuiltinAvatar } from './builtin-avatars'
-import { SandboxChatLunaStateStore } from './chatluna-state'
+import { SandboxChatLunaStateStore, type SandboxChatLunaErrorTarget } from './chatluna-state'
+import { findLatestFailedModelRequest, readChatLunaRequestError } from './chatluna-error'
 import { SandboxMediaStorage, MAX_MEDIA_SIZE } from './media-storage'
 import { SandboxOneBotDebugStore, createOneBotDebugError, type AppendOneBotDebugRecordInput, type SandboxOneBotDebugPersistence } from './onebot-debug'
 import {
@@ -267,6 +268,8 @@ export class SandboxControlService {
       return participant?.kind === 'bot' && !!conversation && this.isConversationVisible(botParticipantId, conversation)
     }, () => this.notifySceneMutation(), (botParticipantId, conversationId, result) => {
       this.archiveChatLunaResult(botParticipantId, conversationId, result)
+    }, (error, targets) => {
+      this.archiveChatLunaModelRequestError(error, targets)
     })
     this.syncRuntimeBots()
     this.contextDisposers.push(ctx.on('ready', async () => {
@@ -548,6 +551,14 @@ export class SandboxControlService {
     return this.chatLunaState.getStates()
       .filter(({ thinking }) => thinking)
       .map(({ botParticipantId, conversationId }) => ({ botId: botParticipantId, conversationId }))
+  }
+
+  private archiveChatLunaModelRequestError(error: unknown, target: SandboxChatLunaErrorTarget): void {
+    const chatlunaError = readChatLunaRequestError(error)
+    if (!chatlunaError) return
+    const record = findLatestFailedModelRequest(this.modelRequests.getRawRecords(), target.conversationId)
+    if (!record) return
+    this.modelRequests.update(record.id, { chatlunaError })
   }
 
   getModelRequestRecords(input: GetSandboxModelRequestRecordsInput = {}): SandboxModelRequestRecordsPage {

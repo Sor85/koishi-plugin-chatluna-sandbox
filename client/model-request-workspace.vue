@@ -338,10 +338,60 @@
               <span class="webqq-model-request-meta-value">{{ detail.interactionId }}</span>
             </p>
           </div>
-          <p v-if="detail.error" class="webqq-model-request-trace">
-            <IconAlertCircle :size="17" aria-hidden="true" />
-            <span>{{ detail.error.message }} · trace {{ detail.error.traceId }}</span>
-          </p>
+          <section v-if="detail.status === 'error'" class="webqq-model-request-error-diagnostic" aria-label="错误诊断">
+            <header class="webqq-model-request-section-heading">
+              <span>
+                <IconAlertCircle :size="17" aria-hidden="true" />
+                <strong>错误诊断</strong>
+              </span>
+              <a
+                v-if="detail.chatlunaError"
+                :href="CHATLUNA_ERROR_CODE_DOCUMENTATION_URL"
+                target="_blank"
+                rel="noreferrer"
+              >
+                ChatLuna 错误码文档
+              </a>
+            </header>
+            <dl class="webqq-model-request-error-details">
+              <template v-if="detail.chatlunaError?.code !== undefined">
+                <dt class="webqq-model-request-error-code-label">错误码</dt>
+                <dd>
+                  <Badge class="webqq-model-request-status-error webqq-model-request-error-code">
+                    {{ detail.chatlunaError.code }}
+                  </Badge>
+                </dd>
+              </template>
+              <template v-if="detail.chatlunaError?.message">
+                <dt>报错</dt>
+                <dd>{{ detail.chatlunaError.message }}</dd>
+              </template>
+              <template v-if="detail.chatlunaError?.originMessage">
+                <dt>原始原因</dt>
+                <dd>{{ detail.chatlunaError.originMessage }}</dd>
+              </template>
+              <template v-if="detail.error">
+                <dt>请求采集</dt>
+                <dd class="webqq-model-request-capture-error">
+                  <Badge class="webqq-model-request-status-error webqq-model-request-error-code">
+                    {{ detail.error.message }}
+                  </Badge>
+                  <span class="webqq-model-request-error-trace">trace {{ detail.error.traceId }}</span>
+                </dd>
+              </template>
+              <template v-if="chatlunaErrorCauses.length">
+                <dt>可能的原因</dt>
+                <dd>
+                  <ul class="webqq-model-request-error-causes">
+                    <li v-for="cause in chatlunaErrorCauses" :key="cause">{{ cause }}</li>
+                  </ul>
+                </dd>
+              </template>
+            </dl>
+            <p v-if="detail.chatlunaError && !chatlunaErrorCauses.length" class="webqq-model-request-error-note">
+              ChatLuna 文档没有为该错误码列出更具体的原因，请结合原始原因和响应原文排查。
+            </p>
+          </section>
           <section class="webqq-model-request-body">
             <div class="webqq-model-request-body-header">
               <div class="webqq-model-request-body-tabs" role="tablist" aria-label="模型请求内容">
@@ -541,6 +591,7 @@ import ModelRequestJsonTree from './model-request-json-tree.vue'
 import ModelRequestTrajectory from './model-request-trajectory.vue'
 import ModelResponseContentPreview from './model-response-content-preview.vue'
 import WebqqAvatar from './webqq-avatar.vue'
+import { CHATLUNA_ERROR_CODE_DOCUMENTATION_URL, getChatLunaErrorPossibleCauses } from '../src/chatluna-error'
 import { formatDuration } from './webqq/format-duration'
 import { parseModelResponseConversation } from './webqq/model-request-conversation'
 import { buildModelRequestJsonTree } from './webqq/model-request-json'
@@ -684,6 +735,7 @@ const detailModel = computed(() => {
   }
   return '未识别'
 })
+const chatlunaErrorCauses = computed(() => getChatLunaErrorPossibleCauses(props.detail?.chatlunaError))
 const usageItems = computed(() => [
   { label: '输入', value: usage.value?.inputTokens, format: 'token' as const },
   { label: '输出', value: usage.value?.outputTokens, format: 'token' as const },

@@ -435,6 +435,13 @@ export interface SandboxModelRequestError {
   traceId: string
 }
 
+export interface SandboxChatLunaRequestError {
+  code?: number
+  message?: string
+  originMessage?: string
+  isTimeout?: boolean
+}
+
 export interface SandboxModelRequestEntities {
   scopeId?: string
   botId?: string
@@ -485,6 +492,7 @@ export interface SandboxModelRequestRecord {
   chatlunaRequestId?: string
   usage?: SandboxModelRequestUsage
   error?: SandboxModelRequestError
+  chatlunaError?: SandboxChatLunaRequestError
 }
 
 export type SandboxModelRequestListItem = Omit<SandboxModelRequestRecord, 'requestBody' | 'responseBodyRaw'> & {

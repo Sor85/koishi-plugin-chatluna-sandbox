@@ -16,6 +16,7 @@ import {
 import type { SandboxOneBotDebugPersistence } from './onebot-debug'
 import { linkChatLunaUsageRequest, type ChatLunaUsageLookup } from './chatluna-usage'
 import { installModelRequestCollector, resolveChatLunaPluginClass } from './model-request-collector'
+import { seedDevelopmentModelRequestErrors } from './model-request-error-preview'
 import { MAIN_MODEL_REQUEST_SCOPE_ID, SandboxModelRequestStore, UNATTRIBUTED_MODEL_REQUEST_SCOPE_ID, type SandboxModelRequestPersistence } from './model-request'
 import { SandboxMcpHttpServer, type SandboxMcpServerConfig } from './mcp/server'
 import { SandboxMcpService } from './mcp/service'
@@ -28,6 +29,8 @@ export * from './persistence'
 export * from './onebot-debug'
 export * from './model-request'
 export * from './model-request-collector'
+export * from './model-request-error-preview'
+export * from './chatluna-error'
 export * from './types'
 export * from './mcp/server'
 export * from './mcp/service'
@@ -207,6 +210,8 @@ export function apply(ctx: Context, config: Config) {
       registerConsole(inner.console, control, config, mcp, testSpaces, unattributedModelRequests, getChatLunaUsage)
       inner.on('ready', async () => {
         await control.waitForSceneReady()
+        const seeded = await seedDevelopmentModelRequestErrors(control)
+        if (seeded) inner.logger('chatluna-sandbox').info(`已生成 ${seeded} 条开发环境 ChatLuna 错误预览记录。`)
         await mcpServer.start().catch((error) => inner.logger('chatluna-sandbox').error('MCP 监听器启动失败；WebQQ 仍可继续使用。', error))
       })
       inner.on('dispose', () => {
@@ -218,6 +223,11 @@ export function apply(ctx: Context, config: Config) {
       inner.logger('chatluna-sandbox').error('MCP 初始化失败；WebQQ 仍可继续使用。', error)
       const getChatLunaUsage = () => findChatLunaUsage(inner)
       registerConsole(inner.console, control, config, undefined, testSpaces, unattributedModelRequests, getChatLunaUsage)
+      inner.on('ready', async () => {
+        await control.waitForSceneReady()
+        const seeded = await seedDevelopmentModelRequestErrors(control)
+        if (seeded) inner.logger('chatluna-sandbox').info(`已生成 ${seeded} 条开发环境 ChatLuna 错误预览记录。`)
+      })
       inner.on('dispose', () => {
         disposeModelRequestCollector()
         void unattributedModelRequests.waitForPersistence()

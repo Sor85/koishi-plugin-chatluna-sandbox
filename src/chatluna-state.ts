@@ -4,6 +4,12 @@ import type { SandboxChatLunaState, SandboxMessageChatLuna } from './types'
 
 type ValidateTarget = (botParticipantId: string, conversationId: string) => boolean
 type ArchiveResult = (botParticipantId: string, conversationId: string, result: SandboxMessageChatLuna) => void
+type ArchiveError = (error: unknown, target: SandboxChatLunaErrorTarget) => void
+
+export interface SandboxChatLunaErrorTarget {
+  botParticipantId: string
+  conversationId: string
+}
 
 interface ChatLunaModelUsagePayload {
   context?: {
@@ -81,19 +87,22 @@ export class SandboxChatLunaStateStore {
   private disposers: Array<() => void> = []
 
   constructor(
-    ctx: Context,
+    private ctx: Context,
     private validateTarget: ValidateTarget,
     private onChange: () => void = () => {},
     private archiveResult: ArchiveResult = () => {},
+    private archiveError: ArchiveError = () => {},
   ) {
-    const on = ctx.on.bind(ctx) as unknown as ChatLunaEventRegistrar
+    const on = this.ctx.on.bind(this.ctx) as unknown as ChatLunaEventRegistrar
     this.disposers.push(on('chatluna/before-chat', (conversationId, _message, _variables, _chatInterface, session) => {
       this.begin(session, conversationId)
     }))
     this.disposers.push(on('chatluna/after-chat', (conversationId, _sourceMessage, responseMessage, _variables, _chatInterface, session) => {
       this.finish(conversationId, session, { lastResponseMessage: responseMessage })
     }))
-    this.disposers.push(on('chatluna/after-chat-error', (_error, conversationId) => {
+    this.disposers.push(on('chatluna/after-chat-error', (error, conversationId) => {
+      const targets = this.resolveErrorTargets(conversationId)
+      if (targets.length === 1) this.archiveError(error, targets[0]!)
       this.finish(conversationId)
     }))
     this.disposers.push(on('chatluna/model-usage', (payload) => {
@@ -159,6 +168,15 @@ export class SandboxChatLunaStateStore {
     }
     // 等待态是不落场景快照的瞬时状态，必须单独广播，否则聊天页面要等下一条消息才刷新，届时思考早已结束。
     this.onChange()
+  }
+
+  private resolveErrorTargets(chatLunaConversationId: string): SandboxChatLunaErrorTarget[] {
+    const activeKeys = this.activeStateKeys.get(chatLunaConversationId)
+    if (!activeKeys) return []
+    return [...activeKeys].flatMap((key) => {
+      const state = this.states.get(key)
+      return state ? [{ botParticipantId: state.botParticipantId, conversationId: state.conversationId }] : []
+    })
   }
 
   private finish(chatLunaConversationId?: string, session?: unknown, payload?: ChatLunaCharacterPayload): void {

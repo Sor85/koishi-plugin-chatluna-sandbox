@@ -486,6 +486,91 @@
   gap: 8px;
 }
 
+.webqq-model-request-error-diagnostic {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, #b91c1c 28%, var(--webqq-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, #fee2e2 46%, var(--webqq-surface));
+}
+
+.webqq-model-request-error-diagnostic .webqq-model-request-section-heading a {
+  color: #b91c1c;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.webqq-model-request-error-details {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 10px;
+  margin: 0;
+}
+
+.webqq-model-request-error-details dt {
+  align-self: start;
+  color: var(--webqq-muted);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.webqq-model-request-error-details dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--webqq-text);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.webqq-model-request-capture-error {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+}
+
+.webqq-workspace .sandbox-badge.webqq-model-request-error-code {
+  min-height: 22px;
+  padding: 2px 8px;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.webqq-model-request-error-trace {
+  color: var(--webqq-muted);
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.webqq-model-request-error-causes {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 20px;
+  color: var(--webqq-text);
+}
+
+.webqq-model-request-error-note {
+  color: var(--webqq-muted) !important;
+  font-size: 13px;
+}
+
+.webqq-workspace[data-color-mode="dark"] .webqq-model-request-error-diagnostic {
+  border-color: color-mix(in srgb, #fca5a5 34%, var(--webqq-border));
+  background: color-mix(in srgb, #7f1d1d 30%, var(--webqq-surface));
+}
+
+.webqq-workspace[data-color-mode="dark"] .webqq-model-request-error-diagnostic .webqq-model-request-section-heading a {
+  color: #fca5a5;
+}
+
 /* 必须带 .webqq-workspace 前缀。工作区默认徽章
    `.webqq-workspace [data-slot="badge"][data-variant="default"]`
    特异度为 (0,3,0)，会把浅色完成态盖成主题蓝；深色选择器原先多一层
