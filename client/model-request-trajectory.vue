@@ -56,15 +56,11 @@
             <IconSquareMinus v-else data-icon="inline-start" aria-hidden="true" />
             请求
           </Button>
-        </div>
-        <div class="webqq-model-trajectory-control-filters" role="group" aria-label="按证据种类过滤">
           <Button
-            v-for="option in MODEL_EVIDENCE_FILTER_KINDS"
+            v-for="option in pinnedKindOptions"
             :key="option.kind"
             size="sm"
             variant="ghost"
-            class="webqq-model-trajectory-filter-toggle"
-            :class="{ 'is-hidden': hiddenKinds.has(option.kind) }"
             :aria-pressed="hiddenKinds.has(option.kind)"
             :aria-label="`${hiddenKinds.has(option.kind) ? '显示' : '隐藏'} ${option.label} 证据`"
             @click="hiddenKinds = toggleFilterMember(hiddenKinds, option.kind)"
@@ -73,15 +69,44 @@
             <IconSquareMinus v-else data-icon="inline-start" aria-hidden="true" />
             {{ option.label }}
           </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            :aria-expanded="filtersExpanded"
+            :aria-controls="moreFiltersId"
+            :aria-label="filtersExpanded ? '收起更多过滤选项' : '展开更多过滤选项'"
+            @click="filtersExpanded = !filtersExpanded"
+          >
+            <IconChevronLeft v-if="filtersExpanded" data-icon="inline-start" aria-hidden="true" />
+            <IconChevronRight v-else data-icon="inline-start" aria-hidden="true" />
+            {{ filtersExpanded ? '收起' : '更多' }}
+          </Button>
         </div>
-        <div class="webqq-model-trajectory-control-filters" role="group" aria-label="按证据来源过滤">
+        <div
+          :id="moreFiltersId"
+          class="webqq-model-trajectory-control-filters"
+          :class="{ 'is-collapsed': !filtersExpanded }"
+          role="group"
+          aria-label="更多证据过滤"
+        >
+          <Button
+            v-for="option in collapsedKindOptions"
+            :key="option.kind"
+            size="sm"
+            variant="ghost"
+            :aria-pressed="hiddenKinds.has(option.kind)"
+            :aria-label="`${hiddenKinds.has(option.kind) ? '显示' : '隐藏'} ${option.label} 证据`"
+            @click="hiddenKinds = toggleFilterMember(hiddenKinds, option.kind)"
+          >
+            <IconSquarePlus v-if="hiddenKinds.has(option.kind)" data-icon="inline-start" aria-hidden="true" />
+            <IconSquareMinus v-else data-icon="inline-start" aria-hidden="true" />
+            {{ option.label }}
+          </Button>
           <Button
             v-for="option in MODEL_EVIDENCE_FILTER_SOURCES"
             :key="option.source"
             size="sm"
             variant="ghost"
-            class="webqq-model-trajectory-filter-toggle"
-            :class="{ 'is-hidden': hiddenSources.has(option.source) }"
             :aria-pressed="hiddenSources.has(option.source)"
             :aria-label="`${hiddenSources.has(option.source) ? '显示' : '隐藏'}${option.label}证据`"
             @click="hiddenSources = toggleFilterMember(hiddenSources, option.source)"
@@ -222,6 +247,8 @@
 
 <script setup lang="ts">
 import {
+  IconChevronLeft,
+  IconChevronRight,
   IconClockHour4,
   IconExternalLink,
   IconSearch,
@@ -229,7 +256,7 @@ import {
   IconSquarePlus,
   IconX,
 } from '@tabler/icons-vue'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, useId, watch } from 'vue'
 import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
@@ -292,6 +319,12 @@ const actualDuration = ref(true)
 const requestsCollapsed = ref(false)
 const hiddenKinds = ref<ReadonlySet<ModelEvidenceFilterKind>>(new Set())
 const hiddenSources = ref<ReadonlySet<ModelEvidenceFilterSource>>(new Set())
+const filtersExpanded = ref(false)
+// TOOL DEFS 常年占满账本，是最常用到的一项过滤，和「耗时」「请求」一起留在工具栏外层。
+const PINNED_FILTER_KINDS: readonly ModelEvidenceFilterKind[] = ['tool-definition']
+const pinnedKindOptions = MODEL_EVIDENCE_FILTER_KINDS.filter(({ kind }) => PINNED_FILTER_KINDS.includes(kind))
+const collapsedKindOptions = MODEL_EVIDENCE_FILTER_KINDS.filter(({ kind }) => !PINNED_FILTER_KINDS.includes(kind))
+const moreFiltersId = useId()
 const searchQuery = ref('')
 const analysisFocusEvidence = ref<{
   evidenceId: string

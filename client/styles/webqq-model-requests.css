@@ -614,31 +614,31 @@
   gap: 2px;
 }
 
-/* 种类与来源共 8 个过滤开关；工具栏必须允许换行，否则窄屏会把搜索框挤出容器。 */
+/* 展开后的过滤开关较多，工具栏必须允许换行，否则窄屏会把搜索框挤出容器。 */
 .webqq-model-trajectory-controls {
   flex-wrap: wrap;
   justify-content: flex-start;
   row-gap: 4px;
 }
 
+/* 横向折叠：收起时用 visibility 一并移出焦点顺序与无障碍树，避免出现看不见但能 Tab 到的按钮。 */
 .webqq-model-trajectory-control-filters {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 2px;
+  max-width: 100%;
+  transition: max-width 0.18s ease, opacity 0.18s ease, visibility 0.18s ease;
 }
 
-/* 「种类」与「来源」之间留一道分隔，避免被读成一排同质按钮。 */
-.webqq-model-trajectory-control-filters + .webqq-model-trajectory-control-filters {
-  padding-left: 6px;
-  border-left: 1px solid var(--webqq-border);
-}
-
-/* 被隐藏的种类划掉标签并降饱和；只改文字表现，不动指针样式。 */
-.webqq-model-trajectory-filter-toggle.is-hidden {
-  color: var(--webqq-muted);
-  text-decoration: line-through;
-  opacity: 0.72;
+.webqq-model-trajectory-control-filters.is-collapsed {
+  max-width: 0;
+  opacity: 0;
+  visibility: hidden;
+  overflow: hidden;
+  /* 收起时必须同时关掉换行：宽度归零后 flex-wrap: wrap 会把每个按钮各占一行，
+     元素宽度是 0 但高度会撑到 7 行，把整条工具栏拉高。 */
+  flex-wrap: nowrap;
 }
 
 .webqq-model-trajectory-controls [data-slot="button"] {
