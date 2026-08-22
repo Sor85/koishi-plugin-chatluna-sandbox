@@ -2,15 +2,12 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
-  analysisTargetScrollTop,
   buildModelRequestAnalysisNavigation,
   exceedsAnalysisLineLimit,
   isPreviewableConversationImage,
   modelAnalysisTargetId,
   normalizeAnalysisQuery,
-  prepareModelAnalysisTarget,
   resolveAnalysisEvidenceTarget,
-  resolveToolDefinitionLocation,
   shouldExpandAnalysisText,
 } from '../client/webqq/model-request-analysis'
 import { parseModelRequestConversationDetail } from '../client/webqq/model-request-conversation'
@@ -155,48 +152,6 @@ describe('模型请求分析展示模型', () => {
       .toBe('model-analysis-tools')
   })
 
-  it('把定位目标还原成需要展开的卡片、工具定义与响应区块', () => {
-    const request = detail()
-    const conversation = parseModelRequestConversationDetail(request)
-
-    expect(prepareModelAnalysisTarget(conversation, modelAnalysisTargetId('req:message:messages.3'))).toMatchObject({
-      messageEvidenceId: 'req:message:messages.3',
-      response: false,
-      expandCards: [modelAnalysisTargetId('req:message:messages.3')],
-      expandTargets: [modelAnalysisTargetId('req:message:messages.3')],
-    })
-    expect(prepareModelAnalysisTarget(conversation, modelAnalysisTargetId('req:tool-call:messages.2.tool_calls.0'))).toMatchObject({
-      messageEvidenceId: 'req:message:messages.2',
-      expandCards: [modelAnalysisTargetId('req:message:messages.2')],
-      expandTargets: [modelAnalysisTargetId('req:tool-call:messages.2.tool_calls.0')],
-    })
-    expect(prepareModelAnalysisTarget(conversation, modelAnalysisTargetId('req:tool-definition:tools.0.function'))).toMatchObject({
-      toolEvidenceIds: ['req:tool-definition:tools.0.function'],
-    })
-    expect(prepareModelAnalysisTarget(conversation, 'model-analysis-response')).toMatchObject({
-      response: true,
-      expandCards: ['model-analysis-response'],
-    })
-    expect(shouldExpandAnalysisText(false, true, '', 'x')).toBe(true)
-  })
-
-  it('同名工具定义证据不明确时展开全部匹配项而不猜测第一项', () => {
-    const request = detail()
-    request.requestBody = {
-      messages: [{ role: 'assistant', tool_calls: [{ function: { name: 'weather', arguments: '{}' } }] }],
-      tools: [
-        { type: 'function', function: { name: 'weather', description: '第一个', parameters: { type: 'object' } } },
-        { type: 'function', function: { name: 'weather', description: '第二个', parameters: { type: 'object' } } },
-      ],
-    }
-    const conversation = parseModelRequestConversationDetail(request)
-
-    expect(resolveToolDefinitionLocation(conversation.tools, 'weather')).toEqual({
-      target: 'model-analysis-tools',
-      toolEvidenceIds: ['req:tool-definition:tools.0.function', 'req:tool-definition:tools.1.function'],
-    })
-  })
-
   it('搜索文本覆盖正文、工具参数、工具定义 Schema 和响应', () => {
     const request = detail()
     const navigation = buildModelRequestAnalysisNavigation(parseModelRequestConversationDetail(request), request)
@@ -211,6 +166,7 @@ describe('模型请求分析展示模型', () => {
   it('按实际排版高度在超过 12 行时折叠，正好 12 行保持完整', () => {
     expect(exceedsAnalysisLineLimit(12 * 22.1, 22.1)).toBe(false)
     expect(exceedsAnalysisLineLimit(12 * 22.1 + 1, 22.1)).toBe(true)
+    expect(shouldExpandAnalysisText(false, true, '', 'x')).toBe(true)
   })
 
   it('分析页、组成图、轨迹台账和响应分段共用角色色', () => {
@@ -262,17 +218,13 @@ describe('模型请求分析展示模型', () => {
     expect(styles).not.toMatch(/\.webqq-model-analysis-tool-summary \{[^}]*min-height: 58px;/s)
   })
 
-  it('检查器按滚动容器对齐目标，等长文本折叠后再定位', () => {
+  // 定位的算术与帧时序已经进入 evidence-locator 并由行为测试覆盖；
+  // 这里只保留无法进入 module 的 DOM 契约：检查器必须滚动 inspector-body 而不是分析内容本身。
+  it('检查器按 inspector-body 而不是分析内容作为滚动容器', () => {
     const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
 
-    expect(analysisTargetScrollTop(400, 80, 20)).toBe(328)
-    expect(analysisTargetScrollTop(40, 80, 0)).toBe(0)
-    expect(view).toContain('analysisTargetScrollTop')
     expect(view).toContain("content.closest<HTMLElement>('.webqq-model-trajectory-inspector-body')")
-    expect(view).toContain('await waitForAnimationFrame()')
-    expect(view).toContain('watchRelocate(target, generation)')
-    expect(view).toContain("scrollTarget(target, 'smooth')")
-    expect(view).toContain("measured.scroller.scrollTo({ top: measured.top, behavior: 'auto' })")
+    expect(view).toContain('createEvidenceLocator')
     expect(view).not.toContain("scrollIntoView({ behavior: 'smooth', block: 'start' })")
   })
 

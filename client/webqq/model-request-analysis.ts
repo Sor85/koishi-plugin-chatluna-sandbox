@@ -175,53 +175,6 @@ export function resolveAnalysisEvidenceTarget(
   return navigation.targets[evidenceId]
 }
 
-export interface ModelAnalysisTargetPreparation {
-  messageEvidenceId?: string
-  response: boolean
-  toolEvidenceIds: string[]
-  expandCards: string[]
-  expandTargets: string[]
-}
-
-export function prepareModelAnalysisTarget(
-  conversation: ModelRequestConversation,
-  target: string,
-): ModelAnalysisTargetPreparation {
-  const message = conversation.messages.find(candidate => (
-    modelAnalysisTargetId(candidate.evidenceId) === target
-    || candidate.toolCalls.some(call => modelAnalysisTargetId(call.evidenceId) === target)
-  ))
-  const tool = conversation.tools.find(candidate => modelAnalysisTargetId(candidate.evidenceId) === target)
-  const response = target === MODEL_ANALYSIS_RESPONSE_TARGET
-    || Boolean(conversation.response && [
-      ...conversation.response.toolCalls.map(call => call.evidenceId),
-      ...conversation.response.toolResults.map(result => result.evidenceId),
-    ].some(evidenceId => modelAnalysisTargetId(evidenceId) === target))
-  return {
-    ...(message ? { messageEvidenceId: message.evidenceId } : {}),
-    response,
-    toolEvidenceIds: tool ? [tool.evidenceId] : [],
-    expandCards: [
-      ...(message ? [modelAnalysisTargetId(message.evidenceId)] : []),
-      ...(response ? [MODEL_ANALYSIS_RESPONSE_TARGET] : []),
-    ],
-    expandTargets: [target],
-  }
-}
-
-export function resolveToolDefinitionLocation(
-  tools: ModelRequestConversation['tools'],
-  name: string,
-): { target: string, toolEvidenceIds: string[] } | undefined {
-  const matches = tools.filter(tool => tool.name === name)
-  if (!matches.length) return undefined
-  return {
-    // 同名工具定义证据不明确时展开全部匹配项，而不是猜测第一项。
-    target: matches.length === 1 ? modelAnalysisTargetId(matches[0]!.evidenceId) : MODEL_ANALYSIS_TOOLS_TARGET,
-    toolEvidenceIds: matches.map(tool => tool.evidenceId),
-  }
-}
-
 export function shouldExpandAnalysisText(
   manuallyExpanded: boolean,
   forceExpanded: boolean,
@@ -237,15 +190,6 @@ export function exceedsAnalysisLineLimit(
   maxLines = 12,
 ): boolean {
   return renderedHeight > lineHeight * maxLines
-}
-
-export function analysisTargetScrollTop(
-  elementTop: number,
-  scrollerTop: number,
-  scrollerScrollTop: number,
-  margin = 12,
-): number {
-  return Math.max(0, elementTop - scrollerTop + scrollerScrollTop - margin)
 }
 
 export function compactAnalysisText(value: string, length = 80): string {

@@ -382,14 +382,11 @@ import {
   MODEL_ANALYSIS_TOOLS_TARGET,
   modelAnalysisTargetId,
   normalizeAnalysisQuery,
-  analysisTargetScrollTop,
-  prepareModelAnalysisTarget,
-  resolveAnalysisEvidenceTarget,
-  resolveToolDefinitionLocation,
   shouldExpandAnalysisText,
   type ModelRequestAnalysisGroupKey,
   type ModelRequestAnalysisNavigationItem,
 } from './model-request-analysis'
+import { createEvidenceLocator } from './evidence-locator'
 import { buildModelRequestJsonTree } from './model-request-json'
 import {
   EMPTY_MODEL_EVIDENCE_FILTER,
@@ -459,13 +456,63 @@ const responseCharacters = computed(() => [
   ...response.value.toolCalls.map(call => call.arguments || ''),
   ...response.value.toolResults.map(result => result.content),
 ].join('').length)
-let highlightTimer: ReturnType<typeof setTimeout> | undefined
-let relocateObserver: ResizeObserver | undefined
-let relocateTimer: ReturnType<typeof setTimeout> | undefined
-let locateGeneration = 0
-let pendingScrollTop: number | undefined
 let pointerStart: { x: number, y: number } | undefined
 let suppressToolSummary = false
+
+// 定位的全部决策与帧时序都在 evidence-locator 里；这里只交出 DOM、渲染状态与计时出口。
+const locator = createEvidenceLocator({
+  getConversation: () => conversation.value,
+  getNavigation: () => navigation.value,
+  measure: (target) => {
+    const element = findTarget(target)
+    const scroller = findScroller()
+    if (!element || !scroller) return undefined
+    return {
+      elementTop: element.getBoundingClientRect().top,
+      scrollerTop: scroller.getBoundingClientRect().top,
+      scrollTop: scroller.scrollTop,
+    }
+  },
+  scrollTo: (top, behavior) => {
+    findScroller()?.scrollTo({ top, behavior })
+  },
+  expandCard,
+  setToolExpanded: expandTool,
+  isMessageRaw: evidenceId => rawMessages.value.has(evidenceId),
+  setMessageRaw: (evidenceId, raw) => {
+    const next = new Set(rawMessages.value)
+    raw ? next.add(evidenceId) : next.delete(evidenceId)
+    rawMessages.value = next
+  },
+  isResponseRaw: () => responseRaw.value,
+  setResponseRaw: (raw) => {
+    responseRaw.value = raw
+  },
+  getExpandedText: () => [...expandedTextTargets.value],
+  setExpandedText: (targets) => {
+    expandedTextTargets.value = new Set(targets)
+  },
+  setHighlight: (target) => {
+    highlightedTarget.value = target ?? ''
+  },
+  nextTick,
+  frame: () => new Promise<void>((resolve) => {
+    requestAnimationFrame(() => resolve())
+  }),
+  observeResize: (callback) => {
+    const content = contentElement.value
+    const scroller = findScroller()
+    if (!content || typeof ResizeObserver === 'undefined') return () => {}
+    const observer = new ResizeObserver(callback)
+    observer.observe(content)
+    if (scroller && scroller !== content) observer.observe(scroller)
+    return () => observer.disconnect()
+  },
+  schedule: (delayMs, callback) => {
+    const timer = setTimeout(callback, delayMs)
+    return () => clearTimeout(timer)
+  },
+})
 
 watch(normalizedSearch, async (query) => {
   if (!query) return
@@ -497,14 +544,13 @@ watch(() => props.detail.id, (next, previous) => {
   collapsedCards.value = new Set()
   expandedTools.value = new Set()
   expandedTextTargets.value = new Set()
-  highlightedTarget.value = ''
+  locator.reset()
   const scroller = findScroller()
   if (scroller) scroller.scrollTop = 0
 })
 
 onBeforeUnmount(() => {
-  if (highlightTimer) clearTimeout(highlightTimer)
-  stopRelocate()
+  locator.dispose()
 })
 
 function itemMatches(item: ModelRequestAnalysisNavigationItem) {
@@ -518,124 +564,35 @@ function messageMatches(message: ModelConversationMessage) {
 async function locateFocusEvidence() {
   const focus = props.focusEvidence
   if (!focus) return
-  const target = resolveAnalysisEvidenceTarget(navigation.value, focus.evidenceId)
-  if (target) await jumpTo(target)
+  const located = await locator.locateEvidence(focus.evidenceId)
+  if (located) emit('locate', located)
 }
 
 async function jumpTo(target?: string, emphasize = true) {
-  if (!target) return
-  const generation = ++locateGeneration
-  const forcedTargets = prepareTarget(target)
-  await nextTick()
-  expandedTextTargets.value = new Set([...expandedTextTargets.value].filter(candidate => !forcedTargets.includes(candidate)))
-  // 长文本折叠发生在下一帧。此时 scrollIntoView 会按未折叠高度把目标算到最底端。
-  await nextTick()
-  await waitForAnimationFrame()
-  await waitForAnimationFrame()
-  if (generation !== locateGeneration) return
-  scrollTarget(target, 'smooth')
-  watchRelocate(target, generation)
-  if (emphasize) emphasizeTarget(target)
-  emit('locate', target)
+  const located = await locator.locate(target, { emphasize })
+  if (located) emit('locate', located)
+}
+
+function locateTool(name: string) {
+  void locator.locateTool(name).then((located) => {
+    if (located) emit('locate', located)
+  })
 }
 
 function findScroller(): HTMLElement | undefined {
   const content = contentElement.value
   if (!content) return undefined
   // 检查器真正滚动的是 inspector-body。analysis-content 在 inspector 下 overflow:visible，
-  // scrollIntoView 会带动外层工作台一起滚，首次点开位置必然偏掉。
+  // 让内层滚动会带动外层工作台一起滚，首次点开位置必然偏掉。
   if (props.layout === 'inspector') {
     return content.closest<HTMLElement>('.webqq-model-trajectory-inspector-body') ?? content
   }
   return content
 }
 
-function measureTargetTop(target: string) {
-  const element = findTarget(target)
-  const scroller = findScroller()
-  if (!element || !scroller) return undefined
-  return {
-    scroller,
-    top: analysisTargetScrollTop(
-      element.getBoundingClientRect().top,
-      scroller.getBoundingClientRect().top,
-      scroller.scrollTop,
-    ),
-  }
-}
-
-function scrollTarget(target: string, behavior: ScrollBehavior) {
-  const measured = measureTargetTop(target)
-  if (!measured) return
-  pendingScrollTop = measured.top
-  if (Math.abs(measured.scroller.scrollTop - measured.top) < 2) return
-  measured.scroller.scrollTo({ top: measured.top, behavior })
-}
-
-function watchRelocate(target: string, generation: number) {
-  stopRelocate()
-  const content = contentElement.value
-  const scroller = findScroller()
-  if (!content || typeof ResizeObserver === 'undefined') return
-  relocateObserver = new ResizeObserver(() => {
-    if (generation !== locateGeneration) return
-    const measured = measureTargetTop(target)
-    if (!measured) return
-    // 锚点没变就是平滑滚动的中间帧。只有折叠把目标挤走时才瞬时校正。
-    if (pendingScrollTop !== undefined && Math.abs(pendingScrollTop - measured.top) < 8) return
-    pendingScrollTop = measured.top
-    if (Math.abs(measured.scroller.scrollTop - measured.top) < 2) return
-    measured.scroller.scrollTo({ top: measured.top, behavior: 'auto' })
-  })
-  relocateObserver.observe(content)
-  if (scroller && scroller !== content) relocateObserver.observe(scroller)
-  relocateTimer = setTimeout(stopRelocate, 480)
-}
-
-function stopRelocate() {
-  relocateObserver?.disconnect()
-  relocateObserver = undefined
-  if (!relocateTimer) return
-  clearTimeout(relocateTimer)
-  relocateTimer = undefined
-}
-
-function waitForAnimationFrame() {
-  return new Promise<void>(resolve => {
-    requestAnimationFrame(() => resolve())
-  })
-}
-
-function prepareTarget(target: string) {
-  const preparation = prepareModelAnalysisTarget(conversation.value, target)
-  for (const card of preparation.expandCards) expandCard(card)
-  for (const evidenceId of preparation.toolEvidenceIds) expandTool(evidenceId)
-  if (preparation.messageEvidenceId !== undefined && rawMessages.value.has(preparation.messageEvidenceId)) {
-    toggleRaw(preparation.messageEvidenceId)
-  }
-  if (preparation.response && responseRaw.value) responseRaw.value = false
-  expandedTextTargets.value = new Set([...expandedTextTargets.value, ...preparation.expandTargets])
-  return preparation.expandTargets
-}
-
 function findTarget(target: string): HTMLElement | null {
   const candidates = contentElement.value?.querySelectorAll<HTMLElement>('[id]') ?? []
   return [...candidates].find(element => element.id === target) ?? null
-}
-
-function emphasizeTarget(target: string) {
-  highlightedTarget.value = target
-  if (highlightTimer) clearTimeout(highlightTimer)
-  highlightTimer = setTimeout(() => {
-    if (highlightedTarget.value === target) highlightedTarget.value = ''
-  }, 1500)
-}
-
-function locateTool(name: string) {
-  const location = resolveToolDefinitionLocation(conversation.value.tools, name)
-  if (!location) return
-  for (const evidenceId of location.toolEvidenceIds) expandTool(evidenceId)
-  void jumpTo(location.target)
 }
 
 function hasTool(name: string) {
