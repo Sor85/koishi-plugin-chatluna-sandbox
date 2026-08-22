@@ -545,6 +545,7 @@ import { formatDuration } from './webqq/format-duration'
 import { parseModelResponseConversation } from './webqq/model-request-conversation'
 import { buildModelRequestJsonTree } from './webqq/model-request-json'
 import { createEvidenceNavigationStack } from './webqq/evidence-navigation-stack'
+import { createScrollRestore } from './webqq/scroll-restore'
 import { createModelRequestEnterRefresh, createModelRequestLiveRefresh } from './webqq/model-request-live-refresh'
 import {
   createModelRequestRecordsQuery,
@@ -621,6 +622,22 @@ const trajectoryReturnState = ref<{
 }>()
 // 返回快照与「详情到达后才消费」的判定都在 evidence-navigation-stack 里；这里只保留反应式镜像。
 const navigationStack = createEvidenceNavigationStack()
+// 返回时正文子树会被页签切换与异步数据重建，重建会把详情面板的 scrollTop 清零；
+// scroll-restore 负责在有界帧窗口内把位置按回目标，单写一次一定会被后续重建抹掉。
+const detailScrollRestore = createScrollRestore({
+  measure: () => {
+    const element = detailElement.value
+    if (!element) return undefined
+    return { scrollTop: element.scrollTop, maxScrollTop: element.scrollHeight - element.clientHeight }
+  },
+  scrollTo: (top) => {
+    if (detailElement.value) detailElement.value.scrollTop = top
+  },
+  nextTick,
+  frame: () => new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve())
+  }),
+})
 let inspectRecordId: string | undefined
 let copyStateTimer: number | undefined
 
@@ -882,11 +899,7 @@ function applyPendingReturnState() {
     ...state.trajectory,
     seq: state.seq,
   }
-  nextTick(() => {
-    window.requestAnimationFrame(() => {
-      if (detailElement.value) detailElement.value.scrollTop = state.detailScrollTop
-    })
-  })
+  void detailScrollRestore.restore(state.detailScrollTop)
 }
 
 function resetFilters() {

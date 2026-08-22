@@ -112,8 +112,15 @@ export function createEvidenceLocator(adapter: EvidenceLocatorAdapter) {
     return locate(location.target, options)
   }
 
-  /** 切换记录时清除高亮；展开集合与滚动量由持有它们的视图自行重置。 */
+  /**
+   * 切换记录时清除高亮并让在飞的定位失效；展开集合与滚动量由持有它们的视图自行重置。
+   *
+   * 必须递增 generation：定位要等两个 nextTick 与两帧，切换记录时上一条记录的定位可能仍在等待，
+   * 恢复后会按旧目标滚动新记录的内容。
+   */
   function reset() {
+    generation += 1
+    stopRelocate()
     cancelHighlight?.()
     cancelHighlight = undefined
     highlighted = undefined

@@ -372,6 +372,29 @@ describe('证据定位', () => {
     expect(harness.highlight).toBeUndefined()
   })
 
+  it('切换记录让在飞的定位失效，不会按旧目标滚动新记录', async () => {
+    const harness = createHarness()
+    harness.setElementTop(USER_TARGET, 500)
+
+    const pending = harness.locator.locate(USER_TARGET)
+    harness.locator.reset()
+
+    expect(await pending).toBeUndefined()
+    expect(harness.scrolls).toEqual([])
+  })
+
+  it('切换记录同时停止上一次定位的校正观察', async () => {
+    const harness = createHarness()
+    harness.setElementTop(USER_TARGET, 500)
+    await harness.locator.locate(USER_TARGET)
+
+    harness.locator.reset()
+    harness.setElementTop(USER_TARGET, -188)
+    harness.resize()
+
+    expect(harness.scrolls).toEqual([{ top: 388, behavior: 'smooth' }])
+  })
+
   it('卸载后尺寸变化不再触发校正', async () => {
     const harness = createHarness()
     harness.setElementTop(USER_TARGET, 500)

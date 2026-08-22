@@ -252,6 +252,7 @@ import { Input } from './components/ui/input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip'
 import ModelRequestConversationAnalysis from './webqq/analysis-view.vue'
 import type { LocateRequest } from './webqq/evidence-locator'
+import { createScrollRestore } from './webqq/scroll-restore'
 import { formatDuration } from './webqq/format-duration'
 import {
   MODEL_EVIDENCE_FILTER_KINDS,
@@ -302,6 +303,20 @@ const emit = defineEmits<{
 }>()
 
 const ledgerElement = ref<HTMLElement>()
+const ledgerScrollRestore = createScrollRestore({
+  measure: () => {
+    const element = ledgerElement.value
+    if (!element) return undefined
+    return { scrollTop: element.scrollTop, maxScrollTop: element.scrollHeight - element.clientHeight }
+  },
+  scrollTo: (top) => {
+    if (ledgerElement.value) ledgerElement.value.scrollTop = top
+  },
+  nextTick,
+  frame: () => new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve())
+  }),
+})
 
 const selectedRowId = ref('')
 const actualDuration = ref(true)
@@ -450,16 +465,13 @@ watch(() => selectedRow.value?.requestId, (requestId) => {
 
 watch(() => props.restoreState?.seq, restoreTrajectoryPosition, { immediate: true })
 
-async function restoreTrajectoryPosition() {
+function restoreTrajectoryPosition() {
   const state = props.restoreState
   if (!state) return
   selectedRowId.value = state.rowId
-  await nextTick()
-  // 轨迹组件在打开原始字段时会被卸载；恢复必须同时还原账本滚动量和选中行，
-  // 且要在轨迹 RPC 更新后重做一次，否则新数据渲染会把刚恢复的位置再次清空。
-  window.requestAnimationFrame(() => {
-    if (ledgerElement.value) ledgerElement.value.scrollTop = state.scrollTop
-  })
+  // 轨迹组件在打开原始字段时会被卸载；恢复必须同时还原账本滚动量和选中行。
+  // 帧时序与「内容长高后继续逼近」由 scroll-restore 负责；这里只给目标偏移量。
+  void ledgerScrollRestore.restore(state.scrollTop)
 }
 
 const requestRows = computed(() => props.trajectory?.rows.filter((row) => row.kind === 'request') ?? [])
