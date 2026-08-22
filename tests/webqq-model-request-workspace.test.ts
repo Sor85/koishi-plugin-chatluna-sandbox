@@ -186,8 +186,10 @@ describe('WebQQ 模型请求工作台', () => {
     expect(trajectorySource).toContain("'inspect-request': [payload: { recordId: string }]")
     expect(trajectorySource).toContain('layout="inspector"')
     expect(trajectorySource).toContain('v-webqq-scrollbar="{ showOverlay: false }"')
-    expect(trajectorySource).toContain(':focus-evidence="inspectorFocusEvidence"')
-    expect(trajectorySource).toContain(':focus-evidence="analysisFocusEvidence"')
+    // 账本选中行与组成分段共用同一种定位信号形状，不再各自维护 token 计数器。
+    expect(trajectorySource).toContain(':locate-request="inspectorLocateRequest"')
+    expect(trajectorySource).toContain(':locate-request="analysisLocateRequest"')
+    expect(trajectorySource).not.toContain('inspectorFocusToken')
     expect(trajectorySource).toContain('正在加载分析…')
     expect(trajectorySource).not.toContain('selectedTree')
     expect(trajectorySource).not.toContain('webqq-model-trajectory-facts')

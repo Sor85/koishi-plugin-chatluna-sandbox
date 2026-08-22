@@ -386,7 +386,7 @@ import {
   type ModelRequestAnalysisGroupKey,
   type ModelRequestAnalysisNavigationItem,
 } from './model-request-analysis'
-import { createEvidenceLocator } from './evidence-locator'
+import { createEvidenceLocator, type LocateRequest } from './evidence-locator'
 import { buildModelRequestJsonTree } from './model-request-json'
 import {
   EMPTY_MODEL_EVIDENCE_FILTER,
@@ -409,10 +409,8 @@ const props = defineProps<{
   trajectory?: SandboxModelRequestTrajectory
   searchQuery?: string
   layout?: 'page' | 'inspector'
-  focusEvidence?: {
-    evidenceId: string
-    token: number
-  }
+  /** 跨视图定位信号；轨迹账本与组成分段都发这个形状。 */
+  locateRequest?: LocateRequest
   /** 与轨迹账本共用的显示过滤；同一条证据在两个视图里必须同时出现或同时隐藏。 */
   filter?: ModelEvidenceFilter
 }>()
@@ -529,12 +527,12 @@ watch(normalizedSearch, async (query) => {
   if (first) await jumpTo(first.target, false)
 })
 
-watch(() => props.focusEvidence?.token, () => {
-  void locateFocusEvidence()
+watch(() => props.locateRequest?.seq, () => {
+  void locateRequestedEvidence()
 })
 
 onMounted(() => {
-  void locateFocusEvidence()
+  void locateRequestedEvidence()
 })
 
 watch(() => props.detail.id, (next, previous) => {
@@ -561,10 +559,10 @@ function messageMatches(message: ModelConversationMessage) {
   return !normalizedSearch.value || message.searchText.toLocaleLowerCase('zh-CN').includes(normalizedSearch.value)
 }
 
-async function locateFocusEvidence() {
-  const focus = props.focusEvidence
-  if (!focus) return
-  const located = await locator.locateEvidence(focus.evidenceId)
+async function locateRequestedEvidence() {
+  const request = props.locateRequest
+  if (!request) return
+  const located = await locator.locateEvidence(request.evidenceId)
   if (located) emit('locate', located)
 }
 

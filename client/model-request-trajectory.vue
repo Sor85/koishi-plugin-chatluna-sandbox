@@ -165,7 +165,7 @@
         :detail="detail"
         :trajectory="trajectory"
         :search-query="searchQuery"
-        :focus-evidence="analysisFocusEvidence"
+        :locate-request="analysisLocateRequest"
         :filter="evidenceFilter"
       />
       <div v-else class="webqq-model-trajectory-ledger" :class="{ 'has-inspector': selectedRow }">
@@ -223,7 +223,7 @@
               layout="inspector"
               :detail="inspectorDetail"
               :search-query="searchQuery"
-              :focus-evidence="inspectorFocusEvidence"
+              :locate-request="inspectorLocateRequest"
               :filter="evidenceFilter"
             />
             <div v-else class="webqq-model-request-empty">正在加载分析…</div>
@@ -251,6 +251,7 @@ import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip'
 import ModelRequestConversationAnalysis from './webqq/analysis-view.vue'
+import type { LocateRequest } from './webqq/evidence-locator'
 import { formatDuration } from './webqq/format-duration'
 import {
   MODEL_EVIDENCE_FILTER_KINDS,
@@ -312,12 +313,9 @@ const pinnedKindOptions = MODEL_EVIDENCE_FILTER_KINDS.filter(({ kind }) => PINNE
 const collapsedKindOptions = MODEL_EVIDENCE_FILTER_KINDS.filter(({ kind }) => !PINNED_FILTER_KINDS.includes(kind))
 const moreFiltersId = useId()
 const searchQuery = ref('')
-const analysisFocusEvidence = ref<{
-  evidenceId: string
-  token: number
-}>()
-// 检查器换行即重新定位；token 只用来触发一次定位，不参与证据身份。
-const inspectorFocusToken = ref(0)
+// 组成分段点击与账本选中行共用同一个定位序号：两种模式互斥渲染，一个计数器即可。
+const locateSeq = ref(0)
+const analysisLocateRequest = ref<LocateRequest>()
 const selectedRow = computed(() => props.trajectory?.rows.find(({ id }) => id === selectedRowId.value))
 const selectedRequest = computed(() => props.trajectory?.records.find(({ id }) => id === selectedRow.value?.requestId))
 const inspectorDetail = computed(() => {
@@ -325,11 +323,11 @@ const inspectorDetail = computed(() => {
   if (!requestId || props.detail?.id !== requestId) return undefined
   return props.detail
 })
-const inspectorFocusEvidence = computed(() => {
+const inspectorLocateRequest = computed<LocateRequest | undefined>(() => {
   const row = selectedRow.value
   if (!row) return undefined
   // 请求边界行没有模型证据；用空身份让分析视图回落到第一条卡片。
-  return { evidenceId: row.evidenceId ?? '', token: inspectorFocusToken.value }
+  return { evidenceId: row.evidenceId ?? '', seq: locateSeq.value }
 })
 const normalizedSearch = computed(() => searchQuery.value.trim().toLocaleLowerCase('zh-CN'))
 const promptComposition = computed(() => {
@@ -440,7 +438,7 @@ watch(() => props.trajectory, (trajectory) => {
 })
 
 watch(selectedRowId, () => {
-  inspectorFocusToken.value += 1
+  locateSeq.value += 1
 })
 
 watch(() => selectedRow.value?.requestId, (requestId) => {
@@ -514,10 +512,7 @@ function isRowSearchMuted(row: SandboxModelRequestTrajectoryRow) {
 
 function selectPromptSegment(segment: CompositionSegment) {
   if (props.analysis) {
-    analysisFocusEvidence.value = {
-      evidenceId: segment.evidenceId,
-      token: (analysisFocusEvidence.value?.token ?? 0) + 1,
-    }
+    analysisLocateRequest.value = { evidenceId: segment.evidenceId, seq: ++locateSeq.value }
     return
   }
   // 组成分段与账本行共享模型证据身份；同一条证据在两个入口一定选中同一行。
@@ -529,7 +524,7 @@ function selectPromptSegment(segment: CompositionSegment) {
 }
 
 function isCompositionSegmentSelected(segment: CompositionSegment) {
-  if (props.analysis) return analysisFocusEvidence.value?.evidenceId === segment.evidenceId
+  if (props.analysis) return analysisLocateRequest.value?.evidenceId === segment.evidenceId
   const selected = selectedRow.value
   if (!selected) return false
   return selected.evidenceId === segment.evidenceId

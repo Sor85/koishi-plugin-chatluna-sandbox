@@ -15,7 +15,12 @@ import type { ModelRequestConversation } from './model-request-conversation'
  * getBoundingClientRect() 恒为 0 且没有真实滚动，恰好测不到本 module 唯一关心的滚动位置。
  */
 
-/** 跨视图触发一次定位的信号。seq 只用来触发，不参与证据身份。 */
+/**
+ * 跨视图触发一次定位的信号。
+ *
+ * `seq` 只用来触发，不参与证据身份；`evidenceId` 为空字符串表示来源行没有模型证据
+ * （例如请求边界行），此时按共享身份表回落到第一条卡片而不是不定位。
+ */
 export interface LocateRequest {
   evidenceId: string
   seq: number
