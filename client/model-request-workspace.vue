@@ -544,6 +544,7 @@ import WebqqAvatar from './webqq-avatar.vue'
 import { formatDuration } from './webqq/format-duration'
 import { parseModelResponseConversation } from './webqq/model-request-conversation'
 import { buildModelRequestJsonTree } from './webqq/model-request-json'
+import { createEvidenceNavigationStack } from './webqq/evidence-navigation-stack'
 import { createModelRequestEnterRefresh, createModelRequestLiveRefresh } from './webqq/model-request-live-refresh'
 import {
   createModelRequestRecordsQuery,
@@ -616,22 +617,10 @@ const canReturnToTrajectory = ref(false)
 const trajectoryReturnState = ref<{
   rowId: string
   scrollTop: number
-  token: number
+  seq: number
 }>()
-interface ModelRequestReturnState {
-  recordId: string
-  detailView: 'trajectory' | 'evidence'
-  bodyView: 'request' | 'response' | 'analysis'
-  trajectoryMode: 'request' | 'conversation'
-  detailScrollTop: number
-  trajectory: {
-    rowId: string
-    scrollTop: number
-  }
-}
-let returnState: ModelRequestReturnState | undefined
-let pendingReturnState: ModelRequestReturnState | undefined
-let returnStateToken = 0
+// 返回快照与「详情到达后才消费」的判定都在 evidence-navigation-stack 里；这里只保留反应式镜像。
+const navigationStack = createEvidenceNavigationStack()
 let inspectRecordId: string | undefined
 let copyStateTimer: number | undefined
 
@@ -803,9 +792,8 @@ function toggleSortOrder() {
 
 function openRecord(recordId: string) {
   inspectRecordId = undefined
+  navigationStack.clear()
   canReturnToTrajectory.value = false
-  returnState = undefined
-  pendingReturnState = undefined
   selectedRecordId.value = recordId
   const record = props.records.find(({ id }) => id === recordId)
   const scope = record ? resolveRecordScope(record) : currentScope()
@@ -846,15 +834,15 @@ function openRelatedRequest(payload: {
   }
 }) {
   inspectRecordId = undefined
-  returnState = {
+  navigationStack.push({
     recordId: selectedRecordId.value,
     detailView: detailView.value,
     bodyView: bodyView.value,
     trajectoryMode: currentTrajectoryMode(),
     detailScrollTop: detailElement.value?.scrollTop ?? 0,
     trajectory: payload.returnState,
-  }
-  canReturnToTrajectory.value = true
+  })
+  canReturnToTrajectory.value = navigationStack.canReturn
   detailView.value = 'evidence'
   bodyView.value = 'request'
   responseView.value = 'content'
@@ -870,11 +858,9 @@ function openRelatedRequest(payload: {
 }
 
 function returnToTrajectory() {
-  const state = returnState
+  const state = navigationStack.beginReturn()
   if (!state) return
-  canReturnToTrajectory.value = false
-  pendingReturnState = state
-  returnState = undefined
+  canReturnToTrajectory.value = navigationStack.canReturn
   selectedRecordId.value = state.recordId
   detailView.value = state.detailView
   bodyView.value = state.bodyView
@@ -886,17 +872,16 @@ function returnToTrajectory() {
 }
 
 function applyPendingReturnState() {
-  const state = pendingReturnState
-  if (!state || props.detail?.id !== state.recordId) return
+  const state = navigationStack.takePending(props.detail?.id)
+  if (!state) return
   // 跨请求返回时 detail.id watcher 会先把页签重置到“请求”；目标详情真正到达后，
   // 必须连同轨迹和滚动位置再次恢复视图快照，否则同请求测试通过但跨请求仍会落回请求页。
   detailView.value = state.detailView
   bodyView.value = state.bodyView
   trajectoryReturnState.value = {
     ...state.trajectory,
-    token: ++returnStateToken,
+    seq: state.seq,
   }
-  pendingReturnState = undefined
   nextTick(() => {
     window.requestAnimationFrame(() => {
       if (detailElement.value) detailElement.value.scrollTop = state.detailScrollTop

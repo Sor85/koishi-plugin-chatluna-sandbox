@@ -281,7 +281,8 @@ const props = withDefaults(defineProps<{
   restoreState?: {
     rowId: string
     scrollTop: number
-    token: number
+    /** 触发一次位置恢复的序号，与定位信号使用同一种词汇。 */
+    seq: number
   }
 }>(), {
   showModeSwitch: true,
@@ -447,7 +448,7 @@ watch(() => selectedRow.value?.requestId, (requestId) => {
   emit('inspect-request', { recordId: requestId })
 })
 
-watch(() => props.restoreState?.token, restoreTrajectoryPosition, { immediate: true })
+watch(() => props.restoreState?.seq, restoreTrajectoryPosition, { immediate: true })
 
 async function restoreTrajectoryPosition() {
   const state = props.restoreState
