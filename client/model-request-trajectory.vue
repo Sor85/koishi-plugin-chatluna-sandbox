@@ -89,32 +89,21 @@
           role="group"
           aria-label="更多证据过滤"
         >
-          <Button
-            v-for="option in collapsedKindOptions"
-            :key="option.kind"
-            size="sm"
-            variant="ghost"
-            :aria-pressed="hiddenKinds.has(option.kind)"
-            :aria-label="`${hiddenKinds.has(option.kind) ? '显示' : '隐藏'} ${option.label} 证据`"
-            @click="hiddenKinds = toggleFilterMember(hiddenKinds, option.kind)"
-          >
-            <IconSquarePlus v-if="hiddenKinds.has(option.kind)" data-icon="inline-start" aria-hidden="true" />
-            <IconSquareMinus v-else data-icon="inline-start" aria-hidden="true" />
-            {{ option.label }}
-          </Button>
-          <Button
-            v-for="option in MODEL_EVIDENCE_FILTER_SOURCES"
-            :key="option.source"
-            size="sm"
-            variant="ghost"
-            :aria-pressed="hiddenSources.has(option.source)"
-            :aria-label="`${hiddenSources.has(option.source) ? '显示' : '隐藏'}${option.label}证据`"
-            @click="hiddenSources = toggleFilterMember(hiddenSources, option.source)"
-          >
-            <IconSquarePlus v-if="hiddenSources.has(option.source)" data-icon="inline-start" aria-hidden="true" />
-            <IconSquareMinus v-else data-icon="inline-start" aria-hidden="true" />
-            {{ option.label }}
-          </Button>
+          <div class="webqq-model-trajectory-control-filters-inner">
+            <Button
+              v-for="option in collapsedKindOptions"
+              :key="option.kind"
+              size="sm"
+              variant="ghost"
+              :aria-pressed="hiddenKinds.has(option.kind)"
+              :aria-label="`${hiddenKinds.has(option.kind) ? '显示' : '隐藏'} ${option.label} 证据`"
+              @click="hiddenKinds = toggleFilterMember(hiddenKinds, option.kind)"
+            >
+              <IconSquarePlus v-if="hiddenKinds.has(option.kind)" data-icon="inline-start" aria-hidden="true" />
+              <IconSquareMinus v-else data-icon="inline-start" aria-hidden="true" />
+              {{ option.label }}
+            </Button>
+          </div>
         </div>
         <label class="webqq-model-trajectory-search">
           <IconSearch aria-hidden="true" />
@@ -265,12 +254,10 @@ import ModelRequestConversationAnalysis from './webqq/analysis-view.vue'
 import { formatDuration } from './webqq/format-duration'
 import {
   MODEL_EVIDENCE_FILTER_KINDS,
-  MODEL_EVIDENCE_FILTER_SOURCES,
   isEvidenceVisible,
   toggleFilterMember,
   trajectoryRowFilterKind,
   type ModelEvidenceFilterKind,
-  type ModelEvidenceFilterSource,
 } from './webqq/model-request-filter'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type {
@@ -318,10 +305,9 @@ const selectedRowId = ref('')
 const actualDuration = ref(true)
 const requestsCollapsed = ref(false)
 const hiddenKinds = ref<ReadonlySet<ModelEvidenceFilterKind>>(new Set())
-const hiddenSources = ref<ReadonlySet<ModelEvidenceFilterSource>>(new Set())
 const filtersExpanded = ref(false)
-// TOOL DEFS 常年占满账本，是最常用到的一项过滤，和「耗时」「请求」一起留在工具栏外层。
-const PINNED_FILTER_KINDS: readonly ModelEvidenceFilterKind[] = ['tool-definition']
+// SYSTEM / USER / TOOL DEFS 是两个视图里最常开关的种类，和「耗时」「请求」一起留在工具栏外层。
+const PINNED_FILTER_KINDS: readonly ModelEvidenceFilterKind[] = ['system', 'user', 'tool-definition']
 const pinnedKindOptions = MODEL_EVIDENCE_FILTER_KINDS.filter(({ kind }) => PINNED_FILTER_KINDS.includes(kind))
 const collapsedKindOptions = MODEL_EVIDENCE_FILTER_KINDS.filter(({ kind }) => !PINNED_FILTER_KINDS.includes(kind))
 const moreFiltersId = useId()
@@ -441,11 +427,10 @@ function groupCompositionTracks(
 }
 const evidenceFilter = computed(() => ({
   hiddenKinds: hiddenKinds.value,
-  hiddenSources: hiddenSources.value,
 }))
 const ledgerRows = computed(() => props.trajectory?.rows.filter((row) => {
   if (requestsCollapsed.value && row.kind !== 'request') return false
-  return isEvidenceVisible(evidenceFilter.value, trajectoryRowFilterKind(row), row.source)
+  return isEvidenceVisible(evidenceFilter.value, trajectoryRowFilterKind(row))
 }) ?? [])
 watch(() => props.trajectory, (trajectory) => {
   // 轨迹行 id 由 evidenceId 派生，刷新后同一条证据仍是同一个 id，因此仍然存在的选中行要保留；

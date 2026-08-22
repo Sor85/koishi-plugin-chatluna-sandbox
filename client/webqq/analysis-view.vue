@@ -394,7 +394,6 @@ import { buildModelRequestJsonTree } from './model-request-json'
 import {
   EMPTY_MODEL_EVIDENCE_FILTER,
   analysisItemFilterKind,
-  analysisItemFilterSource,
   isEvidenceVisible,
   messageRoleFilterKind,
   type ModelEvidenceFilter,
@@ -431,21 +430,21 @@ const visibleNavigationGroups = computed(() => navigation.value.groups.flatMap((
   const items = group.items.filter(item => isEvidenceVisible(
     evidenceFilter.value,
     analysisItemFilterKind(item.kind, group.key),
-    analysisItemFilterSource(group.key),
   ))
   return items.length ? [{ ...group, count: items.length, items }] : []
 }))
 const visibleMessages = computed(() => conversation.value.messages.filter(message => isEvidenceVisible(
   evidenceFilter.value,
   messageRoleFilterKind(message.role),
-  'request',
 )))
-const requestToolCallsVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'tool-call', 'request'))
-const toolDefinitionsVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'tool-definition', 'request'))
-const responseVisible = computed(() => isEvidenceVisible(evidenceFilter.value, undefined, 'response'))
-const responseContentVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'assistant', 'response'))
-const responseToolCallsVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'tool-call', 'response'))
-const responseToolResultsVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'tool-result', 'response'))
+const requestToolCallsVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'tool-call'))
+const toolDefinitionsVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'tool-definition'))
+const responseContentVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'assistant'))
+const responseToolCallsVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'tool-call'))
+const responseToolResultsVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'tool-result'))
+const responseVisible = computed(() => (
+  responseContentVisible.value || responseToolCallsVisible.value || responseToolResultsVisible.value
+))
 const responseRaw = ref(false)
 const rawMessages = ref(new Set<string>())
 const collapsedCards = ref(new Set<string>())

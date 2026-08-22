@@ -2,9 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   EMPTY_MODEL_EVIDENCE_FILTER,
   MODEL_EVIDENCE_FILTER_KINDS,
-  MODEL_EVIDENCE_FILTER_SOURCES,
   analysisItemFilterKind,
-  analysisItemFilterSource,
   isEvidenceVisible,
   messageRoleFilterKind,
   isModelEvidenceFilterActive,
@@ -13,21 +11,16 @@ import {
   trajectoryRowFilterKind,
   type ModelEvidenceFilter,
   type ModelEvidenceFilterKind,
-  type ModelEvidenceFilterSource,
 } from '../client/webqq/model-request-filter'
 
-function filter(
-  kinds: ModelEvidenceFilterKind[] = [],
-  sources: ModelEvidenceFilterSource[] = [],
-): ModelEvidenceFilter {
-  return { hiddenKinds: new Set(kinds), hiddenSources: new Set(sources) }
+function filter(kinds: ModelEvidenceFilterKind[] = []): ModelEvidenceFilter {
+  return { hiddenKinds: new Set(kinds) }
 }
 
 describe('模型证据显示过滤', () => {
   it('过滤选项覆盖轨迹账本展示的全部证据种类标签', () => {
     expect(MODEL_EVIDENCE_FILTER_KINDS.map(({ label }) => label))
       .toEqual(['SYSTEM', 'USER', 'ASSISTANT', 'TOOL DEFS', 'TOOL CALL', 'TOOL RESULT'])
-    expect(MODEL_EVIDENCE_FILTER_SOURCES.map(({ label }) => label)).toEqual(['请求侧', '响应侧'])
   })
 
   it('轨迹行按种类与工具事件映射到过滤种类', () => {
@@ -39,32 +32,19 @@ describe('模型证据显示过滤', () => {
     expect(trajectoryRowFilterKind({ kind: 'tool', toolEvent: 'result' })).toBe('tool-result')
   })
 
-  it('请求边界行不参与种类与来源过滤，隐藏全部种类后仍能看出有哪些请求', () => {
+  it('请求边界行不参与种类过滤，隐藏全部种类后仍能看出有哪些请求', () => {
     expect(trajectoryRowFilterKind({ kind: 'request' })).toBeUndefined()
-    const everything = filter(
-      MODEL_EVIDENCE_FILTER_KINDS.map(({ kind }) => kind),
-      MODEL_EVIDENCE_FILTER_SOURCES.map(({ source }) => source),
-    )
-    expect(isEvidenceVisible(everything, trajectoryRowFilterKind({ kind: 'request' }), undefined)).toBe(true)
+    const everything = filter(MODEL_EVIDENCE_FILTER_KINDS.map(({ kind }) => kind))
+    expect(isEvidenceVisible(everything, trajectoryRowFilterKind({ kind: 'request' }))).toBe(true)
   })
 
-  it('种类与来源是两条独立的约束，任意一条命中即隐藏', () => {
-    expect(isEvidenceVisible(filter(['system']), 'system', 'request')).toBe(false)
-    expect(isEvidenceVisible(filter(['system']), 'user', 'request')).toBe(true)
-    expect(isEvidenceVisible(filter([], ['response']), 'assistant', 'response')).toBe(false)
-    expect(isEvidenceVisible(filter([], ['response']), 'assistant', 'request')).toBe(true)
-    expect(isEvidenceVisible(EMPTY_MODEL_EVIDENCE_FILTER, 'tool-call', 'response')).toBe(true)
+  it('按种类隐藏证据，未隐藏的种类仍然显示', () => {
+    expect(isEvidenceVisible(filter(['system']), 'system')).toBe(false)
+    expect(isEvidenceVisible(filter(['system']), 'user')).toBe(true)
+    expect(isEvidenceVisible(EMPTY_MODEL_EVIDENCE_FILTER, 'tool-call')).toBe(true)
   })
 
-  it('隐藏响应侧只影响响应证据，请求里的同种类证据仍然显示', () => {
-    const responseHidden = filter([], ['response'])
-    expect(isEvidenceVisible(responseHidden, 'tool-call', 'request')).toBe(true)
-    expect(isEvidenceVisible(responseHidden, 'tool-call', 'response')).toBe(false)
-    expect(isEvidenceVisible(responseHidden, 'tool-result', 'request')).toBe(true)
-    expect(isEvidenceVisible(responseHidden, 'tool-result', 'response')).toBe(false)
-  })
-
-  it('分析导航项映射到与轨迹账本一致的种类和来源', () => {
+  it('分析导航项映射到与轨迹账本一致的种类', () => {
     expect(analysisItemFilterKind('message', 'system')).toBe('system')
     expect(analysisItemFilterKind('message', 'user')).toBe('user')
     expect(analysisItemFilterKind('message', 'assistant')).toBe('assistant')
@@ -76,9 +56,6 @@ describe('模型证据显示过滤', () => {
     expect(analysisItemFilterKind('response', 'response')).toBeUndefined()
 
     expect(analysisItemFilterKind('message', 'tool')).toBeUndefined()
-    expect(analysisItemFilterSource('system')).toBe('request')
-    expect(analysisItemFilterSource('tool')).toBe('request')
-    expect(analysisItemFilterSource('response')).toBe('response')
   })
 
   it('请求里的 tool 角色消息按 TOOL RESULT 过滤', () => {
@@ -88,11 +65,10 @@ describe('模型证据显示过滤', () => {
     expect(messageRoleFilterKind('assistant')).toBe('assistant')
   })
 
-  it('响应分组头部只受来源过滤约束，不会被 ASSISTANT 种类过滤掉', () => {
+  it('响应分组头部没有单一角色，不会被 ASSISTANT 种类过滤掉', () => {
     const kind = analysisItemFilterKind('response', 'response')
-    const source = analysisItemFilterSource('response')
-    expect(isEvidenceVisible(filter(['assistant']), kind, source)).toBe(true)
-    expect(isEvidenceVisible(filter([], ['response']), kind, source)).toBe(false)
+    expect(isEvidenceVisible(filter(['assistant']), kind)).toBe(true)
+    expect(isEvidenceVisible(filter(['tool-call']), kind)).toBe(true)
   })
 
   it('切换过滤成员返回新集合，便于响应式识别变更', () => {
@@ -107,9 +83,9 @@ describe('模型证据显示过滤', () => {
   it('过滤摘要说明当前隐藏了什么', () => {
     expect(isModelEvidenceFilterActive(EMPTY_MODEL_EVIDENCE_FILTER)).toBe(false)
     expect(modelEvidenceFilterSummary(EMPTY_MODEL_EVIDENCE_FILTER)).toBe('显示全部证据')
-    const active = filter(['tool-definition', 'system'], ['response'])
+    const active = filter(['tool-definition', 'system'])
     expect(isModelEvidenceFilterActive(active)).toBe(true)
     // 摘要按选项声明顺序排列，不按用户点击顺序，避免同一组过滤读出不同文案。
-    expect(modelEvidenceFilterSummary(active)).toBe('已隐藏 SYSTEM、TOOL DEFS、响应侧')
+    expect(modelEvidenceFilterSummary(active)).toBe('已隐藏 SYSTEM、TOOL DEFS')
   })
 })

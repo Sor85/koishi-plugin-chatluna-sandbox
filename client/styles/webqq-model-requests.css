@@ -621,24 +621,35 @@
   row-gap: 4px;
 }
 
-/* 横向折叠：收起时用 visibility 一并移出焦点顺序与无障碍树，避免出现看不见但能 Tab 到的按钮。 */
+/* 横向折叠：用 0fr → 1fr 插值到真实内容宽，宽屏向右展开。
+   旧实现 max-width: 100% + flex-wrap 会让这一组按整行计宽，剩余空间被搜索框的
+   margin-left: auto 吃掉，按钮在组内换行，看起来像向下长高。 */
 .webqq-model-trajectory-control-filters {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 2px;
-  max-width: 100%;
-  transition: max-width 0.18s ease, opacity 0.18s ease, visibility 0.18s ease;
+  display: grid;
+  grid-template-columns: 1fr;
+  flex: 0 0 auto;
+  min-width: 0;
+  overflow: hidden;
+  transition: grid-template-columns 0.18s ease, opacity 0.18s ease, visibility 0.18s ease;
 }
 
 .webqq-model-trajectory-control-filters.is-collapsed {
-  max-width: 0;
+  grid-template-columns: 0fr;
   opacity: 0;
   visibility: hidden;
-  overflow: hidden;
-  /* 收起时必须同时关掉换行：宽度归零后 flex-wrap: wrap 会把每个按钮各占一行，
-     元素宽度是 0 但高度会撑到 7 行，把整条工具栏拉高。 */
+}
+
+.webqq-model-trajectory-control-filters-inner {
+  display: flex;
   flex-wrap: nowrap;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.webqq-model-trajectory-control-filters:not(.is-collapsed) .webqq-model-trajectory-control-filters-inner {
+  min-width: min-content;
 }
 
 .webqq-model-trajectory-controls [data-slot="button"] {

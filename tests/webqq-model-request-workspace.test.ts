@@ -282,6 +282,10 @@ describe('WebQQ 模型请求工作台', () => {
     expect(trajectorySource).toContain('耗时')
     expect(trajectorySource).toContain('placeholder="搜索"')
     expect(trajectorySource).toContain('v-for="row in ledgerRows"')
+    expect(trajectorySource).toContain("['system', 'user', 'tool-definition']")
+    expect(trajectorySource).not.toContain('请求侧')
+    expect(trajectorySource).not.toContain('响应侧')
+    expect(trajectorySource).not.toContain('MODEL_EVIDENCE_FILTER_SOURCES')
     // 过滤开关多了之后工具栏必须能换行，否则窄屏会把搜索框挤出容器。
     expect(styles).toMatch(/\.webqq-model-trajectory-controls\s*\{[^}]*min-height:\s*32px/s)
     expect(styles).toMatch(/\.webqq-model-trajectory-controls\s*\{[^}]*flex-wrap:\s*wrap/s)
@@ -289,8 +293,10 @@ describe('WebQQ 模型请求工作台', () => {
     expect(styles).not.toContain('text-decoration: line-through')
     // 横向折叠收起时必须一并移出焦点顺序，不能只是宽度归零。
     expect(styles).toMatch(/\.webqq-model-trajectory-control-filters\.is-collapsed\s*\{[^}]*visibility:\s*hidden/s)
-    // 宽度归零后仍允许换行会让按钮各占一行，把工具栏高度撑到七行。
-    expect(styles).toMatch(/\.webqq-model-trajectory-control-filters\.is-collapsed\s*\{[^}]*flex-wrap:\s*nowrap/s)
+    // 用 0fr → 1fr 向右展开到内容宽；组内按钮不得换行，否则宽屏也会向下长高。
+    expect(styles).toMatch(/\.webqq-model-trajectory-control-filters\.is-collapsed\s*\{[^}]*grid-template-columns:\s*0fr/s)
+    expect(styles).toMatch(/\.webqq-model-trajectory-control-filters-inner\s*\{[^}]*flex-wrap:\s*nowrap/s)
+    expect(styles).not.toMatch(/\.webqq-model-trajectory-control-filters\s*\{[^}]*flex-wrap:\s*wrap/s)
     expect(styles).not.toContain('cursor:')
   })
 
