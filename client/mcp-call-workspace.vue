@@ -96,7 +96,6 @@
                 </div>
               </div>
             </header>
-            <p v-if="item.errorCode" class="webqq-mcp-call-trace">{{ item.errorCode }}</p>
           </button>
         </div>
       </section>

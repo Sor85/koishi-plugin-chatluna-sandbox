@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { App } from '@koishijs/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SandboxControlService, SandboxRuntimeBotRegistry } from '../src/control-service'
+import { redactMcpCallValue } from '../src/mcp/call-records'
 import { SandboxMcpService } from '../src/mcp/service'
 import { SandboxTestSpaceService } from '../src/test-spaces'
 
@@ -26,6 +27,26 @@ function createService(scopes: Array<'read' | 'interact' | 'manage' | 'debug'> =
 
 afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.stop()))
+})
+
+describe('MCP 调用值脱敏', () => {
+  it('保留消息正文，只脱敏敏感字段', () => {
+    expect(redactMcpCallValue({
+      content: '你好世界',
+      message: 'hello',
+      text: 'short',
+      raw_message: 'raw',
+      authorization: 'secret-token',
+      confirmationToken: 'confirm-secret',
+    })).toEqual({
+      content: '你好世界',
+      message: 'hello',
+      text: 'short',
+      raw_message: 'raw',
+      authorization: '[已脱敏]',
+      confirmationToken: '[已脱敏]',
+    })
+  })
 })
 
 describe('MCP 测试调用记录', () => {
@@ -66,7 +87,7 @@ describe('MCP 测试调用记录', () => {
     expect(detail.arguments).toMatchObject({
       operatorId: '10001',
       conversationId: 'private:10001:20001',
-      content: '[文本已省略，4 字符]',
+      content: '秘密正文',
       authorization: '[已脱敏]',
       confirmationToken: '[已脱敏]',
     })
@@ -77,7 +98,6 @@ describe('MCP 测试调用记录', () => {
     const serialized = JSON.stringify(detail)
     expect(serialized).not.toContain(credential.token)
     expect(serialized).not.toContain('confirm-secret')
-    expect(serialized).not.toContain('秘密正文')
     expect(serialized).not.toContain(mediaBase64)
   })
 

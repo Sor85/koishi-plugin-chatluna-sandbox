@@ -3,7 +3,6 @@ import { LARGE_BASE64_CHAR_THRESHOLD } from '../onebot-debug'
 import type { SandboxMcpCallRecord, SandboxMcpCallRecordListItem, SandboxMcpError } from './types'
 
 const SENSITIVE_KEY_PATTERN = /authorization|access[_-]?token|(?:^|_)token$|secret|password|cookie|private[_-]?key|confirmation[_-]?token|data[_-]?base64/i
-const TEXT_KEY_PATTERN = /^(?:content|message|raw_message|text)$/i
 const BASE64_BODY_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
 
 export interface ListSandboxMcpCallRecordsInput {
@@ -20,10 +19,8 @@ export interface SandboxMcpCallRecordsPage {
 
 export function redactMcpCallValue(value: unknown, key = ''): unknown {
   if (SENSITIVE_KEY_PATTERN.test(key)) return '[已脱敏]'
-  if (typeof value === 'string') {
-    if (TEXT_KEY_PATTERN.test(key)) return `[文本已省略，${value.length} 字符]`
-    return foldLargeBase64(value)
-  }
+  // 与 OneBot 调试记录不同：测试调用记录要复盘工具参数，content/message/text 必须保留。
+  if (typeof value === 'string') return foldLargeBase64(value)
   if (Array.isArray(value)) return value.map((item) => redactMcpCallValue(item, key))
   if (!value || typeof value !== 'object') return value
   return Object.fromEntries(Object.entries(value).map(([entryKey, entryValue]) => [

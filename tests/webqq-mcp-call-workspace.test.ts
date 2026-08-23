@@ -43,6 +43,7 @@ describe('WebQQ MCP 调用工作台', () => {
     expect(workspaceSource).not.toContain('formatSource')
     expect(workspaceSource.match(/v-for="item in records"[\s\S]*?<\/button>/)?.[0] ?? '').not.toContain('item.spaceId')
     expect(workspaceSource.match(/v-for="item in records"[\s\S]*?<\/button>/)?.[0] ?? '').not.toContain('item.sourceIp')
+    expect(workspaceSource.match(/v-for="item in records"[\s\S]*?<\/button>/)?.[0] ?? '').not.toContain('item.errorCode')
     expect(styles).toMatch(/\.webqq-mcp-call-meta\s*\{[^}]*align-items:\s*center/s)
     expect(workspaceSource).not.toContain("emit('replay'")
     expect(workspaceSource).toMatch(/webqq-mcp-call-list-pane[\s\S]*webqq-mcp-call-list-toolbar[\s\S]*webqq-mcp-call-list/)
