@@ -1,9 +1,9 @@
 <template>
   <div ref="thumbnailRef" class="webqq-space-thumbnail" aria-hidden="true">
     <div ref="liveHostRef" class="webqq-space-thumbnail-live-host" />
-    <!-- 从未进入过的空间没有可捕获 DOM，继续用当前快照绘制首屏作为冷启动兜底。 -->
+    <!-- 从未进入过的空间、或捕获的是独立页时，用消息工作区快照绘制首屏。 -->
     <div
-      v-if="!capture"
+      v-if="!liveCapture"
       inert
       class="webqq-workspace webqq-space-thumbnail-workspace is-details-open"
       :class="{
@@ -33,10 +33,17 @@ import WebqqSidebar from './webqq-sidebar.vue'
 import { buildWorkspaceThumbnailModels } from './webqq/workspace-thumbnail-model'
 import {
   instantiateWorkspaceThumbnail,
+  isWorkspaceThumbnailView,
   restoreWorkspaceThumbnailScroll,
   type WorkspaceThumbnailCapture,
 } from './webqq/workspace-thumbnail-capture'
 import { calculateContainedWorkspaceThumbnailTransform } from './webqq/workspace-thumbnail-scale'
+import {
+  applyThumbnailAvatars,
+  collectAvatarMediaIds,
+  mediaSourcesFromCache,
+  thumbnailMediaCacheKey,
+} from './webqq/workspace-thumbnail-media'
 import type { SandboxAppearance, SandboxSnapshot } from '../src/types'
 
 const THUMBNAIL_CANVAS_WIDTH = 1440
@@ -55,34 +62,42 @@ const thumbnailRef = ref<HTMLElement>()
 const liveHostRef = ref<HTMLElement>()
 const resolvedSnapshot = ref(props.snapshot)
 const models = computed(() => buildWorkspaceThumbnailModels(resolvedSnapshot.value, props.appearance, props.colorMode))
+const liveCapture = computed(() => {
+  const capture = props.capture
+  if (!capture) return
+  return isWorkspaceThumbnailView(capture.element.getAttribute('data-mobile-view')) ? capture : undefined
+})
 let resizeObserver: ResizeObserver | undefined
 let mediaLoadGeneration = 0
 
+function applyCachedAvatars(snapshot: SandboxSnapshot) {
+  const mediaIds = collectAvatarMediaIds(snapshot)
+  return applyThumbnailAvatars(
+    snapshot,
+    mediaSourcesFromCache(mediaIds, thumbnailMediaCache, props.spaceId),
+    resolvedSnapshot.value,
+  )
+}
+
+resolvedSnapshot.value = applyCachedAvatars(props.snapshot)
+
 async function resolveSnapshotMedia() {
+  if (liveCapture.value) return
   const generation = ++mediaLoadGeneration
-  if (props.capture) return
-  const references = [...props.snapshot.participants.map(({ avatar }) => avatar), ...props.snapshot.groups.map(({ avatar }) => avatar)]
-  const mediaIds = [...new Set(references.flatMap((reference) => reference?.match(/^sandbox-media:\/\/([a-f0-9]{32})$/)?.[1] ?? []))]
-  const loadedMedia: Array<readonly [string, string] | undefined> = await Promise.all(mediaIds.map(async (mediaId) => {
-    const cacheKey = `${props.spaceId ?? 'main'}:${mediaId}`
-    const cached = thumbnailMediaCache.get(cacheKey)
-    if (cached) return [mediaId, cached] as const
+  const snapshot = props.snapshot
+  resolvedSnapshot.value = applyCachedAvatars(snapshot)
+  const missingIds = collectAvatarMediaIds(snapshot).filter((id) => !thumbnailMediaCache.has(thumbnailMediaCacheKey(props.spaceId, id)))
+  if (!missingIds.length) return
+  const operatorId = previewOperatorId()
+  if (!operatorId) return
+  await Promise.all(missingIds.map(async (mediaId) => {
     try {
-      const content = await send('chatluna-sandbox/media-content', { spaceId: props.spaceId, operatorId: previewOperatorId(), mediaId })
-      const source = `data:${content.mimeType};base64,${content.dataBase64}`
-      thumbnailMediaCache.set(cacheKey, source)
-      return [mediaId, source] as const
-    } catch {
-      return undefined
-    }
+      const content = await send('chatluna-sandbox/media-content', { spaceId: props.spaceId, operatorId, mediaId })
+      thumbnailMediaCache.set(thumbnailMediaCacheKey(props.spaceId, mediaId), `data:${content.mimeType};base64,${content.dataBase64}`)
+    } catch {}
   }))
-  const mediaSources = Object.fromEntries(loadedMedia.filter((entry): entry is readonly [string, string] => entry !== undefined))
   if (generation !== mediaLoadGeneration) return
-  resolvedSnapshot.value = {
-    ...props.snapshot,
-    participants: props.snapshot.participants.map((participant) => ({ ...participant, avatar: resolveReference(participant.avatar, mediaSources) })),
-    groups: props.snapshot.groups.map((group) => ({ ...group, avatar: resolveReference(group.avatar, mediaSources) })),
-  }
+  resolvedSnapshot.value = applyCachedAvatars(props.snapshot)
 }
 
 function previewOperatorId() {
@@ -91,14 +106,9 @@ function previewOperatorId() {
     ?? ''
 }
 
-function resolveReference(reference: string | undefined, mediaSources: Record<string, string>) {
-  const id = reference?.match(/^sandbox-media:\/\/([a-f0-9]{32})$/)?.[1]
-  return id ? mediaSources[id] ?? '' : reference
-}
-
 function renderCapture() {
   const host = liveHostRef.value
-  const capture = props.capture
+  const capture = liveCapture.value
   if (!host) return
   host.replaceChildren()
   if (!capture) return
@@ -129,7 +139,7 @@ function applyContainedScale(element: HTMLElement, canvasWidth: number, canvasHe
 }
 
 function scaleThumbnail() {
-  const capture = props.capture
+  const capture = liveCapture.value
   if (capture) {
     const element = liveHostRef.value?.firstElementChild
     if (element instanceof HTMLElement) applyContainedScale(element, capture.width, capture.height)
@@ -139,13 +149,12 @@ function scaleThumbnail() {
   if (element) applyContainedScale(element, THUMBNAIL_CANVAS_WIDTH, THUMBNAIL_CANVAS_HEIGHT)
 }
 
-watch(() => props.capture, () => {
+watch(liveCapture, () => {
   renderCapture()
   void nextTick(scaleThumbnail)
   void resolveSnapshotMedia()
 })
 watch(() => props.snapshot, () => {
-  resolvedSnapshot.value = props.snapshot
   void resolveSnapshotMedia()
 })
 onMounted(() => {

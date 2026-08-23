@@ -5,6 +5,10 @@ export interface WorkspaceThumbnailCapture {
   scrollOffsets: Array<{ index: number, left: number, top: number }>
 }
 
+export function isWorkspaceThumbnailView(view: string | null | undefined) {
+  return view === 'messages' || view === 'contacts'
+}
+
 export function captureWorkspaceThumbnail(root: HTMLElement): WorkspaceThumbnailCapture {
   const rect = root.getBoundingClientRect()
   const nodes = [root, ...root.querySelectorAll<HTMLElement>('*')]

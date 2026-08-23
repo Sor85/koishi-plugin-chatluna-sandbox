@@ -49,7 +49,7 @@ describe('AI 测试空间总览', () => {
     expect(zoom).toContain('prefers-reduced-motion')
   })
 
-  it('卡片优先展示离开前的真实页面缩略图，并为未访问空间解析媒体头像', () => {
+  it('卡片优先展示离开前的消息工作区缩略图，并为未访问空间解析媒体头像', () => {
     const thumbnail = readFileSync(resolve('client/workspace-thumbnail.vue'), 'utf8')
     const capture = readFileSync(resolve('client/webqq/workspace-thumbnail-capture.ts'), 'utf8')
     const shell = readFileSync(resolve('client/webqq/test-space-shell.ts'), 'utf8')
@@ -58,8 +58,11 @@ describe('AI 测试空间总览', () => {
     const responsiveStyles = readFileSync(resolve('client/styles/webqq-responsive.css'), 'utf8')
     expect(shell).toContain('rememberCurrentWorkspaceThumbnail()')
     expect(shell).toContain('captureWorkspaceThumbnail(workspace)')
+    expect(shell).toContain('isWorkspaceThumbnailView(currentView.value)')
     expect(shell).toContain('thumbnailCaptures')
     expect(overview).toContain(':capture="thumbnailCaptures[space.id]"')
+    expect(capture).toContain("view === 'messages' || view === 'contacts'")
+    expect(thumbnail).toContain('isWorkspaceThumbnailView')
     expect(thumbnail).toContain('instantiateWorkspaceThumbnail')
     expect(thumbnail).toContain('restoreWorkspaceThumbnailScroll')
     expect(thumbnail).toContain('calculateContainedWorkspaceThumbnailTransform')
@@ -67,7 +70,10 @@ describe('AI 测试空间总览', () => {
     expect(thumbnail).toContain('THUMBNAIL_CANVAS_HEIGHT = 760')
     expect(thumbnail).toContain('resizeObserver = new ResizeObserver(scaleThumbnail)')
     expect(thumbnail).toContain("send('chatluna-sandbox/media-content'")
-    expect(thumbnail).toContain('v-if="!capture"')
+    expect(thumbnail).toContain('applyCachedAvatars')
+    expect(thumbnail).toContain('applyThumbnailAvatars')
+    expect(thumbnail).not.toContain('resolvedSnapshot.value = props.snapshot')
+    expect(thumbnail).toContain('v-if="!liveCapture"')
     expect(thumbnail).toContain('<WebqqSidebar :model="models.sidebar" :color-mode="colorMode" preview />')
     expect(thumbnail).toContain('<WebqqDetailsPanel :model="models.detailsPanel" preview />')
     // 缩略图是 inert 视觉副本，但 Vue 指令仍会执行；必须显式禁用 body 级滚动条 Portal，避免缩放时在页面中间闪现。

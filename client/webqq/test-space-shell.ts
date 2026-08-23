@@ -4,7 +4,7 @@ import type { SandboxTestSpaceSummary } from '../../src/test-spaces'
 import type { SandboxSnapshot } from '../../src/types'
 import { createWorkspaceController } from './workspace-controller'
 import type { SandboxWorkspaceView } from './workspace-state'
-import { captureWorkspaceThumbnail, type WorkspaceThumbnailCapture } from './workspace-thumbnail-capture'
+import { captureWorkspaceThumbnail, isWorkspaceThumbnailView, type WorkspaceThumbnailCapture } from './workspace-thumbnail-capture'
 import { captureZoomRect, staggerCardsIn, zoomCardFromRect, zoomWorkspaceFromRect } from './workspace-zoom'
 
 const emptySnapshot: SandboxSnapshot = {
@@ -32,6 +32,16 @@ export function createAiTestSpaceShell(
     const workspace = document.querySelector<HTMLElement>('.webqq-workspace')
     if (!workspace || currentView.value === 'spaces') return
     const key = activeSpaceId.value ?? 'main'
+    // 独立页（模型请求/预设/调试等）不是空间画面；总览卡片始终展示消息工作区。
+    if (!isWorkspaceThumbnailView(currentView.value)) {
+      const existing = thumbnailCaptures.value[key]
+      if (existing && !isWorkspaceThumbnailView(existing.element.getAttribute('data-mobile-view'))) {
+        const next = { ...thumbnailCaptures.value }
+        delete next[key]
+        thumbnailCaptures.value = next
+      }
+      return
+    }
     thumbnailCaptures.value = { ...thumbnailCaptures.value, [key]: captureWorkspaceThumbnail(workspace) }
   }
 
@@ -55,7 +65,7 @@ export function createAiTestSpaceShell(
       await loadTestSpaces()
       return
     }
-    // 在切到总览前保存完整可见 DOM；领域快照无法表达当前页签、滚动位置与详情栏开关。
+    // 切到总览前只保存消息工作区 DOM；独立页不能覆盖空间缩略图。
     rememberCurrentWorkspaceThumbnail()
     // 记录工作区当前位置，切换视图后让活动空间的卡片从这里缩回网格位。
     const fromRect = captureZoomRect(document.querySelector('.webqq-workspace'))

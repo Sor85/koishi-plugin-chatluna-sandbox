@@ -10,6 +10,8 @@ describe('WebQQ 共享头像', () => {
     expect(source).toContain("['webqq-identity-avatar'")
     expect(source).toContain(':alt="alt || name"')
     expect(source).toContain('@error="imageFailed = true"')
+    expect(source).toContain("avatar.startsWith('sandbox-media:')")
+    expect(source).toContain('usableAvatar')
     expect(source).not.toContain('showBotBadge')
     expect(source).not.toContain('IconRobotFace')
     expect(source).not.toContain('webqq-avatar-bot-badge')
