@@ -40,6 +40,10 @@ export function createKoishiWorkspacePort(resolveSpaceId: () => string | undefin
   renamePreset: (input) => send('chatluna-sandbox/preset-rename', input),
   deletePreset: (input) => send('chatluna-sandbox/preset-delete', input),
   locatePresetExpression: (input) => send('chatluna-sandbox/preset-locate-expression', input),
+  // 测试调用记录跨主环境和全部测试空间共享；筛选里的 spaceId 是记录字段，不能被当前观察空间覆盖。
+  getMcpCallRecords: (input = {}) => send('chatluna-sandbox/mcp-call-records', input),
+  getMcpCallRecord: (input) => send('chatluna-sandbox/mcp-call-record', input),
+  clearMcpCallRecords: () => send('chatluna-sandbox/clear-mcp-call-records'),
   }
 }
 

@@ -56,6 +56,17 @@
           @query="loadOneBotDebugRecords"
           @clear="clearOneBotDebugRecords"
         />
+        <McpCallWorkspace
+          v-else-if="currentView === 'mcp-calls'"
+          :records="mcpCallWorkspaceModel.records"
+          :detail="mcpCallWorkspaceModel.detail"
+          :loading="mcpCallWorkspaceModel.loading"
+          :detail-loading="mcpCallWorkspaceModel.detailLoading"
+          :error="mcpCallWorkspaceModel.error"
+          @query="loadMcpCallRecords"
+          @open="loadMcpCallRecord"
+          @clear="clearMcpCallRecords"
+        />
         <PresetWorkspace
           v-else-if="currentView === 'presets'"
           :catalog="presetWorkspaceModel.catalog"
@@ -181,6 +192,7 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 import AgentObserveOverlay from './agent-observe-overlay.vue'
 import AiTestSpaceOverview from './ai-test-space-overview.vue'
 import EnvironmentManager from './environment-manager.vue'
+import McpCallWorkspace from './mcp-call-workspace.vue'
 import ModelRequestWorkspace from './model-request-workspace.vue'
 import OneBotDebugWorkspace from './onebot-debug-workspace.vue'
 import PresetWorkspace from './preset-workspace.vue'
@@ -206,6 +218,7 @@ const {
   appearance,
   chatPaneModel,
   clearOneBotDebugRecords,
+  clearMcpCallRecords,
   clearModelRequestRecords,
   closeDetails,
   currentView,
@@ -214,6 +227,7 @@ const {
   detailsPanelModel,
   detailsVisible,
   debugWorkspaceModel,
+  mcpCallWorkspaceModel,
   modelRequestVisitKey,
   modelRequestWorkspaceModel,
   presetDiscardGuard,
@@ -225,6 +239,8 @@ const {
   loadEarlierMessages,
   searchConversationMessages,
   loadOneBotDebugRecords,
+  loadMcpCallRecords,
+  loadMcpCallRecord,
   loadModelRequestRecords,
   loadMoreModelRequestRecords,
   loadModelRequestRecord,

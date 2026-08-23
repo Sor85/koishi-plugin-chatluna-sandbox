@@ -316,12 +316,14 @@ describe('SandboxMcpService', () => {
     const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media') })
     const service = new SandboxMcpService(control, { dataDirectory: directory, readPerMinute: 1 })
     const credential = service.createCredential('限流凭证', ['read', 'debug'])
-    const debugCredential = service.createCredential('调试凭证', ['debug'])
     await service.callTool(credential.token, 'get_server_info', {}, { sourceIp: '127.0.0.1' })
     await expect(service.callTool(credential.token, 'get_scene_snapshot', {})).rejects.toMatchObject({ code: 'rate_limited', retryable: true, retryAfterMs: expect.any(Number) })
-    const records = await service.callTool(debugCredential.token, 'list_mcp_call_records', {}) as Array<Record<string, unknown>>
-    expect(records[0]).toMatchObject({ credentialName: '限流凭证', sourceIp: '127.0.0.1', tool: 'get_server_info', status: 'success' })
-    expect(JSON.stringify(records)).not.toContain(credential.token)
+    const page = service.listCallRecords()
+    expect(page.records).toEqual(expect.arrayContaining([
+      expect.objectContaining({ credentialName: '限流凭证', sourceIp: '127.0.0.1', tool: 'get_server_info', status: 'success' }),
+      expect.objectContaining({ credentialName: '限流凭证', tool: 'get_scene_snapshot', status: 'error', errorCode: 'rate_limited' }),
+    ]))
+    expect(JSON.stringify(page.records)).not.toContain(credential.token)
   })
 
   it('在显式 spaceId 中准备隔离环境并保留完成结果', async () => {

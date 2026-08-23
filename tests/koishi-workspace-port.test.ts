@@ -92,4 +92,18 @@ describe('Koishi 工作区端口', () => {
     expect(send).toHaveBeenNthCalledWith(2, 'chatluna-sandbox/model-request-record', { scope: 'space', spaceId: 'main', recordId: 'record-1' })
     expect(send).toHaveBeenNthCalledWith(3, 'chatluna-sandbox/clear-model-request-records', { scope: 'unattributed' })
   })
+
+  it('MCP 调用记录按筛选参数发送，不注入当前工作区 spaceId', async () => {
+    send.mockClear()
+    send.mockResolvedValue({ records: [] })
+    const port = createKoishiWorkspacePort(() => 'space-1')
+
+    await port.getMcpCallRecords({ tool: 'send_message', spaceId: 'space-target' })
+    await port.getMcpCallRecord({ recordId: 'call-1' })
+    await port.clearMcpCallRecords()
+
+    expect(send).toHaveBeenNthCalledWith(1, 'chatluna-sandbox/mcp-call-records', { tool: 'send_message', spaceId: 'space-target' })
+    expect(send).toHaveBeenNthCalledWith(2, 'chatluna-sandbox/mcp-call-record', { recordId: 'call-1' })
+    expect(send).toHaveBeenNthCalledWith(3, 'chatluna-sandbox/clear-mcp-call-records')
+  })
 })

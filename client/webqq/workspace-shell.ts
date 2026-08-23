@@ -5,6 +5,7 @@ import type { WebqqDetailsPanelModel } from '../webqq-details-panel.vue'
 import type { WebqqForwardTargetModel, WebqqForwardTargetOption } from '../webqq-forward-target-dialog.vue'
 import type { WebqqMessageListModel } from '../webqq-message-list.vue'
 import type { WebqqSidebarModel } from '../webqq-sidebar.vue'
+import type { ListSandboxMcpCallRecordsInput } from '../../src/mcp/call-records'
 import type {
   GetSandboxOneBotDebugRecordsInput,
   ManageSandboxEnvironmentInput,
@@ -76,6 +77,9 @@ export function createWebqqWorkspaceShell(
   const errorMessage = ref('')
   const debugLoading = ref(false)
   const debugError = ref('')
+  const mcpCallLoading = ref(false)
+  const mcpCallDetailLoading = ref(false)
+  const mcpCallError = ref('')
   const modelRequestLoading = ref(false)
   const modelRequestDetailLoading = ref(false)
   const modelRequestError = ref('')
@@ -353,6 +357,13 @@ export function createWebqqWorkspaceShell(
     loading: debugLoading.value,
     error: debugError.value,
   }))
+  const mcpCallWorkspaceModel = computed(() => ({
+    records: workspaceController.mcpCallRecords.value,
+    detail: workspaceController.mcpCallRecord.value,
+    loading: mcpCallLoading.value,
+    detailLoading: mcpCallDetailLoading.value,
+    error: mcpCallError.value,
+  }))
   const modelRequestWorkspaceModel = computed(() => ({
     records: workspaceController.modelRequestRecords.value,
     detail: workspaceController.modelRequestRecord.value,
@@ -379,6 +390,7 @@ export function createWebqqWorkspaceShell(
     // 视图会从本地偏好直接恢复为独立页，此路径不会触发侧栏点击处理器；
     // 必须在工作区恢复后主动读取，否则重启后的首屏会一直显示空状态。
     if (currentView.value === 'debug') await loadOneBotDebugRecords()
+    if (currentView.value === 'mcp-calls') await loadMcpCallRecords()
     if (currentView.value === 'presets') await loadPresetCatalog()
   })
 
@@ -605,6 +617,7 @@ export function createWebqqWorkspaceShell(
     if (view !== 'model-requests') clearPresetEvidenceReturn()
     workspaceController.selectView(view)
     if (view === 'debug') void loadOneBotDebugRecords()
+    if (view === 'mcp-calls') void loadMcpCallRecords()
     if (view === 'model-requests') modelRequestVisitKey.value += 1
     if (view === 'presets') void loadPresetCatalog()
     return true
@@ -645,6 +658,42 @@ export function createWebqqWorkspaceShell(
       debugError.value = error instanceof Error ? error.message : '读取 OneBot 调试记录失败'
     } finally {
       debugLoading.value = false
+    }
+  }
+
+  async function loadMcpCallRecords(input: ListSandboxMcpCallRecordsInput = {}) {
+    mcpCallLoading.value = true
+    mcpCallError.value = ''
+    try {
+      await workspaceController.loadMcpCallRecords(input)
+    } catch (error) {
+      mcpCallError.value = error instanceof Error ? error.message : '读取 MCP 调用记录失败'
+    } finally {
+      mcpCallLoading.value = false
+    }
+  }
+
+  async function loadMcpCallRecord(input: { recordId: string }) {
+    mcpCallDetailLoading.value = true
+    mcpCallError.value = ''
+    try {
+      await workspaceController.loadMcpCallRecord(input)
+    } catch (error) {
+      mcpCallError.value = error instanceof Error ? error.message : '读取 MCP 调用详情失败'
+    } finally {
+      mcpCallDetailLoading.value = false
+    }
+  }
+
+  async function clearMcpCallRecords() {
+    mcpCallLoading.value = true
+    mcpCallError.value = ''
+    try {
+      await workspaceController.clearMcpCallRecords()
+    } catch (error) {
+      mcpCallError.value = error instanceof Error ? error.message : '清理 MCP 调用记录失败'
+    } finally {
+      mcpCallLoading.value = false
     }
   }
 
@@ -958,6 +1007,7 @@ export function createWebqqWorkspaceShell(
     appearance,
     chatPaneModel,
     clearOneBotDebugRecords,
+    clearMcpCallRecords,
     clearModelRequestRecords,
     closeDetails,
     currentView,
@@ -966,6 +1016,7 @@ export function createWebqqWorkspaceShell(
     detailsPanelModel,
     detailsVisible,
     debugWorkspaceModel,
+    mcpCallWorkspaceModel,
     environmentModel,
     modelRequestVisitKey,
     modelRequestWorkspaceModel,
@@ -977,6 +1028,8 @@ export function createWebqqWorkspaceShell(
     loadEarlierMessages,
     searchConversationMessages,
     loadOneBotDebugRecords,
+    loadMcpCallRecords,
+    loadMcpCallRecord,
     loadModelRequestRecords,
     loadMoreModelRequestRecords,
     loadModelRequestRecord,

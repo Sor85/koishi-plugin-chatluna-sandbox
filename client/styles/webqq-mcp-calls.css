@@ -1,0 +1,208 @@
+.webqq-mcp-call-workspace {
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 16px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 24px;
+  background: var(--webqq-bg);
+}
+
+.webqq-mcp-call-header,
+.webqq-mcp-call-item > header,
+.webqq-mcp-call-detail > header,
+.webqq-mcp-call-item-title,
+.webqq-mcp-call-actions,
+.webqq-mcp-call-error-filter {
+  display: flex;
+  align-items: center;
+}
+
+.webqq-mcp-call-header {
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.webqq-mcp-call-header h1 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.webqq-mcp-call-header p,
+.webqq-mcp-call-item p,
+.webqq-mcp-call-detail p {
+  margin: 0;
+  color: var(--webqq-muted);
+}
+
+.webqq-mcp-call-actions,
+.webqq-mcp-call-item-title,
+.webqq-mcp-call-error-filter {
+  gap: 8px;
+}
+
+.webqq-mcp-call-filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--webqq-border);
+  border-radius: 16px;
+  background: var(--webqq-surface);
+}
+
+.webqq-mcp-call-filters > label:not(.webqq-mcp-call-error-filter) {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.webqq-mcp-call-control {
+  width: 100%;
+}
+
+.webqq-mcp-call-error-filter {
+  align-self: end;
+  min-height: 40px;
+  white-space: nowrap;
+}
+
+.webqq-mcp-call-split {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  min-height: 0;
+  gap: 16px;
+}
+
+.webqq-mcp-call-list-pane,
+.webqq-mcp-call-detail-pane {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--webqq-border);
+  border-radius: 16px;
+  background: var(--webqq-surface);
+}
+
+.webqq-mcp-call-list,
+.webqq-mcp-call-detail {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+}
+
+.webqq-mcp-call-list {
+  display: grid;
+  align-content: start;
+  grid-auto-rows: max-content;
+}
+
+.webqq-mcp-call-item {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--webqq-border);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.webqq-mcp-call-item.is-active,
+.webqq-mcp-call-item:hover,
+.webqq-mcp-call-item:focus-visible {
+  background: var(--webqq-surface-muted);
+}
+
+.webqq-mcp-call-item-title {
+  flex-wrap: wrap;
+}
+
+.webqq-mcp-call-item time,
+.webqq-mcp-call-detail time,
+.webqq-mcp-call-trace {
+  font-size: 13px;
+}
+
+.webqq-mcp-call-status-success {
+  color: #047857;
+  background: #d1fae5;
+}
+
+.webqq-mcp-call-status-error,
+.webqq-mcp-call-error,
+.webqq-mcp-call-trace {
+  color: #b91c1c;
+}
+
+.webqq-mcp-call-status-error {
+  background: #fee2e2;
+}
+
+.webqq-mcp-call-detail {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 16px;
+}
+
+.webqq-mcp-call-payloads {
+  display: grid;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.webqq-mcp-call-payloads h2 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.webqq-mcp-call-payloads pre {
+  max-height: 280px;
+  overflow: auto;
+  padding: 10px 12px;
+  margin: 0;
+  border-radius: 12px;
+  color: var(--webqq-text);
+  background: var(--webqq-surface-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.webqq-mcp-call-empty,
+.webqq-mcp-call-error {
+  padding: 32px;
+  text-align: center;
+}
+
+@media (max-width: 960px) {
+  .webqq-mcp-call-workspace {
+    padding: 16px;
+  }
+
+  .webqq-mcp-call-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .webqq-mcp-call-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .webqq-mcp-call-header,
+  .webqq-mcp-call-item > header,
+  .webqq-mcp-call-detail > header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .webqq-mcp-call-filters {
+    grid-template-columns: 1fr;
+  }
+}

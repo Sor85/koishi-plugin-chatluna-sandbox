@@ -31,17 +31,33 @@ export interface SandboxMcpEvent {
   data: unknown
 }
 
-export interface SandboxMcpCallRecord {
+export interface SandboxMcpCallRecordError {
+  code: string
+  message: string
+  retryable: boolean
+  recovery: string
+  details?: unknown
+  retryAfterMs?: number
+}
+
+export interface SandboxMcpCallRecordListItem {
   id: string
   createdAt: string
   credentialName: string
   sourceIp?: string
   tool: string
   testRunId?: string
+  spaceId?: string
   durationMs: number
   status: 'success' | 'error'
-  affected: string[]
+  affected: readonly string[]
   errorCode?: string
+}
+
+export interface SandboxMcpCallRecord extends SandboxMcpCallRecordListItem {
+  arguments: unknown
+  result?: unknown
+  error?: SandboxMcpCallRecordError
 }
 
 export interface SandboxMcpExport {

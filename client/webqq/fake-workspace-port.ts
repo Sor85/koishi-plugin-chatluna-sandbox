@@ -37,6 +37,8 @@ import type {
   ModelRequestTrajectoryQuery,
 } from './model-request-query'
 import { emptyModelRequestRecordsPage } from './model-request-query'
+import type { ListSandboxMcpCallRecordsInput, SandboxMcpCallRecordsPage } from '../../src/mcp/call-records'
+import type { SandboxMcpCallRecord } from '../../src/mcp/types'
 import type {
   LocateSandboxPresetExpressionInput,
   LocateSandboxPresetExpressionResult,
@@ -101,6 +103,9 @@ export class FakeWorkspacePort implements WorkspacePort {
     code: 'request-not-observed',
     message: '没有匹配的模型请求',
   }
+  mcpCallRecordsResult: SandboxMcpCallRecordsPage = { records: [] }
+  mcpCallRecordResult?: SandboxMcpCallRecord
+  clearMcpCallRecordsResult = { cleared: 0 }
   private readonly failures = new Map<WorkspacePortOperation, unknown[]>()
 
   constructor(workspace: SandboxWorkspaceState) {
@@ -262,6 +267,25 @@ export class FakeWorkspacePort implements WorkspacePort {
 
   locatePresetExpression(input: LocateSandboxPresetExpressionInput) {
     return this.invoke('locatePresetExpression', input, this.locatePresetExpressionResult)
+  }
+
+  getMcpCallRecords(input?: ListSandboxMcpCallRecordsInput) {
+    return this.invoke('getMcpCallRecords', input, this.mcpCallRecordsResult)
+  }
+
+  getMcpCallRecord(input: { recordId: string }) {
+    const record = this.mcpCallRecordResult
+      ?? this.mcpCallRecordsResult.records.find(({ id }) => id === input.recordId)
+    if (!record) this.rejectNext('getMcpCallRecord', new Error('MCP 调用记录不存在'))
+    return this.invoke('getMcpCallRecord', input, {
+      ...record,
+      arguments: record && 'arguments' in record ? record.arguments : {},
+      result: record && 'result' in record ? record.result : undefined,
+    } as SandboxMcpCallRecord)
+  }
+
+  clearMcpCallRecords() {
+    return this.invoke('clearMcpCallRecords', undefined, this.clearMcpCallRecordsResult)
   }
 }
 

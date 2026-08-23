@@ -18,6 +18,16 @@ import type { SandboxTestSpaceService } from '../test-spaces'
 import type { GetSandboxModelRequestRecordsInput, SandboxForwardNodeInput, SandboxMedia, SandboxImplementationProfile, SandboxSnapshot } from '../types'
 import { createDirectConversationId, createGroupConversationId, isRecalledMessage, SandboxModelRequestCursorExpiredError, SandboxOneBotDebugCursorExpiredError } from '../types'
 import { getOneBotCapabilityMatrix } from '../onebot-profiles'
+import {
+  matchesMcpCallRecordFilter,
+  presentMcpCallRecord,
+  redactMcpCallValue,
+  resolveMcpCallSpaceId,
+  summarizeMcpCallError,
+  toMcpCallRecordListItem,
+  type ListSandboxMcpCallRecordsInput,
+  type SandboxMcpCallRecordsPage,
+} from './call-records'
 import { SandboxMcpError, type SandboxMcpCallRecord, type SandboxMcpCreatedCredential, type SandboxMcpCredential, type SandboxMcpEvent, type SandboxMcpEventCursor, type SandboxMcpExport, type SandboxMcpScope } from './types'
 
 export interface SandboxMcpServiceOptions {
@@ -528,8 +538,23 @@ const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
     },
     required: ['spaceId'],
   },
-  list_mcp_call_records: { type: 'object', properties: { spaceId: SPACE_REQUIRED }, required: ['spaceId'] },
-  clear_mcp_call_records: { type: 'object', properties: { spaceId: SPACE_REQUIRED }, required: ['spaceId'] },
+  list_mcp_call_records: {
+    type: 'object',
+    properties: {
+      tool: { type: 'string' },
+      credentialName: { type: 'string' },
+      spaceId: { type: 'string', description: '按测试调用记录中的空间筛选；省略时返回全部记录' },
+      testRunId: { type: 'string' },
+      errorsOnly: { type: 'boolean' },
+    },
+  },
+  get_mcp_call_record: {
+    type: 'object',
+    description: '按记录 ID 读取单条脱敏测试调用记录，包含参数、结果和错误。',
+    properties: { recordId: { type: 'string' } },
+    required: ['recordId'],
+  },
+  clear_mcp_call_records: { type: 'object', properties: {} },
 }
 
 const TOOL_DEFINITIONS: ToolDefinition[] = [
@@ -570,7 +595,8 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   ['list_model_request_records', 'debug', '读取模型请求记录'],
   ['get_model_request_record', 'debug', '读取单条模型请求记录，含完整请求体和原始响应体'],
   ['clear_model_request_records', 'debug', '清理指定 AI 测试空间的模型请求记录'],
-  ['list_mcp_call_records', 'debug', '读取 MCP 调用记录'],
+  ['list_mcp_call_records', 'debug', '读取 MCP 调用记录摘要'],
+  ['get_mcp_call_record', 'debug', '读取单条 MCP 调用记录详情'],
   ['clear_mcp_call_records', 'debug', '清理 MCP 调用记录'],
 ].map(([name, scope, description]) => ({ name, scope, description, inputSchema: TOOL_SCHEMAS[name as string] ?? { type: 'object', properties: {} } }) as ToolDefinition)
 
@@ -887,16 +913,16 @@ export class SandboxMcpService {
 
   async callTool(token: string, tool: string, argumentsValue: unknown, context: { sourceIp?: string } = {}): Promise<unknown> {
     const credential = this.requireCredential(token)
-    const definition = TOOL_DEFINITIONS.find(({ name }) => name === tool)
-    if (!definition) throw new SandboxMcpError('tool_not_found', `工具不存在：${tool}`)
-    this.requireScope(credential, definition.scope)
-    const rateCategory = tool.startsWith('wait_for_') ? 'wait' : tool === 'upload_media' ? 'upload' : definition.scope === 'read' || definition.scope === 'debug' ? 'read' : 'mutation'
-    const rateLimit = rateCategory === 'read' ? this.readPerMinute : rateCategory === 'mutation' ? this.mutationPerMinute : rateCategory === 'wait' ? this.waitPerMinute : this.uploadPerMinute
-    this.consumeRateLimit(credential.id, rateCategory, rateLimit)
     const args = asRecord(argumentsValue)
     const startedAt = Date.now()
-    const concurrencyCategory = tool.startsWith('wait_for_') ? 'wait' : tool === 'upload_media' ? 'upload' : definition.scope === 'read' || definition.scope === 'debug' ? undefined : 'mutation'
     try {
+      const definition = TOOL_DEFINITIONS.find(({ name }) => name === tool)
+      if (!definition) throw new SandboxMcpError('tool_not_found', `工具不存在：${tool}`)
+      this.requireScope(credential, definition.scope)
+      const rateCategory = tool.startsWith('wait_for_') ? 'wait' : tool === 'upload_media' ? 'upload' : definition.scope === 'read' || definition.scope === 'debug' ? 'read' : 'mutation'
+      const rateLimit = rateCategory === 'read' ? this.readPerMinute : rateCategory === 'mutation' ? this.mutationPerMinute : rateCategory === 'wait' ? this.waitPerMinute : this.uploadPerMinute
+      this.consumeRateLimit(credential.id, rateCategory, rateLimit)
+      const concurrencyCategory = tool.startsWith('wait_for_') ? 'wait' : tool === 'upload_media' ? 'upload' : definition.scope === 'read' || definition.scope === 'debug' ? undefined : 'mutation'
       const result = concurrencyCategory
         ? await this.withConcurrency(credential.id, concurrencyCategory, () => this.executeTool(credential, tool, args))
         : await this.executeTool(credential, tool, args)
@@ -906,9 +932,29 @@ export class SandboxMcpService {
       const normalized = error instanceof SandboxMcpError
         ? error
         : new SandboxMcpError('domain_error', error instanceof Error ? error.message : '工具调用失败')
-      this.appendCallRecord(credential, tool, args, context.sourceIp, 'error', undefined, normalized.code, Date.now() - startedAt)
+      this.appendCallRecord(credential, tool, args, context.sourceIp, 'error', undefined, normalized, Date.now() - startedAt)
       throw normalized
     }
+  }
+
+  listCallRecords(input: ListSandboxMcpCallRecordsInput = {}): SandboxMcpCallRecordsPage {
+    const records = this.callRecords
+      .filter((record) => matchesMcpCallRecordFilter(record, input))
+      .map(toMcpCallRecordListItem)
+      .reverse()
+    return { records }
+  }
+
+  getCallRecord(recordId: string): SandboxMcpCallRecord {
+    const record = this.callRecords.find(({ id }) => id === recordId)
+    if (!record) throw new SandboxMcpError('record_not_found', `MCP 调用记录不存在：${recordId}`)
+    return presentMcpCallRecord(record)
+  }
+
+  clearCallRecords(): { cleared: number } {
+    const cleared = this.callRecords.length
+    this.callRecords = []
+    return { cleared }
   }
 
   private async executeTool(credential: SandboxMcpCredential, tool: string, args: Record<string, unknown>): Promise<unknown> {
@@ -925,6 +971,17 @@ export class SandboxMcpService {
     if (tool === 'delete_test_space') return this.withIdempotency(credential, tool, args, async () => this.deleteTestSpace(args))
     if (tool === 'list_model_request_records') return this.listModelRequestRecords(args)
     if (tool === 'get_model_request_record') return this.getModelRequestRecord(args)
+    if (tool === 'list_mcp_call_records') {
+      return this.listCallRecords({
+        tool: typeof args.tool === 'string' ? args.tool : undefined,
+        credentialName: typeof args.credentialName === 'string' ? args.credentialName : undefined,
+        spaceId: typeof args.spaceId === 'string' ? args.spaceId : undefined,
+        testRunId: typeof args.testRunId === 'string' ? args.testRunId : undefined,
+        errorsOnly: args.errorsOnly === true,
+      })
+    }
+    if (tool === 'get_mcp_call_record') return this.getCallRecord(requireString(args.recordId, 'recordId'))
+    if (tool === 'clear_mcp_call_records') return this.clearCallRecords()
     if (tool === 'clear_model_request_records') {
       if (args.scope === 'unattributed') {
         throw new SandboxMcpError('invalid_arguments', 'MCP 不能清理未归属模型请求记录')
@@ -997,8 +1054,6 @@ export class SandboxMcpService {
       }
     }
     if (tool === 'clear_onebot_debug_records') return { cleared: activeControl.clearOneBotDebugRecords() }
-    if (tool === 'list_mcp_call_records') return structuredClone(this.callRecords).reverse()
-    if (tool === 'clear_mcp_call_records') { const cleared = this.callRecords.length; this.callRecords = []; return { cleared } }
     throw new SandboxMcpError('tool_not_found', `工具不存在：${tool}`)
   }
 
@@ -1566,9 +1621,36 @@ export class SandboxMcpService {
     if (!credential.scopes.includes(scope)) throw new SandboxMcpError('permission_denied', `凭证缺少 ${scope} 权限`)
   }
 
-  private appendCallRecord(credential: SandboxMcpCredential, tool: string, args: Record<string, unknown>, sourceIp: string | undefined, status: 'success' | 'error', result?: unknown, errorCode?: string, durationMs = 0) {
-    const affected = result && typeof result === 'object' && Array.isArray(Reflect.get(result, 'affected')) ? Reflect.get(result, 'affected').map(String) : []
-    this.callRecords.push({ id: randomUUID(), createdAt: new Date().toISOString(), credentialName: credential.name, sourceIp, tool, testRunId: typeof args.testRunId === 'string' ? args.testRunId : undefined, durationMs, status, affected, errorCode })
+  private appendCallRecord(
+    credential: SandboxMcpCredential,
+    tool: string,
+    args: Record<string, unknown>,
+    sourceIp: string | undefined,
+    status: 'success' | 'error',
+    result: unknown,
+    error: SandboxMcpError | undefined,
+    durationMs = 0,
+  ) {
+    const affected = result && typeof result === 'object' && Array.isArray(Reflect.get(result, 'affected'))
+      ? Reflect.get(result, 'affected').map(String)
+      : []
+    const spaceId = resolveMcpCallSpaceId(args, result)
+    this.callRecords.push({
+      id: randomUUID(),
+      createdAt: new Date().toISOString(),
+      credentialName: credential.name,
+      sourceIp,
+      tool,
+      testRunId: typeof args.testRunId === 'string' ? args.testRunId : undefined,
+      spaceId,
+      durationMs,
+      status,
+      affected,
+      errorCode: error?.code,
+      arguments: redactMcpCallValue(args),
+      result: result === undefined ? undefined : redactMcpCallValue(result),
+      error: error ? summarizeMcpCallError(error) : undefined,
+    })
     if (this.callRecords.length > this.callRecordLimit) this.callRecords.splice(0, this.callRecords.length - this.callRecordLimit)
   }
 

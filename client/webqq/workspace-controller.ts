@@ -50,6 +50,8 @@ import type {
   SavePresetInput,
 } from '../../src/presets'
 import { getVisibleRecentConversations } from './relationship-directory'
+import type { ListSandboxMcpCallRecordsInput } from '../../src/mcp/call-records'
+import type { SandboxMcpCallRecord, SandboxMcpCallRecordListItem } from '../../src/mcp/types'
 import {
   emptyModelRequestCapacity,
   type ClearModelRequestRecordsQuery,
@@ -158,6 +160,8 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   const presetCatalogState = ref<SandboxPresetDocument[]>([])
   const presetDocumentState = ref<SandboxPresetDocument>()
   const presetLocateResultState = ref<LocateSandboxPresetExpressionResult>()
+  const mcpCallRecordsState = ref<SandboxMcpCallRecordListItem[]>([])
+  const mcpCallRecordState = ref<SandboxMcpCallRecord>()
   const modelRequestRecordsPageState = ref<ModelRequestRecordsPageState>({
     hasMore: false,
     capacity: emptyModelRequestCapacity,
@@ -683,6 +687,34 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     }
   }
 
+  async function loadMcpCallRecords(input: ListSandboxMcpCallRecordsInput = {}) {
+    try {
+      const page = await port.getMcpCallRecords(input)
+      mcpCallRecordsState.value = page.records
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '读取 MCP 调用记录失败')
+    }
+  }
+
+  async function loadMcpCallRecord(input: { recordId: string }) {
+    try {
+      mcpCallRecordState.value = await port.getMcpCallRecord(input)
+      return mcpCallRecordState.value
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '读取 MCP 调用详情失败')
+    }
+  }
+
+  async function clearMcpCallRecords() {
+    try {
+      await port.clearMcpCallRecords()
+      mcpCallRecordsState.value = []
+      mcpCallRecordState.value = undefined
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '清理 MCP 调用记录失败')
+    }
+  }
+
   async function locatePresetExpression(input: LocateSandboxPresetExpressionInput) {
     try {
       const result = await port.locatePresetExpression(input)
@@ -729,6 +761,8 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     presetCatalog: readonly(presetCatalogState),
     presetDocument: readonly(presetDocumentState),
     presetLocateResult: readonly(presetLocateResultState),
+    mcpCallRecords: readonly(mcpCallRecordsState),
+    mcpCallRecord: readonly(mcpCallRecordState),
     sidebar,
     chat,
     composer,
@@ -744,6 +778,8 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     loadModelRequestRecord,
     loadModelRequestTrajectory,
     loadPresetCatalog,
+    loadMcpCallRecords,
+    loadMcpCallRecord,
     readPreset,
     createPreset,
     savePreset,
@@ -756,6 +792,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     performGroupAction,
     clearOneBotDebugRecords,
     clearModelRequestRecords,
+    clearMcpCallRecords,
     recallMessage,
     clearConversationMessages,
     removeRecentConversation,

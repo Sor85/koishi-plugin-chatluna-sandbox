@@ -294,7 +294,7 @@
 
 <script setup lang="ts">
 import {
-  IconBell, IconBrain, IconBug, IconClock, IconEdit, IconFileCode, IconId, IconLayoutGrid, IconMessageCircle, IconPlus,
+  IconBell, IconBrain, IconBug, IconClock, IconEdit, IconFileCode, IconHistory, IconId, IconLayoutGrid, IconMessageCircle, IconPlus,
   IconSearch, IconTag, IconTrash, IconUser, IconUserCircle, IconUserMinus, IconUserPlus, IconUsers,
 } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
@@ -357,7 +357,7 @@ interface SidebarParticipant {
 
 export interface WebqqSidebarModel {
   appearance: SandboxAppearance
-  currentView: 'messages' | 'contacts' | 'profile' | 'debug' | 'model-requests' | 'presets' | 'spaces'
+  currentView: 'messages' | 'contacts' | 'profile' | 'debug' | 'mcp-calls' | 'model-requests' | 'presets' | 'spaces'
   activeConversationId?: string
   currentGroupId?: string
   currentGroupMemberIds: string[]
@@ -406,6 +406,7 @@ const notificationErrorMessage = ref('')
 const navigationItems = [
   { id: 'messages' as const, label: '消息', icon: IconMessageCircle },
   { id: 'debug' as const, label: '调试', icon: IconBug },
+  { id: 'mcp-calls' as const, label: 'MCP 调用', icon: IconHistory },
   { id: 'model-requests' as const, label: '模型请求', icon: IconBrain },
   { id: 'presets' as const, label: '预设', icon: IconFileCode },
   { id: 'profile' as const, label: '资料', icon: IconUserCircle },

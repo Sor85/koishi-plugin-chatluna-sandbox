@@ -4,8 +4,9 @@ import type {} from '@koishijs/console'
 import { lookupChatLunaUsage, type ChatLunaUsageLookup } from './chatluna-usage'
 import { buildSandboxModelRequestTrajectory } from './model-request-trajectory'
 import type { SandboxControlService } from './control-service'
+import type { ListSandboxMcpCallRecordsInput, SandboxMcpCallRecordsPage } from './mcp/call-records'
 import type { SandboxMcpService } from './mcp/service'
-import type { SandboxMcpScope } from './mcp/types'
+import type { SandboxMcpCallRecord, SandboxMcpScope } from './mcp/types'
 import type {
   LocateSandboxPresetExpressionInput,
   LocateSandboxPresetExpressionResult,
@@ -113,6 +114,9 @@ interface ConsoleEventMap {
   'chatluna-sandbox/preset-rename': (input: RenamePresetInput) => Promise<SandboxPresetDocument>
   'chatluna-sandbox/preset-delete': (input: DeletePresetInput) => Promise<{ deleted: true }>
   'chatluna-sandbox/preset-locate-expression': (input: LocateSandboxPresetExpressionInput) => Promise<LocateSandboxPresetExpressionResult>
+  'chatluna-sandbox/mcp-call-records': (input?: ListSandboxMcpCallRecordsInput) => SandboxMcpCallRecordsPage
+  'chatluna-sandbox/mcp-call-record': (input: { recordId: string }) => SandboxMcpCallRecord
+  'chatluna-sandbox/clear-mcp-call-records': () => { cleared: number }
   'chatluna-sandbox/mcp-credentials': () => Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }>
   'chatluna-sandbox/create-mcp-credential': (input: { name: string; scopes: SandboxMcpScope[] }) => { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
   'chatluna-sandbox/update-mcp-credential': (input: { id: string; name?: string; scopes?: SandboxMcpScope[] }) => { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }
@@ -556,6 +560,9 @@ export function registerConsole(
     registerListener('chatluna-sandbox/preset-locate-expression', (input) => presets.locateExpression(input), { authority: 4 })
   }
   if (mcp) {
+    registerListener('chatluna-sandbox/mcp-call-records', (input = {}) => mcp.listCallRecords(input), { authority: 4 })
+    registerListener('chatluna-sandbox/mcp-call-record', (input) => mcp.getCallRecord(input.recordId), { authority: 4 })
+    registerListener('chatluna-sandbox/clear-mcp-call-records', () => mcp.clearCallRecords(), { authority: 4 })
     registerListener('chatluna-sandbox/mcp-credentials', () => mcp.listCredentials(), { authority: 4 })
     registerListener('chatluna-sandbox/create-mcp-credential', (input) => mcp.createCredential(input.name, input.scopes), { authority: 4 })
     registerListener('chatluna-sandbox/update-mcp-credential', (input) => mcp.updateCredential(input.id, input), { authority: 4 })
@@ -611,6 +618,9 @@ declare module '@koishijs/console' {
     'chatluna-sandbox/preset-rename'(input: RenamePresetInput): Promise<SandboxPresetDocument>
     'chatluna-sandbox/preset-delete'(input: DeletePresetInput): Promise<{ deleted: true }>
     'chatluna-sandbox/preset-locate-expression'(input: LocateSandboxPresetExpressionInput): Promise<LocateSandboxPresetExpressionResult>
+    'chatluna-sandbox/mcp-call-records'(input?: ListSandboxMcpCallRecordsInput): SandboxMcpCallRecordsPage
+    'chatluna-sandbox/mcp-call-record'(input: { recordId: string }): SandboxMcpCallRecord
+    'chatluna-sandbox/clear-mcp-call-records'(): { cleared: number }
     'chatluna-sandbox/mcp-credentials'(): Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }>
     'chatluna-sandbox/create-mcp-credential'(input: { name: string; scopes: SandboxMcpScope[] }): { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
     'chatluna-sandbox/update-mcp-credential'(input: { id: string; name?: string; scopes?: SandboxMcpScope[] }): { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }

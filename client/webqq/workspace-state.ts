@@ -1,6 +1,6 @@
 import type { SandboxSnapshot } from '../../src/types'
 
-export type SandboxWorkspaceView = 'messages' | 'contacts' | 'profile' | 'debug' | 'model-requests' | 'presets' | 'spaces'
+export type SandboxWorkspaceView = 'messages' | 'contacts' | 'profile' | 'debug' | 'mcp-calls' | 'model-requests' | 'presets' | 'spaces'
 export type SandboxDetailsPreference = 'auto' | 'open' | 'closed'
 
 export interface SandboxWorkspacePreferences {
@@ -19,7 +19,7 @@ const STORAGE_KEY = 'chatluna-sandbox.workspace'
 const DEFAULT_PREFERENCES: SandboxWorkspacePreferences = {
   currentView: 'messages',
 }
-const WORKSPACE_VIEWS = new Set<SandboxWorkspaceView>(['messages', 'contacts', 'profile', 'debug', 'model-requests', 'presets', 'spaces'])
+const WORKSPACE_VIEWS = new Set<SandboxWorkspaceView>(['messages', 'contacts', 'profile', 'debug', 'mcp-calls', 'model-requests', 'presets', 'spaces'])
 
 function readHiddenRecentConversations(value: unknown): Record<string, Record<string, string>> | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return

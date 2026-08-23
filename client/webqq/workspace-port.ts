@@ -35,6 +35,8 @@ import type {
   ModelRequestRecordsQuery,
   ModelRequestTrajectoryQuery,
 } from './model-request-query'
+import type { ListSandboxMcpCallRecordsInput, SandboxMcpCallRecordsPage } from '../../src/mcp/call-records'
+import type { SandboxMcpCallRecord } from '../../src/mcp/types'
 import type {
   LocateSandboxPresetExpressionInput,
   LocateSandboxPresetExpressionResult,
@@ -79,4 +81,7 @@ export interface WorkspacePort {
   renamePreset(input: RenamePresetInput): Promise<SandboxPresetDocument>
   deletePreset(input: DeletePresetInput): Promise<{ deleted: true }>
   locatePresetExpression(input: LocateSandboxPresetExpressionInput): Promise<LocateSandboxPresetExpressionResult>
+  getMcpCallRecords(input?: ListSandboxMcpCallRecordsInput): Promise<SandboxMcpCallRecordsPage>
+  getMcpCallRecord(input: { recordId: string }): Promise<SandboxMcpCallRecord>
+  clearMcpCallRecords(): Promise<{ cleared: number }>
 }
