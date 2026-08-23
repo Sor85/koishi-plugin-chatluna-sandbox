@@ -9,7 +9,7 @@ import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { EditorState, StateEffect, StateField, type Extension } from '@codemirror/state'
 import { Decoration, EditorView, hoverTooltip, type DecorationSet, type Tooltip, type ViewUpdate } from '@codemirror/view'
 import { tags } from '@lezer/highlight'
-import { onBeforeUnmount, onMounted, ref, watch, type DeepReadonly } from 'vue'
+import { markRaw, onBeforeUnmount, onMounted, ref, toRaw, watch, type DeepReadonly } from 'vue'
 import {
   codeMirrorOffset,
   resolvePresetSourceExpressions,
@@ -25,6 +25,7 @@ const props = defineProps<{
   loadedSource: string
   readOnly?: boolean
   resolveExpressionValue?: (expression: SandboxPresetExpression) => Promise<PresetExpressionObservedValueResult>
+  scrollTo?: StateEffect<unknown>
 }>()
 const emit = defineEmits<{
   'update:modelValue': [value: string]
@@ -255,17 +256,33 @@ function editorExtensions(readOnly = Boolean(props.readOnly)): Extension[] {
   ]
 }
 
+function captureScrollSnapshot() {
+  const snapshot = view?.scrollSnapshot()
+  return snapshot ? markRaw(snapshot) : undefined
+}
+
+function restoreScrollSnapshot(scrollTo = toRaw(props.scrollTo)) {
+  if (!view || !scrollTo) return
+  view.dispatch({ effects: scrollTo })
+}
+
 onMounted(() => {
   if (!editorElement.value) return
+  const scrollTo = toRaw(props.scrollTo)
   view = new EditorView({
     parent: editorElement.value,
     state: EditorState.create({
       doc: props.modelValue,
       extensions: editorExtensions(),
     }),
+    ...(scrollTo ? { scrollTo } : {}),
   })
   dispatchDecorations()
+  // 构造时高度还没量完，快照要等一帧再 dispatch，否则会按未测量行高滚回顶部。
+  if (scrollTo) requestAnimationFrame(() => restoreScrollSnapshot(scrollTo))
 })
+
+defineExpose({ captureScrollSnapshot })
 
 watch(() => props.modelValue, (value) => {
   if (!view) return

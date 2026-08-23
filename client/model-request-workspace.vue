@@ -6,22 +6,35 @@
         <p>查看模型调用请求日志</p>
       </div>
       <div class="webqq-model-request-actions">
-        <label class="webqq-model-request-live">
-          <Switch v-model="liveRefresh" aria-label="自动刷新" />
-          <span>自动刷新</span>
-        </label>
-        <Button variant="outline" :disabled="loading" @click="refresh()">
-          <IconRefresh :size="16" aria-hidden="true" />
-          刷新
-        </Button>
+        <div class="webqq-model-request-action-row">
+          <label class="webqq-model-request-live">
+            <Switch v-model="liveRefresh" aria-label="自动刷新" />
+            <span>自动刷新</span>
+          </label>
+          <Button variant="outline" :disabled="loading" @click="refresh()">
+            <IconRefresh :size="16" aria-hidden="true" />
+            刷新
+          </Button>
+          <Button
+            v-if="category === 'unattributed'"
+            variant="destructive"
+            :disabled="loading || !records.length"
+            @click="openClearDialog"
+          >
+            <IconTrash :size="16" aria-hidden="true" />
+            清理未归属记录
+          </Button>
+        </div>
         <Button
-          v-if="category === 'unattributed'"
-          variant="destructive"
-          :disabled="loading || !records.length"
-          @click="openClearDialog"
+          v-if="canReturnToTrajectory || canReturnToPreset"
+          class="webqq-model-request-return"
+          size="sm"
+          variant="ghost"
+          :aria-label="canReturnToTrajectory ? '返回轨迹' : '返回预设'"
+          @click="returnFromDetail"
         >
-          <IconTrash :size="16" aria-hidden="true" />
-          清理未归属记录
+          <IconArrowLeft data-icon="inline-start" aria-hidden="true" />
+          返回
         </Button>
       </div>
     </header>
@@ -191,16 +204,6 @@
               </span>
             </div>
             <div class="webqq-model-request-detail-nav">
-              <Button
-                v-if="canReturnToTrajectory"
-                size="sm"
-                variant="ghost"
-                aria-label="返回轨迹"
-                @click="returnToTrajectory"
-              >
-                <IconArrowLeft data-icon="inline-start" aria-hidden="true" />
-                返回
-              </Button>
               <section class="webqq-model-request-view-switch" aria-label="详情显示方式">
                 <Button
                   size="sm"
@@ -643,6 +646,7 @@ const props = defineProps<{
   error: string
   visitKey?: number
   navigationIntent?: PresetEvidenceNavigationIntent
+  canReturnToPreset?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -653,6 +657,7 @@ const emit = defineEmits<{
   clear: [input: ClearModelRequestRecordsQuery]
   consumeNavigationIntent: [seq: number]
   navigationIntentFailure: [payload: { seq: number, message: string }]
+  returnToPreset: []
 }>()
 
 const category = ref<'all' | 'space' | 'unattributed'>('all')
@@ -678,6 +683,7 @@ const headersExpanded = ref(false)
 const copyState = ref<'idle' | 'success' | 'error'>('idle')
 const detailElement = ref<HTMLElement>()
 const canReturnToTrajectory = ref(false)
+const canReturnToPreset = computed(() => Boolean(props.canReturnToPreset) && !canReturnToTrajectory.value)
 const trajectoryReturnState = ref<{
   rowId: string
   scrollTop: number
@@ -988,6 +994,11 @@ function openRelatedRequest(payload: {
   nextTick(() => {
     if (detailElement.value) detailElement.value.scrollTop = 0
   })
+}
+
+function returnFromDetail() {
+  if (canReturnToTrajectory.value) return returnToTrajectory()
+  emit('returnToPreset')
 }
 
 function returnToTrajectory() {

@@ -219,13 +219,16 @@ describe('模型请求分析展示模型', () => {
   })
 
   // 定位的算术与帧时序已经进入 evidence-locator 并由行为测试覆盖；
-  // 这里只保留无法进入 module 的 DOM 契约：检查器必须滚动 inspector-body 而不是分析内容本身。
-  it('检查器按 inspector-body 而不是分析内容作为滚动容器', () => {
+  // 这里只保留无法进入 module 的 DOM 契约：滚动容器选择规则留在视图侧。
+  it('工作台分析滚动外层详情卡片，检查器仍滚动 inspector-body', () => {
     const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
+    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
 
+    expect(view).toContain("content.closest<HTMLElement>('.webqq-model-request-detail')")
     expect(view).toContain("content.closest<HTMLElement>('.webqq-model-trajectory-inspector-body')")
     expect(view).toContain('createEvidenceLocator')
     expect(view).not.toContain("scrollIntoView({ behavior: 'smooth', block: 'start' })")
+    expect(styles).toMatch(/\.webqq-model-request-analysis \.webqq-model-analysis-content \{[^}]*max-height: none[^}]*overflow: visible/s)
   })
 
   it('TOOL DEFS 强调框与消息卡片一样是圆角矩形', () => {

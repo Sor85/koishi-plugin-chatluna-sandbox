@@ -1,4 +1,4 @@
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, markRaw, onMounted, ref, shallowRef, watch } from 'vue'
 import type { WebqqChatPaneModel } from '../webqq-chat-pane.vue'
 import type { WebqqComposerModel, WebqqComposerSendIntent, WebqqComposerSender } from '../webqq-composer.vue'
 import type { WebqqDetailsPanelModel } from '../webqq-details-panel.vue'
@@ -38,7 +38,12 @@ import type {
 import type { CreatePresetInput, DeletePresetInput, RenamePresetInput, SavePresetInput } from '../../src/presets'
 import { createPresetDirtyGuard } from './preset-dirty-guard'
 import { resolvePresetEvidenceBots } from './preset-evidence-context'
-import { createPresetEvidenceNavigationState, type PresetEvidenceNavigationIntent } from './preset-evidence-navigation'
+import {
+  createPresetEvidenceNavigationState,
+  type PresetEvidenceNavigationIntent,
+  type PresetOriginRestore,
+  type PresetOriginSnapshot,
+} from './preset-evidence-navigation'
 
 type WorkspaceController = ReturnType<typeof createWorkspaceController>
 type WorkspaceLayout = ReturnType<typeof createWorkspaceLayout>
@@ -82,6 +87,9 @@ export function createWebqqWorkspaceShell(
   const presetDiscardGuard = ref(presetDirtyGuard.peek())
   const presetEvidenceNavigation = createPresetEvidenceNavigationState()
   const presetEvidenceIntent = ref<PresetEvidenceNavigationIntent>()
+  const canReturnFromPresetEvidence = ref(false)
+  const presetOriginRestore = shallowRef<PresetOriginRestore>()
+  let originRestoreSeq = 0
   const selectedPresetBotId = ref('')
   const snapshot = computed(() => workspace.value.snapshot)
   const users = computed(() => getSandboxUsers(snapshot.value))
@@ -569,11 +577,18 @@ export function createWebqqWorkspaceShell(
     }
   }
 
+  function clearPresetEvidenceReturn() {
+    presetEvidenceNavigation.clear()
+    canReturnFromPresetEvidence.value = false
+    presetOriginRestore.value = undefined
+  }
+
   function selectConversation(conversationId: string) {
     if (currentView.value === 'presets' && !presetDirtyGuard.request({ action: 'leave', targetView: 'messages', conversationId })) {
       presetDiscardGuard.value = presetDirtyGuard.peek()
       return
     }
+    if (currentView.value === 'model-requests') clearPresetEvidenceReturn()
     workspaceController.selectConversation(conversationId)
   }
 
@@ -587,6 +602,7 @@ export function createWebqqWorkspaceShell(
       return false
     }
     if (!commit) return true
+    if (view !== 'model-requests') clearPresetEvidenceReturn()
     workspaceController.selectView(view)
     if (view === 'debug') void loadOneBotDebugRecords()
     if (view === 'model-requests') modelRequestVisitKey.value += 1
@@ -758,10 +774,11 @@ export function createWebqqWorkspaceShell(
     selectedPresetBotId.value = presetEvidenceBots.value.some(({ id }) => id === botId) ? botId : ''
   }
 
-  function navigateToPresetEvidence(result: LocateSandboxPresetExpressionResult) {
-    const intent = presetEvidenceNavigation.publish(result)
+  function navigateToPresetEvidence(result: LocateSandboxPresetExpressionResult, snapshot?: PresetOriginSnapshot) {
+    const intent = presetEvidenceNavigation.publish(result, snapshot)
     if (!intent) return
     presetEvidenceIntent.value = intent
+    canReturnFromPresetEvidence.value = presetEvidenceNavigation.canReturn
     workspaceController.selectView('model-requests')
     modelRequestVisitKey.value += 1
   }
@@ -774,6 +791,14 @@ export function createWebqqWorkspaceShell(
   function reportPresetEvidenceNavigationFailure(payload: { seq: number, message: string }) {
     if (presetEvidenceIntent.value?.seq === payload.seq) presetEvidenceIntent.value = undefined
     modelRequestError.value = payload.message
+  }
+
+  function returnFromPresetEvidence() {
+    const returned = presetEvidenceNavigation.returnToOrigin()
+    if (!returned) return
+    canReturnFromPresetEvidence.value = presetEvidenceNavigation.canReturn
+    presetOriginRestore.value = markRaw({ ...returned.snapshot, seq: ++originRestoreSeq })
+    workspaceController.selectView('presets')
   }
 
   function toggleDetails() {
@@ -970,6 +995,9 @@ export function createWebqqWorkspaceShell(
     navigateToPresetEvidence,
     consumePresetEvidenceIntent,
     reportPresetEvidenceNavigationFailure,
+    canReturnFromPresetEvidence,
+    returnFromPresetEvidence,
+    presetOriginRestore,
     manageEnvironment,
     openComposerParticipantDialog,
     openEntityDialog,

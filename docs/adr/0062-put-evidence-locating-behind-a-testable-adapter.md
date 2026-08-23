@@ -1,6 +1,6 @@
 # 把证据定位收进带 adapter 的可测 module
 
-证据定位的展开决策、帧时序与滚动校正集中在 `client/webqq/evidence-locator.ts`，通过 `EvidenceLocatorAdapter` 这一个 seam 访问外界。adapter 是唯一的 DOM、渲染状态与计时出口：`measure` 只交出元素顶、滚动容器顶与当前滚动量三个数字，滚动容器的选择规则（检查器下取 `.webqq-model-trajectory-inspector-body`）留在视图侧；`nextTick`、`frame`、`observeResize`、`schedule` 交出全部时序原语。seam 有两个真实实现：`analysis-view.vue` 中的 DOM adapter 和测试中的数字化假 adapter。
+证据定位的展开决策、帧时序与滚动校正集中在 `client/webqq/evidence-locator.ts`，通过 `EvidenceLocatorAdapter` 这一个 seam 访问外界。adapter 是唯一的 DOM、渲染状态与计时出口：`measure` 只交出元素顶、滚动容器顶与当前滚动量三个数字，滚动容器的选择规则留在视图侧——检查器取 `.webqq-model-trajectory-inspector-body`，工作台分析取外层 `.webqq-model-request-detail`，避免只滚内层分析卡片而让右侧详情停在顶部；`nextTick`、`frame`、`observeResize`、`schedule` 交出全部时序原语。seam 有两个真实实现：`analysis-view.vue` 中的 DOM adapter 和测试中的数字化假 adapter。
 
 展开状态（折叠卡片、原始消息、展开工具、强制展开长文本、当前高亮）继续由视图以 Vue `ref` 持有，module 只拥有「定位时该展开哪些」的决策与它们之间的先后顺序。这条分工来自缺陷的实际形状：展开决策一直是对的，出错的始终是展开、测量、折叠与滚动的时序，因此只有时序需要进入可测 module，渲染状态留在框架里更简单。跨视图触发定位统一为 `LocateRequest { evidenceId, seq }`，`seq` 只用于触发一次定位，不参与证据身份；原先分散在工作台、轨迹与分析视图的三个计数器收敛为 module 内部的一个 generation。
 

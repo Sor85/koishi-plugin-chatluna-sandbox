@@ -66,6 +66,7 @@
           :evidence-context="presetWorkspaceModel.evidenceContext"
           :discard-guard-open="Boolean(presetDiscardGuard.pending)"
           :discard-guard-action="presetDiscardGuard.pending?.action"
+          :origin-restore="presetOriginRestore"
           @refresh="loadPresetCatalog"
           @read="readPresetFromWorkspace"
           @create="createPresetFromWorkspace"
@@ -96,6 +97,7 @@
           :error="modelRequestWorkspaceModel.error"
           :visit-key="modelRequestVisitKey"
           :navigation-intent="presetEvidenceIntent"
+          :can-return-to-preset="canReturnFromPresetEvidence"
           @query="loadModelRequestRecords"
           @load-more="loadMoreModelRequestRecords"
           @open="loadModelRequestRecord"
@@ -103,6 +105,7 @@
           @clear="clearModelRequestRecords"
           @consume-navigation-intent="consumePresetEvidenceIntent"
           @navigation-intent-failure="reportPresetEvidenceNavigationFailure"
+          @return-to-preset="returnFromPresetEvidence"
         />
         <WebqqChatPane
           v-else
@@ -239,6 +242,9 @@ const {
   navigateToPresetEvidence,
   consumePresetEvidenceIntent,
   reportPresetEvidenceNavigationFailure,
+  canReturnFromPresetEvidence,
+  returnFromPresetEvidence,
+  presetOriginRestore,
   manageEnvironment,
   openComposerParticipantDialog,
   openEntityDialog,

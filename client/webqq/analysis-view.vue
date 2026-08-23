@@ -605,12 +605,12 @@ function locateTool(name: string) {
 function findScroller(): HTMLElement | undefined {
   const content = contentElement.value
   if (!content) return undefined
-  // 检查器真正滚动的是 inspector-body。analysis-content 在 inspector 下 overflow:visible，
-  // 让内层滚动会带动外层工作台一起滚，首次点开位置必然偏掉。
+  // 检查器真正滚动的是 inspector-body。工作台分析真正滚动的是外层详情卡片：
+  // analysis-content 在这两处都应 overflow:visible，否则只会滚内层卡片，外层详情停在顶部。
   if (props.layout === 'inspector') {
     return content.closest<HTMLElement>('.webqq-model-trajectory-inspector-body') ?? content
   }
-  return content
+  return content.closest<HTMLElement>('.webqq-model-request-detail') ?? content
 }
 
 function findTarget(target: string): HTMLElement | null {

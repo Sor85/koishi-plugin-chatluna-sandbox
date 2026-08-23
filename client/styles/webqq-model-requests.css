@@ -52,12 +52,20 @@
   color: var(--webqq-muted);
 }
 
-.webqq-model-request-actions,
+.webqq-model-request-actions {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.webqq-model-request-action-row,
 .webqq-model-request-item-title,
 .webqq-model-request-bot,
 .webqq-model-request-bot-name,
 .webqq-model-request-live,
 .webqq-model-request-error-filter {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
@@ -1183,7 +1191,17 @@
 
 .webqq-model-request-analysis.webqq-model-trajectory {
   min-height: 420px;
+  overflow: visible;
   border-radius: 8px;
+}
+
+.webqq-model-request-analysis .webqq-model-analysis-main {
+  overflow: visible;
+}
+
+.webqq-model-request-analysis .webqq-model-analysis-content {
+  max-height: none;
+  overflow: visible;
 }
 
 .webqq-model-request-body-header {

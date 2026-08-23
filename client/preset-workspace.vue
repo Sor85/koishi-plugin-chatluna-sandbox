@@ -26,7 +26,7 @@
           <Input v-model="searchQuery" type="search" placeholder="搜索文件名或展示名称" />
         </label>
         <div v-if="loading && !catalog.length" class="webqq-preset-empty">正在读取预设目录…</div>
-        <div v-else v-webqq-scrollbar class="webqq-preset-groups">
+        <div v-else ref="listElement" v-webqq-scrollbar class="webqq-preset-groups">
           <section v-for="group in presetGroups" :key="group.kind" class="webqq-preset-group">
             <header>
               <strong>{{ kindLabel(group.kind) }}</strong>
@@ -90,12 +90,14 @@
           </div>
 
           <PresetSourceEditor
+            ref="editor"
             v-model="source"
             :kind="document.kind"
             :expressions="document.expressions"
             :loaded-source="document.source"
             :read-only="saving"
             :resolve-expression-value="resolveExpressionValue"
+            :scroll-to="originEditorScroll"
             @expression-click="locateExpression"
           />
 
@@ -196,7 +198,8 @@ import {
   IconSearch,
   IconTrash,
 } from '@tabler/icons-vue'
-import { computed, ref, watch, type DeepReadonly } from 'vue'
+import { computed, markRaw, nextTick, ref, shallowRef, watch, type DeepReadonly } from 'vue'
+import type { StateEffect } from '@codemirror/state'
 import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './components/ui/dialog'
@@ -204,6 +207,11 @@ import { Input } from './components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
 import PresetSourceEditor from './preset-source-editor.vue'
 import { resolvePresetExpressionObservedValue, type PresetExpressionObservedValueResult } from './webqq/preset-expression-value'
+import {
+  type PresetOriginRestore,
+  type PresetOriginSnapshot,
+} from './webqq/preset-evidence-navigation'
+import { createScrollRestore } from './webqq/scroll-restore'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type {
   LocateSandboxPresetExpressionInput,
@@ -232,6 +240,7 @@ const props = defineProps<{
   evidenceContext: PresetEvidenceContextModel
   discardGuardOpen?: boolean
   discardGuardAction?: 'create' | 'rename' | 'delete' | 'leave'
+  originRestore?: PresetOriginRestore
 }>()
 const emit = defineEmits<{
   refresh: []
@@ -241,7 +250,7 @@ const emit = defineEmits<{
   rename: [input: { kind: PresetDocumentKind, fileName: string, newFileName: string, expectedRevision: string, confirmed: true }, resolve: () => void, reject: (error: unknown) => void]
   delete: [input: { kind: PresetDocumentKind, fileName: string, expectedRevision: string, confirmed: true }, resolve: () => void, reject: (error: unknown) => void]
   locate: [input: LocateSandboxPresetExpressionInput, resolve: (result: LocateSandboxPresetExpressionResult) => void, reject: (error: unknown) => void]
-  navigateEvidence: [result: LocateSandboxPresetExpressionResult & { status: 'matched' }]
+  navigateEvidence: [result: LocateSandboxPresetExpressionResult & { status: 'matched' }, snapshot: PresetOriginSnapshot]
   readRequest: [input: { recordId: string } & SandboxPresetRequestScope, resolve: (detail: SandboxModelRequestDetail) => void, reject: (error: unknown) => void]
   dirtyChange: [dirty: boolean]
   cancelDiscard: []
@@ -250,6 +259,24 @@ const emit = defineEmits<{
 
 const source = ref('')
 const searchQuery = ref('')
+const listElement = ref<HTMLElement>()
+const editor = ref<{ captureScrollSnapshot: () => StateEffect<unknown> | undefined }>()
+const originEditorScroll = shallowRef<StateEffect<unknown>>()
+const listScrollRestore = createScrollRestore({
+  measure: () => {
+    const element = listElement.value
+    if (!element) return undefined
+    return { scrollTop: element.scrollTop, maxScrollTop: element.scrollHeight - element.clientHeight }
+  },
+  scrollTo: (top) => {
+    if (listElement.value) listElement.value.scrollTop = top
+  },
+  nextTick,
+  frame: () => new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve())
+  }),
+})
+
 const createDialogOpen = ref(false)
 const renameDialogOpen = ref(false)
 const deleteDialogOpen = ref(false)
@@ -317,6 +344,17 @@ watch(dirty, (value) => {
   emit('dirtyChange', value)
   if (value && saveStatus.value !== 'error') saveStatus.value = 'dirty'
   if (!value && saveStatus.value !== 'error') saveStatus.value = 'saved'
+}, { immediate: true })
+watch(() => props.originRestore?.seq, async () => {
+  const restore = props.originRestore
+  if (!restore) return
+  searchQuery.value = restore.searchQuery
+  originEditorScroll.value = restore.editorScroll
+    ? markRaw(restore.editorScroll as StateEffect<unknown>)
+    : undefined
+  void listScrollRestore.restore(restore.listScrollTop)
+  await nextTick()
+  originEditorScroll.value = undefined
 }, { immediate: true })
 
 function matchesSearch(item: DeepReadonly<SandboxPresetDocument>) {
@@ -523,7 +561,16 @@ async function locateExpression(expression: SandboxPresetExpression) {
     return
   }
   locateMessage.value = '已找到使用当前预设快照的模型请求证据，正在打开精确位置…'
-  emit('navigateEvidence', result)
+  emit('navigateEvidence', result, captureOrigin())
+}
+
+function captureOrigin(): PresetOriginSnapshot {
+  const editorScroll = editor.value?.captureScrollSnapshot()
+  return markRaw({
+    listScrollTop: listElement.value?.scrollTop ?? 0,
+    searchQuery: searchQuery.value,
+    ...(editorScroll ? { editorScroll: markRaw(editorScroll) } : {}),
+  })
 }
 
 function normalizeFileName(value: string) {
