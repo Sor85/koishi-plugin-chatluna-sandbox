@@ -57,6 +57,28 @@ describe('Koishi 工作区端口', () => {
     })
   })
 
+  it('预设文件调用保持全局，表达式定位使用调用方提供的显式 scope', async () => {
+    send.mockClear()
+    send.mockResolvedValue({})
+    const port = createKoishiWorkspacePort(() => 'space-current')
+
+    await port.getPresetCatalog()
+    await port.readPreset({ kind: 'core', fileName: 'assistant.yml' })
+    await port.locatePresetExpression({
+      document: { kind: 'core', fileName: 'assistant.yml', revision: 'rev-1' },
+      expression: { stableId: 'expression-1' },
+      scope: { scope: 'space', spaceId: 'space-target' },
+      botId: '20001',
+      conversationId: 'conversation-1',
+    })
+
+    expect(send).toHaveBeenNthCalledWith(1, 'chatluna-sandbox/preset-catalog', {})
+    expect(send).toHaveBeenNthCalledWith(2, 'chatluna-sandbox/preset-read', { kind: 'core', fileName: 'assistant.yml' })
+    expect(send).toHaveBeenNthCalledWith(3, 'chatluna-sandbox/preset-locate-expression', expect.objectContaining({
+      scope: { scope: 'space', spaceId: 'space-target' },
+    }))
+  })
+
   it('模型请求记录按显式 scope 发送，不注入当前工作区 spaceId', async () => {
     send.mockClear()
     send.mockResolvedValue({ records: [], hasMore: false, capacity: { recordCount: 0, totalBytes: 0, maxRecords: 5000, maxBytes: 1 } })

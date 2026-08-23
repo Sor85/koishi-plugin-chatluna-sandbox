@@ -167,6 +167,7 @@
         :search-query="searchQuery"
         :locate-request="analysisLocateRequest"
         :filter="evidenceFilter"
+        @locate-result="emit('locate-result', $event)"
       />
       <div v-else class="webqq-model-trajectory-ledger" :class="{ 'has-inspector': selectedRow }">
         <div ref="ledgerElement" v-webqq-scrollbar class="webqq-model-trajectory-table" role="table" aria-label="轨迹事件账本">
@@ -279,6 +280,7 @@ const props = withDefaults(defineProps<{
   conversationAvailable: boolean
   showModeSwitch?: boolean
   analysis?: boolean
+  externalLocate?: LocateRequest
   restoreState?: {
     rowId: string
     scrollTop: number
@@ -300,6 +302,7 @@ const emit = defineEmits<{
     }
   }]
   'inspect-request': [payload: { recordId: string }]
+  'locate-result': [result: { seq: number, located: boolean }]
 }>()
 
 const ledgerElement = ref<HTMLElement>()
@@ -331,7 +334,8 @@ const moreFiltersId = useId()
 const searchQuery = ref('')
 // 组成分段点击与账本选中行共用同一个定位序号：两种模式互斥渲染，一个计数器即可。
 const locateSeq = ref(0)
-const analysisLocateRequest = ref<LocateRequest>()
+const internalAnalysisLocateRequest = ref<LocateRequest>()
+const analysisLocateRequest = computed(() => props.externalLocate ?? internalAnalysisLocateRequest.value)
 const selectedRow = computed(() => props.trajectory?.rows.find(({ id }) => id === selectedRowId.value))
 const selectedRequest = computed(() => props.trajectory?.records.find(({ id }) => id === selectedRow.value?.requestId))
 const inspectorDetail = computed(() => {
@@ -525,7 +529,7 @@ function isRowSearchMuted(row: SandboxModelRequestTrajectoryRow) {
 
 function selectPromptSegment(segment: CompositionSegment) {
   if (props.analysis) {
-    analysisLocateRequest.value = { evidenceId: segment.evidenceId, seq: ++locateSeq.value }
+    internalAnalysisLocateRequest.value = { evidenceId: segment.evidenceId, seq: ++locateSeq.value }
     return
   }
   // 组成分段与账本行共享模型证据身份；同一条证据在两个入口一定选中同一行。

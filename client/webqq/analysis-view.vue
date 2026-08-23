@@ -122,8 +122,15 @@
               />
             </div>
             <div v-show="!isCardCollapsed(modelAnalysisTargetId(message.evidenceId)) && !rawMessages.has(message.evidenceId)" class="webqq-model-analysis-formatted">
+              <AnalysisTextBlock
+                v-if="occurrenceForMessage(message.evidenceId)"
+                :value="message.content"
+                :search-query="normalizedSearch"
+                :occurrence="occurrenceForMessage(message.evidenceId)"
+                :force-expanded="expandedTextTargets.has(modelAnalysisTargetId(message.evidenceId))"
+              />
               <AnalysisContentParts
-                v-if="message.contentParts.length"
+                v-else-if="message.contentParts.length"
                 :parts="message.contentParts"
                 :search-query="normalizedSearch"
                 :force-expanded="expandedTextTargets.has(modelAnalysisTargetId(message.evidenceId))"
@@ -387,6 +394,10 @@ import {
   type ModelRequestAnalysisNavigationItem,
 } from './model-request-analysis'
 import { createEvidenceLocator, type LocateRequest } from './evidence-locator'
+import {
+  renderModelRequestOccurrence,
+  type ModelRequestOccurrence,
+} from './model-request-occurrence'
 import { buildModelRequestJsonTree } from './model-request-json'
 import {
   EMPTY_MODEL_EVIDENCE_FILTER,
@@ -414,7 +425,10 @@ const props = defineProps<{
   /** 与轨迹账本共用的显示过滤；同一条证据在两个视图里必须同时出现或同时隐藏。 */
   filter?: ModelEvidenceFilter
 }>()
-const emit = defineEmits<{ locate: [target: string] }>()
+const emit = defineEmits<{
+  locate: [target: string]
+  locateResult: [result: { seq: number, located: boolean }]
+}>()
 
 const normalizedSearch = computed(() => normalizeAnalysisQuery(props.searchQuery))
 const conversation = computed<ModelRequestConversation>(() => parseModelRequestConversationDetail(props.detail))
@@ -447,6 +461,7 @@ const expandedTools = ref(new Set<string>())
 const expandedTextTargets = ref(new Set<string>())
 const contentElement = ref<HTMLElement>()
 const highlightedTarget = ref('')
+const activeOccurrence = ref<ModelRequestOccurrence>()
 const responseMatches = computed(() => !normalizedSearch.value || response.value.searchText.toLocaleLowerCase('zh-CN').includes(normalizedSearch.value))
 const responseCharacters = computed(() => [
   ...response.value.content,
@@ -461,6 +476,9 @@ let suppressToolSummary = false
 const locator = createEvidenceLocator({
   getConversation: () => conversation.value,
   getNavigation: () => navigation.value,
+  setOccurrenceTarget: (occurrence) => {
+    activeOccurrence.value = occurrence
+  },
   measure: (target) => {
     const element = findTarget(target)
     const scroller = findScroller()
@@ -562,8 +580,15 @@ function messageMatches(message: ModelConversationMessage) {
 async function locateRequestedEvidence() {
   const request = props.locateRequest
   if (!request) return
-  const located = await locator.locateEvidence(request.evidenceId)
+  const located = request.range
+    ? await locator.locateOccurrence(request.evidenceId, request.range)
+    : await locator.locateEvidence(request.evidenceId)
   if (located) emit('locate', located)
+  emit('locateResult', { seq: request.seq, located: Boolean(located) })
+}
+
+function occurrenceForMessage(evidenceId: string) {
+  return activeOccurrence.value?.evidenceId === evidenceId ? activeOccurrence.value : undefined
 }
 
 async function jumpTo(target?: string, emphasize = true) {
@@ -718,6 +743,7 @@ const AnalysisTextBlock = defineComponent({
     searchQuery: { type: String, default: '' },
     maxLines: { type: Number, default: 12 },
     forceExpanded: Boolean,
+    occurrence: Object as () => ModelRequestOccurrence | undefined,
     compact: Boolean,
   },
   setup(blockProps) {
@@ -770,7 +796,9 @@ const AnalysisTextBlock = defineComponent({
         h('pre', {
           ref: textElement,
           style: { '--webqq-model-analysis-collapse-height': collapsedHeight.value },
-        }, highlightText(blockProps.value, blockProps.searchQuery)),
+        }, blockProps.occurrence
+          ? renderModelRequestOccurrence(blockProps.value, blockProps.occurrence)
+          : highlightText(blockProps.value, blockProps.searchQuery)),
         collapsible.value && h('button', {
           type: 'button',
           class: 'webqq-model-analysis-expand',

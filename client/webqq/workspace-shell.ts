@@ -30,6 +30,15 @@ import type {
   ModelRequestRecordsQuery,
   ModelRequestTrajectoryQuery,
 } from './model-request-query'
+import type {
+  LocateSandboxPresetExpressionInput,
+  LocateSandboxPresetExpressionResult,
+  ReadSandboxPresetInput,
+} from '../../src/presets'
+import type { CreatePresetInput, DeletePresetInput, RenamePresetInput, SavePresetInput } from '../../src/presets'
+import { createPresetDirtyGuard } from './preset-dirty-guard'
+import { resolvePresetEvidenceBots } from './preset-evidence-context'
+import { createPresetEvidenceNavigationState, type PresetEvidenceNavigationIntent } from './preset-evidence-navigation'
 
 type WorkspaceController = ReturnType<typeof createWorkspaceController>
 type WorkspaceLayout = ReturnType<typeof createWorkspaceLayout>
@@ -50,6 +59,7 @@ export function createWebqqWorkspaceShell(
   workspaceController: WorkspaceController,
   workspaceLayout: WorkspaceLayout,
   getOverlayHost: () => WebqqWorkspaceOverlayHost | undefined,
+  getActiveSpaceId: () => string | undefined = () => undefined,
 ) {
   const workspace = workspaceController.workspace
   const currentOperatorId = workspaceController.currentOperatorId
@@ -65,6 +75,14 @@ export function createWebqqWorkspaceShell(
   const modelRequestDetailLoading = ref(false)
   const modelRequestError = ref('')
   const modelRequestVisitKey = ref(0)
+  const presetLoading = ref(false)
+  const presetSaving = ref(false)
+  const presetError = ref('')
+  const presetDirtyGuard = createPresetDirtyGuard()
+  const presetDiscardGuard = ref(presetDirtyGuard.peek())
+  const presetEvidenceNavigation = createPresetEvidenceNavigationState()
+  const presetEvidenceIntent = ref<PresetEvidenceNavigationIntent>()
+  const selectedPresetBotId = ref('')
   const snapshot = computed(() => workspace.value.snapshot)
   const users = computed(() => getSandboxUsers(snapshot.value))
   const bots = computed(() => getSandboxBots(snapshot.value))
@@ -82,6 +100,23 @@ export function createWebqqWorkspaceShell(
   const currentPeer = computed(() => currentBot.value
     ?? users.value.find(({ id }) => id === currentPeerId.value))
   const currentGroup = computed(() => snapshot.value.groups.find(({ id }) => id === currentConversation.value?.groupId))
+  const presetEvidenceBots = computed(() => resolvePresetEvidenceBots(
+    currentConversation.value,
+    currentGroup.value,
+    bots.value,
+  ))
+  const resolvedPresetBotId = computed(() => {
+    const options = presetEvidenceBots.value
+    if (options.some(({ id }) => id === selectedPresetBotId.value)) return selectedPresetBotId.value
+    return options.length === 1 ? options[0]!.id : ''
+  })
+  const presetEvidenceContext = computed(() => ({
+    scope: activeSpaceIdScope(),
+    conversationId: currentConversation.value?.id,
+    bots: presetEvidenceBots.value,
+    botId: resolvedPresetBotId.value || undefined,
+    needsBotSelection: presetEvidenceBots.value.length > 1 && !resolvedPresetBotId.value,
+  }))
   const currentConversationTitle = computed(() => currentGroup.value?.name
     ?? currentPeer.value?.name
     ?? (currentConversation.value ? currentConversation.value.id : '选择一个会话'))
@@ -322,15 +357,25 @@ export function createWebqqWorkspaceShell(
     detailLoading: modelRequestDetailLoading.value,
     error: modelRequestError.value,
   }))
+  const presetWorkspaceModel = computed(() => ({
+    catalog: workspaceController.presetCatalog.value,
+    document: workspaceController.presetDocument.value,
+    loading: presetLoading.value,
+    saving: presetSaving.value,
+    error: presetError.value,
+    evidenceContext: presetEvidenceContext.value,
+  }))
 
   onMounted(async () => {
     await workspaceController.load()
-    // 视图会从本地偏好直接恢复为调试页，此路径不会触发侧栏点击处理器；
-    // 必须在工作区恢复后主动读取，否则重启后的首屏会一直显示空记录。
+    // 视图会从本地偏好直接恢复为独立页，此路径不会触发侧栏点击处理器；
+    // 必须在工作区恢复后主动读取，否则重启后的首屏会一直显示空状态。
     if (currentView.value === 'debug') await loadOneBotDebugRecords()
+    if (currentView.value === 'presets') await loadPresetCatalog()
   })
 
   watch(activeConversationId, () => {
+    selectedPresetBotId.value = ''
     workspaceLayout.resetDetails()
   })
 
@@ -525,6 +570,10 @@ export function createWebqqWorkspaceShell(
   }
 
   function selectConversation(conversationId: string) {
+    if (currentView.value === 'presets' && !presetDirtyGuard.request({ action: 'leave', targetView: 'messages', conversationId })) {
+      presetDiscardGuard.value = presetDirtyGuard.peek()
+      return
+    }
     workspaceController.selectConversation(conversationId)
   }
 
@@ -532,10 +581,43 @@ export function createWebqqWorkspaceShell(
     workspaceController.removeRecentConversation(conversationId)
   }
 
-  function selectNavigation(view: SandboxWorkspaceView) {
+  function selectNavigation(view: SandboxWorkspaceView, commit = true) {
+    if (currentView.value === 'presets' && view !== 'presets' && !presetDirtyGuard.request({ action: 'leave', targetView: view })) {
+      presetDiscardGuard.value = presetDirtyGuard.peek()
+      return false
+    }
+    if (!commit) return true
     workspaceController.selectView(view)
     if (view === 'debug') void loadOneBotDebugRecords()
     if (view === 'model-requests') modelRequestVisitKey.value += 1
+    if (view === 'presets') void loadPresetCatalog()
+    return true
+  }
+
+  function updatePresetDirty(dirty: boolean) {
+    presetDirtyGuard.update(dirty)
+    presetDiscardGuard.value = presetDirtyGuard.peek()
+  }
+
+  function cancelPresetDiscard() {
+    presetDirtyGuard.cancel()
+    presetDiscardGuard.value = presetDirtyGuard.peek()
+  }
+
+  function confirmPresetDiscard() {
+    const request = presetDirtyGuard.discard()
+    presetDiscardGuard.value = presetDirtyGuard.peek()
+    if (request?.action !== 'leave') return
+    if (request.conversationId) {
+      workspaceController.selectConversation(request.conversationId)
+      return
+    }
+    if (request.targetView) selectNavigation(request.targetView)
+  }
+
+  function activeSpaceIdScope() {
+    const spaceId = getActiveSpaceId()
+    return spaceId ? { scope: 'space' as const, spaceId } : { scope: 'main' as const }
   }
 
   async function loadOneBotDebugRecords(input: GetSandboxOneBotDebugRecordsInput = {}) {
@@ -612,6 +694,85 @@ export function createWebqqWorkspaceShell(
     } finally {
       modelRequestLoading.value = false
     }
+  }
+
+  async function loadPresetCatalog() {
+    presetLoading.value = true
+    presetError.value = ''
+    try {
+      await workspaceController.loadPresetCatalog()
+    } catch (error) {
+      presetError.value = error instanceof Error ? error.message : '读取预设目录失败'
+    } finally {
+      presetLoading.value = false
+    }
+  }
+
+  async function readPreset(input: ReadSandboxPresetInput) {
+    presetLoading.value = true
+    presetError.value = ''
+    try {
+      return await workspaceController.readPreset(input)
+    } catch (error) {
+      presetError.value = error instanceof Error ? error.message : '读取预设失败'
+      throw error
+    } finally {
+      presetLoading.value = false
+    }
+  }
+
+  async function runPresetMutation<T>(operation: () => Promise<T>) {
+    presetSaving.value = true
+    presetError.value = ''
+    try {
+      return await operation()
+    } catch (error) {
+      presetError.value = error instanceof Error ? error.message : '预设操作失败'
+      throw error
+    } finally {
+      presetSaving.value = false
+    }
+  }
+
+  const createPreset = (input: CreatePresetInput) => runPresetMutation(() => workspaceController.createPreset(input))
+  const savePreset = (input: SavePresetInput) => runPresetMutation(async () => {
+    const result = await workspaceController.savePreset(input)
+    updatePresetDirty(false)
+    return result
+  })
+  const renamePreset = (input: RenamePresetInput) => runPresetMutation(() => workspaceController.renamePreset(input))
+  const deletePreset = (input: DeletePresetInput) => runPresetMutation(() => workspaceController.deletePreset(input))
+
+  async function locatePresetExpression(input: LocateSandboxPresetExpressionInput) {
+    presetError.value = ''
+    try {
+      return await workspaceController.locatePresetExpression(input)
+    } catch (error) {
+      presetError.value = error instanceof Error ? error.message : '定位预设表达式失败'
+      throw error
+    }
+  }
+
+  function selectPresetEvidenceBot(botId: string) {
+    selectedPresetBotId.value = presetEvidenceBots.value.some(({ id }) => id === botId) ? botId : ''
+  }
+
+  function navigateToPresetEvidence(result: LocateSandboxPresetExpressionResult) {
+    const intent = presetEvidenceNavigation.publish(result)
+    if (!intent) return
+    presetEvidenceIntent.value = intent
+    workspaceController.selectView('model-requests')
+    modelRequestVisitKey.value += 1
+  }
+
+  function consumePresetEvidenceIntent(seq: number) {
+    const consumed = presetEvidenceNavigation.consume(seq)
+    if (consumed && presetEvidenceIntent.value?.seq === seq) presetEvidenceIntent.value = undefined
+  }
+
+  function reportPresetEvidenceNavigationFailure(payload: { seq: number, message: string }) {
+    if (presetEvidenceIntent.value?.seq === payload.seq) presetEvidenceIntent.value = undefined
+    modelRequestError.value = payload.message
   }
 
   function toggleDetails() {
@@ -782,6 +943,9 @@ export function createWebqqWorkspaceShell(
     environmentModel,
     modelRequestVisitKey,
     modelRequestWorkspaceModel,
+    presetDiscardGuard,
+    presetEvidenceIntent,
+    presetWorkspaceModel,
     handleSidebarNotification,
     kickGroupMember,
     loadEarlierMessages,
@@ -791,6 +955,20 @@ export function createWebqqWorkspaceShell(
     loadMoreModelRequestRecords,
     loadModelRequestRecord,
     loadModelRequestTrajectory,
+    loadPresetCatalog,
+    readPreset,
+    createPreset,
+    savePreset,
+    renamePreset,
+    deletePreset,
+    locatePresetExpression,
+    updatePresetDirty,
+    cancelPresetDiscard,
+    confirmPresetDiscard,
+    selectPresetEvidenceBot,
+    navigateToPresetEvidence,
+    consumePresetEvidenceIntent,
+    reportPresetEvidenceNavigationFailure,
     manageEnvironment,
     openComposerParticipantDialog,
     openEntityDialog,

@@ -35,6 +35,19 @@ import type {
   ModelRequestRecordsQuery,
   ModelRequestTrajectoryQuery,
 } from './model-request-query'
+import type {
+  LocateSandboxPresetExpressionInput,
+  LocateSandboxPresetExpressionResult,
+  ReadSandboxPresetInput,
+  SandboxPresetDocument,
+} from '../../src/presets'
+import type {
+  CreatePresetInput,
+  DeletePresetInput,
+  PresetDocumentKind,
+  RenamePresetInput,
+  SavePresetInput,
+} from '../../src/presets'
 
 export interface WorkspacePort {
   getWorkspace(input?: GetSandboxWorkspaceInput): Promise<SandboxWorkspaceState>
@@ -59,4 +72,11 @@ export interface WorkspacePort {
   getModelRequestRecord(input: ModelRequestRecordQuery): Promise<SandboxModelRequestDetail>
   getModelRequestTrajectory(input: ModelRequestTrajectoryQuery): Promise<SandboxModelRequestTrajectory>
   clearModelRequestRecords(input: ClearModelRequestRecordsQuery): Promise<ClearSandboxModelRequestRecordsResult>
+  getPresetCatalog(input?: { kind?: PresetDocumentKind }): Promise<SandboxPresetDocument[]>
+  readPreset(input: ReadSandboxPresetInput): Promise<SandboxPresetDocument>
+  createPreset(input: CreatePresetInput): Promise<SandboxPresetDocument>
+  savePreset(input: SavePresetInput): Promise<SandboxPresetDocument>
+  renamePreset(input: RenamePresetInput): Promise<SandboxPresetDocument>
+  deletePreset(input: DeletePresetInput): Promise<{ deleted: true }>
+  locatePresetExpression(input: LocateSandboxPresetExpressionInput): Promise<LocateSandboxPresetExpressionResult>
 }

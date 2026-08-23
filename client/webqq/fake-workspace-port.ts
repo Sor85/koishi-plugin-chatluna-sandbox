@@ -37,6 +37,19 @@ import type {
   ModelRequestTrajectoryQuery,
 } from './model-request-query'
 import { emptyModelRequestRecordsPage } from './model-request-query'
+import type {
+  LocateSandboxPresetExpressionInput,
+  LocateSandboxPresetExpressionResult,
+  ReadSandboxPresetInput,
+  SandboxPresetDocument,
+} from '../../src/presets'
+import type {
+  CreatePresetInput,
+  DeletePresetInput,
+  PresetDocumentKind,
+  RenamePresetInput,
+  SavePresetInput,
+} from '../../src/presets'
 
 export type WorkspacePortOperation = keyof WorkspacePort
 
@@ -81,6 +94,13 @@ export class FakeWorkspacePort implements WorkspacePort {
   modelRequestRecordResult?: SandboxModelRequestDetail
   modelRequestTrajectoryResult?: SandboxModelRequestTrajectory
   clearModelRequestRecordsResult: ClearSandboxModelRequestRecordsResult = { cleared: 0 }
+  presetCatalogResult: SandboxPresetDocument[] = []
+  presetDocumentResult?: SandboxPresetDocument
+  locatePresetExpressionResult: LocateSandboxPresetExpressionResult = {
+    status: 'failed',
+    code: 'request-not-observed',
+    message: '没有匹配的模型请求',
+  }
   private readonly failures = new Map<WorkspacePortOperation, unknown[]>()
 
   constructor(workspace: SandboxWorkspaceState) {
@@ -199,6 +219,61 @@ export class FakeWorkspacePort implements WorkspacePort {
 
   clearModelRequestRecords(input: ClearModelRequestRecordsQuery) {
     return this.invoke('clearModelRequestRecords', input, this.clearModelRequestRecordsResult)
+  }
+
+  getPresetCatalog(input: { kind?: PresetDocumentKind } = {}) {
+    const result = input.kind
+      ? this.presetCatalogResult.filter(({ kind }) => kind === input.kind)
+      : this.presetCatalogResult
+    return this.invoke('getPresetCatalog', input, result)
+  }
+
+  readPreset(input: ReadSandboxPresetInput) {
+    const document = this.presetCatalogResult.find(({ kind, fileName }) => kind === input.kind && fileName === input.fileName)
+      ?? this.presetDocumentResult
+    if (!document) this.rejectNext('readPreset', new Error('预设不存在'))
+    return this.invoke('readPreset', input, document as SandboxPresetDocument)
+  }
+
+  createPreset(input: CreatePresetInput) {
+    const result = this.presetDocumentResult ?? fakePresetDocument(input)
+    return this.invoke('createPreset', input, result)
+  }
+
+  savePreset(input: SavePresetInput) {
+    const result = this.presetDocumentResult ?? fakePresetDocument(input)
+    return this.invoke('savePreset', input, result)
+  }
+
+  renamePreset(input: RenamePresetInput) {
+    const current = this.presetDocumentResult
+      ?? this.presetCatalogResult.find(({ kind, fileName }) => kind === input.kind && fileName === input.fileName)
+    const result = current ? { ...current, fileName: input.newFileName } : fakePresetDocument({
+      kind: input.kind,
+      fileName: input.newFileName,
+      source: '',
+    })
+    return this.invoke('renamePreset', input, result)
+  }
+
+  deletePreset(input: DeletePresetInput) {
+    return this.invoke('deletePreset', input, { deleted: true } as const)
+  }
+
+  locatePresetExpression(input: LocateSandboxPresetExpressionInput) {
+    return this.invoke('locatePresetExpression', input, this.locatePresetExpressionResult)
+  }
+}
+
+function fakePresetDocument(input: CreatePresetInput): SandboxPresetDocument {
+  return {
+    ...input,
+    revision: `revision:${input.source}`,
+    size: input.source.length,
+    modifiedAt: '2026-08-22T00:00:00.000Z',
+    templateFields: [],
+    expressions: [],
+    diagnostics: [],
   }
 }
 

@@ -6,6 +6,20 @@ import { buildSandboxModelRequestTrajectory } from './model-request-trajectory'
 import type { SandboxControlService } from './control-service'
 import type { SandboxMcpService } from './mcp/service'
 import type { SandboxMcpScope } from './mcp/types'
+import type {
+  LocateSandboxPresetExpressionInput,
+  LocateSandboxPresetExpressionResult,
+  ReadSandboxPresetInput,
+  SandboxPresetDocument,
+  SandboxPresetService,
+} from './presets'
+import type {
+  CreatePresetInput,
+  DeletePresetInput,
+  PresetDocumentKind,
+  RenamePresetInput,
+  SavePresetInput,
+} from './presets'
 import { trimSnapshotMessages, type SandboxTestSpaceService, type SandboxTestSpaceSummary } from './test-spaces'
 import {
   DEFAULT_MODEL_REQUEST_PAGE_SIZE,
@@ -92,6 +106,13 @@ interface ConsoleEventMap {
   'chatluna-sandbox/model-request-record': (input: ReadSandboxModelRequestRecordInput) => Promise<SandboxConsoleModelRequestDetail>
   'chatluna-sandbox/model-request-trajectory': (input: ReadSandboxModelRequestTrajectoryInput) => SandboxModelRequestTrajectory
   'chatluna-sandbox/clear-model-request-records': (input: SandboxModelRequestScope) => ClearSandboxModelRequestRecordsResult
+  'chatluna-sandbox/preset-catalog': (input?: { kind?: PresetDocumentKind }) => Promise<SandboxPresetDocument[]>
+  'chatluna-sandbox/preset-read': (input: ReadSandboxPresetInput) => Promise<SandboxPresetDocument>
+  'chatluna-sandbox/preset-create': (input: CreatePresetInput) => Promise<SandboxPresetDocument>
+  'chatluna-sandbox/preset-save': (input: SavePresetInput) => Promise<SandboxPresetDocument>
+  'chatluna-sandbox/preset-rename': (input: RenamePresetInput) => Promise<SandboxPresetDocument>
+  'chatluna-sandbox/preset-delete': (input: DeletePresetInput) => Promise<{ deleted: true }>
+  'chatluna-sandbox/preset-locate-expression': (input: LocateSandboxPresetExpressionInput) => Promise<LocateSandboxPresetExpressionResult>
   'chatluna-sandbox/mcp-credentials': () => Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }>
   'chatluna-sandbox/create-mcp-credential': (input: { name: string; scopes: SandboxMcpScope[] }) => { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
   'chatluna-sandbox/update-mcp-credential': (input: { id: string; name?: string; scopes?: SandboxMcpScope[] }) => { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }
@@ -160,6 +181,7 @@ export function registerConsole(
   testSpaces?: SandboxTestSpaceService,
   unattributedModelRequests?: SandboxModelRequestStore,
   chatlunaUsage?: ChatLunaUsageSource,
+  presets?: SandboxPresetService,
 ) {
   console.addEntry(resolveConsoleEntry())
 
@@ -524,6 +546,15 @@ export function registerConsole(
   registerListener('chatluna-sandbox/model-request-record', getModelRequestRecord, { authority: 4 })
   registerListener('chatluna-sandbox/model-request-trajectory', getModelRequestTrajectory, { authority: 4 })
   registerListener('chatluna-sandbox/clear-model-request-records', clearModelRequestRecords, { authority: 4 })
+  if (presets) {
+    registerListener('chatluna-sandbox/preset-catalog', (input = {}) => presets.catalog(input.kind), { authority: 4 })
+    registerListener('chatluna-sandbox/preset-read', (input) => presets.read(input), { authority: 4 })
+    registerListener('chatluna-sandbox/preset-create', (input) => presets.create(input), { authority: 4 })
+    registerListener('chatluna-sandbox/preset-save', (input) => presets.save(input), { authority: 4 })
+    registerListener('chatluna-sandbox/preset-rename', (input) => presets.rename(input), { authority: 4 })
+    registerListener('chatluna-sandbox/preset-delete', (input) => presets.delete(input), { authority: 4 })
+    registerListener('chatluna-sandbox/preset-locate-expression', (input) => presets.locateExpression(input), { authority: 4 })
+  }
   if (mcp) {
     registerListener('chatluna-sandbox/mcp-credentials', () => mcp.listCredentials(), { authority: 4 })
     registerListener('chatluna-sandbox/create-mcp-credential', (input) => mcp.createCredential(input.name, input.scopes), { authority: 4 })
@@ -573,6 +604,13 @@ declare module '@koishijs/console' {
     'chatluna-sandbox/model-request-record'(input: ReadSandboxModelRequestRecordInput): Promise<SandboxConsoleModelRequestDetail>
     'chatluna-sandbox/model-request-trajectory'(input: ReadSandboxModelRequestTrajectoryInput): SandboxModelRequestTrajectory
     'chatluna-sandbox/clear-model-request-records'(input: SandboxModelRequestScope): ClearSandboxModelRequestRecordsResult
+    'chatluna-sandbox/preset-catalog'(input?: { kind?: PresetDocumentKind }): Promise<SandboxPresetDocument[]>
+    'chatluna-sandbox/preset-read'(input: ReadSandboxPresetInput): Promise<SandboxPresetDocument>
+    'chatluna-sandbox/preset-create'(input: CreatePresetInput): Promise<SandboxPresetDocument>
+    'chatluna-sandbox/preset-save'(input: SavePresetInput): Promise<SandboxPresetDocument>
+    'chatluna-sandbox/preset-rename'(input: RenamePresetInput): Promise<SandboxPresetDocument>
+    'chatluna-sandbox/preset-delete'(input: DeletePresetInput): Promise<{ deleted: true }>
+    'chatluna-sandbox/preset-locate-expression'(input: LocateSandboxPresetExpressionInput): Promise<LocateSandboxPresetExpressionResult>
     'chatluna-sandbox/mcp-credentials'(): Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }>
     'chatluna-sandbox/create-mcp-credential'(input: { name: string; scopes: SandboxMcpScope[] }): { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
     'chatluna-sandbox/update-mcp-credential'(input: { id: string; name?: string; scopes?: SandboxMcpScope[] }): { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }

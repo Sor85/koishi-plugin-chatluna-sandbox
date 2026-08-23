@@ -55,6 +55,7 @@ function createHarness(request: SandboxModelRequestDetail = detail()) {
   const rawMessages = new Set<string>()
   let responseRaw = false
   let expandedText: readonly string[] = []
+  let occurrenceTarget: string | undefined
   let highlight: string | undefined
   const resizeListeners = new Set<() => void>()
   const timers: Array<{ delayMs: number, callback: () => void, cancelled: boolean }> = []
@@ -62,6 +63,9 @@ function createHarness(request: SandboxModelRequestDetail = detail()) {
   const locator = createEvidenceLocator({
     getConversation: () => conversation,
     getNavigation: () => navigation,
+    setOccurrenceTarget: (occurrence) => {
+      occurrenceTarget = occurrence?.target
+    },
     measure: (target): EvidenceMeasurement | undefined => {
       const elementTop = elementTops.get(target)
       if (elementTop === undefined) return undefined
@@ -121,6 +125,9 @@ function createHarness(request: SandboxModelRequestDetail = detail()) {
     },
     get expandedText() {
       return expandedText
+    },
+    get occurrenceTarget() {
+      return occurrenceTarget
     },
     get highlight() {
       return highlight
@@ -288,6 +295,76 @@ describe('证据定位', () => {
     expect(await harness.locator.locateEvidence('req:message:messages.99')).toBeUndefined()
     expect(harness.expandedCards).toEqual([])
     expect(harness.scrolls).toEqual([])
+  })
+
+  it('精确范围定位测量 occurrence mark，并展开卡片、正文和退出原始模式', async () => {
+    const harness = createHarness()
+    const occurrenceTarget = `${USER_TARGET}--content-occurrence`
+    harness.setElementTop(occurrenceTarget, 640)
+    harness.markMessageRaw('req:message:messages.1')
+
+    expect(await harness.locator.locateOccurrence('req:message:messages.1', { start: 2, end: 4 }))
+      .toBe(occurrenceTarget)
+    expect(harness.occurrenceTarget).toBe(occurrenceTarget)
+    expect(harness.expandedCards).toEqual([USER_TARGET])
+    expect(harness.rawMessages.has('req:message:messages.1')).toBe(false)
+    expect(harness.expandedText).toEqual([])
+    expect(harness.scrolls).toEqual([{ top: 528, behavior: 'smooth' }])
+    expect(harness.highlight).toBe(occurrenceTarget)
+  })
+
+  it('精确范围只接受请求消息 content 的有效 UTF-16 边界', async () => {
+    const request = detail()
+    request.requestBody = {
+      messages: [{ role: 'user', content: 'A😀B', reasoning: '这里也有文字' }],
+    }
+    const harness = createHarness(request)
+
+    expect(await harness.locator.locateOccurrence('req:message:messages.0', { start: 2, end: 3 })).toBeUndefined()
+    expect(await harness.locator.locateOccurrence('req:message:messages.0', { start: 0, end: 9 })).toBeUndefined()
+    expect(await harness.locator.locateOccurrence('req:tool-call:messages.0.tool_calls.0', { start: 0, end: 0 })).toBeUndefined()
+    expect(harness.occurrenceTarget).toBeUndefined()
+    expect(harness.expandedCards).toEqual([])
+    expect(harness.scrolls).toEqual([])
+  })
+
+  it('occurrence target 未渲染时不伪装成精确成功，也不回落到消息卡片', async () => {
+    const harness = createHarness()
+    harness.setElementTop(USER_TARGET, 500)
+
+    expect(await harness.locator.locateOccurrence('req:message:messages.1', { start: 2, end: 4 })).toBeUndefined()
+    expect(harness.occurrenceTarget).toBeUndefined()
+    expect(harness.scrolls).toEqual([])
+    expect(harness.highlight).toBeUndefined()
+  })
+
+  it('普通证据定位会清除旧 occurrence，既有卡片定位语义不变', async () => {
+    const harness = createHarness()
+    const occurrenceTarget = `${USER_TARGET}--content-occurrence`
+    harness.setElementTop(occurrenceTarget, 640)
+    harness.setElementTop(SYSTEM_TARGET, 300)
+    await harness.locator.locateOccurrence('req:message:messages.1', { start: 2, end: 4 })
+
+    expect(await harness.locator.locateEvidence('req:message:messages.0')).toBe(SYSTEM_TARGET)
+    expect(harness.occurrenceTarget).toBeUndefined()
+    expect(harness.highlight).toBe(SYSTEM_TARGET)
+  })
+
+  it('过期 occurrence 失败不会清掉后一次精确定位的 mark', async () => {
+    const harness = createHarness()
+    const firstTarget = `${SYSTEM_TARGET}--content-occurrence`
+    const secondTarget = `${USER_TARGET}--content-occurrence`
+    harness.setElementTop(secondTarget, 640)
+
+    const first = harness.locator.locateOccurrence('req:message:messages.0', { start: 0, end: 2 })
+    const second = harness.locator.locateOccurrence('req:message:messages.1', { start: 2, end: 4 })
+
+    expect(await first).toBeUndefined()
+    expect(await second).toBe(secondTarget)
+    expect(harness.occurrenceTarget).toBe(secondTarget)
+    expect(harness.highlight).toBe(secondTarget)
+    expect(harness.scrolls).toEqual([{ top: 528, behavior: 'smooth' }])
+    expect(firstTarget).not.toBe(secondTarget)
   })
 
   it('按工具名称定位到唯一工具定义', async () => {

@@ -37,6 +37,18 @@ import {
   type SandboxWorkspaceView,
 } from './workspace-state'
 import type { WorkspacePort } from './workspace-port'
+import type {
+  LocateSandboxPresetExpressionInput,
+  LocateSandboxPresetExpressionResult,
+  ReadSandboxPresetInput,
+  SandboxPresetDocument,
+} from '../../src/presets'
+import type {
+  CreatePresetInput,
+  DeletePresetInput,
+  RenamePresetInput,
+  SavePresetInput,
+} from '../../src/presets'
 import { getVisibleRecentConversations } from './relationship-directory'
 import {
   emptyModelRequestCapacity,
@@ -143,6 +155,9 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   const modelRequestRecordsState = ref<SandboxModelRequestListItem[]>([])
   const modelRequestRecordState = ref<SandboxModelRequestDetail>()
   const modelRequestTrajectoryState = ref<SandboxModelRequestTrajectory>()
+  const presetCatalogState = ref<SandboxPresetDocument[]>([])
+  const presetDocumentState = ref<SandboxPresetDocument>()
+  const presetLocateResultState = ref<LocateSandboxPresetExpressionResult>()
   const modelRequestRecordsPageState = ref<ModelRequestRecordsPageState>({
     hasMore: false,
     capacity: emptyModelRequestCapacity,
@@ -599,6 +614,93 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     }
   }
 
+  async function loadPresetCatalog() {
+    try {
+      presetCatalogState.value = await port.getPresetCatalog()
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '读取预设目录失败')
+    }
+  }
+
+  async function readPreset(input: ReadSandboxPresetInput) {
+    try {
+      presetDocumentState.value = await port.readPreset(input)
+      return presetDocumentState.value
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '读取预设失败')
+    }
+  }
+
+  async function createPreset(input: CreatePresetInput) {
+    try {
+      const document = await port.createPreset(input)
+      upsertPreset(document)
+      presetDocumentState.value = document
+      return document
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '创建预设失败')
+    }
+  }
+
+  async function savePreset(input: SavePresetInput) {
+    try {
+      const document = await port.savePreset(input)
+      upsertPreset(document)
+      presetDocumentState.value = document
+      return document
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '保存预设失败')
+    }
+  }
+
+  async function renamePreset(input: RenamePresetInput) {
+    try {
+      const document = await port.renamePreset(input)
+      presetCatalogState.value = presetCatalogState.value.filter(({ kind, fileName }) => (
+        kind !== input.kind || fileName !== input.fileName
+      ))
+      upsertPreset(document)
+      presetDocumentState.value = document
+      return document
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '重命名预设失败')
+    }
+  }
+
+  async function deletePreset(input: DeletePresetInput) {
+    try {
+      const result = await port.deletePreset(input)
+      presetCatalogState.value = presetCatalogState.value.filter(({ kind, fileName }) => (
+        kind !== input.kind || fileName !== input.fileName
+      ))
+      if (presetDocumentState.value?.kind === input.kind && presetDocumentState.value.fileName === input.fileName) {
+        presetDocumentState.value = undefined
+      }
+      return result
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '删除预设失败')
+    }
+  }
+
+  async function locatePresetExpression(input: LocateSandboxPresetExpressionInput) {
+    try {
+      const result = await port.locatePresetExpression(input)
+      presetLocateResultState.value = result
+      return result
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '定位预设表达式失败')
+    }
+  }
+
+  function upsertPreset(document: SandboxPresetDocument) {
+    presetCatalogState.value = [
+      ...presetCatalogState.value.filter(({ kind, fileName }) => (
+        kind !== document.kind || fileName !== document.fileName
+      )),
+      document,
+    ].sort((left, right) => left.kind.localeCompare(right.kind) || left.fileName.localeCompare(right.fileName))
+  }
+
   async function handleRelationshipRequest(requestId: string, approve: boolean) {
     const operatorId = getCurrentOperatorId()
     const request = snapshot.value.requests.find(({ id }) => id === requestId)
@@ -623,6 +725,9 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     modelRequestRecord: readonly(modelRequestRecordState),
     modelRequestTrajectory: readonly(modelRequestTrajectoryState),
     modelRequestRecordsPage: readonly(modelRequestRecordsPageState),
+    presetCatalog: readonly(presetCatalogState),
+    presetDocument: readonly(presetDocumentState),
+    presetLocateResult: readonly(presetLocateResultState),
     sidebar,
     chat,
     composer,
@@ -637,6 +742,13 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     loadModelRequestRecords,
     loadModelRequestRecord,
     loadModelRequestTrajectory,
+    loadPresetCatalog,
+    readPreset,
+    createPreset,
+    savePreset,
+    renamePreset,
+    deletePreset,
+    locatePresetExpression,
     manageEnvironment,
     notifySceneRevision,
     performFriendAction,

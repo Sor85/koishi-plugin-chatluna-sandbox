@@ -56,6 +56,28 @@
           @query="loadOneBotDebugRecords"
           @clear="clearOneBotDebugRecords"
         />
+        <PresetWorkspace
+          v-else-if="currentView === 'presets'"
+          :catalog="presetWorkspaceModel.catalog"
+          :document="presetWorkspaceModel.document"
+          :loading="presetWorkspaceModel.loading"
+          :saving="presetWorkspaceModel.saving"
+          :error="presetWorkspaceModel.error"
+          :evidence-context="presetWorkspaceModel.evidenceContext"
+          :discard-guard-open="Boolean(presetDiscardGuard.pending)"
+          :discard-guard-action="presetDiscardGuard.pending?.action"
+          @refresh="loadPresetCatalog"
+          @read="readPresetFromWorkspace"
+          @create="createPresetFromWorkspace"
+          @save="savePresetFromWorkspace"
+          @rename="renamePresetFromWorkspace"
+          @delete="deletePresetFromWorkspace"
+          @locate="locatePresetExpressionFromWorkspace"
+          @navigate-evidence="navigateToPresetEvidence"
+          @dirty-change="updatePresetDirty"
+          @cancel-discard="cancelPresetDiscard"
+          @confirm-discard="confirmPresetDiscard"
+        />
         <ModelRequestWorkspace
           v-else-if="currentView === 'model-requests'"
           :records="modelRequestWorkspaceModel.records"
@@ -72,11 +94,14 @@
           :detail-loading="modelRequestWorkspaceModel.detailLoading"
           :error="modelRequestWorkspaceModel.error"
           :visit-key="modelRequestVisitKey"
+          :navigation-intent="presetEvidenceIntent"
           @query="loadModelRequestRecords"
           @load-more="loadMoreModelRequestRecords"
           @open="loadModelRequestRecord"
           @trajectory="loadModelRequestTrajectory"
           @clear="clearModelRequestRecords"
+          @consume-navigation-intent="consumePresetEvidenceIntent"
+          @navigation-intent-failure="reportPresetEvidenceNavigationFailure"
         />
         <WebqqChatPane
           v-else
@@ -154,6 +179,7 @@ import AiTestSpaceOverview from './ai-test-space-overview.vue'
 import EnvironmentManager from './environment-manager.vue'
 import ModelRequestWorkspace from './model-request-workspace.vue'
 import OneBotDebugWorkspace from './onebot-debug-workspace.vue'
+import PresetWorkspace from './preset-workspace.vue'
 import WebqqChatPane from './webqq-chat-pane.vue'
 import WebqqDetailsPanel from './webqq-details-panel.vue'
 import WebqqSidebar from './webqq-sidebar.vue'
@@ -186,6 +212,9 @@ const {
   debugWorkspaceModel,
   modelRequestVisitKey,
   modelRequestWorkspaceModel,
+  presetDiscardGuard,
+  presetEvidenceIntent,
+  presetWorkspaceModel,
   environmentModel,
   handleSidebarNotification,
   kickGroupMember,
@@ -196,6 +225,19 @@ const {
   loadMoreModelRequestRecords,
   loadModelRequestRecord,
   loadModelRequestTrajectory,
+  loadPresetCatalog,
+  readPreset,
+  createPreset,
+  savePreset,
+  renamePreset,
+  deletePreset,
+  locatePresetExpression,
+  updatePresetDirty,
+  cancelPresetDiscard,
+  confirmPresetDiscard,
+  navigateToPresetEvidence,
+  consumePresetEvidenceIntent,
+  reportPresetEvidenceNavigationFailure,
   manageEnvironment,
   openComposerParticipantDialog,
   openEntityDialog,
@@ -227,7 +269,35 @@ const {
   sidebarModel,
   toggleDetails,
   transferGroupOwner,
-} = createWebqqWorkspaceShell(workspaceController, workspaceLayout, () => overlayHostRef.value)
+} = createWebqqWorkspaceShell(workspaceController, workspaceLayout, () => overlayHostRef.value, () => activeSpaceId.value)
+
+function readPresetFromWorkspace(input: Parameters<typeof readPreset>[0]) {
+  void readPreset(input).catch(() => undefined)
+}
+
+function createPresetFromWorkspace(input: Parameters<typeof createPreset>[0], resolve: () => void, reject: (error: unknown) => void) {
+  void createPreset(input).then(() => resolve(), reject)
+}
+
+function savePresetFromWorkspace(input: Parameters<typeof savePreset>[0], resolve: () => void, reject: (error: unknown) => void) {
+  void savePreset(input).then(() => resolve(), reject)
+}
+
+function renamePresetFromWorkspace(input: Parameters<typeof renamePreset>[0], resolve: () => void, reject: (error: unknown) => void) {
+  void renamePreset(input).then(() => resolve(), reject)
+}
+
+function deletePresetFromWorkspace(input: Parameters<typeof deletePreset>[0], resolve: () => void, reject: (error: unknown) => void) {
+  void deletePreset(input).then(() => resolve(), reject)
+}
+
+function locatePresetExpressionFromWorkspace(
+  input: Parameters<typeof locatePresetExpression>[0],
+  resolve: (result: Awaited<ReturnType<typeof locatePresetExpression>>) => void,
+  reject: (error: unknown) => void,
+) {
+  void locatePresetExpression(input).then(resolve, reject)
+}
 
 const mentionRequest = ref<{ id: string, name: string, requestId: number }>()
 const chatPaneViewModel = computed(() => ({

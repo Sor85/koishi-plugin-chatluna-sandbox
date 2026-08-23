@@ -22,7 +22,8 @@ import { SandboxMcpHttpServer, type SandboxMcpServerConfig } from './mcp/server'
 import { SandboxMcpService } from './mcp/service'
 import { SandboxTestSpaceService } from './test-spaces'
 import { resolve } from 'node:path'
-import type { SandboxAppearance, SandboxPersistenceMode } from './types'
+import { PresetRuntimeSnapshotTracker, SandboxPresetService, type PresetRuntimeResolvedTarget } from './presets'
+import type { SandboxAppearance, SandboxModelRequestEntities, SandboxPersistenceMode } from './types'
 
 export * from './control-service'
 export * from './persistence'
@@ -36,6 +37,7 @@ export * from './mcp/server'
 export * from './mcp/service'
 export * from './mcp/types'
 export * from './test-spaces'
+export * from './presets'
 
 export const name = 'chatluna-sandbox'
 export const inject = {
@@ -158,11 +160,40 @@ export function apply(ctx: Context, config: Config) {
       createModelRequestPersistence,
       config.modelRequestRecordLimit,
     )
+    const resolvePresetRuntimeTarget = ({ botId, conversationId }: Pick<PresetRuntimeResolvedTarget, 'botId' | 'conversationId'>): PresetRuntimeResolvedTarget | undefined => {
+      const belongsToTarget = (snapshot: ReturnType<SandboxControlService['getSnapshot']>) => {
+        const botExists = snapshot.participants.some(({ id, kind }) => id === botId && kind === 'bot')
+        const conversation = snapshot.conversations.find(({ id }) => id === conversationId)
+        if (!botExists || !conversation) return false
+        if (conversation.type === 'direct') return conversation.participantIds.includes(botId)
+        return snapshot.groups.find(({ id }) => id === conversation.groupId)?.members.some(({ participantId }) => participantId === botId) ?? false
+      }
+      const matches: PresetRuntimeResolvedTarget[] = []
+      if (belongsToTarget(control.getSnapshot())) {
+        matches.push({ scopeId: MAIN_MODEL_REQUEST_SCOPE_ID, botId, conversationId })
+      }
+      for (const space of testSpaces.listSpaces()) {
+        if (belongsToTarget(testSpaces.getControl(space.id).getSnapshot())) {
+          matches.push({ scopeId: space.id, botId, conversationId })
+        }
+      }
+      return matches.length === 1 ? matches[0] : undefined
+    }
+    const presetSnapshots = new PresetRuntimeSnapshotTracker(inner, resolvePresetRuntimeTarget)
+    const getActivePresetSnapshots = (entities: SandboxModelRequestEntities) => {
+      if (!entities.scopeId || !entities.botId || !entities.conversationId) return []
+      return presetSnapshots.getActiveSnapshots({
+        scopeId: entities.scopeId,
+        botId: entities.botId,
+        conversationId: entities.conversationId,
+      })
+    }
     const chatLunaPlugin = resolveChatLunaPluginClass(inner.baseDir)
     const disposeModelRequestCollector = installModelRequestCollector({
       plugin: chatLunaPlugin,
       baseDir: inner.baseDir,
       unattributed: unattributedModelRequests,
+      getActivePresetSnapshots,
       getCandidates: () => [
         {
           scopeId: MAIN_MODEL_REQUEST_SCOPE_ID,
@@ -191,6 +222,18 @@ export function apply(ctx: Context, config: Config) {
       linkChatLunaUsageRequest(modelRequestStores(), payload)
     })
     inner.provide('chatlunaSandbox', control, true)
+    const presetService = new SandboxPresetService({
+      baseDir: inner.baseDir,
+      mainModelRequests: control.getModelRequestStore(),
+      getTestSpaceModelRequests: (spaceId) => {
+        if (spaceId === MAIN_MODEL_REQUEST_SCOPE_ID) return control.getModelRequestStore()
+        try {
+          return testSpaces.getControl(spaceId).getModelRequestStore()
+        } catch {
+          return undefined
+        }
+      },
+    })
     try {
       const mcp = new SandboxMcpService(control, {
         dataDirectory: resolve(inner.baseDir, 'data/chatluna-sandbox'),
@@ -207,7 +250,7 @@ export function apply(ctx: Context, config: Config) {
       const mcpServer = new SandboxMcpHttpServer(inner, mcp, config.mcp)
       // chatluna-usage 位于另一个 loader group，Cordis 会为服务建立隔离映射；复用 usage 插件的 Context 才能解析到同一实例。
       const getChatLunaUsage = () => findChatLunaUsage(inner)
-      registerConsole(inner.console, control, config, mcp, testSpaces, unattributedModelRequests, getChatLunaUsage)
+      registerConsole(inner.console, control, config, mcp, testSpaces, unattributedModelRequests, getChatLunaUsage, presetService)
       inner.on('ready', async () => {
         await control.waitForSceneReady()
         const seeded = await seedDevelopmentModelRequestErrors(control)
@@ -216,13 +259,14 @@ export function apply(ctx: Context, config: Config) {
       })
       inner.on('dispose', () => {
         disposeModelRequestCollector()
+        presetSnapshots.dispose()
         void unattributedModelRequests.waitForPersistence()
         mcpServer.stop()
       })
     } catch (error) {
       inner.logger('chatluna-sandbox').error('MCP 初始化失败；WebQQ 仍可继续使用。', error)
       const getChatLunaUsage = () => findChatLunaUsage(inner)
-      registerConsole(inner.console, control, config, undefined, testSpaces, unattributedModelRequests, getChatLunaUsage)
+      registerConsole(inner.console, control, config, undefined, testSpaces, unattributedModelRequests, getChatLunaUsage, presetService)
       inner.on('ready', async () => {
         await control.waitForSceneReady()
         const seeded = await seedDevelopmentModelRequestErrors(control)
@@ -230,6 +274,7 @@ export function apply(ctx: Context, config: Config) {
       })
       inner.on('dispose', () => {
         disposeModelRequestCollector()
+        presetSnapshots.dispose()
         void unattributedModelRequests.waitForPersistence()
       })
     }

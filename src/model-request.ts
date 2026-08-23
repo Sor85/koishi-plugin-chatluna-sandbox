@@ -12,6 +12,8 @@ import type {
   SandboxModelRequestStatus,
   SandboxModelRequestSummary,
   SandboxModelResponseBodyFormat,
+  SandboxPresetRuntimeSnapshot,
+  SandboxPresetRuntimeSnapshotSummary,
   SandboxModelResponseBodyStatus,
 } from './types'
 import { SandboxModelRequestCursorExpiredError } from './types'
@@ -49,6 +51,7 @@ export interface AppendModelRequestRecordInput {
   responseBodyError?: string
   interactionId?: string
   chatlunaRequestId?: string
+  presetSnapshots?: SandboxPresetRuntimeSnapshot[]
   error?: SandboxModelRequestError
   chatlunaError?: SandboxChatLunaRequestError
 }
@@ -109,6 +112,16 @@ export function createModelRequestError(error: unknown, traceId = Random.id()): 
   return { code: retryable ? 'transient_error' : 'model_request_error', message, retryable, traceId }
 }
 
+function summarizePresetSnapshots(snapshots: readonly SandboxPresetRuntimeSnapshot[] | undefined): SandboxPresetRuntimeSnapshotSummary[] | undefined {
+  if (!snapshots?.length) return
+  return snapshots.map((snapshot) => ({
+    kind: snapshot.kind,
+    presetName: snapshot.presetName,
+    capturedAt: snapshot.capturedAt,
+    templateCount: snapshot.templates.length,
+  }))
+}
+
 export function presentModelRequestRecord(record: SandboxModelRequestRecord, view: 'list' | 'detail'): SandboxModelRequestListItem | SandboxModelRequestDetail {
   const base = structuredClone(record)
   const item = {
@@ -119,9 +132,14 @@ export function presentModelRequestRecord(record: SandboxModelRequestRecord, vie
     const {
       requestBody: _requestBody,
       responseBodyRaw: _responseBodyRaw,
+      presetSnapshots,
       ...listItem
     } = item
-    return listItem
+    const presetSnapshotSummaries = summarizePresetSnapshots(presetSnapshots)
+    return {
+      ...listItem,
+      ...(presetSnapshotSummaries ? { presetSnapshotSummaries } : {}),
+    }
   }
   return item
 }
@@ -207,6 +225,7 @@ export class SandboxModelRequestStore {
       ...(input.responseBodyError ? { responseBodyError: input.responseBodyError } : {}),
       ...(input.interactionId ? { interactionId: input.interactionId } : {}),
       ...(input.chatlunaRequestId ? { chatlunaRequestId: input.chatlunaRequestId } : {}),
+      ...(input.presetSnapshots?.length ? { presetSnapshots: structuredClone(input.presetSnapshots) } : {}),
       ...(input.error ? { error: structuredClone(input.error) } : {}),
       ...(input.chatlunaError ? { chatlunaError: structuredClone(input.chatlunaError) } : {}),
     }

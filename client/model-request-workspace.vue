@@ -26,8 +26,9 @@
       </div>
     </header>
 
-    <div v-if="error" class="webqq-model-request-status">
-      <p class="webqq-model-request-error" role="alert">{{ error }}</p>
+    <div v-if="error || navigationStatus" class="webqq-model-request-status">
+      <p v-if="error" class="webqq-model-request-error" role="alert">{{ error }}</p>
+      <p v-else role="status">{{ navigationStatus }}</p>
     </div>
 
     <div class="webqq-model-request-split">
@@ -495,7 +496,9 @@
               :conversation-available="false"
               :analysis="true"
               :detail="detail"
+              :external-locate="externalLocateRequest"
               @open-request="openRelatedRequest"
+              @locate-result="completeNavigationIntent"
             />
 
             <template v-else>
@@ -596,6 +599,9 @@ import { formatDuration } from './webqq/format-duration'
 import { parseModelResponseConversation } from './webqq/model-request-conversation'
 import { buildModelRequestJsonTree } from './webqq/model-request-json'
 import { createEvidenceNavigationStack } from './webqq/evidence-navigation-stack'
+import type { LocateRequest } from './webqq/evidence-locator'
+import type { PresetEvidenceNavigationIntent } from './webqq/preset-evidence-navigation'
+import { createPresetNavigationCoordinator } from './webqq/preset-navigation-coordinator'
 import { createScrollRestore } from './webqq/scroll-restore'
 import { createModelRequestEnterRefresh, createModelRequestLiveRefresh } from './webqq/model-request-live-refresh'
 import {
@@ -636,6 +642,7 @@ const props = defineProps<{
   detailLoading: boolean
   error: string
   visitKey?: number
+  navigationIntent?: PresetEvidenceNavigationIntent
 }>()
 
 const emit = defineEmits<{
@@ -644,6 +651,8 @@ const emit = defineEmits<{
   open: [input: ModelRequestRecordQuery]
   trajectory: [input: ModelRequestTrajectoryQuery]
   clear: [input: ClearModelRequestRecordsQuery]
+  consumeNavigationIntent: [seq: number]
+  navigationIntentFailure: [payload: { seq: number, message: string }]
 }>()
 
 const category = ref<'all' | 'space' | 'unattributed'>('all')
@@ -659,6 +668,9 @@ const detailView = ref<'trajectory' | 'evidence'>('evidence')
 const clearDialogOpen = ref(false)
 const clearStep = ref<1 | 2>(1)
 const bodyView = ref<'request' | 'response' | 'analysis'>('request')
+const externalLocateRequest = ref<LocateRequest>()
+const navigationStatus = ref('')
+const presetNavigation = createPresetNavigationCoordinator()
 const conversationTrajectory = computed(() => props.trajectory?.mode === 'conversation' ? props.trajectory : undefined)
 const requestTrajectory = computed(() => props.trajectory?.mode === 'request' ? props.trajectory : undefined)
 const responseView = ref<'content' | 'json'>('content')
@@ -818,8 +830,60 @@ watch(() => props.visitKey, () => {
   enterRefresh.schedule()
 })
 
+watch(() => props.navigationIntent?.seq, () => {
+  applyNavigationIntent()
+}, { immediate: true })
+
+watch([() => props.detail?.id, () => props.trajectory], () => {
+  prepareNavigationIntent()
+})
+
 function currentScope() {
   return resolveModelRequestScope(category.value, spaceId.value)
+}
+
+function applyNavigationIntent() {
+  const intent = props.navigationIntent
+  if (!intent) return
+  presetNavigation.begin(intent)
+  externalLocateRequest.value = undefined
+  navigationStatus.value = '正在打开匹配的模型请求并定位精确文本…'
+  category.value = 'space'
+  spaceId.value = intent.scope.scope === 'main' ? MAIN_MODEL_REQUEST_SPACE_ID : intent.scope.spaceId
+  model.value = ''
+  errorsOnly.value = false
+  selectedRecordId.value = intent.recordId
+  detailView.value = 'evidence'
+  bodyView.value = 'analysis'
+  const scope = intent.scope.scope === 'main'
+    ? createSpaceModelRequestScope(MAIN_MODEL_REQUEST_SPACE_ID)
+    : createSpaceModelRequestScope(intent.scope.spaceId)
+  emit('query', createModelRequestRecordsQuery(scope, { order: sortOrder.value }))
+  emit('open', { ...scope, recordId: intent.recordId })
+  emit('trajectory', { ...scope, recordId: intent.recordId, mode: 'request' })
+  prepareNavigationIntent()
+}
+
+function prepareNavigationIntent() {
+  const request = presetNavigation.prepare(props.detail, props.trajectory)
+  if (!request) return
+  detailView.value = 'evidence'
+  bodyView.value = 'analysis'
+  externalLocateRequest.value = request
+}
+
+function completeNavigationIntent(result: { seq: number, located: boolean }) {
+  const acknowledged = presetNavigation.acknowledge(result.seq, result.located)
+  if (!acknowledged) return
+  externalLocateRequest.value = undefined
+  navigationStatus.value = result.located ? '已定位到预设表达式对应的精确文本。' : ''
+  emit('consumeNavigationIntent', result.seq)
+  if (!result.located) {
+    emit('navigationIntentFailure', {
+      seq: result.seq,
+      message: '已打开匹配的模型请求，但无法定位精确文本标记。',
+    })
+  }
 }
 
 function emitQuery(limit = MODEL_REQUEST_PAGE_SIZE) {

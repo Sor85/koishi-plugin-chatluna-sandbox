@@ -1,0 +1,146 @@
+import { describe, expect, it } from 'vitest'
+import { createPresetDirtyGuard } from '../client/webqq/preset-dirty-guard'
+import { resolvePresetEvidenceBots } from '../client/webqq/preset-evidence-context'
+import { createPresetNavigationCoordinator } from '../client/webqq/preset-navigation-coordinator'
+import { codeMirrorOffset, resolvePresetSourceExpressions } from '../client/webqq/preset-source-expressions'
+import { expressionStableId, parsePresetSourceDocument } from '../src/presets'
+import type { SandboxBotProfile, SandboxConversation } from '../src/types'
+
+const bot = (id: string, name: string): SandboxBotProfile => ({
+  kind: 'bot',
+  id,
+  name,
+  enabled: true,
+  implementation: 'napcat',
+})
+
+const directConversation: SandboxConversation = {
+  id: 'private:10001:20001',
+  type: 'direct',
+  participantIds: ['10001', '20001'],
+  messageIds: [],
+}
+
+describe('预设客户端 UX 纯 seam', () => {
+  it('把 CRLF 原始源码范围转换成 CodeMirror 的 LF 文档范围', () => {
+    const source = 'input: |-\r\n  first\r\n  天气:{weather}\r\n'
+    const start = source.indexOf('{weather}')
+    const end = start + '{weather}'.length
+    const normalized = source.replaceAll('\r\n', '\n')
+
+    expect(normalized.slice(codeMirrorOffset(source, start), codeMirrorOffset(source, end))).toBe('{weather}')
+  })
+
+  it('源码未修改时沿用服务端表达式身份，并保留值表达式点击能力', () => {
+    const source = `system: Hello {name}\ninput: '{if ready}{prompt}{/if}'\n`
+    const serverExpressions = parsePresetSourceDocument('character', source).expressions.map((expression) => ({
+      ...expression,
+      stableId: expressionStableId(expression),
+    }))
+
+    const expressions = resolvePresetSourceExpressions({
+      kind: 'character',
+      source,
+      loadedSource: source,
+      serverExpressions,
+    })
+
+    expect(expressions).toBe(serverExpressions)
+    expect(expressions.map(({ kind, clickable, stableId }) => ({ kind, clickable, stableId }))).toEqual([
+      { kind: 'value', clickable: true, stableId: '["system"]#0' },
+      { kind: 'control', clickable: false, stableId: '["input"]#0' },
+      { kind: 'value', clickable: true, stableId: '["input"]#1' },
+      { kind: 'control', clickable: false, stableId: '["input"]#2' },
+    ])
+  })
+
+  it('源码修改后按当前 YAML 重算值与控制范围，但全部禁用点击且不制造服务端身份', () => {
+    const loadedSource = `system: Hello {old}\ninput: '{if ready}{oldPrompt}{/if}'\n`
+    const source = `system: "Hello {{escaped}} {newName}"\ninput: |-\n  {if ready}{newPrompt}{/if}\n`
+    const serverExpressions = parsePresetSourceDocument('character', loadedSource).expressions.map((expression) => ({
+      ...expression,
+      stableId: expressionStableId(expression),
+    }))
+
+    const expressions = resolvePresetSourceExpressions({
+      kind: 'character',
+      source,
+      loadedSource,
+      serverExpressions,
+    })
+
+    expect(expressions.map((expression) => ({
+      text: source.slice(expression.range.start, expression.range.end),
+      kind: expression.kind,
+      clickable: expression.clickable,
+      stableId: expression.stableId,
+    }))).toEqual([
+      { text: '{newName}', kind: 'value', clickable: false, stableId: undefined },
+      { text: '{if ready}', kind: 'control', clickable: false, stableId: undefined },
+      { text: '{newPrompt}', kind: 'value', clickable: false, stableId: undefined },
+      { text: '{/if}', kind: 'control', clickable: false, stableId: undefined },
+    ])
+  })
+
+  it('私聊证据机器人候选包含逻辑会话中的所有机器人，包括当前操作者机器人', () => {
+    expect(resolvePresetEvidenceBots(directConversation, undefined, [bot('20001', 'Koishi')]))
+      .toEqual([{ id: '20001', name: 'Koishi' }])
+
+    expect(resolvePresetEvidenceBots({
+      ...directConversation,
+      participantIds: ['20001', '20002'],
+    }, undefined, [bot('20001', 'Koishi'), bot('20002', '助手')]))
+      .toEqual([{ id: '20001', name: 'Koishi' }, { id: '20002', name: '助手' }])
+  })
+
+  it('脏状态统一拦截操作，只有显式丢弃才返回待执行动作', () => {
+    const guard = createPresetDirtyGuard()
+    guard.update(true)
+
+    expect(guard.request({ action: 'create' })).toBe(false)
+    expect(guard.peek().pending).toEqual({ action: 'create' })
+    guard.cancel()
+    expect(guard.peek()).toEqual({ dirty: true })
+
+    expect(guard.request({ action: 'leave', targetView: 'messages', conversationId: 'private:1:2' })).toBe(false)
+    expect(guard.discard()).toEqual({ action: 'leave', targetView: 'messages', conversationId: 'private:1:2' })
+    expect(guard.peek()).toEqual({ dirty: false })
+    expect(guard.request({ action: 'delete' })).toBe(true)
+  })
+
+  it('详情与 request 轨迹必须都属于目标记录，且只在精确定位回执后结束意图', () => {
+    const coordinator = createPresetNavigationCoordinator()
+    coordinator.begin({
+      seq: 4,
+      recordId: 'record-new',
+      evidenceId: 'req:message:messages.0',
+      range: { start: 2, end: 7 },
+      scope: { scope: 'main' },
+    })
+
+    expect(coordinator.prepare(
+      { id: 'record-new' },
+      { mode: 'request', records: [{ id: 'record-old' }] as never },
+    )).toBeUndefined()
+    expect(coordinator.prepare(
+      { id: 'record-old' },
+      { mode: 'request', records: [{ id: 'record-new' }] as never },
+    )).toBeUndefined()
+    expect(coordinator.prepare(
+      { id: 'record-new' },
+      { mode: 'request', records: [{ id: 'record-new' }] as never },
+    )).toEqual({
+      seq: 4,
+      evidenceId: 'req:message:messages.0',
+      range: { start: 2, end: 7 },
+    })
+    expect(coordinator.prepare(
+      { id: 'record-new' },
+      { mode: 'request', records: [{ id: 'record-new' }] as never },
+    )).toBeUndefined()
+    expect(coordinator.acknowledge(3, true)).toBeUndefined()
+    expect(coordinator.peek()?.recordId).toBe('record-new')
+    expect(coordinator.acknowledge(4, false)).toMatchObject({ located: false, intent: { seq: 4 } })
+    expect(coordinator.peek()).toBeUndefined()
+  })
+})

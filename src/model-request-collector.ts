@@ -2,7 +2,7 @@ import { createRequire } from 'node:module'
 import diagnosticsChannel from 'node:diagnostics_channel'
 import { resolve } from 'node:path'
 import { createModelRequestError, type SandboxModelRequestStore } from './model-request'
-import type { SandboxModelRequestAttribution, SandboxModelRequestEntities } from './types'
+import type { SandboxModelRequestAttribution, SandboxModelRequestEntities, SandboxPresetRuntimeSnapshot } from './types'
 
 export interface ChatLunaPluginLike {
   prototype: {
@@ -86,6 +86,7 @@ export interface InstallModelRequestCollectorOptions {
   baseDir?: string
   unattributed: SandboxModelRequestStore
   getCandidates: () => ModelRequestAttributionCandidate[]
+  getActivePresetSnapshots?: (entities: SandboxModelRequestEntities) => SandboxPresetRuntimeSnapshot[]
 }
 
 interface CloneableModelResponse {
@@ -184,6 +185,12 @@ export function installModelRequestCollector(options: InstallModelRequestCollect
       : options.unattributed
     const startedAt = Date.now()
     const configuredHeaders = readRequestHeaders(info, init)
+    const presetSnapshots = resolved.attribution === 'attributed'
+      && resolved.entities.scopeId
+      && resolved.entities.botId
+      && resolved.entities.conversationId
+      ? options.getActivePresetSnapshots?.(resolved.entities)
+      : undefined
     const pending = store.append({
       status: 'pending',
       durationMs: 0,
@@ -196,6 +203,7 @@ export function installModelRequestCollector(options: InstallModelRequestCollect
       entities: resolved.entities,
       requestBodyAvailable: body.available,
       ...(body.available ? { requestBody: body.value } : {}),
+      ...(presetSnapshots?.length ? { presetSnapshots } : {}),
       responseBodyStatus: 'pending',
     })
     // init.headers 只是调用方配置；Accept、User-Agent、Content-Length 等由 Undici

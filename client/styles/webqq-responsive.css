@@ -111,6 +111,7 @@
   .webqq-workspace[data-mobile-view="messages"] .chatluna-sandbox-chat,
   .webqq-workspace[data-mobile-view="debug"] .chatluna-sandbox-chat,
   .webqq-workspace[data-mobile-view="model-requests"] .chatluna-sandbox-chat,
+  .webqq-workspace[data-mobile-view="presets"] .chatluna-sandbox-chat,
   .webqq-workspace[data-mobile-view="profile"] .chatluna-sandbox-chat {
     display: flex;
   }
@@ -140,7 +141,8 @@
   }
 
   .webqq-workspace[data-mobile-view="debug"] .chatluna-sandbox-chat,
-  .webqq-workspace[data-mobile-view="model-requests"] .chatluna-sandbox-chat {
+  .webqq-workspace[data-mobile-view="model-requests"] .chatluna-sandbox-chat,
+  .webqq-workspace[data-mobile-view="presets"] .chatluna-sandbox-chat {
     display: grid;
   }
 

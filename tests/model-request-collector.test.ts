@@ -166,6 +166,45 @@ describe('模型请求采集', () => {
     })
   })
 
+  it('仅在请求唯一归属时于派发时复制活动预设快照', async () => {
+    const unattributed = new SandboxModelRequestStore()
+    const attributed = new SandboxModelRequestStore()
+    const snapshot = {
+      kind: 'character' as const,
+      presetName: 'alice',
+      capturedAt: '2026-01-01T00:00:00.000Z',
+      source: 'system: System {status}\ninput: Input {prompt}\n',
+      templates: [
+        { path: ['system'] as const, role: 'system' as const, template: 'System {status}' },
+        { path: ['input'] as const, role: 'user' as const, template: 'Input {prompt}' },
+      ],
+    }
+    const plugin = createFakePlugin(async () => ({ ok: true, status: 200 }))
+    disposers.push(installModelRequestCollector({
+      plugin,
+      unattributed,
+      getCandidates: () => [{
+        scopeId: 'space-a',
+        store: attributed,
+        thinking: [{ botId: '21001', conversationId: 'private:11001:21001' }],
+      }],
+      getActivePresetSnapshots: (entities) => entities.botId === '21001' ? [snapshot] : [],
+    }))
+
+    await plugin.fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', body: chatBody() })
+    snapshot.templates[0]!.template = 'mutated after dispatch'
+
+    const record = attributed.getRecord(attributed.getRecords().records[0]!.id)
+    expect(record?.presetSnapshots).toMatchObject([{
+      kind: 'character',
+      presetName: 'alice',
+      templates: [{ template: 'System {status}' }, { template: 'Input {prompt}' }],
+    }])
+    expect(attributed.getRecords().records[0]?.presetSnapshotSummaries).toEqual([{
+      kind: 'character', presetName: 'alice', capturedAt: snapshot.capturedAt, templateCount: 2,
+    }])
+  })
+
   it('记录 Undici 实际派发的完整请求头，而不只记录 init.headers', async () => {
     const server = createServer((_request, response) => {
       response.setHeader('content-type', 'application/json')

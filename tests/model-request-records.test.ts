@@ -3,7 +3,15 @@ import {
   SandboxModelRequestStore,
   createModelRequestError,
 } from '../src/model-request'
-import { SandboxModelRequestCursorExpiredError } from '../src/types'
+import { SandboxModelRequestCursorExpiredError, type SandboxPresetRuntimeSnapshot } from '../src/types'
+
+const presetSnapshot: SandboxPresetRuntimeSnapshot = {
+  kind: 'core',
+  presetName: 'demo',
+  capturedAt: '2026-01-01T00:00:00.000Z',
+  source: 'prompts:\n  - role: system\n    content: Hello {name}.\n',
+  templates: [{ path: ['prompts', 0, 'content'], role: 'system', template: 'Hello {name}.' }],
+}
 
 function appendRecord(
   store: SandboxModelRequestStore,
@@ -51,6 +59,18 @@ describe('模型请求记录库', () => {
       responseBodyRaw: JSON.stringify({ choices: [{ message: { content: 'hello' } }] }),
       summary: { messageCount: 1, toolCount: 1, bodyAvailable: true },
     })
+  })
+
+  it('列表只暴露预设快照摘要，详情与持久记录保留完整模板源码', () => {
+    const store = new SandboxModelRequestStore()
+    const created = appendRecord(store, { presetSnapshots: [presetSnapshot] })
+
+    expect(store.getRecords().records[0]).toMatchObject({
+      presetSnapshotSummaries: [{ kind: 'core', presetName: 'demo', templateCount: 1, capturedAt: presetSnapshot.capturedAt }],
+    })
+    expect(JSON.stringify(store.getRecords().records[0])).not.toContain('Hello {name}')
+    expect(store.getRecord(created.id)?.presetSnapshots).toEqual([presetSnapshot])
+    expect(store.getRawRecords()[0]?.presetSnapshots).toEqual([presetSnapshot])
   })
 
   it('按 Gemini generateContent 结构统计消息和函数声明工具', () => {

@@ -1,0 +1,303 @@
+.chatluna-sandbox-chat.webqq-preset-workspace {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.webqq-preset-header,
+.webqq-preset-document-header,
+.webqq-preset-editor-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.webqq-preset-header {
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--webqq-border);
+}
+
+.webqq-preset-header h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.webqq-preset-header p,
+.webqq-preset-document-header p {
+  margin: 4px 0 0;
+  color: var(--webqq-muted);
+  font-size: 12px;
+}
+
+.webqq-preset-header-actions,
+.webqq-preset-document-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.webqq-preset-error,
+.webqq-preset-diagnostics {
+  margin: 0;
+  padding: 10px 22px;
+  border-bottom: 1px solid var(--webqq-border);
+  color: var(--webqq-danger, #b91c1c);
+  background: color-mix(in srgb, var(--webqq-danger, #dc2626) 8%, transparent);
+}
+
+.webqq-preset-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  min-height: 0;
+}
+
+.webqq-preset-list-pane,
+.webqq-preset-editor-pane {
+  min-width: 0;
+  min-height: 0;
+}
+
+.webqq-preset-list-pane {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  border-right: 1px solid var(--webqq-border);
+}
+
+.webqq-preset-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid var(--webqq-border);
+}
+
+.webqq-preset-search > svg {
+  flex: none;
+  color: var(--webqq-muted);
+}
+
+.webqq-preset-groups {
+  overflow: auto;
+  padding: 8px;
+}
+
+.webqq-preset-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.webqq-preset-group > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  color: var(--webqq-muted);
+  font-size: 12px;
+}
+
+.webqq-preset-list-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  border-radius: 8px;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+}
+
+.webqq-preset-list-item:hover,
+.webqq-preset-list-item.is-active {
+  background: color-mix(in srgb, var(--webqq-accent) 10%, transparent);
+}
+
+.webqq-preset-list-item.is-active {
+  box-shadow: inset 3px 0 var(--webqq-accent);
+}
+
+.webqq-preset-list-item span {
+  display: grid;
+  min-width: 0;
+}
+
+.webqq-preset-list-item strong,
+.webqq-preset-list-item small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webqq-preset-list-item small,
+.webqq-preset-list-item time {
+  color: var(--webqq-muted);
+  font-size: 11px;
+}
+
+.webqq-preset-editor-pane {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+.webqq-preset-document-header,
+.webqq-preset-editor-footer {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--webqq-border);
+}
+
+.webqq-preset-document-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.webqq-preset-save-status {
+  color: var(--webqq-muted);
+  font-size: 12px;
+}
+
+.webqq-preset-save-status[data-status="dirty"],
+.webqq-preset-save-status[data-status="error"] {
+  color: var(--webqq-danger, #b91c1c);
+}
+
+.webqq-preset-diagnostics {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.webqq-preset-diagnostics p {
+  margin: 0;
+  font-size: 12px;
+}
+
+.webqq-preset-source-editor {
+  min-height: 0;
+  overflow: hidden;
+  background: var(--webqq-bg);
+}
+
+.webqq-preset-source-editor .cm-editor {
+  height: 100%;
+  color: var(--webqq-text);
+  background: transparent;
+}
+
+.webqq-preset-source-editor .cm-scroller {
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.webqq-preset-source-editor .cm-gutters {
+  color: var(--webqq-muted);
+  background: color-mix(in srgb, var(--webqq-bg) 92%, var(--webqq-text));
+  border-right-color: var(--webqq-border);
+}
+
+.webqq-preset-source-editor .cm-activeLine,
+.webqq-preset-source-editor .cm-activeLineGutter {
+  background: color-mix(in srgb, var(--webqq-accent) 7%, transparent);
+}
+
+.webqq-preset-expression {
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+.webqq-preset-expression.is-control {
+  color: var(--webqq-muted);
+  background: color-mix(in srgb, var(--webqq-muted) 12%, transparent);
+  text-decoration: underline dotted;
+}
+
+.webqq-preset-expression.is-value {
+  color: var(--webqq-accent);
+  background: color-mix(in srgb, var(--webqq-accent) 12%, transparent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.webqq-preset-expression.is-value:hover {
+  background: color-mix(in srgb, var(--webqq-accent) 20%, transparent);
+}
+
+.webqq-preset-editor-footer {
+  border-top: 1px solid var(--webqq-border);
+  border-bottom: 0;
+}
+
+.webqq-preset-editor-footer p {
+  margin: 0;
+  color: var(--webqq-muted);
+  font-size: 12px;
+}
+
+.webqq-preset-editor-footer p.is-error {
+  color: var(--webqq-danger, #b91c1c);
+}
+
+.webqq-preset-empty {
+  padding: 20px;
+  color: var(--webqq-muted);
+  text-align: center;
+}
+
+.webqq-preset-empty.is-editor {
+  display: grid;
+  place-items: center;
+  height: 100%;
+}
+
+.webqq-preset-dialog-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.webqq-preset-dialog-fields label,
+label.webqq-preset-dialog-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+@media (max-width: 900px) {
+  .webqq-preset-layout {
+    grid-template-columns: minmax(190px, 34%) minmax(0, 1fr);
+  }
+
+  .webqq-preset-document-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 640px) {
+  .webqq-preset-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .webqq-preset-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(160px, 34%) minmax(0, 1fr);
+  }
+
+  .webqq-preset-list-pane {
+    border-right: 0;
+    border-bottom: 1px solid var(--webqq-border);
+  }
+
+  .webqq-preset-document-actions {
+    width: 100%;
+  }
+}

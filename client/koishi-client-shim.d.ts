@@ -37,6 +37,17 @@ declare module '@koishijs/client' {
   } from '../src/types'
   import type { SandboxMcpScope } from '../src/mcp/types'
   import type { SandboxTestSpaceSummary } from '../src/test-spaces'
+  import type {
+    CreatePresetInput,
+    DeletePresetInput,
+    LocateSandboxPresetExpressionInput,
+    LocateSandboxPresetExpressionResult,
+    PresetDocumentKind,
+    ReadSandboxPresetInput,
+    RenamePresetInput,
+    SandboxPresetDocument,
+    SavePresetInput,
+  } from '../src/presets'
 
   type SpaceScoped<Input> = Input & { spaceId?: string }
 
@@ -78,6 +89,13 @@ declare module '@koishijs/client' {
   export function send(event: 'chatluna-sandbox/model-request-record', input: GetSandboxModelRequestRecordInput & SandboxModelRequestScope): Promise<SandboxModelRequestDetail>
   export function send(event: 'chatluna-sandbox/model-request-trajectory', input: GetSandboxModelRequestRecordInput & SandboxModelRequestScope & { mode: 'request' | 'conversation' }): Promise<SandboxModelRequestTrajectory>
   export function send(event: 'chatluna-sandbox/clear-model-request-records', input: SandboxModelRequestScope): Promise<ClearSandboxModelRequestRecordsResult>
+  export function send(event: 'chatluna-sandbox/preset-catalog', input?: { kind?: PresetDocumentKind }): Promise<SandboxPresetDocument[]>
+  export function send(event: 'chatluna-sandbox/preset-read', input: ReadSandboxPresetInput): Promise<SandboxPresetDocument>
+  export function send(event: 'chatluna-sandbox/preset-create', input: CreatePresetInput): Promise<SandboxPresetDocument>
+  export function send(event: 'chatluna-sandbox/preset-save', input: SavePresetInput): Promise<SandboxPresetDocument>
+  export function send(event: 'chatluna-sandbox/preset-rename', input: RenamePresetInput): Promise<SandboxPresetDocument>
+  export function send(event: 'chatluna-sandbox/preset-delete', input: DeletePresetInput): Promise<{ deleted: true }>
+  export function send(event: 'chatluna-sandbox/preset-locate-expression', input: LocateSandboxPresetExpressionInput): Promise<LocateSandboxPresetExpressionResult>
   export function send(event: 'chatluna-sandbox/mcp-credentials'): Promise<Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }>>
   export function send(event: 'chatluna-sandbox/create-mcp-credential', input: { name: string; scopes: SandboxMcpScope[] }): Promise<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }>
   export function send(event: 'chatluna-sandbox/update-mcp-credential', input: { id: string; name?: string; scopes?: SandboxMcpScope[] }): Promise<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }>

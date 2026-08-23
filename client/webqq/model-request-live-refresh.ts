@@ -30,8 +30,10 @@ export function createModelRequestEnterRefresh(refresh: () => void) {
 // 也会在用户回来时覆盖正在翻看的分页。可见且开关仍开时再恢复，而不是重新打开开关。
 export function createModelRequestLiveRefresh(options: ModelRequestLiveRefreshOptions) {
   const intervalMs = options.intervalMs ?? MODEL_REQUEST_LIVE_REFRESH_INTERVAL_MS
-  const schedule = options.setInterval ?? setInterval
-  const cancel = options.clearInterval ?? clearInterval
+  const schedule: NonNullable<ModelRequestLiveRefreshOptions['setInterval']> = options.setInterval
+    ?? ((handler, timeout) => globalThis.setInterval(handler, timeout))
+  const cancel: NonNullable<ModelRequestLiveRefreshOptions['clearInterval']> = options.clearInterval
+    ?? ((id) => globalThis.clearInterval(id))
   let timer: ReturnType<typeof setInterval> | undefined
 
   function sync() {

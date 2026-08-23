@@ -448,6 +448,30 @@ export interface SandboxModelRequestEntities {
   conversationId?: string
 }
 
+export type SandboxPresetDocumentKind = 'core' | 'character'
+export type SandboxPresetTemplateRole = 'system' | 'user' | 'assistant' | 'tool'
+
+export interface SandboxPresetRuntimeTemplate {
+  path: readonly (string | number)[]
+  role: SandboxPresetTemplateRole
+  template: string
+}
+
+export interface SandboxPresetRuntimeSnapshot {
+  kind: SandboxPresetDocumentKind
+  presetName: string
+  capturedAt: string
+  source?: string
+  templates: readonly SandboxPresetRuntimeTemplate[]
+}
+
+export interface SandboxPresetRuntimeSnapshotSummary {
+  kind: SandboxPresetDocumentKind
+  presetName: string
+  capturedAt: string
+  templateCount: number
+}
+
 export interface SandboxModelRequestSummary {
   keys: number
   messageCount: number
@@ -490,12 +514,14 @@ export interface SandboxModelRequestRecord {
   responseBodyError?: string
   interactionId?: string
   chatlunaRequestId?: string
+  presetSnapshots?: readonly SandboxPresetRuntimeSnapshot[]
   usage?: SandboxModelRequestUsage
   error?: SandboxModelRequestError
   chatlunaError?: SandboxChatLunaRequestError
 }
 
-export type SandboxModelRequestListItem = Omit<SandboxModelRequestRecord, 'requestBody' | 'responseBodyRaw'> & {
+export type SandboxModelRequestListItem = Omit<SandboxModelRequestRecord, 'requestBody' | 'responseBodyRaw' | 'presetSnapshots'> & {
+  presetSnapshotSummaries?: readonly SandboxPresetRuntimeSnapshotSummary[]
   summary: SandboxModelRequestSummary
 }
 export type SandboxModelRequestDetail = SandboxModelRequestRecord & { summary: SandboxModelRequestSummary }

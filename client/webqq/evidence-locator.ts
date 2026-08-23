@@ -6,6 +6,12 @@ import {
   type ModelRequestAnalysisNavigation,
 } from './model-request-analysis'
 import type { ModelRequestConversation } from './model-request-conversation'
+import {
+  modelRequestOccurrenceTargetId,
+  resolveModelRequestOccurrence,
+  type ModelRequestOccurrence,
+  type ModelTextRange,
+} from './model-request-occurrence'
 
 /**
  * 证据定位：跳到一条原始模型证据，展开它所在的卡片，并在长文本折叠后保持对齐。
@@ -24,6 +30,8 @@ import type { ModelRequestConversation } from './model-request-conversation'
 export interface LocateRequest {
   evidenceId: string
   seq: number
+  /** 服务端匹配出的 occurrence 精确文本范围，使用 JavaScript/JSON 的 UTF-16 offset。 */
+  range?: ModelTextRange
 }
 
 /** 目标元素与滚动容器的布局读数。adapter 只交数字，不交元素。 */
@@ -36,6 +44,8 @@ export interface EvidenceMeasurement {
 export interface EvidenceLocatorAdapter {
   getConversation(): ModelRequestConversation
   getNavigation(): ModelRequestAnalysisNavigation
+  /** 让视图渲染已经由纯 module 验证过的 occurrence；不交 DOM。 */
+  setOccurrenceTarget(occurrence: ModelRequestOccurrence | undefined): void
   /** 唯一读取布局的出口。滚动容器的选择规则由视图持有，本 module 只做算术。 */
   measure(target: string): EvidenceMeasurement | undefined
   scrollTo(top: number, behavior: ScrollBehavior): void
@@ -73,6 +83,7 @@ export function createEvidenceLocator(adapter: EvidenceLocatorAdapter) {
   let cancelRelocateWindow: (() => void) | undefined
   let cancelHighlight: (() => void) | undefined
   let highlighted: string | undefined
+  let occurrenceTarget: string | undefined
 
   /**
    * 定位一个已经解析好的目标。
@@ -80,6 +91,15 @@ export function createEvidenceLocator(adapter: EvidenceLocatorAdapter) {
    * 返回实际定位到的目标；过期定位返回 undefined，调用方据此决定是否对外广播。
    */
   async function locate(target: string | undefined, options: EvidenceLocateOptions = {}): Promise<string | undefined> {
+    setOccurrence(undefined)
+    return locatePrepared(target, options)
+  }
+
+  async function locatePrepared(
+    target: string | undefined,
+    options: EvidenceLocateOptions = {},
+    requireMeasurement = false,
+  ): Promise<string | undefined> {
     if (!target) return undefined
     const current = ++generation
     const forcedTargets = prepareTarget(target)
@@ -93,6 +113,9 @@ export function createEvidenceLocator(adapter: EvidenceLocatorAdapter) {
     await adapter.frame()
     await adapter.frame()
     if (current !== generation) return undefined
+    // 普通证据定位保留“目标暂时测不到也算身份解析成功”的既有语义；
+    // 精确 occurrence 必须真的存在，缺失时不能伪装成成功或回落到卡片。
+    if (requireMeasurement && !adapter.measure(target)) return undefined
     scrollToTarget(target, 'smooth')
     watchRelocate(target, current)
     if (options.emphasize !== false) emphasize(target)
@@ -104,8 +127,28 @@ export function createEvidenceLocator(adapter: EvidenceLocatorAdapter) {
     return locate(resolveAnalysisEvidenceTarget(adapter.getNavigation(), evidenceId), options)
   }
 
+  /**
+   * 精确范围定位只接受请求消息正文。
+   * 先用纯 module 验证 evidence + UTF-16 range，再让视图渲染 occurrence target；
+   * 渲染后若 adapter 仍测不到该 target，则明确失败，不回落到消息卡片或其他位置。
+   */
+  async function locateOccurrence(evidenceId: string, range: ModelTextRange, options?: EvidenceLocateOptions) {
+    const occurrence = resolveModelRequestOccurrence(adapter.getConversation(), evidenceId, range)
+    if (!occurrence) {
+      setOccurrence(undefined)
+      return undefined
+    }
+    setOccurrence(occurrence)
+    const located = await locatePrepared(occurrence.target, options, true)
+    if (located) return located
+    // 后一次精确定位可能已经替换了 occurrence；旧请求失败时不能把新 mark 清掉。
+    if (occurrenceTarget === occurrence.target) setOccurrence(undefined)
+    return undefined
+  }
+
   /** 按工具名称定位到工具定义。同名工具定义证据不明确时展开全部匹配项。 */
   function locateTool(name: string, options?: EvidenceLocateOptions) {
+    setOccurrence(undefined)
     const location = resolveToolDefinitionLocation(adapter.getConversation(), name)
     if (!location) return Promise.resolve(undefined)
     for (const evidenceId of location.toolEvidenceIds) adapter.setToolExpanded(evidenceId)
@@ -124,13 +167,21 @@ export function createEvidenceLocator(adapter: EvidenceLocatorAdapter) {
     cancelHighlight?.()
     cancelHighlight = undefined
     highlighted = undefined
+    setOccurrence(undefined)
     adapter.setHighlight(undefined)
   }
 
   function dispose() {
+    generation += 1
     cancelHighlight?.()
     cancelHighlight = undefined
     stopRelocate()
+    setOccurrence(undefined)
+  }
+
+  function setOccurrence(occurrence: ModelRequestOccurrence | undefined) {
+    occurrenceTarget = occurrence?.target
+    adapter.setOccurrenceTarget(occurrence)
   }
 
   function prepareTarget(target: string): readonly string[] {
@@ -192,7 +243,7 @@ export function createEvidenceLocator(adapter: EvidenceLocatorAdapter) {
     })
   }
 
-  return { locate, locateEvidence, locateTool, reset, dispose }
+  return { locate, locateEvidence, locateOccurrence, locateTool, reset, dispose }
 }
 
 function targetScrollTop(measured: EvidenceMeasurement): number {
@@ -213,8 +264,11 @@ function prepareModelAnalysisTarget(
 ): EvidenceTargetPreparation {
   const message = conversation.messages.find(candidate => (
     modelAnalysisTargetId(candidate.evidenceId) === target
+    || modelRequestOccurrenceTargetId(candidate.evidenceId) === target
     || candidate.toolCalls.some(call => modelAnalysisTargetId(call.evidenceId) === target)
   ))
+  const messageTarget = message ? modelAnalysisTargetId(message.evidenceId) : undefined
+  const occurrence = Boolean(message && modelRequestOccurrenceTargetId(message.evidenceId) === target)
   const tool = conversation.tools.find(candidate => modelAnalysisTargetId(candidate.evidenceId) === target)
   const response = target === MODEL_ANALYSIS_RESPONSE_TARGET
     || Boolean(conversation.response && [
@@ -226,10 +280,11 @@ function prepareModelAnalysisTarget(
     response,
     toolEvidenceIds: tool ? [tool.evidenceId] : [],
     expandCards: [
-      ...(message ? [modelAnalysisTargetId(message.evidenceId)] : []),
+      ...(messageTarget ? [messageTarget] : []),
       ...(response ? [MODEL_ANALYSIS_RESPONSE_TARGET] : []),
     ],
-    expandTargets: [target],
+    // occurrence mark 自己负责测量；所属消息 target 负责驱动 AnalysisTextBlock 强制展开。
+    expandTargets: occurrence && messageTarget ? [messageTarget, target] : [target],
   }
 }
 

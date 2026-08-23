@@ -1837,6 +1837,24 @@
   color: inherit;
   background: color-mix(in srgb, #facc15 48%, transparent);
 }
+.webqq-model-analysis-section mark.webqq-model-analysis-occurrence {
+  padding: 1px 2px;
+  outline: 2px solid color-mix(in srgb, var(--webqq-accent) 72%, transparent);
+  outline-offset: 1px;
+  background: color-mix(in srgb, #facc15 68%, transparent);
+  scroll-margin-top: 12px;
+}
+.webqq-model-analysis-section mark.webqq-model-analysis-occurrence.is-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.35em;
+  margin: 0 1px;
+  padding: 0;
+  border-radius: 1px;
+  outline: 0;
+  background: var(--webqq-accent);
+  vertical-align: -0.28em;
+}
 .webqq-model-analysis-image {
   display: grid;
   justify-items: start;
