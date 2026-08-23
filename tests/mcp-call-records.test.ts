@@ -164,4 +164,26 @@ describe('MCP 测试调用记录', () => {
     expect(service.clearCallRecords()).toEqual({ cleared: all.records.length + 1 })
     expect(service.listCallRecords().records).toEqual([])
   })
+
+  it('支持按时间正序或倒序返回调用记录', async () => {
+    const { service, credential } = createService(['read', 'debug'])
+    await service.callTool(credential.token, 'get_server_info', {})
+    await service.callTool(credential.token, 'get_scene_snapshot', {})
+
+    expect(service.listCallRecords({ order: 'asc' }).records.map(({ tool }) => tool)).toEqual([
+      'get_server_info',
+      'get_scene_snapshot',
+    ])
+    expect(service.listCallRecords({ order: 'desc' }).records.map(({ tool }) => tool)).toEqual([
+      'get_scene_snapshot',
+      'get_server_info',
+    ])
+    const listed = await service.callTool(credential.token, 'list_mcp_call_records', { order: 'asc' }) as {
+      records: Array<{ tool: string }>
+    }
+    expect(listed.records.map(({ tool }) => tool)).toEqual([
+      'get_server_info',
+      'get_scene_snapshot',
+    ])
+  })
 })

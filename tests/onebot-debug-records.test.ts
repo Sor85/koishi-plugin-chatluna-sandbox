@@ -168,4 +168,43 @@ describe('OneBot 调试记录', () => {
       expect.objectContaining({ code: 'cursor_expired', earliestCursor: 2 }),
     )
   })
+
+  it('支持按时间正序或倒序返回调试记录', async () => {
+    const { control } = await createControl()
+    await control.bot.internal._request('get_status', {})
+    await control.bot.internal._request('get_login_info', {})
+
+    expect(control.getOneBotDebugRecords({ order: 'asc' }).records.map(({ requestedAction }) => requestedAction)).toEqual([
+      'get_status',
+      'get_login_info',
+    ])
+    expect(control.getOneBotDebugRecords({ order: 'desc' }).records.map(({ requestedAction }) => requestedAction)).toEqual([
+      'get_login_info',
+      'get_status',
+    ])
+  })
+
+  it('正序分页使用 beforeSequence 作为更晚记录的游标', async () => {
+    const { control } = await createControl()
+    await control.bot.internal._request('get_status', {})
+    await control.bot.internal._request('get_login_info', {})
+    await control.bot.internal._request('get_version_info', {})
+    await control.bot.internal._request('get_friend_list', {})
+
+    const firstPage = control.getOneBotDebugRecords({ limit: 2, order: 'asc' })
+    expect(firstPage.records.map(({ requestedAction, sequence }) => ({ requestedAction, sequence }))).toEqual([
+      { requestedAction: 'get_status', sequence: 1 },
+      { requestedAction: 'get_login_info', sequence: 2 },
+    ])
+    expect(firstPage.hasMore).toBe(true)
+    expect(firstPage.nextCursor).toBe(2)
+
+    await control.bot.internal._request('get_group_list', {})
+    const secondPage = control.getOneBotDebugRecords({ limit: 2, order: 'asc', beforeSequence: firstPage.nextCursor })
+    expect(secondPage.records.map(({ requestedAction, sequence }) => ({ requestedAction, sequence }))).toEqual([
+      { requestedAction: 'get_version_info', sequence: 3 },
+      { requestedAction: 'get_friend_list', sequence: 4 },
+    ])
+    expect(secondPage.hasMore).toBe(true)
+  })
 })

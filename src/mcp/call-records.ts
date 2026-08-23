@@ -11,6 +11,8 @@ export interface ListSandboxMcpCallRecordsInput {
   spaceId?: string
   testRunId?: string
   errorsOnly?: boolean
+  /** 按创建时间正序或倒序，默认倒序。 */
+  order?: 'asc' | 'desc'
 }
 
 export interface SandboxMcpCallRecordsPage {

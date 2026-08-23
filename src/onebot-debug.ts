@@ -133,6 +133,25 @@ function matchesActionFilter(record: SandboxOneBotDebugRecord, action: string): 
   return !!capability && (capability.action === action || capability.aliases?.includes(action) === true)
 }
 
+export function resolveOneBotDebugOrder(input: Pick<GetSandboxOneBotDebugRecordsInput, 'order'>): 'asc' | 'desc' {
+  return input.order === 'asc' ? 'asc' : 'desc'
+}
+
+function compareOneBotDebugSequence(left: number, right: number, order: 'asc' | 'desc'): number {
+  return order === 'asc' ? left - right : right - left
+}
+
+function isBeforeOneBotDebugPageCursor(
+  record: Pick<SandboxOneBotDebugRecord, 'sequence'>,
+  input: GetSandboxOneBotDebugRecordsInput,
+): boolean {
+  if (input.beforeSequence === undefined) return true
+  // 倒序向更早翻页，正序向更晚翻页；字段名沿用 beforeSequence，语义随 order 翻转。
+  return resolveOneBotDebugOrder(input) === 'asc'
+    ? record.sequence > input.beforeSequence
+    : record.sequence < input.beforeSequence
+}
+
 function estimateRecordBytes(record: SandboxOneBotDebugRecord): number {
   return Buffer.byteLength(JSON.stringify(record), 'utf8')
 }
@@ -298,16 +317,17 @@ export class SandboxOneBotDebugStore {
       }
     }
 
+    const order = resolveOneBotDebugOrder(input)
     const filtered = this.records.filter((record) => (
       (!input.botId || record.botId === input.botId)
       && (!input.direction || record.direction === input.direction)
       && (!input.action || matchesActionFilter(record, input.action))
       && (!input.requestedAction || record.requestedAction === input.requestedAction)
       && (!input.errorsOnly || record.status === 'error')
-      && (input.beforeSequence === undefined || record.sequence < input.beforeSequence)
+      && isBeforeOneBotDebugPageCursor(record, input)
     ))
-    // 新到旧稳定排序，插入新记录不影响既有 beforeSequence 窗口。
-    filtered.sort((left, right) => right.sequence - left.sequence)
+    // 按 sequence 稳定排序；插入新记录不影响既有 beforeSequence 窗口。
+    filtered.sort((left, right) => compareOneBotDebugSequence(left.sequence, right.sequence, order))
     const page = filtered.slice(0, limit)
     const hasMore = filtered.length > page.length
     return {

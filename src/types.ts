@@ -357,9 +357,11 @@ export interface GetSandboxOneBotDebugRecordsInput {
   /** 仅精确匹配插件实际请求名。 */
   requestedAction?: string
   errorsOnly?: boolean
+  /** 按创建时间正序或倒序，默认倒序。 */
+  order?: 'asc' | 'desc'
   /** 每页条数，默认 50，最大 200。 */
   limit?: number
-  /** 新到旧分页：仅返回 sequence 严格小于该值的记录。 */
+  /** 分页游标：倒序仅返回 sequence 更小的记录，正序仅返回 sequence 更大的记录。 */
   beforeSequence?: number
 }
 

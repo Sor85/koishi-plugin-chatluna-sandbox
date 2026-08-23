@@ -85,6 +85,8 @@ export function createWebqqWorkspaceShell(
   const modelRequestLoading = ref(false)
   const modelRequestDetailLoading = ref(false)
   const modelRequestError = ref('')
+  const debugVisitKey = ref(0)
+  const mcpCallVisitKey = ref(0)
   const modelRequestVisitKey = ref(0)
   const presetLoading = ref(false)
   const presetSaving = ref(false)
@@ -393,8 +395,8 @@ export function createWebqqWorkspaceShell(
     await workspaceController.load()
     // 视图会从本地偏好直接恢复为独立页，此路径不会触发侧栏点击处理器；
     // 必须在工作区恢复后主动读取，否则重启后的首屏会一直显示空状态。
-    if (currentView.value === 'debug') await loadOneBotDebugRecords()
-    if (currentView.value === 'mcp-calls') await loadMcpCallRecords()
+    if (currentView.value === 'debug') debugVisitKey.value += 1
+    if (currentView.value === 'mcp-calls') mcpCallVisitKey.value += 1
     if (currentView.value === 'presets') await loadPresetCatalog()
   })
 
@@ -620,8 +622,8 @@ export function createWebqqWorkspaceShell(
     if (!commit) return true
     if (view !== 'model-requests') clearPresetEvidenceReturn()
     workspaceController.selectView(view)
-    if (view === 'debug') void loadOneBotDebugRecords()
-    if (view === 'mcp-calls') void loadMcpCallRecords()
+    if (view === 'debug') debugVisitKey.value += 1
+    if (view === 'mcp-calls') mcpCallVisitKey.value += 1
     if (view === 'model-requests') modelRequestVisitKey.value += 1
     if (view === 'presets') void loadPresetCatalog()
     return true
@@ -1031,7 +1033,9 @@ export function createWebqqWorkspaceShell(
     deleteFriend,
     detailsPanelModel,
     detailsVisible,
+    debugVisitKey,
     debugWorkspaceModel,
+    mcpCallVisitKey,
     mcpCallWorkspaceModel,
     environmentModel,
     modelRequestVisitKey,

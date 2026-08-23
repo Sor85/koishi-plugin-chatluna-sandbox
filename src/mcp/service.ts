@@ -487,8 +487,9 @@ const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
       action: { type: 'string', description: '匹配规范 action，并覆盖能力矩阵声明的全部别名' },
       requestedAction: { type: 'string', description: '仅精确匹配插件实际请求名' },
       errorsOnly: { type: 'boolean' },
+      order: { type: 'string', enum: ['asc', 'desc'], description: '按创建时间正序或倒序，默认倒序' },
       limit: { type: 'number', description: '每页条数，默认 50，最大 200' },
-      beforeSequence: { type: 'number', description: '新到旧分页游标：仅返回 sequence 更小的记录' },
+      beforeSequence: { type: 'number', description: '分页游标：倒序仅返回 sequence 更小的记录，正序仅返回 sequence 更大的记录' },
     },
   },
   get_onebot_debug_record: {
@@ -546,6 +547,7 @@ const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
       spaceId: { type: 'string', description: '按测试调用记录中的空间筛选；省略时返回全部记录' },
       testRunId: { type: 'string' },
       errorsOnly: { type: 'boolean' },
+      order: { type: 'string', enum: ['asc', 'desc'], description: '按创建时间正序或倒序，默认倒序' },
     },
   },
   get_mcp_call_record: {
@@ -941,8 +943,7 @@ export class SandboxMcpService {
     const records = this.callRecords
       .filter((record) => matchesMcpCallRecordFilter(record, input))
       .map(toMcpCallRecordListItem)
-      .reverse()
-    return { records }
+    return { records: input.order === 'asc' ? records : records.reverse() }
   }
 
   getCallRecord(recordId: string): SandboxMcpCallRecord {
@@ -978,6 +979,7 @@ export class SandboxMcpService {
         spaceId: typeof args.spaceId === 'string' ? args.spaceId : undefined,
         testRunId: typeof args.testRunId === 'string' ? args.testRunId : undefined,
         errorsOnly: args.errorsOnly === true,
+        order: args.order === 'asc' ? 'asc' : args.order === 'desc' ? 'desc' : undefined,
       })
     }
     if (tool === 'get_mcp_call_record') return this.getCallRecord(requireString(args.recordId, 'recordId'))
@@ -1030,6 +1032,7 @@ export class SandboxMcpService {
           action: typeof args.action === 'string' ? args.action : undefined,
           requestedAction: typeof args.requestedAction === 'string' ? args.requestedAction : undefined,
           errorsOnly: args.errorsOnly === true ? true : undefined,
+          order: args.order === 'asc' ? 'asc' : args.order === 'desc' ? 'desc' : undefined,
           limit: typeof args.limit === 'number' ? args.limit : undefined,
           beforeSequence: typeof args.beforeSequence === 'number' ? args.beforeSequence : undefined,
         })

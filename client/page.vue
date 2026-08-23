@@ -55,6 +55,7 @@
           :loading="debugWorkspaceModel.loading"
           :detail-loading="debugWorkspaceModel.detailLoading"
           :error="debugWorkspaceModel.error"
+          :visit-key="debugVisitKey"
           @query="loadOneBotDebugRecords"
           @open="loadOneBotDebugRecord"
           @clear="clearOneBotDebugRecords"
@@ -66,6 +67,7 @@
           :loading="mcpCallWorkspaceModel.loading"
           :detail-loading="mcpCallWorkspaceModel.detailLoading"
           :error="mcpCallWorkspaceModel.error"
+          :visit-key="mcpCallVisitKey"
           @query="loadMcpCallRecords"
           @open="loadMcpCallRecord"
           @clear="clearMcpCallRecords"
@@ -229,7 +231,9 @@ const {
   deleteFriend,
   detailsPanelModel,
   detailsVisible,
+  debugVisitKey,
   debugWorkspaceModel,
+  mcpCallVisitKey,
   mcpCallWorkspaceModel,
   modelRequestVisitKey,
   modelRequestWorkspaceModel,

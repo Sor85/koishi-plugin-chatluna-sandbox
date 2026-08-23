@@ -106,6 +106,12 @@ describe('OneBot 调试 Console 协议', () => {
         { requestedAction: 'main-action', source: { type: 'main', name: '主环境' } },
       ],
     })
+    expect(await listeners.get('chatluna-sandbox/debug-records')?.({ order: 'asc' })).toMatchObject({
+      records: [
+        { requestedAction: 'main-action', source: { type: 'main', name: '主环境' } },
+        { requestedAction: 'space-event', source: { type: 'test-space', spaceId: first.id, name: '空间 A' } },
+      ],
+    })
     expect(await listeners.get('chatluna-sandbox/debug-records')?.({ spaceId: first.id })).toMatchObject({
       records: [
         { requestedAction: 'space-event', source: { type: 'test-space', spaceId: first.id, name: '空间 A' } },

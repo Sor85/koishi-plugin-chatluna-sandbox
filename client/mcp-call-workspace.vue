@@ -6,7 +6,11 @@
         <p>查看外部测试控制器的工具调用</p>
       </div>
       <div class="webqq-mcp-call-actions">
-        <Button variant="outline" :disabled="loading" @click="applyFilters">
+        <label class="webqq-mcp-call-live">
+          <Switch v-model="liveRefresh" aria-label="自动刷新" />
+          <span>自动刷新</span>
+        </label>
+        <Button variant="outline" :disabled="loading" @click="refresh">
           <IconRefresh :size="16" aria-hidden="true" />
           刷新
         </Button>
@@ -23,6 +27,16 @@
         <header class="webqq-mcp-call-list-toolbar">
           <h2>调用列表</h2>
           <div class="webqq-mcp-call-list-tools">
+            <button
+              type="button"
+              class="webqq-mcp-call-sort"
+              :aria-label="sortOrder === 'asc' ? '当前按时间正序，点击改为倒序' : '当前按时间倒序，点击改为正序'"
+              @click="toggleSortOrder"
+            >
+              {{ sortOrder === 'asc' ? '按时间正序' : '按时间倒序' }}
+              <IconChevronUp v-if="sortOrder === 'asc'" :size="16" aria-hidden="true" />
+              <IconChevronDown v-else :size="16" aria-hidden="true" />
+            </button>
             <Popover v-model:open="filterOpen">
               <PopoverTrigger as-child>
                 <Button
@@ -70,7 +84,7 @@
         <div v-else-if="!records.length" class="webqq-mcp-call-empty">暂无符合条件的 MCP 调用记录</div>
         <div v-else v-webqq-scrollbar class="webqq-mcp-call-list">
           <button
-            v-for="item in records"
+            v-for="item in orderedRecords"
             :key="item.id"
             type="button"
             class="webqq-mcp-call-item"
@@ -197,6 +211,8 @@ import {
   IconBox,
   IconBraces,
   IconCalendarTime,
+  IconChevronDown,
+  IconChevronUp,
   IconClock,
   IconFilter,
   IconKey,
@@ -205,14 +221,16 @@ import {
   IconTrash,
   IconWorld,
 } from '@tabler/icons-vue'
-import { computed, ref, watch } from 'vue'
+import { computed, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
 import { Checkbox } from './components/ui/checkbox'
 import { Input } from './components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover'
+import { Switch } from './components/ui/switch'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import { formatDuration } from './webqq/format-duration'
+import { createModelRequestEnterRefresh, createModelRequestLiveRefresh } from './webqq/model-request-live-refresh'
 import type { ListSandboxMcpCallRecordsInput } from '../src/mcp/call-records'
 import type { SandboxMcpCallRecord, SandboxMcpCallRecordListItem } from '../src/mcp/types'
 
@@ -222,6 +240,7 @@ const props = defineProps<{
   loading: boolean
   detailLoading: boolean
   error: string
+  visitKey?: number
 }>()
 const emit = defineEmits<{
   query: [input: ListSandboxMcpCallRecordsInput]
@@ -234,8 +253,17 @@ const credentialName = ref('')
 const spaceId = ref('')
 const testRunId = ref('')
 const errorsOnly = ref(false)
+const sortOrder = ref<'asc' | 'desc'>('desc')
+const liveRefresh = ref(false)
 const filterOpen = ref(false)
 const selectedRecordId = computed(() => props.detail?.id)
+const orderedRecords = computed(() => orderRecordsByTime(props.records, sortOrder.value))
+const liveRefreshController = createModelRequestLiveRefresh({
+  isEnabled: () => liveRefresh.value,
+  isVisible: () => typeof document === 'undefined' || document.visibilityState === 'visible',
+  refresh: () => refresh(),
+})
+const enterRefresh = createModelRequestEnterRefresh(() => refresh())
 const filtersActive = computed(() => Boolean(
   tool.value.trim()
   || credentialName.value.trim()
@@ -253,10 +281,13 @@ const filterSummary = computed(() => {
   return parts.length ? parts.join(' · ') : '无筛选'
 })
 
+watch(liveRefresh, () => liveRefreshController.sync(), { immediate: true })
+watch(() => props.visitKey, () => {
+  enterRefresh.schedule()
+})
 watch(errorsOnly, () => {
   applyFilters()
 })
-
 watch(filterOpen, (open, wasOpen) => {
   if (wasOpen && !open) applyFilters()
 })
@@ -268,7 +299,28 @@ function applyFilters() {
     spaceId: spaceId.value.trim() || undefined,
     testRunId: testRunId.value.trim() || undefined,
     errorsOnly: errorsOnly.value || undefined,
+    order: sortOrder.value,
   })
+}
+
+function refresh() {
+  applyFilters()
+  if (props.detail) emit('open', { recordId: props.detail.id })
+}
+
+function toggleSortOrder() {
+  sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
+  applyFilters()
+}
+
+function orderRecordsByTime(
+  records: readonly SandboxMcpCallRecordListItem[],
+  order: 'asc' | 'desc',
+) {
+  const sign = order === 'asc' ? 1 : -1
+  return [...records].sort((left, right) => (
+    sign * (left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id))
+  ))
 }
 
 function resetFilters() {
@@ -301,4 +353,22 @@ function formatTime(value: string) {
 function formatPayload(value: unknown) {
   return JSON.stringify(value, null, 2)
 }
+
+function onVisibilityChange() {
+  liveRefreshController.sync()
+}
+
+onMounted(() => {
+  document.addEventListener('visibilitychange', onVisibilityChange)
+  enterRefresh.schedule()
+})
+
+onActivated(() => {
+  enterRefresh.schedule()
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', onVisibilityChange)
+  liveRefreshController.dispose()
+})
 </script>

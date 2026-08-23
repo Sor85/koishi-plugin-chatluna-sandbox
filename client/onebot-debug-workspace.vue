@@ -6,7 +6,11 @@
         <p>查看最近的 action、原始事件和错误</p>
       </div>
       <div class="webqq-debug-actions">
-        <Button variant="outline" :disabled="loading" @click="applyFilters">
+        <label class="webqq-debug-live">
+          <Switch v-model="liveRefresh" aria-label="自动刷新" />
+          <span>自动刷新</span>
+        </label>
+        <Button variant="outline" :disabled="loading" @click="refresh">
           <IconRefresh :size="16" aria-hidden="true" />
           刷新
         </Button>
@@ -23,6 +27,16 @@
         <header class="webqq-debug-list-toolbar">
           <h2>调用列表</h2>
           <div class="webqq-debug-list-tools">
+            <button
+              type="button"
+              class="webqq-debug-sort"
+              :aria-label="sortOrder === 'asc' ? '当前按时间正序，点击改为倒序' : '当前按时间倒序，点击改为正序'"
+              @click="toggleSortOrder"
+            >
+              {{ sortOrder === 'asc' ? '按时间正序' : '按时间倒序' }}
+              <IconChevronUp v-if="sortOrder === 'asc'" :size="16" aria-hidden="true" />
+              <IconChevronDown v-else :size="16" aria-hidden="true" />
+            </button>
             <Popover v-model:open="filterOpen">
               <PopoverTrigger as-child>
                 <Button
@@ -101,7 +115,7 @@
         <div v-else-if="!records.length" class="webqq-debug-empty">暂无符合条件的 OneBot 调试记录</div>
         <div v-else v-webqq-scrollbar class="webqq-debug-list">
           <button
-            v-for="record in records"
+            v-for="record in orderedRecords"
             :key="getRecordKey(record)"
             type="button"
             class="webqq-debug-item"
@@ -238,6 +252,8 @@ import {
   IconBox,
   IconBraces,
   IconCalendarTime,
+  IconChevronDown,
+  IconChevronUp,
   IconClock,
   IconCpu,
   IconFilter,
@@ -247,16 +263,18 @@ import {
   IconTag,
   IconTrash,
 } from '@tabler/icons-vue'
-import { computed, ref, watch } from 'vue'
+import { computed, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
 import { Checkbox } from './components/ui/checkbox'
 import { Input } from './components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
+import { Switch } from './components/ui/switch'
 import WebqqAvatar from './webqq-avatar.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import { formatDuration } from './webqq/format-duration'
+import { createModelRequestEnterRefresh, createModelRequestLiveRefresh } from './webqq/model-request-live-refresh'
 import type {
   GetSandboxOneBotDebugRecordInput,
   GetSandboxOneBotDebugRecordsInput,
@@ -271,6 +289,7 @@ const props = defineProps<{
   loading: boolean
   detailLoading: boolean
   error: string
+  visitKey?: number
 }>()
 const emit = defineEmits<{
   query: [input: GetSandboxOneBotDebugRecordsInput]
@@ -283,9 +302,18 @@ const direction = ref('all')
 const action = ref('')
 const requestedAction = ref('')
 const errorsOnly = ref(false)
+const sortOrder = ref<'asc' | 'desc'>('desc')
+const liveRefresh = ref(false)
 const filterOpen = ref(false)
 const filterSelectPortalTarget = ref<HTMLElement>()
 const selectedRecordKey = computed(() => props.detail ? getRecordKey(props.detail) : undefined)
+const orderedRecords = computed(() => orderRecordsByTime(props.records, sortOrder.value))
+const liveRefreshController = createModelRequestLiveRefresh({
+  isEnabled: () => liveRefresh.value,
+  isVisible: () => typeof document === 'undefined' || document.visibilityState === 'visible',
+  refresh: () => refresh(),
+})
+const enterRefresh = createModelRequestEnterRefresh(() => refresh())
 const filtersActive = computed(() => Boolean(
   botId.value !== 'all'
   || direction.value !== 'all'
@@ -307,10 +335,13 @@ const filterSummary = computed(() => {
   return parts.length ? parts.join(' · ') : '无筛选'
 })
 
+watch(liveRefresh, () => liveRefreshController.sync(), { immediate: true })
+watch(() => props.visitKey, () => {
+  enterRefresh.schedule()
+})
 watch(errorsOnly, () => {
   applyFilters()
 })
-
 watch(filterOpen, (open, wasOpen) => {
   if (wasOpen && !open) applyFilters()
 })
@@ -322,7 +353,28 @@ function applyFilters() {
     action: action.value.trim() || undefined,
     requestedAction: requestedAction.value.trim() || undefined,
     errorsOnly: errorsOnly.value || undefined,
+    order: sortOrder.value,
   })
+}
+
+function refresh() {
+  applyFilters()
+  if (props.detail) openRecord(props.detail)
+}
+
+function toggleSortOrder() {
+  sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
+  applyFilters()
+}
+
+function orderRecordsByTime(
+  records: readonly SandboxConsoleOneBotDebugRecord[],
+  order: 'asc' | 'desc',
+) {
+  const sign = order === 'asc' ? 1 : -1
+  return [...records].sort((left, right) => (
+    sign * (left.createdAt.localeCompare(right.createdAt) || left.sequence - right.sequence)
+  ))
 }
 
 function resetFilters() {
@@ -400,4 +452,22 @@ function countLargeValueSummaries(value: unknown): number {
   if (!value || typeof value !== 'object') return 0
   return Object.values(value).reduce((sum, item) => sum + countLargeValueSummaries(item), 0)
 }
+
+function onVisibilityChange() {
+  liveRefreshController.sync()
+}
+
+onMounted(() => {
+  document.addEventListener('visibilitychange', onVisibilityChange)
+  enterRefresh.schedule()
+})
+
+onActivated(() => {
+  enterRefresh.schedule()
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', onVisibilityChange)
+  liveRefreshController.dispose()
+})
 </script>

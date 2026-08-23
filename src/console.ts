@@ -256,9 +256,10 @@ export function registerConsole(
       }, { ...query, beforeSequence: undefined })),
     ]
     const limit = Math.min(Math.max(Number(query.limit ?? 50) || 50, 1), 200)
+    const sign = query.order === 'asc' ? 1 : -1
     const records = pages
       .flatMap(({ records: items }) => items)
-      .sort((left, right) => right.createdAt.localeCompare(left.createdAt) || right.sequence - left.sequence)
+      .sort((left, right) => sign * (left.createdAt.localeCompare(right.createdAt) || left.sequence - right.sequence))
       .slice(0, limit)
     const capacity = pages.reduce((summary, page) => ({
       recordCount: summary.recordCount + page.capacity.recordCount,

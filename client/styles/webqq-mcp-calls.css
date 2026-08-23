@@ -10,6 +10,7 @@
 .webqq-mcp-call-header,
 .webqq-mcp-call-item-name,
 .webqq-mcp-call-actions,
+.webqq-mcp-call-live,
 .webqq-mcp-call-error-filter,
 .webqq-mcp-call-timing,
 .webqq-mcp-call-timing > time,
@@ -40,12 +41,36 @@
 
 .webqq-mcp-call-actions,
 .webqq-mcp-call-item-name,
+.webqq-mcp-call-live,
 .webqq-mcp-call-error-filter {
   gap: 8px;
 }
 
+.webqq-mcp-call-live {
+  min-height: 40px;
+  color: var(--webqq-muted);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.webqq-mcp-call-live [data-slot="switch"] {
+  width: 36px;
+  height: 20px;
+  background: #e5e7eb;
+  box-shadow: none;
+}
+
+.webqq-mcp-call-live [data-slot="switch"][data-state="checked"] {
+  background: var(--webqq-accent);
+}
+
+.webqq-workspace[data-color-mode="dark"] .webqq-mcp-call-live [data-slot="switch"]:not([data-state="checked"]) {
+  background: #3f3f46;
+}
+
 .webqq-mcp-call-list-toolbar,
-.webqq-mcp-call-list-tools {
+.webqq-mcp-call-list-tools,
+.webqq-mcp-call-sort {
   display: flex;
 }
 
@@ -73,6 +98,16 @@
 .webqq-mcp-call-list-tools {
   align-items: center;
   gap: 8px;
+}
+
+.webqq-mcp-call-sort {
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  color: var(--webqq-muted);
+  background: transparent;
+  font-size: 13px;
 }
 
 .webqq-mcp-call-filter-trigger {
