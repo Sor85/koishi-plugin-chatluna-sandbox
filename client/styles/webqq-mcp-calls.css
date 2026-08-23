@@ -8,11 +8,14 @@
 }
 
 .webqq-mcp-call-header,
-.webqq-mcp-call-item > header,
-.webqq-mcp-call-detail > header,
-.webqq-mcp-call-item-title,
+.webqq-mcp-call-item-name,
 .webqq-mcp-call-actions,
-.webqq-mcp-call-error-filter {
+.webqq-mcp-call-error-filter,
+.webqq-mcp-call-timing,
+.webqq-mcp-call-timing > time,
+.webqq-mcp-call-timing > span,
+.webqq-mcp-call-section-heading,
+.webqq-mcp-call-section-heading > span {
   display: flex;
   align-items: center;
 }
@@ -36,23 +39,59 @@
 }
 
 .webqq-mcp-call-actions,
-.webqq-mcp-call-item-title,
+.webqq-mcp-call-item-name,
 .webqq-mcp-call-error-filter {
   gap: 8px;
 }
 
-.webqq-mcp-call-filters {
+.webqq-mcp-call-list-toolbar,
+.webqq-mcp-call-list-tools {
+  display: flex;
+}
+
+.webqq-mcp-call-filter-popover > label:not(.webqq-mcp-call-error-filter) {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
-  gap: 16px;
-  padding: 16px;
-  border: 1px solid var(--webqq-border);
-  border-radius: 16px;
+}
+
+.webqq-mcp-call-list-toolbar {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 56px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--webqq-border);
   background: var(--webqq-surface);
 }
 
-.webqq-mcp-call-filters > label:not(.webqq-mcp-call-error-filter) {
+.webqq-mcp-call-list-toolbar h2 {
+  margin: 0;
+  color: var(--webqq-text);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.webqq-mcp-call-list-tools {
+  align-items: center;
+  gap: 8px;
+}
+
+.webqq-mcp-call-filter-trigger {
+  border-radius: 8px;
+}
+
+.webqq-mcp-call-filter-trigger.is-filtered {
+  color: var(--webqq-accent);
+  border-color: color-mix(in srgb, var(--webqq-accent) 34%, var(--webqq-border));
+  background: color-mix(in srgb, var(--webqq-accent) 10%, var(--webqq-surface));
+}
+
+.webqq-mcp-call-filter-popover {
   display: grid;
+  gap: 12px;
+  width: 280px;
+}
+
+.webqq-mcp-call-filter-popover > label:not(.webqq-mcp-call-error-filter) {
   gap: 8px;
   min-width: 0;
   font-weight: 600;
@@ -71,6 +110,7 @@
 .webqq-mcp-call-split {
   display: grid;
   grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  grid-row: 3;
   min-height: 0;
   gap: 16px;
 }
@@ -85,6 +125,11 @@
   background: var(--webqq-surface);
 }
 
+.webqq-mcp-call-list-pane {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
 .webqq-mcp-call-list,
 .webqq-mcp-call-detail {
   height: 100%;
@@ -96,82 +141,210 @@
   display: grid;
   align-content: start;
   grid-auto-rows: max-content;
+  gap: 8px;
+  padding: 8px;
 }
 
 .webqq-mcp-call-item {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   width: 100%;
-  padding: 14px 16px;
-  border: 0;
-  border-bottom: 1px solid var(--webqq-border);
+  padding: 12px 16px;
+  border: 1px solid transparent;
+  border-radius: 12px;
   background: transparent;
   color: inherit;
   text-align: left;
-  cursor: pointer;
 }
 
 .webqq-mcp-call-item.is-active,
 .webqq-mcp-call-item:hover,
 .webqq-mcp-call-item:focus-visible {
-  background: var(--webqq-surface-muted);
+  background: var(--webqq-hover);
 }
 
-.webqq-mcp-call-item-title {
+.webqq-mcp-call-item:focus-visible {
+  outline: 2px solid var(--webqq-accent);
+  outline-offset: 2px;
+}
+
+.webqq-mcp-call-item-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.webqq-mcp-call-item-name {
+  min-width: 0;
   flex-wrap: wrap;
+}
+
+.webqq-mcp-call-item-name strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--webqq-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webqq-mcp-call-timing {
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: var(--webqq-muted);
+}
+
+.webqq-mcp-call-timing > time,
+.webqq-mcp-call-timing > span {
+  gap: 4px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.webqq-mcp-call-timing svg {
+  flex: 0 0 auto;
+}
+
+.sandbox-badge.webqq-mcp-call-credential {
+  max-width: 7.5em;
+  overflow: hidden;
+  border-color: var(--webqq-border);
+  color: var(--webqq-muted);
+  background: var(--webqq-surface-muted);
+  text-overflow: ellipsis;
 }
 
 .webqq-mcp-call-item time,
 .webqq-mcp-call-detail time,
+.webqq-mcp-call-timing,
 .webqq-mcp-call-trace {
   font-size: 13px;
 }
 
-.webqq-mcp-call-status-success {
+.webqq-workspace .sandbox-badge.webqq-mcp-call-status-success {
   color: #047857;
   background: #d1fae5;
 }
 
-.webqq-mcp-call-status-error,
+.webqq-workspace[data-color-mode="dark"] .sandbox-badge.webqq-mcp-call-status-success {
+  color: #a7f3d0;
+  background: #064e3b;
+}
+
 .webqq-mcp-call-error,
 .webqq-mcp-call-trace {
   color: #b91c1c;
 }
 
-.webqq-mcp-call-status-error {
+.webqq-workspace .sandbox-badge.webqq-mcp-call-status-error {
+  color: #b91c1c;
   background: #fee2e2;
 }
 
 .webqq-mcp-call-detail {
   display: grid;
   align-content: start;
-  gap: 10px;
+  grid-auto-rows: max-content;
+  gap: 16px;
   padding: 16px;
+}
+
+.webqq-mcp-call-meta-list {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--webqq-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--webqq-surface-muted) 52%, transparent);
+}
+
+.webqq-mcp-call-meta {
+  display: grid;
+  grid-template-columns: 17px minmax(64px, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  line-height: 20px;
+}
+
+.webqq-mcp-call-meta + .webqq-mcp-call-meta {
+  border-top: 1px solid var(--webqq-border);
+}
+
+.webqq-mcp-call-meta svg {
+  display: block;
+  width: 17px;
+  height: 17px;
+  color: var(--webqq-accent);
+}
+
+.webqq-mcp-call-meta-label {
+  color: var(--webqq-muted);
+  font-weight: 600;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.webqq-mcp-call-meta-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--webqq-text);
+  line-height: 20px;
+  user-select: text;
+}
+
+.webqq-mcp-call-error-diagnostic {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, #b91c1c 28%, var(--webqq-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, #fee2e2 46%, var(--webqq-surface));
+}
+
+.webqq-mcp-call-section-heading {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.webqq-mcp-call-section-heading > span {
+  gap: 7px;
+}
+
+.webqq-mcp-call-section-heading svg {
+  flex: 0 0 auto;
+  color: var(--webqq-accent);
 }
 
 .webqq-mcp-call-payloads {
   display: grid;
-  gap: 12px;
-  margin-top: 8px;
+  gap: 16px;
 }
 
-.webqq-mcp-call-payloads h2 {
-  margin: 0 0 8px;
+.webqq-mcp-call-payloads > section {
+  display: grid;
+  gap: 8px;
+}
+
+.webqq-mcp-call-payloads h2,
+.webqq-mcp-call-section-heading strong {
+  margin: 0;
   font-size: 13px;
 }
 
 .webqq-mcp-call-payloads pre {
-  max-height: 280px;
+  max-height: 320px;
   overflow: auto;
-  padding: 10px 12px;
+  padding: 12px;
   margin: 0;
   border-radius: 12px;
   color: var(--webqq-text);
   background: var(--webqq-surface-muted);
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
   line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  user-select: text;
 }
 
 .webqq-mcp-call-empty,
@@ -185,24 +358,14 @@
     padding: 16px;
   }
 
-  .webqq-mcp-call-filters {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .webqq-mcp-call-split {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 720px) {
-  .webqq-mcp-call-header,
-  .webqq-mcp-call-item > header,
-  .webqq-mcp-call-detail > header {
+  .webqq-mcp-call-header {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .webqq-mcp-call-filters {
-    grid-template-columns: 1fr;
   }
 }
