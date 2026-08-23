@@ -30,6 +30,7 @@ describe('WebQQ 预设工作台源码契约', () => {
     expect(workspace).not.toContain('打开模型请求证据')
     expect(workspace).toContain('预设已被其他位置修改')
     expect(workspace).toContain('v-if="showSaveStatus"')
+    expect(workspace).not.toContain('formatBytes(document.size)')
     expect(workspace).not.toContain("return dirty.value ? '有未保存修改' : '已保存'")
     expect(workspace).not.toContain('webqq-preset-context-bar')
     expect(workspace).not.toContain('选择证据定位机器人')

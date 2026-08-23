@@ -3,7 +3,7 @@
     <header class="webqq-preset-header">
       <div>
         <h1>预设</h1>
-        <p>直接管理 ChatLuna YAML 源码并定位变量的模型请求证据</p>
+        <p>管理和编辑 ChatLuna YAML 预设文件</p>
       </div>
       <div class="webqq-preset-header-actions">
         <Button variant="outline" :disabled="loading || saving" @click="emit('refresh')">
@@ -62,7 +62,6 @@
                 <strong>{{ document.displayName || document.fileName }}</strong>
                 <Badge variant="outline">{{ kindLabel(document.kind) }}</Badge>
               </span>
-              <p>{{ document.fileName }} · {{ formatBytes(document.size) }}</p>
             </div>
             <div class="webqq-preset-document-actions">
               <span v-if="showSaveStatus" class="webqq-preset-save-status" :data-status="saveStatus">
@@ -526,10 +525,6 @@ function kindLabel(kind: PresetDocumentKind) {
 
 function formatModifiedAt(value: string) {
   return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit' }).format(new Date(value))
-}
-
-function formatBytes(value: number) {
-  return value < 1024 ? `${value} B` : `${(value / 1024).toFixed(1)} KB`
 }
 
 function errorMessage(error: unknown) {
