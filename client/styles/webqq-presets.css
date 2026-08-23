@@ -1,7 +1,11 @@
 .chatluna-sandbox-chat.webqq-preset-workspace {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 16px;
+  min-width: 0;
   overflow: hidden;
+  padding: 24px;
+  background: var(--webqq-bg);
 }
 
 .webqq-preset-header,
@@ -13,17 +17,17 @@
   gap: 16px;
 }
 
-.webqq-preset-header {
-  padding: 18px 22px;
-  border-bottom: 1px solid var(--webqq-border);
-}
-
 .webqq-preset-header h1 {
-  margin: 0;
-  font-size: 20px;
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 700;
 }
 
-.webqq-preset-header p,
+.webqq-preset-header p {
+  margin: 0;
+  color: var(--webqq-muted);
+}
+
 .webqq-preset-document-header p {
   margin: 4px 0 0;
   color: var(--webqq-muted);
@@ -41,15 +45,19 @@
 .webqq-preset-error,
 .webqq-preset-diagnostics {
   margin: 0;
-  padding: 10px 22px;
-  border-bottom: 1px solid var(--webqq-border);
   color: var(--webqq-danger, #b91c1c);
   background: color-mix(in srgb, var(--webqq-danger, #dc2626) 8%, transparent);
 }
 
+.webqq-preset-error {
+  padding: 0;
+}
+
 .webqq-preset-layout {
   display: grid;
-  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  grid-row: 3;
+  gap: 16px;
   min-height: 0;
 }
 
@@ -57,12 +65,15 @@
 .webqq-preset-editor-pane {
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--webqq-border);
+  border-radius: 16px;
+  background: var(--webqq-surface);
 }
 
 .webqq-preset-list-pane {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  border-right: 1px solid var(--webqq-border);
 }
 
 .webqq-preset-search {
@@ -172,6 +183,8 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--webqq-border);
 }
 
 .webqq-preset-diagnostics p {
@@ -270,9 +283,14 @@ label.webqq-preset-dialog-fields {
   font-size: 13px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 960px) {
+  .webqq-preset-workspace {
+    padding: 16px;
+  }
+
   .webqq-preset-layout {
-    grid-template-columns: minmax(190px, 34%) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(180px, 36%) minmax(0, 1fr);
   }
 
   .webqq-preset-document-header {
@@ -281,20 +299,10 @@ label.webqq-preset-dialog-fields {
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 720px) {
   .webqq-preset-header {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .webqq-preset-layout {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(160px, 34%) minmax(0, 1fr);
-  }
-
-  .webqq-preset-list-pane {
-    border-right: 0;
-    border-bottom: 1px solid var(--webqq-border);
   }
 
   .webqq-preset-document-actions {

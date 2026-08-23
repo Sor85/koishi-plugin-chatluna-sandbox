@@ -65,7 +65,7 @@
               <p>{{ document.fileName }} · {{ formatBytes(document.size) }}</p>
             </div>
             <div class="webqq-preset-document-actions">
-              <span class="webqq-preset-save-status" :data-status="saveStatus">
+              <span v-if="showSaveStatus" class="webqq-preset-save-status" :data-status="saveStatus">
                 {{ saveStatusLabel }}
               </span>
               <Button variant="outline" size="sm" :disabled="saving" @click="openRenameDialog">
@@ -290,10 +290,11 @@ const discardGuardConfirmLabel = computed(() => {
   if (activeDiscardAction.value === 'delete') return '放弃并删除'
   return '放弃并离开'
 })
+const showSaveStatus = computed(() => saving.value || dirty.value || saveStatus.value === 'saving' || saveStatus.value === 'error')
 const saveStatusLabel = computed(() => {
   if (saving.value || saveStatus.value === 'saving') return '保存中…'
   if (saveStatus.value === 'error') return '保存失败'
-  return dirty.value ? '有未保存修改' : '已保存'
+  return '有未保存修改'
 })
 const presetGroups = computed(() => (['core', 'character'] as const).map((kind) => ({
   kind,
