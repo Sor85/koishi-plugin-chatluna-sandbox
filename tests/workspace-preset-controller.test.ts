@@ -71,8 +71,6 @@ describe('预设工作区控制器和端口', () => {
       document: { kind: 'core', fileName: 'renamed.yml', revision: 'rev-1' },
       expression: { stableId: '["messages",0]#0' },
       scope: { scope: 'main' },
-      botId: '20001',
-      conversationId: 'private:10001:20001',
     })
     expect(located.status).toBe('matched')
     expect(controller.presetLocateResult.value).toEqual(located)

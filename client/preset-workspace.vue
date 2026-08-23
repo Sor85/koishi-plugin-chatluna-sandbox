@@ -225,10 +225,6 @@ import type { SandboxModelRequestDetail } from '../src/types'
 
 export interface PresetEvidenceContextModel {
   scope: SandboxPresetRequestScope
-  conversationId?: string
-  bots: readonly { id: string, name: string }[]
-  botId?: string
-  needsBotSelection: boolean
 }
 
 const props = defineProps<{
@@ -518,19 +514,11 @@ function failedLocateResult(message: string): LocateSandboxPresetExpressionResul
 async function resolveLocatedExpression(expression: SandboxPresetExpression): Promise<LocateSandboxPresetExpressionResult> {
   const current = document.value
   if (!current || dirty.value) return failedLocateResult('请先保存当前源码，再查看最新请求中的值。')
-  if (!evidenceContext.value.conversationId) return failedLocateResult('当前没有活动逻辑会话，无法读取最新请求。')
-  if (!evidenceContext.value.botId) {
-    return failedLocateResult(evidenceContext.value.needsBotSelection
-      ? '群聊中有多个虚拟机器人，请先选择一个。'
-      : '当前会话中没有虚拟 OneBot 机器人。')
-  }
   try {
     return await new Promise<LocateSandboxPresetExpressionResult>((resolve, reject) => emit('locate', {
       document: { kind: current.kind, fileName: current.fileName, revision: current.revision },
       expression: { stableId: expression.stableId },
       scope: evidenceContext.value.scope,
-      botId: evidenceContext.value.botId!,
-      conversationId: evidenceContext.value.conversationId!,
     }, resolve, reject))
   } catch (error) {
     return failedLocateResult(errorMessage(error))

@@ -131,8 +131,6 @@ describe('预设应用服务', () => {
       document: { kind: 'core', fileName: 'different-file-name.yml', revision: document.revision },
       expression: { stableId: expression.stableId },
       scope: { scope: 'main' },
-      botId: '20001',
-      conversationId: 'private:10001:20001',
     })).resolves.toEqual({
       status: 'matched',
       recordId: matching.id,
@@ -167,28 +165,79 @@ describe('预设应用服务', () => {
       document: { kind: 'character', fileName: 'alice.yml', revision: document.revision },
       expression: { range: document.expressions[0]!.range, occurrence: 0, path: ['system'] },
       scope: { scope: 'space', spaceId: 'space-a' },
-      botId: '20001', conversationId: 'group:30001',
     })).resolves.toMatchObject({ status: 'matched', scope: { scope: 'space', spaceId: 'space-a' } })
 
     await expect(service.locateExpression({
       document: { kind: 'character', fileName: 'alice.yml', revision: 'stale' },
       expression: { stableId: document.expressions[0]!.stableId },
       scope: { scope: 'space', spaceId: 'space-a' },
-      botId: '20001', conversationId: 'group:30001',
     })).resolves.toMatchObject({ status: 'failed', code: 'document-stale' })
 
     await expect(service.locateExpression({
       document: { kind: 'character', fileName: 'alice.yml', revision: document.revision },
       expression: { stableId: document.expressions[0]!.stableId },
       scope: { scope: 'all' } as never,
-      botId: '20001', conversationId: 'group:30001',
     })).resolves.toMatchObject({ status: 'failed', code: 'invalid-scope' })
 
     await expect(service.locateExpression({
       document: { kind: 'character', fileName: 'alice.yml', revision: document.revision },
       expression: { stableId: document.expressions[0]!.stableId },
       scope: { scope: 'space', spaceId: 'missing' },
-      botId: '20001', conversationId: 'group:30001',
     })).resolves.toMatchObject({ status: 'failed', code: 'scope-unavailable' })
+  })
+
+  it('忽略逻辑会话和机器人，只取当前范围内最新有归属成功请求', async () => {
+    const { coreRoot, main, service } = await createService()
+    const source = `keywords:\n  - runtime-core-name\nprompts:\n  - role: system\n    content: "Hello {name}."\n`
+    const snapshot = {
+      kind: 'core' as const,
+      presetName: 'runtime-core-name',
+      capturedAt: '2026-01-01T00:00:00.000Z',
+      source,
+      templates: [{ path: ['prompts', 0, 'content'], role: 'system' as const, template: 'Hello {name}.' }],
+    }
+    await writeFile(join(coreRoot, 'assistant.yml'), source)
+    const document = await service.read({ kind: 'core', fileName: 'assistant.yml' })
+
+    main.append({
+      status: 'success', durationMs: 10, attribution: 'attributed',
+      entities: { scopeId: 'main', botId: '20001', conversationId: 'private:10001:20001' },
+      requestBodyAvailable: true,
+      requestBody: { messages: [{ role: 'system', content: 'Hello Alice.' }] },
+      presetSnapshots: [snapshot],
+    })
+    const latest = main.append({
+      status: 'success', durationMs: 10, attribution: 'attributed',
+      entities: { scopeId: 'main', botId: '20002', conversationId: 'group:30001' },
+      requestBodyAvailable: true,
+      requestBody: { messages: [{ role: 'system', content: 'Hello Bobby.' }] },
+      presetSnapshots: [snapshot],
+    })
+    main.append({
+      status: 'error', durationMs: 10, attribution: 'attributed',
+      entities: { scopeId: 'main', botId: '20002', conversationId: 'group:30001' },
+      requestBodyAvailable: true,
+      requestBody: { messages: [{ role: 'system', content: 'Hello Error.' }] },
+      presetSnapshots: [snapshot],
+    })
+    main.append({
+      status: 'success', durationMs: 10, attribution: 'unattributed',
+      entities: {},
+      requestBodyAvailable: true,
+      requestBody: { messages: [{ role: 'system', content: 'Hello Ghost.' }] },
+      presetSnapshots: [snapshot],
+    })
+
+    await expect(service.locateExpression({
+      document: { kind: 'core', fileName: 'assistant.yml', revision: document.revision },
+      expression: { stableId: document.expressions[0]!.stableId },
+      scope: { scope: 'main' },
+    })).resolves.toEqual({
+      status: 'matched',
+      recordId: latest.id,
+      evidenceId: 'req:message:messages.0',
+      range: { start: 6, end: 11 },
+      scope: { scope: 'main' },
+    })
   })
 })

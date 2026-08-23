@@ -65,8 +65,6 @@ export interface LocateSandboxPresetExpressionInput {
   document: SandboxPresetDocumentIdentity
   expression: SandboxPresetExpressionIdentity
   scope: SandboxPresetRequestScope
-  botId: string
-  conversationId: string
 }
 
 export type SandboxPresetLocateFailureCode =
@@ -174,12 +172,10 @@ export class SandboxPresetService {
     const recordAndSnapshot = findLatestMatchingRequest(
       resolvedScope.store,
       resolvedScope.scopeId,
-      input.botId,
-      input.conversationId,
       document,
     )
     if (!recordAndSnapshot) {
-      return failure('request-not-observed', '当前范围、机器人和逻辑会话内没有使用该预设当前模板的模型请求', input.scope)
+      return failure('request-not-observed', '当前范围内没有使用该预设当前模板的有归属成功模型请求', input.scope)
     }
 
     const { record, snapshot } = recordAndSnapshot
@@ -285,14 +281,13 @@ function resolveExpression(
 function findLatestMatchingRequest(
   store: SandboxModelRequestStore,
   scopeId: string,
-  botId: string,
-  conversationId: string,
   document: SandboxPresetDocument,
 ): { record: SandboxModelRequestRecord, snapshot: SandboxPresetRuntimeSnapshot } | undefined {
   let beforeSequence: number | undefined
   do {
-    const page = store.getRecords({ botId, conversationId, order: 'desc', limit: 200, beforeSequence })
+    const page = store.getRecords({ order: 'desc', limit: 200, beforeSequence })
     for (const item of page.records) {
+      if (item.attribution !== 'attributed' || item.status !== 'success') continue
       if (item.entities.scopeId !== scopeId || !item.requestBodyAvailable) continue
       if (!item.presetSnapshotSummaries?.some((snapshot) => (
         snapshot.kind === document.kind && snapshot.presetName === document.displayName

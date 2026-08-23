@@ -39,7 +39,6 @@ import type {
 } from '../../src/presets'
 import type { CreatePresetInput, DeletePresetInput, RenamePresetInput, SavePresetInput } from '../../src/presets'
 import { createPresetDirtyGuard } from './preset-dirty-guard'
-import { resolvePresetEvidenceBots } from './preset-evidence-context'
 import {
   createPresetEvidenceNavigationState,
   type PresetEvidenceNavigationIntent,
@@ -98,7 +97,6 @@ export function createWebqqWorkspaceShell(
   const canReturnFromPresetEvidence = ref(false)
   const presetOriginRestore = shallowRef<PresetOriginRestore>()
   let originRestoreSeq = 0
-  const selectedPresetBotId = ref('')
   const snapshot = computed(() => workspace.value.snapshot)
   const users = computed(() => getSandboxUsers(snapshot.value))
   const bots = computed(() => getSandboxBots(snapshot.value))
@@ -116,22 +114,8 @@ export function createWebqqWorkspaceShell(
   const currentPeer = computed(() => currentBot.value
     ?? users.value.find(({ id }) => id === currentPeerId.value))
   const currentGroup = computed(() => snapshot.value.groups.find(({ id }) => id === currentConversation.value?.groupId))
-  const presetEvidenceBots = computed(() => resolvePresetEvidenceBots(
-    currentConversation.value,
-    currentGroup.value,
-    bots.value,
-  ))
-  const resolvedPresetBotId = computed(() => {
-    const options = presetEvidenceBots.value
-    if (options.some(({ id }) => id === selectedPresetBotId.value)) return selectedPresetBotId.value
-    return options.length === 1 ? options[0]!.id : ''
-  })
   const presetEvidenceContext = computed(() => ({
     scope: activeSpaceIdScope(),
-    conversationId: currentConversation.value?.id,
-    bots: presetEvidenceBots.value,
-    botId: resolvedPresetBotId.value || undefined,
-    needsBotSelection: presetEvidenceBots.value.length > 1 && !resolvedPresetBotId.value,
   }))
   const currentConversationTitle = computed(() => currentGroup.value?.name
     ?? currentPeer.value?.name
@@ -401,7 +385,6 @@ export function createWebqqWorkspaceShell(
   })
 
   watch(activeConversationId, () => {
-    selectedPresetBotId.value = ''
     workspaceLayout.resetDetails()
   })
 
@@ -837,10 +820,6 @@ export function createWebqqWorkspaceShell(
     }
   }
 
-  function selectPresetEvidenceBot(botId: string) {
-    selectedPresetBotId.value = presetEvidenceBots.value.some(({ id }) => id === botId) ? botId : ''
-  }
-
   function navigateToPresetEvidence(result: LocateSandboxPresetExpressionResult, snapshot?: PresetOriginSnapshot) {
     const intent = presetEvidenceNavigation.publish(result, snapshot)
     if (!intent) return
@@ -1065,7 +1044,6 @@ export function createWebqqWorkspaceShell(
     updatePresetDirty,
     cancelPresetDiscard,
     confirmPresetDiscard,
-    selectPresetEvidenceBot,
     navigateToPresetEvidence,
     consumePresetEvidenceIntent,
     reportPresetEvidenceNavigationFailure,

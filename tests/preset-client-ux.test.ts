@@ -1,25 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createPresetDirtyGuard } from '../client/webqq/preset-dirty-guard'
-import { resolvePresetEvidenceBots } from '../client/webqq/preset-evidence-context'
 import { createPresetNavigationCoordinator } from '../client/webqq/preset-navigation-coordinator'
 import { codeMirrorOffset, resolvePresetSourceExpressions } from '../client/webqq/preset-source-expressions'
 import { expressionStableId, parsePresetSourceDocument } from '../src/presets'
-import type { SandboxBotProfile, SandboxConversation } from '../src/types'
-
-const bot = (id: string, name: string): SandboxBotProfile => ({
-  kind: 'bot',
-  id,
-  name,
-  enabled: true,
-  implementation: 'napcat',
-})
-
-const directConversation: SandboxConversation = {
-  id: 'private:10001:20001',
-  type: 'direct',
-  participantIds: ['10001', '20001'],
-  messageIds: [],
-}
 
 describe('预设客户端 UX 纯 seam', () => {
   it('把 CRLF 原始源码范围转换成 CodeMirror 的 LF 文档范围', () => {
@@ -80,17 +63,6 @@ describe('预设客户端 UX 纯 seam', () => {
       { text: '{newPrompt}', kind: 'value', clickable: false, stableId: undefined },
       { text: '{/if}', kind: 'control', clickable: false, stableId: undefined },
     ])
-  })
-
-  it('私聊证据机器人候选包含逻辑会话中的所有机器人，包括当前操作者机器人', () => {
-    expect(resolvePresetEvidenceBots(directConversation, undefined, [bot('20001', 'Koishi')]))
-      .toEqual([{ id: '20001', name: 'Koishi' }])
-
-    expect(resolvePresetEvidenceBots({
-      ...directConversation,
-      participantIds: ['20001', '20002'],
-    }, undefined, [bot('20001', 'Koishi'), bot('20002', '助手')]))
-      .toEqual([{ id: '20001', name: 'Koishi' }, { id: '20002', name: '助手' }])
   })
 
   it('脏状态统一拦截操作，只有显式丢弃才返回待执行动作', () => {

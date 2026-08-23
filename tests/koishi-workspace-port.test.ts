@@ -68,8 +68,6 @@ describe('Koishi 工作区端口', () => {
       document: { kind: 'core', fileName: 'assistant.yml', revision: 'rev-1' },
       expression: { stableId: 'expression-1' },
       scope: { scope: 'space', spaceId: 'space-target' },
-      botId: '20001',
-      conversationId: 'conversation-1',
     })
 
     expect(send).toHaveBeenNthCalledWith(1, 'chatluna-sandbox/preset-catalog', {})
