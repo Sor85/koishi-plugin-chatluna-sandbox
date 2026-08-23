@@ -5,8 +5,10 @@
 <script setup lang="ts">
 import { basicSetup } from 'codemirror'
 import { yaml } from '@codemirror/lang-yaml'
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { EditorState, StateEffect, StateField, type Extension } from '@codemirror/state'
 import { Decoration, EditorView, type DecorationSet, type ViewUpdate } from '@codemirror/view'
+import { tags } from '@lezer/highlight'
 import { onBeforeUnmount, onMounted, ref, watch, type DeepReadonly } from 'vue'
 import {
   codeMirrorOffset,
@@ -30,6 +32,81 @@ const emit = defineEmits<{
 const editorElement = ref<HTMLElement>()
 let view: EditorView | undefined
 let activeExpressions: readonly PresetSourceEditorExpression[] = []
+
+const presetEditorTheme = EditorView.theme({
+  '&': {
+    fontSize: '13px',
+  },
+  '.cm-content': {
+    padding: '18px 0 28px',
+    caretColor: 'var(--webqq-accent)',
+  },
+  '.cm-line': {
+    padding: '0 20px 0 14px',
+    lineHeight: '1.72',
+  },
+  '.cm-cursor, .cm-dropCursor': {
+    borderLeftColor: 'var(--webqq-accent)',
+    borderLeftWidth: '2px',
+  },
+  '.cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection': {
+    backgroundColor: 'color-mix(in srgb, var(--webqq-accent) 20%, transparent)',
+  },
+  '.cm-activeLine': {
+    backgroundColor: 'color-mix(in srgb, var(--webqq-accent) 6%, transparent)',
+  },
+  '.cm-lineNumbers .cm-gutterElement': {
+    minWidth: '32px',
+    padding: '0 6px 0 4px',
+    lineHeight: '1.72',
+  },
+  '.cm-activeLineGutter': {
+    color: 'var(--webqq-text)',
+    fontWeight: '600',
+  },
+  '.cm-foldGutter .cm-gutterElement': {
+    padding: '0 3px 0 0',
+    lineHeight: '1.72',
+  },
+  '.cm-foldPlaceholder': {
+    margin: '0 4px',
+    padding: '0 6px',
+    border: '1px solid var(--webqq-border)',
+    borderRadius: '5px',
+    color: 'var(--webqq-muted)',
+    backgroundColor: 'var(--webqq-surface-muted)',
+  },
+  '.cm-panels': {
+    color: 'var(--webqq-text)',
+    backgroundColor: 'var(--webqq-panel)',
+  },
+  '.cm-panels.cm-panels-top': {
+    borderBottom: '1px solid var(--webqq-border)',
+  },
+  '.cm-searchMatch': {
+    borderRadius: '3px',
+    backgroundColor: 'color-mix(in srgb, #f59e0b 28%, transparent)',
+  },
+  '.cm-searchMatch.cm-searchMatch-selected': {
+    backgroundColor: 'color-mix(in srgb, var(--webqq-accent) 28%, transparent)',
+  },
+})
+
+const presetHighlightStyle = HighlightStyle.define([
+  { tag: tags.comment, class: 'webqq-preset-token-comment' },
+  { tag: [tags.propertyName, tags.attributeName, tags.labelName], class: 'webqq-preset-token-key' },
+  { tag: [tags.string, tags.special(tags.string)], class: 'webqq-preset-token-string' },
+  { tag: [tags.number, tags.bool, tags.null], class: 'webqq-preset-token-literal' },
+  { tag: [tags.punctuation, tags.separator], class: 'webqq-preset-token-punctuation' },
+  { tag: [tags.keyword, tags.atom], class: 'webqq-preset-token-keyword' },
+])
+
+const editorBaseExtensions: Extension[] = [
+  basicSetup,
+  yaml(),
+  presetEditorTheme,
+  syntaxHighlighting(presetHighlightStyle),
+]
 
 const setDecorations = StateEffect.define<DecorationSet>()
 const syncDocument = StateEffect.define<boolean>()
@@ -112,22 +189,25 @@ function handleDocumentUpdate(update: ViewUpdate) {
   }
 }
 
+function editorExtensions(readOnly = Boolean(props.readOnly)): Extension[] {
+  return [
+    ...editorBaseExtensions,
+    decorationField,
+    expressionInteraction(),
+    EditorView.lineWrapping,
+    EditorView.editable.of(!readOnly),
+    EditorState.readOnly.of(readOnly),
+    EditorView.updateListener.of(handleDocumentUpdate),
+  ]
+}
+
 onMounted(() => {
   if (!editorElement.value) return
   view = new EditorView({
     parent: editorElement.value,
     state: EditorState.create({
       doc: props.modelValue,
-      extensions: [
-        basicSetup,
-        yaml(),
-        decorationField,
-        expressionInteraction(),
-        EditorView.lineWrapping,
-        EditorView.editable.of(!props.readOnly),
-        EditorState.readOnly.of(Boolean(props.readOnly)),
-        EditorView.updateListener.of(handleDocumentUpdate),
-      ],
+      extensions: editorExtensions(),
     }),
   })
   dispatchDecorations()
@@ -159,16 +239,7 @@ watch([() => props.kind, () => props.loadedSource, () => props.expressions], () 
 watch(() => props.readOnly, (readOnly) => {
   if (!view) return
   view.dispatch({
-    effects: StateEffect.reconfigure.of([
-      basicSetup,
-      yaml(),
-      decorationField,
-      expressionInteraction(),
-      EditorView.lineWrapping,
-      EditorView.editable.of(!readOnly),
-      EditorState.readOnly.of(Boolean(readOnly)),
-      EditorView.updateListener.of(handleDocumentUpdate),
-    ]),
+    effects: StateEffect.reconfigure.of(editorExtensions(Boolean(readOnly))),
   })
   dispatchDecorations()
 })

@@ -193,9 +193,26 @@
 }
 
 .webqq-preset-source-editor {
+  --webqq-preset-code-bg: color-mix(in srgb, var(--webqq-panel) 82%, var(--webqq-bg));
+  --webqq-preset-code-gutter: color-mix(in srgb, var(--webqq-surface-muted) 84%, var(--webqq-panel));
+  --webqq-preset-code-key: #1662a8;
+  --webqq-preset-code-string: #26734d;
+  --webqq-preset-code-literal: #8b4db2;
+  --webqq-preset-code-keyword: #a34b1e;
+  --webqq-preset-code-punctuation: #8a94a3;
   min-height: 0;
   overflow: hidden;
-  background: var(--webqq-bg);
+  background: var(--webqq-preset-code-bg);
+}
+
+.webqq-workspace[data-color-mode="dark"] .webqq-preset-source-editor {
+  --webqq-preset-code-bg: #24262b;
+  --webqq-preset-code-gutter: #292c32;
+  --webqq-preset-code-key: #75b7f0;
+  --webqq-preset-code-string: #81c995;
+  --webqq-preset-code-literal: #cf9bea;
+  --webqq-preset-code-keyword: #efad77;
+  --webqq-preset-code-punctuation: #858d9b;
 }
 
 .webqq-preset-source-editor .cm-editor {
@@ -204,20 +221,75 @@
   background: transparent;
 }
 
+.webqq-preset-source-editor .cm-editor.cm-focused {
+  outline: none;
+}
+
 .webqq-preset-source-editor .cm-scroller {
   overflow: auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: "SFMono-Regular", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+  font-variant-ligatures: none;
+  scrollbar-gutter: stable;
 }
 
 .webqq-preset-source-editor .cm-gutters {
-  color: var(--webqq-muted);
-  background: color-mix(in srgb, var(--webqq-bg) 92%, var(--webqq-text));
-  border-right-color: var(--webqq-border);
+  color: color-mix(in srgb, var(--webqq-muted) 78%, transparent);
+  background: var(--webqq-preset-code-gutter);
+  border-right: 1px solid color-mix(in srgb, var(--webqq-border) 72%, transparent);
 }
 
-.webqq-preset-source-editor .cm-activeLine,
-.webqq-preset-source-editor .cm-activeLineGutter {
-  background: color-mix(in srgb, var(--webqq-accent) 7%, transparent);
+.webqq-preset-source-editor .cm-gutterElement {
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.webqq-preset-source-editor .cm-foldGutter .cm-gutterElement {
+  color: color-mix(in srgb, var(--webqq-muted) 68%, transparent);
+  cursor: pointer;
+}
+
+.webqq-preset-source-editor .cm-foldGutter .cm-gutterElement:hover {
+  color: var(--webqq-accent);
+}
+
+.webqq-preset-source-editor .cm-tooltip {
+  overflow: hidden;
+  border: 1px solid var(--webqq-border);
+  border-radius: 8px;
+  color: var(--webqq-text);
+  background: var(--webqq-panel);
+  box-shadow: 0 12px 32px rgb(15 23 42 / 16%);
+}
+
+.webqq-preset-source-editor .cm-tooltip-autocomplete > ul > li[aria-selected] {
+  color: var(--webqq-text);
+  background: color-mix(in srgb, var(--webqq-accent) 12%, transparent);
+}
+
+.webqq-preset-token-comment {
+  color: var(--webqq-muted);
+  font-style: italic;
+}
+
+.webqq-preset-token-key {
+  color: var(--webqq-preset-code-key);
+  font-weight: 600;
+}
+
+.webqq-preset-token-string {
+  color: var(--webqq-preset-code-string);
+}
+
+.webqq-preset-token-literal {
+  color: var(--webqq-preset-code-literal);
+  font-weight: 550;
+}
+
+.webqq-preset-token-keyword {
+  color: var(--webqq-preset-code-keyword);
+}
+
+.webqq-preset-token-punctuation {
+  color: var(--webqq-preset-code-punctuation);
 }
 
 .webqq-preset-expression {
@@ -225,14 +297,22 @@
   padding: 0 1px;
 }
 
-.webqq-preset-expression.is-control {
+.webqq-preset-expression.is-control,
+.webqq-preset-expression.is-control * {
   color: var(--webqq-muted);
+}
+
+.webqq-preset-expression.is-control {
   background: color-mix(in srgb, var(--webqq-muted) 12%, transparent);
   text-decoration: underline dotted;
 }
 
-.webqq-preset-expression.is-value {
+.webqq-preset-expression.is-value,
+.webqq-preset-expression.is-value * {
   color: var(--webqq-accent);
+}
+
+.webqq-preset-expression.is-value {
   background: color-mix(in srgb, var(--webqq-accent) 12%, transparent);
   text-decoration: underline;
   cursor: pointer;
