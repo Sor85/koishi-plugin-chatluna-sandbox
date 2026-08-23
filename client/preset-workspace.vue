@@ -95,6 +95,7 @@
             :expressions="document.expressions"
             :loaded-source="document.source"
             :read-only="saving"
+            :resolve-expression-value="resolveExpressionValue"
             @expression-click="locateExpression"
           />
 
@@ -202,6 +203,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from './components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
 import PresetSourceEditor from './preset-source-editor.vue'
+import { resolvePresetExpressionObservedValue, type PresetExpressionObservedValueResult } from './webqq/preset-expression-value'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type {
   LocateSandboxPresetExpressionInput,
@@ -211,6 +213,7 @@ import type {
   SandboxPresetExpression,
   SandboxPresetRequestScope,
 } from '../src/presets'
+import type { SandboxModelRequestDetail } from '../src/types'
 
 export interface PresetEvidenceContextModel {
   scope: SandboxPresetRequestScope
@@ -239,6 +242,7 @@ const emit = defineEmits<{
   delete: [input: { kind: PresetDocumentKind, fileName: string, expectedRevision: string, confirmed: true }, resolve: () => void, reject: (error: unknown) => void]
   locate: [input: LocateSandboxPresetExpressionInput, resolve: (result: LocateSandboxPresetExpressionResult) => void, reject: (error: unknown) => void]
   navigateEvidence: [result: LocateSandboxPresetExpressionResult & { status: 'matched' }]
+  readRequest: [input: { recordId: string } & SandboxPresetRequestScope, resolve: (detail: SandboxModelRequestDetail) => void, reject: (error: unknown) => void]
   dirtyChange: [dirty: boolean]
   cancelDiscard: []
   confirmDiscard: []
@@ -469,44 +473,57 @@ function reloadConflict() {
   conflictDialogOpen.value = false
 }
 
-async function locateExpression(expression: SandboxPresetExpression) {
+function failedLocateResult(message: string): LocateSandboxPresetExpressionResult {
+  return { status: 'failed', code: 'request-not-observed', message }
+}
+
+async function resolveLocatedExpression(expression: SandboxPresetExpression): Promise<LocateSandboxPresetExpressionResult> {
   const current = document.value
-  locateMessage.value = ''
-  locateFailed.value = false
-  if (!current || dirty.value) {
-    locateFailed.value = true
-    locateMessage.value = '请先保存当前源码，再定位表达式证据。'
-    return
-  }
-  if (!evidenceContext.value.conversationId) {
-    locateFailed.value = true
-    locateMessage.value = '当前没有活动逻辑会话，无法建立证据上下文。'
-    return
-  }
+  if (!current || dirty.value) return failedLocateResult('请先保存当前源码，再查看最新请求中的值。')
+  if (!evidenceContext.value.conversationId) return failedLocateResult('当前没有活动逻辑会话，无法读取最新请求。')
   if (!evidenceContext.value.botId) {
-    locateFailed.value = true
-    locateMessage.value = evidenceContext.value.needsBotSelection ? '群聊中有多个虚拟机器人，请先选择一个。' : '当前会话中没有虚拟 OneBot 机器人。'
-    return
+    return failedLocateResult(evidenceContext.value.needsBotSelection
+      ? '群聊中有多个虚拟机器人，请先选择一个。'
+      : '当前会话中没有虚拟 OneBot 机器人。')
   }
   try {
-    const result = await new Promise<LocateSandboxPresetExpressionResult>((resolve, reject) => emit('locate', {
+    return await new Promise<LocateSandboxPresetExpressionResult>((resolve, reject) => emit('locate', {
       document: { kind: current.kind, fileName: current.fileName, revision: current.revision },
       expression: { stableId: expression.stableId },
       scope: evidenceContext.value.scope,
       botId: evidenceContext.value.botId!,
       conversationId: evidenceContext.value.conversationId!,
     }, resolve, reject))
-    if (result.status === 'failed') {
-      locateFailed.value = true
-      locateMessage.value = result.message
-      return
-    }
-    locateMessage.value = '已找到使用当前预设快照的模型请求证据，正在打开精确位置…'
-    emit('navigateEvidence', result)
   } catch (error) {
-    locateFailed.value = true
-    locateMessage.value = errorMessage(error)
+    return failedLocateResult(errorMessage(error))
   }
+}
+
+async function resolveExpressionValue(expression: SandboxPresetExpression): Promise<PresetExpressionObservedValueResult> {
+  const located = await resolveLocatedExpression(expression)
+  if (located.status === 'failed') return resolvePresetExpressionObservedValue(located)
+  try {
+    const detail = await new Promise<SandboxModelRequestDetail>((resolve, reject) => emit('readRequest', {
+      ...located.scope,
+      recordId: located.recordId,
+    }, resolve, reject))
+    return resolvePresetExpressionObservedValue(located, detail)
+  } catch (error) {
+    return { status: 'failed', message: errorMessage(error) }
+  }
+}
+
+async function locateExpression(expression: SandboxPresetExpression) {
+  locateMessage.value = ''
+  locateFailed.value = false
+  const result = await resolveLocatedExpression(expression)
+  if (result.status === 'failed') {
+    locateFailed.value = true
+    locateMessage.value = result.message
+    return
+  }
+  locateMessage.value = '已找到使用当前预设快照的模型请求证据，正在打开精确位置…'
+  emit('navigateEvidence', result)
 }
 
 function normalizeFileName(value: string) {

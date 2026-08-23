@@ -664,9 +664,10 @@ export function createWebqqWorkspaceShell(
     modelRequestDetailLoading.value = true
     modelRequestError.value = ''
     try {
-      await workspaceController.loadModelRequestRecord(input)
+      return await workspaceController.loadModelRequestRecord(input)
     } catch (error) {
       modelRequestError.value = error instanceof Error ? error.message : '读取模型请求详情失败'
+      throw error
     } finally {
       modelRequestDetailLoading.value = false
     }

@@ -586,6 +586,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   async function loadModelRequestRecord(input: ModelRequestRecordQuery) {
     try {
       modelRequestRecordState.value = await port.getModelRequestRecord(input)
+      return modelRequestRecordState.value
     } catch (error) {
       throw normalizeWorkspaceError(error, '读取模型请求详情失败')
     }

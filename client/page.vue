@@ -73,6 +73,7 @@
           @rename="renamePresetFromWorkspace"
           @delete="deletePresetFromWorkspace"
           @locate="locatePresetExpressionFromWorkspace"
+          @read-request="readPresetRequestFromWorkspace"
           @navigate-evidence="navigateToPresetEvidence"
           @dirty-change="updatePresetDirty"
           @cancel-discard="cancelPresetDiscard"
@@ -297,6 +298,14 @@ function locatePresetExpressionFromWorkspace(
   reject: (error: unknown) => void,
 ) {
   void locatePresetExpression(input).then(resolve, reject)
+}
+
+function readPresetRequestFromWorkspace(
+  input: Parameters<typeof loadModelRequestRecord>[0],
+  resolve: (result: Awaited<ReturnType<typeof loadModelRequestRecord>>) => void,
+  reject: (error: unknown) => void,
+) {
+  void loadModelRequestRecord(input).then(resolve, reject)
 }
 
 const mentionRequest = ref<{ id: string, name: string, requestId: number }>()

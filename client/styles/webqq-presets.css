@@ -265,6 +265,36 @@
   background: color-mix(in srgb, var(--webqq-accent) 12%, transparent);
 }
 
+.webqq-preset-source-editor .cm-tooltip .webqq-preset-expression-tooltip {
+  display: grid;
+  gap: 6px;
+  min-width: 180px;
+  max-width: min(420px, 70vw);
+  padding: 10px 12px;
+}
+
+.webqq-preset-expression-tooltip-label,
+.webqq-preset-expression-tooltip time {
+  color: var(--webqq-muted);
+  font-size: 11px;
+}
+
+.webqq-preset-expression-tooltip-value {
+  overflow: auto;
+  max-height: 180px;
+  margin: 0;
+  color: var(--webqq-text);
+  font: inherit;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.webqq-preset-expression-tooltip.is-error {
+  color: var(--webqq-danger, #b91c1c);
+  font-size: 12px;
+}
+
 .webqq-preset-token-comment {
   color: var(--webqq-muted);
   font-style: italic;

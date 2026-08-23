@@ -7,7 +7,7 @@ import { basicSetup } from 'codemirror'
 import { yaml } from '@codemirror/lang-yaml'
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { EditorState, StateEffect, StateField, type Extension } from '@codemirror/state'
-import { Decoration, EditorView, type DecorationSet, type ViewUpdate } from '@codemirror/view'
+import { Decoration, EditorView, hoverTooltip, type DecorationSet, type Tooltip, type ViewUpdate } from '@codemirror/view'
 import { tags } from '@lezer/highlight'
 import { onBeforeUnmount, onMounted, ref, watch, type DeepReadonly } from 'vue'
 import {
@@ -15,6 +15,7 @@ import {
   resolvePresetSourceExpressions,
   type PresetSourceEditorExpression,
 } from './webqq/preset-source-expressions'
+import type { PresetExpressionObservedValueResult } from './webqq/preset-expression-value'
 import type { PresetDocumentKind, SandboxPresetExpression } from '../src/presets'
 
 const props = defineProps<{
@@ -23,6 +24,7 @@ const props = defineProps<{
   expressions: readonly DeepReadonly<SandboxPresetExpression>[]
   loadedSource: string
   readOnly?: boolean
+  resolveExpressionValue?: (expression: SandboxPresetExpression) => Promise<PresetExpressionObservedValueResult>
 }>()
 const emit = defineEmits<{
   'update:modelValue': [value: string]
@@ -141,6 +143,57 @@ function expressionDecorations(
   }), true)
 }
 
+function expressionValueTooltip(): Extension {
+  return hoverTooltip(async (_view, pos) => {
+    const expression = activeExpressions.find((candidate) => (
+      candidate.kind === 'value'
+      && candidate.clickable
+      && candidate.stableId
+      && pos >= codeMirrorOffset(props.modelValue, candidate.range.start)
+      && pos <= codeMirrorOffset(props.modelValue, candidate.range.end)
+    ))
+    if (!expression || !props.resolveExpressionValue) return null
+
+    const result = await props.resolveExpressionValue(expression as SandboxPresetExpression)
+    return expressionTooltip(result, expression)
+  }, { hoverTime: 180, hideOnChange: true })
+}
+
+function expressionTooltip(
+  result: PresetExpressionObservedValueResult,
+  expression: PresetSourceEditorExpression,
+): Tooltip {
+  const from = codeMirrorOffset(props.modelValue, expression.range.start)
+  const to = codeMirrorOffset(props.modelValue, expression.range.end)
+  return {
+    pos: from,
+    end: to,
+    above: true,
+    create() {
+      const dom = document.createElement('div')
+      dom.className = 'webqq-preset-expression-tooltip'
+      if (result.status === 'failed') {
+        dom.classList.add('is-error')
+        dom.textContent = result.message
+        return { dom }
+      }
+      const label = document.createElement('span')
+      label.className = 'webqq-preset-expression-tooltip-label'
+      label.textContent = '最新请求中的值'
+      const value = document.createElement('pre')
+      value.className = 'webqq-preset-expression-tooltip-value'
+      value.textContent = result.value || '（空字符串）'
+      const time = document.createElement('time')
+      time.dateTime = result.requestCreatedAt
+      time.textContent = new Intl.DateTimeFormat('zh-CN', {
+        month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+      }).format(new Date(result.requestCreatedAt))
+      dom.append(label, value, time)
+      return { dom }
+    },
+  }
+}
+
 function expressionInteraction(): Extension {
   function resolveExpression(event: Event) {
     const element = event.target instanceof Element
@@ -194,6 +247,7 @@ function editorExtensions(readOnly = Boolean(props.readOnly)): Extension[] {
     ...editorBaseExtensions,
     decorationField,
     expressionInteraction(),
+    expressionValueTooltip(),
     EditorView.lineWrapping,
     EditorView.editable.of(!readOnly),
     EditorState.readOnly.of(readOnly),
