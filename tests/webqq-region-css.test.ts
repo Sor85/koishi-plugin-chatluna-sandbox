@@ -56,8 +56,17 @@ describe('WebQQ 区域样式', () => {
     const frostedSurfaceRule = primitives.slice(primitives.indexOf('body[data-sandbox-frosted] :is(')).split('}')[0]
     expect(frostedSurfaceRule).toContain('background: color-mix(in srgb, var(--webqq-panel) 72%, transparent)')
     expect(frostedSurfaceRule).toContain('backdrop-filter: saturate(180%) blur(20px)')
+    expect(frostedSurfaceRule).toContain('.sandbox-select-content')
     expect(frostedSurfaceRule).toContain('[data-slot="chatluna-sandbox-context-menu-content"]')
     expect(frostedSurfaceRule).toContain('[data-slot="chatluna-sandbox-context-menu-sub-content"]')
+    expect(frostedSurfaceRule).not.toContain('.sandbox-popover-content')
+    expect(frostedSurfaceRule).not.toContain('.sandbox-dialog-content')
+    const nestedHostRule = primitives.slice(primitives.indexOf('body[data-sandbox-frosted] :is(\n  .sandbox-dialog-content,\n  .sandbox-popover-content\n) {')).split('}')[0]
+    expect(nestedHostRule).toContain('background: transparent')
+    expect(nestedHostRule).toContain('backdrop-filter: none')
+    const nestedHostFrostRule = primitives.slice(primitives.indexOf('body[data-sandbox-frosted] :is(\n  .sandbox-dialog-content,\n  .sandbox-popover-content\n)::before {')).split('}')[0]
+    expect(nestedHostFrostRule).toContain('background: color-mix(in srgb, var(--webqq-panel) 72%, transparent)')
+    expect(nestedHostFrostRule).toContain('backdrop-filter: saturate(180%) blur(20px)')
     const contextMenuShadowRule = primitives.slice(primitives.indexOf('/* 右键菜单的 shadow-2xl')).split('}')[0]
     expect(contextMenuShadowRule).toContain('box-shadow: var(--webqq-secondary-shadow)')
     expect(primitives).toContain('body[data-sandbox-frosted] [data-slot="dialog-overlay"]')

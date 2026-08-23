@@ -320,12 +320,12 @@ body[data-sandbox-color-scheme="dark"] .webqq-environment-create-popover,
 }
 
 /* 毛玻璃外观（body[data-sandbox-frosted] 由 useFrostedSurfaceFlag 写入）下，
-   teleport 到 body 的实体二级面统一切换为雾化态：半透明面板色 + 背景模糊。
+   teleport 到 body 的叶子浮层切换为雾化态：半透明面板色 + 背景模糊。
    本条必须位于上方所有实体态背景规则之后，靠层叠顺序覆盖同特异性的实心背景；
-   工作区层已禁用 backdrop-filter（ADR 0060），浮层的模糊才能真正采样到内容。 */
+   工作区层已禁用 backdrop-filter（ADR 0060），浮层的模糊才能真正采样到内容。
+   Popover/Dialog 可能再嵌套 Select，不能把 backdrop-filter 写在容器上，否则
+   容器成为 Backdrop Root，嵌套下拉的模糊会完全失效并退化成半透明中间态。 */
 body[data-sandbox-frosted] :is(
-  .sandbox-dialog-content,
-  .sandbox-popover-content,
   .sandbox-select-content,
   [data-slot="chatluna-sandbox-context-menu-content"],
   [data-slot="chatluna-sandbox-context-menu-sub-content"]
@@ -333,6 +333,29 @@ body[data-sandbox-frosted] :is(
   border-color: color-mix(in srgb, var(--webqq-secondary-outline) 64%, transparent);
   /* 92% 面板填充会把已模糊的背景重新盖成近乎实心；72% 才能保留可辨识的雾化纹理。 */
   background: color-mix(in srgb, var(--webqq-panel) 72%, transparent);
+  backdrop-filter: saturate(180%) blur(20px);
+}
+
+body[data-sandbox-frosted] :is(
+  .sandbox-dialog-content,
+  .sandbox-popover-content
+) {
+  border-color: color-mix(in srgb, var(--webqq-secondary-outline) 64%, transparent);
+  background: transparent;
+  backdrop-filter: none;
+}
+
+body[data-sandbox-frosted] :is(
+  .sandbox-dialog-content,
+  .sandbox-popover-content
+)::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--webqq-panel) 72%, transparent);
+  content: "";
+  pointer-events: none;
   backdrop-filter: saturate(180%) blur(20px);
 }
 
