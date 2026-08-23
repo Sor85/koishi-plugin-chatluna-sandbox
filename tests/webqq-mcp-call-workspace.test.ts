@@ -12,7 +12,7 @@ describe('WebQQ MCP 调用工作台', () => {
 
     expect(sidebarSource).toMatch(/label:\s*['"]MCP 调用['"]/)
     expect(sidebarSource).toContain('IconHistory')
-    expect(sidebarSource).toContain("id === 'messages' || id === 'model-requests' || id === 'presets' || id === 'spaces'")
+    expect(sidebarSource).toContain("id === 'messages' || id === 'spaces'")
     expect(sidebarSource).not.toContain("id === 'mcp-calls'")
     expect(sidebarSource.indexOf("label: '调试'")).toBeLessThan(sidebarSource.indexOf("label: 'MCP 调用'"))
     expect(sidebarSource.indexOf("label: 'MCP 调用'")).toBeLessThan(sidebarSource.indexOf("label: '模型请求'"))

@@ -10,6 +10,8 @@ describe('AI 测试空间总览', () => {
 
     expect(sidebar).toContain("label: 'AI 测试空间'")
     expect(sidebar).toContain('visibleNavigationItems')
+    expect(sidebar).toContain("id === 'messages' || id === 'spaces'")
+    expect(sidebar).not.toContain("id === 'messages' || id === 'model-requests' || id === 'presets' || id === 'spaces'")
     expect(sidebar).toContain("'is-rail-pin-end': item.id === 'spaces'")
     expect(overview).toContain('主模拟 QQ 环境')
     expect(overview).toContain('filteredSpaces')

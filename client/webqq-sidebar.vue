@@ -413,7 +413,7 @@ const navigationItems = [
   { id: 'spaces' as const, label: 'AI 测试空间', icon: IconLayoutGrid },
 ]
 const visibleNavigationItems = computed(() => props.activeSpaceId
-  ? navigationItems.filter(({ id }) => id === 'messages' || id === 'model-requests' || id === 'presets' || id === 'spaces')
+  ? navigationItems.filter(({ id }) => id === 'messages' || id === 'spaces')
   : navigationItems)
 const sidebarTabs = [
   { id: 'recent' as const, label: '最近', icon: IconClock },
