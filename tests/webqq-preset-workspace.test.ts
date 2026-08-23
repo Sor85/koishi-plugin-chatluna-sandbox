@@ -77,4 +77,14 @@ describe('WebQQ 预设工作台源码契约', () => {
     expect(styles).toContain('.webqq-preset-token-key')
     expect(styles).toContain('.webqq-workspace[data-color-mode="dark"] .webqq-preset-source-editor')
   })
+
+  it('表达式悬停值滚动条不绘制轨道背景', () => {
+    const styles = readFileSync(resolve('client/styles/webqq-presets.css'), 'utf8')
+    const valueRule = styles.slice(styles.indexOf('.webqq-preset-expression-tooltip-value {')).split('}')[0]
+    expect(valueRule).toContain('scrollbar-color: #94a3b8 transparent')
+    const trackRule = styles
+      .slice(styles.indexOf('.webqq-preset-expression-tooltip-value::-webkit-scrollbar-track {'))
+      .split('}')[0]
+    expect(trackRule).toContain('background: transparent')
+  })
 })
