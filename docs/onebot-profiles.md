@@ -30,7 +30,7 @@ NapCat 与 LLBot 都提供 `send_poke`、`friend_poke` 和 `group_poke`。沙盒
 | 批量踢出群成员 | `set_group_kick_members`，参数 `user_id` | `batch_delete_group_member`，参数 `user_ids` |
 | 获取群相册列表（沙盒暂未实现） | `get_qun_album_list` | `get_group_album_list` |
 
-`get_friend_msg_history` 和 `get_group_msg_history` 复用沙盒逻辑会话的唯一消息历史，按当前机器人可见性过滤，并支持 `message_seq`、`count` 与反向排序参数。历史消息与实时消息使用同一套 Koishi 元素到 OneBot 消息段转换，因此图片等媒体不会降级为 `<img>` 文本。
+`get_friend_msg_history` 和 `get_group_msg_history` 复用沙盒逻辑会话的唯一消息历史，按当前机器人可见性过滤，并支持 `message_seq`、`count` 与反向排序参数。`message_seq` 游标在完整逻辑会话中解析，不使用 WebQQ 最近消息窗口；翻到最早一条之后返回空列表。历史消息与实时消息使用同一套 Koishi 元素到 OneBot 消息段转换，因此图片等媒体不会降级为 `<img>` 文本。
 
 沙盒尚未维护独立的 QQ 好友分组，因此 `get_friends_with_category` 会把当前机器人的真实好友关系放入“我的好友”默认分组。NapCat 的 `get_recent_contact` 从当前机器人可见的逻辑会话和最后一条消息实时生成，并遵守 `count` 参数；LLBot 基线不声明这个 action，避免掩盖两种实现的真实差异。
 

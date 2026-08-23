@@ -842,16 +842,23 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
   }
 
   private getVisibleConversation(channelId: string) {
-    const conversation = this.control.getVisibleSnapshot(this.selfId).conversations.find(({ id }) => id === channelId)
+    // WebQQ 可见快照会截断最近消息；机器人 action 必须按完整逻辑会话判断可见性。
+    const conversation = this.control.getSnapshot().conversations.find(({ id }) => id === channelId)
     if (!conversation) throw new Error(`会话不存在：${channelId}`)
+    if (!this.control.getVisibleSnapshot(this.selfId, 1).conversations.some(({ id }) => id === channelId)) {
+      throw new Error(`会话不存在：${channelId}`)
+    }
     return conversation
   }
 
   private findAccessibleMessage(rawMessageId: string, channelId?: string) {
-    const snapshot = this.control.getVisibleSnapshot(this.selfId)
-    const visibleMessages = channelId
-      ? snapshot.messages.filter(({ conversationId }) => conversationId === channelId)
-      : snapshot.messages
+    const visibleConversationIds = new Set(
+      this.control.getVisibleSnapshot(this.selfId, 1).conversations.map(({ id }) => id),
+    )
+    const visibleMessages = this.control.getSnapshot().messages.filter(({ conversationId }) => (
+      visibleConversationIds.has(conversationId)
+      && (!channelId || conversationId === channelId)
+    ))
     const messageId = resolveOneBotMessageId(rawMessageId, visibleMessages.map(({ id }) => id))
     const message = visibleMessages.find(({ id }) => id === messageId)
     if (!message) throw new Error(`消息不存在：${rawMessageId}`)

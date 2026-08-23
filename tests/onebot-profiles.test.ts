@@ -2,7 +2,7 @@ import { App } from '@koishijs/core'
 import type { Session } from 'koishi'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SandboxControlService } from '../src/control-service'
-import { getOneBotProfileBaseline } from '../src/onebot-profiles'
+import { getOneBotMessageSequence, getOneBotProfileBaseline } from '../src/onebot-profiles'
 
 const runningApps: App[] = []
 
@@ -203,6 +203,54 @@ describe('OneBot 实现配置', () => {
         ...(botId === '20002' ? { reverseOrder: false } : {}),
       })).resolves.toMatchObject({ data: { messages: [expect.objectContaining({ raw_message: '群聊历史' })] } })
     }
+  })
+
+  it('群聊历史按 message_seq 翻页时能读取超过可见快照窗口的更早消息', async () => {
+    const control = await createControl()
+    const first = await control.sendMessage({
+      operatorId: '10002',
+      conversationId: 'group:30001',
+      content: '更早的群聊历史',
+    })
+    for (let index = 1; index <= 50; index += 1) {
+      await control.sendMessage({
+        operatorId: '10002',
+        conversationId: 'group:30001',
+        content: `最近群聊历史${index}`,
+      })
+    }
+
+    const firstPage = await control.bot.internal._request('get_group_msg_history', {
+      group_id: 30001,
+      count: 50,
+    }) as { data: { messages: Array<{ raw_message: string, message_seq: number }> } }
+    expect(firstPage.data.messages.map(({ raw_message }) => raw_message)).toEqual([
+      ...Array.from({ length: 50 }, (_, index) => `最近群聊历史${index + 1}`),
+    ])
+
+    const olderPage = await control.bot.internal._request('get_group_msg_history', {
+      group_id: 30001,
+      message_seq: firstPage.data.messages[0].message_seq,
+      count: 50,
+      reverseOrder: true,
+    }) as { data: { messages: Array<{ raw_message: string, message_seq: number }> } }
+    expect(olderPage.data.messages.map(({ raw_message }) => raw_message)).toEqual(['更早的群聊历史'])
+    expect(olderPage.data.messages[0].message_seq).toBe(getOneBotMessageSequence(first.messageId))
+
+    // Character 会继续用最旧一条的 message_seq 翻页；游标必须在完整逻辑会话中解析，
+    // 且到达起点时返回空列表而不是抛错，否则整段已拉取历史会被丢弃。
+    const beforeOldest = await control.bot.internal._request('get_group_msg_history', {
+      group_id: 30001,
+      message_seq: getOneBotMessageSequence(first.messageId),
+      count: 50,
+      reverseOrder: true,
+    }) as { data: { messages: Array<{ raw_message: string }> } }
+    expect(beforeOldest.data.messages).toEqual([])
+    await expect(control.bot.internal._request('get_msg', {
+      message_id: getOneBotMessageSequence(first.messageId),
+    })).resolves.toMatchObject({
+      data: { raw_message: '更早的群聊历史', message_id: getOneBotMessageSequence(first.messageId) },
+    })
   })
 
   it('按机器人实现配置生成版本返回并隔离能力覆盖', async () => {
