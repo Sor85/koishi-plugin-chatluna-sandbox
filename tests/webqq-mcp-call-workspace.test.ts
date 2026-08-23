@@ -78,5 +78,7 @@ describe('WebQQ MCP 调用工作台', () => {
     expect(styles).toMatch(/\.webqq-mcp-call-list-toolbar\s*\{[^}]*justify-content:\s*space-between/s)
     expect(styles).toMatch(/\.webqq-mcp-call-list-toolbar\s*\{[^}]*border-bottom:\s*1px solid var\(--webqq-border\)/s)
     expect(styles).toMatch(/\.webqq-mcp-call-split\s*\{[^}]*grid-row:\s*3/s)
+    expect(styles).toMatch(/\.webqq-mcp-call-list-pane,\s*\n\s*\.webqq-mcp-call-detail-pane\s*\{[^}]*display:\s*grid/s)
+    expect(styles).toMatch(/\.webqq-mcp-call-empty,\s*\n\s*\.webqq-mcp-call-error\s*\{[^}]*place-items:\s*center/s)
   })
 })

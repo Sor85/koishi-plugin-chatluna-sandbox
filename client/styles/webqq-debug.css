@@ -175,6 +175,7 @@
 
 .webqq-debug-list-pane,
 .webqq-debug-detail-pane {
+  display: grid;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -420,6 +421,9 @@
 
 .webqq-debug-empty,
 .webqq-debug-error {
+  display: grid;
+  place-items: center;
+  min-height: 0;
   padding: 32px;
   text-align: center;
 }

@@ -63,6 +63,7 @@
 
 .webqq-preset-list-pane,
 .webqq-preset-editor-pane {
+  display: grid;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -383,15 +384,16 @@
 }
 
 .webqq-preset-empty {
-  padding: 20px;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  padding: 32px;
   color: var(--webqq-muted);
   text-align: center;
 }
 
 .webqq-preset-empty.is-editor {
-  display: grid;
-  place-items: center;
-  height: 100%;
+  grid-row: 1 / -1;
 }
 
 .webqq-preset-dialog-fields {

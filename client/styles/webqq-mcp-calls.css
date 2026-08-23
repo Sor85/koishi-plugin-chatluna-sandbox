@@ -152,6 +152,7 @@
 
 .webqq-mcp-call-list-pane,
 .webqq-mcp-call-detail-pane {
+  display: grid;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -384,6 +385,9 @@
 
 .webqq-mcp-call-empty,
 .webqq-mcp-call-error {
+  display: grid;
+  place-items: center;
+  min-height: 0;
   padding: 32px;
   text-align: center;
 }

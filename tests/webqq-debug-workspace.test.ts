@@ -81,6 +81,8 @@ describe('WebQQ OneBot 调试工作台', () => {
     expect(styles).toMatch(/\.webqq-debug-list-toolbar\s*\{[^}]*border-bottom:\s*1px solid var\(--webqq-border\)/s)
     expect(styles).toMatch(/\.webqq-debug-split\s*\{[^}]*grid-row:\s*3/s)
     expect(styles).toMatch(/\.webqq-debug-meta\s*\{[^}]*align-items:\s*center/s)
+    expect(styles).toMatch(/\.webqq-debug-list-pane,\s*\n\s*\.webqq-debug-detail-pane\s*\{[^}]*display:\s*grid/s)
+    expect(styles).toMatch(/\.webqq-debug-empty,\s*\n\s*\.webqq-debug-error\s*\{[^}]*place-items:\s*center/s)
   })
 
   it('使用独立网格和统一控件基线，避免筛选器溢出与黑色描边', () => {
