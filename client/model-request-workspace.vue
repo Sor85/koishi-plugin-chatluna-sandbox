@@ -401,6 +401,15 @@
               <div class="webqq-model-request-body-tabs" role="tablist" aria-label="模型请求内容">
                 <Button
                   size="sm"
+                  :variant="bodyView === 'analysis' ? 'secondary' : 'ghost'"
+                  role="tab"
+                  :aria-selected="bodyView === 'analysis'"
+                  @click="bodyView = 'analysis'"
+                >
+                  分析
+                </Button>
+                <Button
+                  size="sm"
                   :variant="bodyView === 'request' ? 'secondary' : 'ghost'"
                   role="tab"
                   :aria-selected="bodyView === 'request'"
@@ -416,15 +425,6 @@
                   @click="bodyView = 'response'"
                 >
                   响应
-                </Button>
-                <Button
-                  size="sm"
-                  :variant="bodyView === 'analysis' ? 'secondary' : 'ghost'"
-                  role="tab"
-                  :aria-selected="bodyView === 'analysis'"
-                  @click="bodyView = 'analysis'"
-                >
-                  分析
                 </Button>
               </div>
               <div v-if="bodyView !== 'analysis'" class="webqq-model-request-body-actions">
@@ -672,7 +672,7 @@ const selectedRecordId = ref('')
 const detailView = ref<'trajectory' | 'evidence'>('evidence')
 const clearDialogOpen = ref(false)
 const clearStep = ref<1 | 2>(1)
-const bodyView = ref<'request' | 'response' | 'analysis'>('request')
+const bodyView = ref<'request' | 'response' | 'analysis'>('analysis')
 const externalLocateRequest = ref<LocateRequest>()
 const navigationStatus = ref('')
 const presetNavigation = createPresetNavigationCoordinator()
@@ -818,7 +818,7 @@ watch(() => props.detail?.id, () => {
   }
   inspectRecordId = undefined
   detailView.value = 'evidence'
-  bodyView.value = 'request'
+  bodyView.value = 'analysis'
   responseView.value = 'content'
   headersExpanded.value = false
   applyPendingReturnState()
@@ -1018,8 +1018,8 @@ function returnToTrajectory() {
 function applyPendingReturnState() {
   const state = navigationStack.takePending(props.detail?.id)
   if (!state) return
-  // 跨请求返回时 detail.id watcher 会先把页签重置到“请求”；目标详情真正到达后，
-  // 必须连同轨迹和滚动位置再次恢复视图快照，否则同请求测试通过但跨请求仍会落回请求页。
+  // 跨请求返回时 detail.id watcher 会先把页签重置到“分析”；目标详情真正到达后，
+  // 必须连同轨迹和滚动位置再次恢复视图快照，否则同请求测试通过但跨请求仍会落回分析页。
   detailView.value = state.detailView
   bodyView.value = state.bodyView
   trajectoryReturnState.value = {
