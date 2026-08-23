@@ -25,6 +25,7 @@ export function createKoishiWorkspacePort(resolveSpaceId: () => string | undefin
   performFriendAction: (input) => send('chatluna-sandbox/friend-action', scoped(input)),
   performGroupAction: (input) => send('chatluna-sandbox/group-action', scoped(input)),
   getOneBotDebugRecords: (input = {}) => send('chatluna-sandbox/debug-records', scoped(input)),
+  getOneBotDebugRecord: (input) => send('chatluna-sandbox/debug-record', scoped(input)),
   clearOneBotDebugRecords: () => send('chatluna-sandbox/clear-debug-records', scoped({})),
   // 模型请求记录按分类显式传 scope/spaceId，不能复用当前工作区的 spaceId 注入：
   // 未归属分类没有 spaceId，切到其他空间时也不应被当前观察的测试空间覆盖。

@@ -6,6 +6,7 @@ import type {
   GetMediaContentInput,
   GetMessageHistoryInput,
   GetSandboxWorkspaceInput,
+  GetSandboxOneBotDebugRecordInput,
   GetSandboxOneBotDebugRecordsInput,
   ManageSandboxEnvironmentInput,
   PerformFriendActionInput,
@@ -91,6 +92,7 @@ export class FakeWorkspacePort implements WorkspacePort {
     hasMore: false,
     capacity: { recordCount: 0, totalBytes: 0, maxRecords: 500, maxBytes: 50 * 1024 * 1024 },
   }
+  debugRecordResult?: SandboxConsoleOneBotDebugRecord
   clearDebugRecordsResult: ClearSandboxOneBotDebugRecordsResult = { cleared: 0 }
   modelRequestRecordsResult: SandboxModelRequestRecordsPage = emptyModelRequestRecordsPage
   modelRequestRecordResult?: SandboxModelRequestDetail
@@ -190,6 +192,13 @@ export class FakeWorkspacePort implements WorkspacePort {
 
   getOneBotDebugRecords(input?: GetSandboxOneBotDebugRecordsInput) {
     return this.invoke('getOneBotDebugRecords', input, this.debugRecordsResult)
+  }
+
+  getOneBotDebugRecord(input: GetSandboxOneBotDebugRecordInput & { spaceId?: string }) {
+    const record = this.debugRecordResult
+      ?? this.debugRecordsResult.records.find(({ id }) => id === input.recordId)
+    if (!record) this.rejectNext('getOneBotDebugRecord', new Error('调试记录不存在'))
+    return this.invoke('getOneBotDebugRecord', input, record as SandboxConsoleOneBotDebugRecord)
   }
 
   clearOneBotDebugRecords() {

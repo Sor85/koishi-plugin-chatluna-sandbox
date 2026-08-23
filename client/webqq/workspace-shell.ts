@@ -7,6 +7,7 @@ import type { WebqqMessageListModel } from '../webqq-message-list.vue'
 import type { WebqqSidebarModel } from '../webqq-sidebar.vue'
 import type { ListSandboxMcpCallRecordsInput } from '../../src/mcp/call-records'
 import type {
+  GetSandboxOneBotDebugRecordInput,
   GetSandboxOneBotDebugRecordsInput,
   ManageSandboxEnvironmentInput,
   SandboxConversation,
@@ -76,6 +77,7 @@ export function createWebqqWorkspaceShell(
   const mediaLoadFailures = ref<Record<string, true>>({})
   const errorMessage = ref('')
   const debugLoading = ref(false)
+  const debugDetailLoading = ref(false)
   const debugError = ref('')
   const mcpCallLoading = ref(false)
   const mcpCallDetailLoading = ref(false)
@@ -354,7 +356,9 @@ export function createWebqqWorkspaceShell(
   }))
   const debugWorkspaceModel = computed(() => ({
     records: workspaceController.oneBotDebugRecords.value,
+    detail: workspaceController.oneBotDebugRecord.value,
     loading: debugLoading.value,
+    detailLoading: debugDetailLoading.value,
     error: debugError.value,
   }))
   const mcpCallWorkspaceModel = computed(() => ({
@@ -658,6 +662,18 @@ export function createWebqqWorkspaceShell(
       debugError.value = error instanceof Error ? error.message : '读取 OneBot 调试记录失败'
     } finally {
       debugLoading.value = false
+    }
+  }
+
+  async function loadOneBotDebugRecord(input: GetSandboxOneBotDebugRecordInput & { spaceId?: string }) {
+    debugDetailLoading.value = true
+    debugError.value = ''
+    try {
+      await workspaceController.loadOneBotDebugRecord(input)
+    } catch (error) {
+      debugError.value = error instanceof Error ? error.message : '读取 OneBot 调试详情失败'
+    } finally {
+      debugDetailLoading.value = false
     }
   }
 
@@ -1028,6 +1044,7 @@ export function createWebqqWorkspaceShell(
     loadEarlierMessages,
     searchConversationMessages,
     loadOneBotDebugRecords,
+    loadOneBotDebugRecord,
     loadMcpCallRecords,
     loadMcpCallRecord,
     loadModelRequestRecords,

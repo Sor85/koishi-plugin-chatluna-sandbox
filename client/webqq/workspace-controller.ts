@@ -3,6 +3,7 @@ import type {
   DeleteGroupAnnouncementInput,
   GetForwardMessageInput,
   GetMessageHistoryInput,
+  GetSandboxOneBotDebugRecordInput,
   GetSandboxOneBotDebugRecordsInput,
   ManageSandboxEnvironmentInput,
   RecallMessageInput,
@@ -154,6 +155,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   const currentViewState = ref<SandboxWorkspaceView>('messages')
   const hiddenRecentConversationsState = ref<Record<string, Record<string, string>>>({})
   const oneBotDebugRecordsState = ref<SandboxConsoleOneBotDebugRecord[]>([])
+  const oneBotDebugRecordState = ref<SandboxConsoleOneBotDebugRecord>()
   const modelRequestRecordsState = ref<SandboxModelRequestListItem[]>([])
   const modelRequestRecordState = ref<SandboxModelRequestDetail>()
   const modelRequestTrajectoryState = ref<SandboxModelRequestTrajectory>()
@@ -559,10 +561,20 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     }
   }
 
+  async function loadOneBotDebugRecord(input: GetSandboxOneBotDebugRecordInput & { spaceId?: string }) {
+    try {
+      oneBotDebugRecordState.value = await port.getOneBotDebugRecord(input)
+      return oneBotDebugRecordState.value
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '读取 OneBot 调试详情失败')
+    }
+  }
+
   async function clearOneBotDebugRecords() {
     try {
       await port.clearOneBotDebugRecords()
       oneBotDebugRecordsState.value = []
+      oneBotDebugRecordState.value = undefined
     } catch (error) {
       throw normalizeWorkspaceError(error, '清理 OneBot 调试记录失败')
     }
@@ -754,6 +766,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     activeConversationId: readonly(activeConversationIdState),
     currentView: readonly(currentViewState),
     oneBotDebugRecords: readonly(oneBotDebugRecordsState),
+    oneBotDebugRecord: readonly(oneBotDebugRecordState),
     modelRequestRecords: readonly(modelRequestRecordsState),
     modelRequestRecord: readonly(modelRequestRecordState),
     modelRequestTrajectory: readonly(modelRequestTrajectoryState),
@@ -774,6 +787,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     loadMessageHistory,
     searchConversationMessages,
     loadOneBotDebugRecords,
+    loadOneBotDebugRecord,
     loadModelRequestRecords,
     loadModelRequestRecord,
     loadModelRequestTrajectory,

@@ -66,8 +66,17 @@ describe('WebQQ OneBot 调试控制器', () => {
       input: { botId: '20001', direction: 'action' },
     })
 
+    port.debugRecordResult = record
+    await controller.loadOneBotDebugRecord({ recordId: 'debug-1', includeLargeValues: true })
+    expect(controller.oneBotDebugRecord.value).toEqual(record)
+    expect(port.calls.at(-1)).toEqual({
+      operation: 'getOneBotDebugRecord',
+      input: { recordId: 'debug-1', includeLargeValues: true },
+    })
+
     await controller.clearOneBotDebugRecords()
     expect(controller.oneBotDebugRecords.value).toEqual([])
+    expect(controller.oneBotDebugRecord.value).toBeUndefined()
     expect(port.calls.at(-1)).toEqual({ operation: 'clearOneBotDebugRecords', input: undefined })
   })
 })

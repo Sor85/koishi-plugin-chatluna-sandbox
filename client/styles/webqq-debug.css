@@ -8,10 +8,14 @@
 }
 
 .webqq-debug-header,
-.webqq-debug-record > header,
-.webqq-debug-record-title,
+.webqq-debug-item-name,
 .webqq-debug-actions,
-.webqq-debug-error-filter {
+.webqq-debug-error-filter,
+.webqq-debug-timing,
+.webqq-debug-timing > time,
+.webqq-debug-timing > span,
+.webqq-debug-section-heading,
+.webqq-debug-section-heading > span {
   display: flex;
   align-items: center;
 }
@@ -28,35 +32,71 @@
 }
 
 .webqq-debug-header p,
-.webqq-debug-record p {
+.webqq-debug-item p,
+.webqq-debug-detail p {
   margin: 0;
   color: var(--webqq-muted);
 }
 
 .webqq-debug-actions,
-.webqq-debug-record-title,
+.webqq-debug-item-name,
 .webqq-debug-error-filter {
   gap: 8px;
 }
 
-.webqq-debug-filters {
+.webqq-debug-list-toolbar,
+.webqq-debug-list-tools {
+  display: flex;
+}
+
+.webqq-debug-filter-popover > label:not(.webqq-debug-error-filter) {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
-  gap: 16px;
-  padding: 16px;
-  border: 1px solid var(--webqq-border);
-  border-radius: 16px;
+}
+
+.webqq-debug-list-toolbar {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 56px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--webqq-border);
   background: var(--webqq-surface);
 }
 
-.webqq-debug-filters > label:not(.webqq-debug-error-filter) {
+.webqq-debug-list-toolbar h2 {
+  margin: 0;
+  color: var(--webqq-text);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.webqq-debug-list-tools {
+  align-items: center;
+  gap: 8px;
+}
+
+.webqq-debug-filter-trigger {
+  border-radius: 8px;
+}
+
+.webqq-debug-filter-trigger.is-filtered {
+  color: var(--webqq-accent);
+  border-color: color-mix(in srgb, var(--webqq-accent) 34%, var(--webqq-border));
+  background: color-mix(in srgb, var(--webqq-accent) 10%, var(--webqq-surface));
+}
+
+.webqq-debug-filter-popover {
   display: grid;
+  gap: 12px;
+  width: 280px;
+}
+
+.webqq-debug-filter-popover > label:not(.webqq-debug-error-filter) {
   gap: 8px;
   min-width: 0;
   font-weight: 600;
 }
 
-/* 颜色与 focus 态由 webqq-primitives.css 的控件基线统一提供，这里只保留布局宽度。 */
 .webqq-debug-control {
   width: 100%;
 }
@@ -90,81 +130,255 @@
   white-space: nowrap;
 }
 
-.webqq-debug-records {
+.webqq-debug-split {
   display: grid;
-  align-content: start;
-  grid-auto-rows: max-content;
-  gap: 16px;
-  height: 100%;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  grid-row: 3;
   min-height: 0;
-  overflow: auto;
-  padding-right: 8px;
+  gap: 16px;
 }
 
-.webqq-debug-record {
-  padding: 14px 16px;
+.webqq-debug-list-pane,
+.webqq-debug-detail-pane {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   border: 1px solid var(--webqq-border);
   border-radius: 16px;
   background: var(--webqq-surface);
 }
 
-.webqq-debug-record > header {
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-bottom: 6px;
+.webqq-debug-list-pane {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
-.webqq-debug-record time,
-.webqq-debug-resolved,
-.webqq-debug-entities,
+.webqq-debug-list,
+.webqq-debug-detail {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+}
+
+.webqq-debug-list {
+  display: grid;
+  align-content: start;
+  grid-auto-rows: max-content;
+  gap: 8px;
+  height: 100%;
+  padding: 8px;
+}
+
+.webqq-debug-item {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.webqq-debug-item.is-active,
+.webqq-debug-item:hover,
+.webqq-debug-item:focus-visible {
+  background: var(--webqq-hover);
+}
+
+.webqq-debug-item:focus-visible {
+  outline: 2px solid var(--webqq-accent);
+  outline-offset: 2px;
+}
+
+.webqq-debug-item-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.webqq-debug-item-name {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.webqq-debug-item-name strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--webqq-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webqq-debug-timing {
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: var(--webqq-muted);
+}
+
+.webqq-debug-timing > time,
+.webqq-debug-timing > span {
+  gap: 4px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.webqq-debug-timing svg {
+  flex: 0 0 auto;
+}
+
+.sandbox-badge.webqq-debug-direction,
+.sandbox-badge.webqq-debug-source {
+  max-width: 7.5em;
+  overflow: hidden;
+  border-color: var(--webqq-border);
+  color: var(--webqq-muted);
+  background: var(--webqq-surface-muted);
+  text-overflow: ellipsis;
+}
+
+.webqq-debug-item time,
+.webqq-debug-detail time,
+.webqq-debug-timing,
 .webqq-debug-trace {
   font-size: 13px;
 }
 
-.webqq-debug-status-success {
+.webqq-workspace .sandbox-badge.webqq-debug-status-success {
   color: #047857;
   background: #d1fae5;
 }
 
-.webqq-debug-status-error,
+.webqq-workspace[data-color-mode="dark"] .sandbox-badge.webqq-debug-status-success {
+  color: #a7f3d0;
+  background: #064e3b;
+}
+
 .webqq-debug-error,
 .webqq-debug-trace {
   color: #b91c1c;
 }
 
-.webqq-debug-status-error {
+.webqq-workspace .sandbox-badge.webqq-debug-status-error {
+  color: #b91c1c;
   background: #fee2e2;
+}
+
+.webqq-workspace[data-color-mode="dark"] .sandbox-badge.webqq-debug-status-error {
+  color: #fecaca;
+  background: #7f1d1d;
+}
+
+.webqq-debug-detail {
+  display: grid;
+  align-content: start;
+  grid-auto-rows: max-content;
+  gap: 16px;
+  padding: 16px;
+}
+
+.webqq-debug-meta-list {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--webqq-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--webqq-surface-muted) 52%, transparent);
+}
+
+.webqq-debug-meta {
+  display: grid;
+  grid-template-columns: 17px minmax(64px, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  line-height: 20px;
+}
+
+.webqq-debug-meta + .webqq-debug-meta {
+  border-top: 1px solid var(--webqq-border);
+}
+
+.webqq-debug-meta svg {
+  display: block;
+  width: 17px;
+  height: 17px;
+  color: var(--webqq-accent);
+}
+
+.webqq-debug-meta-label {
+  color: var(--webqq-muted);
+  font-weight: 600;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.webqq-debug-meta-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--webqq-text);
+  line-height: 20px;
+  user-select: text;
+}
+
+.webqq-debug-error-diagnostic {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, #b91c1c 28%, var(--webqq-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, #fee2e2 46%, var(--webqq-surface));
+}
+
+.webqq-debug-section-heading {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.webqq-debug-section-heading > span {
+  gap: 7px;
+}
+
+.webqq-debug-section-heading svg {
+  flex: 0 0 auto;
+  color: var(--webqq-accent);
 }
 
 .webqq-debug-payloads {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 12px;
+  gap: 16px;
 }
 
-.webqq-debug-payloads h2 {
-  margin: 0 0 8px;
+.webqq-debug-payloads > section {
+  display: grid;
+  gap: 8px;
+}
+
+.webqq-debug-payloads h2,
+.webqq-debug-section-heading strong {
+  margin: 0;
   font-size: 13px;
 }
 
 .webqq-debug-payloads pre {
-  max-height: 176px;
+  max-height: 320px;
   overflow: auto;
-  padding: 10px 12px;
+  padding: 12px;
   margin: 0;
   border-radius: 12px;
   color: var(--webqq-text);
   background: var(--webqq-surface-muted);
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
   line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  user-select: text;
 }
 
 .webqq-debug-fold {
-  margin: 8px 0 0;
+  margin: 0;
   font-size: 12px;
   color: var(--webqq-text-muted, #64748b);
 }
@@ -180,23 +394,14 @@
     padding: 16px;
   }
 
-  .webqq-debug-filters {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .webqq-debug-payloads {
+  .webqq-debug-split {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 720px) {
-  .webqq-debug-header,
-  .webqq-debug-record > header {
+  .webqq-debug-header {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .webqq-debug-filters {
-    grid-template-columns: 1fr;
   }
 }

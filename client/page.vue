@@ -50,10 +50,13 @@
         <OneBotDebugWorkspace
           v-else-if="currentView === 'debug'"
           :records="debugWorkspaceModel.records"
+          :detail="debugWorkspaceModel.detail"
           :bots="debugBots"
           :loading="debugWorkspaceModel.loading"
+          :detail-loading="debugWorkspaceModel.detailLoading"
           :error="debugWorkspaceModel.error"
           @query="loadOneBotDebugRecords"
+          @open="loadOneBotDebugRecord"
           @clear="clearOneBotDebugRecords"
         />
         <McpCallWorkspace
@@ -239,6 +242,7 @@ const {
   loadEarlierMessages,
   searchConversationMessages,
   loadOneBotDebugRecords,
+  loadOneBotDebugRecord,
   loadMcpCallRecords,
   loadMcpCallRecord,
   loadModelRequestRecords,
