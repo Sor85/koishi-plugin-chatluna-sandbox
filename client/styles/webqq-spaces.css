@@ -27,7 +27,7 @@
 .webqq-space-thumbnail-live-workspace { position: absolute; top: 0; left: 0; margin: 0; transform-origin: 0 0; }
 .webqq-space-thumbnail-workspace { position: absolute; top: 0; left: 0; width: 1440px; height: 760px; grid-template-columns: 300px minmax(360px, 1fr) 280px; grid-template-rows: 56px minmax(0, 1fr); transform-origin: 0 0; }
 /* 预览副本只负责绘制；裁掉滚动条、弹层和动态选择态，避免缩放副本污染正文交互。 */
-:is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) :is(.chatluna-sandbox-scrollbar-overlay, [data-reka-popper-content-wrapper]) { display: none !important; }
+:is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) :is(.chatluna-sandbox-scrollbar-overlay, [data-reka-popper-content-wrapper], .webqq-agent-observe) { display: none !important; }
 :is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) .chatluna-sandbox-messages { scrollbar-width: none; }
 :is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) .chatluna-sandbox-messages::-webkit-scrollbar { display: none; }
 
@@ -52,7 +52,7 @@
 @keyframes webqq-agent-pulse { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--webqq-accent) 4%, transparent); } }
 
 /* 观察被控空间的覆盖层保留状态专属点阵；它不是页面底色，不能被通用纯色背景规范抹除。 */
-.webqq-agent-observe { position: relative; z-index: 25; grid-column: 1 / -1; grid-row: 2; min-width: 0; min-height: 0; pointer-events: none; background: rgb(37 99 235 / 24%); }
+.webqq-agent-observe { position: relative; z-index: 25; grid-column: 1 / -1; grid-row: 1 / -1; min-width: 0; min-height: 0; pointer-events: none; background: rgb(37 99 235 / 24%); }
 .webqq-agent-observe-dots { position: absolute; inset: 0; opacity: 0.5; background-image: radial-gradient(circle, rgb(55 55 55 / 10%) 1px, transparent 1px); background-size: 6px 6px; }
 .webqq-agent-observe-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .webqq-agent-observe .webqq-agent-cursor { z-index: 20; }

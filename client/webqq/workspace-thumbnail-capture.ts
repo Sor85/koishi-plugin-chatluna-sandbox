@@ -13,6 +13,8 @@ export function captureWorkspaceThumbnail(root: HTMLElement): WorkspaceThumbnail
     : [])
   const element = root.cloneNode(true) as HTMLElement
   copyCanvasPixels(root, element)
+  // 缩略图只保留工作区画面；被控覆盖层的 scrim、点阵、WebGL 跑马灯和任务栏会挡住真实页面。
+  stripAgentObserveOverlay(element)
 
   return {
     element,
@@ -34,16 +36,20 @@ export function instantiateWorkspaceThumbnail(capture: WorkspaceThumbnailCapture
 }
 
 function copyCanvasPixels(sourceRoot: HTMLElement, targetRoot: HTMLElement) {
-  const sourceCanvases = [...sourceRoot.querySelectorAll('canvas')]
-  const targetCanvases = [...targetRoot.querySelectorAll('canvas')]
+  const sourceCanvases = [...sourceRoot.querySelectorAll('canvas')].filter((node) => !node.closest('.webqq-agent-observe'))
+  const targetCanvases = [...targetRoot.querySelectorAll('canvas')].filter((node) => !node.closest('.webqq-agent-observe'))
   for (const [index, source] of sourceCanvases.entries()) {
     const target = targetCanvases[index]
     if (!target) continue
     target.width = source.width
     target.height = source.height
-    // cloneNode 不复制 Canvas 的像素缓冲；转成位图后再写入，避免运行中空间的 WebGL 光效在缩略图中消失。
+    // cloneNode 不复制 Canvas 的像素缓冲；转成位图后再写入，才能保留工作区里真正需要展示的画布。
     target.getContext('2d')?.drawImage(source, 0, 0)
   }
+}
+
+function stripAgentObserveOverlay(root: HTMLElement) {
+  for (const node of root.querySelectorAll('.webqq-agent-observe')) node.remove()
 }
 
 export function restoreWorkspaceThumbnailScroll(capture: WorkspaceThumbnailCapture, element: HTMLElement) {
