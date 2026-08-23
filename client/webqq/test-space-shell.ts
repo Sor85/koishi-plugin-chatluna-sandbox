@@ -114,10 +114,8 @@ export function createAiTestSpaceShell(
   onMounted(() => {
     void loadTestSpaces()
     refreshTimer = setInterval(() => {
-      // 除总览外，进入测试空间观察时也要轮询：AI 完成或失败后被控覆盖层要实时消失。
-      if (currentView.value === 'spaces' || currentView.value === 'profile' || currentView.value === 'debug' || currentView.value === 'mcp-calls' || currentView.value === 'model-requests' || currentView.value === 'presets' || activeSpaceId.value) {
-        void loadTestSpaces()
-      }
+      // 顶栏占用特效、总览卡片和被控覆盖层都依赖空间 status，任意视图都要轮询。
+      void loadTestSpaces()
     }, 1500)
   })
   onBeforeUnmount(() => {

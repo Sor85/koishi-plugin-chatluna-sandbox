@@ -702,6 +702,8 @@ export class SandboxMcpService {
   private uploadPerMinute: number
   private rateWindows = new Map<string, number[]>()
   private activeCalls = new Map<string, number>()
+  private activityListeners = new Set<(running: boolean) => void>()
+  private activityRunning = false
   private concurrentLimits: Record<'mutation' | 'wait' | 'upload', number>
   private testSpaces?: SandboxTestSpaceService
   private unattributedModelRequests?: SandboxModelRequestStore
@@ -725,6 +727,8 @@ export class SandboxMcpService {
     this.loadCredentials()
     this.observeControl(this.control)
     this.testSpaces?.onSpaceCreated((spaceId, control) => this.observeControl(control, spaceId))
+    this.testSpaces?.onOccupationChange(() => this.syncActivity())
+    this.syncActivity()
   }
 
   private observeControl(control: SandboxControlService, spaceId?: string): void {
@@ -911,6 +915,15 @@ export class SandboxMcpService {
 
   getRevision(): number {
     return this.control.getSnapshot().revision
+  }
+
+  isActivityRunning(): boolean {
+    return this.activityRunning
+  }
+
+  onActivity(listener: (running: boolean) => void): () => void {
+    this.activityListeners.add(listener)
+    return () => { this.activityListeners.delete(listener) }
   }
 
   async callTool(token: string, tool: string, argumentsValue: unknown, context: { sourceIp?: string } = {}): Promise<unknown> {
@@ -1667,6 +1680,18 @@ export class SandboxMcpService {
     }
     window.push(now)
     this.rateWindows.set(key, window)
+  }
+
+  private hasOccupiedSpace() {
+    return this.testSpaces?.isOccupied() ?? false
+  }
+
+  private syncActivity() {
+    // 顶栏特效跟 AI 测试空间占用走：status=running 期间持续转，不随单次工具调用闪断。
+    const running = this.hasOccupiedSpace()
+    if (running === this.activityRunning) return
+    this.activityRunning = running
+    for (const listener of this.activityListeners) listener(running)
   }
 
   private async withConcurrency<T>(credentialId: string, category: 'mutation' | 'wait' | 'upload', action: () => Promise<T>): Promise<T> {

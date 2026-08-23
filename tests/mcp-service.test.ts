@@ -637,4 +637,39 @@ describe('SandboxMcpService', () => {
       timeoutSeconds: 1,
     })).resolves.toMatchObject({ matched: false, reason: 'timeout' })
   })
+
+  it('AI 测试空间占用期间报告 MCP 活动，结束后清除', async () => {
+    const { service, credential, testSpaces } = createService(['read', 'interact', 'manage'], true)
+    const events: boolean[] = []
+    service.onActivity((running) => events.push(running))
+    expect(service.isActivityRunning()).toBe(false)
+
+    const created = await service.callTool(credential.token, 'create_test_space', {
+      idempotencyKey: 'space-activity-1',
+    }) as { spaceId: string }
+    expect(service.isActivityRunning()).toBe(true)
+    expect(events).toEqual([true])
+
+    await service.callTool(credential.token, 'wait_for_message', {
+      spaceId: created.spaceId,
+      cursor: service.currentCursor(),
+      timeoutSeconds: 1,
+    })
+    expect(service.isActivityRunning()).toBe(true)
+    expect(events).toEqual([true])
+
+    testSpaces.takeOver(created.spaceId)
+    expect(service.isActivityRunning()).toBe(false)
+    expect(events).toEqual([true, false])
+
+    testSpaces.returnControl(created.spaceId)
+    expect(service.isActivityRunning()).toBe(true)
+
+    await service.callTool(credential.token, 'complete_test_space', {
+      spaceId: created.spaceId,
+      idempotencyKey: 'space-activity-complete-1',
+    })
+    expect(service.isActivityRunning()).toBe(false)
+    expect(events).toEqual([true, false, true, false])
+  })
 })

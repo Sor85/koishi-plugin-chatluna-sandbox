@@ -117,6 +117,7 @@ interface ConsoleEventMap {
   'chatluna-sandbox/mcp-call-records': (input?: ListSandboxMcpCallRecordsInput) => SandboxMcpCallRecordsPage
   'chatluna-sandbox/mcp-call-record': (input: { recordId: string }) => SandboxMcpCallRecord
   'chatluna-sandbox/clear-mcp-call-records': () => { cleared: number }
+  'chatluna-sandbox/mcp-activity': () => { running: boolean }
   'chatluna-sandbox/mcp-credentials': () => Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }>
   'chatluna-sandbox/create-mcp-credential': (input: { name: string; scopes: SandboxMcpScope[] }) => { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
   'chatluna-sandbox/update-mcp-credential': (input: { id: string; name?: string; scopes?: SandboxMcpScope[] }) => { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }
@@ -561,6 +562,10 @@ export function registerConsole(
     registerListener('chatluna-sandbox/preset-locate-expression', (input) => presets.locateExpression(input), { authority: 4 })
   }
   if (mcp) {
+    mcp.onActivity((running) => {
+      void console.broadcast('chatluna-sandbox/mcp-activity', { running })
+    })
+    registerListener('chatluna-sandbox/mcp-activity', () => ({ running: mcp.isActivityRunning() }), { authority: 4 })
     registerListener('chatluna-sandbox/mcp-call-records', (input = {}) => mcp.listCallRecords(input), { authority: 4 })
     registerListener('chatluna-sandbox/mcp-call-record', (input) => mcp.getCallRecord(input.recordId), { authority: 4 })
     registerListener('chatluna-sandbox/clear-mcp-call-records', () => mcp.clearCallRecords(), { authority: 4 })
@@ -622,6 +627,7 @@ declare module '@koishijs/console' {
     'chatluna-sandbox/mcp-call-records'(input?: ListSandboxMcpCallRecordsInput): SandboxMcpCallRecordsPage
     'chatluna-sandbox/mcp-call-record'(input: { recordId: string }): SandboxMcpCallRecord
     'chatluna-sandbox/clear-mcp-call-records'(): { cleared: number }
+    'chatluna-sandbox/mcp-activity'(): { running: boolean }
     'chatluna-sandbox/mcp-credentials'(): Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }>
     'chatluna-sandbox/create-mcp-credential'(input: { name: string; scopes: SandboxMcpScope[] }): { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
     'chatluna-sandbox/update-mcp-credential'(input: { id: string; name?: string; scopes?: SandboxMcpScope[] }): { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }

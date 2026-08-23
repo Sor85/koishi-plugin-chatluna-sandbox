@@ -41,6 +41,7 @@
 }
 
 .webqq-rail-button {
+  position: relative;
   width: auto;
   height: 40px;
   gap: 7px;
@@ -62,6 +63,19 @@
 .webqq-rail-button.is-active {
   color: #fff;
   background: var(--webqq-accent);
+}
+
+.webqq-rail-button.is-mcp-running,
+.webqq-rail-button.is-mcp-running:hover,
+.webqq-rail-button.is-mcp-running:focus-visible {
+  overflow: visible;
+  color: var(--webqq-accent);
+}
+
+.webqq-rail-button.is-mcp-running.is-active,
+.webqq-rail-button.is-mcp-running.is-active:hover,
+.webqq-rail-button.is-mcp-running.is-active:focus-visible {
+  color: #fff;
 }
 
 .webqq-conversations {

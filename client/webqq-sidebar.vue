@@ -11,12 +11,17 @@
             :key="item.id"
             type="button"
             class="webqq-rail-button"
-            :class="{ 'is-active': isNavigationActive(item.id), 'is-rail-pin-end': item.id === 'spaces' }"
-            :aria-label="item.label"
+            :class="{
+              'is-active': isNavigationActive(item.id),
+              'is-rail-pin-end': item.id === 'spaces',
+              'is-mcp-running': item.id === 'spaces' && spacesBusy,
+            }"
+            :aria-label="item.id === 'spaces' && spacesBusy ? 'AI 测试空间（AI 控制中）' : item.label"
             :aria-current="isNavigationActive(item.id) ? 'page' : undefined"
             @click="selectNavigation(item.id)"
           >
-            <component :is="item.icon" :size="20" stroke-width="1.8" aria-hidden="true" />
+            <SandboxAgentControlIcon v-if="item.id === 'spaces'" :running="spacesBusy" />
+            <component v-else-if="item.icon" :is="item.icon" :size="20" stroke-width="1.8" aria-hidden="true" />
             <span v-if="item.id !== 'spaces'" class="webqq-rail-label">{{ item.label }}</span>
           </button>
         </nav>
@@ -294,7 +299,7 @@
 
 <script setup lang="ts">
 import {
-  IconBell, IconBrain, IconBug, IconClock, IconEdit, IconFileCode, IconHistory, IconId, IconLayoutGrid, IconMessageCircle, IconPlus,
+  IconBell, IconBrain, IconBug, IconClock, IconEdit, IconFileCode, IconHistory, IconId, IconMessageCircle, IconPlus,
   IconSearch, IconTag, IconTrash, IconUser, IconUserCircle, IconUserMinus, IconUserPlus, IconUsers,
 } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
@@ -303,6 +308,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover
 import EnvironmentCreatePopover from './environment-create-popover.vue'
 import NotificationMenu from './notification-menu.vue'
 import SandboxActivityIcon from './sandbox-activity-icon.vue'
+import SandboxAgentControlIcon from './sandbox-agent-control-icon.vue'
 import { getGroupRoleLabel } from './webqq/group-display'
 import WebqqAvatar from './webqq-avatar.vue'
 import WebqqMenuExtensionMark from './webqq-menu-extension-mark.vue'
@@ -376,8 +382,11 @@ const props = defineProps<{
   activeSpaceId?: string
   colorMode: 'light' | 'dark'
   preview?: boolean
+  mcpRunning?: boolean
 }>()
 const preview = computed(() => props.preview)
+// 缩略图预览不得播放运行特效，避免总览卡片再次出现已去掉的 AI 动效。
+const spacesBusy = computed(() => !!props.mcpRunning && !preview.value)
 const emit = defineEmits<{
   selectView: [view: WebqqSidebarModel['currentView']]
   selectConversation: [conversationId: string]
@@ -410,7 +419,7 @@ const navigationItems = [
   { id: 'model-requests' as const, label: '模型请求', icon: IconBrain },
   { id: 'presets' as const, label: '预设', icon: IconFileCode },
   { id: 'profile' as const, label: '资料', icon: IconUserCircle },
-  { id: 'spaces' as const, label: 'AI 测试空间', icon: IconLayoutGrid },
+  { id: 'spaces' as const, label: 'AI 测试空间' },
 ]
 const visibleNavigationItems = computed(() => props.activeSpaceId
   ? navigationItems.filter(({ id }) => id === 'messages' || id === 'spaces')

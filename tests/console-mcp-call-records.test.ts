@@ -4,8 +4,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { registerConsole, type SandboxConsoleRegistrar } from '../src/console'
-import { SandboxControlService } from '../src/control-service'
+import { SandboxControlService, SandboxRuntimeBotRegistry } from '../src/control-service'
 import { SandboxMcpService } from '../src/mcp/service'
+import { SandboxTestSpaceService } from '../src/test-spaces'
 import type { SandboxAppearance } from '../src/types'
 
 const appearance: SandboxAppearance = {
@@ -94,5 +95,44 @@ describe('MCP 调用记录 Console 协议', () => {
     expect(listeners.has('chatluna-sandbox/mcp-call-records')).toBe(false)
     expect(listeners.has('chatluna-sandbox/mcp-call-record')).toBe(false)
     expect(listeners.has('chatluna-sandbox/clear-mcp-call-records')).toBe(false)
+    expect(listeners.has('chatluna-sandbox/mcp-activity')).toBe(false)
+  })
+
+  it('广播 MCP 活动状态并提供当前值查询', async () => {
+    const app = new App()
+    runningApps.push(app)
+    const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-console-mcp-activity-'))
+    const runtimeBots = new SandboxRuntimeBotRegistry()
+    const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media'), runtimeBots })
+    const testSpaces = new SandboxTestSpaceService(app, runtimeBots)
+    const mcp = new SandboxMcpService(control, { dataDirectory: directory, testSpaces })
+    const credential = mcp.createCredential('控制台凭证', ['read', 'manage'])
+    const broadcasts: Array<{ type: string, body: unknown }> = []
+    const listeners = new Map<string, unknown>()
+    const consoleRegistrar: SandboxConsoleRegistrar = {
+      addEntry() {},
+      addListener(event, callback) {
+        listeners.set(event, callback)
+      },
+      broadcast(type, body) {
+        broadcasts.push({ type, body })
+      },
+    }
+    registerConsole(consoleRegistrar, control, appearance, mcp, testSpaces)
+
+    const getActivity = listeners.get('chatluna-sandbox/mcp-activity')
+    expect(getActivity).toBeTypeOf('function')
+    if (typeof getActivity !== 'function') throw new Error('MCP 活动监听器未注册')
+    expect(Reflect.apply(getActivity, undefined, [])).toEqual({ running: false })
+
+    const created = await mcp.callTool(credential.token, 'create_test_space', {
+      idempotencyKey: 'console-activity-1',
+    }) as { spaceId: string }
+    expect(broadcasts).toContainEqual({ type: 'chatluna-sandbox/mcp-activity', body: { running: true } })
+    expect(Reflect.apply(getActivity, undefined, [])).toEqual({ running: true })
+
+    testSpaces.takeOver(created.spaceId)
+    expect(broadcasts).toContainEqual({ type: 'chatluna-sandbox/mcp-activity', body: { running: false } })
+    expect(Reflect.apply(getActivity, undefined, [])).toEqual({ running: false })
   })
 })

@@ -19,6 +19,7 @@
         <WebqqSidebar
           :model="sidebarModel"
           :active-space-id="activeSpaceId"
+          :mcp-running="mcpRunning"
           :color-mode="resolvedColorMode"
           @select-view="selectNavigation"
           @select-conversation="selectConversation"
@@ -208,6 +209,7 @@ import WorkspaceOverlayHost from './workspace-overlay-host.vue'
 import { useResolvedColorMode, useFrostedSurfaceFlag } from './webqq/color-scheme'
 import { rememberFloatingPanelAnchor } from './webqq/floating-panel'
 import { createKoishiWorkspacePort } from './webqq/koishi-workspace-port'
+import { createMcpActivitySync } from './webqq/mcp-activity-sync'
 import { createSceneMutationSync } from './webqq/scene-sync'
 import { createWorkspaceController } from './webqq/workspace-controller'
 import { createWorkspaceLayout } from './webqq/workspace-layout'
@@ -383,7 +385,11 @@ const debugBots = modelRequestBots
 const resolvedColorMode = useResolvedColorMode(appearance)
 useFrostedSurfaceFlag(appearance)
 const disposeSceneMutationSync = createSceneMutationSync(workspaceController, () => activeSpaceId.value)
-onBeforeUnmount(disposeSceneMutationSync)
+const { running: mcpRunning, dispose: disposeMcpActivitySync } = createMcpActivitySync()
+onBeforeUnmount(() => {
+  disposeSceneMutationSync()
+  disposeMcpActivitySync()
+})
 // 正在观察一个仍由 AI 控制的测试空间时，叠加 ego 式被控覆盖层（发光边缘 + 控制条 + agent 光标）。
 const observingSpace = computed(() => isWebqqView.value
   ? testSpaces.value.find((space) => space.id === activeSpaceId.value && space.status === 'running')

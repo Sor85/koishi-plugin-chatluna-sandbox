@@ -47,6 +47,23 @@ describe('AI 测试空间', () => {
     expect(spaces.requireAiControl(space.id)).toBe(space.control)
   })
 
+  it('占用状态随创建、接管和结束切换', () => {
+    const { spaces } = createServices()
+    const events: boolean[] = []
+    spaces.onOccupationChange(() => events.push(spaces.isOccupied()))
+    expect(spaces.isOccupied()).toBe(false)
+
+    const space = spaces.createSpace({})
+    expect(spaces.isOccupied()).toBe(true)
+    spaces.takeOver(space.id)
+    expect(spaces.isOccupied()).toBe(false)
+    spaces.returnControl(space.id)
+    expect(spaces.isOccupied()).toBe(true)
+    spaces.terminateSpace(space.id)
+    expect(spaces.isOccupied()).toBe(false)
+    expect(events).toEqual([true, false, true, false])
+  })
+
   it('用户终止任务后空间结束为已完成，AI 不能再修改', () => {
     const { spaces } = createServices()
     const space = spaces.createSpace({})

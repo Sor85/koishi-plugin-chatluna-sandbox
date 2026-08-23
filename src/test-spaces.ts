@@ -48,6 +48,8 @@ interface SandboxTestSpaceRecord extends Omit<SandboxTestSpaceSummary, 'snapshot
 export class SandboxTestSpaceService {
   private spaces = new Map<string, SandboxTestSpaceRecord>()
   private spaceCreatedListeners = new Set<(spaceId: string, control: SandboxControlService) => void>()
+  private occupationListeners = new Set<() => void>()
+  private occupied = false
   private persistenceQueue = Promise.resolve()
 
   constructor(
@@ -84,12 +86,22 @@ export class SandboxTestSpaceService {
     this.spaces.set(id, record)
     this.attachControl(record)
     this.queuePersistence(record)
+    this.syncOccupation()
     return { ...this.toSummary(record), control }
   }
 
   onSpaceCreated(listener: (spaceId: string, control: SandboxControlService) => void): () => void {
     this.spaceCreatedListeners.add(listener)
     return () => this.spaceCreatedListeners.delete(listener)
+  }
+
+  isOccupied(): boolean {
+    return this.listSpaces().some(({ status }) => status === 'running')
+  }
+
+  onOccupationChange(listener: () => void): () => void {
+    this.occupationListeners.add(listener)
+    return () => this.occupationListeners.delete(listener)
   }
 
   waitForPersistence(): Promise<void> {
@@ -144,6 +156,7 @@ export class SandboxTestSpaceService {
     space.updatedAt = space.completedAt
     space.control.setRuntimeActive(false)
     this.queuePersistence(space)
+    this.syncOccupation()
     return this.toSummary(space)
   }
 
@@ -154,6 +167,7 @@ export class SandboxTestSpaceService {
     space.updatedAt = space.completedAt
     space.control.setRuntimeActive(false)
     this.queuePersistence(space)
+    this.syncOccupation()
     return this.toSummary(space)
   }
 
@@ -164,6 +178,7 @@ export class SandboxTestSpaceService {
     space.updatedAt = space.completedAt
     space.control.setRuntimeActive(false)
     this.queuePersistence(space)
+    this.syncOccupation()
     return this.toSummary(space)
   }
 
@@ -176,6 +191,7 @@ export class SandboxTestSpaceService {
     space.updatedAt = new Date().toISOString()
     delete space.completedAt
     this.queuePersistence(space)
+    this.syncOccupation()
     return this.toSummary(space)
   }
 
@@ -190,6 +206,7 @@ export class SandboxTestSpaceService {
     })
     const persistence = this.persistence
     if (persistence) this.queuePersistenceTask(() => persistence.delete(spaceId))
+    this.syncOccupation()
   }
 
   private setStatus(spaceId: string, status: 'running' | 'taken-over'): SandboxTestSpaceSummary {
@@ -198,6 +215,7 @@ export class SandboxTestSpaceService {
     space.status = status
     space.updatedAt = new Date().toISOString()
     this.queuePersistence(space)
+    this.syncOccupation()
     return this.toSummary(space)
   }
 
@@ -227,6 +245,14 @@ export class SandboxTestSpaceService {
     }
     this.spaces.set(record.id, record)
     this.attachControl(record)
+    this.syncOccupation()
+  }
+
+  private syncOccupation() {
+    const occupied = this.isOccupied()
+    if (occupied === this.occupied) return
+    this.occupied = occupied
+    for (const listener of this.occupationListeners) listener()
   }
 
   private attachControl(record: SandboxTestSpaceRecord): void {
