@@ -1,7 +1,10 @@
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
     <DialogContent
-      :class="{ 'webqq-group-editor-dialog': target?.type === 'group' && mode === 'edit' }"
+      :class="{
+        'webqq-entity-editor-dialog': mode === 'edit',
+        'webqq-group-editor-dialog': target?.type === 'group' && mode === 'edit',
+      }"
       :style="{ '--webqq-accent': accentColor }"
     >
       <WebqqAvatarPicker
@@ -13,22 +16,23 @@
         @select="selectAvatar"
       />
       <template v-else>
-      <DialogHeader>
-        <DialogTitle>{{ dialogTitle }}</DialogTitle>
-        <DialogDescription>{{ dialogDescription }}</DialogDescription>
-      </DialogHeader>
+        <DialogHeader>
+          <DialogTitle>{{ dialogTitle }}</DialogTitle>
+          <DialogDescription>{{ dialogDescription }}</DialogDescription>
+        </DialogHeader>
 
-      <form v-if="mode === 'edit'" class="webqq-secondary-form" @submit.prevent="submitEdit">
-        <button
-          type="button"
-          class="webqq-avatar-editor-trigger"
-          aria-label="选择头像"
-          @click="avatarPickerOpen = true"
-        >
-          <WebqqAvatar :kind="target?.type ?? 'user'" :name="draft.name" :avatar="draft.avatar || entity?.avatar" />
-          <span>点击更换头像</span>
-        </button>
-        <div class="webqq-secondary-field">
+        <form v-if="mode === 'edit'" class="webqq-entity-editor-form" @submit.prevent="submitEdit">
+          <div v-webqq-scrollbar="{ showOverlay: false }" class="webqq-entity-editor-body webqq-secondary-form">
+            <button
+              type="button"
+              class="webqq-avatar-editor-trigger"
+              aria-label="选择头像"
+              @click="avatarPickerOpen = true"
+            >
+              <WebqqAvatar :kind="target?.type ?? 'user'" :name="draft.name" :avatar="draft.avatar || entity?.avatar" />
+              <span>点击更换头像</span>
+            </button>
+            <div class="webqq-secondary-field">
           <Label :for="`${fieldPrefix}-id`">{{ target?.type === 'group' ? '群号' : 'QQ ID' }}</Label>
           <Input
             :id="`${fieldPrefix}-id`"
@@ -98,36 +102,38 @@
                 aria-label="搜索能力覆盖"
               />
             </div>
-            <div class="webqq-secondary-panel grid max-h-48 gap-2 overflow-y-auto rounded-lg p-3">
-              <label
-                v-for="capability in filteredCapabilities"
-                :key="capability.id"
-                class="flex items-start gap-2"
-              >
-                <Checkbox
-                  :model-value="capability.supported && !draft.disabledCapabilities.includes(capability.id)"
-                  :disabled="!capability.supported"
-                  class="mt-0.5"
-                  @update:model-value="setCapabilityEnabled(capability.id, $event === true)"
-                />
-                <span class="grid min-w-0 gap-0.5">
-                  <span class="flex min-w-0 items-center gap-1.5">
-                    <span class="min-w-0 truncate text-sm">{{ capability.action }}</span>
-                    <Badge variant="secondary" class="shrink-0">
-                      {{ capability.surface === 'standard' ? '标准能力' : '原生扩展' }}
-                    </Badge>
+            <div class="webqq-secondary-panel overflow-hidden rounded-lg">
+              <div class="webqq-capability-list grid max-h-48 gap-2 overflow-y-auto p-3">
+                <label
+                  v-for="capability in filteredCapabilities"
+                  :key="capability.id"
+                  class="flex items-start gap-2"
+                >
+                  <Checkbox
+                    :model-value="capability.supported && !draft.disabledCapabilities.includes(capability.id)"
+                    :disabled="!capability.supported"
+                    class="mt-0.5"
+                    @update:model-value="setCapabilityEnabled(capability.id, $event === true)"
+                  />
+                  <span class="grid min-w-0 gap-0.5">
+                    <span class="flex min-w-0 items-center gap-1.5">
+                      <span class="min-w-0 truncate text-sm">{{ capability.action }}</span>
+                      <Badge variant="secondary" class="shrink-0">
+                        {{ capability.surface === 'standard' ? '标准能力' : '原生扩展' }}
+                      </Badge>
+                    </span>
+                    <span class="webqq-secondary-hint text-xs leading-5">{{ capability.description }}</span>
+                    <small v-if="capability.aliases?.length || !capability.supported" class="webqq-secondary-hint text-xs">
+                      <template v-if="capability.aliases?.length">别名 {{ capability.aliases.join('、') }}</template>
+                      <template v-if="capability.aliases?.length && !capability.supported"> · </template>
+                      <template v-if="!capability.supported">{{ capability.reason }}</template>
+                    </small>
                   </span>
-                  <span class="webqq-secondary-hint text-xs leading-5">{{ capability.description }}</span>
-                  <small v-if="capability.aliases?.length || !capability.supported" class="webqq-secondary-hint text-xs">
-                    <template v-if="capability.aliases?.length">别名 {{ capability.aliases.join('、') }}</template>
-                    <template v-if="capability.aliases?.length && !capability.supported"> · </template>
-                    <template v-if="!capability.supported">{{ capability.reason }}</template>
-                  </small>
-                </span>
-              </label>
-              <p v-if="!filteredCapabilities.length" class="webqq-secondary-hint m-0 py-3 text-center text-xs">
-                没有匹配的能力
-              </p>
+                </label>
+                <p v-if="!filteredCapabilities.length" class="webqq-secondary-hint m-0 py-3 text-center text-xs">
+                  没有匹配的能力
+                </p>
+              </div>
             </div>
           </div>
           <div class="flex items-center gap-2">
@@ -243,6 +249,7 @@
         <p v-if="errorMessage" class="webqq-form-error m-0 rounded-lg px-3 py-2 text-xs" role="alert">
           {{ errorMessage }}
         </p>
+        </div>
         <DialogFooter>
           <Button type="button" variant="outline" @click="emit('update:open', false)">取消</Button>
           <Button type="submit" :disabled="busy">{{ busy ? '保存中...' : '保存' }}</Button>
@@ -282,6 +289,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { getOneBotProfileBaseline } from '../src/onebot-profiles'
 import WebqqAvatar from './webqq-avatar.vue'
 import WebqqAvatarPicker from './webqq-avatar-picker.vue'
+import { vWebqqScrollbar } from './webqq-scrollbar'
 import type {
   ManageSandboxEnvironmentInput,
   SandboxAccountSex,

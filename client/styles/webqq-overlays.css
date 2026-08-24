@@ -7,6 +7,25 @@
   --webqq-secondary-section-gap: 16px;
 }
 
+.webqq-entity-editor-dialog {
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.webqq-entity-editor-form {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: var(--webqq-secondary-row-gap, 8px);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.webqq-entity-editor-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 12px;
+}
+
 .webqq-secondary-form {
   display: grid;
   gap: var(--webqq-secondary-section-gap, 16px);

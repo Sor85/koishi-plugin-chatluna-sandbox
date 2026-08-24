@@ -121,9 +121,23 @@ describe('环境管理组件传输边界', () => {
     expect(source).toContain('搜索 action、别名或作用')
     expect(source).toContain('absolute inset-y-0 left-3 flex items-center')
     expect(source).toContain('items-center gap-2')
+    expect(source).toContain('class="webqq-secondary-panel overflow-hidden rounded-lg"')
+    expect(source).toContain('class="webqq-capability-list grid max-h-48 gap-2 overflow-y-auto p-3"')
     expect(source).toContain('filteredCapabilities')
     expect(source).toContain('capability.description')
     expect(source).toContain('disabledCapabilities')
+  })
+
+  it('实体编辑 Dialog 将标题、滚动正文和操作区分层，避免长表单遮挡操作按钮', () => {
+    const source = readFileSync(resolve('client/environment-entity-dialog.vue'), 'utf8')
+    const styles = readFileSync(resolve('client/styles/webqq-overlays.css'), 'utf8')
+
+    expect(source).toContain("'webqq-entity-editor-dialog': mode === 'edit'")
+    expect(source).toContain('class="webqq-entity-editor-form"')
+    expect(source).toContain('class="webqq-entity-editor-body webqq-secondary-form"')
+    expect(styles).toMatch(/\.webqq-entity-editor-dialog\s*\{[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\)[^}]*overflow:\s*hidden/s)
+    expect(styles).toMatch(/\.webqq-entity-editor-form\s*\{[^}]*grid-template-rows:\s*minmax\(0, 1fr\) auto[^}]*min-height:\s*0[^}]*overflow:\s*hidden/s)
+    expect(styles).toMatch(/\.webqq-entity-editor-body\s*\{[^}]*min-height:\s*0[^}]*overflow-y:\s*auto[^}]*padding-right:\s*12px/s)
   })
 
   it('二级菜单统一使用共享标题、正文和操作区间距', () => {
