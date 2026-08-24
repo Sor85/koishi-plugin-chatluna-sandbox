@@ -1,9 +1,18 @@
 import type { Context } from 'koishi'
 import { parseThinkContent, readChatLunaResponseText } from './chatluna-thinking'
-import type { SandboxChatLunaState, SandboxMessageChatLuna } from './types'
+import type {
+  SandboxChatLunaState,
+  SandboxMessageChatLuna,
+  SandboxMessageModelRequestReference,
+} from './types'
 
 type ValidateTarget = (botParticipantId: string, conversationId: string) => boolean
-type ArchiveResult = (botParticipantId: string, conversationId: string, result: SandboxMessageChatLuna) => void
+type ArchiveResult = (
+  botParticipantId: string,
+  conversationId: string,
+  result: SandboxMessageChatLuna,
+  messageIds: readonly string[],
+) => void
 type ArchiveError = (error: unknown, target: SandboxChatLunaErrorTarget) => void
 
 export interface SandboxChatLunaErrorTarget {
@@ -84,6 +93,8 @@ export class SandboxChatLunaStateStore {
   private states = new Map<string, SandboxChatLunaState>()
   private activeStateKeys = new Map<string, Set<string>>()
   private thinkingStartedAt = new Map<string, number>()
+  private modelRequests = new Map<string, SandboxMessageModelRequestReference[]>()
+  private replyMessageIds = new Map<string, string[]>()
   private disposers: Array<() => void> = []
 
   constructor(
@@ -120,10 +131,41 @@ export class SandboxChatLunaStateStore {
     return structuredClone([...this.states.values()])
   }
 
+  recordModelRequest(
+    botParticipantId: string,
+    conversationId: string,
+    reference: SandboxMessageModelRequestReference,
+  ): void {
+    const key = createStateKey(botParticipantId, conversationId)
+    const state = this.states.get(key)
+    if (!state?.thinking) return
+    const references = this.modelRequests.get(key) ?? []
+    if (!references.some(({ scopeId, recordId }) => scopeId === reference.scopeId && recordId === reference.recordId)) {
+      references.push({ ...reference })
+      this.modelRequests.set(key, references)
+    }
+  }
+
+  recordReplyMessage(
+    botParticipantId: string,
+    conversationId: string,
+    messageId: string,
+  ): void {
+    const key = createStateKey(botParticipantId, conversationId)
+    if (!this.states.get(key)?.thinking) return
+    const messageIds = this.replyMessageIds.get(key) ?? []
+    if (!messageIds.includes(messageId)) {
+      messageIds.push(messageId)
+      this.replyMessageIds.set(key, messageIds)
+    }
+  }
+
   clear(): void {
     this.states.clear()
     this.activeStateKeys.clear()
     this.thinkingStartedAt.clear()
+    this.modelRequests.clear()
+    this.replyMessageIds.clear()
   }
 
   dispose(): void {
@@ -154,6 +196,8 @@ export class SandboxChatLunaStateStore {
       return
     }
     this.detachStateKey(key)
+    this.modelRequests.delete(key)
+    this.replyMessageIds.delete(key)
     this.states.set(key, {
       ...target,
       thinking: true,
@@ -194,6 +238,8 @@ export class SandboxChatLunaStateStore {
       for (const activeKey of activeKeys) {
         changed = this.states.delete(activeKey) || changed
         this.thinkingStartedAt.delete(activeKey)
+        this.modelRequests.delete(activeKey)
+        this.replyMessageIds.delete(activeKey)
       }
     }
     if (chatLunaConversationId) this.activeStateKeys.delete(chatLunaConversationId)
@@ -234,14 +280,23 @@ export class SandboxChatLunaStateStore {
     state.thinking = false
     state.updatedAt = new Date().toISOString()
     const thought = payload ? parseThinkContent(readChatLunaResponseText(payload)) : ''
-    // 思考内容与本轮用量归档到机器人消息上，下一轮对话开始后仍然可以展开查看历史。
-    if (thought || state.usage) {
-      this.archiveResult(state.botParticipantId, state.conversationId, {
-        thought,
-        ...(thought && startedAt !== undefined ? { thoughtDurationMs: Math.max(0, Date.now() - startedAt) } : {}),
-        ...(state.usage ? { usage: { ...state.usage } } : {}),
-      })
+    const modelRequests = this.modelRequests.get(key)
+    // 思考内容、用量和本轮权威请求引用一起归档，避免前端按时间猜测对应请求。
+    if (thought || state.usage || modelRequests?.length) {
+      this.archiveResult(
+        state.botParticipantId,
+        state.conversationId,
+        {
+          thought,
+          ...(thought && startedAt !== undefined ? { thoughtDurationMs: Math.max(0, Date.now() - startedAt) } : {}),
+          ...(state.usage ? { usage: { ...state.usage } } : {}),
+          ...(modelRequests?.length ? { modelRequests: modelRequests.map((reference) => ({ ...reference })) } : {}),
+        },
+        this.replyMessageIds.get(key) ?? [],
+      )
     }
+    this.modelRequests.delete(key)
+    this.replyMessageIds.delete(key)
     this.detachStateKey(key)
     return true
   }
@@ -258,6 +313,8 @@ export class SandboxChatLunaStateStore {
       if (!predicate(state)) continue
       this.states.delete(key)
       this.thinkingStartedAt.delete(key)
+      this.modelRequests.delete(key)
+      this.replyMessageIds.delete(key)
       this.detachStateKey(key)
     }
   }

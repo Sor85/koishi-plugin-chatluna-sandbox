@@ -2,7 +2,12 @@ import { createRequire } from 'node:module'
 import diagnosticsChannel from 'node:diagnostics_channel'
 import { resolve } from 'node:path'
 import { createModelRequestError, type SandboxModelRequestStore } from './model-request'
-import type { SandboxModelRequestAttribution, SandboxModelRequestEntities, SandboxPresetRuntimeSnapshot } from './types'
+import type {
+  SandboxModelRequestAttribution,
+  SandboxModelRequestEntities,
+  SandboxModelRequestRecord,
+  SandboxPresetRuntimeSnapshot,
+} from './types'
 
 export interface ChatLunaPluginLike {
   prototype: {
@@ -87,6 +92,7 @@ export interface InstallModelRequestCollectorOptions {
   unattributed: SandboxModelRequestStore
   getCandidates: () => ModelRequestAttributionCandidate[]
   getActivePresetSnapshots?: (entities: SandboxModelRequestEntities) => SandboxPresetRuntimeSnapshot[]
+  onAttributedRequest?: (record: SandboxModelRequestRecord) => void
 }
 
 interface CloneableModelResponse {
@@ -206,6 +212,7 @@ export function installModelRequestCollector(options: InstallModelRequestCollect
       ...(presetSnapshots?.length ? { presetSnapshots } : {}),
       responseBodyStatus: 'pending',
     })
+    if (resolved.attribution === 'attributed') options.onAttributedRequest?.(pending)
     // init.headers 只是调用方配置；Accept、User-Agent、Content-Length 等由 Undici
     // 在派发阶段补齐。先登记请求，让 diagnostics_channel 用最终发送头覆盖该记录。
     pendingDispatchedRequests.push({ method: request.method, url: request.url, recordId: pending.id, store })

@@ -266,8 +266,8 @@ export class SandboxControlService {
       const participant = this.scene.participants.find(({ id }) => id === botParticipantId)
       const conversation = this.scene.conversations.find(({ id }) => id === conversationId)
       return participant?.kind === 'bot' && !!conversation && this.isConversationVisible(botParticipantId, conversation)
-    }, () => this.notifySceneMutation(), (botParticipantId, conversationId, result) => {
-      this.archiveChatLunaResult(botParticipantId, conversationId, result)
+    }, () => this.notifySceneMutation(), (botParticipantId, conversationId, result, messageIds) => {
+      this.archiveChatLunaResult(botParticipantId, conversationId, result, messageIds)
     }, (error, targets) => {
       this.archiveChatLunaModelRequestError(error, targets)
     })
@@ -551,6 +551,10 @@ export class SandboxControlService {
     return this.chatLunaState.getStates()
       .filter(({ thinking }) => thinking)
       .map(({ botParticipantId, conversationId }) => ({ botId: botParticipantId, conversationId }))
+  }
+
+  recordChatLunaModelRequest(scopeId: string, recordId: string, botParticipantId: string, conversationId: string): void {
+    this.chatLunaState.recordModelRequest(botParticipantId, conversationId, { scopeId, recordId })
   }
 
   private archiveChatLunaModelRequestError(error: unknown, target: SandboxChatLunaErrorTarget): void {
@@ -2039,25 +2043,51 @@ export class SandboxControlService {
     }
     this.scene.messages.push(message)
     conversation.messageIds.push(message.id)
+    if (!event && this.isBot(authorId)) {
+      this.chatLunaState.recordReplyMessage(authorId, conversationId, message.id)
+    }
     this.commitSceneMutation()
     return message
   }
 
-  // 把本轮 ChatLuna 思考与用量写到该机器人最后一条消息上，让结果随场景快照持久化并覆盖多轮历史。
-  // 撤回只是生命周期状态，不能因 event 过滤把思考挂到更早的可见消息上。
-  private archiveChatLunaResult(botParticipantId: string, conversationId: string, result: SandboxMessageChatLuna): void {
-    for (let index = this.scene.messages.length - 1; index >= 0; index--) {
-      const message = this.scene.messages[index]
-      if (message.event || message.authorId !== botParticipantId || message.conversationId !== conversationId) continue
+  // 显式记录本轮产生的每条机器人回复，确保分段发送时每个气泡都能追溯到同一组模型请求。
+  // 没有捕获到消息 ID 的兼容路径仍只归档最后一条，供不经过标准发送入口的上游实现使用。
+  private archiveChatLunaResult(
+    botParticipantId: string,
+    conversationId: string,
+    result: SandboxMessageChatLuna,
+    replyMessageIds: readonly string[],
+  ): void {
+    const targetIds = new Set(replyMessageIds)
+    const messages = targetIds.size
+      ? this.scene.messages.filter((message) => targetIds.has(message.id))
+      : [...this.scene.messages].reverse().filter((message) => (
+          !message.event
+          && message.authorId === botParticipantId
+          && message.conversationId === conversationId
+        )).slice(0, 1)
+    if (!messages.length) return
+
+    const finalMessage = messages.at(-1)!
+    for (const message of messages) {
+      if (message !== finalMessage) {
+        if (result.modelRequests?.length) {
+          message.chatLuna = {
+            ...(message.chatLuna ?? { thought: '' }),
+            modelRequests: result.modelRequests.map((reference) => ({ ...reference })),
+          }
+        }
+        continue
+      }
       message.chatLuna = {
         ...(result.thought ? { thought: result.thought } : { thought: message.chatLuna?.thought ?? '' }),
         ...(result.thoughtDurationMs === undefined ? {} : { thoughtDurationMs: result.thoughtDurationMs }),
         ...(result.usage ? { usage: result.usage } : {}),
+        ...(result.modelRequests?.length ? { modelRequests: result.modelRequests.map((reference) => ({ ...reference })) } : {}),
       }
-      if (!message.chatLuna.thought && !message.chatLuna.usage) delete message.chatLuna
-      this.commitSceneMutation()
-      return
+      if (!message.chatLuna.thought && !message.chatLuna.usage && !message.chatLuna.modelRequests?.length) delete message.chatLuna
     }
+    this.commitSceneMutation()
   }
 
   private async loadSceneAfterDatabaseReady(persistence: SandboxScenePersistence): Promise<SandboxSceneLoadResult> {

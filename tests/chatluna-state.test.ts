@@ -288,6 +288,44 @@ describe('ChatLuna 多机器人对话状态', () => {
     ])
   })
 
+  it('把本轮模型请求引用归档到每段机器人回复且多轮不串联', async () => {
+    const { app, control } = await createControl()
+    const session = createGroupSession(control, '20001')
+
+    await emit(app, 'chatluna/before-chat', 'chatluna:first-request', {}, {}, {}, session)
+    await emit(app, 'chatluna/model-usage', {
+      context: { conversationId: 'chatluna:first-request' },
+      usageMetadata: { input_tokens: 8, output_tokens: 3, total_tokens: 11 },
+    })
+    control.recordChatLunaModelRequest('main', 'request:first-a', '20001', 'group:30001')
+    control.recordChatLunaModelRequest('main', 'request:first-b', '20001', 'group:30001')
+    await control.sendMessage({ operatorId: '20001', conversationId: 'group:30001', content: '第一轮第一段' })
+    await control.sendMessage({ operatorId: '20001', conversationId: 'group:30001', content: '第一轮第二段' })
+    await emit(app, 'chatluna/after-chat', 'chatluna:first-request', {}, { content: '第一轮回复' }, {}, {}, session)
+
+    await emit(app, 'chatluna/before-chat', 'chatluna:second-request', {}, {}, {}, session)
+    control.recordChatLunaModelRequest('main', 'request:second', '20001', 'group:30001')
+    await control.sendMessage({ operatorId: '20001', conversationId: 'group:30001', content: '第二轮回复' })
+    await emit(app, 'chatluna/after-chat', 'chatluna:second-request', {}, { content: '第二轮回复' }, {}, {}, session)
+
+    expect(control.getSnapshot().messages.map(({ chatLuna }) => chatLuna?.modelRequests)).toEqual([
+      [
+        { scopeId: 'main', recordId: 'request:first-a' },
+        { scopeId: 'main', recordId: 'request:first-b' },
+      ],
+      [
+        { scopeId: 'main', recordId: 'request:first-a' },
+        { scopeId: 'main', recordId: 'request:first-b' },
+      ],
+      [{ scopeId: 'main', recordId: 'request:second' }],
+    ])
+    expect(control.getSnapshot().messages.map(({ chatLuna }) => chatLuna?.usage)).toEqual([
+      undefined,
+      { inputTokens: 8, outputTokens: 3, totalTokens: 11 },
+      undefined,
+    ])
+  })
+
   it('多轮对话时每条机器人消息各自保留思考内容', async () => {
     const { app, control } = await createControl()
     const session = createGroupSession(control, '20001')

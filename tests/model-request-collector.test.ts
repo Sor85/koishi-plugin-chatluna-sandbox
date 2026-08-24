@@ -166,6 +166,30 @@ describe('模型请求采集', () => {
     })
   })
 
+  it('把唯一归属请求同步报告给当前 ChatLuna 轮次', async () => {
+    const unattributed = new SandboxModelRequestStore()
+    const attributed = new SandboxModelRequestStore()
+    const reported: Array<{ id: string, scopeId?: string }> = []
+    const plugin = createFakePlugin()
+    disposers.push(installModelRequestCollector({
+      plugin,
+      unattributed,
+      getCandidates: () => [{
+        scopeId: 'space-a',
+        store: attributed,
+        thinking: [{ botId: '21001', conversationId: 'private:11001:21001' }],
+      }],
+      onAttributedRequest: (record) => reported.push({ id: record.id, scopeId: record.entities.scopeId }),
+    }))
+
+    await plugin.fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', body: chatBody() })
+
+    expect(reported).toEqual([{
+      id: attributed.getRecords().records[0]?.id,
+      scopeId: 'space-a',
+    }])
+  })
+
   it('仅在请求唯一归属时于派发时复制活动预设快照', async () => {
     const unattributed = new SandboxModelRequestStore()
     const attributed = new SandboxModelRequestStore()

@@ -114,6 +114,7 @@
           :error="modelRequestWorkspaceModel.error"
           :visit-key="modelRequestVisitKey"
           :navigation-intent="presetEvidenceIntent"
+          :request-navigation-intent="modelRequestNavigationIntent"
           :can-return-to-preset="canReturnFromPresetEvidence"
           @query="loadModelRequestRecords"
           @load-more="loadMoreModelRequestRecords"
@@ -121,6 +122,7 @@
           @trajectory="loadModelRequestTrajectory"
           @clear="clearModelRequestRecords"
           @consume-navigation-intent="consumePresetEvidenceIntent"
+          @consume-request-navigation-intent="consumeModelRequestNavigationIntent"
           @navigation-intent-failure="reportPresetEvidenceNavigationFailure"
           @return-to-preset="returnFromPresetEvidence"
         />
@@ -140,6 +142,7 @@
           @recall-message="recallMessage"
           @clear-conversation="clearConversationMessages"
           @set-message-reaction="setMessageReaction"
+          @open-model-request="navigateToModelRequest"
           @send-forward-message="sendForwardMessage"
           @get-forward-message="getForwardMessage"
           @request-friend="requestFriend"
@@ -239,6 +242,7 @@ const {
   mcpCallWorkspaceModel,
   modelRequestVisitKey,
   modelRequestWorkspaceModel,
+  modelRequestNavigationIntent,
   presetDiscardGuard,
   presetEvidenceIntent,
   presetWorkspaceModel,
@@ -267,6 +271,8 @@ const {
   confirmPresetDiscard,
   navigateToPresetEvidence,
   consumePresetEvidenceIntent,
+  navigateToModelRequest,
+  consumeModelRequestNavigationIntent,
   reportPresetEvidenceNavigationFailure,
   canReturnFromPresetEvidence,
   returnFromPresetEvidence,

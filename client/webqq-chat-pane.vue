@@ -83,6 +83,7 @@
       @open-forward="openForwardDialog"
       @set-message-reaction="forwardSetMessageReaction"
       @open-reaction-picker="openReactionPicker"
+      @open-model-request="emit('openModelRequest', $event)"
       @load-history="forwardLoadHistory"
       @request-friend="emit('requestFriend', $event)"
       @poke-friend="emit('pokeFriend', $event)"
@@ -177,6 +178,7 @@ import {
   type SandboxForwardNode,
   type SandboxMessageSearchHit,
   type SandboxMessageSearchResult,
+  type SandboxMessageModelRequestReference,
   type SearchConversationMessagesInput,
 } from '../src/types'
 
@@ -216,6 +218,7 @@ const emit = defineEmits<{
   recallMessage: [messageId: string]
   clearConversation: []
   setMessageReaction: [messageId: string, emojiId: string, enabled: boolean]
+  openModelRequest: [reference: SandboxMessageModelRequestReference]
   sendForwardMessage: [input: { conversationId: string, messageIds: string[] }, resolve: () => void, reject: (error: unknown) => void]
   getForwardMessage: [input: { forwardId?: string, messageId?: string }, resolve: (forward: SandboxForward) => void, reject: (error: unknown) => void]
   requestFriend: [targetId: string]

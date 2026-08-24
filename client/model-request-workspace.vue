@@ -125,15 +125,16 @@
           </div>
         </header>
 
-        <div v-if="loading && !records.length" class="webqq-model-request-empty">正在读取模型请求记录…</div>
-        <div v-else-if="!records.length" class="webqq-model-request-empty">暂无符合条件的模型请求记录</div>
+        <div v-if="loading && !displayRecords.length" class="webqq-model-request-empty">正在读取模型请求记录…</div>
+        <div v-else-if="!displayRecords.length" class="webqq-model-request-empty">暂无符合条件的模型请求记录</div>
         <div v-else v-webqq-scrollbar class="webqq-model-request-list">
           <button
-            v-for="record in records"
+            v-for="record in displayRecords"
             :key="record.id"
             type="button"
             class="webqq-model-request-item"
-            :class="{ 'is-active': record.id === selectedRecordId }"
+            :class="{ 'is-selected': record.id === selectedRecordId }"
+            :aria-current="record.id === selectedRecordId ? 'true' : undefined"
             @click="openRecord(record.id)"
           >
             <header>
@@ -603,10 +604,19 @@ import { parseModelResponseConversation } from './webqq/model-request-conversati
 import { buildModelRequestJsonTree } from './webqq/model-request-json'
 import { createEvidenceNavigationStack } from './webqq/evidence-navigation-stack'
 import type { LocateRequest } from './webqq/evidence-locator'
+import type { ModelRequestNavigationIntent } from './webqq/model-request-navigation'
 import type { PresetEvidenceNavigationIntent } from './webqq/preset-evidence-navigation'
 import { createPresetNavigationCoordinator } from './webqq/preset-navigation-coordinator'
 import { createScrollRestore } from './webqq/scroll-restore'
 import { createModelRequestEnterRefresh, createModelRequestLiveRefresh } from './webqq/model-request-live-refresh'
+import {
+  beginModelRequestListNavigation,
+  clearModelRequestListSelection,
+  releaseModelRequestListNavigationGuard,
+  resolveModelRequestListRecords,
+  selectModelRequestListRecord,
+  type ModelRequestListSelectionState,
+} from './webqq/model-request-list-selection'
 import {
   createModelRequestRecordsQuery,
   createSpaceModelRequestScope,
@@ -646,6 +656,7 @@ const props = defineProps<{
   error: string
   visitKey?: number
   navigationIntent?: PresetEvidenceNavigationIntent
+  requestNavigationIntent?: ModelRequestNavigationIntent
   canReturnToPreset?: boolean
 }>()
 
@@ -656,6 +667,7 @@ const emit = defineEmits<{
   trajectory: [input: ModelRequestTrajectoryQuery]
   clear: [input: ClearModelRequestRecordsQuery]
   consumeNavigationIntent: [seq: number]
+  consumeRequestNavigationIntent: [seq: number]
   navigationIntentFailure: [payload: { seq: number, message: string }]
   returnToPreset: []
 }>()
@@ -668,7 +680,11 @@ const sortOrder = ref<'asc' | 'desc'>('desc')
 const filterOpen = ref(false)
 const filterSelectPortalTarget = ref<HTMLElement>()
 const liveRefresh = ref(false)
-const selectedRecordId = ref('')
+const selectionState = ref<ModelRequestListSelectionState>({ selectedRecordId: '' })
+const selectedRecordId = computed({
+  get: () => selectionState.value.selectedRecordId,
+  set: (value: string) => { selectionState.value.selectedRecordId = value },
+})
 const detailView = ref<'trajectory' | 'evidence'>('evidence')
 const clearDialogOpen = ref(false)
 const clearStep = ref<1 | 2>(1)
@@ -679,6 +695,11 @@ const presetNavigation = createPresetNavigationCoordinator()
 const conversationTrajectory = computed(() => props.trajectory?.mode === 'conversation' ? props.trajectory : undefined)
 const requestTrajectory = computed(() => props.trajectory?.mode === 'request' ? props.trajectory : undefined)
 const responseView = ref<'content' | 'json'>('content')
+const displayRecords = computed(() => resolveModelRequestListRecords(
+  selectionState.value,
+  props.records,
+  props.detail,
+))
 const headersExpanded = ref(false)
 const copyState = ref<'idle' | 'success' | 'error'>('idle')
 const detailElement = ref<HTMLElement>()
@@ -803,7 +824,7 @@ watch(() => props.defaultSpaceId, (value) => {
 })
 
 watch([category, spaceId, errorsOnly, sortOrder], () => {
-  selectedRecordId.value = ''
+  clearModelRequestListSelection(selectionState.value)
   refresh()
 })
 
@@ -840,12 +861,39 @@ watch(() => props.navigationIntent?.seq, () => {
   applyNavigationIntent()
 }, { immediate: true })
 
+watch(() => props.requestNavigationIntent?.seq, () => {
+  applyRequestNavigationIntent()
+}, { immediate: true })
+
 watch([() => props.detail?.id, () => props.trajectory], () => {
   prepareNavigationIntent()
 })
 
 function currentScope() {
   return resolveModelRequestScope(category.value, spaceId.value)
+}
+
+function applyRequestNavigationIntent() {
+  const intent = props.requestNavigationIntent
+  if (!intent) return
+  externalLocateRequest.value = undefined
+  navigationStatus.value = ''
+  category.value = 'space'
+  spaceId.value = intent.scope.scope === 'main' ? MAIN_MODEL_REQUEST_SPACE_ID : intent.scope.spaceId
+  model.value = ''
+  errorsOnly.value = false
+  beginModelRequestListNavigation(selectionState.value, intent.recordId)
+  detailView.value = 'evidence'
+  bodyView.value = 'analysis'
+  const scope = intent.scope.scope === 'main'
+    ? createSpaceModelRequestScope(MAIN_MODEL_REQUEST_SPACE_ID)
+    : createSpaceModelRequestScope(intent.scope.spaceId)
+  emit('query', createModelRequestRecordsQuery(scope, { order: sortOrder.value }))
+  emit('open', { ...scope, recordId: intent.recordId })
+  emit('trajectory', { ...scope, recordId: intent.recordId, mode: 'request' })
+  // category/spaceId 的筛选 watcher 会在当前同步栈结束后清空普通选择；保护必须等它消费后再释放。
+  void nextTick(() => releaseModelRequestListNavigationGuard(selectionState.value))
+  emit('consumeRequestNavigationIntent', intent.seq)
 }
 
 function applyNavigationIntent() {
@@ -930,10 +978,10 @@ function toggleSortOrder() {
 }
 
 function openRecord(recordId: string) {
+  selectModelRequestListRecord(selectionState.value, recordId)
   inspectRecordId = undefined
   navigationStack.clear()
   canReturnToTrajectory.value = false
-  selectedRecordId.value = recordId
   const record = props.records.find(({ id }) => id === recordId)
   const scope = record ? resolveRecordScope(record) : currentScope()
   emit('open', { ...scope, recordId })

@@ -14,6 +14,7 @@ import type {
   SandboxForward,
   SandboxFriendAction,
   SandboxGroupAction,
+  SandboxMessageModelRequestReference,
   SearchConversationMessagesInput,
 } from '../../src/types'
 import { formatRecalledMessageEventText, getSandboxBots, getSandboxUsers, isRecalledMessage } from '../../src/types'
@@ -38,6 +39,10 @@ import type {
   ReadSandboxPresetInput,
 } from '../../src/presets'
 import type { CreatePresetInput, DeletePresetInput, RenamePresetInput, SavePresetInput } from '../../src/presets'
+import {
+  createMessageModelRequestNavigationIntent,
+  type ModelRequestNavigationIntent,
+} from './model-request-navigation'
 import { createPresetDirtyGuard } from './preset-dirty-guard'
 import {
   createPresetEvidenceNavigationState,
@@ -94,6 +99,8 @@ export function createWebqqWorkspaceShell(
   const presetDiscardGuard = ref(presetDirtyGuard.peek())
   const presetEvidenceNavigation = createPresetEvidenceNavigationState()
   const presetEvidenceIntent = ref<PresetEvidenceNavigationIntent>()
+  const modelRequestNavigationIntent = ref<ModelRequestNavigationIntent>()
+  let modelRequestNavigationSeq = 0
   const canReturnFromPresetEvidence = ref(false)
   const presetOriginRestore = shallowRef<PresetOriginRestore>()
   let originRestoreSeq = 0
@@ -820,6 +827,20 @@ export function createWebqqWorkspaceShell(
     }
   }
 
+  function navigateToModelRequest(reference: SandboxMessageModelRequestReference) {
+    clearPresetEvidenceReturn()
+    modelRequestNavigationIntent.value = createMessageModelRequestNavigationIntent(
+      ++modelRequestNavigationSeq,
+      reference,
+    )
+    workspaceController.selectView('model-requests')
+    modelRequestVisitKey.value += 1
+  }
+
+  function consumeModelRequestNavigationIntent(seq: number) {
+    if (modelRequestNavigationIntent.value?.seq === seq) modelRequestNavigationIntent.value = undefined
+  }
+
   function navigateToPresetEvidence(result: LocateSandboxPresetExpressionResult, snapshot?: PresetOriginSnapshot) {
     const intent = presetEvidenceNavigation.publish(result, snapshot)
     if (!intent) return
@@ -1019,6 +1040,7 @@ export function createWebqqWorkspaceShell(
     environmentModel,
     modelRequestVisitKey,
     modelRequestWorkspaceModel,
+    modelRequestNavigationIntent,
     presetDiscardGuard,
     presetEvidenceIntent,
     presetWorkspaceModel,
@@ -1046,6 +1068,8 @@ export function createWebqqWorkspaceShell(
     confirmPresetDiscard,
     navigateToPresetEvidence,
     consumePresetEvidenceIntent,
+    navigateToModelRequest,
+    consumeModelRequestNavigationIntent,
     reportPresetEvidenceNavigationFailure,
     canReturnFromPresetEvidence,
     returnFromPresetEvidence,

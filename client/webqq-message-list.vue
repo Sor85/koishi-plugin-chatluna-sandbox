@@ -178,6 +178,12 @@
               </div>
             </li>
           <ContextMenuContent style="z-index: 140">
+            <ContextMenuItem
+              v-if="isBotParticipant(message.authorId) && message.chatLuna?.modelRequests?.length"
+              @select="emit('openModelRequest', message.chatLuna.modelRequests.at(-1)!)"
+            >
+              <IconExternalLink :size="16" aria-hidden="true" /> 跳转到对应请求
+            </ContextMenuItem>
             <ContextMenuItem v-if="!isRecalledMessage(message)" @select="emit('reply', message.id)"><IconMessageReply :size="16" aria-hidden="true" /> 回复</ContextMenuItem>
             <ContextMenuItem v-if="canReactToMessage(message)" @select="emit('openReactionPicker', message.id)">
               <IconMoodSmile :size="16" aria-hidden="true" /> 贴表情
@@ -314,7 +320,7 @@
 </template>
 
 <script setup lang="ts">
-import { IconArrowBackUp, IconAt, IconBell, IconCheck, IconChecks, IconClock, IconHandClick, IconId, IconMessageReply, IconMoodSmile, IconPaperclip, IconTag, IconTrash, IconUserMinus, IconUserPlus, IconUsers } from '@tabler/icons-vue'
+import { IconArrowBackUp, IconAt, IconBell, IconCheck, IconChecks, IconClock, IconExternalLink, IconHandClick, IconId, IconMessageReply, IconMoodSmile, IconPaperclip, IconTag, IconTrash, IconUserMinus, IconUserPlus, IconUsers } from '@tabler/icons-vue'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from './components/ui/context-menu'
 import { getFriendMenuActions, type FriendMenuState } from './webqq/friend-menu'
@@ -350,6 +356,7 @@ import {
   type SandboxGroup,
   type SandboxMedia,
   type SandboxMessage,
+  type SandboxMessageModelRequestReference,
 } from '../src/types'
 
 interface MessageParticipant {
@@ -393,6 +400,7 @@ const emit = defineEmits<{
   openForward: [input: { messageId: string; forwardId: string }]
   setMessageReaction: [messageId: string, emojiId: string, enabled: boolean]
   openReactionPicker: [messageId: string]
+  openModelRequest: [reference: SandboxMessageModelRequestReference]
   loadHistory: [resolve: () => void, reject: (error: unknown) => void]
   requestFriend: [targetId: string]
   pokeFriend: [targetId: string]

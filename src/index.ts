@@ -194,6 +194,19 @@ export function apply(ctx: Context, config: Config) {
       baseDir: inner.baseDir,
       unattributed: unattributedModelRequests,
       getActivePresetSnapshots,
+      onAttributedRequest: (record) => {
+        const { scopeId, botId, conversationId } = record.entities
+        if (!scopeId || !botId || !conversationId) return
+        if (scopeId === MAIN_MODEL_REQUEST_SCOPE_ID) {
+          control.recordChatLunaModelRequest(scopeId, record.id, botId, conversationId)
+          return
+        }
+        try {
+          testSpaces.getControl(scopeId).recordChatLunaModelRequest(scopeId, record.id, botId, conversationId)
+        } catch {
+          // 请求归属后空间可能被并发删除；此时不把引用错误写入其他空间。
+        }
+      },
       getCandidates: () => [
         {
           scopeId: MAIN_MODEL_REQUEST_SCOPE_ID,

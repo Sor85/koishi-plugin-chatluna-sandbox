@@ -183,10 +183,16 @@ export function getDirectConversationPeerId(conversation: SandboxDirectConversat
   return peerId
 }
 
+export interface SandboxMessageModelRequestReference {
+  scopeId: string
+  recordId: string
+}
+
 export interface SandboxMessageChatLuna {
   thought: string
   thoughtDurationMs?: number
   usage?: SandboxChatLunaTokenUsage
+  modelRequests?: SandboxMessageModelRequestReference[]
 }
 
 export interface SandboxMessageReaction {
