@@ -28,6 +28,8 @@
 .webqq-space-thumbnail-workspace { position: absolute; top: 0; left: 0; width: 1440px; height: 760px; grid-template-columns: 300px minmax(360px, 1fr) 280px; grid-template-rows: 56px minmax(0, 1fr); transform-origin: 0 0; }
 /* 预览副本只负责绘制；裁掉滚动条、弹层和动态选择态，避免缩放副本污染正文交互。 */
 :is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) :is(.chatluna-sandbox-scrollbar-overlay, [data-reka-popper-content-wrapper], .webqq-agent-observe) { display: none !important; }
+:is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) .sandbox-agent-control-orbit { opacity: 0 !important; }
+:is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) :is(.sandbox-agent-control-icon-rays, .sandbox-agent-control-orbit-band) { animation: none !important; }
 :is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) .chatluna-sandbox-messages { scrollbar-width: none; }
 :is(.webqq-space-thumbnail-workspace, .webqq-space-thumbnail-live-workspace) .chatluna-sandbox-messages::-webkit-scrollbar { display: none; }
 
@@ -62,7 +64,9 @@
 .webqq-agent-taskbar-pause { display: inline-flex; flex: none; color: rgb(255 255 255 / 55%); }
 .webqq-agent-taskbar-control-icon { display: inline-flex; flex: none; overflow: visible; color: #fff; }
 .sandbox-agent-control { position: relative; display: inline-flex; width: 20px; height: 20px; flex: none; align-items: center; justify-content: center; overflow: visible; }
-.sandbox-agent-control-icon { position: relative; z-index: 1; overflow: visible; }
+.sandbox-agent-control-icon { position: absolute; inset: 0; width: 20px; height: 20px; overflow: visible; }
+.sandbox-agent-control-rays-layer { z-index: 1; }
+.sandbox-agent-control-pointer { z-index: 2; }
 .sandbox-agent-control-icon-rays { transform-box: fill-box; transform-origin: center; }
 .sandbox-agent-control-orbit { position: absolute; inset: -7px; opacity: 0; pointer-events: none; }
 .sandbox-agent-control.is-running .sandbox-agent-control-orbit { opacity: 1; }
