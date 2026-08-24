@@ -10,6 +10,7 @@ describe('AI 测试空间总览', () => {
 
     expect(sidebar).toContain("label: 'AI 测试空间'")
     expect(sidebar).toContain('visibleNavigationItems')
+    expect(sidebar).toContain("props.activeSpaceId && currentView.value !== 'spaces'")
     expect(sidebar).toContain("id === 'messages' || id === 'spaces'")
     expect(sidebar).not.toContain("id === 'messages' || id === 'model-requests' || id === 'presets' || id === 'spaces'")
     expect(sidebar).toContain("'is-rail-pin-end': item.id === 'spaces'")

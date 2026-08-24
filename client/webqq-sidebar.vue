@@ -421,9 +421,13 @@ const navigationItems = [
   { id: 'profile' as const, label: '环境管理', icon: IconSettings },
   { id: 'spaces' as const, label: 'AI 测试空间' },
 ]
-const visibleNavigationItems = computed(() => props.activeSpaceId
-  ? navigationItems.filter(({ id }) => id === 'messages' || id === 'spaces')
-  : navigationItems)
+const visibleNavigationItems = computed(() => {
+  // 总览仍保留 activeSpaceId 以定位缩回的空间卡片，不能仅据此判断仍在空间内部。
+  const isInsideTestSpace = props.activeSpaceId && currentView.value !== 'spaces'
+  return isInsideTestSpace
+    ? navigationItems.filter(({ id }) => id === 'messages' || id === 'spaces')
+    : navigationItems
+})
 const sidebarTabs = [
   { id: 'recent' as const, label: '最近', icon: IconClock },
   { id: 'friends' as const, label: '好友', icon: IconUser },
