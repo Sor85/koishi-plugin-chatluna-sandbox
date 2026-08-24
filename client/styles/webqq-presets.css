@@ -306,6 +306,31 @@
   background: #94a3b8;
 }
 
+.webqq-preset-expression-tooltip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 24px;
+}
+
+.webqq-preset-expression-tooltip-action {
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.webqq-preset-expression-tooltip-action .webqq-preset-expression-tooltip-link {
+  height: 24px;
+  padding-inline: 8px;
+  color: var(--webqq-accent);
+  background: transparent;
+}
+
+.webqq-preset-expression-tooltip-action .webqq-preset-expression-tooltip-link:hover {
+  color: var(--webqq-accent);
+  background: color-mix(in srgb, var(--webqq-accent) 10%, transparent);
+}
+
 .webqq-preset-expression-tooltip.is-error {
   color: var(--webqq-danger, #b91c1c);
   font-size: 12px;
@@ -361,7 +386,6 @@
 .webqq-preset-expression.is-value {
   background: color-mix(in srgb, var(--webqq-accent) 12%, transparent);
   text-decoration: underline;
-  cursor: pointer;
 }
 
 .webqq-preset-expression.is-value:hover {

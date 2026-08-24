@@ -8,8 +8,10 @@ import { yaml } from '@codemirror/lang-yaml'
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { EditorState, StateEffect, StateField, type Extension } from '@codemirror/state'
 import { Decoration, EditorView, hoverTooltip, type DecorationSet, type Tooltip, type ViewUpdate } from '@codemirror/view'
+import { IconExternalLink } from '@tabler/icons-vue'
 import { tags } from '@lezer/highlight'
-import { markRaw, onBeforeUnmount, onMounted, ref, toRaw, watch, type DeepReadonly } from 'vue'
+import { createApp, h, markRaw, onBeforeUnmount, onMounted, ref, toRaw, watch, type DeepReadonly } from 'vue'
+import { Button } from './components/ui/button'
 import {
   codeMirrorOffset,
   resolvePresetSourceExpressions,
@@ -138,7 +140,7 @@ function expressionDecorations(
         ? 'webqq-preset-expression is-control'
         : 'webqq-preset-expression is-value',
       attributes: expression.clickable && expression.stableId
-        ? { 'data-preset-expression-id': expression.stableId, role: 'button', tabindex: '0' }
+        ? { 'data-preset-expression-id': expression.stableId }
         : { 'data-preset-expression': expression.kind },
     }).range(from, to)]
   }), true)
@@ -178,6 +180,8 @@ function expressionTooltip(
         dom.textContent = result.message
         return { dom }
       }
+      const header = document.createElement('div')
+      header.className = 'webqq-preset-expression-tooltip-header'
       const label = document.createElement('span')
       label.className = 'webqq-preset-expression-tooltip-label'
       label.textContent = '最新请求中的值'
@@ -189,36 +193,25 @@ function expressionTooltip(
       time.textContent = new Intl.DateTimeFormat('zh-CN', {
         month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
       }).format(new Date(result.requestCreatedAt))
-      dom.append(label, value, time)
-      return { dom }
+      const action = document.createElement('div')
+      action.className = 'webqq-preset-expression-tooltip-action'
+      const app = createApp({
+        render: () => h(Button, {
+          size: 'xs',
+          variant: 'ghost',
+          class: 'webqq-preset-expression-tooltip-link',
+          onClick: () => emit('expressionClick', expression as SandboxPresetExpression),
+        }, () => [
+          h(IconExternalLink, { 'data-icon': 'inline-start', 'aria-hidden': 'true' }),
+          '查看模型请求',
+        ]),
+      })
+      app.mount(action)
+      header.append(label, action)
+      dom.append(header, value, time)
+      return { dom, destroy: () => app.unmount() }
     },
   }
-}
-
-function expressionInteraction(): Extension {
-  function resolveExpression(event: Event) {
-    const element = event.target instanceof Element
-      ? event.target.closest<HTMLElement>('[data-preset-expression-id]')
-      : undefined
-    return activeExpressions.find(({ stableId }) => stableId === element?.dataset.presetExpressionId)
-  }
-  return EditorView.domEventHandlers({
-    mousedown(event) {
-      const expression = resolveExpression(event)
-      if (!expression?.clickable) return false
-      event.preventDefault()
-      emit('expressionClick', expression as SandboxPresetExpression)
-      return true
-    },
-    keydown(event) {
-      if (event.key !== 'Enter' && event.key !== ' ') return false
-      const expression = resolveExpression(event)
-      if (!expression?.clickable) return false
-      event.preventDefault()
-      emit('expressionClick', expression as SandboxPresetExpression)
-      return true
-    },
-  })
 }
 
 function dispatchDecorations(source = props.modelValue) {
@@ -247,7 +240,6 @@ function editorExtensions(readOnly = Boolean(props.readOnly)): Extension[] {
   return [
     ...editorBaseExtensions,
     decorationField,
-    expressionInteraction(),
     expressionValueTooltip(),
     EditorView.lineWrapping,
     EditorView.editable.of(!readOnly),
