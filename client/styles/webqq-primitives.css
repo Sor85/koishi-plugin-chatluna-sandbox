@@ -250,13 +250,20 @@
   box-shadow: none;
 }
 
+/* 输入框与选择框本体使用半透明面板，让底层背景能够透过并产生毛玻璃效果。 */
+:is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) :is([data-slot="input"], [data-slot="select-trigger"]) {
+  background: color-mix(in srgb, var(--webqq-bg) 72%, transparent);
+  backdrop-filter: saturate(180%) blur(20px);
+}
+
 :is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) :is([data-slot="input"], [data-slot="select-trigger"])::placeholder {
   color: var(--webqq-muted);
 }
 
 :is(.webqq-workspace, .sandbox-dialog-content, .sandbox-popover-content) :is([data-slot="input"], [data-slot="select-trigger"]):focus-visible {
   border-color: var(--webqq-accent);
-  box-shadow: 0 0 0 3px var(--webqq-accent-shadow);
+  /* 焦点强调改为内描边，避免外扩阴影被 Dialog 正文滚动容器裁掉左侧。 */
+  box-shadow: inset 0 0 0 2px var(--webqq-accent-shadow);
   outline: none;
 }
 

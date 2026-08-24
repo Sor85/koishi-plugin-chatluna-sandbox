@@ -145,7 +145,7 @@
           </div>
         </template>
 
-        <section v-if="target?.type === 'group'" class="webqq-secondary-divider chatluna-sandbox-group-members-editor">
+        <section v-if="target?.type === 'group'" class="chatluna-sandbox-group-members-editor">
           <div class="chatluna-sandbox-group-members-heading">
             <div>
               <strong>群成员</strong>
