@@ -22,7 +22,7 @@ describe('环境管理组件传输边界', () => {
 
     expect(page).toContain('<EnvironmentManager :snapshot="environmentModel" :test-spaces="testSpaces" />')
     expect(source).toContain('<h1>环境管理</h1>')
-    expect(source).toContain('<p>查看模拟 QQ 环境中的普通用户、机器人、群组和 MCP 凭证</p>')
+    expect(source).toContain('<p>查看模拟 QQ 环境中的普通用户、机器人、群组、MCP 凭证和能力</p>')
     expect(source).toContain('class="environment-split"')
     expect(source).toContain('class="environment-list-pane"')
     expect(source).toContain('class="environment-detail-pane"')
@@ -221,6 +221,30 @@ describe('环境管理组件传输边界', () => {
     const solidSurfaceRule = primitives.slice(primitives.indexOf('.chatluna-sandbox-solid-secondary-surface:not(.is-frosted) {')).split('}')[0]
     expect(solidSurfaceRule).toContain('border-color: var(--webqq-secondary-outline)')
     expect(solidSurfaceRule).toContain('box-shadow: var(--webqq-secondary-shadow)')
+  })
+
+  it('环境管理展示服务端权威 MCP 工具、资源和协议能力目录', () => {
+    const manager = readFileSync(resolve('client/environment-manager.vue'), 'utf8')
+    const catalog = readFileSync(resolve('client/mcp-capability-catalog.vue'), 'utf8')
+    const shim = readFileSync(resolve('client/koishi-client-shim.d.ts'), 'utf8')
+
+    expect(manager).toContain("'mcp-capabilities'")
+    expect(manager).toContain("send('chatluna-sandbox/mcp-capabilities')")
+    expect(manager).toContain('label: \'MCP 能力\'')
+    expect(manager).toContain('<McpCapabilityCatalog')
+    expect(catalog).not.toContain("from '@koishijs/client'")
+    expect(catalog).not.toContain('chatluna-sandbox/mcp-capabilities')
+    expect(catalog).toContain('Server capabilities')
+    expect(catalog).toContain('catalog.tools.length')
+    expect(catalog).toContain('catalog.resources.length')
+    expect(catalog).toContain('搜索工具名称、描述或权限')
+    expect(catalog).toContain('scopeOptions')
+    expect(catalog).toContain('输入 Schema')
+    expect(catalog).toContain('<Collapsible v-for="tool in filteredTools"')
+    expect(catalog).toContain('<CollapsibleTrigger class="mcp-capability-trigger">')
+    expect(catalog).not.toContain('<details')
+    expect(catalog).toContain('MCP 服务不可用')
+    expect(shim).toContain("'chatluna-sandbox/mcp-capabilities'")
   })
 
   it('已创建的 MCP 凭证可以查看并修改名称和权限', () => {

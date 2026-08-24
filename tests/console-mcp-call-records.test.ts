@@ -44,15 +44,21 @@ describe('MCP 调用记录 Console 协议', () => {
     registerConsole(consoleRegistrar, control, appearance, mcp)
 
     const listRecords = listeners.get('chatluna-sandbox/mcp-call-records')
+    const getCapabilities = listeners.get('chatluna-sandbox/mcp-capabilities')
     const getRecord = listeners.get('chatluna-sandbox/mcp-call-record')
     const clearRecords = listeners.get('chatluna-sandbox/clear-mcp-call-records')
     expect(listRecords).toBeTypeOf('function')
+    expect(getCapabilities).toBeTypeOf('function')
     expect(getRecord).toBeTypeOf('function')
     expect(clearRecords).toBeTypeOf('function')
     expect(listeners.has('chatluna-sandbox/replay-mcp-call-record')).toBe(false)
-    if (typeof listRecords !== 'function' || typeof getRecord !== 'function' || typeof clearRecords !== 'function') {
-      throw new Error('MCP 调用记录监听器未注册')
+    if (typeof listRecords !== 'function' || typeof getCapabilities !== 'function' || typeof getRecord !== 'function' || typeof clearRecords !== 'function') {
+      throw new Error('MCP Console 监听器未注册')
     }
+
+    const catalog = Reflect.apply(getCapabilities, undefined, []) as { tools: unknown[]; resources: unknown[] }
+    expect(catalog.tools).toHaveLength(40)
+    expect(catalog.resources).toHaveLength(6)
 
     const page = Reflect.apply(listRecords, undefined, [{ tool: 'get_server_info' }]) as {
       records: Array<{ id: string, tool: string, arguments?: unknown }>
@@ -96,6 +102,7 @@ describe('MCP 调用记录 Console 协议', () => {
     expect(listeners.has('chatluna-sandbox/mcp-call-record')).toBe(false)
     expect(listeners.has('chatluna-sandbox/clear-mcp-call-records')).toBe(false)
     expect(listeners.has('chatluna-sandbox/mcp-activity')).toBe(false)
+    expect(listeners.has('chatluna-sandbox/mcp-capabilities')).toBe(false)
   })
 
   it('广播 MCP 活动状态并提供当前值查询', async () => {

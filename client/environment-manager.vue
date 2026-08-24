@@ -3,7 +3,7 @@
     <header class="environment-header">
       <div>
         <h1>环境管理</h1>
-        <p>查看模拟 QQ 环境中的普通用户、机器人、群组和 MCP 凭证</p>
+        <p>查看模拟 QQ 环境中的普通用户、机器人、群组、MCP 凭证和能力</p>
       </div>
     </header>
 
@@ -58,6 +58,14 @@
 
         <McpCredentialManager v-else-if="section === 'credentials'" />
 
+        <McpCapabilityCatalog
+          v-else-if="section === 'mcp-capabilities'"
+          :catalog="mcpCapabilities"
+          :loading="mcpCapabilitiesLoading"
+          :error="mcpCapabilitiesError"
+          @retry="loadMcpCapabilities"
+        />
+
         <div v-else v-webqq-scrollbar class="directory-list">
           <article v-for="group in snapshot.groups" :key="group.id" class="directory-card">
             <WebqqAvatar class="directory-avatar" kind="group" :name="group.name" :avatar="group.avatar" />
@@ -71,13 +79,16 @@
 </template>
 
 <script setup lang="ts">
-import { IconKey, IconRobot, IconUser, IconUsers } from '@tabler/icons-vue'
-import { computed, ref } from 'vue'
+import { send } from '@koishijs/client'
+import { IconKey, IconRobot, IconServerCog, IconUser, IconUsers } from '@tabler/icons-vue'
+import { computed, onMounted, ref } from 'vue'
 import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
+import McpCapabilityCatalog from './mcp-capability-catalog.vue'
 import McpCredentialManager from './mcp-credential-manager.vue'
 import WebqqAvatar from './webqq-avatar.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
+import type { SandboxMcpCapabilityCatalog } from '../src/mcp/types'
 import { getSandboxBots, getSandboxUsers, type SandboxDirectoryBot, type SandboxSnapshot } from '../src/types'
 import type { SandboxTestSpaceSummary } from '../src/test-spaces'
 
@@ -97,20 +108,38 @@ const bots = computed<SandboxDirectoryBot[]>(() => [
   }))),
 ])
 
-type EnvironmentSection = 'users' | 'bots' | 'groups' | 'credentials'
+type EnvironmentSection = 'users' | 'bots' | 'groups' | 'credentials' | 'mcp-capabilities'
 const section = ref<EnvironmentSection>('users')
+const mcpCapabilities = ref<SandboxMcpCapabilityCatalog>()
+const mcpCapabilitiesLoading = ref(false)
+const mcpCapabilitiesError = ref('')
 
 const sections = computed(() => [
   { id: 'users' as const, label: '普通用户', description: '主环境中的普通 QQ 用户', icon: IconUser, count: users.value.length },
   { id: 'bots' as const, label: '机器人', description: '主环境和 AI 测试空间中的 OneBot 机器人', icon: IconRobot, count: bots.value.length },
   { id: 'groups' as const, label: '群组', description: '主环境中的 QQ 群组及成员数量', icon: IconUsers, count: props.snapshot.groups.length },
   { id: 'credentials' as const, label: 'MCP 凭证', description: '管理 MCP 测试控制器的访问凭证', icon: IconKey, count: undefined },
+  { id: 'mcp-capabilities' as const, label: 'MCP 能力', description: '查看服务器提供的工具、资源和协议能力', icon: IconServerCog, count: mcpCapabilities.value?.tools.length },
 ])
 const activeSection = computed(() => sections.value.find(({ id }) => id === section.value) ?? sections.value[0])
+
+async function loadMcpCapabilities() {
+  mcpCapabilitiesLoading.value = true
+  mcpCapabilitiesError.value = ''
+  try {
+    mcpCapabilities.value = await send('chatluna-sandbox/mcp-capabilities')
+  } catch (cause) {
+    mcpCapabilitiesError.value = cause instanceof Error ? cause.message : '读取 MCP 能力失败'
+  } finally {
+    mcpCapabilitiesLoading.value = false
+  }
+}
 
 function getBotKey(bot: SandboxDirectoryBot) {
   return bot.source.type === 'main' ? `main:${bot.id}` : `space:${bot.source.spaceId}:${bot.id}`
 }
+
+onMounted(() => void loadMcpCapabilities())
 </script>
 
 <style scoped>

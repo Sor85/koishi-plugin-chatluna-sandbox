@@ -2,6 +2,31 @@ import type { SandboxSnapshot } from '../types'
 
 export type SandboxMcpScope = 'read' | 'interact' | 'manage' | 'debug'
 
+export interface SandboxMcpToolCapability {
+  name: string
+  scope: SandboxMcpScope
+  description: string
+  inputSchema: Record<string, unknown>
+}
+
+export interface SandboxMcpResourceCapability {
+  uri: string
+  name: string
+  mimeType: string
+  requiredScopes: SandboxMcpScope[]
+}
+
+export interface SandboxMcpCapabilityCatalog {
+  serverCapabilities: {
+    tools: boolean
+    resources: boolean
+    prompts: boolean
+  }
+  scopes: SandboxMcpScope[]
+  tools: SandboxMcpToolCapability[]
+  resources: SandboxMcpResourceCapability[]
+}
+
 export interface SandboxMcpCredential {
   id: string
   name: string

@@ -6,7 +6,7 @@ import { buildSandboxModelRequestTrajectory } from './model-request-trajectory'
 import type { SandboxControlService } from './control-service'
 import type { ListSandboxMcpCallRecordsInput, SandboxMcpCallRecordsPage } from './mcp/call-records'
 import type { SandboxMcpService } from './mcp/service'
-import type { SandboxMcpCallRecord, SandboxMcpScope } from './mcp/types'
+import type { SandboxMcpCallRecord, SandboxMcpCapabilityCatalog, SandboxMcpScope } from './mcp/types'
 import type {
   LocateSandboxPresetExpressionInput,
   LocateSandboxPresetExpressionResult,
@@ -118,6 +118,7 @@ interface ConsoleEventMap {
   'chatluna-sandbox/mcp-call-record': (input: { recordId: string }) => SandboxMcpCallRecord
   'chatluna-sandbox/clear-mcp-call-records': () => { cleared: number }
   'chatluna-sandbox/mcp-activity': () => { running: boolean }
+  'chatluna-sandbox/mcp-capabilities': () => SandboxMcpCapabilityCatalog
   'chatluna-sandbox/mcp-credentials': () => Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }>
   'chatluna-sandbox/create-mcp-credential': (input: { name: string; scopes: SandboxMcpScope[] }) => { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
   'chatluna-sandbox/update-mcp-credential': (input: { id: string; name?: string; scopes?: SandboxMcpScope[] }) => { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }
@@ -566,6 +567,7 @@ export function registerConsole(
       void console.broadcast('chatluna-sandbox/mcp-activity', { running })
     })
     registerListener('chatluna-sandbox/mcp-activity', () => ({ running: mcp.isActivityRunning() }), { authority: 4 })
+    registerListener('chatluna-sandbox/mcp-capabilities', () => mcp.getCapabilityCatalog(), { authority: 4 })
     registerListener('chatluna-sandbox/mcp-call-records', (input = {}) => mcp.listCallRecords(input), { authority: 4 })
     registerListener('chatluna-sandbox/mcp-call-record', (input) => mcp.getCallRecord(input.recordId), { authority: 4 })
     registerListener('chatluna-sandbox/clear-mcp-call-records', () => mcp.clearCallRecords(), { authority: 4 })
@@ -628,6 +630,7 @@ declare module '@koishijs/console' {
     'chatluna-sandbox/mcp-call-record'(input: { recordId: string }): SandboxMcpCallRecord
     'chatluna-sandbox/clear-mcp-call-records'(): { cleared: number }
     'chatluna-sandbox/mcp-activity'(): { running: boolean }
+    'chatluna-sandbox/mcp-capabilities'(): SandboxMcpCapabilityCatalog
     'chatluna-sandbox/mcp-credentials'(): Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }>
     'chatluna-sandbox/create-mcp-credential'(input: { name: string; scopes: SandboxMcpScope[] }): { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
     'chatluna-sandbox/update-mcp-credential'(input: { id: string; name?: string; scopes?: SandboxMcpScope[] }): { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }

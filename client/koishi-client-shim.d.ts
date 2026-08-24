@@ -36,7 +36,7 @@ declare module '@koishijs/client' {
     SetGroupAnnouncementInput,
   } from '../src/types'
   import type { ListSandboxMcpCallRecordsInput, SandboxMcpCallRecordsPage } from '../src/mcp/call-records'
-  import type { SandboxMcpCallRecord, SandboxMcpScope } from '../src/mcp/types'
+  import type { SandboxMcpCallRecord, SandboxMcpCapabilityCatalog, SandboxMcpScope } from '../src/mcp/types'
   import type { SandboxTestSpaceSummary } from '../src/test-spaces'
   import type {
     CreatePresetInput,
@@ -101,6 +101,7 @@ declare module '@koishijs/client' {
   export function send(event: 'chatluna-sandbox/mcp-call-record', input: { recordId: string }): Promise<SandboxMcpCallRecord>
   export function send(event: 'chatluna-sandbox/clear-mcp-call-records'): Promise<{ cleared: number }>
   export function send(event: 'chatluna-sandbox/mcp-activity'): Promise<{ running: boolean }>
+  export function send(event: 'chatluna-sandbox/mcp-capabilities'): Promise<SandboxMcpCapabilityCatalog>
   export function send(event: 'chatluna-sandbox/mcp-credentials'): Promise<Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }>>
   export function send(event: 'chatluna-sandbox/create-mcp-credential', input: { name: string; scopes: SandboxMcpScope[] }): Promise<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }>
   export function send(event: 'chatluna-sandbox/update-mcp-credential', input: { id: string; name?: string; scopes?: SandboxMcpScope[] }): Promise<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }>

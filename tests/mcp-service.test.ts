@@ -48,6 +48,30 @@ describe('SandboxMcpService', () => {
     expect(service.listCredentials()[0]).not.toHaveProperty('tokenDigest')
   })
 
+  it('从同一权威定义生成完整 MCP 能力目录', () => {
+    const { service } = createService(['read', 'interact', 'manage', 'debug'])
+
+    const catalog = service.getCapabilityCatalog()
+    expect(catalog.serverCapabilities).toEqual({ tools: true, resources: true, prompts: false })
+    expect(catalog.scopes).toEqual(['read', 'interact', 'manage', 'debug'])
+    expect(catalog.tools).toHaveLength(40)
+    expect(catalog.resources).toHaveLength(6)
+    expect(catalog.tools).toContainEqual(expect.objectContaining({
+      name: 'get_server_info',
+      scope: 'read',
+      inputSchema: expect.objectContaining({ type: 'object' }),
+    }))
+    expect(catalog.resources).toContainEqual(expect.objectContaining({
+      uri: 'chatluna-sandbox://guide',
+      mimeType: 'application/json',
+      requiredScopes: ['read'],
+    }))
+
+    catalog.tools[0]!.name = 'mutated'
+    expect(service.getCapabilityCatalog().tools[0]!.name).toBe('get_server_info')
+    expect(service.listCallRecords()).toEqual({ records: [] })
+  })
+
   it('允许查看并修改已创建凭证的名称、权限和 Token', () => {
     const { service, credential, directory, control } = createService(['read'])
 

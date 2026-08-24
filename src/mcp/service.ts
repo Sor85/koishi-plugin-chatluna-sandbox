@@ -28,7 +28,18 @@ import {
   type ListSandboxMcpCallRecordsInput,
   type SandboxMcpCallRecordsPage,
 } from './call-records'
-import { SandboxMcpError, type SandboxMcpCallRecord, type SandboxMcpCreatedCredential, type SandboxMcpCredential, type SandboxMcpEvent, type SandboxMcpEventCursor, type SandboxMcpExport, type SandboxMcpScope } from './types'
+import {
+  SandboxMcpError,
+  type SandboxMcpCallRecord,
+  type SandboxMcpCapabilityCatalog,
+  type SandboxMcpCreatedCredential,
+  type SandboxMcpCredential,
+  type SandboxMcpEvent,
+  type SandboxMcpEventCursor,
+  type SandboxMcpExport,
+  type SandboxMcpScope,
+  type SandboxMcpToolCapability,
+} from './types'
 
 export interface SandboxMcpServiceOptions {
   dataDirectory: string
@@ -43,13 +54,6 @@ export interface SandboxMcpServiceOptions {
   maxConcurrentUploads?: number
   testSpaces?: SandboxTestSpaceService
   unattributedModelRequests?: SandboxModelRequestStore
-}
-
-interface ToolDefinition {
-  name: string
-  scope: SandboxMcpScope
-  description: string
-  inputSchema: Record<string, unknown>
 }
 
 interface SandboxMcpWaitResult {
@@ -559,7 +563,7 @@ const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
   clear_mcp_call_records: { type: 'object', properties: {} },
 }
 
-const TOOL_DEFINITIONS: ToolDefinition[] = [
+const TOOL_DEFINITIONS: SandboxMcpToolCapability[] = [
   ['get_server_info', 'read', '获取沙盒服务、测试 API 和 MCP 状态'],
   ['list_test_spaces', 'read', '列出当前 Sandbox 实例的全部 AI 测试空间'],
   ['get_test_space', 'read', '读取单个 AI 测试空间状态'],
@@ -600,7 +604,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   ['list_mcp_call_records', 'debug', '读取 MCP 调用记录摘要'],
   ['get_mcp_call_record', 'debug', '读取单条 MCP 调用记录详情'],
   ['clear_mcp_call_records', 'debug', '清理 MCP 调用记录'],
-].map(([name, scope, description]) => ({ name, scope, description, inputSchema: TOOL_SCHEMAS[name as string] ?? { type: 'object', properties: {} } }) as ToolDefinition)
+].map(([name, scope, description]) => ({ name, scope, description, inputSchema: TOOL_SCHEMAS[name as string] ?? { type: 'object', properties: {} } }) as SandboxMcpToolCapability)
 
 const READ_RESOURCES = [
   { uri: 'chatluna-sandbox://guide', name: 'MCP 测试指南' },
@@ -609,7 +613,11 @@ const READ_RESOURCES = [
   { uri: 'chatluna-sandbox://capabilities/llbot', name: 'LLBot 能力基线' },
   { uri: 'chatluna-sandbox://errors', name: '稳定错误码' },
   { uri: 'chatluna-sandbox://examples', name: '工具调用示例' },
-]
+].map((resource) => ({
+  ...resource,
+  mimeType: 'application/json',
+  requiredScopes: ['read' as const],
+}))
 
 const ALL_SCOPES: SandboxMcpScope[] = ['read', 'interact', 'manage', 'debug']
 
@@ -821,9 +829,18 @@ export class SandboxMcpService {
       && timingSafeEqual(digest, Buffer.from(credential.tokenDigest, 'hex')))
   }
 
-  listTools(token: string): ToolDefinition[] {
+  listTools(token: string): SandboxMcpToolCapability[] {
     const credential = this.requireCredential(token)
-    return TOOL_DEFINITIONS.filter(({ scope }) => credential.scopes.includes(scope)).map((item) => ({ ...item }))
+    return TOOL_DEFINITIONS.filter(({ scope }) => credential.scopes.includes(scope)).map((item) => structuredClone(item))
+  }
+
+  getCapabilityCatalog(): SandboxMcpCapabilityCatalog {
+    return {
+      serverCapabilities: { tools: true, resources: true, prompts: false },
+      scopes: [...ALL_SCOPES],
+      tools: structuredClone(TOOL_DEFINITIONS),
+      resources: structuredClone(READ_RESOURCES),
+    }
   }
 
   listResources(token: string) {

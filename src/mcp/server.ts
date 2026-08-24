@@ -164,7 +164,7 @@ export class SandboxMcpHttpServer {
       }
     })
     server.setRequestHandler(ListResourcesRequestSchema, async () => ({
-      resources: this.service.listResources(token).map(({ uri, name }) => ({ uri, name, mimeType: 'application/json' })),
+      resources: this.service.listResources(token).map(({ uri, name, mimeType }) => ({ uri, name, mimeType })),
     }))
     server.setRequestHandler(ReadResourceRequestSchema, async (request) => ({
       contents: [{ uri: request.params.uri, mimeType: 'application/json', text: JSON.stringify(this.service.readResource(token, request.params.uri)) }],
