@@ -17,6 +17,8 @@ describe('AI 测试空间总览', () => {
     expect(overview).toContain('主模拟 QQ 环境')
     expect(overview).toContain('filteredSpaces')
     expect(overview).toContain('创建测试空间')
+    expect(styles).toMatch(/\.webqq-space-toolbar h1\s*\{[^}]*margin-bottom:\s*8px[^}]*font-size:\s*24px[^}]*font-weight:\s*700/s)
+    expect(styles).toMatch(/\.webqq-space-toolbar p\s*\{[^}]*color:\s*var\(--webqq-muted\)/s)
     expect(overview).toContain("space.status === 'running'")
     // "接管"入口已移入空间内部任务栏，总览卡片不再提供 take-over 动作
     expect(overview).not.toContain("'take-over'")

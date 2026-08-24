@@ -4,8 +4,8 @@
 .webqq-space-overview.is-zooming .webqq-space-card { content-visibility: visible; }
 .webqq-space-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
 .webqq-space-toolbar h1, .webqq-space-toolbar p { margin: 0; }
-.webqq-space-toolbar h1 { font-size: 24px; }
-.webqq-space-toolbar p { margin-top: 4px; color: var(--webqq-muted); font-size: 13px; }
+.webqq-space-toolbar h1 { margin-bottom: 8px; font-size: 24px; font-weight: 700; }
+.webqq-space-toolbar p { color: var(--webqq-muted); }
 .webqq-space-filter { width: 144px; }
 .webqq-space-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; }
 .webqq-space-card { position: relative; display: grid; min-height: 250px; overflow: hidden; border: 1px solid var(--webqq-border); border-radius: 18px; background: var(--webqq-bg); color: inherit; text-align: left; box-shadow: 0 12px 30px rgb(15 23 42 / 8%); transition: transform 180ms ease, box-shadow 180ms ease; content-visibility: auto; contain-intrinsic-size: 250px; }

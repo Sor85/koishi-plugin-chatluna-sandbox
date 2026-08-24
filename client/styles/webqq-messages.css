@@ -670,7 +670,8 @@
 
   color: #fff;
   background: var(--webqq-bubble-bg);
-  box-shadow: 0 8px 18px var(--webqq-accent-shadow);
+  /* 蓝色气泡会削弱与左侧相同透明度的投影视觉，保留相同几何参数并提高对比度。 */
+  box-shadow: 0 2px 8px rgb(15 23 42 / 16%);
 }
 
 .chatluna-sandbox-message-row.is-cluster-first:not(.is-outgoing) .chatluna-sandbox-message-bubble {
@@ -778,7 +779,6 @@
 
   color: #fff;
   background: var(--webqq-bubble-bg);
-  box-shadow: none;
 }
 
 .chatluna-sandbox-message-stack {

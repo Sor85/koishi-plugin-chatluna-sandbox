@@ -10,7 +10,7 @@ describe('WebQQ OneBot 调试工作台', () => {
     const debugSource = readFileSync(resolve('client/onebot-debug-workspace.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-debug.css'), 'utf8')
 
-    expect(sidebarSource).toMatch(/label:\s*['"]调试['"]/)
+    expect(sidebarSource).toMatch(/label:\s*['"]OneBot 调试['"]/)
     expect(sidebarSource).toContain('IconBug')
     expect(pageSource).toContain("currentView === 'debug'")
     expect(pageSource).toContain('<OneBotDebugWorkspace')

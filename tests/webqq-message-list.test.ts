@@ -146,7 +146,8 @@ describe('WebQQ 消息列表', () => {
     const darkOutgoingBubble = styles.slice(darkOutgoingRule, darkOutgoingRule + 360)
     expect(darkOutgoingBubble).toContain('--webqq-bubble-bg: var(--webqq-accent)')
     expect(darkOutgoingBubble).toContain('background: var(--webqq-bubble-bg)')
-    expect(darkOutgoingBubble).toContain('box-shadow: none')
+    expect(darkOutgoingBubble).not.toContain('box-shadow: none')
+    expect(styles).toContain('box-shadow: 0 2px 8px rgb(15 23 42 / 16%)')
   })
 
   it('按机器人参与者和逻辑会话渲染 ChatLuna 等待态', () => {
