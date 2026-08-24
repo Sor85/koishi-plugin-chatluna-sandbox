@@ -16,13 +16,20 @@ describe('环境管理组件传输边界', () => {
     }
   })
 
-  it('资料页联邦展示主环境和测试空间机器人，并保留用户与群组的主环境边界', () => {
+  it('环境管理页联邦展示主环境和测试空间机器人，并使用与模型请求页一致的左右布局', () => {
     const source = readFileSync(resolve('client/environment-manager.vue'), 'utf8')
     const page = readFileSync(resolve('client/page.vue'), 'utf8')
 
     expect(page).toContain('<EnvironmentManager :snapshot="environmentModel" :test-spaces="testSpaces" />')
     expect(source).toContain('<h1>环境管理</h1>')
-    expect(source).toContain('<p>查看模拟 QQ 环境中的普通用户、机器人和群组</p>')
+    expect(source).toContain('<p>查看模拟 QQ 环境中的普通用户、机器人、群组和 MCP 凭证</p>')
+    expect(source).toContain('class="environment-split"')
+    expect(source).toContain('class="environment-list-pane"')
+    expect(source).toContain('class="environment-detail-pane"')
+    expect(source).toContain('grid-template-columns: minmax(280px, 360px) minmax(0, 1fr)')
+    expect(source).toContain('grid-template-rows: minmax(180px, 36%) minmax(0, 1fr)')
+    expect(source).toContain(':variant="section === item.id ? \'secondary\' : \'ghost\'"')
+    expect(source).toContain('<Badge v-if="item.count !== undefined" variant="outline">')
     expect(source).not.toContain('<h1>模拟 QQ 环境</h1>')
     expect(source).not.toContain('集中查看')
     expect(source).not.toContain('<small>环境管理</small>')

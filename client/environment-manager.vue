@@ -3,52 +3,69 @@
     <header class="environment-header">
       <div>
         <h1>环境管理</h1>
-        <p>查看模拟 QQ 环境中的普通用户、机器人和群组</p>
+        <p>查看模拟 QQ 环境中的普通用户、机器人、群组和 MCP 凭证</p>
       </div>
     </header>
 
-    <nav class="environment-tabs" aria-label="环境目录类型">
-      <button
-        v-for="item in sections"
-        :key="item.id"
-        type="button"
-        :class="{ 'is-active': section === item.id }"
-        :aria-current="section === item.id ? 'page' : undefined"
-        @click="section = item.id"
-      >
-        <component :is="item.icon" :size="17" aria-hidden="true" />
-        {{ item.label }}
-        <span v-if="item.count !== undefined">{{ item.count }}</span>
-      </button>
-    </nav>
-    <div v-if="section === 'users'" v-webqq-scrollbar class="directory-list">
-      <article v-for="user in users" :key="user.id" class="directory-card">
-        <WebqqAvatar class="directory-avatar" kind="user" :name="user.name" :avatar="user.avatar" />
-        <span class="directory-copy"><strong>{{ user.name }}</strong><small>{{ user.id }}</small></span>
-      </article>
-    </div>
+    <div class="environment-split">
+      <section class="environment-list-pane" aria-label="环境管理范围">
+        <header class="environment-list-toolbar">
+          <h2>管理范围</h2>
+        </header>
+        <nav class="environment-navigation" aria-label="环境目录类型">
+          <Button
+            v-for="item in sections"
+            :key="item.id"
+            :variant="section === item.id ? 'secondary' : 'ghost'"
+            :aria-current="section === item.id ? 'page' : undefined"
+            @click="section = item.id"
+          >
+            <component :is="item.icon" data-icon="inline-start" aria-hidden="true" />
+            <span>{{ item.label }}</span>
+            <Badge v-if="item.count !== undefined" variant="outline">{{ item.count }}</Badge>
+          </Button>
+        </nav>
+      </section>
 
-    <div v-else-if="section === 'bots'" v-webqq-scrollbar class="directory-list">
-      <article v-for="bot in bots" :key="getBotKey(bot)" class="directory-card is-bot-row">
-        <WebqqAvatar class="directory-avatar" kind="bot" :name="bot.name" :avatar="bot.avatar" />
-        <span class="directory-copy">
-          <strong>{{ bot.name }}</strong>
-          <small>{{ bot.id }} · {{ bot.implementation === 'napcat' ? 'NapCat' : 'LLBot' }}</small>
-        </span>
-        <span class="directory-source">{{ bot.source.name }}</span>
-        <span :class="['status-pill', bot.enabled ? 'is-online' : 'is-offline']">
-          {{ bot.enabled ? '已启用' : '已停用' }}
-        </span>
-      </article>
-    </div>
+      <section class="environment-detail-pane" :aria-label="`${activeSection.label}目录`">
+        <header class="environment-detail-toolbar">
+          <div>
+            <h2>{{ activeSection.label }}</h2>
+            <p>{{ activeSection.description }}</p>
+          </div>
+        </header>
 
-    <McpCredentialManager v-else-if="section === 'credentials'" />
+        <div v-if="section === 'users'" v-webqq-scrollbar class="directory-list">
+          <article v-for="user in users" :key="user.id" class="directory-card">
+            <WebqqAvatar class="directory-avatar" kind="user" :name="user.name" :avatar="user.avatar" />
+            <span class="directory-copy"><strong>{{ user.name }}</strong><small>{{ user.id }}</small></span>
+          </article>
+          <p v-if="!users.length" class="environment-empty">当前环境没有普通用户</p>
+        </div>
 
-    <div v-else v-webqq-scrollbar class="directory-list">
-      <article v-for="group in snapshot.groups" :key="group.id" class="directory-card">
-        <WebqqAvatar class="directory-avatar" kind="group" :name="group.name" :avatar="group.avatar" />
-        <span class="directory-copy"><strong>{{ group.name }}</strong><small>{{ group.id }} · {{ group.members.length }} 人</small></span>
-      </article>
+        <div v-else-if="section === 'bots'" v-webqq-scrollbar class="directory-list">
+          <article v-for="bot in bots" :key="getBotKey(bot)" class="directory-card is-bot-row">
+            <WebqqAvatar class="directory-avatar" kind="bot" :name="bot.name" :avatar="bot.avatar" />
+            <span class="directory-copy">
+              <strong>{{ bot.name }}</strong>
+              <small>{{ bot.id }} · {{ bot.implementation === 'napcat' ? 'NapCat' : 'LLBot' }}</small>
+            </span>
+            <Badge variant="outline" class="directory-source">{{ bot.source.name }}</Badge>
+            <Badge :variant="bot.enabled ? 'secondary' : 'outline'">{{ bot.enabled ? '已启用' : '已停用' }}</Badge>
+          </article>
+          <p v-if="!bots.length" class="environment-empty">当前环境没有机器人</p>
+        </div>
+
+        <McpCredentialManager v-else-if="section === 'credentials'" />
+
+        <div v-else v-webqq-scrollbar class="directory-list">
+          <article v-for="group in snapshot.groups" :key="group.id" class="directory-card">
+            <WebqqAvatar class="directory-avatar" kind="group" :name="group.name" :avatar="group.avatar" />
+            <span class="directory-copy"><strong>{{ group.name }}</strong><small>{{ group.id }} · {{ group.members.length }} 人</small></span>
+          </article>
+          <p v-if="!snapshot.groups.length" class="environment-empty">当前环境没有群组</p>
+        </div>
+      </section>
     </div>
   </section>
 </template>
@@ -56,8 +73,10 @@
 <script setup lang="ts">
 import { IconKey, IconRobot, IconUser, IconUsers } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
-import WebqqAvatar from './webqq-avatar.vue'
+import { Badge } from './components/ui/badge'
+import { Button } from './components/ui/button'
 import McpCredentialManager from './mcp-credential-manager.vue'
+import WebqqAvatar from './webqq-avatar.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import { getSandboxBots, getSandboxUsers, type SandboxDirectoryBot, type SandboxSnapshot } from '../src/types'
 import type { SandboxTestSpaceSummary } from '../src/test-spaces'
@@ -82,40 +101,37 @@ type EnvironmentSection = 'users' | 'bots' | 'groups' | 'credentials'
 const section = ref<EnvironmentSection>('users')
 
 const sections = computed(() => [
-  { id: 'users' as const, label: '普通用户', icon: IconUser, count: users.value.length },
-  { id: 'bots' as const, label: '机器人', icon: IconRobot, count: bots.value.length },
-  { id: 'groups' as const, label: '群组', icon: IconUsers, count: props.snapshot.groups.length },
-  { id: 'credentials' as const, label: 'MCP 凭证', icon: IconKey, count: undefined },
+  { id: 'users' as const, label: '普通用户', description: '主环境中的普通 QQ 用户', icon: IconUser, count: users.value.length },
+  { id: 'bots' as const, label: '机器人', description: '主环境和 AI 测试空间中的 OneBot 机器人', icon: IconRobot, count: bots.value.length },
+  { id: 'groups' as const, label: '群组', description: '主环境中的 QQ 群组及成员数量', icon: IconUsers, count: props.snapshot.groups.length },
+  { id: 'credentials' as const, label: 'MCP 凭证', description: '管理 MCP 测试控制器的访问凭证', icon: IconKey, count: undefined },
 ])
+const activeSection = computed(() => sections.value.find(({ id }) => id === section.value) ?? sections.value[0])
 
 function getBotKey(bot: SandboxDirectoryBot) {
   return bot.source.type === 'main' ? `main:${bot.id}` : `space:${bot.source.spaceId}:${bot.id}`
 }
-
 </script>
 
 <style scoped>
 .environment-manager {
-  display: flex;
+  display: grid;
   min-width: 0;
   min-height: 0;
   flex: 1;
-  flex-direction: column;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 16px;
+  overflow: hidden;
+  padding: 24px;
   color: var(--webqq-text);
+  background: var(--webqq-bg);
 }
 
 .environment-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  padding: 26px 28px 20px;
-  border-bottom: 1px solid var(--webqq-border);
-}
-
-.environment-header p,
-.directory-copy small {
-  color: var(--webqq-muted);
+  gap: 24px;
 }
 
 .environment-header h1 {
@@ -124,43 +140,81 @@ function getBotKey(bot: SandboxDirectoryBot) {
   font-weight: 700;
 }
 
-.environment-header p {
+.environment-header p,
+.environment-detail-toolbar p,
+.directory-copy small,
+.environment-empty {
   margin: 0;
-}
-
-.environment-tabs {
-  display: flex;
-  gap: 8px;
-  padding: 14px 28px;
-  border-bottom: 1px solid var(--webqq-border);
-}
-
-.environment-tabs button {
-  display: inline-flex;
-  min-height: 34px;
-  align-items: center;
-  gap: 7px;
-  padding: 0 11px;
-  border-radius: 9px;
   color: var(--webqq-muted);
-  background: transparent;
+}
+
+.environment-split {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 16px;
+  min-height: 0;
+}
+
+.environment-list-pane,
+.environment-detail-pane {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--webqq-border);
+  border-radius: 16px;
+  background: var(--webqq-surface);
+}
+
+.environment-list-pane {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.environment-detail-pane {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.environment-list-toolbar,
+.environment-detail-toolbar {
+  display: flex;
+  min-height: 56px;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--webqq-border);
+  background: var(--webqq-surface);
+}
+
+.environment-list-toolbar h2,
+.environment-detail-toolbar h2 {
+  margin: 0;
+  color: var(--webqq-text);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.environment-detail-toolbar h2 {
+  margin-bottom: 4px;
+}
+
+.environment-detail-toolbar p {
   font-size: 12px;
 }
 
-.environment-tabs button:hover,
-.environment-tabs button:focus-visible,
-.environment-tabs button.is-active {
-  color: var(--webqq-accent);
-  background: color-mix(in srgb, var(--webqq-accent) 10%, transparent);
+.environment-navigation {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
 }
 
-.environment-tabs button span {
-  min-width: 18px;
-  padding: 1px 5px;
-  border-radius: 999px;
-  background: color-mix(in srgb, currentColor 10%, transparent);
-  text-align: center;
-  font-size: 10px;
+.environment-navigation [data-slot="button"] {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.environment-navigation [data-slot="badge"] {
+  margin-left: auto;
 }
 
 .directory-list {
@@ -169,7 +223,7 @@ function getBotKey(bot: SandboxDirectoryBot) {
   align-content: start;
   gap: 8px;
   overflow: auto;
-  padding: 20px 28px 28px;
+  padding: 8px;
 }
 
 .directory-card {
@@ -177,10 +231,14 @@ function getBotKey(bot: SandboxDirectoryBot) {
   grid-template-columns: 38px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  padding: 11px 12px;
-  border: 1px solid var(--webqq-border);
+  padding: 12px 16px;
+  border: 1px solid transparent;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--webqq-bg) 84%, transparent);
+  background: transparent;
+}
+
+.directory-card:hover {
+  background: var(--webqq-hover);
 }
 
 .directory-card.is-bot-row {
@@ -190,11 +248,6 @@ function getBotKey(bot: SandboxDirectoryBot) {
 .directory-source {
   max-width: 180px;
   overflow: hidden;
-  padding: 3px 7px;
-  border-radius: 999px;
-  color: var(--webqq-accent);
-  background: color-mix(in srgb, var(--webqq-accent) 12%, transparent);
-  font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -242,37 +295,30 @@ function getBotKey(bot: SandboxDirectoryBot) {
   font-size: 11px;
 }
 
-.status-pill {
-  padding: 3px 7px;
-  border-radius: 999px;
-  font-size: 10px;
+.environment-empty {
+  padding: 32px 16px;
+  text-align: center;
 }
 
-.status-pill.is-online {
-  color: #15803d;
-  background: #dcfce7;
-}
+@media (max-width: 960px) {
+  .environment-manager {
+    padding: 16px;
+  }
 
-.status-pill.is-offline {
-  color: #64748b;
-  background: #e2e8f0;
+  .environment-split {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(180px, 36%) minmax(0, 1fr);
+  }
+
+  .environment-navigation {
+    overflow: auto;
+  }
 }
 
 @media (max-width: 560px) {
   .environment-header {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .environment-header,
-  .environment-tabs,
-  .directory-list {
-    padding-right: 14px;
-    padding-left: 14px;
-  }
-
-  .environment-tabs {
-    flex-wrap: wrap;
   }
 
   .directory-card.is-bot-row {
@@ -284,7 +330,7 @@ function getBotKey(bot: SandboxDirectoryBot) {
     justify-self: start;
   }
 
-  .directory-card.is-bot-row .status-pill {
+  .directory-card.is-bot-row > [data-slot="badge"]:last-child {
     grid-column: 3;
     grid-row: 1 / span 2;
   }

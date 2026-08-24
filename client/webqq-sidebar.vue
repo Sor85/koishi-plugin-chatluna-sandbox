@@ -300,7 +300,7 @@
 <script setup lang="ts">
 import {
   IconBell, IconBrain, IconBug, IconClock, IconEdit, IconFileCode, IconHistory, IconId, IconMessageCircle, IconPlus,
-  IconSearch, IconTag, IconTrash, IconUser, IconUserCircle, IconUserMinus, IconUserPlus, IconUsers,
+  IconSearch, IconSettings, IconTag, IconTrash, IconUser, IconUserMinus, IconUserPlus, IconUsers,
 } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from './components/ui/context-menu'
@@ -418,7 +418,7 @@ const navigationItems = [
   { id: 'mcp-calls' as const, label: 'MCP 调用', icon: IconHistory },
   { id: 'model-requests' as const, label: '模型请求', icon: IconBrain },
   { id: 'presets' as const, label: '预设', icon: IconFileCode },
-  { id: 'profile' as const, label: '资料', icon: IconUserCircle },
+  { id: 'profile' as const, label: '环境管理', icon: IconSettings },
   { id: 'spaces' as const, label: 'AI 测试空间' },
 ]
 const visibleNavigationItems = computed(() => props.activeSpaceId
