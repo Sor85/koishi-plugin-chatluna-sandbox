@@ -261,6 +261,13 @@
   box-shadow: 0 12px 32px rgb(15 23 42 / 16%);
 }
 
+/* CodeMirror 浮层位于工作区内，可直接采样编辑器内容；仅在统一毛玻璃开关开启时雾化。 */
+body[data-sandbox-frosted] .webqq-preset-source-editor .cm-tooltip {
+  border-color: color-mix(in srgb, var(--webqq-secondary-outline) 64%, transparent);
+  background: color-mix(in srgb, var(--webqq-panel) 72%, transparent);
+  backdrop-filter: saturate(180%) blur(20px);
+}
+
 .webqq-preset-source-editor .cm-tooltip-autocomplete > ul > li[aria-selected] {
   color: var(--webqq-text);
   background: color-mix(in srgb, var(--webqq-accent) 12%, transparent);
