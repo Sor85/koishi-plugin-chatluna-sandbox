@@ -19,7 +19,6 @@ function record(sequence: number, input: Partial<SandboxModelRequestDetail> = {}
     requestBody: {},
     responseBodyStatus: 'unavailable',
     variables: [],
-    summary: { keys: 0, messageCount: 0, toolCount: 0, bodyAvailable: true },
     ...input,
   }
 }

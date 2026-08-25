@@ -1,6 +1,6 @@
 # 模型证据投影作为唯一协议解析处规格
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 

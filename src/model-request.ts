@@ -1,4 +1,5 @@
 import { Random } from 'koishi'
+import { projectModelEvidence } from './model-evidence'
 import { deriveModelRequestVariables } from './model-request-variables'
 import type {
   GetSandboxModelRequestRecordsInput,
@@ -11,7 +12,6 @@ import type {
   SandboxModelRequestRecord,
   SandboxModelRequestRecordsPage,
   SandboxModelRequestStatus,
-  SandboxModelRequestSummary,
   SandboxModelResponseBodyFormat,
   SandboxPresetRuntimeSnapshot,
   SandboxPresetRuntimeSnapshotSummary,
@@ -81,31 +81,6 @@ function estimateBytes(record: SandboxModelRequestRecord): number {
   return Buffer.byteLength(JSON.stringify(record), 'utf8')
 }
 
-function summary(record: Pick<SandboxModelRequestRecord, 'requestBody'>): SandboxModelRequestSummary {
-  const body = record.requestBody
-  if (!body || typeof body !== 'object') return { keys: 0, messageCount: 0, toolCount: 0, bodyAvailable: record.requestBody !== undefined }
-  const object = body as Record<string, unknown>
-  // ChatLuna 的 Gemini 网关使用 contents/functionDeclarations；只读 OpenAI
-  // 字段会把真实请求误报成 0 条消息、1 个工具，导致详情页统计失真。
-  const messages = Array.isArray(object.messages)
-    ? object.messages
-    : Array.isArray(object.contents)
-      ? object.contents
-      : []
-  const tools = Array.isArray(object.tools) ? object.tools : []
-  const toolCount = tools.reduce((count, tool) => {
-    if (!tool || typeof tool !== 'object') return count + 1
-    const declarations = Reflect.get(tool, 'functionDeclarations')
-    return count + (Array.isArray(declarations) ? declarations.length : 1)
-  }, 0)
-  return {
-    keys: Object.keys(object).length,
-    messageCount: messages.length,
-    toolCount,
-    bodyAvailable: record.requestBody !== undefined,
-  }
-}
-
 export function createModelRequestError(error: unknown, traceId = Random.id()): SandboxModelRequestError {
   const message = error instanceof Error ? error.message : String(error ?? '模型请求失败')
   const lower = message.toLowerCase()
@@ -125,27 +100,46 @@ function summarizePresetSnapshots(snapshots: readonly SandboxPresetRuntimeSnapsh
 
 export function presentModelRequestRecord(record: SandboxModelRequestRecord, view: 'list' | 'detail'): SandboxModelRequestListItem | SandboxModelRequestDetail {
   const base = structuredClone(record)
-  const item = {
-    ...base,
-    summary: summary(record),
-  }
   if (view === 'list') {
     const {
       requestBody: _requestBody,
       responseBodyRaw: _responseBodyRaw,
       presetSnapshots,
       ...listItem
-    } = item
+    } = base
     const presetSnapshotSummaries = summarizePresetSnapshots(presetSnapshots)
     return {
       ...listItem,
       ...(presetSnapshotSummaries ? { presetSnapshotSummaries } : {}),
     }
   }
+  // 请求体未采集时不运行投影：详情读取路径是唯一决定是否运行共享模型证据投影的地方，
+  // 也是唯一从请求体读取协议结构的入口。只传入请求体——详情路径上没有消费者需要响应侧投影，
+  // 不为无人使用的响应事件解析流式原文。
+  const evidence = record.requestBody === undefined
+    ? undefined
+    : projectModelEvidence({ requestBody: record.requestBody })
   return {
-    ...item,
-    variables: deriveModelRequestVariables(record),
+    ...base,
+    // 字段数是原始 JSON 事实，只有请求体确实是对象时才存在；非对象请求体不暗示它有 0 个字段。
+    ...(isRequestBodyObject(record.requestBody) ? { requestBodyKeyCount: Object.keys(record.requestBody).length } : {}),
+    ...(evidence
+      ? {
+          evidenceCounts: {
+            requestMessageCount: evidence.requestMessages.length,
+            toolDefinitionCount: evidence.toolDefinitions.length,
+          },
+        }
+      : {}),
+    variables: evidence && record.presetSnapshots?.length
+      ? deriveModelRequestVariables(record.presetSnapshots, evidence)
+      : [],
   }
+}
+
+/** 与共享模型证据投影同一个对象边界：数组不算对象，它在投影里就是不支持的请求体形状。 */
+function isRequestBodyObject(body: unknown): body is Record<string, unknown> {
+  return Boolean(body && typeof body === 'object' && !Array.isArray(body))
 }
 
 export class SandboxModelRequestStore {

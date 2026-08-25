@@ -25,7 +25,6 @@ function detail(content: string): SandboxModelRequestDetail {
     },
     responseBodyStatus: 'unavailable',
     variables: [],
-    summary: { keys: 1, messageCount: 1, toolCount: 0, bodyAvailable: true },
   }
 }
 

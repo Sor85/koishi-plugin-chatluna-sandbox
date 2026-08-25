@@ -4,6 +4,14 @@ import {
   createModelRequestError,
 } from '../src/model-request'
 import { SandboxModelRequestCursorExpiredError, type SandboxPresetRuntimeSnapshot } from '../src/types'
+import {
+  aiSdkRequest,
+  anthropicMessagesRequest,
+  geminiGenerateContentRequest,
+  legacyFunctionsRequest,
+  openAiChatRequest,
+  openAiResponsesRequest,
+} from './fixtures/model-protocol-fixtures'
 
 const presetSnapshot: SandboxPresetRuntimeSnapshot = {
   kind: 'core',
@@ -37,18 +45,19 @@ function appendRecord(
 }
 
 describe('模型请求记录库', () => {
-  it('列表省略请求体并提供摘要，详情保留完整请求体', () => {
+  it('列表省略请求体与协议派生计数，详情保留完整请求体并给出证据计数', () => {
     const store = new SandboxModelRequestStore()
     const created = appendRecord(store)
     const page = store.getRecords()
     expect(page.records).toHaveLength(1)
     expect(page.records[0]).not.toHaveProperty('requestBody')
     expect(page.records[0]).not.toHaveProperty('responseBodyRaw')
+    expect(page.records[0]).not.toHaveProperty('requestBodyKeyCount')
+    expect(page.records[0]).not.toHaveProperty('evidenceCounts')
     expect(page.records[0]).toMatchObject({
       id: created.id,
       status: 'success',
       model: 'gpt-4o',
-      summary: { keys: 3, messageCount: 1, toolCount: 1, bodyAvailable: true },
     })
     expect(store.getRecord(created.id)).toMatchObject({
       id: created.id,
@@ -57,7 +66,8 @@ describe('模型请求记录库', () => {
       responseBodyFormat: 'json',
       responseStatus: 200,
       responseBodyRaw: JSON.stringify({ choices: [{ message: { content: 'hello' } }] }),
-      summary: { messageCount: 1, toolCount: 1, bodyAvailable: true },
+      requestBodyKeyCount: 3,
+      evidenceCounts: { requestMessageCount: 1, toolDefinitionCount: 1 },
     })
   })
 
@@ -79,7 +89,39 @@ describe('模型请求记录库', () => {
     expect(store.getRawRecords()[0]?.presetSnapshots).toEqual([presetSnapshot])
   })
 
-  it('按 Gemini generateContent 结构统计消息和函数声明工具', () => {
+  it('没有运行时预设快照的记录照常返回详情，变量为空', () => {
+    const store = new SandboxModelRequestStore()
+    const created = appendRecord(store)
+    expect(store.getRecord(created.id)?.variables).toEqual([])
+  })
+
+  it('没有采集到请求体时不产生字段数与证据计数', () => {
+    const store = new SandboxModelRequestStore()
+    const created = appendRecord(store, {
+      requestBodyAvailable: false,
+      requestBody: undefined,
+      presetSnapshots: [presetSnapshot],
+    })
+    const detail = store.getRecord(created.id)!
+
+    expect(detail).not.toHaveProperty('requestBodyKeyCount')
+    expect(detail).not.toHaveProperty('evidenceCounts')
+    expect(detail.requestBodyAvailable).toBe(false)
+    expect(detail.variables).toEqual([])
+  })
+
+  it('采集到的请求体不是对象时证据计数取零，字段数仍然缺省', () => {
+    const store = new SandboxModelRequestStore()
+    for (const requestBody of ['纯文本请求体', [{ role: 'user', content: 'hi' }], 42] as const) {
+      const created = appendRecord(store, { requestBody })
+      const detail = store.getRecord(created.id)!
+
+      expect(detail).not.toHaveProperty('requestBodyKeyCount')
+      expect(detail.evidenceCounts, JSON.stringify(requestBody)).toEqual({ requestMessageCount: 0, toolDefinitionCount: 0 })
+    }
+  })
+
+  it('按 Gemini generateContent 结构统计请求消息和展平后的函数声明工具', () => {
     const store = new SandboxModelRequestStore()
     const created = appendRecord(store, {
       url: 'http://192.168.5.3/v1beta/models/gemini:generateContent',
@@ -98,7 +140,8 @@ describe('模型请求记录库', () => {
     })
 
     expect(store.getRecord(created.id)).toMatchObject({
-      summary: { keys: 5, messageCount: 1, toolCount: 2, bodyAvailable: true },
+      requestBodyKeyCount: 5,
+      evidenceCounts: { requestMessageCount: 2, toolDefinitionCount: 2 },
     })
   })
 
@@ -164,4 +207,36 @@ describe('模型请求记录库', () => {
     expect(store.getRecords({ order: 'asc' }).records.map(({ model }) => model)).toEqual(['one', 'two'])
     expect(store.getRecords({ order: 'desc' }).records.map(({ model }) => model)).toEqual(['two', 'one'])
   })
+})
+
+/**
+ * 协议形状回归表。
+ *
+ * 期望值逐 fixture 硬编码：不与共享模型证据投影的数组长度作比较，否则断言与实现同源，
+ * 投影本身回退时会跟着一起错。这张表是"概览格计数与模型请求对话视图同源"的全部证据。
+ */
+describe('模型请求详情的协议形状计数', () => {
+  const SHAPES: readonly { name: string, requestBody: unknown, keyCount: number, requestMessageCount: number, toolDefinitionCount: number }[] = [
+    { name: 'OpenAI Chat Completions', requestBody: openAiChatRequest, keyCount: 3, requestMessageCount: 4, toolDefinitionCount: 1 },
+    { name: 'OpenAI Responses', requestBody: openAiResponsesRequest, keyCount: 4, requestMessageCount: 4, toolDefinitionCount: 1 },
+    { name: 'Anthropic Messages', requestBody: anthropicMessagesRequest, keyCount: 4, requestMessageCount: 4, toolDefinitionCount: 1 },
+    { name: 'Gemini generateContent', requestBody: geminiGenerateContentRequest, keyCount: 3, requestMessageCount: 5, toolDefinitionCount: 1 },
+    { name: 'AI SDK', requestBody: aiSdkRequest, keyCount: 2, requestMessageCount: 3, toolDefinitionCount: 1 },
+    { name: '旧式 function 声明', requestBody: legacyFunctionsRequest, keyCount: 4, requestMessageCount: 2, toolDefinitionCount: 2 },
+  ]
+
+  for (const shape of SHAPES) {
+    it(`${shape.name} 的请求消息数与工具定义数与共享模型证据投影一致`, () => {
+      const store = new SandboxModelRequestStore()
+      const created = appendRecord(store, { requestBody: shape.requestBody })
+
+      expect(store.getRecord(created.id)).toMatchObject({
+        requestBodyKeyCount: shape.keyCount,
+        evidenceCounts: {
+          requestMessageCount: shape.requestMessageCount,
+          toolDefinitionCount: shape.toolDefinitionCount,
+        },
+      })
+    })
+  }
 })

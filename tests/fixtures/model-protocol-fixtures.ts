@@ -93,6 +93,20 @@ export const aiSdkRequest = {
   },
 }
 
+/** 旧式 function 声明：工具定义写在顶层 functions 数组里，没有 tools 字段。 */
+export const legacyFunctionsRequest = {
+  model: 'gpt-3.5-turbo-0613',
+  messages: [
+    { role: 'system', content: '旧式系统提示' },
+    { role: 'user', content: '北京天气' },
+  ],
+  functions: [
+    { name: 'get_weather', description: '查询天气', parameters: { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] } },
+    { name: 'get_time', description: '查询时间', parameters: { type: 'object' } },
+  ],
+  function_call: 'auto',
+}
+
 export const openAiChatJsonResponse = JSON.stringify({
   choices: [{
     message: {

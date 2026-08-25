@@ -216,7 +216,6 @@ export class FakeWorkspacePort implements WorkspacePort {
     return this.invoke('getModelRequestRecord', input, {
       ...record,
       requestBody: record && 'requestBody' in record ? record.requestBody : undefined,
-      summary: record?.summary ?? { keys: 0, messageCount: 0, toolCount: 0, bodyAvailable: false },
     } as SandboxModelRequestDetail)
   }
 

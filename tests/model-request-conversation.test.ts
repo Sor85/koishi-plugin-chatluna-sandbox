@@ -7,7 +7,6 @@ function detail(overrides: Partial<SandboxModelRequestDetail>): SandboxModelRequ
     id: 'request-1', sequence: 1, createdAt: '2026-08-19T12:00:00.000Z', status: 'success', durationMs: 120,
     attribution: 'unattributed', entities: {}, requestBodyAvailable: true, responseBodyStatus: 'unavailable',
     variables: [],
-    summary: { keys: 0, messageCount: 0, toolCount: 0, bodyAvailable: true },
     ...overrides,
   }
 }

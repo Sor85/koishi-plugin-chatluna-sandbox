@@ -1,21 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { projectModelEvidence } from '../src/model-evidence'
 import { deriveModelRequestVariables } from '../src/model-request-variables'
-import type { SandboxModelRequestRecord, SandboxPresetRuntimeSnapshot } from '../src/types'
+import type { SandboxPresetRuntimeSnapshot } from '../src/types'
 
-function record(snapshot: SandboxPresetRuntimeSnapshot, content: string): SandboxModelRequestRecord {
-  return {
-    id: 'request-1',
-    sequence: 1,
-    createdAt: '2026-08-23T04:28:13.000Z',
-    status: 'success',
-    durationMs: 10,
-    attribution: 'attributed',
-    entities: { scopeId: 'main', botId: '20001', conversationId: 'group:30001' },
-    requestBodyAvailable: true,
-    requestBody: { messages: [{ role: 'system', content }] },
-    responseBodyStatus: 'unavailable',
-    presetSnapshots: [snapshot],
-  }
+function evidence(content: string) {
+  return projectModelEvidence({ requestBody: { messages: [{ role: 'system', content }] } })
 }
 
 describe('模型请求变量', () => {
@@ -31,7 +20,7 @@ describe('模型请求变量', () => {
       }],
     }
 
-    expect(deriveModelRequestVariables(record(snapshot, '时间：12:30，天气：晴，记忆：昨天一起散步。'))).toEqual([
+    expect(deriveModelRequestVariables([snapshot], evidence('时间：12:30，天气：晴，记忆：昨天一起散步。'))).toEqual([
       expect.objectContaining({ name: 'time', status: 'observed', value: '12:30' }),
       expect.objectContaining({ name: 'weather', status: 'observed', value: '晴' }),
       expect.objectContaining({ name: 'long_memory("guild")', status: 'observed', value: '昨天一起散步' }),
@@ -45,7 +34,7 @@ describe('模型请求变量', () => {
       capturedAt: '2026-08-23T04:28:12.000Z',
       templates: [{ path: ['prompts', 0, 'content'], role: 'system', template: 'A[{name}]B[{name}]C' }],
     }
-    const variables = deriveModelRequestVariables(record(snapshot, 'A[Alice]B[Bob]C'))
+    const variables = deriveModelRequestVariables([snapshot], evidence('A[Alice]B[Bob]C'))
 
     expect(variables.map(({ name, occurrence, value }) => ({ name, occurrence, value }))).toEqual([
       { name: 'name', occurrence: 0, value: 'Alice' },
@@ -60,11 +49,29 @@ describe('模型请求变量', () => {
       capturedAt: '2026-08-23T04:28:12.000Z',
       templates: [{ path: ['system'], role: 'system', template: '{if ok}值：{value}{else}备用：{fallback}{/if}' }],
     }
-    const variables = deriveModelRequestVariables(record(snapshot, '备用：离线'))
+    const variables = deriveModelRequestVariables([snapshot], evidence('备用：离线'))
 
     expect(variables.map(({ name, status, value }) => ({ name, status, value }))).toEqual([
       { name: 'value', status: 'not-observed', value: undefined },
       { name: 'fallback', status: 'observed', value: '离线' },
     ])
+  })
+
+  it('投影没有请求消息时不产生观察值，只保留未观察状态', () => {
+    const snapshot: SandboxPresetRuntimeSnapshot = {
+      kind: 'character',
+      presetName: 'demo',
+      capturedAt: '2026-08-23T04:28:12.000Z',
+      templates: [{ path: ['system'], role: 'system', template: '时间：{time}。' }],
+    }
+    const variables = deriveModelRequestVariables([snapshot], projectModelEvidence({ requestBody: 'not-an-object' }))
+
+    expect(variables.map(({ name, status, value }) => ({ name, status, value }))).toEqual([
+      { name: 'time', status: 'not-observed', value: undefined },
+    ])
+  })
+
+  it('没有运行时预设快照时不产生变量', () => {
+    expect(deriveModelRequestVariables([], evidence('时间：12:30。'))).toEqual([])
   })
 })

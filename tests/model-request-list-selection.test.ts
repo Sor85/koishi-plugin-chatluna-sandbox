@@ -23,12 +23,11 @@ function record(id: string): SandboxModelRequestListItem {
     entities: { scopeId: 'main' },
     requestBodyAvailable: true,
     responseBodyStatus: 'complete',
-    summary: { keys: 0, messageCount: 0, toolCount: 0, bodyAvailable: true },
   }
 }
 
 function detail(id: string): SandboxModelRequestDetail {
-  return record(id) as SandboxModelRequestDetail
+  return { ...record(id), variables: [] } as SandboxModelRequestDetail
 }
 
 describe('模型请求跳转列表选中', () => {

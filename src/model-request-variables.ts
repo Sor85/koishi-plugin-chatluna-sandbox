@@ -1,26 +1,26 @@
 import { stringify } from 'yaml'
-import { projectModelEvidence } from './model-evidence'
+import type { ModelEvidenceProjection } from './model-evidence'
 import { matchPresetExpressionEvidence } from './presets/evidence-match'
 import { parsePresetSourceDocument } from './presets/source-document'
 import type { PresetSourceDocument } from './presets/types'
 import type {
-  SandboxModelRequestRecord,
   SandboxModelRequestVariable,
   SandboxPresetRuntimeSnapshot,
 } from './types'
 
+/**
+ * 从运行时预设快照与一份已算好的模型证据投影派生模型请求变量。
+ *
+ * 本函数只读投影的请求消息，不解释请求体、响应原文或响应 transport 格式，
+ * 因此不接收模型请求记录，也不自己决定是否运行投影——那由调用方（模型请求记录的读取投影）决定。
+ */
 export function deriveModelRequestVariables(
-  record: Pick<SandboxModelRequestRecord, 'requestBody' | 'responseBodyRaw' | 'responseBodyFormat' | 'presetSnapshots'>,
+  snapshots: readonly SandboxPresetRuntimeSnapshot[],
+  evidence: ModelEvidenceProjection,
 ): SandboxModelRequestVariable[] {
-  if (!record.presetSnapshots?.length || record.requestBody === undefined) return []
-  const evidence = projectModelEvidence({
-    requestBody: record.requestBody,
-    responseBodyRaw: record.responseBodyRaw,
-    responseBodyFormat: record.responseBodyFormat,
-  })
   const messages = new Map(evidence.requestMessages.map((message) => [message.evidenceId, message]))
 
-  return record.presetSnapshots.flatMap((snapshot, snapshotIndex) => {
+  return snapshots.flatMap((snapshot, snapshotIndex) => {
     const document = documentFromRuntimeSnapshot(snapshot)
     return document.expressions
       .filter((expression) => expression.kind === 'value')

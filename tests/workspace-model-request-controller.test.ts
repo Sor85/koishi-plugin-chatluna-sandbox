@@ -42,7 +42,6 @@ const listItem: SandboxModelRequestListItem = {
   responseBodyStatus: 'complete',
   responseBodyFormat: 'json',
   responseStatus: 200,
-  summary: { keys: 3, messageCount: 2, toolCount: 1, bodyAvailable: true },
 }
 
 const olderItem: SandboxModelRequestListItem = {

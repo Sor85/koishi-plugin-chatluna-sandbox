@@ -258,7 +258,7 @@
               <article>
                 <IconCpu :size="17" aria-hidden="true" />
                 <span>模型 ID</span>
-                <strong>{{ detailModel }}</strong>
+                <strong>{{ detail.model || '未识别' }}</strong>
               </article>
               <article>
                 <IconClock :size="17" aria-hidden="true" />
@@ -268,17 +268,17 @@
               <article>
                 <IconBraces :size="17" aria-hidden="true" />
                 <span>字段</span>
-                <strong>{{ detail.summary.keys }}</strong>
+                <strong>{{ detail.requestBodyKeyCount ?? '—' }}</strong>
               </article>
               <article>
                 <IconMessages :size="17" aria-hidden="true" />
                 <span>消息</span>
-                <strong>{{ detail.summary.messageCount }}</strong>
+                <strong>{{ detail.evidenceCounts?.requestMessageCount ?? '—' }}</strong>
               </article>
               <article>
                 <IconTools :size="17" aria-hidden="true" />
                 <span>工具</span>
-                <strong>{{ detail.summary.toolCount }}</strong>
+                <strong>{{ detail.evidenceCounts?.toolDefinitionCount ?? '—' }}</strong>
               </article>
             </div>
           </section>
@@ -755,25 +755,6 @@ const responseConversation = computed(() => parseModelResponseConversation({
 const responseTree = computed(() => buildModelRequestJsonTree(responseConversation.value.raw, 'responseBody'))
 // ADR-0059 的优先级已经在响应投影 adapter 里应用过：标准化 ChatLuna 用量优先于响应体候选。
 const usage = computed<SandboxModelRequestUsage | undefined>(() => responseConversation.value.usage)
-const detailModel = computed(() => {
-  const detail = props.detail
-  if (!detail) return '未识别'
-  if (detail.model) return detail.model
-  if (detail.requestBody && typeof detail.requestBody === 'object' && !Array.isArray(detail.requestBody)) {
-    const body = detail.requestBody as Record<string, unknown>
-    const model = body.model ?? body.modelVersion
-    if (typeof model === 'string' && model) return model
-  }
-  if (detail.url) {
-    try {
-      const match = new URL(detail.url).pathname.match(/\/models\/([^/:]+)(?::|$)/i)
-      if (match?.[1]) return decodeURIComponent(match[1])
-    } catch {
-      // 历史记录中的地址可能不是标准 URL，无法回退提取模型名时继续显示未识别。
-    }
-  }
-  return '未识别'
-})
 const chatlunaErrorCauses = computed(() => getChatLunaErrorPossibleCauses(props.detail?.chatlunaError))
 const usageItems = computed(() => [
   { label: '输入', value: usage.value?.inputTokens, format: 'token' as const },

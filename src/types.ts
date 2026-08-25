@@ -500,11 +500,15 @@ export interface SandboxModelRequestVariable {
   range?: { start: number, end: number }
 }
 
-export interface SandboxModelRequestSummary {
-  keys: number
-  messageCount: number
-  toolCount: number
-  bodyAvailable: boolean
+/**
+ * 一条模型请求记录被共享模型证据投影读出的计数。
+ *
+ * 两个字段都是投影派生事实，与模型请求对话视图、模型请求轨迹使用完全相同的消息边界和工具展平规则。
+ * 原始请求体的字段数与模型名称不属于这里：它们不是协议事实，见 SandboxModelRequestDetail。
+ */
+export interface SandboxModelEvidenceCounts {
+  requestMessageCount: number
+  toolDefinitionCount: number
 }
 
 export interface SandboxModelRequestUsage {
@@ -550,10 +554,12 @@ export interface SandboxModelRequestRecord {
 
 export type SandboxModelRequestListItem = Omit<SandboxModelRequestRecord, 'requestBody' | 'responseBodyRaw' | 'presetSnapshots'> & {
   presetSnapshotSummaries?: readonly SandboxPresetRuntimeSnapshotSummary[]
-  summary: SandboxModelRequestSummary
 }
 export type SandboxModelRequestDetail = SandboxModelRequestRecord & {
-  summary: SandboxModelRequestSummary
+  /** 原始请求体的顶层键数量。这是原始 JSON 事实而不是投影产物；请求体未采集或不是对象时缺省。 */
+  requestBodyKeyCount?: number
+  /** 共享模型证据投影派生的计数。请求体未采集时缺省，采集到但不是对象时两项均为 0。 */
+  evidenceCounts?: SandboxModelEvidenceCounts
   variables: readonly SandboxModelRequestVariable[]
 }
 
