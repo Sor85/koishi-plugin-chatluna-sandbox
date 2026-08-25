@@ -550,7 +550,8 @@ const responseCharacters = computed(() => [
   ...response.value.toolCalls.map(call => call.arguments || ''),
   ...response.value.toolResults.map(result => result.content),
 ].join('').length)
-const NAVIGATION_TARGET_SCROLL_MARGIN = 12
+const NAVIGATION_TARGET_SCROLL_TOP_MARGIN = 12
+const NAVIGATION_TARGET_SCROLL_BOTTOM_MARGIN = 32
 let pointerStart: { x: number, y: number } | undefined
 let suppressToolSummary = false
 let navigationScroller: HTMLElement | undefined
@@ -753,8 +754,8 @@ function scrollNavigationTargetIntoView(target: string) {
   if (!item) return
   const navigationRect = navigation.getBoundingClientRect()
   const itemRect = item.getBoundingClientRect()
-  const visibleTop = navigationRect.top + NAVIGATION_TARGET_SCROLL_MARGIN
-  const visibleBottom = navigationRect.bottom - NAVIGATION_TARGET_SCROLL_MARGIN
+  const visibleTop = navigationRect.top + NAVIGATION_TARGET_SCROLL_TOP_MARGIN
+  const visibleBottom = navigationRect.bottom - NAVIGATION_TARGET_SCROLL_BOTTOM_MARGIN
   if (itemRect.top < visibleTop) {
     navigation.scrollTo({ top: navigation.scrollTop + itemRect.top - visibleTop, behavior: 'smooth' })
   } else if (itemRect.bottom > visibleBottom) {

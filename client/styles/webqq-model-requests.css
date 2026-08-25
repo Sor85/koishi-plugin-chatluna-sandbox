@@ -1214,7 +1214,7 @@
   align-self: start;
   max-height: var(--webqq-model-analysis-nav-height, 100vh);
   overflow: auto;
-  padding-bottom: 24px;
+  padding-bottom: 44px;
 }
 
 .webqq-model-request-body-header {
