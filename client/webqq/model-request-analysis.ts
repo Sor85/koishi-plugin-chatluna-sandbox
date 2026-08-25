@@ -68,6 +68,25 @@ export function normalizeAnalysisQuery(value: string | undefined): string {
 }
 
 /**
+ * 用滚动容器上方约四分之一处作为阅读探针，返回探针最后越过的分析分类。
+ * 这样长卡片仍保持所属分类，下一分类进入主要阅读区域后才切换导航。
+ */
+export function resolveActiveAnalysisGroup(
+  positions: readonly { key: ModelRequestAnalysisGroupKey, top: number }[],
+  scrollerTop: number,
+  scrollerHeight: number,
+): ModelRequestAnalysisGroupKey | undefined {
+  if (!positions.length) return undefined
+  const probeTop = scrollerTop + Math.min(120, Math.max(0, scrollerHeight) * 0.25)
+  let active = positions[0].key
+  for (const position of positions) {
+    if (position.top > probeTop) break
+    active = position.key
+  }
+  return active
+}
+
+/**
  * 把模型证据身份编码成分析视图的 DOM 目标。
  *
  * evidenceId 已经是确定性的，这里只做 DOM id 允许字符的收敛，不引入第二套排序或序号规则。

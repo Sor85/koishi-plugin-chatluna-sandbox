@@ -7,6 +7,7 @@ import {
   isPreviewableConversationImage,
   modelAnalysisTargetId,
   normalizeAnalysisQuery,
+  resolveActiveAnalysisGroup,
   resolveAnalysisEvidenceTarget,
   shouldExpandAnalysisText,
 } from '../client/webqq/model-request-analysis'
@@ -76,6 +77,22 @@ describe('模型请求分析展示模型', () => {
     expect(navigation.groups.every(({ items }) => items.every(({ evidenceId, target }) => (
       evidenceId === undefined || navigation.targets[evidenceId] === target
     )))).toBe(true)
+  })
+
+  it('按阅读探针切换左侧当前展开分类', () => {
+    const positions = [
+      { key: 'system' as const, top: -600 },
+      { key: 'variables' as const, top: 80 },
+      { key: 'response' as const, top: 900 },
+    ]
+
+    expect(resolveActiveAnalysisGroup(positions, 0, 800)).toBe('variables')
+    expect(resolveActiveAnalysisGroup([
+      { key: 'system', top: -1400 },
+      { key: 'variables', top: -700 },
+      { key: 'response', top: 100 },
+    ], 0, 800)).toBe('response')
+    expect(resolveActiveAnalysisGroup([], 0, 800)).toBeUndefined()
   })
 
   it('按模型证据身份把轨迹行和组成分段定位到同一分析目标', () => {
@@ -264,7 +281,7 @@ describe('模型请求分析展示模型', () => {
 
   // 定位的算术与帧时序已经进入 evidence-locator 并由行为测试覆盖；
   // 这里只保留无法进入 module 的 DOM 契约：滚动容器选择规则留在视图侧。
-  it('工作台分析滚动外层详情卡片，检查器仍滚动 inspector-body', () => {
+  it('工作台分析的导航与卡片共用外层详情滚动，检查器仍滚动 inspector-body', () => {
     const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
 
@@ -272,7 +289,32 @@ describe('模型请求分析展示模型', () => {
     expect(view).toContain("content.closest<HTMLElement>('.webqq-model-trajectory-inspector-body')")
     expect(view).toContain('createEvidenceLocator')
     expect(view).not.toContain("scrollIntoView({ behavior: 'smooth', block: 'start' })")
-    expect(styles).toMatch(/\.webqq-model-request-analysis \.webqq-model-analysis-content \{[^}]*max-height: none[^}]*overflow: visible/s)
+    expect(styles).toMatch(/\.webqq-model-request-analysis \.webqq-model-analysis-nav,\s*\.webqq-model-request-analysis \.webqq-model-analysis-content \{[^}]*max-height: none[^}]*overflow: visible/s)
+    expect(styles).toMatch(/\.webqq-model-analysis-nav-fallback \{[^}]*position: fixed;[^}]*top: var\(--webqq-model-analysis-nav-top, 0\);/s)
+  })
+
+  it('原导航离开视野后以动画显示分类导航，标题点击只展开不跳转', () => {
+    const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
+    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+
+    expect(view).toContain('<Transition name="webqq-model-analysis-nav-fallback">')
+    expect(view).toContain('v-if="fallbackNavigationVisible"')
+    expect(view).toContain('ref="navigationSourceElement"')
+    expect(view).toContain('navigationSourceElement.value.getBoundingClientRect().bottom <= scrollerTop')
+    expect(view).toContain('@click="activateNavigationGroup(group.key)"')
+    expect(view).toContain('activeNavigationGroup.value === group ? undefined : group')
+    expect(view).not.toContain('@click="jumpTo(group.items[0]?.target)"')
+    expect(view).toContain("'is-collapsed': activeNavigationGroup !== group.key")
+    expect(view).toContain('v-show="activeNavigationGroup === group.key"')
+    expect(view).toContain(':data-analysis-group="message.role"')
+    expect(view).toContain('data-analysis-group="variables"')
+    expect(view).toContain('data-analysis-group="response"')
+    expect(view).toContain('data-analysis-group="tool"')
+    expect(view).toContain("navigationScroller.addEventListener('scroll', scheduleNavigationTracking")
+    expect(view).toContain('resolveActiveAnalysisGroup')
+    expect(styles).toMatch(/\.webqq-model-analysis-nav-fallback-enter-active,[^}]*transition: opacity 0\.18s ease, transform 0\.18s ease;/s)
+    expect(view).toContain("style.setProperty('--webqq-model-analysis-nav-top', `${scrollerRect.top}px`)")
+    expect(styles).not.toMatch(/\.webqq-model-analysis-nav-fallback \{[^}]*border-top:/s)
   })
 
   it('TOOL DEFS 强调框与消息卡片一样是圆角矩形', () => {

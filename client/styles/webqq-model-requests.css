@@ -1203,9 +1203,43 @@
   overflow: visible;
 }
 
+.webqq-model-request-analysis .webqq-model-analysis-nav,
 .webqq-model-request-analysis .webqq-model-analysis-content {
   max-height: none;
   overflow: visible;
+}
+
+.webqq-model-request-analysis .webqq-model-analysis-nav {
+  position: relative;
+}
+
+.webqq-model-analysis-nav-source {
+  display: grid;
+}
+
+.webqq-model-analysis-nav-fallback {
+  position: fixed;
+  z-index: 2;
+  top: var(--webqq-model-analysis-nav-top, 0);
+  left: var(--webqq-model-analysis-nav-left, 0);
+  display: grid;
+  width: var(--webqq-model-analysis-nav-width, 260px);
+  max-height: var(--webqq-model-analysis-nav-height, 100vh);
+  overflow: auto;
+  border-right: 1px solid var(--webqq-border);
+  border-bottom: 1px solid var(--webqq-border);
+  background: color-mix(in srgb, var(--webqq-surface-muted) 52%, var(--webqq-surface));
+}
+
+.webqq-model-analysis-nav-fallback-enter-active,
+.webqq-model-analysis-nav-fallback-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.webqq-model-analysis-nav-fallback-enter-from,
+.webqq-model-analysis-nav-fallback-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 
 .webqq-model-request-body-header {
@@ -1710,8 +1744,26 @@
 .webqq-model-analysis-nav-group.is-tool { --webqq-role: var(--webqq-role-tool); }
 .webqq-model-analysis-nav-group.is-variables { --webqq-role: var(--webqq-accent); }
 .webqq-model-analysis-nav-heading { justify-content: flex-start; gap: 6px; padding: 3px 4px; }
+.webqq-model-analysis-nav-fallback .webqq-model-analysis-nav-heading {
+  width: 100%;
+  padding: 5px 4px;
+  border: 0;
+  border-radius: 5px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+}
+.webqq-model-analysis-nav-fallback .webqq-model-analysis-nav-heading:hover,
+.webqq-model-analysis-nav-fallback .webqq-model-analysis-nav-heading:focus-visible { background: var(--webqq-hover); }
 .webqq-model-analysis-nav-heading svg { flex: 0 0 auto; color: var(--webqq-role); }
 .webqq-model-analysis-nav-heading small { margin-left: auto; color: var(--webqq-muted); }
+.webqq-model-analysis-nav-heading .webqq-model-analysis-nav-chevron {
+  color: var(--webqq-muted);
+  transition: transform 0.16s ease;
+}
+.webqq-model-analysis-nav-group.is-active .webqq-model-analysis-nav-chevron { transform: rotate(180deg); }
+.webqq-model-analysis-nav-items { display: grid; gap: 2px; }
 .webqq-model-analysis-nav-item {
   gap: 7px;
   width: 100%;

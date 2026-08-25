@@ -1,7 +1,8 @@
 <template>
   <section class="webqq-model-analysis" :class="{ 'is-inspector': layout === 'inspector' }" aria-label="模型请求分析">
     <div class="webqq-model-analysis-main">
-      <aside v-if="layout !== 'inspector'" class="webqq-model-analysis-nav" aria-label="分析导航">
+      <aside v-if="layout !== 'inspector'" ref="navigationElement" class="webqq-model-analysis-nav" aria-label="分析导航">
+        <div ref="navigationSourceElement" class="webqq-model-analysis-nav-source">
         <button
           type="button"
           class="webqq-model-analysis-boundary"
@@ -43,6 +44,51 @@
             <span class="webqq-model-analysis-nav-preview"><AnalysisHighlightedText :value="item.preview" :query="normalizedSearch" /></span>
           </button>
         </section>
+        </div>
+
+        <Transition name="webqq-model-analysis-nav-fallback">
+          <nav v-if="fallbackNavigationVisible" class="webqq-model-analysis-nav-fallback" aria-label="当前分析分类">
+            <section
+              v-for="group in visibleNavigationGroups"
+              :key="group.key"
+              class="webqq-model-analysis-nav-group"
+              :class="[
+                `is-${group.key}`,
+                {
+                  'is-active': activeNavigationGroup === group.key,
+                  'is-collapsed': activeNavigationGroup !== group.key,
+                  'is-muted': normalizedSearch && !group.items.some(itemMatches),
+                },
+              ]"
+            >
+              <button
+                type="button"
+                class="webqq-model-analysis-nav-heading"
+                :aria-expanded="activeNavigationGroup === group.key"
+                @click="activateNavigationGroup(group.key)"
+              >
+                <component :is="groupIcon(group.key)" :size="15" aria-hidden="true" />
+                <strong><AnalysisHighlightedText :value="group.label" :query="normalizedSearch" /></strong>
+                <small>{{ group.count }}</small>
+                <IconChevronDown class="webqq-model-analysis-nav-chevron" :size="15" aria-hidden="true" />
+              </button>
+              <div v-show="activeNavigationGroup === group.key" class="webqq-model-analysis-nav-items">
+                <button
+                  v-for="item in group.items"
+                  :key="item.id"
+                  type="button"
+                  class="webqq-model-analysis-nav-item"
+                  :class="{ 'is-muted': normalizedSearch && !itemMatches(item) }"
+                  @click="jumpTo(item.target)"
+                >
+                  <span class="webqq-model-analysis-nav-kind" :class="`is-${item.kind}`"><AnalysisHighlightedText :value="item.label" :query="normalizedSearch" /></span>
+                  <span v-if="item.index !== undefined" class="webqq-model-analysis-nav-index">#{{ item.index }}</span>
+                  <span class="webqq-model-analysis-nav-preview"><AnalysisHighlightedText :value="item.preview" :query="normalizedSearch" /></span>
+                </button>
+              </div>
+            </section>
+          </nav>
+        </Transition>
       </aside>
 
       <div ref="contentElement" class="webqq-model-analysis-content">
@@ -62,6 +108,7 @@
             v-for="message in visibleMessages"
             :id="modelAnalysisTargetId(message.evidenceId)"
             :key="message.evidenceId"
+            :data-analysis-group="message.role"
             class="webqq-model-analysis-card"
             :class="[
               `is-${message.role}`,
@@ -177,7 +224,7 @@
             </div>
           </article>
 
-          <section v-if="detail.variables?.length" class="webqq-model-analysis-variables">
+          <section v-if="detail.variables?.length" class="webqq-model-analysis-variables" data-analysis-group="variables">
             <h3>Variables <span>({{ detail.variables.length }})</span></h3>
             <div class="webqq-model-analysis-variable-list">
               <article
@@ -230,7 +277,7 @@
           </section>
 
           <template v-if="responseVisible">
-          <section class="webqq-model-analysis-response-heading">
+          <section class="webqq-model-analysis-response-heading" data-analysis-group="response">
             <h3>Response</h3>
           </section>
           <article
@@ -361,7 +408,7 @@
           </article>
           </template>
 
-          <section v-if="toolDefinitionsVisible" :id="MODEL_ANALYSIS_TOOLS_TARGET" class="webqq-model-analysis-tools" :class="{ 'is-located': highlightedTarget === MODEL_ANALYSIS_TOOLS_TARGET }">
+          <section v-if="toolDefinitionsVisible" :id="MODEL_ANALYSIS_TOOLS_TARGET" class="webqq-model-analysis-tools" data-analysis-group="tool" :class="{ 'is-located': highlightedTarget === MODEL_ANALYSIS_TOOLS_TARGET }">
             <h3>Tools <span>({{ conversation.tools.length }})</span></h3>
             <p v-if="!conversation.tools.length" class="webqq-model-analysis-empty">请求未声明工具定义</p>
             <article
@@ -443,6 +490,7 @@ import {
   modelAnalysisTargetId,
   modelAnalysisVariableTargetId,
   normalizeAnalysisQuery,
+  resolveActiveAnalysisGroup,
   shouldExpandAnalysisText,
   type ModelRequestAnalysisGroupKey,
   type ModelRequestAnalysisNavigationItem,
@@ -514,6 +562,10 @@ const collapsedCards = ref(new Set<string>())
 const expandedTools = ref(new Set<string>())
 const expandedTextTargets = ref(new Set<string>())
 const contentElement = ref<HTMLElement>()
+const navigationElement = ref<HTMLElement>()
+const navigationSourceElement = ref<HTMLElement>()
+const activeNavigationGroup = ref<ModelRequestAnalysisGroupKey>()
+const fallbackNavigationVisible = ref(false)
 const highlightedTarget = ref('')
 const activeOccurrence = ref<ModelRequestOccurrence>()
 const responseMatches = computed(() => !normalizedSearch.value || response.value.searchText.toLocaleLowerCase('zh-CN').includes(normalizedSearch.value))
@@ -525,6 +577,9 @@ const responseCharacters = computed(() => [
 ].join('').length)
 let pointerStart: { x: number, y: number } | undefined
 let suppressToolSummary = false
+let navigationScroller: HTMLElement | undefined
+let navigationResizeObserver: ResizeObserver | undefined
+let navigationFrame = 0
 
 // 定位的全部决策与帧时序都在 evidence-locator 里；这里只交出 DOM、渲染状态与计时出口。
 const locator = createEvidenceLocator({
@@ -608,7 +663,15 @@ watch(() => props.locateRequest?.seq, () => {
 
 onMounted(() => {
   void locateRequestedEvidence()
+  nextTick(setupNavigationTracking)
 })
+
+watch(visibleNavigationGroups, () => {
+  nextTick(() => {
+    ensureActiveNavigationGroup()
+    scheduleNavigationTracking()
+  })
+}, { flush: 'post' })
 
 watch(() => props.detail.id, (next, previous) => {
   if (next === previous) return
@@ -617,6 +680,8 @@ watch(() => props.detail.id, (next, previous) => {
   collapsedCards.value = new Set()
   expandedTools.value = new Set()
   expandedTextTargets.value = new Set()
+  activeNavigationGroup.value = visibleNavigationGroups.value[0]?.key
+  fallbackNavigationVisible.value = false
   locator.reset()
   const scroller = findScroller()
   if (scroller) scroller.scrollTop = 0
@@ -624,7 +689,80 @@ watch(() => props.detail.id, (next, previous) => {
 
 onBeforeUnmount(() => {
   locator.dispose()
+  teardownNavigationTracking()
 })
+
+function setupNavigationTracking() {
+  teardownNavigationTracking()
+  if (props.layout === 'inspector') return
+  navigationScroller = findScroller()
+  if (!navigationScroller) return
+  navigationScroller.addEventListener('scroll', scheduleNavigationTracking, { passive: true })
+  if (typeof ResizeObserver !== 'undefined' && contentElement.value) {
+    navigationResizeObserver = new ResizeObserver(scheduleNavigationTracking)
+    navigationResizeObserver.observe(contentElement.value)
+    navigationResizeObserver.observe(navigationScroller)
+  }
+  ensureActiveNavigationGroup()
+  updateActiveNavigationGroup()
+}
+
+function teardownNavigationTracking() {
+  navigationScroller?.removeEventListener('scroll', scheduleNavigationTracking)
+  navigationScroller = undefined
+  navigationResizeObserver?.disconnect()
+  navigationResizeObserver = undefined
+  if (navigationFrame) cancelAnimationFrame(navigationFrame)
+  navigationFrame = 0
+}
+
+function scheduleNavigationTracking() {
+  if (navigationFrame) return
+  navigationFrame = requestAnimationFrame(() => {
+    navigationFrame = 0
+    updateActiveNavigationGroup()
+  })
+}
+
+function ensureActiveNavigationGroup() {
+  if (visibleNavigationGroups.value.some(group => group.key === activeNavigationGroup.value)) return
+  activeNavigationGroup.value = visibleNavigationGroups.value[0]?.key
+}
+
+function updateActiveNavigationGroup() {
+  const content = contentElement.value
+  const scroller = navigationScroller ?? findScroller()
+  if (!content || !scroller) return
+  const scrollerRect = scroller.getBoundingClientRect()
+  const scrollerTop = scrollerRect.top
+  const navigationRect = navigationElement.value?.getBoundingClientRect()
+  if (navigationElement.value && navigationRect) {
+    navigationElement.value.style.setProperty('--webqq-model-analysis-nav-top', `${scrollerRect.top}px`)
+    navigationElement.value.style.setProperty('--webqq-model-analysis-nav-left', `${navigationRect.left}px`)
+    navigationElement.value.style.setProperty('--webqq-model-analysis-nav-width', `${navigationRect.width}px`)
+    navigationElement.value.style.setProperty('--webqq-model-analysis-nav-height', `${scrollerRect.height}px`)
+  }
+  fallbackNavigationVisible.value = Boolean(
+    navigationSourceElement.value
+    && navigationSourceElement.value.getBoundingClientRect().bottom <= scrollerTop,
+  )
+  const visibleKeys = new Set(visibleNavigationGroups.value.map(group => group.key))
+  const positions = [...content.querySelectorAll<HTMLElement>('[data-analysis-group]')]
+    .flatMap((element) => {
+      const key = element.dataset.analysisGroup as ModelRequestAnalysisGroupKey | undefined
+      return key && visibleKeys.has(key) ? [{ key, top: element.getBoundingClientRect().top }] : []
+    })
+  const active = resolveActiveAnalysisGroup(
+    positions,
+    scrollerTop,
+    scroller.clientHeight,
+  )
+  if (active) activeNavigationGroup.value = active
+}
+
+function activateNavigationGroup(group: ModelRequestAnalysisGroupKey) {
+  activeNavigationGroup.value = activeNavigationGroup.value === group ? undefined : group
+}
 
 function itemMatches(item: ModelRequestAnalysisNavigationItem) {
   return !normalizedSearch.value || item.searchText.includes(normalizedSearch.value)
