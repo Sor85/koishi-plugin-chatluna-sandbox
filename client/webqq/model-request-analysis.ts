@@ -77,13 +77,46 @@ export function resolveActiveAnalysisGroup(
   scrollerHeight: number,
 ): ModelRequestAnalysisGroupKey | undefined {
   if (!positions.length) return undefined
-  const probeTop = scrollerTop + Math.min(120, Math.max(0, scrollerHeight) * 0.25)
+  const probeTop = analysisProbeTop(scrollerTop, scrollerHeight)
   let active = positions[0].key
   for (const position of positions) {
     if (position.top > probeTop) break
     active = position.key
   }
   return active
+}
+
+/** 折叠阅读探针已经越过、且当前不再阅读的分类；尚未读到的分类保持展开。 */
+export function resolveCollapsedAnalysisGroups(
+  positions: readonly { key: ModelRequestAnalysisGroupKey, top: number }[],
+  scrollerTop: number,
+  scrollerHeight: number,
+): ModelRequestAnalysisGroupKey[] {
+  const probeTop = analysisProbeTop(scrollerTop, scrollerHeight)
+  const passed = positions.filter(position => position.top <= probeTop)
+  const active = passed.at(-1)?.key
+  if (!active) return []
+  return [...new Set(passed.slice(0, -1).map(position => position.key))]
+    .filter(key => key !== active)
+}
+
+/** 返回阅读探针当前经过的具体导航目标，用于同步左侧条目。 */
+export function resolveActiveAnalysisTarget(
+  positions: readonly { target: string, top: number }[],
+  scrollerTop: number,
+  scrollerHeight: number,
+): string | undefined {
+  const probeTop = analysisProbeTop(scrollerTop, scrollerHeight)
+  let active: string | undefined
+  for (const position of positions) {
+    if (position.top > probeTop) break
+    active = position.target
+  }
+  return active
+}
+
+function analysisProbeTop(scrollerTop: number, scrollerHeight: number): number {
+  return scrollerTop + Math.min(120, Math.max(0, scrollerHeight) * 0.25)
 }
 
 /**
@@ -175,7 +208,7 @@ export function buildModelRequestAnalysisNavigation(
     }
   }
 
-  const order: ModelRequestAnalysisGroupKey[] = ['system', 'user', 'assistant', 'tool', 'variables', 'response']
+  const order: ModelRequestAnalysisGroupKey[] = ['system', 'user', 'variables', 'response', 'assistant', 'tool']
   const groups = order.flatMap((key) => {
     const items = grouped.get(key) ?? []
     return items.length ? [{ key, label: GROUP_LABELS[key], count: items.length, items }] : []

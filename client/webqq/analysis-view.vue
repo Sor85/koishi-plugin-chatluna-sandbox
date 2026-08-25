@@ -2,7 +2,6 @@
   <section class="webqq-model-analysis" :class="{ 'is-inspector': layout === 'inspector' }" aria-label="模型请求分析">
     <div class="webqq-model-analysis-main">
       <aside v-if="layout !== 'inspector'" ref="navigationElement" class="webqq-model-analysis-nav" aria-label="分析导航">
-        <div ref="navigationSourceElement" class="webqq-model-analysis-nav-source">
         <button
           type="button"
           class="webqq-model-analysis-boundary"
@@ -27,8 +26,8 @@
           :class="[
             `is-${group.key}`,
             {
-              'is-active': !sourceCollapsedNavigationGroups.has(group.key),
-              'is-collapsed': sourceCollapsedNavigationGroups.has(group.key),
+              'is-active': !collapsedNavigationGroups.has(group.key),
+              'is-collapsed': collapsedNavigationGroups.has(group.key),
               'is-muted': normalizedSearch && !group.items.some(itemMatches),
             },
           ]"
@@ -36,21 +35,25 @@
           <button
             type="button"
             class="webqq-model-analysis-nav-heading"
-            :aria-expanded="!sourceCollapsedNavigationGroups.has(group.key)"
-            @click="toggleSourceNavigationGroup(group.key)"
+            :aria-expanded="!collapsedNavigationGroups.has(group.key)"
+            @click="toggleNavigationGroup(group.key)"
           >
             <component :is="groupIcon(group.key)" :size="15" aria-hidden="true" />
             <strong><AnalysisHighlightedText :value="group.label" :query="normalizedSearch" /></strong>
             <small>{{ group.count }}</small>
             <IconChevronDown class="webqq-model-analysis-nav-chevron" :size="15" aria-hidden="true" />
           </button>
-          <div v-show="!sourceCollapsedNavigationGroups.has(group.key)" class="webqq-model-analysis-nav-items">
+          <div v-show="!collapsedNavigationGroups.has(group.key)" class="webqq-model-analysis-nav-items">
             <button
               v-for="item in group.items"
               :key="item.id"
               type="button"
               class="webqq-model-analysis-nav-item"
-              :class="{ 'is-muted': normalizedSearch && !itemMatches(item) }"
+              :class="{
+                'is-current': activeNavigationTarget === item.target,
+                'is-muted': normalizedSearch && !itemMatches(item),
+              }"
+              :data-target="item.target"
               @click="jumpTo(item.target)"
             >
               <span class="webqq-model-analysis-nav-kind" :class="`is-${item.kind}`"><AnalysisHighlightedText :value="item.label" :query="normalizedSearch" /></span>
@@ -59,51 +62,6 @@
             </button>
           </div>
         </section>
-        </div>
-
-        <Transition name="webqq-model-analysis-nav-fallback">
-          <nav v-if="fallbackNavigationVisible" class="webqq-model-analysis-nav-fallback" aria-label="当前分析分类">
-            <section
-              v-for="group in visibleNavigationGroups"
-              :key="group.key"
-              class="webqq-model-analysis-nav-group"
-              :class="[
-                `is-${group.key}`,
-                {
-                  'is-active': activeNavigationGroup === group.key,
-                  'is-collapsed': activeNavigationGroup !== group.key,
-                  'is-muted': normalizedSearch && !group.items.some(itemMatches),
-                },
-              ]"
-            >
-              <button
-                type="button"
-                class="webqq-model-analysis-nav-heading"
-                :aria-expanded="activeNavigationGroup === group.key"
-                @click="activateNavigationGroup(group.key)"
-              >
-                <component :is="groupIcon(group.key)" :size="15" aria-hidden="true" />
-                <strong><AnalysisHighlightedText :value="group.label" :query="normalizedSearch" /></strong>
-                <small>{{ group.count }}</small>
-                <IconChevronDown class="webqq-model-analysis-nav-chevron" :size="15" aria-hidden="true" />
-              </button>
-              <div v-show="activeNavigationGroup === group.key" class="webqq-model-analysis-nav-items">
-                <button
-                  v-for="item in group.items"
-                  :key="item.id"
-                  type="button"
-                  class="webqq-model-analysis-nav-item"
-                  :class="{ 'is-muted': normalizedSearch && !itemMatches(item) }"
-                  @click="jumpTo(item.target)"
-                >
-                  <span class="webqq-model-analysis-nav-kind" :class="`is-${item.kind}`"><AnalysisHighlightedText :value="item.label" :query="normalizedSearch" /></span>
-                  <span v-if="item.index !== undefined" class="webqq-model-analysis-nav-index">#{{ item.index }}</span>
-                  <span class="webqq-model-analysis-nav-preview"><AnalysisHighlightedText :value="item.preview" :query="normalizedSearch" /></span>
-                </button>
-              </div>
-            </section>
-          </nav>
-        </Transition>
       </aside>
 
       <div ref="contentElement" class="webqq-model-analysis-content">
@@ -506,6 +464,8 @@ import {
   modelAnalysisVariableTargetId,
   normalizeAnalysisQuery,
   resolveActiveAnalysisGroup,
+  resolveActiveAnalysisTarget,
+  resolveCollapsedAnalysisGroups,
   shouldExpandAnalysisText,
   type ModelRequestAnalysisGroupKey,
   type ModelRequestAnalysisNavigationItem,
@@ -578,10 +538,9 @@ const expandedTools = ref(new Set<string>())
 const expandedTextTargets = ref(new Set<string>())
 const contentElement = ref<HTMLElement>()
 const navigationElement = ref<HTMLElement>()
-const navigationSourceElement = ref<HTMLElement>()
-const sourceCollapsedNavigationGroups = ref(new Set<ModelRequestAnalysisGroupKey>())
+const collapsedNavigationGroups = ref(new Set<ModelRequestAnalysisGroupKey>())
 const activeNavigationGroup = ref<ModelRequestAnalysisGroupKey>()
-const fallbackNavigationVisible = ref(false)
+const activeNavigationTarget = ref('')
 const highlightedTarget = ref('')
 const activeOccurrence = ref<ModelRequestOccurrence>()
 const responseMatches = computed(() => !normalizedSearch.value || response.value.searchText.toLocaleLowerCase('zh-CN').includes(normalizedSearch.value))
@@ -591,6 +550,7 @@ const responseCharacters = computed(() => [
   ...response.value.toolCalls.map(call => call.arguments || ''),
   ...response.value.toolResults.map(result => result.content),
 ].join('').length)
+const NAVIGATION_TARGET_SCROLL_MARGIN = 12
 let pointerStart: { x: number, y: number } | undefined
 let suppressToolSummary = false
 let navigationScroller: HTMLElement | undefined
@@ -696,9 +656,9 @@ watch(() => props.detail.id, (next, previous) => {
   collapsedCards.value = new Set()
   expandedTools.value = new Set()
   expandedTextTargets.value = new Set()
-  sourceCollapsedNavigationGroups.value = new Set()
+  collapsedNavigationGroups.value = new Set()
   activeNavigationGroup.value = visibleNavigationGroups.value[0]?.key
-  fallbackNavigationVisible.value = false
+  activeNavigationTarget.value = ''
   locator.reset()
   const scroller = findScroller()
   if (scroller) scroller.scrollTop = 0
@@ -719,7 +679,7 @@ function setupNavigationTracking() {
     navigationResizeObserver = new ResizeObserver(scheduleNavigationTracking)
     navigationResizeObserver.observe(contentElement.value)
     navigationResizeObserver.observe(navigationScroller)
-    if (navigationSourceElement.value) navigationResizeObserver.observe(navigationSourceElement.value)
+    if (navigationElement.value) navigationResizeObserver.observe(navigationElement.value)
   }
   ensureActiveNavigationGroup()
   updateActiveNavigationGroup()
@@ -753,17 +713,7 @@ function updateActiveNavigationGroup() {
   if (!content || !scroller) return
   const scrollerRect = scroller.getBoundingClientRect()
   const scrollerTop = scrollerRect.top
-  const navigationRect = navigationElement.value?.getBoundingClientRect()
-  if (navigationElement.value && navigationRect) {
-    navigationElement.value.style.setProperty('--webqq-model-analysis-nav-top', `${scrollerRect.top}px`)
-    navigationElement.value.style.setProperty('--webqq-model-analysis-nav-left', `${navigationRect.left}px`)
-    navigationElement.value.style.setProperty('--webqq-model-analysis-nav-width', `${navigationRect.width}px`)
-    navigationElement.value.style.setProperty('--webqq-model-analysis-nav-height', `${scrollerRect.height}px`)
-  }
-  fallbackNavigationVisible.value = Boolean(
-    navigationSourceElement.value
-    && navigationSourceElement.value.getBoundingClientRect().bottom <= scrollerTop,
-  )
+  navigationElement.value?.style.setProperty('--webqq-model-analysis-nav-height', `${scroller.clientHeight}px`)
   const visibleKeys = new Set(visibleNavigationGroups.value.map(group => group.key))
   const positions = [...content.querySelectorAll<HTMLElement>('[data-analysis-group]')]
     .flatMap((element) => {
@@ -775,18 +725,48 @@ function updateActiveNavigationGroup() {
     scrollerTop,
     scroller.clientHeight,
   )
-  if (active) activeNavigationGroup.value = active
+  if (active && active !== activeNavigationGroup.value) {
+    activeNavigationGroup.value = active
+    collapsedNavigationGroups.value = new Set(resolveCollapsedAnalysisGroups(
+      positions,
+      scrollerTop,
+      scroller.clientHeight,
+    ))
+  }
+  const navigationTargets = new Set(visibleNavigationGroups.value.flatMap(group => group.items.map(item => item.target)))
+  const targetPositions = [...content.querySelectorAll<HTMLElement>('[id]')]
+    .flatMap((element) => navigationTargets.has(element.id)
+      ? [{ target: element.id, top: element.getBoundingClientRect().top }]
+      : [])
+  const nextTarget = resolveActiveAnalysisTarget(targetPositions, scrollerTop, scroller.clientHeight)
+  if (nextTarget && nextTarget !== activeNavigationTarget.value) {
+    activeNavigationTarget.value = nextTarget
+    nextTick(() => scrollNavigationTargetIntoView(nextTarget))
+  }
 }
 
-function toggleSourceNavigationGroup(group: ModelRequestAnalysisGroupKey) {
-  const next = new Set(sourceCollapsedNavigationGroups.value)
+function scrollNavigationTargetIntoView(target: string) {
+  const navigation = navigationElement.value
+  if (!navigation) return
+  const item = [...navigation.querySelectorAll<HTMLElement>('.webqq-model-analysis-nav-item')]
+    .find(element => element.dataset.target === target)
+  if (!item) return
+  const navigationRect = navigation.getBoundingClientRect()
+  const itemRect = item.getBoundingClientRect()
+  const visibleTop = navigationRect.top + NAVIGATION_TARGET_SCROLL_MARGIN
+  const visibleBottom = navigationRect.bottom - NAVIGATION_TARGET_SCROLL_MARGIN
+  if (itemRect.top < visibleTop) {
+    navigation.scrollTo({ top: navigation.scrollTop + itemRect.top - visibleTop, behavior: 'smooth' })
+  } else if (itemRect.bottom > visibleBottom) {
+    navigation.scrollTo({ top: navigation.scrollTop + itemRect.bottom - visibleBottom, behavior: 'smooth' })
+  }
+}
+
+function toggleNavigationGroup(group: ModelRequestAnalysisGroupKey) {
+  const next = new Set(collapsedNavigationGroups.value)
   next.has(group) ? next.delete(group) : next.add(group)
-  sourceCollapsedNavigationGroups.value = next
+  collapsedNavigationGroups.value = next
   nextTick(scheduleNavigationTracking)
-}
-
-function activateNavigationGroup(group: ModelRequestAnalysisGroupKey) {
-  activeNavigationGroup.value = activeNavigationGroup.value === group ? undefined : group
 }
 
 function itemMatches(item: ModelRequestAnalysisNavigationItem) {

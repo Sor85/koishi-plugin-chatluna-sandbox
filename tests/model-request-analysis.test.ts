@@ -8,6 +8,8 @@ import {
   modelAnalysisTargetId,
   normalizeAnalysisQuery,
   resolveActiveAnalysisGroup,
+  resolveActiveAnalysisTarget,
+  resolveCollapsedAnalysisGroups,
   resolveAnalysisEvidenceTarget,
   shouldExpandAnalysisText,
 } from '../client/webqq/model-request-analysis'
@@ -59,18 +61,36 @@ describe('模型请求分析展示模型', () => {
     expect(navigation.groups.map(({ key, count }) => ({ key, count }))).toEqual([
       { key: 'system', count: 1 },
       { key: 'user', count: 1 },
+      { key: 'response', count: 1 },
       { key: 'assistant', count: 2 },
       { key: 'tool', count: 2 },
-      { key: 'response', count: 1 },
     ])
-    expect(navigation.groups[2]?.items[1]).toMatchObject({
+
+    request.variables = [{
+      id: 'variable-1',
+      name: 'weather',
+      presetKind: 'character',
+      presetName: 'koishi',
+      path: ['system'],
+      occurrence: 0,
+      status: 'observed',
+      value: '晴朗',
+      evidenceId: 'req:message:messages.0',
+      range: { start: 0, end: 2 },
+    }]
+    const navigationWithVariables = buildModelRequestAnalysisNavigation(parseModelRequestConversationDetail(request), request)
+    expect(navigationWithVariables.groups.map(({ key }) => key)).toEqual([
+      'system', 'user', 'variables', 'response', 'assistant', 'tool',
+    ])
+
+    expect(navigation.groups.find(({ key }) => key === 'assistant')?.items[1]).toMatchObject({
       kind: 'tool-call',
       label: 'TOOL CALL',
       preview: 'weather',
       evidenceId: 'req:tool-call:messages.2.tool_calls.0',
       target: 'model-analysis-req:tool-call:messages.2.tool_calls.0',
     })
-    expect(navigation.groups[3]?.items).toEqual(expect.arrayContaining([
+    expect(navigation.groups.find(({ key }) => key === 'tool')?.items).toEqual(expect.arrayContaining([
       expect.objectContaining({ label: 'TOOL RESULT', evidenceId: 'req:message:messages.3' }),
       expect.objectContaining({ label: 'TOOL DEFS', target: 'model-analysis-tools' }),
     ]))
@@ -93,6 +113,39 @@ describe('模型请求分析展示模型', () => {
       { key: 'response', top: 100 },
     ], 0, 800)).toBe('response')
     expect(resolveActiveAnalysisGroup([], 0, 800)).toBeUndefined()
+  })
+
+  it('右侧切换分类后只折叠实际已经越过的左侧分类', () => {
+    const positions = [
+      { key: 'system' as const, top: -600 },
+      { key: 'user' as const, top: -200 },
+      { key: 'variables' as const, top: 80 },
+      { key: 'response' as const, top: 900 },
+      // 左侧 Tool 虽排在 Variables 前，但右侧尚未读到时必须保持展开。
+      { key: 'tool' as const, top: 1200 },
+    ]
+
+    expect(resolveCollapsedAnalysisGroups(positions, 0, 800)).toEqual(['system', 'user'])
+    expect(resolveCollapsedAnalysisGroups([
+      { key: 'system', top: -1200 },
+      { key: 'user', top: -800 },
+      { key: 'assistant', top: -400 },
+      { key: 'tool', top: 80 },
+    ], 0, 800)).toEqual(['system', 'user', 'assistant'])
+    expect(resolveCollapsedAnalysisGroups([{ key: 'system', top: 200 }], 0, 800)).toEqual([])
+  })
+
+  it('按阅读探针追踪右侧具体卡片对应的左侧条目', () => {
+    const positions = [
+      { target: 'model-analysis-system-0', top: -500 },
+      { target: 'model-analysis-variable-time', top: 40 },
+      { target: 'model-analysis-variable-groupShutList', top: 100 },
+      { target: 'model-analysis-response', top: 900 },
+    ]
+
+    expect(resolveActiveAnalysisTarget(positions, 0, 800)).toBe('model-analysis-variable-groupShutList')
+    expect(resolveActiveAnalysisTarget(positions, 0, 200)).toBe('model-analysis-variable-time')
+    expect(resolveActiveAnalysisTarget([], 0, 800)).toBeUndefined()
   })
 
   it('按模型证据身份把轨迹行和组成分段定位到同一分析目标', () => {
@@ -157,8 +210,8 @@ describe('模型请求分析展示模型', () => {
     expect(navigation.groups.map(({ key, count }) => ({ key, count }))).toEqual([
       { key: 'system', count: 2 },
       { key: 'user', count: 1 },
-      { key: 'tool', count: 1 },
       { key: 'response', count: 1 },
+      { key: 'tool', count: 1 },
     ])
     expect(resolveAnalysisEvidenceTarget(navigation, 'req:message:systemInstruction.parts.0'))
       .toBe(modelAnalysisTargetId('req:message:systemInstruction.parts.0'))
@@ -175,7 +228,7 @@ describe('模型请求分析展示模型', () => {
     const navigation = buildModelRequestAnalysisNavigation(parseModelRequestConversationDetail(request), request)
 
     const weather = navigation.groups.flatMap(({ items }) => items).filter(({ searchText }) => searchText.includes(normalizeAnalysisQuery('北京')))
-    expect(weather.map(({ label }) => label)).toEqual(['ASSISTANT', 'TOOL CALL', '响应'])
+    expect(weather.map(({ label }) => label)).toEqual(['响应', 'ASSISTANT', 'TOOL CALL'])
     expect(navigation.searchText).toContain('查询天气')
     expect(navigation.searchText).toContain('北京晴朗')
     expect(navigation.searchText).toContain('weather')
@@ -289,46 +342,49 @@ describe('模型请求分析展示模型', () => {
     expect(view).toContain("content.closest<HTMLElement>('.webqq-model-trajectory-inspector-body')")
     expect(view).toContain('createEvidenceLocator')
     expect(view).not.toContain("scrollIntoView({ behavior: 'smooth', block: 'start' })")
-    expect(styles).toMatch(/\.webqq-model-request-analysis \.webqq-model-analysis-nav,\s*\.webqq-model-request-analysis \.webqq-model-analysis-content \{[^}]*max-height: none[^}]*overflow: visible/s)
-    expect(styles).toMatch(/\.webqq-model-analysis-nav-fallback \{[^}]*position: fixed;[^}]*top: var\(--webqq-model-analysis-nav-top, 0\);/s)
+    expect(styles).toMatch(/\.webqq-model-request-analysis \.webqq-model-analysis-content \{[^}]*max-height: none[^}]*overflow: visible/s)
   })
 
-  it('原导航分类默认展开且支持独立折叠', () => {
+  it('单一左侧导航保持吸顶，分类默认展开且支持独立折叠', () => {
     const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
 
-    expect(view).toContain('sourceCollapsedNavigationGroups = ref(new Set<ModelRequestAnalysisGroupKey>())')
-    expect(view).toContain('@click="toggleSourceNavigationGroup(group.key)"')
-    expect(view).toContain(':aria-expanded="!sourceCollapsedNavigationGroups.has(group.key)"')
-    expect(view).toContain('v-show="!sourceCollapsedNavigationGroups.has(group.key)"')
-    expect(view).toContain('sourceCollapsedNavigationGroups.value = new Set()')
+    expect(view).toContain('collapsedNavigationGroups = ref(new Set<ModelRequestAnalysisGroupKey>())')
+    expect(view).toContain('@click="toggleNavigationGroup(group.key)"')
+    expect(view).toContain(':aria-expanded="!collapsedNavigationGroups.has(group.key)"')
+    expect(view).toContain('v-show="!collapsedNavigationGroups.has(group.key)"')
+    expect(view).toContain('collapsedNavigationGroups.value = new Set()')
     expect(view).toContain('next.has(group) ? next.delete(group) : next.add(group)')
-    expect(view).toContain('navigationResizeObserver.observe(navigationSourceElement.value)')
-    expect(styles).toContain('.webqq-model-analysis-nav-source .webqq-model-analysis-nav-heading,')
+    expect(styles).toMatch(/\.webqq-model-request-analysis \.webqq-model-analysis-nav \{[^}]*position: sticky;[^}]*top: 0;[^}]*max-height: var\(--webqq-model-analysis-nav-height[^}]*overflow: auto;/s)
   })
 
-  it('原导航离开视野后以动画显示分类导航，标题点击只展开不跳转', () => {
+  it('滚动阅读右侧时自动折叠已越过分类，不再渲染第二份浮动导航', () => {
     const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
 
-    expect(view).toContain('<Transition name="webqq-model-analysis-nav-fallback">')
-    expect(view).toContain('v-if="fallbackNavigationVisible"')
-    expect(view).toContain('ref="navigationSourceElement"')
-    expect(view).toContain('navigationSourceElement.value.getBoundingClientRect().bottom <= scrollerTop')
-    expect(view).toContain('@click="activateNavigationGroup(group.key)"')
-    expect(view).toContain('activeNavigationGroup.value === group ? undefined : group')
-    expect(view).not.toContain('@click="jumpTo(group.items[0]?.target)"')
-    expect(view).toContain("'is-collapsed': activeNavigationGroup !== group.key")
-    expect(view).toContain('v-show="activeNavigationGroup === group.key"')
+    expect(view).not.toContain('webqq-model-analysis-nav-fallback')
+    expect(view).not.toContain('fallbackNavigationVisible')
+    expect(view).not.toContain('navigationSourceElement')
+    expect(styles).not.toContain('.webqq-model-analysis-nav-fallback')
+    expect(view).toContain('resolveCollapsedAnalysisGroups')
+    expect(view).toContain('resolveActiveAnalysisTarget')
+    expect(view).toContain(":data-target=\"item.target\"")
+    expect(view).toContain("'is-current': activeNavigationTarget === item.target")
+    expect(view).toContain('const NAVIGATION_TARGET_SCROLL_MARGIN = 12')
+    expect(view).toMatch(/const visibleBottom = navigationRect\.bottom - NAVIGATION_TARGET_SCROLL_MARGIN/)
+    expect(view).toMatch(/navigation\.scrollTo\(\{ top: navigation\.scrollTop \+ itemRect\.bottom - visibleBottom, behavior: 'smooth' \}\)/)
+    expect(styles).toMatch(/\.webqq-model-request-analysis \.webqq-model-analysis-nav \{[^}]*padding-bottom: 24px;/s)
+    expect(styles).toContain('.webqq-model-analysis-nav-item.is-current')
+    expect(view).toContain('if (active && active !== activeNavigationGroup.value)')
+    expect(view).toContain('collapsedNavigationGroups.value = new Set(resolveCollapsedAnalysisGroups(')
+    expect(view).toContain('positions,')
     expect(view).toContain(':data-analysis-group="message.role"')
     expect(view).toContain('data-analysis-group="variables"')
     expect(view).toContain('data-analysis-group="response"')
     expect(view).toContain('data-analysis-group="tool"')
     expect(view).toContain("navigationScroller.addEventListener('scroll', scheduleNavigationTracking")
     expect(view).toContain('resolveActiveAnalysisGroup')
-    expect(styles).toMatch(/\.webqq-model-analysis-nav-fallback-enter-active,[^}]*transition: opacity 0\.18s ease, transform 0\.18s ease;/s)
-    expect(view).toContain("style.setProperty('--webqq-model-analysis-nav-top', `${scrollerRect.top}px`)")
-    expect(styles).not.toMatch(/\.webqq-model-analysis-nav-fallback \{[^}]*border-top:/s)
+    expect(view).toContain("style.setProperty('--webqq-model-analysis-nav-height', `${scroller.clientHeight}px`)")
   })
 
   it('TOOL DEFS 强调框与消息卡片一样是圆角矩形', () => {
