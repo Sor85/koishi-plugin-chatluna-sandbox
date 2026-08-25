@@ -24,6 +24,7 @@ function detail(content: string): SandboxModelRequestDetail {
       messages: [{ role: 'user', content, reasoning: '不要定位到思考文本' }],
     },
     responseBodyStatus: 'unavailable',
+    variables: [],
     summary: { keys: 1, messageCount: 1, toolCount: 0, bodyAvailable: true },
   }
 }

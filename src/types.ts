@@ -480,6 +480,26 @@ export interface SandboxPresetRuntimeSnapshotSummary {
   templateCount: number
 }
 
+export type SandboxModelRequestVariableStatus =
+  | 'observed'
+  | 'stale'
+  | 'not-observed'
+  | 'ambiguous'
+  | 'unsupported'
+
+export interface SandboxModelRequestVariable {
+  id: string
+  name: string
+  presetKind: SandboxPresetDocumentKind
+  presetName: string
+  path: readonly (string | number)[]
+  occurrence: number
+  status: SandboxModelRequestVariableStatus
+  value?: string
+  evidenceId?: string
+  range?: { start: number, end: number }
+}
+
 export interface SandboxModelRequestSummary {
   keys: number
   messageCount: number
@@ -532,7 +552,10 @@ export type SandboxModelRequestListItem = Omit<SandboxModelRequestRecord, 'reque
   presetSnapshotSummaries?: readonly SandboxPresetRuntimeSnapshotSummary[]
   summary: SandboxModelRequestSummary
 }
-export type SandboxModelRequestDetail = SandboxModelRequestRecord & { summary: SandboxModelRequestSummary }
+export type SandboxModelRequestDetail = SandboxModelRequestRecord & {
+  summary: SandboxModelRequestSummary
+  variables: readonly SandboxModelRequestVariable[]
+}
 
 export interface GetSandboxModelRequestRecordsInput {
   botId?: string

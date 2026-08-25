@@ -62,6 +62,8 @@ export function analysisItemFilterKind(
   if (itemKind === 'tool-call') return 'tool-call'
   if (itemKind === 'tool-result') return 'tool-result'
   if (itemKind === 'tool-definition') return 'tool-definition'
+  // 变量由运行时预设快照和请求证据派生，不属于轨迹证据种类过滤。
+  if (itemKind === 'variable') return undefined
   // 响应分组头部代表整张响应卡片，不属于任何单一角色，不参与种类过滤。
   if (itemKind === 'response') return undefined
   if (groupKey === 'system' || groupKey === 'user' || groupKey === 'assistant') return messageRoleFilterKind(groupKey)

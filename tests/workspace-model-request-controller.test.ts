@@ -53,6 +53,7 @@ const olderItem: SandboxModelRequestListItem = {
 
 const detail: SandboxModelRequestDetail = {
   ...listItem,
+  variables: [],
   requestBody: { model: 'gpt-4.1', messages: [] },
 }
 

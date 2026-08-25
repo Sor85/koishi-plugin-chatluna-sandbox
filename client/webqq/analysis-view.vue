@@ -177,6 +177,58 @@
             </div>
           </article>
 
+          <section v-if="detail.variables?.length" class="webqq-model-analysis-variables">
+            <h3>Variables <span>({{ detail.variables.length }})</span></h3>
+            <div class="webqq-model-analysis-variable-list">
+              <article
+                v-for="variable in detail.variables"
+                :id="modelAnalysisVariableTargetId(variable.id)"
+                :key="variable.id"
+                class="webqq-model-analysis-variable-card"
+                :class="{
+                  'is-collapsed': isCardCollapsed(modelAnalysisVariableTargetId(variable.id)),
+                  'is-muted': normalizedSearch && !variableMatches(variable),
+                  'is-located': highlightedTarget === modelAnalysisVariableTargetId(variable.id),
+                }"
+              >
+                <header @click="toggleCardFromHeader($event, modelAnalysisVariableTargetId(variable.id))">
+                  <span class="webqq-model-analysis-role">variable</span>
+                  <strong><AnalysisHighlightedText :value="variable.name" :query="normalizedSearch" /></strong>
+                  <span class="webqq-model-analysis-variable-preset">{{ variable.presetName }}</span>
+                  <TooltipProvider :delay-duration="500">
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <Button
+                          size="icon-sm"
+                          variant="ghost"
+                          class="webqq-model-analysis-collapse"
+                          :aria-expanded="!isCardCollapsed(modelAnalysisVariableTargetId(variable.id))"
+                          :aria-label="isCardCollapsed(modelAnalysisVariableTargetId(variable.id)) ? `展开变量 ${variable.name}` : `收起变量 ${variable.name}`"
+                          @click="toggleCard(modelAnalysisVariableTargetId(variable.id))"
+                        >
+                          <IconChevronDown :size="16" aria-hidden="true" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{{ isCardCollapsed(modelAnalysisVariableTargetId(variable.id)) ? '展开变量卡片' : '收起变量卡片' }}</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </header>
+                <div v-show="!isCardCollapsed(modelAnalysisVariableTargetId(variable.id))" class="webqq-model-analysis-variable-body">
+                  <p v-if="variable.status === 'observed' && !variable.value" class="webqq-model-analysis-variable-empty">
+                    <span>空值</span>该表达式在本次模型请求中展开为空字符串
+                  </p>
+                  <AnalysisTextBlock
+                    v-else-if="variable.status === 'observed'"
+                    :value="variable.value ?? ''"
+                    :search-query="normalizedSearch"
+                    compact
+                  />
+                  <p v-else class="webqq-model-analysis-variable-status">{{ variableStatusLabel(variable.status) }}</p>
+                </div>
+              </article>
+            </div>
+          </section>
+
           <template v-if="responseVisible">
           <section class="webqq-model-analysis-response-heading">
             <h3>Response</h3>
@@ -366,6 +418,7 @@
 
 <script setup lang="ts">
 import {
+  IconBraces,
   IconChevronDown,
   IconCode,
   IconMessage,
@@ -388,6 +441,7 @@ import {
   MODEL_ANALYSIS_RESPONSE_TARGET,
   MODEL_ANALYSIS_TOOLS_TARGET,
   modelAnalysisTargetId,
+  modelAnalysisVariableTargetId,
   normalizeAnalysisQuery,
   shouldExpandAnalysisText,
   type ModelRequestAnalysisGroupKey,
@@ -413,7 +467,7 @@ import {
   type ModelConversationRole,
   type ModelRequestConversation,
 } from './model-request-conversation'
-import type { SandboxModelRequestDetail, SandboxModelRequestStatus, SandboxModelRequestTrajectory } from '../../src/types'
+import type { SandboxModelRequestDetail, SandboxModelRequestStatus, SandboxModelRequestTrajectory, SandboxModelRequestVariable } from '../../src/types'
 
 const props = defineProps<{
   detail: SandboxModelRequestDetail
@@ -539,6 +593,9 @@ watch(normalizedSearch, async (query) => {
   for (const tool of conversation.value.tools) {
     if (tool.searchText.toLocaleLowerCase('zh-CN').includes(query)) expandTool(tool.evidenceId)
   }
+  for (const variable of props.detail.variables) {
+    if (variableMatches(variable)) expandCard(modelAnalysisVariableTargetId(variable.id))
+  }
   // 轨迹检查器已经选中了具体账本行，搜索只高亮匹配卡片，不再抢走当前定位。
   if (props.layout === 'inspector') return
   const first = visibleNavigationGroups.value.flatMap(group => group.items).find(itemMatches)
@@ -575,6 +632,20 @@ function itemMatches(item: ModelRequestAnalysisNavigationItem) {
 
 function messageMatches(message: ModelConversationMessage) {
   return !normalizedSearch.value || message.searchText.toLocaleLowerCase('zh-CN').includes(normalizedSearch.value)
+}
+
+function variableMatches(variable: SandboxModelRequestVariable) {
+  if (!normalizedSearch.value) return true
+  return `${variable.name}\n${variable.value ?? ''}\n${variable.presetName}`
+    .toLocaleLowerCase('zh-CN')
+    .includes(normalizedSearch.value)
+}
+
+function variableStatusLabel(status: SandboxModelRequestVariable['status']) {
+  if (status === 'ambiguous') return '该表达式在请求消息中存在多个可能的展开范围，无法唯一确定变量值。'
+  if (status === 'stale') return '运行时预设模板与表达式不一致。'
+  if (status === 'unsupported') return '该表达式不支持映射为模型请求变量。'
+  return '该表达式未在这次模型请求中产生可观察值。'
 }
 
 async function locateRequestedEvidence() {
@@ -706,6 +777,7 @@ function groupIcon(group: ModelRequestAnalysisGroupKey): Component {
   if (group === 'user') return IconUser
   if (group === 'assistant') return IconRobot
   if (group === 'tool') return IconTool
+  if (group === 'variables') return IconBraces
   return IconMessage
 }
 

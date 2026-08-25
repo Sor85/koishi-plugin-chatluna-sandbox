@@ -1708,6 +1708,7 @@
 .webqq-model-analysis-nav-group.is-assistant,
 .webqq-model-analysis-nav-group.is-response { --webqq-role: var(--webqq-role-assistant); }
 .webqq-model-analysis-nav-group.is-tool { --webqq-role: var(--webqq-role-tool); }
+.webqq-model-analysis-nav-group.is-variables { --webqq-role: var(--webqq-accent); }
 .webqq-model-analysis-nav-heading { justify-content: flex-start; gap: 6px; padding: 3px 4px; }
 .webqq-model-analysis-nav-heading svg { flex: 0 0 auto; color: var(--webqq-role); }
 .webqq-model-analysis-nav-heading small { margin-left: auto; color: var(--webqq-muted); }
@@ -1739,8 +1740,12 @@
 .webqq-model-analysis-nav-kind.is-tool-call,
 .webqq-model-analysis-nav-kind.is-tool-result { --webqq-role: var(--webqq-role-tool-interaction); }
 .webqq-model-analysis-nav-kind.is-tool-definition { --webqq-role: var(--webqq-role-tool); }
+.webqq-model-analysis-nav-kind.is-variable { --webqq-role: var(--webqq-accent); }
 .webqq-model-analysis-nav-kind.is-response { --webqq-role: var(--webqq-role-assistant); }
-.webqq-model-analysis-nav-group.is-muted, .webqq-model-analysis-nav-item.is-muted, .webqq-model-analysis-card.is-muted { opacity: 0.2; }
+.webqq-model-analysis-nav-group.is-muted,
+.webqq-model-analysis-nav-item.is-muted,
+.webqq-model-analysis-card.is-muted,
+.webqq-model-analysis-variable-card.is-muted { opacity: 0.2; }
 
 .webqq-model-analysis-content,
 .webqq-model-analysis-conversation { display: grid; align-content: start; gap: 12px; min-width: 0; }
@@ -1768,8 +1773,12 @@
 }
 .webqq-model-analysis-formatted { min-width: 0; }
 .webqq-model-analysis-heading { justify-content: space-between; gap: 12px; }
-.webqq-model-analysis-heading h3, .webqq-model-analysis-tools h3 { margin: 0; color: var(--webqq-text); font-size: 16px; }
-.webqq-model-analysis-heading h3 span, .webqq-model-analysis-tools h3 span { color: var(--webqq-muted); font-weight: 500; }
+.webqq-model-analysis-heading h3,
+.webqq-model-analysis-variables h3,
+.webqq-model-analysis-tools h3 { margin: 0; color: var(--webqq-text); font-size: 16px; }
+.webqq-model-analysis-heading h3 span,
+.webqq-model-analysis-variables h3 span,
+.webqq-model-analysis-tools h3 span { color: var(--webqq-muted); font-weight: 500; }
 
 .webqq-model-analysis-card,
 .webqq-model-analysis-tool-card {
@@ -1918,6 +1927,75 @@
 }
 .webqq-model-analysis-response-heading { padding-top: 4px; }
 .webqq-model-analysis-response-heading h3 { margin: 0; color: var(--webqq-text); font-size: 16px; }
+
+.webqq-model-analysis-variables {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+.webqq-model-analysis-variable-list { display: grid; gap: 8px; }
+.webqq-model-analysis-variable-card {
+  --webqq-role: var(--webqq-accent);
+  overflow: hidden;
+  border: 1px solid var(--webqq-border);
+  border-top: 2px solid var(--webqq-role);
+  border-radius: 8px;
+  background: var(--webqq-surface);
+  scroll-margin-top: 12px;
+}
+.webqq-model-analysis-variable-card.is-located {
+  outline: 2px solid var(--webqq-accent);
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--webqq-accent) 8%, var(--webqq-surface));
+}
+.webqq-model-analysis-variable-card > header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--webqq-border);
+}
+.webqq-model-analysis-variable-card > header > strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--webqq-text);
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+.webqq-model-analysis-variable-preset {
+  margin-left: auto;
+  color: var(--webqq-muted);
+  font-size: 11px;
+}
+.webqq-model-analysis-variable-card.is-collapsed > header { border-bottom: 0; }
+.webqq-model-analysis-variable-card:not(.is-collapsed) .webqq-model-analysis-collapse svg { transform: rotate(180deg); }
+.webqq-model-analysis-variable-body { min-width: 0; }
+.webqq-model-analysis-variable-body > .webqq-model-analysis-section {
+  padding: 14px 16px;
+}
+.webqq-model-analysis-variable-status,
+.webqq-model-analysis-variable-empty {
+  margin: 0;
+  padding: 14px 16px;
+  color: var(--webqq-muted);
+  font-size: 12px;
+}
+.webqq-model-analysis-variable-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.webqq-model-analysis-variable-empty > span {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border: 1px solid color-mix(in srgb, var(--webqq-accent) 35%, var(--webqq-border));
+  border-radius: 999px;
+  color: var(--webqq-accent);
+  background: color-mix(in srgb, var(--webqq-accent) 9%, transparent);
+  font-size: 10px;
+  font-weight: 700;
+}
 
 .webqq-model-analysis-tools {
   display: grid;

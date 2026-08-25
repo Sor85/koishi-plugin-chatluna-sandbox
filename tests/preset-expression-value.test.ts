@@ -22,6 +22,7 @@ const detail: SandboxModelRequestDetail = {
   requestBodyAvailable: true,
   requestBody: { contents: [{ role: 'user', parts: [{ text: 'Hello Alice.' }] }] },
   responseBodyStatus: 'complete',
+  variables: [],
   summary: { keys: 1, messageCount: 1, toolCount: 0, bodyAvailable: true },
 }
 

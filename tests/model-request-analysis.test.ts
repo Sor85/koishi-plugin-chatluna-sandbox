@@ -34,6 +34,7 @@ function detail(): SandboxModelRequestDetail {
       ],
       tools: [{ type: 'function', function: { name: 'weather', description: '查询天气', parameters: { type: 'object' } } }],
     },
+    variables: [],
     responseBodyStatus: 'complete',
     responseBodyFormat: 'json',
     responseBodyRaw: JSON.stringify({ choices: [{ message: { content: '北京晴朗' }, finish_reason: 'stop' }] }),
@@ -193,6 +194,49 @@ describe('模型请求分析展示模型', () => {
     expect(view).toContain('class="webqq-model-analysis-tool-call is-call"')
     expect(view).toContain('class="webqq-model-analysis-tool-call is-result"')
     expect(trajectory).toContain("row.toolEvent === 'definition' ? 'is-tool-definition' : ''")
+  })
+
+  it('左侧 Variables 列出预设表达式名，并定位右侧变量值卡片', () => {
+    const request = detail()
+    request.variables = [{
+      id: 'character:0:["system"]#0',
+      name: 'weather',
+      presetKind: 'character',
+      presetName: 'koishi',
+      path: ['system'],
+      occurrence: 0,
+      status: 'observed',
+      value: '长沙晴朗',
+      evidenceId: 'req:message:messages.0',
+      range: { start: 0, end: 4 },
+    }]
+    const navigation = buildModelRequestAnalysisNavigation(parseModelRequestConversationDetail(request), request)
+    const variables = navigation.groups.find(({ key }) => key === 'variables')
+
+    expect(variables).toMatchObject({ label: 'Variables', count: 1 })
+    expect(variables?.items[0]).toMatchObject({
+      kind: 'variable', label: 'VARIABLE', preview: 'weather', searchText: expect.stringContaining('长沙晴朗'),
+    })
+
+    const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
+    expect(view).toContain(':id="modelAnalysisVariableTargetId(variable.id)"')
+    expect(view).toContain(':value="variable.name"')
+    expect(view).toContain(':value="variable.value ?? \'\'"')
+  })
+
+  it('变量卡片正文保持卡片内边距，支持头部和按钮折叠，并标注空值', () => {
+    const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
+    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+
+    expect(view).toContain("'is-collapsed': isCardCollapsed(modelAnalysisVariableTargetId(variable.id))")
+    expect(view).toContain('@click="toggleCardFromHeader($event, modelAnalysisVariableTargetId(variable.id))"')
+    expect(view).toContain('@click="toggleCard(modelAnalysisVariableTargetId(variable.id))"')
+    expect(view).toContain('v-show="!isCardCollapsed(modelAnalysisVariableTargetId(variable.id))"')
+    expect(view).toContain("variable.status === 'observed' && !variable.value")
+    expect(view).toContain('<span>空值</span>该表达式在本次模型请求中展开为空字符串')
+    expect(styles).toMatch(/\.webqq-model-analysis-variable-body > \.webqq-model-analysis-section \{[^}]*padding: 14px 16px;/s)
+    expect(styles).toContain('.webqq-model-analysis-variable-card.is-collapsed > header { border-bottom: 0; }')
+    expect(styles).toContain('.webqq-model-analysis-variable-card:not(.is-collapsed) .webqq-model-analysis-collapse svg { transform: rotate(180deg); }')
   })
 
   it('工具列表图标锁死 18px，避免 flex 把扳手挤成不同大小', () => {

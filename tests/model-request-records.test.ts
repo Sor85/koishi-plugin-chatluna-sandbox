@@ -61,15 +61,21 @@ describe('模型请求记录库', () => {
     })
   })
 
-  it('列表只暴露预设快照摘要，详情与持久记录保留完整模板源码', () => {
+  it('列表只暴露预设快照摘要，详情保留模板源码并派生预设变量', () => {
     const store = new SandboxModelRequestStore()
-    const created = appendRecord(store, { presetSnapshots: [presetSnapshot] })
+    const created = appendRecord(store, {
+      presetSnapshots: [presetSnapshot],
+      requestBody: { model: 'gpt-4o', messages: [{ role: 'system', content: 'Hello Alice.' }] },
+    })
 
     expect(store.getRecords().records[0]).toMatchObject({
       presetSnapshotSummaries: [{ kind: 'core', presetName: 'demo', templateCount: 1, capturedAt: presetSnapshot.capturedAt }],
     })
     expect(JSON.stringify(store.getRecords().records[0])).not.toContain('Hello {name}')
     expect(store.getRecord(created.id)?.presetSnapshots).toEqual([presetSnapshot])
+    expect(store.getRecord(created.id)?.variables).toEqual([
+      expect.objectContaining({ name: 'name', status: 'observed', value: 'Alice' }),
+    ])
     expect(store.getRawRecords()[0]?.presetSnapshots).toEqual([presetSnapshot])
   })
 

@@ -1,14 +1,15 @@
 import type {
   SandboxModelRequestDetail,
   SandboxModelRequestStatus,
+  SandboxModelRequestVariable,
 } from '../../src/types'
 import type {
   ModelConversationMessage,
   ModelRequestConversation,
 } from './model-request-conversation'
 
-export type ModelRequestAnalysisGroupKey = 'system' | 'user' | 'assistant' | 'tool' | 'response'
-export type ModelRequestAnalysisItemKind = 'message' | 'tool-call' | 'tool-result' | 'tool-definition' | 'response'
+export type ModelRequestAnalysisGroupKey = 'system' | 'user' | 'assistant' | 'tool' | 'variables' | 'response'
+export type ModelRequestAnalysisItemKind = 'message' | 'tool-call' | 'tool-result' | 'tool-definition' | 'variable' | 'response'
 
 export interface ModelRequestAnalysisNavigationItem {
   id: string
@@ -51,11 +52,16 @@ const GROUP_LABELS: Record<ModelRequestAnalysisGroupKey, string> = {
   user: 'User',
   assistant: 'Assistant',
   tool: 'Tool',
+  variables: 'Variables',
   response: '响应',
 }
 
 export const MODEL_ANALYSIS_RESPONSE_TARGET = 'model-analysis-response'
 export const MODEL_ANALYSIS_TOOLS_TARGET = 'model-analysis-tools'
+
+export function modelAnalysisVariableTargetId(variableId: string): string {
+  return modelAnalysisTargetId(`variable:${variableId}`)
+}
 
 export function normalizeAnalysisQuery(value: string | undefined): string {
   return value?.trim().toLocaleLowerCase('zh-CN') ?? ''
@@ -72,7 +78,7 @@ export function modelAnalysisTargetId(evidenceId: string): string {
 
 export function buildModelRequestAnalysisNavigation(
   conversation: ModelRequestConversation,
-  detail: Pick<SandboxModelRequestDetail, 'sequence' | 'status' | 'model' | 'provider' | 'durationMs'>,
+  detail: Pick<SandboxModelRequestDetail, 'sequence' | 'status' | 'model' | 'provider' | 'durationMs' | 'variables'>,
 ): ModelRequestAnalysisNavigation {
   const grouped = new Map<ModelRequestAnalysisGroupKey, ModelRequestAnalysisNavigationItem[]>()
   const targets: Record<string, string> = {}
@@ -110,6 +116,10 @@ export function buildModelRequestAnalysisNavigation(
     searchText: tool.searchText,
   }))
 
+  for (const variable of detail.variables ?? []) {
+    add('variables', variableNavigationItem(variable))
+  }
+
   const response = conversation.response
   if (response) {
     add('response', {
@@ -146,7 +156,7 @@ export function buildModelRequestAnalysisNavigation(
     }
   }
 
-  const order: ModelRequestAnalysisGroupKey[] = ['system', 'user', 'assistant', 'tool', 'response']
+  const order: ModelRequestAnalysisGroupKey[] = ['system', 'user', 'assistant', 'tool', 'variables', 'response']
   const groups = order.flatMap((key) => {
     const items = grouped.get(key) ?? []
     return items.length ? [{ key, label: GROUP_LABELS[key], count: items.length, items }] : []
@@ -205,6 +215,25 @@ export function isPreviewableConversationImage(value: string): boolean {
 
 export function formatEvidencePath(path: readonly string[]): string {
   return path.reduce((result, part) => /^\d+$/.test(part) ? `${result}[${part}]` : result ? `${result}.${part}` : part, '')
+}
+
+function variableNavigationItem(variable: SandboxModelRequestVariable): ModelRequestAnalysisNavigationItem {
+  const statusText = variable.status === 'observed' ? variable.value ?? '' : variableStatusLabel(variable.status)
+  return {
+    id: variable.id,
+    kind: 'variable',
+    label: 'VARIABLE',
+    preview: variable.name,
+    target: modelAnalysisVariableTargetId(variable.id),
+    searchText: `${variable.name}\n${statusText}\n${variable.presetName}`,
+  }
+}
+
+function variableStatusLabel(status: SandboxModelRequestVariable['status']): string {
+  if (status === 'ambiguous') return '展开值存在歧义'
+  if (status === 'stale') return '预设快照已变化'
+  if (status === 'unsupported') return '表达式不支持定位'
+  return '未在模型请求中观察到展开值'
 }
 
 function messageNavigationItem(message: ModelConversationMessage): ModelRequestAnalysisNavigationItem {

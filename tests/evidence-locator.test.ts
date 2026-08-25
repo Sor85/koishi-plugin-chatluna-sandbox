@@ -28,6 +28,7 @@ function detail(): SandboxModelRequestDetail {
     responseBodyStatus: 'complete',
     responseBodyFormat: 'json',
     responseBodyRaw: JSON.stringify({ choices: [{ message: { content: '北京晴朗' }, finish_reason: 'stop' }] }),
+    variables: [],
     summary: { keys: 2, messageCount: 4, toolCount: 1, bodyAvailable: true },
   }
 }

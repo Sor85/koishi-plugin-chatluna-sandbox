@@ -1,4 +1,5 @@
 import { Random } from 'koishi'
+import { deriveModelRequestVariables } from './model-request-variables'
 import type {
   GetSandboxModelRequestRecordsInput,
   SandboxChatLunaRequestError,
@@ -141,7 +142,10 @@ export function presentModelRequestRecord(record: SandboxModelRequestRecord, vie
       ...(presetSnapshotSummaries ? { presetSnapshotSummaries } : {}),
     }
   }
-  return item
+  return {
+    ...item,
+    variables: deriveModelRequestVariables(record),
+  }
 }
 
 export class SandboxModelRequestStore {
