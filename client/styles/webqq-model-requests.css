@@ -1744,9 +1744,9 @@
 .webqq-model-analysis-nav-group.is-tool { --webqq-role: var(--webqq-role-tool); }
 .webqq-model-analysis-nav-group.is-variables { --webqq-role: var(--webqq-accent); }
 .webqq-model-analysis-nav-heading { justify-content: flex-start; gap: 6px; padding: 3px 4px; }
+.webqq-model-analysis-nav-source .webqq-model-analysis-nav-heading,
 .webqq-model-analysis-nav-fallback .webqq-model-analysis-nav-heading {
   width: 100%;
-  padding: 5px 4px;
   border: 0;
   border-radius: 5px;
   color: inherit;
@@ -1754,6 +1754,9 @@
   font: inherit;
   text-align: left;
 }
+.webqq-model-analysis-nav-fallback .webqq-model-analysis-nav-heading { padding: 5px 4px; }
+.webqq-model-analysis-nav-source .webqq-model-analysis-nav-heading:hover,
+.webqq-model-analysis-nav-source .webqq-model-analysis-nav-heading:focus-visible,
 .webqq-model-analysis-nav-fallback .webqq-model-analysis-nav-heading:hover,
 .webqq-model-analysis-nav-fallback .webqq-model-analysis-nav-heading:focus-visible { background: var(--webqq-hover); }
 .webqq-model-analysis-nav-heading svg { flex: 0 0 auto; color: var(--webqq-role); }

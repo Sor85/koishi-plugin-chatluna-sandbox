@@ -24,25 +24,40 @@
           v-for="group in visibleNavigationGroups"
           :key="group.key"
           class="webqq-model-analysis-nav-group"
-          :class="[`is-${group.key}`, { 'is-muted': normalizedSearch && !group.items.some(itemMatches) }]"
+          :class="[
+            `is-${group.key}`,
+            {
+              'is-active': !sourceCollapsedNavigationGroups.has(group.key),
+              'is-collapsed': sourceCollapsedNavigationGroups.has(group.key),
+              'is-muted': normalizedSearch && !group.items.some(itemMatches),
+            },
+          ]"
         >
-          <header class="webqq-model-analysis-nav-heading">
+          <button
+            type="button"
+            class="webqq-model-analysis-nav-heading"
+            :aria-expanded="!sourceCollapsedNavigationGroups.has(group.key)"
+            @click="toggleSourceNavigationGroup(group.key)"
+          >
             <component :is="groupIcon(group.key)" :size="15" aria-hidden="true" />
             <strong><AnalysisHighlightedText :value="group.label" :query="normalizedSearch" /></strong>
             <small>{{ group.count }}</small>
-          </header>
-          <button
-            v-for="item in group.items"
-            :key="item.id"
-            type="button"
-            class="webqq-model-analysis-nav-item"
-            :class="{ 'is-muted': normalizedSearch && !itemMatches(item) }"
-            @click="jumpTo(item.target)"
-          >
-            <span class="webqq-model-analysis-nav-kind" :class="`is-${item.kind}`"><AnalysisHighlightedText :value="item.label" :query="normalizedSearch" /></span>
-            <span v-if="item.index !== undefined" class="webqq-model-analysis-nav-index">#{{ item.index }}</span>
-            <span class="webqq-model-analysis-nav-preview"><AnalysisHighlightedText :value="item.preview" :query="normalizedSearch" /></span>
+            <IconChevronDown class="webqq-model-analysis-nav-chevron" :size="15" aria-hidden="true" />
           </button>
+          <div v-show="!sourceCollapsedNavigationGroups.has(group.key)" class="webqq-model-analysis-nav-items">
+            <button
+              v-for="item in group.items"
+              :key="item.id"
+              type="button"
+              class="webqq-model-analysis-nav-item"
+              :class="{ 'is-muted': normalizedSearch && !itemMatches(item) }"
+              @click="jumpTo(item.target)"
+            >
+              <span class="webqq-model-analysis-nav-kind" :class="`is-${item.kind}`"><AnalysisHighlightedText :value="item.label" :query="normalizedSearch" /></span>
+              <span v-if="item.index !== undefined" class="webqq-model-analysis-nav-index">#{{ item.index }}</span>
+              <span class="webqq-model-analysis-nav-preview"><AnalysisHighlightedText :value="item.preview" :query="normalizedSearch" /></span>
+            </button>
+          </div>
         </section>
         </div>
 
@@ -564,6 +579,7 @@ const expandedTextTargets = ref(new Set<string>())
 const contentElement = ref<HTMLElement>()
 const navigationElement = ref<HTMLElement>()
 const navigationSourceElement = ref<HTMLElement>()
+const sourceCollapsedNavigationGroups = ref(new Set<ModelRequestAnalysisGroupKey>())
 const activeNavigationGroup = ref<ModelRequestAnalysisGroupKey>()
 const fallbackNavigationVisible = ref(false)
 const highlightedTarget = ref('')
@@ -680,6 +696,7 @@ watch(() => props.detail.id, (next, previous) => {
   collapsedCards.value = new Set()
   expandedTools.value = new Set()
   expandedTextTargets.value = new Set()
+  sourceCollapsedNavigationGroups.value = new Set()
   activeNavigationGroup.value = visibleNavigationGroups.value[0]?.key
   fallbackNavigationVisible.value = false
   locator.reset()
@@ -702,6 +719,7 @@ function setupNavigationTracking() {
     navigationResizeObserver = new ResizeObserver(scheduleNavigationTracking)
     navigationResizeObserver.observe(contentElement.value)
     navigationResizeObserver.observe(navigationScroller)
+    if (navigationSourceElement.value) navigationResizeObserver.observe(navigationSourceElement.value)
   }
   ensureActiveNavigationGroup()
   updateActiveNavigationGroup()
@@ -758,6 +776,13 @@ function updateActiveNavigationGroup() {
     scroller.clientHeight,
   )
   if (active) activeNavigationGroup.value = active
+}
+
+function toggleSourceNavigationGroup(group: ModelRequestAnalysisGroupKey) {
+  const next = new Set(sourceCollapsedNavigationGroups.value)
+  next.has(group) ? next.delete(group) : next.add(group)
+  sourceCollapsedNavigationGroups.value = next
+  nextTick(scheduleNavigationTracking)
 }
 
 function activateNavigationGroup(group: ModelRequestAnalysisGroupKey) {

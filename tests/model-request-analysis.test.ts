@@ -293,6 +293,20 @@ describe('模型请求分析展示模型', () => {
     expect(styles).toMatch(/\.webqq-model-analysis-nav-fallback \{[^}]*position: fixed;[^}]*top: var\(--webqq-model-analysis-nav-top, 0\);/s)
   })
 
+  it('原导航分类默认展开且支持独立折叠', () => {
+    const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
+    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+
+    expect(view).toContain('sourceCollapsedNavigationGroups = ref(new Set<ModelRequestAnalysisGroupKey>())')
+    expect(view).toContain('@click="toggleSourceNavigationGroup(group.key)"')
+    expect(view).toContain(':aria-expanded="!sourceCollapsedNavigationGroups.has(group.key)"')
+    expect(view).toContain('v-show="!sourceCollapsedNavigationGroups.has(group.key)"')
+    expect(view).toContain('sourceCollapsedNavigationGroups.value = new Set()')
+    expect(view).toContain('next.has(group) ? next.delete(group) : next.add(group)')
+    expect(view).toContain('navigationResizeObserver.observe(navigationSourceElement.value)')
+    expect(styles).toContain('.webqq-model-analysis-nav-source .webqq-model-analysis-nav-heading,')
+  })
+
   it('原导航离开视野后以动画显示分类导航，标题点击只展开不跳转', () => {
     const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
