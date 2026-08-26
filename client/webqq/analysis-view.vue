@@ -214,6 +214,21 @@
                   <span class="webqq-model-analysis-role">variable</span>
                   <strong><AnalysisHighlightedText :value="variable.name" :query="normalizedSearch" /></strong>
                   <span class="webqq-model-analysis-variable-preset">{{ variable.presetName }}</span>
+                  <TooltipProvider v-if="historyPreview(variable)" :delay-duration="500">
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <Button
+                          size="icon-sm"
+                          variant="ghost"
+                          :aria-label="rawHistoryVariables.has(variable.id) ? `查看变量 ${variable.name} 的消息预览` : `查看变量 ${variable.name} 的原始 XML`"
+                          @click="toggleHistoryRaw(variable.id)"
+                        >
+                          <IconCode :size="16" aria-hidden="true" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{{ rawHistoryVariables.has(variable.id) ? '查看消息预览' : '查看原始 XML' }}</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   <TooltipProvider :delay-duration="500">
                     <Tooltip>
                       <TooltipTrigger as-child>
@@ -236,6 +251,13 @@
                   <p v-if="variable.status === 'observed' && !variable.value" class="webqq-model-analysis-variable-empty">
                     <span>空值</span>该表达式在本次模型请求中展开为空字符串
                   </p>
+                  <ModelRequestHistoryPreview
+                    v-else-if="historyPreview(variable) && !rawHistoryVariables.has(variable.id)"
+                    :messages="historyPreview(variable)!"
+                    :bot-id="detail.entities.botId"
+                    :navigable="historyMessagesNavigable"
+                    @open-message="openHistoryMessage"
+                  />
                   <AnalysisTextBlock
                     v-else-if="variable.status === 'observed'"
                     :value="variable.value ?? ''"
@@ -449,6 +471,7 @@ import {
 import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
 import { Button } from '../components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip'
+import ModelRequestHistoryPreview from '../model-request-history-preview.vue'
 import ModelRequestJsonTree from '../model-request-json-tree.vue'
 import { formatDuration } from './format-duration'
 import {
@@ -468,6 +491,12 @@ import {
   type ModelRequestAnalysisNavigationItem,
 } from './model-request-analysis'
 import { createEvidenceLocator, type LocateRequest } from './evidence-locator'
+import {
+  isHistoryVariableName,
+  parseModelRequestHistory,
+  type ModelRequestHistoryMessage,
+} from './model-request-history'
+import { buildMessageNavigationTarget, type WebqqMessageNavigationTarget } from './message-navigation'
 import {
   renderModelRequestOccurrence,
   type ModelRequestOccurrence,
@@ -502,6 +531,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   locate: [target: string]
   locateResult: [result: { seq: number, located: boolean }]
+  openMessage: [target: WebqqMessageNavigationTarget]
 }>()
 
 const normalizedSearch = computed(() => normalizeAnalysisQuery(props.searchQuery))
@@ -521,6 +551,11 @@ const visibleMessages = computed(() => conversation.value.messages.filter(messag
   messageRoleFilterKind(message.role),
 )))
 const variablesVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'variable'))
+const historyMessagesNavigable = computed(() => Boolean(buildMessageNavigationTarget({
+  attribution: props.detail.attribution,
+  ...props.detail.entities,
+  messageId: 'candidate',
+})))
 const requestToolCallsVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'tool-call'))
 const toolDefinitionsVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'tool-definition'))
 const responseContentVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'assistant'))
@@ -531,6 +566,8 @@ const responseVisible = computed(() => (
 ))
 const responseRaw = ref(false)
 const rawMessages = ref(new Set<string>())
+const rawHistoryVariables = ref(new Set<string>())
+const historyPreviewCache = new Map<string, readonly ModelRequestHistoryMessage[] | undefined>()
 const collapsedCards = ref(new Set<string>())
 const expandedTools = ref(new Set<string>())
 const expandedTextTargets = ref(new Set<string>())
@@ -648,6 +685,8 @@ watch(() => props.detail.id, (next, previous) => {
   if (next === previous) return
   responseRaw.value = false
   rawMessages.value = new Set()
+  rawHistoryVariables.value = new Set()
+  historyPreviewCache.clear()
   collapsedCards.value = new Set()
   expandedTools.value = new Set()
   expandedTextTargets.value = new Set()
@@ -751,6 +790,28 @@ function variableMatches(variable: SandboxModelRequestVariable) {
   return `${variable.name}\n${variable.value ?? ''}\n${variable.presetName}`
     .toLocaleLowerCase('zh-CN')
     .includes(normalizedSearch.value)
+}
+
+function historyPreview(variable: SandboxModelRequestVariable): readonly ModelRequestHistoryMessage[] | undefined {
+  if (variable.status !== 'observed' || !variable.value || !isHistoryVariableName(variable.name)) return undefined
+  const cacheKey = `${variable.id}\u0000${variable.value}`
+  if (!historyPreviewCache.has(cacheKey)) historyPreviewCache.set(cacheKey, parseModelRequestHistory(variable.value))
+  return historyPreviewCache.get(cacheKey)
+}
+
+function toggleHistoryRaw(variableId: string) {
+  const next = new Set(rawHistoryVariables.value)
+  next.has(variableId) ? next.delete(variableId) : next.add(variableId)
+  rawHistoryVariables.value = next
+}
+
+function openHistoryMessage(messageId: string) {
+  const target = buildMessageNavigationTarget({
+    attribution: props.detail.attribution,
+    ...props.detail.entities,
+    messageId,
+  })
+  if (target) emit('openMessage', target)
 }
 
 function variableStatusLabel(status: SandboxModelRequestVariable['status']) {

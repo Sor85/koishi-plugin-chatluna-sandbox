@@ -75,6 +75,7 @@
     "@modelcontextprotocol/sdk": "1.29.0",
     "animejs": "4.5.0",
     "codemirror": "^6.0.2",
+    "fast-xml-parser": "^5.3.6",
     "qface": "^1.4.1",
     "yaml": "^2.9.0",
     "zod": "^3.25.0"

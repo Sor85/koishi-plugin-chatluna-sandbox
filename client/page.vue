@@ -121,11 +121,13 @@
           @clear="clearModelRequestRecords"
           @navigation-failure="reportEvidenceNavigationFailure"
           @return-to-preset="returnToPresetOrigin"
+          @open-message="navigateToHistoryMessage"
         />
         <WebqqChatPane
           v-else
           :model="chatPaneViewModel"
           :scroll-scope="activeSpaceId ?? 'main'"
+          :reveal-request="messageRevealRequest"
           @back="selectNavigation('contacts')"
           @toggle-details="toggleDetails"
           @send="sendComposerMessage"
@@ -214,6 +216,7 @@ import { createWorkspaceController } from './webqq/workspace-controller'
 import { createWorkspaceLayout } from './webqq/workspace-layout'
 import { createWebqqWorkspaceShell } from './webqq/workspace-shell'
 import { createAiTestSpaceShell } from './webqq/test-space-shell'
+import { createMessageNavigationShell } from './webqq/message-navigation'
 import { getSandboxBots, type SandboxDirectoryBot } from '../src/types'
 
 const activeSpaceId = ref<string>()
@@ -361,6 +364,11 @@ const { createTestSpace, enterTestSpace, handleTestSpaceAction, mainSnapshot, se
   currentView,
   selectWorkspaceNavigation,
 )
+
+const {
+  navigateToMessage: navigateToHistoryMessage,
+  revealRequest: messageRevealRequest,
+} = createMessageNavigationShell(workspaceController, activeSpaceId, enterTestSpace)
 const isWebqqView = computed(() => currentView.value === 'messages' || currentView.value === 'contacts')
 const modelRequestSpaces = computed(() => [
   { id: 'main', name: '主环境' },

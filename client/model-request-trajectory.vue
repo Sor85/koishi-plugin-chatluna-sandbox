@@ -229,6 +229,7 @@
         :locate-request="analysisLocateRequest"
         :filter="evidenceFilter"
         @locate-result="emit('locate-result', $event)"
+        @open-message="emit('open-message', $event)"
       />
       <div v-else class="webqq-model-trajectory-ledger" :class="{ 'has-inspector': selectedRow }">
         <div ref="ledgerElement" v-webqq-scrollbar class="webqq-model-trajectory-table" role="table" aria-label="轨迹事件账本">
@@ -296,6 +297,7 @@
               :search-query="searchQuery"
               :locate-request="inspectorLocateRequest"
               :filter="evidenceFilter"
+              @open-message="emit('open-message', $event)"
             />
             <div v-else class="webqq-model-request-empty">正在加载分析…</div>
           </div>
@@ -327,6 +329,7 @@ import { Input } from './components/ui/input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip'
 import ModelRequestConversationAnalysis from './webqq/analysis-view.vue'
 import type { EvidenceNavigation, EvidenceViewRestore } from './webqq/evidence-navigation'
+import type { WebqqMessageNavigationTarget } from './webqq/message-navigation'
 import type { LocateRequest } from './webqq/evidence-locator'
 import {
   isModelRequestTrajectoryRowCollapsed,
@@ -380,6 +383,7 @@ const emit = defineEmits<{
   }]
   'inspect-request': [payload: { recordId: string }]
   'locate-result': [result: { seq: number, located: boolean }]
+  'open-message': [target: WebqqMessageNavigationTarget]
 }>()
 
 const ledgerElement = ref<HTMLElement>()

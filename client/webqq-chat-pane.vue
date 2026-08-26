@@ -181,6 +181,7 @@ import {
   type SandboxMessageModelRequestReference,
   type SearchConversationMessagesInput,
 } from '../src/types'
+import type { WebqqMessageRevealRequest } from './webqq/message-navigation'
 
 export interface WebqqChatPaneModel {
   conversationId?: string
@@ -198,7 +199,12 @@ export interface WebqqChatPaneModel {
   forwardTargets: WebqqForwardTargetModel
 }
 
-const props = defineProps<{ model: WebqqChatPaneModel; preview?: boolean; scrollScope?: string }>()
+const props = defineProps<{
+  model: WebqqChatPaneModel
+  preview?: boolean
+  scrollScope?: string
+  revealRequest?: WebqqMessageRevealRequest
+}>()
 const preview = computed(() => !!props.preview)
 const scrollScope = computed(() => props.scrollScope)
 const emit = defineEmits<{
@@ -266,6 +272,7 @@ const searchNextBeforeMessageId = ref<string>()
 const activeSearchMessageId = ref('')
 const revealingMessageId = ref('')
 let searchRequestSerial = 0
+let revealRequestSerial = 0
 interface ForwardDialogFrame {
   title: string
   items: SandboxForwardNode[]
@@ -300,6 +307,10 @@ watch(() => props.model.conversationId, () => {
   resetSearchState()
   searchOpen.value = false
 })
+
+watch(() => props.revealRequest?.seq, () => {
+  void revealRequestedMessage()
+}, { immediate: true, flush: 'post' })
 
 watch(selectionMode, (active) => {
   if (active) {
@@ -517,6 +528,23 @@ async function loadMoreSearchHits() {
   } finally {
     if (serial === searchRequestSerial) searchLoading.value = false
   }
+}
+
+async function revealRequestedMessage() {
+  const request = props.revealRequest
+  if (!request || request.conversationId !== props.model.conversationId) return
+  const serial = ++revealRequestSerial
+  const loaded = await ensureMessageLoaded({
+    messageId: request.messageId,
+    isLoaded: () => props.model.messageList.messages.some(({ id }) => id === request.messageId),
+    canLoadMore: () => !!props.model.messageList.hasMoreMessages,
+    getOldestLoadedMessageId: () => props.model.messageList.messages[0]?.id,
+    loadMore: () => new Promise<void>((resolve, reject) => emit('loadHistory', resolve, reject)),
+  })
+  if (!loaded || serial !== revealRequestSerial || props.model.conversationId !== request.conversationId) return
+  await nextTick()
+  if (serial !== revealRequestSerial) return
+  messageListRef.value?.revealMessage(request.messageId)
 }
 
 async function revealSearchHit(hit: SandboxMessageSearchHit) {
