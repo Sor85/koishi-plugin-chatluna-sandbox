@@ -23,27 +23,21 @@
             </Tooltip>
           </TooltipProvider>
         </div>
-        <span class="webqq-model-history-content"><MessageJumpButton v-if="isBotMessage(message) && canOpenMessage(message)" :message-id="message.messageId!" placement="before" /><span>{{ message.content || '（空消息）' }}</span><MessageJumpButton v-if="!isBotMessage(message) && canOpenMessage(message)" :message-id="message.messageId!" placement="after" /></span>
+        <span class="webqq-model-history-content">{{ message.content || '（空消息）' }}</span>
       </div>
     </article>
   </div>
 </template>
 
 <script setup lang="ts">
-import { IconExternalLink } from '@tabler/icons-vue'
 import { defineComponent, h, type PropType, type VNode } from 'vue'
 import { Badge } from './components/ui/badge'
-import { Button } from './components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip'
 import type { ModelRequestHistoryMessage } from './webqq/model-request-history'
 
 const props = defineProps<{
   messages: readonly ModelRequestHistoryMessage[]
   botId?: string
-  navigable?: boolean
-}>()
-const emit = defineEmits<{
-  openMessage: [messageId: string]
 }>()
 
 interface MetadataItem {
@@ -65,38 +59,11 @@ function isBotMessage(message: ModelRequestHistoryMessage): boolean {
   return Boolean(props.botId && message.id === props.botId)
 }
 
-function canOpenMessage(message: ModelRequestHistoryMessage): boolean {
-  return Boolean(props.navigable && message.messageId)
-}
-
 function metadataClass(message: ModelRequestHistoryMessage, item: MetadataItem): string | undefined {
   if (item.key === 'id') return 'is-id'
   if (item.key !== 'name' || !props.botId) return undefined
   return isBotMessage(message) ? 'is-name is-bot' : 'is-name is-user'
 }
-
-const MessageJumpButton = defineComponent({
-  name: 'MessageJumpButton',
-  props: {
-    messageId: { type: String, required: true },
-    placement: { type: String as PropType<'before' | 'after'>, required: true },
-  },
-  setup(buttonProps) {
-    return () => h(TooltipProvider, { delayDuration: 500 }, () => h(Tooltip, {}, {
-      default: () => [
-        h(TooltipTrigger, { asChild: true }, () => h(Button, {
-          type: 'button',
-          size: 'icon-sm',
-          variant: 'ghost',
-          class: ['webqq-model-history-jump', `is-${buttonProps.placement}`],
-          'aria-label': '在消息页面中查看',
-          onClick: () => emit('openMessage', buttonProps.messageId),
-        }, () => h(IconExternalLink, { 'aria-hidden': 'true' }))),
-        h(TooltipContent, {}, () => '在消息页面中查看'),
-      ],
-    }))
-  },
-})
 
 const HistoryQuote = defineComponent({
   name: 'HistoryQuote',

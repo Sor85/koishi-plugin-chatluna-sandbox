@@ -238,7 +238,6 @@
             :restore-state="navigation.viewRestore.value"
             @open-request="openRelatedRequest"
             @inspect-request="inspectRelatedRequest"
-            @open-message="emit('openMessage', $event)"
           />
           <template v-else>
           <section class="webqq-model-request-overview" aria-label="请求概览">
@@ -506,7 +505,6 @@
               :external-locate="navigation.locateRequest.value"
               @open-request="openRelatedRequest"
               @locate-result="completeNavigationLocate"
-              @open-message="emit('openMessage', $event)"
             />
 
             <template v-else>
@@ -630,7 +628,6 @@ import {
   type ModelRequestTrajectoryQuery,
 } from './webqq/model-request-query'
 import { vWebqqScrollbar } from './webqq-scrollbar'
-import type { WebqqMessageNavigationTarget } from './webqq/message-navigation'
 import type {
   SandboxModelRequestDetail,
   SandboxModelRequestScope,
@@ -667,7 +664,6 @@ const emit = defineEmits<{
   clear: [input: ClearModelRequestRecordsQuery]
   navigationFailure: [message: string]
   returnToPreset: []
-  openMessage: [target: WebqqMessageNavigationTarget]
 }>()
 
 const category = ref<'all' | 'space' | 'unattributed'>('all')

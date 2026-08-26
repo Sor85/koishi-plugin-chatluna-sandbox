@@ -15,46 +15,6 @@ afterEach(async () => {
 })
 
 describe('模拟 QQ 环境消息闭环', () => {
-  it('在可见会话内将 OneBot 数字消息 ID 解析为领域消息 ID', async () => {
-    const app = new App()
-    const mediaDirectory = await mkdtemp(join(tmpdir(), 'chatluna-sandbox-media-'))
-    temporaryDirectories.push(mediaDirectory)
-    let control: SandboxControlService | undefined
-    app.plugin((ctx) => {
-      control = new SandboxControlService(ctx, { mediaDirectory })
-    })
-    runningApps.push(app)
-    await app.start()
-    if (!control) throw new Error('沙盒控制服务未注册')
-
-    const direct = await control.sendMessage({
-      operatorId: '10001',
-      conversationId: 'private:10001:20001',
-      content: '待定位消息',
-    })
-    const group = await control.sendMessage({
-      operatorId: '10001',
-      conversationId: 'group:30001',
-      content: '其他会话消息',
-    })
-
-    expect(control.resolveMessageId({
-      operatorId: '20001',
-      conversationId: 'private:10001:20001',
-      rawMessageId: String(getOneBotMessageSequence(direct.messageId)),
-    })).toEqual({ messageId: direct.messageId })
-    expect(control.resolveMessageId({
-      operatorId: '20001',
-      conversationId: 'private:10001:20001',
-      rawMessageId: direct.messageId,
-    })).toEqual({ messageId: direct.messageId })
-    expect(control.resolveMessageId({
-      operatorId: '20001',
-      conversationId: 'private:10001:20001',
-      rawMessageId: String(getOneBotMessageSequence(group.messageId)),
-    })).toEqual({ messageId: undefined })
-  })
-
   it('发送图片时只在场景保存安全引用，并生成 Koishi 与 OneBot 媒体消息', async () => {
     const app = new App()
     const mediaDirectory = await mkdtemp(join(tmpdir(), 'chatluna-sandbox-media-'))

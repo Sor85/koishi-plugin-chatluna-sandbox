@@ -12,8 +12,6 @@ import type {
   PerformFriendActionInput,
   PerformGroupActionInput,
   RecallMessageInput,
-  ResolveMessageIdInput,
-  ResolveMessageIdResult,
   ClearConversationMessagesInput,
   SearchConversationMessagesInput,
   SetMessageReactionInput,
@@ -67,7 +65,6 @@ export class FakeWorkspacePort implements WorkspacePort {
   readonly calls: WorkspacePortCall[] = []
   workspaceResult: SandboxWorkspaceState
   historyResult: SandboxMessageHistory = { messages: [], forwards: [] }
-  resolveMessageIdResult: ResolveMessageIdResult = {}
   searchResult: SandboxMessageSearchResult = { hits: [] }
   forwardResult: SandboxForward = {
     id: 'forward-1',
@@ -135,10 +132,6 @@ export class FakeWorkspacePort implements WorkspacePort {
 
   getMessageHistory(input: GetMessageHistoryInput) {
     return this.invoke('getMessageHistory', input, this.historyResult)
-  }
-
-  resolveMessageId(input: ResolveMessageIdInput) {
-    return this.invoke('resolveMessageId', input, this.resolveMessageIdResult)
   }
 
   searchConversationMessages(input: SearchConversationMessagesInput) {

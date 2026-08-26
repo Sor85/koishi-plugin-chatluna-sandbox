@@ -255,8 +255,6 @@
                     v-else-if="historyPreview(variable) && !rawHistoryVariables.has(variable.id)"
                     :messages="historyPreview(variable)!"
                     :bot-id="detail.entities.botId"
-                    :navigable="historyMessagesNavigable"
-                    @open-message="openHistoryMessage"
                   />
                   <AnalysisTextBlock
                     v-else-if="variable.status === 'observed'"
@@ -496,7 +494,6 @@ import {
   parseModelRequestHistory,
   type ModelRequestHistoryMessage,
 } from './model-request-history'
-import { buildMessageNavigationTarget, type WebqqMessageNavigationTarget } from './message-navigation'
 import {
   renderModelRequestOccurrence,
   type ModelRequestOccurrence,
@@ -531,7 +528,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   locate: [target: string]
   locateResult: [result: { seq: number, located: boolean }]
-  openMessage: [target: WebqqMessageNavigationTarget]
 }>()
 
 const normalizedSearch = computed(() => normalizeAnalysisQuery(props.searchQuery))
@@ -551,11 +547,6 @@ const visibleMessages = computed(() => conversation.value.messages.filter(messag
   messageRoleFilterKind(message.role),
 )))
 const variablesVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'variable'))
-const historyMessagesNavigable = computed(() => Boolean(buildMessageNavigationTarget({
-  attribution: props.detail.attribution,
-  ...props.detail.entities,
-  messageId: 'candidate',
-})))
 const requestToolCallsVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'tool-call'))
 const toolDefinitionsVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'tool-definition'))
 const responseContentVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'assistant'))
@@ -803,15 +794,6 @@ function toggleHistoryRaw(variableId: string) {
   const next = new Set(rawHistoryVariables.value)
   next.has(variableId) ? next.delete(variableId) : next.add(variableId)
   rawHistoryVariables.value = next
-}
-
-function openHistoryMessage(messageId: string) {
-  const target = buildMessageNavigationTarget({
-    attribution: props.detail.attribution,
-    ...props.detail.entities,
-    messageId,
-  })
-  if (target) emit('openMessage', target)
 }
 
 function variableStatusLabel(status: SandboxModelRequestVariable['status']) {

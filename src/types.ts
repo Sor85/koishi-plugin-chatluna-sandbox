@@ -782,16 +782,6 @@ export interface GetMessageHistoryInput {
   limit?: number
 }
 
-export interface ResolveMessageIdInput {
-  operatorId: string
-  conversationId: string
-  rawMessageId: string
-}
-
-export interface ResolveMessageIdResult {
-  messageId?: string
-}
-
 export interface SandboxMessageHistory {
   messages: SandboxMessage[]
   // 历史页直接引用的转发资源；嵌套详情仍按 getForwardMessage 按需读取。

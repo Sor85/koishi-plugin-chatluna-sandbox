@@ -93,7 +93,6 @@ describe('Koishi 控制台适配器', () => {
 
     const snapshotListener = listeners.get('chatluna-sandbox/workspace')
     const historyListener = listeners.get('chatluna-sandbox/message-history')
-    const resolveMessageIdListener = listeners.get('chatluna-sandbox/resolve-message-id')
     const searchConversationMessagesListener = listeners.get('chatluna-sandbox/search-conversation-messages')
     const sendMessageListener = listeners.get('chatluna-sandbox/send-message')
     const sendMediaMessageListener = listeners.get('chatluna-sandbox/send-media-message')
@@ -108,7 +107,6 @@ describe('Koishi 控制台适配器', () => {
     const botDeliveriesListener = listeners.get('chatluna-sandbox/bot-deliveries')
     if (typeof snapshotListener !== 'function'
       || typeof historyListener !== 'function'
-      || typeof resolveMessageIdListener !== 'function'
       || typeof searchConversationMessagesListener !== 'function'
       || typeof sendMessageListener !== 'function'
       || typeof sendMediaMessageListener !== 'function'
@@ -166,11 +164,6 @@ describe('Koishi 控制台适配器', () => {
       })],
     })
     const sentMessage = control.getSnapshot().messages.find(({ content }) => content === '控制台消息')!
-    expect(await resolveMessageIdListener({
-      operatorId: '20001',
-      conversationId: 'private:10001:20001',
-      rawMessageId: String(Number.parseInt(sentMessage.id, 16)),
-    })).toEqual({ messageId: sentMessage.id })
     expect(await searchConversationMessagesListener({
       operatorId: '10001',
       conversationId: 'private:10001:20001',

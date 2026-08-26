@@ -24,4 +24,4 @@ Status: resolved
 
 实现使用 `fast-xml-parser` 严格校验完整消息序列，只在客户端派生预览。用户消息保持左侧 `name → id → timestamp`，Bot 消息按权威 `botId` 镜像为右侧 `timestamp → id → name`，正文限制最大宽度。Playwright 已检查桌面与窄屏的引用、换行和横向溢出。
 
-带 `messageId` 且请求归属信息完整的消息提供悬停跳转：用户按钮位于正文末尾，Bot 按钮位于正文左侧。点击后按空间、Bot 操作者和逻辑会话切换到消息页面，服务端先在目标会话中把 Character XML 可能携带的 OneBot 数字 `message_id` 解析为 `SandboxMessage.id`，再按需加载更早历史并滚动高亮目标消息；缺少任一权威标识或无法解析消息 ID 时不跳转。
+历史变量仅提供结构化只读预览和原始 XML 切换，不提供消息页面跳转。XML 中的 `messageId` 仍作为原始证据保留，但不会派生导航状态或触发操作者、空间与会话切换。

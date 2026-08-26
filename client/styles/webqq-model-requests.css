@@ -2188,35 +2188,6 @@
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
-.webqq-model-history-jump {
-  color: var(--webqq-muted);
-  opacity: 0;
-  transition: opacity 140ms ease, color 140ms ease, background-color 140ms ease;
-}
-.webqq-model-history-jump:hover,
-.webqq-model-history-jump:focus-visible { color: var(--webqq-text); }
-.webqq-model-history-jump.is-before,
-.webqq-model-history-jump.is-after {
-  display: inline-flex;
-  width: 1em;
-  height: 1em;
-  min-width: 1em;
-  min-height: 1em;
-  padding: 0;
-  vertical-align: -0.1em;
-}
-.webqq-model-history-jump.is-before { margin-inline-end: 5px; }
-.webqq-model-history-jump.is-after { margin-inline-start: 5px; }
-.webqq-model-history-jump.is-before svg,
-.webqq-model-history-jump.is-after svg {
-  width: 1em;
-  height: 1em;
-}
-.webqq-model-history-message:hover .webqq-model-history-jump,
-.webqq-model-history-message:focus-within .webqq-model-history-jump { opacity: 1; }
-@media (hover: none) {
-  .webqq-model-history-jump { opacity: 1; }
-}
 .webqq-model-history-quote.chatluna-sandbox-message-quote {
   width: min(100%, 620px);
   margin: 0;
