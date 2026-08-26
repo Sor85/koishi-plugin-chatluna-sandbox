@@ -91,7 +91,10 @@
               },
             ]"
           >
-            <header @click="toggleCardFromHeader($event, modelAnalysisTargetId(message.evidenceId))">
+            <header
+              @mousedown="preventCardHeaderDoubleClickSelection"
+              @click="toggleCardFromHeader($event, modelAnalysisTargetId(message.evidenceId))"
+            >
               <span class="webqq-model-analysis-role"><AnalysisHighlightedText :value="roleLabel(message.role)" :query="normalizedSearch" /></span>
               <span class="webqq-model-analysis-index">#{{ message.index }}</span>
               <span class="webqq-model-analysis-path">{{ formatEvidencePath(message.path) }}</span>
@@ -210,7 +213,10 @@
                   'is-located': highlightedTarget === modelAnalysisVariableTargetId(variable.id),
                 }"
               >
-                <header @click="toggleCardFromHeader($event, modelAnalysisVariableTargetId(variable.id))">
+                <header
+                  @mousedown="preventCardHeaderDoubleClickSelection"
+                  @click="toggleCardFromHeader($event, modelAnalysisVariableTargetId(variable.id))"
+                >
                   <span class="webqq-model-analysis-role">variable</span>
                   <strong><AnalysisHighlightedText :value="variable.name" :query="normalizedSearch" /></strong>
                   <span class="webqq-model-analysis-variable-preset">{{ variable.presetName }}</span>
@@ -282,7 +288,10 @@
               'is-located': highlightedTarget === MODEL_ANALYSIS_RESPONSE_TARGET,
             }"
           >
-            <header @click="toggleCardFromHeader($event, MODEL_ANALYSIS_RESPONSE_TARGET)">
+            <header
+              @mousedown="preventCardHeaderDoubleClickSelection"
+              @click="toggleCardFromHeader($event, MODEL_ANALYSIS_RESPONSE_TARGET)"
+            >
               <span class="webqq-model-analysis-role">响应</span>
               <span class="webqq-model-analysis-path">{{ responseFormatLabel }}</span>
               <span class="webqq-model-analysis-chars">{{ responseCharacters }} chars</span>
@@ -872,6 +881,13 @@ function toggleCard(target: string) {
   const next = new Set(collapsedCards.value)
   next.has(target) ? next.delete(target) : next.add(target)
   collapsedCards.value = next
+}
+
+// 第二次按下时阻止浏览器按单词选中，但保留单击折叠和拖选复制。
+function preventCardHeaderDoubleClickSelection(event: MouseEvent) {
+  if (event.detail < 2) return
+  if (event.target instanceof Element && event.target.closest('button')) return
+  event.preventDefault()
 }
 
 // 头部空白也折叠。JSON / 箭头是独立按钮，closest('button') 避免点它们时再切一次。

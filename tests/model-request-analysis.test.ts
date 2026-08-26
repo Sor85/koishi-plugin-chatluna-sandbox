@@ -338,6 +338,9 @@ describe('模型请求分析展示模型', () => {
 
     expect(view).toContain("'is-collapsed': isCardCollapsed(modelAnalysisVariableTargetId(variable.id))")
     expect(view).toContain('@click="toggleCardFromHeader($event, modelAnalysisVariableTargetId(variable.id))"')
+    expect(view).toContain('@mousedown="preventCardHeaderDoubleClickSelection"')
+    expect(view).toContain('if (event.detail < 2) return')
+    expect(view).toContain('event.preventDefault()')
     expect(view).toContain('@click="toggleCard(modelAnalysisVariableTargetId(variable.id))"')
     expect(view).toContain('v-show="!isCardCollapsed(modelAnalysisVariableTargetId(variable.id))"')
     expect(view).toContain("variable.status === 'observed' && !variable.value")
