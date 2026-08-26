@@ -2196,14 +2196,29 @@
   background: #1e3a8a;
 }
 .webqq-model-history-content {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
   width: fit-content;
-  max-width: 100%;
+  max-width: min(100%, var(--webqq-model-history-content-max-width, 100%));
   min-width: 0;
   color: var(--webqq-text);
   font-size: 13px;
   line-height: 1.55;
+}
+.webqq-model-history-content-line {
+  display: block;
+  max-width: 100%;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+.webqq-model-history-content-line:empty::before { content: "\00a0"; }
+.webqq-model-history-message.is-bot .webqq-model-history-content-line {
+  align-self: flex-end;
+  text-align: left;
+}
+.webqq-model-history-message.is-bot .webqq-model-history-content-line.is-single-visual-line {
+  text-align: right;
 }
 .webqq-model-history-quote.chatluna-sandbox-message-quote {
   width: min(100%, 620px);

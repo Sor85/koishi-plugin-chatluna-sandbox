@@ -29,7 +29,15 @@
               </Tooltip>
             </TooltipProvider>
           </div>
-          <span class="webqq-model-history-content">{{ message.content || '（空消息）' }}</span>
+          <span class="webqq-model-history-content">
+            <span
+              v-for="(line, lineIndex) in contentLines(message)"
+              :key="lineIndex"
+              class="webqq-model-history-content-line"
+              :class="{ 'is-single-visual-line': singleVisualLines.has(contentLineKey(message, index, lineIndex)) }"
+              :data-history-content-line="contentLineKey(message, index, lineIndex)"
+            >{{ line }}</span>
+          </span>
         </div>
       </article>
     </div>
@@ -67,6 +75,7 @@ const collapsible = ref(false)
 const collapsedHeight = computed(() => `${props.maxHeight}px`)
 const previewElement = ref<HTMLElement>()
 const characters = computed(() => props.characters ?? props.messages.reduce((total, message) => total + historyMessageCharacters(message), 0))
+const singleVisualLines = ref(new Set<string>())
 let resizeObserver: ResizeObserver | undefined
 
 function historyMessageCharacters(message: ModelRequestHistoryMessage): number {
@@ -80,7 +89,47 @@ function historyMessageCharacters(message: ModelRequestHistoryMessage): number {
 function measurePreview() {
   const preview = previewElement.value?.querySelector<HTMLElement>('.webqq-model-history-preview')
   if (!preview) return
+  measureContentWidths(preview)
   collapsible.value = preview.scrollHeight > props.maxHeight + 1
+}
+
+function measureContentWidths(preview: HTMLElement) {
+  const previewRect = preview.getBoundingClientRect()
+  const cardCenter = previewRect.left + previewRect.width / 2
+  const nextSingleVisualLines = new Set<string>()
+  for (const message of preview.querySelectorAll<HTMLElement>('.webqq-model-history-message')) {
+    const line = message.querySelector<HTMLElement>('.webqq-model-history-line')
+    const content = message.querySelector<HTMLElement>('.webqq-model-history-content')
+    content?.style.removeProperty('--webqq-model-history-content-max-width')
+    if (!line || !content) continue
+
+    const lineRect = line.getBoundingClientRect()
+    const width = message.classList.contains('is-bot')
+      ? lineRect.right - cardCenter
+      : cardCenter - lineRect.left
+    const constrainedWidth = Math.max(0, Math.min(lineRect.width, width))
+    content.style.setProperty('--webqq-model-history-content-max-width', `${constrainedWidth}px`)
+
+    for (const contentLine of content.querySelectorAll<HTMLElement>('[data-history-content-line]')) {
+      if (visualLineCount(contentLine) <= 1) {
+        const key = contentLine.dataset.historyContentLine
+        if (key) nextSingleVisualLines.add(key)
+      }
+    }
+  }
+  if (!sameSet(singleVisualLines.value, nextSingleVisualLines)) {
+    singleVisualLines.value = nextSingleVisualLines
+  }
+}
+
+function sameSet(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean {
+  return left.size === right.size && Array.from(left).every(value => right.has(value))
+}
+
+function visualLineCount(element: HTMLElement): number {
+  const range = document.createRange()
+  range.selectNodeContents(element)
+  return new Set(Array.from(range.getClientRects(), rect => Math.round(rect.top * 100) / 100)).size
 }
 
 watch(
@@ -120,6 +169,14 @@ function metadata(message: ModelRequestHistoryMessage): MetadataItem[] {
 
 function isBotMessage(message: ModelRequestHistoryMessage): boolean {
   return Boolean(props.botId && message.id === props.botId)
+}
+
+function contentLines(message: ModelRequestHistoryMessage): string[] {
+  return (message.content || '（空消息）').split(/\r\n|\r|\n/)
+}
+
+function contentLineKey(message: ModelRequestHistoryMessage, messageIndex: number, lineIndex: number): string {
+  return `${message.messageId || message.id || message.name || 'message'}:${messageIndex}:${lineIndex}`
 }
 
 function metadataClass(message: ModelRequestHistoryMessage, item: MetadataItem): string | undefined {
