@@ -414,10 +414,10 @@ const handlingRequestId = ref('')
 const notificationErrorMessage = ref('')
 const navigationItems = [
   { id: 'messages' as const, label: '消息', icon: IconMessageCircle },
-  { id: 'debug' as const, label: 'OneBot 调试', icon: IconBug },
-  { id: 'mcp-calls' as const, label: 'MCP 调用', icon: IconHistory },
   { id: 'model-requests' as const, label: '模型请求', icon: IconBrain },
   { id: 'presets' as const, label: '预设', icon: IconFileCode },
+  { id: 'debug' as const, label: 'OneBot 调试', icon: IconBug },
+  { id: 'mcp-calls' as const, label: 'MCP 调用', icon: IconHistory },
   { id: 'profile' as const, label: '环境管理', icon: IconSettings },
   { id: 'spaces' as const, label: 'AI 测试空间' },
 ]

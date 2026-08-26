@@ -51,9 +51,16 @@ describe('WebQQ 顶部导航与会话栏', () => {
     expect(source).toContain('IconBrain')
     expect(source).toContain("label: '预设'")
     expect(source).toContain('IconFileCode')
-    expect(source.indexOf("label: 'OneBot 调试'")).toBeLessThan(source.indexOf("label: 'MCP 调用'"))
-    expect(source.indexOf("label: 'MCP 调用'")).toBeLessThan(source.indexOf("label: '模型请求'"))
-    expect(source.indexOf("label: '模型请求'")).toBeLessThan(source.indexOf("label: '环境管理'"))
+    const navigationSource = source.slice(source.indexOf('const navigationItems = ['), source.indexOf('const visibleNavigationItems'))
+    expect([...navigationSource.matchAll(/label: '([^']+)'/g)].map(match => match[1])).toEqual([
+      '消息',
+      '模型请求',
+      '预设',
+      'OneBot 调试',
+      'MCP 调用',
+      '环境管理',
+      'AI 测试空间',
+    ])
     expect(source).toContain('IconSettings')
     expect(source).toContain("'is-rail-pin-end': item.id === 'spaces'")
     expect(source).toContain("'is-mcp-running': item.id === 'spaces' && spacesBusy")
