@@ -36,6 +36,19 @@ export function selectModelRequestListRecord(
   state.navigationRecordId = undefined
 }
 
+/**
+ * 工作台重新挂载时，详情仍由工作区控制器保留；用它恢复左侧的当前选择。
+ * 不写入 navigationRecordId，避免普通页面返回被误当成跨页导航并重复补入记录。
+ */
+export function restoreModelRequestListSelection(
+  state: ModelRequestListSelectionState,
+  detail?: Pick<SandboxModelRequestDetail, 'id'>,
+): void {
+  if (!detail) return
+  state.selectedRecordId = detail.id
+  state.navigationRecordId = undefined
+}
+
 export function resolveModelRequestListRecords(
   state: ModelRequestListSelectionState,
   records: readonly SandboxModelRequestListItem[],

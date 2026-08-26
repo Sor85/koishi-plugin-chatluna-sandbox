@@ -3,6 +3,7 @@ import {
   beginModelRequestListNavigation,
   clearModelRequestListSelection,
   resolveModelRequestListRecords,
+  restoreModelRequestListSelection,
   selectModelRequestListRecord,
   type ModelRequestListSelectionState,
 } from '../client/webqq/model-request-list-selection'
@@ -62,6 +63,30 @@ describe('模型请求列表选择', () => {
     clearModelRequestListSelection(state)
 
     expect(state).toEqual({ selectedRecordId: '', navigationRecordId: undefined })
+    expect(resolveModelRequestListRecords(
+      state,
+      [record('request:latest')],
+      detail('request:target'),
+    ).map(({ id }) => id)).toEqual(['request:latest'])
+  })
+
+  it('工作台重新挂载时从已有详情恢复左侧选中记录', () => {
+    const state: ModelRequestListSelectionState = { selectedRecordId: '' }
+
+    restoreModelRequestListSelection(state, detail('request:target'))
+
+    expect(state).toEqual({ selectedRecordId: 'request:target', navigationRecordId: undefined })
+    expect(resolveModelRequestListRecords(
+      state,
+      [record('request:target'), record('request:other')],
+    ).map(({ id }) => id)).toEqual(['request:target', 'request:other'])
+  })
+
+  it('恢复普通详情选择不会把记录误登记为跨页导航目标', () => {
+    const state: ModelRequestListSelectionState = { selectedRecordId: '' }
+
+    restoreModelRequestListSelection(state, detail('request:target'))
+
     expect(resolveModelRequestListRecords(
       state,
       [record('request:latest')],

@@ -611,6 +611,7 @@ import {
   beginModelRequestListNavigation,
   clearModelRequestListSelection,
   resolveModelRequestListRecords,
+  restoreModelRequestListSelection,
   selectModelRequestListRecord,
   type ModelRequestListSelectionState,
 } from './webqq/model-request-list-selection'
@@ -814,6 +815,7 @@ watch(() => props.detail?.id, () => {
   bodyView.value = 'analysis'
   responseView.value = 'content'
   headersExpanded.value = false
+  restoreSelectionOnEnter()
   applyViewRestore()
   if (props.detail) fetchTrajectory(currentTrajectoryMode())
   resetCopyState()
@@ -1196,12 +1198,21 @@ function onVisibilityChange() {
   liveRefreshController.sync()
 }
 
+function restoreSelectionOnEnter() {
+  // 页面切换会销毁工作台组件，但工作区控制器会保留详情；普通返回没有 entryState，
+  // 因此需要用这份权威详情恢复左侧选中态。导航进入时已有选择则不覆盖目标。
+  if (selectedRecordId.value || props.navigation.entryState.value) return
+  restoreModelRequestListSelection(selectionState.value, props.detail)
+}
+
 onMounted(() => {
+  restoreSelectionOnEnter()
   document.addEventListener('visibilitychange', onVisibilityChange)
   enterRefresh.schedule()
 })
 
 onActivated(() => {
+  restoreSelectionOnEnter()
   enterRefresh.schedule()
 })
 
