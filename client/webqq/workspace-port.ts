@@ -12,6 +12,8 @@ import type {
   PerformFriendActionInput,
   PerformGroupActionInput,
   RecallMessageInput,
+  ResolveMessageIdInput,
+  ResolveMessageIdResult,
   ClearConversationMessagesInput,
   SearchConversationMessagesInput,
   SetMessageReactionInput,
@@ -55,6 +57,7 @@ import type {
 export interface WorkspacePort {
   getWorkspace(input?: GetSandboxWorkspaceInput): Promise<SandboxWorkspaceState>
   getMessageHistory(input: GetMessageHistoryInput): Promise<SandboxMessageHistory>
+  resolveMessageId(input: ResolveMessageIdInput): Promise<ResolveMessageIdResult>
   searchConversationMessages(input: SearchConversationMessagesInput): Promise<SandboxMessageSearchResult>
   sendMessage(input: SendMessageInput): Promise<SandboxWorkspaceState>
   sendMediaMessage(input: SendMediaMessageInput): Promise<SandboxWorkspaceState>

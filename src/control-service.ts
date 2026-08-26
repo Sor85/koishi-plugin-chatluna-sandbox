@@ -44,6 +44,8 @@ import {
   type PerformGroupActionInput,
   type PerformGroupActionResult,
   type RecallMessageInput,
+  type ResolveMessageIdInput,
+  type ResolveMessageIdResult,
   type ClearConversationMessagesInput,
   type SearchConversationMessagesInput,
   type SetMessageReactionInput,
@@ -703,6 +705,11 @@ export class SandboxControlService {
       forwards: structuredClone(this.getForwards().filter(({ id }) => visibleForwardIds.has(id))),
       nextBeforeMessageId: start > 0 ? messageIds[0] : undefined,
     }
+  }
+
+  resolveMessageId(input: ResolveMessageIdInput): ResolveMessageIdResult {
+    const conversation = this.getVisibleConversation(input.operatorId, input.conversationId)
+    return { messageId: resolveOneBotMessageId(input.rawMessageId, conversation.messageIds) }
   }
 
   searchConversationMessages(input: SearchConversationMessagesInput): SandboxMessageSearchResult {

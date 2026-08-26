@@ -40,11 +40,16 @@ export function createMessageNavigationShell(
     await controller.selectOperator(target.botId)
     if (controller.currentOperatorId.value !== target.botId) return
     if (!controller.workspace.value.snapshot.conversations.some(({ id }) => id === target.conversationId)) return
+    const { messageId } = await controller.resolveMessageId({
+      conversationId: target.conversationId,
+      rawMessageId: target.messageId,
+    })
+    if (!messageId) return
     controller.selectConversation(target.conversationId)
     revealRequest.value = {
       seq: (revealRequest.value?.seq ?? 0) + 1,
       conversationId: target.conversationId,
-      messageId: target.messageId,
+      messageId,
     }
   }
 

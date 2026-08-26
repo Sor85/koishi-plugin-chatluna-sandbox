@@ -54,6 +54,8 @@ import type {
   PerformFriendActionInput,
   PerformGroupActionInput,
   RecallMessageInput,
+  ResolveMessageIdInput,
+  ResolveMessageIdResult,
   ClearConversationMessagesInput,
   SearchConversationMessagesInput,
   SetMessageReactionInput,
@@ -85,6 +87,7 @@ type SpaceScoped<Input> = Input & { spaceId?: string }
 interface ConsoleEventMap {
   'chatluna-sandbox/workspace': (input?: SpaceScoped<GetSandboxWorkspaceInput>) => Promise<SandboxWorkspaceState>
   'chatluna-sandbox/message-history': (input: SpaceScoped<GetMessageHistoryInput>) => Promise<SandboxMessageHistory>
+  'chatluna-sandbox/resolve-message-id': (input: SpaceScoped<ResolveMessageIdInput>) => Promise<ResolveMessageIdResult>
   'chatluna-sandbox/search-conversation-messages': (input: SpaceScoped<SearchConversationMessagesInput>) => Promise<SandboxMessageSearchResult>
   'chatluna-sandbox/send-message': (input: SpaceScoped<SendMessageInput>) => Promise<SandboxWorkspaceState>
   'chatluna-sandbox/send-media-message': (input: SpaceScoped<SendMediaMessageInput>) => Promise<SandboxWorkspaceState>
@@ -347,6 +350,7 @@ export function registerConsole(
   const workspaceListener = (input?: SpaceScoped<GetSandboxWorkspaceInput>) => getWorkspace(input)
   registerListener('chatluna-sandbox/workspace', workspaceListener, { authority: 4 })
   registerListener('chatluna-sandbox/message-history', async (input) => (await resolveReadyControl(input, false)).getMessageHistory(assertInteractionInput(withoutSpaceId(input)) as GetMessageHistoryInput), { authority: 4 })
+  registerListener('chatluna-sandbox/resolve-message-id', async (input) => (await resolveReadyControl(input, false)).resolveMessageId(assertInteractionInput(withoutSpaceId(input)) as ResolveMessageIdInput), { authority: 4 })
   registerListener('chatluna-sandbox/search-conversation-messages', async (input) => (
     await resolveReadyControl(input, false)
   ).searchConversationMessages(assertInteractionInput(withoutSpaceId(input)) as SearchConversationMessagesInput), { authority: 4 })
@@ -597,6 +601,7 @@ declare module '@koishijs/console' {
   interface Events {
     'chatluna-sandbox/workspace'(input?: SpaceScoped<GetSandboxWorkspaceInput>): Promise<SandboxWorkspaceState>
     'chatluna-sandbox/message-history'(input: SpaceScoped<GetMessageHistoryInput>): Promise<SandboxMessageHistory>
+    'chatluna-sandbox/resolve-message-id'(input: SpaceScoped<ResolveMessageIdInput>): Promise<ResolveMessageIdResult>
     'chatluna-sandbox/search-conversation-messages'(input: SpaceScoped<SearchConversationMessagesInput>): Promise<SandboxMessageSearchResult>
     'chatluna-sandbox/send-message'(input: SpaceScoped<SendMessageInput>): Promise<SandboxWorkspaceState>
     'chatluna-sandbox/send-media-message'(input: SpaceScoped<SendMediaMessageInput>): Promise<SandboxWorkspaceState>

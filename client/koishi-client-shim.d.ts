@@ -16,6 +16,8 @@ declare module '@koishijs/client' {
     PerformFriendActionInput,
     PerformGroupActionInput,
     RecallMessageInput,
+    ResolveMessageIdInput,
+    ResolveMessageIdResult,
     ClearConversationMessagesInput,
     SearchConversationMessagesInput,
     SetMessageReactionInput,
@@ -69,6 +71,7 @@ declare module '@koishijs/client' {
 
   export function send(event: 'chatluna-sandbox/workspace', input?: SpaceScoped<GetSandboxWorkspaceInput>): Promise<SandboxWorkspaceState>
   export function send(event: 'chatluna-sandbox/message-history', input: SpaceScoped<GetMessageHistoryInput>): Promise<SandboxMessageHistory>
+  export function send(event: 'chatluna-sandbox/resolve-message-id', input: SpaceScoped<ResolveMessageIdInput>): Promise<ResolveMessageIdResult>
   export function send(event: 'chatluna-sandbox/search-conversation-messages', input: SpaceScoped<SearchConversationMessagesInput>): Promise<SandboxMessageSearchResult>
   export function send(event: 'chatluna-sandbox/send-message', input: SpaceScoped<SendMessageInput>): Promise<SandboxWorkspaceState>
   export function send(event: 'chatluna-sandbox/send-media-message', input: SpaceScoped<SendMediaMessageInput>): Promise<SandboxWorkspaceState>

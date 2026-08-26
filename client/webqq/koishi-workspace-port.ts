@@ -10,6 +10,7 @@ export function createKoishiWorkspacePort(resolveSpaceId: () => string | undefin
   // Koishi Console 会把省略的 send 参数序列化为 null；服务端工作区接口需要收到普通对象才能执行 fallback。
   getWorkspace: (input = {}) => send('chatluna-sandbox/workspace', scoped(input)),
   getMessageHistory: (input) => send('chatluna-sandbox/message-history', scoped(input)),
+  resolveMessageId: (input) => send('chatluna-sandbox/resolve-message-id', scoped(input)),
   searchConversationMessages: (input) => send('chatluna-sandbox/search-conversation-messages', scoped(input)),
   sendMessage: (input) => send('chatluna-sandbox/send-message', scoped(input)),
   sendMediaMessage: (input) => send('chatluna-sandbox/send-media-message', scoped(input)),

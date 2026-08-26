@@ -7,6 +7,7 @@ import type {
   GetSandboxOneBotDebugRecordsInput,
   ManageSandboxEnvironmentInput,
   RecallMessageInput,
+  ResolveMessageIdInput,
   ClearConversationMessagesInput,
   SearchConversationMessagesInput,
   SetMessageReactionInput,
@@ -499,6 +500,15 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     }
   }
 
+  async function resolveMessageId(input: Omit<ResolveMessageIdInput, 'operatorId'>) {
+    const operatorId = getCurrentOperatorId()
+    try {
+      return await port.resolveMessageId({ ...input, operatorId })
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '解析消息 ID 失败')
+    }
+  }
+
   // 搜索只返回命中摘要，不改快照；定位历史消息仍走 loadMessageHistory。
   async function searchConversationMessages(input: Omit<SearchConversationMessagesInput, 'operatorId'>) {
     const operatorId = getCurrentOperatorId()
@@ -785,6 +795,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     handleRelationshipRequest,
     load,
     loadMessageHistory,
+    resolveMessageId,
     searchConversationMessages,
     loadOneBotDebugRecords,
     loadOneBotDebugRecord,
