@@ -124,48 +124,94 @@
       </div>
 
       <TooltipProvider :delay-duration="500">
-        <section
-          v-if="compositionTracks.length"
-          class="webqq-model-trajectory-composition"
-          :style="{ minHeight: `${Math.max(50, compositionTracks.length * 14 + 8)}px` }"
-          aria-label="请求体提示词内容占比"
-        >
-          <div class="webqq-model-trajectory-composition-labels" aria-hidden="true">
-            <span v-for="track in compositionTracks" :key="track.kind">{{ promptKindLabel(track.kind) }}</span>
+        <div v-if="compositionTracks.length" class="webqq-model-trajectory-composition-shell">
+          <div class="webqq-model-trajectory-composition-zoom" role="group" aria-label="轨道缩放">
+            <Button
+              class="webqq-model-trajectory-composition-zoom-value"
+              size="sm"
+              variant="ghost"
+              :disabled="compositionZoom === COMPOSITION_ZOOM_MIN"
+              aria-label="重置轨道缩放"
+              @click="setCompositionZoom(COMPOSITION_ZOOM_MIN)"
+            >
+              {{ Math.round(compositionZoom * 100) }}%
+            </Button>
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              :disabled="compositionZoom <= COMPOSITION_ZOOM_MIN"
+              aria-label="缩小轨道"
+              @click="setCompositionZoom(compositionZoom - COMPOSITION_ZOOM_STEP)"
+            >
+              <IconZoomOut aria-hidden="true" />
+            </Button>
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              :disabled="compositionZoom >= COMPOSITION_ZOOM_MAX"
+              aria-label="放大轨道"
+              @click="setCompositionZoom(compositionZoom + COMPOSITION_ZOOM_STEP)"
+            >
+              <IconZoomIn aria-hidden="true" />
+            </Button>
           </div>
-          <div class="webqq-model-trajectory-composition-tracks">
-            <span
-              v-for="boundary in compositionBoundaries"
-              :key="boundary.id"
-              class="webqq-model-trajectory-boundary"
-              :style="{ left: `${boundary.left}%` }"
-              aria-hidden="true"
-            />
-            <div v-for="track in compositionTracks" :key="track.kind" class="webqq-model-trajectory-composition-track">
-              <Tooltip v-for="segment in track.segments" :key="segment.id">
-                <TooltipTrigger as-child>
-                  <button
-                    type="button"
-                    class="webqq-model-trajectory-composition-bar"
-                    :class="[
-                      promptBarClass(segment.kind),
-                      { 'is-variable': segment.variableId, 'is-selected': isCompositionSegmentSelected(segment) },
-                    ]"
-                    :style="{ left: `${segment.left}%`, width: `${segment.width}%` }"
-                    :aria-label="segment.variableName
-                      ? `变量 ${segment.variableName} 占请求体提示内容的 ${formatPercentage(segment.percentage)}`
-                      : `${promptKindLabel(segment.kind)} 占请求体提示内容的 ${formatPercentage(segment.percentage)}`"
-                    @click="selectPromptSegment(segment)"
-                  />
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  <strong>{{ segment.variableName ? `Variable · ${segment.variableName}` : promptKindLabel(segment.kind) }} · {{ formatPercentage(segment.percentage) }}</strong>
-                  <span>{{ segment.characters.toLocaleString('zh-CN') }} 个字符</span>
-                </TooltipContent>
-              </Tooltip>
+          <section
+            class="webqq-model-trajectory-composition"
+            :style="{ minHeight: `${Math.max(50, compositionTracks.length * 14 + 8)}px` }"
+            aria-label="请求体提示词内容占比"
+          >
+            <div class="webqq-model-trajectory-composition-labels" aria-hidden="true">
+              <span v-for="track in compositionTracks" :key="track.kind">{{ promptKindLabel(track.kind) }}</span>
             </div>
-          </div>
-        </section>
+            <div
+              ref="compositionViewport"
+              class="webqq-model-trajectory-composition-viewport"
+              :class="{ 'is-dragging': compositionDragging }"
+              @wheel="handleCompositionWheel"
+              @pointerdown="handleCompositionPointerDown"
+              @pointermove="handleCompositionPointerMove"
+              @pointerup="finishCompositionDrag"
+              @pointercancel="finishCompositionDrag"
+              @click.capture="handleCompositionClickCapture"
+            >
+              <div
+                class="webqq-model-trajectory-composition-tracks"
+                :style="{ width: `${compositionZoom * 100}%` }"
+              >
+                <span
+                  v-for="boundary in compositionBoundaries"
+                  :key="boundary.id"
+                  class="webqq-model-trajectory-boundary"
+                  :style="{ left: `${boundary.left}%` }"
+                  aria-hidden="true"
+                />
+                <div v-for="track in compositionTracks" :key="track.kind" class="webqq-model-trajectory-composition-track">
+                  <Tooltip v-for="segment in track.segments" :key="segment.id">
+                    <TooltipTrigger as-child>
+                      <button
+                        type="button"
+                        class="webqq-model-trajectory-composition-bar"
+                        :class="[
+                          promptBarClass(segment.kind),
+                          { 'is-variable': segment.variableId, 'is-selected': isCompositionSegmentSelected(segment) },
+                        ]"
+                        :style="{ left: `${segment.left}%`, width: `${segment.width}%` }"
+                        :aria-label="segment.variableName
+                          ? `变量 ${segment.variableName} 占请求体提示内容的 ${formatPercentage(segment.percentage)}`
+                          : `${promptKindLabel(segment.kind)} 占请求体提示内容的 ${formatPercentage(segment.percentage)}`"
+                        @click="selectPromptSegment(segment)"
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <strong>{{ segment.variableName ? `Variable · ${segment.variableName}` : promptKindLabel(segment.kind) }} · {{ formatPercentage(segment.percentage) }}</strong>
+                      <span>{{ segment.characters.toLocaleString('zh-CN') }} 个字符</span>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
         <div v-else class="webqq-model-trajectory-composition-empty">
           {{ mode === 'conversation' ? '当前会话没有可投影的请求组成' : '当前请求体没有可统计的提示词内容' }}
         </div>
@@ -271,6 +317,8 @@ import {
   IconSquareMinus,
   IconSquarePlus,
   IconX,
+  IconZoomIn,
+  IconZoomOut,
 } from '@tabler/icons-vue'
 import { computed, nextTick, ref, useId, watch } from 'vue'
 import { Badge } from './components/ui/badge'
@@ -352,6 +400,19 @@ const ledgerScrollRestore = createScrollRestore({
 
 const selectedRowId = ref('')
 const actualDuration = ref(true)
+const compositionViewport = ref<HTMLElement>()
+const COMPOSITION_ZOOM_MIN = 1
+const COMPOSITION_ZOOM_MAX = 10
+const COMPOSITION_ZOOM_STEP = 0.25
+const compositionZoom = ref(COMPOSITION_ZOOM_MIN)
+const compositionDragging = ref(false)
+let compositionDrag: {
+  pointerId: number
+  startX: number
+  scrollLeft: number
+  moved: boolean
+} | undefined
+let suppressCompositionClickUntil = 0
 const requestsCollapsed = ref(false)
 const trajectorySortOrder = ref<ModelRequestTrajectorySortOrder>('desc')
 const collapsedRequestIds = ref<ReadonlySet<string>>(new Set())
@@ -572,6 +633,74 @@ function toggleRequestCollapsed(row: SandboxModelRequestTrajectoryRow) {
   const next = new Set(collapsedRequestIds.value)
   next.has(requestId) ? next.delete(requestId) : next.add(requestId)
   collapsedRequestIds.value = next
+}
+
+function setCompositionZoom(value: number, anchorClientX?: number) {
+  const viewport = compositionViewport.value
+  const next = Math.min(Math.max(value, COMPOSITION_ZOOM_MIN), COMPOSITION_ZOOM_MAX)
+  if (next === compositionZoom.value) return
+  const previous = compositionZoom.value
+  const anchor = viewport && anchorClientX !== undefined
+    ? Math.min(Math.max(anchorClientX - viewport.getBoundingClientRect().left, 0), viewport.clientWidth)
+    : viewport ? viewport.clientWidth / 2 : 0
+  const contentX = viewport ? (viewport.scrollLeft + anchor) / previous : 0
+  compositionZoom.value = next
+  if (viewport) {
+    void nextTick(() => {
+      viewport.scrollLeft = Math.max(contentX * next - anchor, 0)
+    })
+  }
+}
+
+function handleCompositionWheel(event: WheelEvent) {
+  // 只在轨道内容区域且按住 Ctrl 时接管滚轮；其余情况保留页面滚动和浏览器缩放。
+  if (!event.ctrlKey || event.deltaY === 0) return
+  event.preventDefault()
+  setCompositionZoom(
+    compositionZoom.value + (event.deltaY < 0 ? COMPOSITION_ZOOM_STEP : -COMPOSITION_ZOOM_STEP),
+    event.clientX,
+  )
+}
+
+function handleCompositionPointerDown(event: PointerEvent) {
+  const viewport = compositionViewport.value
+  if (!viewport || event.button !== 0) return
+  compositionDrag = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    scrollLeft: viewport.scrollLeft,
+    moved: false,
+  }
+  viewport.setPointerCapture(event.pointerId)
+}
+
+function handleCompositionPointerMove(event: PointerEvent) {
+  const viewport = compositionViewport.value
+  const drag = compositionDrag
+  if (!viewport || !drag || drag.pointerId !== event.pointerId) return
+  const delta = event.clientX - drag.startX
+  if (!drag.moved && Math.abs(delta) < 3) return
+  drag.moved = true
+  compositionDragging.value = true
+  event.preventDefault()
+  viewport.scrollLeft = drag.scrollLeft - delta
+}
+
+function finishCompositionDrag(event: PointerEvent) {
+  const viewport = compositionViewport.value
+  const drag = compositionDrag
+  if (!viewport || !drag || drag.pointerId !== event.pointerId) return
+  if (viewport.hasPointerCapture(event.pointerId)) viewport.releasePointerCapture(event.pointerId)
+  if (drag.moved) suppressCompositionClickUntil = performance.now() + 250
+  compositionDrag = undefined
+  compositionDragging.value = false
+}
+
+function handleCompositionClickCapture(event: MouseEvent) {
+  if (performance.now() > suppressCompositionClickUntil) return
+  event.preventDefault()
+  event.stopPropagation()
+  suppressCompositionClickUntil = 0
 }
 
 function selectPromptSegment(segment: CompositionSegment) {
