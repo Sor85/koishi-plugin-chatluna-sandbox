@@ -295,6 +295,8 @@ describe('模型请求分析展示模型', () => {
     expect(view).toContain(':id="modelAnalysisVariableTargetId(variable.id)"')
     expect(view).toContain(':value="variable.name"')
     expect(view).toContain(':value="variable.value ?? \'\'"')
+    expect(view).toContain('variablesVisible')
+    expect(view).toContain("isEvidenceVisible(evidenceFilter.value, 'variable')")
   })
 
   it('变量卡片正文保持卡片内边距，支持头部和按钮折叠，并标注空值', () => {

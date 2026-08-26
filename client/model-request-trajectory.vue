@@ -354,8 +354,8 @@ const trajectorySortOrder = ref<ModelRequestTrajectorySortOrder>('desc')
 const collapsedRequestIds = ref<ReadonlySet<string>>(new Set())
 const hiddenKinds = ref<ReadonlySet<ModelEvidenceFilterKind>>(new Set())
 const filtersExpanded = ref(false)
-// SYSTEM / USER / TOOL DEFS 是两个视图里最常开关的种类，和「耗时」「请求」一起留在工具栏外层。
-const PINNED_FILTER_KINDS: readonly ModelEvidenceFilterKind[] = ['system', 'user', 'tool-definition']
+// 常用证据种类和「耗时」「请求」一起留在工具栏外层；VARIABLE 紧邻 TOOL DEFS 左侧。
+const PINNED_FILTER_KINDS: readonly ModelEvidenceFilterKind[] = ['system', 'user', 'variable', 'tool-definition']
 const pinnedKindOptions = MODEL_EVIDENCE_FILTER_KINDS.filter(({ kind }) => PINNED_FILTER_KINDS.includes(kind))
 const collapsedKindOptions = MODEL_EVIDENCE_FILTER_KINDS.filter(({ kind }) => !PINNED_FILTER_KINDS.includes(kind))
 const moreFiltersId = useId()

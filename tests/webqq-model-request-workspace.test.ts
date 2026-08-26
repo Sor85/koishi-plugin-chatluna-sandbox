@@ -347,8 +347,9 @@ describe('WebQQ 模型请求工作台', () => {
     expect(toggleRequestCollapsedSource).toContain('collapsedRequestIds.value = next')
     expect(toggleRequestCollapsedSource).not.toContain('selectedRowId.value')
     expect(trajectorySource).toContain("if (kind === 'variable') return 'VARIABLE'")
-    expect(trajectorySource).toContain("['system', 'user', 'tool-definition']")
+    expect(trajectorySource).toContain("['system', 'user', 'variable', 'tool-definition']")
     expect(trajectorySource).not.toContain('请求侧')
+    expect(trajectorySource).toContain('VARIABLE')
     expect(trajectorySource).not.toContain('响应侧')
     expect(trajectorySource).not.toContain('MODEL_EVIDENCE_FILTER_SOURCES')
     // 过滤开关多了之后工具栏必须能换行，否则窄屏会把搜索框挤出容器。

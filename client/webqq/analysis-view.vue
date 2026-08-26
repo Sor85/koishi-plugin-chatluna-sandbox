@@ -197,7 +197,7 @@
             </div>
           </article>
 
-          <section v-if="detail.variables?.length" class="webqq-model-analysis-variables" data-analysis-group="variables">
+          <section v-if="detail.variables?.length && variablesVisible" class="webqq-model-analysis-variables" data-analysis-group="variables">
             <h3>Variables <span>({{ detail.variables.length }})</span></h3>
             <div class="webqq-model-analysis-variable-list">
               <article
@@ -523,6 +523,7 @@ const visibleMessages = computed(() => conversation.value.messages.filter(messag
   evidenceFilter.value,
   messageRoleFilterKind(message.role),
 )))
+const variablesVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'variable'))
 const requestToolCallsVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'tool-call'))
 const toolDefinitionsVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'tool-definition'))
 const responseContentVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'assistant'))

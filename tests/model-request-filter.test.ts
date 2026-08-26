@@ -20,13 +20,14 @@ function filter(kinds: ModelEvidenceFilterKind[] = []): ModelEvidenceFilter {
 describe('模型证据显示过滤', () => {
   it('过滤选项覆盖轨迹账本展示的全部证据种类标签', () => {
     expect(MODEL_EVIDENCE_FILTER_KINDS.map(({ label }) => label))
-      .toEqual(['SYSTEM', 'USER', 'ASSISTANT', 'TOOL DEFS', 'TOOL CALL', 'TOOL RESULT'])
+      .toEqual(['SYSTEM', 'USER', 'ASSISTANT', 'VARIABLE', 'TOOL DEFS', 'TOOL CALL', 'TOOL RESULT'])
   })
 
   it('轨迹行按种类与工具事件映射到过滤种类', () => {
     expect(trajectoryRowFilterKind({ kind: 'system' })).toBe('system')
     expect(trajectoryRowFilterKind({ kind: 'user' })).toBe('user')
     expect(trajectoryRowFilterKind({ kind: 'assistant' })).toBe('assistant')
+    expect(trajectoryRowFilterKind({ kind: 'variable' })).toBe('variable')
     expect(trajectoryRowFilterKind({ kind: 'tool', toolEvent: 'definition' })).toBe('tool-definition')
     expect(trajectoryRowFilterKind({ kind: 'tool', toolEvent: 'call' })).toBe('tool-call')
     expect(trajectoryRowFilterKind({ kind: 'tool', toolEvent: 'result' })).toBe('tool-result')
@@ -48,6 +49,7 @@ describe('模型证据显示过滤', () => {
     expect(analysisItemFilterKind('message', 'system')).toBe('system')
     expect(analysisItemFilterKind('message', 'user')).toBe('user')
     expect(analysisItemFilterKind('message', 'assistant')).toBe('assistant')
+    expect(analysisItemFilterKind('variable', 'variables')).toBe('variable')
     expect(analysisItemFilterKind('tool-result', 'tool')).toBe('tool-result')
     expect(analysisItemFilterKind('tool-definition', 'tool')).toBe('tool-definition')
     expect(analysisItemFilterKind('tool-call', 'assistant')).toBe('tool-call')

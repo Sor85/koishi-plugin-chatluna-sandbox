@@ -5,13 +5,14 @@ import type { ModelRequestAnalysisGroupKey, ModelRequestAnalysisItemKind } from 
  * 模型证据显示过滤。
  *
  * 轨迹账本、分析导航和分析卡片共用同一份过滤定义：种类取自用户在两个视图里看到的同一套标签
- * （SYSTEM / USER / ASSISTANT / TOOL DEFS / TOOL CALL / TOOL RESULT）。任何一侧自己重算一套判定，
+ * （SYSTEM / USER / ASSISTANT / VARIABLE / TOOL DEFS / TOOL CALL / TOOL RESULT）。任何一侧自己重算一套判定，
  * 都会让同一条证据在两个视图里出现和消失得不一致。
  */
 export type ModelEvidenceFilterKind =
   | 'system'
   | 'user'
   | 'assistant'
+  | 'variable'
   | 'tool-definition'
   | 'tool-call'
   | 'tool-result'
@@ -24,6 +25,7 @@ export const MODEL_EVIDENCE_FILTER_KINDS: readonly { kind: ModelEvidenceFilterKi
   { kind: 'system', label: 'SYSTEM' },
   { kind: 'user', label: 'USER' },
   { kind: 'assistant', label: 'ASSISTANT' },
+  { kind: 'variable', label: 'VARIABLE' },
   { kind: 'tool-definition', label: 'TOOL DEFS' },
   { kind: 'tool-call', label: 'TOOL CALL' },
   { kind: 'tool-result', label: 'TOOL RESULT' },
@@ -42,7 +44,8 @@ export const EMPTY_MODEL_EVIDENCE_FILTER: ModelEvidenceFilter = {
 export function trajectoryRowFilterKind(
   row: Pick<SandboxModelRequestTrajectoryRow, 'kind' | 'toolEvent'>,
 ): ModelEvidenceFilterKind | undefined {
-  if (row.kind === 'request' || row.kind === 'variable') return undefined
+  if (row.kind === 'request') return undefined
+  if (row.kind === 'variable') return 'variable'
   if (row.kind !== 'tool') return row.kind
   if (row.toolEvent === 'definition') return 'tool-definition'
   if (row.toolEvent === 'result') return 'tool-result'
@@ -62,8 +65,7 @@ export function analysisItemFilterKind(
   if (itemKind === 'tool-call') return 'tool-call'
   if (itemKind === 'tool-result') return 'tool-result'
   if (itemKind === 'tool-definition') return 'tool-definition'
-  // 变量由运行时预设快照和请求证据派生，不属于轨迹证据种类过滤。
-  if (itemKind === 'variable') return undefined
+  if (itemKind === 'variable') return 'variable'
   // 响应分组头部代表整张响应卡片，不属于任何单一角色，不参与种类过滤。
   if (itemKind === 'response') return undefined
   if (groupKey === 'system' || groupKey === 'user' || groupKey === 'assistant') return messageRoleFilterKind(groupKey)
