@@ -690,6 +690,28 @@
   gap: 12px;
 }
 
+.webqq-model-trajectory-inspector > header {
+  position: relative;
+  min-width: 0;
+  flex-wrap: wrap;
+  padding-right: 40px;
+}
+
+.webqq-model-trajectory-inspector-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+.webqq-model-trajectory-inspector > header > div {
+  min-width: 0;
+}
+
+.webqq-model-trajectory-inspector-actions {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
 .webqq-model-trajectory-scope {
   min-height: 40px;
   padding: 4px 8px;
@@ -966,7 +988,7 @@
 }
 
 .webqq-model-trajectory-ledger.has-inspector {
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 38%);
+  grid-template-columns: minmax(0, 1fr) minmax(480px, 42%);
 }
 
 .webqq-model-trajectory-table,
@@ -1868,7 +1890,7 @@
   outline-offset: -2px;
   background: color-mix(in srgb, var(--webqq-accent) 8%, var(--webqq-surface));
 }
-.webqq-model-analysis-card > header { gap: 9px; min-height: 44px; padding: 8px 12px; border-bottom: 1px solid var(--webqq-border); }
+.webqq-model-analysis-card > header { gap: 9px; min-width: 0; min-height: 44px; padding: 8px 12px; border-bottom: 1px solid var(--webqq-border); }
 .webqq-model-analysis-card.is-collapsed > header { border-bottom: 0; }
 .webqq-model-analysis-collapse svg { transition: transform 160ms ease; }
 .webqq-model-analysis-card:not(.is-collapsed) .webqq-model-analysis-collapse svg { transform: rotate(180deg); }

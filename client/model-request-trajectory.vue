@@ -235,7 +235,7 @@
                 <IconExternalLink data-icon="inline-start" aria-hidden="true" />
                 打开原始请求
               </Button>
-              <Button variant="ghost" size="icon-sm" aria-label="关闭检查器" @click="selectedRowId = ''">
+              <Button class="webqq-model-trajectory-inspector-close" variant="ghost" size="icon-sm" aria-label="关闭检查器" @click="selectedRowId = ''">
                 <IconX aria-hidden="true" />
               </Button>
             </div>

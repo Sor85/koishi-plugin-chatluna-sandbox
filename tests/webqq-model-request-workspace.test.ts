@@ -217,6 +217,7 @@ describe('WebQQ 模型请求工作台', () => {
     expect(trajectorySource).not.toContain('indexInKind')
     expect(trajectorySource).toContain("'inspect-request': [payload: { recordId: string }]")
     expect(trajectorySource).toContain('layout="inspector"')
+    expect(trajectorySource).toContain('class="webqq-model-trajectory-inspector-close"')
     expect(trajectorySource).toContain('v-webqq-scrollbar="{ showOverlay: false }"')
     // 账本选中行与组成分段共用同一种定位信号形状，且从证据导航 module 的同一个发号源取号。
     expect(trajectorySource).toContain(':locate-request="inspectorLocateRequest"')
@@ -316,7 +317,8 @@ describe('WebQQ 模型请求工作台', () => {
     expect(styles).toMatch(/\.webqq-model-request-list-pane\s*\{[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\)/s)
     expect(styles).toMatch(/\.webqq-model-request-list-toolbar\s*\{[^}]*border-bottom:\s*1px solid var\(--webqq-border\)/s)
     expect(styles).not.toContain('.webqq-model-request-filters {')
-    expect(styles).toMatch(/\.webqq-model-trajectory-ledger\.has-inspector\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(320px, 38%\)/s)
+    expect(styles).toMatch(/\.webqq-model-trajectory-ledger\.has-inspector\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(500px, 42%\)/s)
+    expect(styles).toMatch(/\.webqq-model-trajectory-inspector-close\s*\{[^}]*position:\s*absolute[^}]*top:\s*0[^}]*right:\s*0/s)
     expect(styles).toMatch(/\.webqq-model-analysis\.is-inspector \.webqq-model-analysis-main \{[^}]*display: block/s)
     expect(styles).toMatch(/\.webqq-model-analysis\.is-inspector \.webqq-model-analysis-content \{[^}]*max-height: none/s)
     expect(styles).toContain('--webqq-trajectory-request: #2f76c9')
