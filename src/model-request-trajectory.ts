@@ -85,7 +85,8 @@ export function buildSandboxModelRequestTrajectory(
     for (const row of projectResponseRows(projection)) {
       rows.push({ id: `${record.id}:${row.evidenceId}`, index: index++, requestId: record.id, source: 'response', ...row })
     }
-    for (const item of projectPromptComposition(projection)) {
+    const detail = presentModelRequestRecord(record, 'detail') as SandboxModelRequestDetail
+    for (const item of projectPromptComposition(projection, detail.variables)) {
       promptComposition.push(options.mode === 'conversation' ? { ...item, requestId: record.id } : item)
     }
   }
@@ -207,11 +208,20 @@ function projectResponseRows(projection: ModelEvidenceProjection): ProjectedRow[
   })
 }
 
-function projectPromptComposition(projection: ModelEvidenceProjection): SandboxModelRequestPromptCompositionItem[] {
+function projectPromptComposition(
+  projection: ModelEvidenceProjection,
+  variables: readonly SandboxModelRequestVariable[],
+): SandboxModelRequestPromptCompositionItem[] {
   const sequence: SandboxModelRequestPromptCompositionItem[] = []
+  const variablesByEvidenceId = groupObservedVariablesByEvidenceId(variables)
   for (const message of projection.requestMessages) {
     const kind: SandboxModelRequestPromptKind = message.role === 'tool' ? 'tool-interaction' : message.role
-    push(sequence, kind, message.evidenceId, countMessageCharacters(message))
+    const messageCharacters = countMessageCharacters(message)
+    if (kind === 'system' || kind === 'user') {
+      pushMessageComposition(sequence, kind, message.evidenceId, messageCharacters, variablesByEvidenceId.get(message.evidenceId) ?? [])
+    } else {
+      push(sequence, kind, message.evidenceId, messageCharacters)
+    }
     for (const call of message.toolCalls) {
       push(sequence, 'tool-interaction', call.evidenceId, countToolCallCharacters(call))
     }
@@ -223,13 +233,60 @@ function projectPromptComposition(projection: ModelEvidenceProjection): SandboxM
     characters: Math.max(countToolDefinitionCharacters(definition), 1),
   }))
 
-  // 工具声明不是对话轮次，但属于请求前缀。插在 leading system/user 之后，
-  // 让单请求轨道按 System → User → Tool Defs 顺序铺开，而不是每种各从 0 起一条。
+  // 工具声明不是对话轮次，但属于请求前缀。变量片段仍使用原请求消息的角色，
+  // 因此和 leading system/user 一起自然保留在工具声明之前。
   let split = 0
   while (split < sequence.length && (sequence[split]!.kind === 'system' || sequence[split]!.kind === 'user')) {
     split += 1
   }
   return [...sequence.slice(0, split), ...tools, ...sequence.slice(split)]
+}
+
+function groupObservedVariablesByEvidenceId(
+  variables: readonly SandboxModelRequestVariable[],
+): Map<string, SandboxModelRequestVariable[]> {
+  const grouped = new Map<string, SandboxModelRequestVariable[]>()
+  for (const variable of variables) {
+    if (variable.status !== 'observed' || !variable.evidenceId || !variable.range) continue
+    if (variable.range.end <= variable.range.start) continue
+    const items = grouped.get(variable.evidenceId) ?? []
+    items.push(variable)
+    grouped.set(variable.evidenceId, items)
+  }
+  for (const items of grouped.values()) {
+    items.sort((left, right) => left.range!.start - right.range!.start || left.range!.end - right.range!.end)
+  }
+  return grouped
+}
+
+function pushMessageComposition(
+  target: SandboxModelRequestPromptCompositionItem[],
+  kind: 'system' | 'user',
+  evidenceId: string,
+  characters: number,
+  variables: readonly SandboxModelRequestVariable[],
+): void {
+  if (!variables.length || characters <= 0) {
+    push(target, kind, evidenceId, characters)
+    return
+  }
+
+  let offset = 0
+  for (const variable of variables) {
+    const range = variable.range!
+    if (range.start < offset || range.start > characters || range.end > characters) continue
+    push(target, kind, evidenceId, range.start - offset)
+    target.push({
+      // 模型请求变量在组成图中统一投影到 User 轨道，和工具定义一样按变量逐段展示。
+      kind: 'user',
+      evidenceId: `variable:${variable.id}`,
+      characters: range.end - range.start,
+      variableId: variable.id,
+      variableName: variable.name,
+    })
+    offset = range.end
+  }
+  push(target, kind, evidenceId, characters - offset)
 }
 
 function push(

@@ -203,6 +203,49 @@ describe('模型请求轨迹投影', () => {
       variableStatus: 'observed',
       variablePresetName: 'demo',
     })
+    expect(trajectory.promptComposition).toEqual([
+      { kind: 'system', evidenceId: 'req:message:messages.0', characters: 3 },
+      {
+        kind: 'user',
+        evidenceId: expect.stringMatching(/^variable:/),
+        characters: 1,
+        variableId: expect.any(String),
+        variableName: 'weather',
+      },
+      { kind: 'user', evidenceId: 'req:message:messages.1', characters: 2 },
+    ])
+    expect(trajectory.promptComposition.reduce((sum, item) => sum + item.characters, 0)).toBe(6)
+  })
+
+  it('把多个变量按实际范围拆成独立片段且不重复计算消息大小', () => {
+    const store = new SandboxModelRequestStore()
+    const first = store.append({
+      status: 'success',
+      durationMs: 10,
+      attribution: 'attributed',
+      entities: { scopeId: 'main' },
+      requestBodyAvailable: true,
+      requestBody: { messages: [{ role: 'user', content: '城市北京，天气晴朗。' }] },
+      presetSnapshots: [{
+        kind: 'core',
+        presetName: 'demo',
+        capturedAt: '2026-08-24T00:00:00.000Z',
+        templates: [{ path: ['prompts', 0, 'content'], role: 'user', template: '城市{city}，天气{weather}。' }],
+      }],
+      responseBodyStatus: 'unavailable',
+    })
+
+    const trajectory = trajectoryFor(store, first.id, 'request')
+    expect(trajectory.promptComposition.map(({ kind, characters, variableName }) => ({ kind, characters, variableName }))).toEqual([
+      { kind: 'user', characters: 2, variableName: undefined },
+      { kind: 'user', characters: 2, variableName: 'city' },
+      { kind: 'user', characters: 3, variableName: undefined },
+      { kind: 'user', characters: 2, variableName: 'weather' },
+      { kind: 'user', characters: 1, variableName: undefined },
+    ])
+    expect(trajectory.promptComposition.reduce((sum, item) => sum + item.characters, 0)).toBe(10)
+    expect(trajectory.promptComposition.filter(({ variableId }) => variableId).map(({ evidenceId }) => evidenceId))
+      .toEqual(trajectory.rows.filter(({ kind }) => kind === 'variable').map(({ evidenceId }) => evidenceId))
   })
 
   it('按同一记录库和 conversationId 组成完整会话 Step，不混入其他会话', () => {

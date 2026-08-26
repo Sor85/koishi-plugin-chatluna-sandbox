@@ -2,6 +2,7 @@
   /* 组成图、轨迹台账、分析页卡片、请求页响应分段共用。不要再给分析页单独开色板。 */
   --webqq-role-system: #737985;
   --webqq-role-user: #2f76c9;
+  --webqq-role-variable: #a13d76;
   --webqq-role-assistant: #a13d76;
   --webqq-role-response: #0f766e;
   --webqq-role-tool: #c46b00;
@@ -17,6 +18,7 @@
 .webqq-workspace[data-color-mode="dark"] .chatluna-sandbox-chat.webqq-model-request-workspace {
   --webqq-role-system: #a3a8b2;
   --webqq-role-user: #6aa9ef;
+  --webqq-role-variable: #dd79b2;
   --webqq-role-assistant: #dd79b2;
   --webqq-role-response: #5eead4;
   --webqq-role-tool: #bf812f;
@@ -857,6 +859,10 @@
   background: var(--webqq-role-user);
 }
 
+.webqq-model-trajectory-composition-bar.is-variable {
+  background: var(--webqq-role-variable);
+}
+
 .webqq-model-trajectory-composition-bar.is-assistant {
   background: var(--webqq-role-assistant);
 }
@@ -1151,8 +1157,8 @@
 }
 
 .webqq-model-trajectory-row.is-variable .webqq-model-trajectory-kind {
-  color: var(--webqq-role-assistant);
-  background: color-mix(in srgb, var(--webqq-role-assistant) 12%, var(--webqq-surface));
+  color: var(--webqq-role-variable);
+  background: color-mix(in srgb, var(--webqq-role-variable) 12%, var(--webqq-surface));
 }
 
 .webqq-model-trajectory-preview {
@@ -1772,7 +1778,7 @@
 .webqq-model-analysis-nav-group.is-assistant { --webqq-role: var(--webqq-role-assistant); }
 .webqq-model-analysis-nav-group.is-response { --webqq-role: var(--webqq-role-response); }
 .webqq-model-analysis-nav-group.is-tool { --webqq-role: var(--webqq-role-tool); }
-.webqq-model-analysis-nav-group.is-variables { --webqq-role: var(--webqq-role-assistant); }
+.webqq-model-analysis-nav-group.is-variables { --webqq-role: var(--webqq-role-variable); }
 .webqq-model-analysis-nav-heading {
   justify-content: flex-start;
   gap: 6px;
@@ -1829,7 +1835,7 @@
 .webqq-model-analysis-nav-kind.is-tool-call,
 .webqq-model-analysis-nav-kind.is-tool-result { --webqq-role: var(--webqq-role-tool-interaction); }
 .webqq-model-analysis-nav-kind.is-tool-definition { --webqq-role: var(--webqq-role-tool); }
-.webqq-model-analysis-nav-kind.is-variable { --webqq-role: var(--webqq-role-assistant); }
+.webqq-model-analysis-nav-kind.is-variable { --webqq-role: var(--webqq-role-variable); }
 .webqq-model-analysis-nav-kind.is-response { --webqq-role: var(--webqq-role-response); }
 .webqq-model-analysis-nav-group.is-muted,
 .webqq-model-analysis-nav-item.is-muted,
@@ -2024,7 +2030,7 @@
 }
 .webqq-model-analysis-variable-list { display: grid; gap: 8px; }
 .webqq-model-analysis-variable-card {
-  --webqq-role: var(--webqq-role-assistant);
+  --webqq-role: var(--webqq-role-variable);
   overflow: hidden;
   border: 1px solid var(--webqq-border);
   border-top: 2px solid var(--webqq-role);
@@ -2078,10 +2084,10 @@
 .webqq-model-analysis-variable-empty > span {
   flex: 0 0 auto;
   padding: 2px 6px;
-  border: 1px solid color-mix(in srgb, var(--webqq-role-assistant) 35%, var(--webqq-border));
+  border: 1px solid color-mix(in srgb, var(--webqq-role-variable) 35%, var(--webqq-border));
   border-radius: 999px;
-  color: var(--webqq-role-assistant);
-  background: color-mix(in srgb, var(--webqq-role-assistant) 9%, transparent);
+  color: var(--webqq-role-variable);
+  background: color-mix(in srgb, var(--webqq-role-variable) 9%, transparent);
   font-size: 10px;
   font-weight: 700;
 }

@@ -626,9 +626,11 @@ export type SandboxModelRequestPromptKind =
 
 export interface SandboxModelRequestPromptCompositionItem {
   kind: SandboxModelRequestPromptKind
-  /** 与轨迹行、分析卡片共享的模型证据投影身份，用于跨视图定位。 */
+  /** 点击组成分段时定位的轨迹行身份；变量片段使用变量证据身份。 */
   evidenceId: string
   characters: number
+  variableId?: string
+  variableName?: string
   requestId?: string
 }
 

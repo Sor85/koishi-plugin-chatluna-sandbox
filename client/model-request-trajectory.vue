@@ -149,15 +149,18 @@
                     class="webqq-model-trajectory-composition-bar"
                     :class="[
                       promptBarClass(segment.kind),
-                      { 'is-selected': isCompositionSegmentSelected(segment) },
+                      { 'is-variable': segment.variableId, 'is-selected': isCompositionSegmentSelected(segment) },
                     ]"
                     :style="{ left: `${segment.left}%`, width: `${segment.width}%` }"
-                    :aria-label="`${promptKindLabel(segment.kind)} 占请求体提示内容的 ${formatPercentage(segment.percentage)}`"
+                    :aria-label="segment.variableName
+                      ? `变量 ${segment.variableName} 占请求体提示内容的 ${formatPercentage(segment.percentage)}`
+                      : `${promptKindLabel(segment.kind)} 占请求体提示内容的 ${formatPercentage(segment.percentage)}`"
                     @click="selectPromptSegment(segment)"
                   />
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  <strong>{{ promptKindLabel(segment.kind) }} · {{ formatPercentage(segment.percentage) }}</strong>
+                  <strong>{{ segment.variableName ? `Variable · ${segment.variableName}` : promptKindLabel(segment.kind) }} · {{ formatPercentage(segment.percentage) }}</strong>
+                  <span>{{ segment.characters.toLocaleString('zh-CN') }} 个字符</span>
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -393,6 +396,8 @@ interface CompositionSegment {
   percentage: number
   left: number
   width: number
+  variableId?: string
+  variableName?: string
   requestId?: string
 }
 
@@ -415,6 +420,8 @@ const requestCompositionTracks = computed(() => {
       kind: item.kind,
       characters: item.characters,
       percentage: item.percentage,
+      ...(item.variableId ? { variableId: item.variableId } : {}),
+      ...(item.variableName ? { variableName: item.variableName } : {}),
       left,
       width: Math.min(Math.max(item.percentage - gap, 0.35), Math.max(100 - left, 0.35)),
     }
@@ -448,6 +455,8 @@ const conversationCompositionTracks = computed(() => {
         kind: item.kind,
         characters: item.characters,
         percentage,
+        ...(item.variableId ? { variableId: item.variableId } : {}),
+        ...(item.variableName ? { variableName: item.variableName } : {}),
         left,
         width: Math.min(Math.max(rawWidth - gap, 0.35), Math.max(slot.left + slot.width - left, 0.35)),
         requestId: slot.id,
