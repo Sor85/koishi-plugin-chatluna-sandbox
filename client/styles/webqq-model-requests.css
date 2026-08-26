@@ -2113,10 +2113,27 @@
 .webqq-model-analysis-variable-body > .webqq-model-analysis-section {
   padding: 14px 16px;
 }
+.webqq-model-history-preview-wrap {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+.webqq-model-history-preview-wrap.is-collapsed .webqq-model-history-preview {
+  max-height: var(--webqq-model-history-collapse-height);
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 72px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 72px), transparent);
+}
 .webqq-model-history-preview {
   display: grid;
   min-width: 0;
   container-type: inline-size;
+}
+.webqq-model-history-expand {
+  padding: 8px 0 10px;
+}
+.webqq-model-history-preview-wrap:not(.is-collapsed) .webqq-model-history-expand svg {
+  transform: rotate(180deg);
 }
 .webqq-model-history-message {
   display: grid;
@@ -2193,6 +2210,13 @@
   margin: 0;
   color: var(--webqq-muted);
   background: var(--webqq-surface-muted);
+}
+/* 聊天消息中的引用为紧凑单行摘要；模型请求历史承担证据阅读，正文不能继承省略号裁切。 */
+.webqq-model-history-quote.chatluna-sandbox-message-quote > span {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .webqq-model-history-quote .chatluna-sandbox-message-quote-title { color: var(--webqq-text); }
 .webqq-model-history-quote .webqq-model-history-quote {

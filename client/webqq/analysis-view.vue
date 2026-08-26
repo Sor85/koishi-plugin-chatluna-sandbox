@@ -255,6 +255,7 @@
                     v-else-if="historyPreview(variable) && !rawHistoryVariables.has(variable.id)"
                     :messages="historyPreview(variable)!"
                     :bot-id="detail.entities.botId"
+                    :characters="variable.value?.length"
                   />
                   <AnalysisTextBlock
                     v-else-if="variable.status === 'observed'"
