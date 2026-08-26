@@ -45,6 +45,18 @@
             耗时
           </Button>
           <Button
+            v-if="mode === 'conversation' && !analysis"
+            size="sm"
+            variant="ghost"
+            :aria-pressed="trajectorySortOrder === 'desc'"
+            :aria-label="trajectorySortOrder === 'desc' ? '当前请求按倒序排列，点击改为正序' : '当前请求按正序排列，点击改为倒序'"
+            @click="trajectorySortOrder = trajectorySortOrder === 'desc' ? 'asc' : 'desc'"
+          >
+            <IconSortDescending v-if="trajectorySortOrder === 'desc'" data-icon="inline-start" aria-hidden="true" />
+            <IconSortAscending v-else data-icon="inline-start" aria-hidden="true" />
+            {{ trajectorySortOrder === 'desc' ? '倒序' : '正序' }}
+          </Button>
+          <Button
             v-if="!analysis"
             size="sm"
             variant="ghost"
@@ -172,21 +184,31 @@
       <div v-else class="webqq-model-trajectory-ledger" :class="{ 'has-inspector': selectedRow }">
         <div ref="ledgerElement" v-webqq-scrollbar class="webqq-model-trajectory-table" role="table" aria-label="轨迹事件账本">
           <div v-if="!ledgerRows.length" class="webqq-model-trajectory-filter-empty">当前过滤条件下没有事件</div>
-          <template v-for="row in ledgerRows" :key="row.id">
-            <div v-if="row.kind === 'request'" class="webqq-model-trajectory-request-boundary" role="row">
-              <button type="button" :aria-label="`选择${requestLabel(row.requestId)}`" @click="selectedRowId = row.id">
+          <template v-for="row in orderedLedgerRows" :key="row.id">
+            <button
+              v-if="row.kind === 'request'"
+              type="button"
+              class="webqq-model-trajectory-request-boundary"
+              :aria-expanded="!collapsedRequestIds.has(row.requestId ?? '')"
+              :aria-label="collapsedRequestIds.has(row.requestId ?? '') ? `展开${requestLabel(row.requestId)}` : `折叠${requestLabel(row.requestId)}`"
+              role="row"
+              @click="toggleRequestCollapsed(row)"
+            >
+              <span class="webqq-model-trajectory-request-title">
+                <IconChevronDown class="webqq-model-trajectory-request-chevron" :class="{ 'is-collapsed': collapsedRequestIds.has(row.requestId ?? '') }" :size="14" aria-hidden="true" />
                 <span class="webqq-model-trajectory-request-dot" :class="statusClass(row.status)" aria-hidden="true" />
                 <span>{{ requestOrdinal(row.requestId) }}</span>
-              </button>
+              </span>
               <span>{{ requestLabel(row.requestId) }}</span>
               <time>{{ row.durationMs === undefined ? '—' : formatDuration(row.durationMs) }}</time>
-            </div>
+            </button>
             <button
-              v-else
+              v-else-if="!isRequestRowCollapsed(row)"
               type="button"
               class="webqq-model-trajectory-row"
               :class="[
                 `is-${row.kind}`,
+                row.source === 'response' ? 'is-response' : '',
                 row.toolEvent === 'definition' ? 'is-tool-definition' : '',
                 {
                   'is-selected': row.id === selectedRowId,
@@ -242,6 +264,8 @@ import {
   IconClockHour4,
   IconExternalLink,
   IconSearch,
+  IconSortAscending,
+  IconSortDescending,
   IconSquareMinus,
   IconSquarePlus,
   IconX,
@@ -254,6 +278,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './comp
 import ModelRequestConversationAnalysis from './webqq/analysis-view.vue'
 import type { EvidenceNavigation, EvidenceViewRestore } from './webqq/evidence-navigation'
 import type { LocateRequest } from './webqq/evidence-locator'
+import {
+  isModelRequestTrajectoryRowCollapsed,
+  orderModelRequestTrajectoryRows,
+  type ModelRequestTrajectorySortOrder,
+} from './webqq/model-request-trajectory-display'
 import { createScrollRestore } from './webqq/scroll-restore'
 import { formatDuration } from './webqq/format-duration'
 import {
@@ -322,6 +351,8 @@ const ledgerScrollRestore = createScrollRestore({
 const selectedRowId = ref('')
 const actualDuration = ref(true)
 const requestsCollapsed = ref(false)
+const trajectorySortOrder = ref<ModelRequestTrajectorySortOrder>('desc')
+const collapsedRequestIds = ref<ReadonlySet<string>>(new Set())
 const hiddenKinds = ref<ReadonlySet<ModelEvidenceFilterKind>>(new Set())
 const filtersExpanded = ref(false)
 // SYSTEM / USER / TOOL DEFS 是两个视图里最常开关的种类，和「耗时」「请求」一起留在工具栏外层。
@@ -443,6 +474,7 @@ const ledgerRows = computed(() => props.trajectory?.rows.filter((row) => {
   if (requestsCollapsed.value && row.kind !== 'request') return false
   return isEvidenceVisible(evidenceFilter.value, trajectoryRowFilterKind(row))
 }) ?? [])
+const orderedLedgerRows = computed(() => orderModelRequestTrajectoryRows(ledgerRows.value, trajectorySortOrder.value))
 watch(() => props.trajectory, (trajectory) => {
   // 轨迹行 id 由 evidenceId 派生，刷新后同一条证据仍是同一个 id，因此仍然存在的选中行要保留；
   // 只有证据真的消失才清空。否则 pending 请求自动刷新每轮都会把用户正在看的行和检查器一起丢掉。
@@ -522,6 +554,18 @@ function isRowSearchMuted(row: SandboxModelRequestTrajectoryRow) {
   return normalizedSearch.value.length > 0 && !rowMatchesSearch(row)
 }
 
+function isRequestRowCollapsed(row: SandboxModelRequestTrajectoryRow) {
+  return isModelRequestTrajectoryRowCollapsed(row, collapsedRequestIds.value)
+}
+
+function toggleRequestCollapsed(row: SandboxModelRequestTrajectoryRow) {
+  const requestId = row.requestId
+  if (!requestId) return
+  const next = new Set(collapsedRequestIds.value)
+  next.has(requestId) ? next.delete(requestId) : next.add(requestId)
+  collapsedRequestIds.value = next
+}
+
 function selectPromptSegment(segment: CompositionSegment) {
   if (props.analysis) {
     internalAnalysisLocateRequest.value = props.navigation.locateEvidence(segment.evidenceId)
@@ -588,6 +632,7 @@ function kindLabel(kind: SandboxModelRequestTrajectoryKind, toolEvent?: SandboxM
   if (kind === 'system') return 'SYSTEM'
   if (kind === 'user') return 'USER'
   if (kind === 'assistant') return 'ASSISTANT'
+  if (kind === 'variable') return 'VARIABLE'
   if (kind === 'tool') {
     if (toolEvent === 'definition') return 'TOOL DEFS'
     if (toolEvent === 'result') return 'TOOL RESULT'

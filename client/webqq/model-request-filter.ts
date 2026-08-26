@@ -42,7 +42,7 @@ export const EMPTY_MODEL_EVIDENCE_FILTER: ModelEvidenceFilter = {
 export function trajectoryRowFilterKind(
   row: Pick<SandboxModelRequestTrajectoryRow, 'kind' | 'toolEvent'>,
 ): ModelEvidenceFilterKind | undefined {
-  if (row.kind === 'request') return undefined
+  if (row.kind === 'request' || row.kind === 'variable') return undefined
   if (row.kind !== 'tool') return row.kind
   if (row.toolEvent === 'definition') return 'tool-definition'
   if (row.toolEvent === 'result') return 'tool-result'

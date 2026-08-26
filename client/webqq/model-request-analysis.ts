@@ -276,6 +276,7 @@ function variableNavigationItem(variable: SandboxModelRequestVariable): ModelReq
     kind: 'variable',
     label: 'VARIABLE',
     preview: variable.name,
+    evidenceId: `variable:${variable.id}`,
     target: modelAnalysisVariableTargetId(variable.id),
     searchText: `${variable.name}\n${statusText}\n${variable.presetName}`,
   }

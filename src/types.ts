@@ -593,7 +593,7 @@ export interface SandboxModelRequestRecordsPage<T extends SandboxModelRequestLis
   capacity: SandboxModelRequestCapacity
 }
 
-export type SandboxModelRequestTrajectoryKind = 'system' | 'user' | 'assistant' | 'tool' | 'request'
+export type SandboxModelRequestTrajectoryKind = 'system' | 'user' | 'variable' | 'assistant' | 'tool' | 'request'
 
 export interface SandboxModelRequestTrajectoryRow {
   id: string
@@ -605,6 +605,11 @@ export interface SandboxModelRequestTrajectoryRow {
   callId?: string
   toolName?: string
   toolEvent?: 'definition' | 'call' | 'result'
+  variableId?: string
+  variableName?: string
+  variablePresetName?: string
+  variableStatus?: SandboxModelRequestVariableStatus
+  variableValue?: string
   source?: 'request' | 'response'
   durationMs?: number
   startedAt?: string

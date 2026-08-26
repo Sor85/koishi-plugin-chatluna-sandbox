@@ -8,6 +8,7 @@ import type {
   SandboxModelRequestTrajectory,
   SandboxModelRequestTrajectoryKind,
   SandboxModelRequestTrajectoryRow,
+  SandboxModelRequestVariable,
 } from './types'
 import { presentModelRequestRecord, type SandboxModelRequestStore } from './model-request'
 import {
@@ -32,6 +33,11 @@ interface ProjectedRow {
   callId?: string
   toolName?: string
   toolEvent?: 'definition' | 'call' | 'result'
+  variableId?: string
+  variableName?: string
+  variablePresetName?: string
+  variableStatus?: SandboxModelRequestVariable['status']
+  variableValue?: string
 }
 
 const CONVERSATION_RECORD_LIMIT = 200
@@ -67,8 +73,14 @@ export function buildSandboxModelRequestTrajectory(
       status: record.status,
     })
 
-    for (const row of projectRequestRows(projection)) {
-      rows.push({ id: `${record.id}:${row.evidenceId}`, index: index++, requestId: record.id, source: 'request', ...row })
+    for (const row of projectRequestRows(projection, record)) {
+      rows.push({
+        id: `${record.id}:${row.evidenceId}`,
+        index: index++,
+        requestId: record.id,
+        source: 'request',
+        ...row,
+      })
     }
     for (const row of projectResponseRows(projection)) {
       rows.push({ id: `${record.id}:${row.evidenceId}`, index: index++, requestId: record.id, source: 'response', ...row })
@@ -90,7 +102,10 @@ export function buildSandboxModelRequestTrajectory(
   }
 }
 
-function projectRequestRows(projection: ModelEvidenceProjection): ProjectedRow[] {
+function projectRequestRows(
+  projection: ModelEvidenceProjection,
+  record: SandboxModelRequestRecord,
+): ProjectedRow[] {
   const rows: ProjectedRow[] = projection.toolDefinitions.map(definition => ({
     evidenceId: definition.evidenceId,
     kind: 'tool' as const,
@@ -101,7 +116,28 @@ function projectRequestRows(projection: ModelEvidenceProjection): ProjectedRow[]
   for (const message of projection.requestMessages) {
     rows.push(...messageRows(message))
   }
-  return rows
+  const detail = presentModelRequestRecord(record, 'detail') as SandboxModelRequestDetail
+  for (const variable of detail.variables) {
+    rows.push({
+      evidenceId: `variable:${variable.id}`,
+      kind: 'variable',
+      preview: `${variable.name} · ${variable.status === 'observed' ? compactText(variable.value ?? '') || '空值' : variableStatusLabel(variable.status)}`,
+      variableId: variable.id,
+      variableName: variable.name,
+      variablePresetName: variable.presetName,
+      variableStatus: variable.status,
+      ...(variable.value !== undefined ? { variableValue: variable.value } : {}),
+    })
+  }
+  return rows.sort((left, right) => requestRowOrder(left.kind) - requestRowOrder(right.kind))
+}
+
+function requestRowOrder(kind: SandboxModelRequestTrajectoryKind): number {
+  if (kind === 'system') return 0
+  if (kind === 'user') return 1
+  if (kind === 'variable') return 2
+  if (kind === 'assistant') return 3
+  return 4
 }
 
 function messageRows(message: ModelEvidenceMessage): ProjectedRow[] {
@@ -212,6 +248,13 @@ function resolveConversationRecords(
   const conversationId = record.entities.conversationId
   if (!store || !conversationId) return [record]
   return store.getRawRecords({ conversationId, order: 'asc', limit: CONVERSATION_RECORD_LIMIT })
+}
+
+function variableStatusLabel(status: SandboxModelRequestVariable['status']): string {
+  if (status === 'ambiguous') return '展开值存在歧义'
+  if (status === 'stale') return '预设快照已变化'
+  if (status === 'unsupported') return '表达式不支持定位'
+  return '未在模型请求中观察到展开值'
 }
 
 function requestPreview(record: SandboxModelRequestRecord): string {

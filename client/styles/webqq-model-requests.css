@@ -3,6 +3,7 @@
   --webqq-role-system: #737985;
   --webqq-role-user: #2f76c9;
   --webqq-role-assistant: #a13d76;
+  --webqq-role-response: #0f766e;
   --webqq-role-tool: #c46b00;
   --webqq-role-tool-interaction: #8f5aa8;
   grid-template-rows: auto auto minmax(0, 1fr);
@@ -17,6 +18,7 @@
   --webqq-role-system: #a3a8b2;
   --webqq-role-user: #6aa9ef;
   --webqq-role-assistant: #dd79b2;
+  --webqq-role-response: #5eead4;
   --webqq-role-tool: #bf812f;
   --webqq-role-tool-interaction: #a87bb8;
 }
@@ -980,29 +982,47 @@
   grid-template-columns: 86px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
+  width: 100%;
   min-height: 24px;
   padding: 0 10px 0 7px;
+  border: 0;
   border-top: 2px solid var(--webqq-border);
   border-bottom: 1px solid var(--webqq-border);
   color: var(--webqq-muted);
   background: color-mix(in srgb, var(--webqq-surface-muted) 62%, var(--webqq-surface));
+  font: inherit;
   font-size: 10px;
+  text-align: left;
 }
 
 .webqq-model-trajectory-request-boundary:first-child {
   border-top: 0;
 }
 
-.webqq-model-trajectory-request-boundary > button {
+.webqq-model-trajectory-request-boundary:hover {
+  background: var(--webqq-hover);
+}
+
+.webqq-model-trajectory-request-boundary:focus-visible {
+  outline: 2px solid var(--webqq-accent);
+  outline-offset: -2px;
+}
+
+.webqq-model-trajectory-request-title {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0;
-  border: 0;
-  color: inherit;
-  background: transparent;
-  font: inherit;
+  min-width: 0;
   font-weight: 650;
+}
+
+.webqq-model-trajectory-request-chevron {
+  flex: 0 0 auto;
+  transition: transform 0.18s ease;
+}
+
+.webqq-model-trajectory-request-chevron.is-collapsed {
+  transform: rotate(-90deg);
 }
 
 .webqq-model-trajectory-request-boundary > span {
@@ -1016,6 +1036,7 @@
 }
 
 .webqq-model-trajectory-request-dot {
+  flex: 0 0 auto;
   width: 5px;
   height: 5px;
   border-radius: 50%;
@@ -1092,6 +1113,11 @@
   background: color-mix(in srgb, var(--webqq-role-assistant) 12%, var(--webqq-surface));
 }
 
+.webqq-model-trajectory-row.is-response .webqq-model-trajectory-kind {
+  color: var(--webqq-role-response);
+  background: color-mix(in srgb, var(--webqq-role-response) 12%, var(--webqq-surface));
+}
+
 .webqq-model-trajectory-row.is-tool .webqq-model-trajectory-kind {
   color: var(--webqq-role-tool-interaction);
   background: color-mix(in srgb, var(--webqq-role-tool-interaction) 13%, var(--webqq-surface));
@@ -1100,6 +1126,11 @@
 .webqq-model-trajectory-row.is-tool-definition .webqq-model-trajectory-kind {
   color: var(--webqq-role-tool);
   background: color-mix(in srgb, var(--webqq-role-tool) 13%, var(--webqq-surface));
+}
+
+.webqq-model-trajectory-row.is-variable .webqq-model-trajectory-kind {
+  color: var(--webqq-role-assistant);
+  background: color-mix(in srgb, var(--webqq-role-assistant) 12%, var(--webqq-surface));
 }
 
 .webqq-model-trajectory-preview {
@@ -1277,7 +1308,7 @@
 
 .webqq-model-response-section.is-content,
 .webqq-model-response-section.is-reasoning {
-  border-left-color: var(--webqq-role-assistant);
+  border-left-color: var(--webqq-role-response);
 }
 
 .webqq-model-response-section.is-tools {
@@ -1714,10 +1745,10 @@
 
 .webqq-model-analysis-nav-group { --webqq-role: var(--webqq-role-system); }
 .webqq-model-analysis-nav-group.is-user { --webqq-role: var(--webqq-role-user); }
-.webqq-model-analysis-nav-group.is-assistant,
-.webqq-model-analysis-nav-group.is-response { --webqq-role: var(--webqq-role-assistant); }
+.webqq-model-analysis-nav-group.is-assistant { --webqq-role: var(--webqq-role-assistant); }
+.webqq-model-analysis-nav-group.is-response { --webqq-role: var(--webqq-role-response); }
 .webqq-model-analysis-nav-group.is-tool { --webqq-role: var(--webqq-role-tool); }
-.webqq-model-analysis-nav-group.is-variables { --webqq-role: var(--webqq-accent); }
+.webqq-model-analysis-nav-group.is-variables { --webqq-role: var(--webqq-role-assistant); }
 .webqq-model-analysis-nav-heading {
   justify-content: flex-start;
   gap: 6px;
@@ -1774,8 +1805,8 @@
 .webqq-model-analysis-nav-kind.is-tool-call,
 .webqq-model-analysis-nav-kind.is-tool-result { --webqq-role: var(--webqq-role-tool-interaction); }
 .webqq-model-analysis-nav-kind.is-tool-definition { --webqq-role: var(--webqq-role-tool); }
-.webqq-model-analysis-nav-kind.is-variable { --webqq-role: var(--webqq-accent); }
-.webqq-model-analysis-nav-kind.is-response { --webqq-role: var(--webqq-role-assistant); }
+.webqq-model-analysis-nav-kind.is-variable { --webqq-role: var(--webqq-role-assistant); }
+.webqq-model-analysis-nav-kind.is-response { --webqq-role: var(--webqq-role-response); }
 .webqq-model-analysis-nav-group.is-muted,
 .webqq-model-analysis-nav-item.is-muted,
 .webqq-model-analysis-card.is-muted,
@@ -1825,8 +1856,8 @@
   scroll-margin-top: 12px;
 }
 .webqq-model-analysis-card.is-user { --webqq-role: var(--webqq-role-user); }
-.webqq-model-analysis-card.is-assistant,
-.webqq-model-analysis-card.is-response { --webqq-role: var(--webqq-role-assistant); }
+.webqq-model-analysis-card.is-assistant { --webqq-role: var(--webqq-role-assistant); }
+.webqq-model-analysis-card.is-response { --webqq-role: var(--webqq-role-response); }
 .webqq-model-analysis-card.is-tool { --webqq-role: var(--webqq-role-tool-interaction); }
 .webqq-model-analysis-tool-card { --webqq-role: var(--webqq-role-tool); }
 .webqq-model-analysis-card.is-located,
@@ -1969,7 +2000,7 @@
 }
 .webqq-model-analysis-variable-list { display: grid; gap: 8px; }
 .webqq-model-analysis-variable-card {
-  --webqq-role: var(--webqq-accent);
+  --webqq-role: var(--webqq-role-assistant);
   overflow: hidden;
   border: 1px solid var(--webqq-border);
   border-top: 2px solid var(--webqq-role);
@@ -2023,10 +2054,10 @@
 .webqq-model-analysis-variable-empty > span {
   flex: 0 0 auto;
   padding: 2px 6px;
-  border: 1px solid color-mix(in srgb, var(--webqq-accent) 35%, var(--webqq-border));
+  border: 1px solid color-mix(in srgb, var(--webqq-role-assistant) 35%, var(--webqq-border));
   border-radius: 999px;
-  color: var(--webqq-accent);
-  background: color-mix(in srgb, var(--webqq-accent) 9%, transparent);
+  color: var(--webqq-role-assistant);
+  background: color-mix(in srgb, var(--webqq-role-assistant) 9%, transparent);
   font-size: 10px;
   font-weight: 700;
 }

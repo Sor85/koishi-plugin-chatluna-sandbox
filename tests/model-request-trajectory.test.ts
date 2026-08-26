@@ -49,10 +49,10 @@ describe('模型请求轨迹投影', () => {
     expect(trajectory.records).toHaveLength(1)
     expect(trajectory.rows.map(({ kind, toolEvent, source }) => ({ kind, toolEvent, source }))).toEqual([
       { kind: 'request', toolEvent: undefined, source: undefined },
-      { kind: 'tool', toolEvent: 'definition', source: 'request' },
       { kind: 'system', toolEvent: undefined, source: 'request' },
       { kind: 'user', toolEvent: undefined, source: 'request' },
       { kind: 'assistant', toolEvent: undefined, source: 'request' },
+      { kind: 'tool', toolEvent: 'definition', source: 'request' },
       { kind: 'tool', toolEvent: 'call', source: 'request' },
       { kind: 'tool', toolEvent: 'result', source: 'request' },
       { kind: 'assistant', toolEvent: undefined, source: 'response' },
@@ -170,6 +170,39 @@ describe('模型请求轨迹投影', () => {
       'tool-interaction',
       'tool-interaction',
     ])
+  })
+
+  it('请求事件按分析页顺序排列，并在请求消息后展示 Variables', () => {
+    const store = new SandboxModelRequestStore()
+    const first = store.append({
+      status: 'success',
+      durationMs: 10,
+      attribution: 'attributed',
+      entities: { scopeId: 'main' },
+      requestBodyAvailable: true,
+      requestBody: { messages: [{ role: 'system', content: '天气：晴' }, { role: 'user', content: '继续' }] },
+      presetSnapshots: [{
+        kind: 'character',
+        presetName: 'demo',
+        capturedAt: '2026-08-24T00:00:00.000Z',
+        templates: [{ path: ['system'], role: 'system', template: '天气：{weather}' }],
+      }],
+      responseBodyStatus: 'unavailable',
+    })
+
+    const trajectory = trajectoryFor(store, first.id, 'request')
+    expect(trajectory.rows.map(({ kind, variableName }) => ({ kind, variableName }))).toEqual([
+      { kind: 'request', variableName: undefined },
+      { kind: 'system', variableName: undefined },
+      { kind: 'user', variableName: undefined },
+      { kind: 'variable', variableName: 'weather' },
+    ])
+    expect(trajectory.rows.find(({ kind }) => kind === 'variable')).toMatchObject({
+      variableName: 'weather',
+      variableValue: '晴',
+      variableStatus: 'observed',
+      variablePresetName: 'demo',
+    })
   })
 
   it('按同一记录库和 conversationId 组成完整会话 Step，不混入其他会话', () => {
