@@ -252,6 +252,7 @@ import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip'
 import ModelRequestConversationAnalysis from './webqq/analysis-view.vue'
+import type { EvidenceNavigation, EvidenceViewRestore } from './webqq/evidence-navigation'
 import type { LocateRequest } from './webqq/evidence-locator'
 import { createScrollRestore } from './webqq/scroll-restore'
 import { formatDuration } from './webqq/format-duration'
@@ -278,15 +279,12 @@ const props = withDefaults(defineProps<{
   mode: 'request' | 'conversation'
   loading: boolean
   conversationAvailable: boolean
+  navigation: EvidenceNavigation
   showModeSwitch?: boolean
   analysis?: boolean
   externalLocate?: LocateRequest
-  restoreState?: {
-    rowId: string
-    scrollTop: number
-    /** 触发一次位置恢复的序号，与定位信号使用同一种词汇。 */
-    seq: number
-  }
+  /** 工作台内视图快照；seq 触发一次位置恢复，与定位信号使用同一种词汇。 */
+  restoreState?: EvidenceViewRestore
 }>(), {
   showModeSwitch: true,
   analysis: false,
@@ -332,9 +330,9 @@ const pinnedKindOptions = MODEL_EVIDENCE_FILTER_KINDS.filter(({ kind }) => PINNE
 const collapsedKindOptions = MODEL_EVIDENCE_FILTER_KINDS.filter(({ kind }) => !PINNED_FILTER_KINDS.includes(kind))
 const moreFiltersId = useId()
 const searchQuery = ref('')
-// 组成分段点击与账本选中行共用同一个定位序号：两种模式互斥渲染，一个计数器即可。
-const locateSeq = ref(0)
+// 详情内定位的三个来源从证据导航 module 的同一个发号源取号；轨迹视图不再持有本地计数器。
 const internalAnalysisLocateRequest = ref<LocateRequest>()
+const inspectorLocateSignal = ref<LocateRequest>()
 const analysisLocateRequest = computed(() => props.externalLocate ?? internalAnalysisLocateRequest.value)
 const selectedRow = computed(() => props.trajectory?.rows.find(({ id }) => id === selectedRowId.value))
 const selectedRequest = computed(() => props.trajectory?.records.find(({ id }) => id === selectedRow.value?.requestId))
@@ -343,12 +341,7 @@ const inspectorDetail = computed(() => {
   if (!requestId || props.detail?.id !== requestId) return undefined
   return props.detail
 })
-const inspectorLocateRequest = computed<LocateRequest | undefined>(() => {
-  const row = selectedRow.value
-  if (!row) return undefined
-  // 请求边界行没有模型证据；用空身份让分析视图回落到第一条卡片。
-  return { evidenceId: row.evidenceId ?? '', seq: locateSeq.value }
-})
+const inspectorLocateRequest = computed(() => inspectorLocateSignal.value)
 const normalizedSearch = computed(() => searchQuery.value.trim().toLocaleLowerCase('zh-CN'))
 const promptComposition = computed(() => {
   const items = props.trajectory?.promptComposition ?? []
@@ -458,7 +451,9 @@ watch(() => props.trajectory, (trajectory) => {
 })
 
 watch(selectedRowId, () => {
-  locateSeq.value += 1
+  const row = selectedRow.value
+  // 请求边界行没有模型证据；用空身份让分析视图回落到第一条卡片。
+  inspectorLocateSignal.value = row ? props.navigation.locateEvidence(row.evidenceId ?? '') : undefined
 })
 
 watch(() => selectedRow.value?.requestId, (requestId) => {
@@ -472,10 +467,10 @@ watch(() => props.restoreState?.seq, restoreTrajectoryPosition, { immediate: tru
 function restoreTrajectoryPosition() {
   const state = props.restoreState
   if (!state) return
-  selectedRowId.value = state.rowId
+  selectedRowId.value = state.trajectory.rowId
   // 轨迹组件在打开原始字段时会被卸载；恢复必须同时还原账本滚动量和选中行。
   // 帧时序与「内容长高后继续逼近」由 scroll-restore 负责；这里只给目标偏移量。
-  void ledgerScrollRestore.restore(state.scrollTop)
+  void ledgerScrollRestore.restore(state.trajectory.scrollTop)
 }
 
 const requestRows = computed(() => props.trajectory?.rows.filter((row) => row.kind === 'request') ?? [])
@@ -529,7 +524,7 @@ function isRowSearchMuted(row: SandboxModelRequestTrajectoryRow) {
 
 function selectPromptSegment(segment: CompositionSegment) {
   if (props.analysis) {
-    internalAnalysisLocateRequest.value = { evidenceId: segment.evidenceId, seq: ++locateSeq.value }
+    internalAnalysisLocateRequest.value = props.navigation.locateEvidence(segment.evidenceId)
     return
   }
   // 组成分段与账本行共享模型证据身份；同一条证据在两个入口一定选中同一行。

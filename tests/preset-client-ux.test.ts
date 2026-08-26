@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { createPresetDirtyGuard } from '../client/webqq/preset-dirty-guard'
-import { createPresetNavigationCoordinator } from '../client/webqq/preset-navigation-coordinator'
 import { codeMirrorOffset, resolvePresetSourceExpressions } from '../client/webqq/preset-source-expressions'
 import { expressionStableId, parsePresetSourceDocument } from '../src/presets'
 
@@ -78,41 +77,5 @@ describe('预设客户端 UX 纯 seam', () => {
     expect(guard.discard()).toEqual({ action: 'leave', targetView: 'messages', conversationId: 'private:1:2' })
     expect(guard.peek()).toEqual({ dirty: false })
     expect(guard.request({ action: 'delete' })).toBe(true)
-  })
-
-  it('详情与 request 轨迹必须都属于目标记录，且只在精确定位回执后结束意图', () => {
-    const coordinator = createPresetNavigationCoordinator()
-    coordinator.begin({
-      seq: 4,
-      recordId: 'record-new',
-      evidenceId: 'req:message:messages.0',
-      range: { start: 2, end: 7 },
-      scope: { scope: 'main' },
-    })
-
-    expect(coordinator.prepare(
-      { id: 'record-new' },
-      { mode: 'request', records: [{ id: 'record-old' }] as never },
-    )).toBeUndefined()
-    expect(coordinator.prepare(
-      { id: 'record-old' },
-      { mode: 'request', records: [{ id: 'record-new' }] as never },
-    )).toBeUndefined()
-    expect(coordinator.prepare(
-      { id: 'record-new' },
-      { mode: 'request', records: [{ id: 'record-new' }] as never },
-    )).toEqual({
-      seq: 4,
-      evidenceId: 'req:message:messages.0',
-      range: { start: 2, end: 7 },
-    })
-    expect(coordinator.prepare(
-      { id: 'record-new' },
-      { mode: 'request', records: [{ id: 'record-new' }] as never },
-    )).toBeUndefined()
-    expect(coordinator.acknowledge(3, true)).toBeUndefined()
-    expect(coordinator.peek()?.recordId).toBe('record-new')
-    expect(coordinator.acknowledge(4, false)).toMatchObject({ located: false, intent: { seq: 4 } })
-    expect(coordinator.peek()).toBeUndefined()
   })
 })

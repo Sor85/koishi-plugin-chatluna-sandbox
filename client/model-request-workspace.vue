@@ -26,11 +26,11 @@
           </Button>
         </div>
         <Button
-          v-if="canReturnToTrajectory || canReturnToPreset"
+          v-if="returnLabel"
           class="webqq-model-request-return"
           size="sm"
           variant="ghost"
-          :aria-label="canReturnToTrajectory ? '返回轨迹' : '返回预设'"
+          :aria-label="returnLabel"
           @click="returnFromDetail"
         >
           <IconArrowLeft data-icon="inline-start" aria-hidden="true" />
@@ -234,7 +234,8 @@
             :show-mode-switch="false"
             :loading="detailLoading || trajectory?.mode !== 'conversation'"
             :conversation-available="Boolean(detail.entities.conversationId)"
-            :restore-state="trajectoryReturnState"
+            :navigation="navigation"
+            :restore-state="navigation.viewRestore.value"
             @open-request="openRelatedRequest"
             @inspect-request="inspectRelatedRequest"
           />
@@ -500,9 +501,10 @@
               :conversation-available="false"
               :analysis="true"
               :detail="detail"
-              :external-locate="externalLocateRequest"
+              :navigation="navigation"
+              :external-locate="navigation.locateRequest.value"
               @open-request="openRelatedRequest"
-              @locate-result="completeNavigationIntent"
+              @locate-result="completeNavigationLocate"
             />
 
             <template v-else>
@@ -602,17 +604,12 @@ import { CHATLUNA_ERROR_CODE_DOCUMENTATION_URL, getChatLunaErrorPossibleCauses }
 import { formatDuration } from './webqq/format-duration'
 import { parseModelResponseConversation } from './webqq/model-request-conversation'
 import { buildModelRequestJsonTree } from './webqq/model-request-json'
-import { createEvidenceNavigationStack } from './webqq/evidence-navigation-stack'
-import type { LocateRequest } from './webqq/evidence-locator'
-import type { ModelRequestNavigationIntent } from './webqq/model-request-navigation'
-import type { PresetEvidenceNavigationIntent } from './webqq/preset-evidence-navigation'
-import { createPresetNavigationCoordinator } from './webqq/preset-navigation-coordinator'
+import type { EvidenceNavigation } from './webqq/evidence-navigation'
 import { createScrollRestore } from './webqq/scroll-restore'
 import { createModelRequestEnterRefresh, createModelRequestLiveRefresh } from './webqq/model-request-live-refresh'
 import {
   beginModelRequestListNavigation,
   clearModelRequestListSelection,
-  releaseModelRequestListNavigationGuard,
   resolveModelRequestListRecords,
   selectModelRequestListRecord,
   type ModelRequestListSelectionState,
@@ -655,9 +652,7 @@ const props = defineProps<{
   detailLoading: boolean
   error: string
   visitKey?: number
-  navigationIntent?: PresetEvidenceNavigationIntent
-  requestNavigationIntent?: ModelRequestNavigationIntent
-  canReturnToPreset?: boolean
+  navigation: EvidenceNavigation
 }>()
 
 const emit = defineEmits<{
@@ -666,9 +661,7 @@ const emit = defineEmits<{
   open: [input: ModelRequestRecordQuery]
   trajectory: [input: ModelRequestTrajectoryQuery]
   clear: [input: ClearModelRequestRecordsQuery]
-  consumeNavigationIntent: [seq: number]
-  consumeRequestNavigationIntent: [seq: number]
-  navigationIntentFailure: [payload: { seq: number, message: string }]
+  navigationFailure: [message: string]
   returnToPreset: []
 }>()
 
@@ -689,9 +682,7 @@ const detailView = ref<'trajectory' | 'evidence'>('evidence')
 const clearDialogOpen = ref(false)
 const clearStep = ref<1 | 2>(1)
 const bodyView = ref<'request' | 'response' | 'analysis'>('analysis')
-const externalLocateRequest = ref<LocateRequest>()
 const navigationStatus = ref('')
-const presetNavigation = createPresetNavigationCoordinator()
 const conversationTrajectory = computed(() => props.trajectory?.mode === 'conversation' ? props.trajectory : undefined)
 const requestTrajectory = computed(() => props.trajectory?.mode === 'request' ? props.trajectory : undefined)
 const responseView = ref<'content' | 'json'>('content')
@@ -703,15 +694,12 @@ const displayRecords = computed(() => resolveModelRequestListRecords(
 const headersExpanded = ref(false)
 const copyState = ref<'idle' | 'success' | 'error'>('idle')
 const detailElement = ref<HTMLElement>()
-const canReturnToTrajectory = ref(false)
-const canReturnToPreset = computed(() => Boolean(props.canReturnToPreset) && !canReturnToTrajectory.value)
-const trajectoryReturnState = ref<{
-  rowId: string
-  scrollTop: number
-  seq: number
-}>()
-// 返回快照与「详情到达后才消费」的判定都在 evidence-navigation-stack 里；这里只保留反应式镜像。
-const navigationStack = createEvidenceNavigationStack()
+// 返回按钮的存在、文案与去向都由导航 module 的 returnTarget 单点派生，不再各自判断一次。
+const returnLabel = computed(() => {
+  const target = props.navigation.returnTarget.value
+  if (target === 'view') return '返回轨迹'
+  return target === 'presets' ? '返回预设' : ''
+})
 // 返回时正文子树会被页签切换与异步数据重建，重建会把详情面板的 scrollTop 清零；
 // scroll-restore 负责在有界帧窗口内把位置按回目标，单写一次一定会被后续重建抹掉。
 const detailScrollRestore = createScrollRestore({
@@ -805,7 +793,10 @@ watch(() => props.defaultSpaceId, (value) => {
 })
 
 watch([category, spaceId, errorsOnly, sortOrder], () => {
-  clearModelRequestListSelection(selectionState.value)
+  // 统一进入状态本身声明「这是一次导航选中」；令牌由导航 module 持有，消费一次后失效。
+  if (!props.navigation.preserveSelectionOnFilterChange()) {
+    clearModelRequestListSelection(selectionState.value)
+  }
   refresh()
 })
 
@@ -823,7 +814,7 @@ watch(() => props.detail?.id, () => {
   bodyView.value = 'analysis'
   responseView.value = 'content'
   headersExpanded.value = false
-  applyPendingReturnState()
+  applyViewRestore()
   if (props.detail) fetchTrajectory(currentTrajectoryMode())
   resetCopyState()
 })
@@ -838,86 +829,61 @@ watch(() => props.visitKey, () => {
   enterRefresh.schedule()
 })
 
-watch(() => props.navigationIntent?.seq, () => {
-  applyNavigationIntent()
-}, { immediate: true })
-
-watch(() => props.requestNavigationIntent?.seq, () => {
-  applyRequestNavigationIntent()
+watch(() => props.navigation.entryState.value?.seq, () => {
+  applyEntryState()
 }, { immediate: true })
 
 watch([() => props.detail?.id, () => props.trajectory], () => {
-  prepareNavigationIntent()
+  arriveAtNavigationTarget()
 })
 
 function currentScope() {
   return resolveModelRequestScope(category.value, spaceId.value)
 }
 
-function applyRequestNavigationIntent() {
-  const intent = props.requestNavigationIntent
-  if (!intent) return
-  externalLocateRequest.value = undefined
-  navigationStatus.value = ''
-  category.value = 'space'
-  spaceId.value = intent.scope.scope === 'main' ? MAIN_MODEL_REQUEST_SPACE_ID : intent.scope.spaceId
-  model.value = ''
-  errorsOnly.value = false
-  beginModelRequestListNavigation(selectionState.value, intent.recordId)
-  detailView.value = 'evidence'
-  bodyView.value = 'analysis'
-  const scope = intent.scope.scope === 'main'
-    ? createSpaceModelRequestScope(MAIN_MODEL_REQUEST_SPACE_ID)
-    : createSpaceModelRequestScope(intent.scope.spaceId)
+/**
+ * 应用导航 module 交出的进入状态。
+ *
+ * 两条入口路径（聊天消息、预设工作台）共用这一份，因此不可能出现一条带列表选择保护、
+ * 另一条不带的不对称——那正是预设路径原先没有列表高亮也不补入跨页目标的原因。
+ */
+function applyEntryState() {
+  const state = props.navigation.entryState.value
+  if (!state) return
+  props.navigation.resetLocate()
+  navigationStatus.value = state.status
+  // 筛选侦听器只在这四个值真的变化时触发；没变化时保护必须当场失效，
+  // 否则它会留到下一次用户主动改筛选，把那一次的清空也误挡掉。
+  const filtersChanged = category.value !== state.category
+    || spaceId.value !== state.spaceId
+    || errorsOnly.value !== state.errorsOnly
+  category.value = state.category
+  spaceId.value = state.spaceId
+  model.value = state.model
+  errorsOnly.value = state.errorsOnly
+  beginModelRequestListNavigation(selectionState.value, state.recordId)
+  detailView.value = state.detailView
+  bodyView.value = state.bodyView
+  const scope = createSpaceModelRequestScope(state.spaceId)
   emit('query', createModelRequestRecordsQuery(scope, { order: sortOrder.value }))
-  emit('open', { ...scope, recordId: intent.recordId })
-  emit('trajectory', { ...scope, recordId: intent.recordId, mode: 'request' })
-  // category/spaceId 的筛选 watcher 会在当前同步栈结束后清空普通选择；保护必须等它消费后再释放。
-  void nextTick(() => releaseModelRequestListNavigationGuard(selectionState.value))
-  emit('consumeRequestNavigationIntent', intent.seq)
+  emit('open', { ...scope, recordId: state.recordId })
+  emit('trajectory', { ...scope, recordId: state.recordId, mode: 'request' })
+  props.navigation.applyEntry(state.seq, filtersChanged)
+  arriveAtNavigationTarget()
 }
 
-function applyNavigationIntent() {
-  const intent = props.navigationIntent
-  if (!intent) return
-  presetNavigation.begin(intent)
-  externalLocateRequest.value = undefined
-  navigationStatus.value = '正在打开匹配的模型请求并定位精确文本…'
-  category.value = 'space'
-  spaceId.value = intent.scope.scope === 'main' ? MAIN_MODEL_REQUEST_SPACE_ID : intent.scope.spaceId
-  model.value = ''
-  errorsOnly.value = false
-  selectedRecordId.value = intent.recordId
+function arriveAtNavigationTarget() {
+  if (!props.navigation.arrive(props.detail, props.trajectory)) return
   detailView.value = 'evidence'
   bodyView.value = 'analysis'
-  const scope = intent.scope.scope === 'main'
-    ? createSpaceModelRequestScope(MAIN_MODEL_REQUEST_SPACE_ID)
-    : createSpaceModelRequestScope(intent.scope.spaceId)
-  emit('query', createModelRequestRecordsQuery(scope, { order: sortOrder.value }))
-  emit('open', { ...scope, recordId: intent.recordId })
-  emit('trajectory', { ...scope, recordId: intent.recordId, mode: 'request' })
-  prepareNavigationIntent()
 }
 
-function prepareNavigationIntent() {
-  const request = presetNavigation.prepare(props.detail, props.trajectory)
-  if (!request) return
-  detailView.value = 'evidence'
-  bodyView.value = 'analysis'
-  externalLocateRequest.value = request
-}
-
-function completeNavigationIntent(result: { seq: number, located: boolean }) {
-  const acknowledged = presetNavigation.acknowledge(result.seq, result.located)
+function completeNavigationLocate(result: { seq: number, located: boolean }) {
+  const acknowledged = props.navigation.acknowledgeLocate(result.seq, result.located)
   if (!acknowledged) return
-  externalLocateRequest.value = undefined
   navigationStatus.value = result.located ? '已定位到预设表达式对应的精确文本。' : ''
-  emit('consumeNavigationIntent', result.seq)
   if (!result.located) {
-    emit('navigationIntentFailure', {
-      seq: result.seq,
-      message: '已打开匹配的模型请求，但无法定位精确文本标记。',
-    })
+    emit('navigationFailure', '已打开匹配的模型请求，但无法定位精确文本标记。')
   }
 }
 
@@ -961,8 +927,7 @@ function toggleSortOrder() {
 function openRecord(recordId: string) {
   selectModelRequestListRecord(selectionState.value, recordId)
   inspectRecordId = undefined
-  navigationStack.clear()
-  canReturnToTrajectory.value = false
+  props.navigation.selectOtherRecord()
   const record = props.records.find(({ id }) => id === recordId)
   const scope = record ? resolveRecordScope(record) : currentScope()
   emit('open', { ...scope, recordId })
@@ -1002,7 +967,7 @@ function openRelatedRequest(payload: {
   }
 }) {
   inspectRecordId = undefined
-  navigationStack.push({
+  props.navigation.pushViewSnapshot({
     recordId: selectedRecordId.value,
     detailView: detailView.value,
     bodyView: bodyView.value,
@@ -1010,7 +975,6 @@ function openRelatedRequest(payload: {
     detailScrollTop: detailElement.value?.scrollTop ?? 0,
     trajectory: payload.returnState,
   })
-  canReturnToTrajectory.value = navigationStack.canReturn
   detailView.value = 'evidence'
   bodyView.value = 'request'
   responseView.value = 'content'
@@ -1026,14 +990,13 @@ function openRelatedRequest(payload: {
 }
 
 function returnFromDetail() {
-  if (canReturnToTrajectory.value) return returnToTrajectory()
+  if (props.navigation.returnTarget.value === 'view') return returnToTrajectory()
   emit('returnToPreset')
 }
 
 function returnToTrajectory() {
-  const state = navigationStack.beginReturn()
+  const state = props.navigation.beginViewReturn()
   if (!state) return
-  canReturnToTrajectory.value = navigationStack.canReturn
   selectedRecordId.value = state.recordId
   detailView.value = state.detailView
   bodyView.value = state.bodyView
@@ -1041,20 +1004,16 @@ function returnToTrajectory() {
   const scope = record ? resolveRecordScope(record) : currentScope()
   emit('open', { ...scope, recordId: state.recordId })
   emit('trajectory', { ...scope, recordId: state.recordId, mode: state.trajectoryMode })
-  applyPendingReturnState()
+  applyViewRestore()
 }
 
-function applyPendingReturnState() {
-  const state = navigationStack.takePending(props.detail?.id)
+function applyViewRestore() {
+  const state = props.navigation.takeViewRestore(props.detail?.id)
   if (!state) return
   // 跨请求返回时 detail.id watcher 会先把页签重置到“分析”；目标详情真正到达后，
   // 必须连同轨迹和滚动位置再次恢复视图快照，否则同请求测试通过但跨请求仍会落回分析页。
   detailView.value = state.detailView
   bodyView.value = state.bodyView
-  trajectoryReturnState.value = {
-    ...state.trajectory,
-    seq: state.seq,
-  }
   void detailScrollRestore.restore(state.detailScrollTop)
 }
 

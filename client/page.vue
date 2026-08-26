@@ -83,7 +83,7 @@
           :evidence-context="presetWorkspaceModel.evidenceContext"
           :discard-guard-open="Boolean(presetDiscardGuard.pending)"
           :discard-guard-action="presetDiscardGuard.pending?.action"
-          :origin-restore="presetOriginRestore"
+          :origin-restore="evidenceNavigation.presetOriginRestore.value"
           @refresh="loadPresetCatalog"
           @read="readPresetFromWorkspace"
           @create="createPresetFromWorkspace"
@@ -113,18 +113,14 @@
           :detail-loading="modelRequestWorkspaceModel.detailLoading"
           :error="modelRequestWorkspaceModel.error"
           :visit-key="modelRequestVisitKey"
-          :navigation-intent="presetEvidenceIntent"
-          :request-navigation-intent="modelRequestNavigationIntent"
-          :can-return-to-preset="canReturnFromPresetEvidence"
+          :navigation="evidenceNavigation"
           @query="loadModelRequestRecords"
           @load-more="loadMoreModelRequestRecords"
           @open="loadModelRequestRecord"
           @trajectory="loadModelRequestTrajectory"
           @clear="clearModelRequestRecords"
-          @consume-navigation-intent="consumePresetEvidenceIntent"
-          @consume-request-navigation-intent="consumeModelRequestNavigationIntent"
-          @navigation-intent-failure="reportPresetEvidenceNavigationFailure"
-          @return-to-preset="returnFromPresetEvidence"
+          @navigation-failure="reportEvidenceNavigationFailure"
+          @return-to-preset="returnToPresetOrigin"
         />
         <WebqqChatPane
           v-else
@@ -242,9 +238,8 @@ const {
   mcpCallWorkspaceModel,
   modelRequestVisitKey,
   modelRequestWorkspaceModel,
-  modelRequestNavigationIntent,
+  evidenceNavigation,
   presetDiscardGuard,
-  presetEvidenceIntent,
   presetWorkspaceModel,
   environmentModel,
   handleSidebarNotification,
@@ -270,13 +265,9 @@ const {
   cancelPresetDiscard,
   confirmPresetDiscard,
   navigateToPresetEvidence,
-  consumePresetEvidenceIntent,
   navigateToModelRequest,
-  consumeModelRequestNavigationIntent,
-  reportPresetEvidenceNavigationFailure,
-  canReturnFromPresetEvidence,
-  returnFromPresetEvidence,
-  presetOriginRestore,
+  reportEvidenceNavigationFailure,
+  returnToPresetOrigin,
   manageEnvironment,
   openComposerParticipantDialog,
   openEntityDialog,

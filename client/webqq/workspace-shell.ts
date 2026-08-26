@@ -1,4 +1,4 @@
-import { computed, markRaw, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import type { WebqqChatPaneModel } from '../webqq-chat-pane.vue'
 import type { WebqqComposerModel, WebqqComposerSendIntent, WebqqComposerSender } from '../webqq-composer.vue'
 import type { WebqqDetailsPanelModel } from '../webqq-details-panel.vue'
@@ -40,16 +40,10 @@ import type {
 } from '../../src/presets'
 import type { CreatePresetInput, DeletePresetInput, RenamePresetInput, SavePresetInput } from '../../src/presets'
 import {
-  createMessageModelRequestNavigationIntent,
-  type ModelRequestNavigationIntent,
-} from './model-request-navigation'
-import { createPresetDirtyGuard } from './preset-dirty-guard'
-import {
-  createPresetEvidenceNavigationState,
-  type PresetEvidenceNavigationIntent,
-  type PresetOriginRestore,
+  createEvidenceNavigation,
   type PresetOriginSnapshot,
-} from './preset-evidence-navigation'
+} from './evidence-navigation'
+import { createPresetDirtyGuard } from './preset-dirty-guard'
 
 type WorkspaceController = ReturnType<typeof createWorkspaceController>
 type WorkspaceLayout = ReturnType<typeof createWorkspaceLayout>
@@ -97,13 +91,8 @@ export function createWebqqWorkspaceShell(
   const presetError = ref('')
   const presetDirtyGuard = createPresetDirtyGuard()
   const presetDiscardGuard = ref(presetDirtyGuard.peek())
-  const presetEvidenceNavigation = createPresetEvidenceNavigationState()
-  const presetEvidenceIntent = ref<PresetEvidenceNavigationIntent>()
-  const modelRequestNavigationIntent = ref<ModelRequestNavigationIntent>()
-  let modelRequestNavigationSeq = 0
-  const canReturnFromPresetEvidence = ref(false)
-  const presetOriginRestore = shallowRef<PresetOriginRestore>()
-  let originRestoreSeq = 0
+  // 跨视图往返的全部决策与四个一次性触发编号都在证据导航 module 里；这里不再镜像任何状态。
+  const evidenceNavigation = createEvidenceNavigation()
   const snapshot = computed(() => workspace.value.snapshot)
   const users = computed(() => getSandboxUsers(snapshot.value))
   const bots = computed(() => getSandboxBots(snapshot.value))
@@ -585,18 +574,12 @@ export function createWebqqWorkspaceShell(
     }
   }
 
-  function clearPresetEvidenceReturn() {
-    presetEvidenceNavigation.clear()
-    canReturnFromPresetEvidence.value = false
-    presetOriginRestore.value = undefined
-  }
-
   function selectConversation(conversationId: string) {
     if (currentView.value === 'presets' && !presetDirtyGuard.request({ action: 'leave', targetView: 'messages', conversationId })) {
       presetDiscardGuard.value = presetDirtyGuard.peek()
       return
     }
-    if (currentView.value === 'model-requests') clearPresetEvidenceReturn()
+    if (currentView.value === 'model-requests') evidenceNavigation.clear()
     workspaceController.selectConversation(conversationId)
   }
 
@@ -610,7 +593,7 @@ export function createWebqqWorkspaceShell(
       return false
     }
     if (!commit) return true
-    if (view !== 'model-requests') clearPresetEvidenceReturn()
+    if (view !== 'model-requests') evidenceNavigation.clear()
     workspaceController.selectView(view)
     if (view === 'debug') debugVisitKey.value += 1
     if (view === 'mcp-calls') mcpCallVisitKey.value += 1
@@ -828,43 +811,23 @@ export function createWebqqWorkspaceShell(
   }
 
   function navigateToModelRequest(reference: SandboxMessageModelRequestReference) {
-    clearPresetEvidenceReturn()
-    modelRequestNavigationIntent.value = createMessageModelRequestNavigationIntent(
-      ++modelRequestNavigationSeq,
-      reference,
-    )
+    evidenceNavigation.enterFromMessage(reference)
     workspaceController.selectView('model-requests')
     modelRequestVisitKey.value += 1
-  }
-
-  function consumeModelRequestNavigationIntent(seq: number) {
-    if (modelRequestNavigationIntent.value?.seq === seq) modelRequestNavigationIntent.value = undefined
   }
 
   function navigateToPresetEvidence(result: LocateSandboxPresetExpressionResult, snapshot?: PresetOriginSnapshot) {
-    const intent = presetEvidenceNavigation.publish(result, snapshot)
-    if (!intent) return
-    presetEvidenceIntent.value = intent
-    canReturnFromPresetEvidence.value = presetEvidenceNavigation.canReturn
+    if (!evidenceNavigation.enterFromPreset(result, snapshot)) return
     workspaceController.selectView('model-requests')
     modelRequestVisitKey.value += 1
   }
 
-  function consumePresetEvidenceIntent(seq: number) {
-    const consumed = presetEvidenceNavigation.consume(seq)
-    if (consumed && presetEvidenceIntent.value?.seq === seq) presetEvidenceIntent.value = undefined
+  function reportEvidenceNavigationFailure(message: string) {
+    modelRequestError.value = message
   }
 
-  function reportPresetEvidenceNavigationFailure(payload: { seq: number, message: string }) {
-    if (presetEvidenceIntent.value?.seq === payload.seq) presetEvidenceIntent.value = undefined
-    modelRequestError.value = payload.message
-  }
-
-  function returnFromPresetEvidence() {
-    const returned = presetEvidenceNavigation.returnToOrigin()
-    if (!returned) return
-    canReturnFromPresetEvidence.value = presetEvidenceNavigation.canReturn
-    presetOriginRestore.value = markRaw({ ...returned.snapshot, seq: ++originRestoreSeq })
+  function returnToPresetOrigin() {
+    if (!evidenceNavigation.returnToPresetOrigin()) return
     workspaceController.selectView('presets')
   }
 
@@ -1040,9 +1003,8 @@ export function createWebqqWorkspaceShell(
     environmentModel,
     modelRequestVisitKey,
     modelRequestWorkspaceModel,
-    modelRequestNavigationIntent,
+    evidenceNavigation,
     presetDiscardGuard,
-    presetEvidenceIntent,
     presetWorkspaceModel,
     handleSidebarNotification,
     kickGroupMember,
@@ -1067,13 +1029,9 @@ export function createWebqqWorkspaceShell(
     cancelPresetDiscard,
     confirmPresetDiscard,
     navigateToPresetEvidence,
-    consumePresetEvidenceIntent,
     navigateToModelRequest,
-    consumeModelRequestNavigationIntent,
-    reportPresetEvidenceNavigationFailure,
-    canReturnFromPresetEvidence,
-    returnFromPresetEvidence,
-    presetOriginRestore,
+    reportEvidenceNavigationFailure,
+    returnToPresetOrigin,
     manageEnvironment,
     openComposerParticipantDialog,
     openEntityDialog,

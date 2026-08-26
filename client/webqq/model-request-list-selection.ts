@@ -3,10 +3,14 @@ import type {
   SandboxModelRequestListItem,
 } from '../../src/types'
 
+/**
+ * 模型请求列表选择：普通选择，以及用权威详情把超出首屏分页的跳转目标补入列表。
+ *
+ * 「本次筛选变化不清空导航选中」这个一次性令牌属于证据导航 module，不在这里。
+ */
 export interface ModelRequestListSelectionState {
   selectedRecordId: string
   navigationRecordId?: string
-  preserveNextClear?: boolean
 }
 
 export function beginModelRequestListNavigation(
@@ -15,22 +19,11 @@ export function beginModelRequestListNavigation(
 ): void {
   state.selectedRecordId = recordId
   state.navigationRecordId = recordId
-  state.preserveNextClear = true
-}
-
-export function releaseModelRequestListNavigationGuard(
-  state: ModelRequestListSelectionState,
-): void {
-  delete state.preserveNextClear
 }
 
 export function clearModelRequestListSelection(
   state: ModelRequestListSelectionState,
 ): void {
-  if (state.preserveNextClear) {
-    delete state.preserveNextClear
-    return
-  }
   state.selectedRecordId = ''
   state.navigationRecordId = undefined
 }
@@ -41,7 +34,6 @@ export function selectModelRequestListRecord(
 ): void {
   state.selectedRecordId = recordId
   state.navigationRecordId = undefined
-  delete state.preserveNextClear
 }
 
 export function resolveModelRequestListRecords(

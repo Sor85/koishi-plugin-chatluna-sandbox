@@ -1,6 +1,6 @@
 # 证据导航统一 module 规格
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 

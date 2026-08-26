@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   beginModelRequestListNavigation,
   clearModelRequestListSelection,
-  releaseModelRequestListNavigationGuard,
   resolveModelRequestListRecords,
   selectModelRequestListRecord,
   type ModelRequestListSelectionState,
@@ -30,32 +29,22 @@ function detail(id: string): SandboxModelRequestDetail {
   return { ...record(id), variables: [] } as SandboxModelRequestDetail
 }
 
-describe('模型请求跳转列表选中', () => {
-  it('筛选 watcher 不会清除跳转目标，详情先返回时把跨页目标补入列表', () => {
+describe('模型请求列表选择', () => {
+  it('详情先返回时把跨页跳转目标补入列表', () => {
     const state: ModelRequestListSelectionState = { selectedRecordId: '' }
     beginModelRequestListNavigation(state, 'request:target')
 
-    clearModelRequestListSelection(state)
     expect(state.selectedRecordId).toBe('request:target')
     expect(resolveModelRequestListRecords(
       state,
       [record('request:latest')],
       detail('request:target'),
     ).map(({ id }) => id)).toEqual(['request:target', 'request:latest'])
+    // 目标仍未进入列表，跨页补入的登记必须保留，下一批记录到达时继续生效。
     expect(state.navigationRecordId).toBe('request:target')
   })
 
-  it('同步阶段保留保护时，筛选 watcher 不会清除跳转选中态', () => {
-    const state: ModelRequestListSelectionState = { selectedRecordId: '' }
-    beginModelRequestListNavigation(state, 'request:target')
-
-    expect(resolveModelRequestListRecords(state, [record('request:target')])).toHaveLength(1)
-    clearModelRequestListSelection(state)
-    releaseModelRequestListNavigationGuard(state)
-    expect(state.selectedRecordId).toBe('request:target')
-  })
-
-  it('列表先返回目标时保留选中，待同步 watcher 后结束跳转保护', () => {
+  it('列表自己返回目标时结束跨页补入登记', () => {
     const state: ModelRequestListSelectionState = { selectedRecordId: '' }
     beginModelRequestListNavigation(state, 'request:target')
 
@@ -63,13 +52,21 @@ describe('模型请求跳转列表选中', () => {
     expect(state).toEqual({
       selectedRecordId: 'request:target',
       navigationRecordId: undefined,
-      preserveNextClear: true,
     })
+  })
+
+  it('清空选中同时丢弃跨页补入登记', () => {
+    const state: ModelRequestListSelectionState = { selectedRecordId: '' }
+    beginModelRequestListNavigation(state, 'request:target')
+
     clearModelRequestListSelection(state)
-    expect(state.selectedRecordId).toBe('request:target')
-    releaseModelRequestListNavigationGuard(state)
-    clearModelRequestListSelection(state)
-    expect(state.selectedRecordId).toBe('')
+
+    expect(state).toEqual({ selectedRecordId: '', navigationRecordId: undefined })
+    expect(resolveModelRequestListRecords(
+      state,
+      [record('request:latest')],
+      detail('request:target'),
+    ).map(({ id }) => id)).toEqual(['request:latest'])
   })
 
   it('用户主动选择其他请求时取消待处理跳转', () => {
@@ -82,6 +79,17 @@ describe('模型请求跳转列表选中', () => {
       state,
       [record('request:latest')],
       detail('request:target'),
+    ).map(({ id }) => id)).toEqual(['request:latest'])
+  })
+
+  it('详情不是跳转目标时不补入列表', () => {
+    const state: ModelRequestListSelectionState = { selectedRecordId: '' }
+    beginModelRequestListNavigation(state, 'request:target')
+
+    expect(resolveModelRequestListRecords(
+      state,
+      [record('request:latest')],
+      detail('request:other'),
     ).map(({ id }) => id)).toEqual(['request:latest'])
   })
 })
