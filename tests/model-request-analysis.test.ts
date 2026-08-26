@@ -7,9 +7,7 @@ import {
   isPreviewableConversationImage,
   modelAnalysisTargetId,
   normalizeAnalysisQuery,
-  resolveActiveAnalysisGroup,
   resolveActiveAnalysisTarget,
-  resolveCollapsedAnalysisGroups,
   resolveAnalysisEvidenceTarget,
   shouldExpandAnalysisText,
 } from '../client/webqq/model-request-analysis'
@@ -96,42 +94,6 @@ describe('模型请求分析展示模型', () => {
     expect(navigation.groups.every(({ items }) => items.every(({ evidenceId, target }) => (
       evidenceId === undefined || navigation.targets[evidenceId] === target
     )))).toBe(true)
-  })
-
-  it('按阅读探针切换左侧当前展开分类', () => {
-    const positions = [
-      { key: 'system' as const, top: -600 },
-      { key: 'variables' as const, top: 80 },
-      { key: 'response' as const, top: 900 },
-    ]
-
-    expect(resolveActiveAnalysisGroup(positions, 0, 800)).toBe('variables')
-    expect(resolveActiveAnalysisGroup([
-      { key: 'system', top: -1400 },
-      { key: 'variables', top: -700 },
-      { key: 'response', top: 100 },
-    ], 0, 800)).toBe('response')
-    expect(resolveActiveAnalysisGroup([], 0, 800)).toBeUndefined()
-  })
-
-  it('右侧切换分类后只折叠实际已经越过的左侧分类', () => {
-    const positions = [
-      { key: 'system' as const, top: -600 },
-      { key: 'user' as const, top: -200 },
-      { key: 'variables' as const, top: 80 },
-      { key: 'response' as const, top: 900 },
-      // 左侧 Tool 虽排在 Variables 前，但右侧尚未读到时必须保持展开。
-      { key: 'tool' as const, top: 1200 },
-    ]
-
-    expect(resolveCollapsedAnalysisGroups(positions, 0, 800)).toEqual(['system', 'user'])
-    expect(resolveCollapsedAnalysisGroups([
-      { key: 'system', top: -1200 },
-      { key: 'user', top: -800 },
-      { key: 'assistant', top: -400 },
-      { key: 'tool', top: 80 },
-    ], 0, 800)).toEqual(['system', 'user', 'assistant'])
-    expect(resolveCollapsedAnalysisGroups([{ key: 'system', top: 200 }], 0, 800)).toEqual([])
   })
 
   it('按阅读探针追踪右侧具体卡片对应的左侧条目', () => {
@@ -366,7 +328,7 @@ describe('模型请求分析展示模型', () => {
     expect(styles).toMatch(/\.webqq-model-request-analysis \.webqq-model-analysis-nav \{[^}]*position: sticky;[^}]*top: 0;[^}]*max-height: var\(--webqq-model-analysis-nav-height[^}]*overflow: auto;/s)
   })
 
-  it('滚动阅读右侧时自动折叠已越过分类，不再渲染第二份浮动导航', () => {
+  it('滚动阅读右侧时只跟随当前条目，不自动改变左侧分类折叠状态', () => {
     const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
 
@@ -374,7 +336,8 @@ describe('模型请求分析展示模型', () => {
     expect(view).not.toContain('fallbackNavigationVisible')
     expect(view).not.toContain('navigationSourceElement')
     expect(styles).not.toContain('.webqq-model-analysis-nav-fallback')
-    expect(view).toContain('resolveCollapsedAnalysisGroups')
+    expect(view).not.toContain('resolveCollapsedAnalysisGroups')
+    expect(view).not.toContain('resolveActiveAnalysisGroup')
     expect(view).toContain('resolveActiveAnalysisTarget')
     expect(view).toContain(":data-target=\"item.target\"")
     expect(view).toContain("'is-current': activeNavigationTarget === item.target")
@@ -384,15 +347,8 @@ describe('模型请求分析展示模型', () => {
     expect(view).toMatch(/navigation\.scrollTo\(\{ top: navigation\.scrollTop \+ itemRect\.bottom - visibleBottom, behavior: 'smooth' \}\)/)
     expect(styles).toMatch(/\.webqq-model-request-analysis \.webqq-model-analysis-nav \{[^}]*padding-bottom: 44px;/s)
     expect(styles).toContain('.webqq-model-analysis-nav-item.is-current')
-    expect(view).toContain('if (active && active !== activeNavigationGroup.value)')
-    expect(view).toContain('collapsedNavigationGroups.value = new Set(resolveCollapsedAnalysisGroups(')
-    expect(view).toContain('positions,')
-    expect(view).toContain(':data-analysis-group="message.role"')
-    expect(view).toContain('data-analysis-group="variables"')
-    expect(view).toContain('data-analysis-group="response"')
-    expect(view).toContain('data-analysis-group="tool"')
+    expect(view).not.toContain('collapsedNavigationGroups.value = new Set(resolveCollapsedAnalysisGroups(')
     expect(view).toContain("navigationScroller.addEventListener('scroll', scheduleNavigationTracking")
-    expect(view).toContain('resolveActiveAnalysisGroup')
     expect(view).toContain("style.setProperty('--webqq-model-analysis-nav-height', `${scroller.clientHeight}px`)")
   })
 

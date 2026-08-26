@@ -81,7 +81,6 @@
             v-for="message in visibleMessages"
             :id="modelAnalysisTargetId(message.evidenceId)"
             :key="message.evidenceId"
-            :data-analysis-group="message.role"
             class="webqq-model-analysis-card"
             :class="[
               `is-${message.role}`,
@@ -197,7 +196,7 @@
             </div>
           </article>
 
-          <section v-if="detail.variables?.length && variablesVisible" class="webqq-model-analysis-variables" data-analysis-group="variables">
+          <section v-if="detail.variables?.length && variablesVisible" class="webqq-model-analysis-variables">
             <h3>Variables <span>({{ detail.variables.length }})</span></h3>
             <div class="webqq-model-analysis-variable-list">
               <article
@@ -250,7 +249,7 @@
           </section>
 
           <template v-if="responseVisible">
-          <section class="webqq-model-analysis-response-heading" data-analysis-group="response">
+          <section class="webqq-model-analysis-response-heading">
             <h3>Response</h3>
           </section>
           <article
@@ -381,7 +380,7 @@
           </article>
           </template>
 
-          <section v-if="toolDefinitionsVisible" :id="MODEL_ANALYSIS_TOOLS_TARGET" class="webqq-model-analysis-tools" data-analysis-group="tool" :class="{ 'is-located': highlightedTarget === MODEL_ANALYSIS_TOOLS_TARGET }">
+          <section v-if="toolDefinitionsVisible" :id="MODEL_ANALYSIS_TOOLS_TARGET" class="webqq-model-analysis-tools" :class="{ 'is-located': highlightedTarget === MODEL_ANALYSIS_TOOLS_TARGET }">
             <h3>Tools <span>({{ conversation.tools.length }})</span></h3>
             <p v-if="!conversation.tools.length" class="webqq-model-analysis-empty">请求未声明工具定义</p>
             <article
@@ -463,9 +462,7 @@ import {
   modelAnalysisTargetId,
   modelAnalysisVariableTargetId,
   normalizeAnalysisQuery,
-  resolveActiveAnalysisGroup,
   resolveActiveAnalysisTarget,
-  resolveCollapsedAnalysisGroups,
   shouldExpandAnalysisText,
   type ModelRequestAnalysisGroupKey,
   type ModelRequestAnalysisNavigationItem,
@@ -540,7 +537,6 @@ const expandedTextTargets = ref(new Set<string>())
 const contentElement = ref<HTMLElement>()
 const navigationElement = ref<HTMLElement>()
 const collapsedNavigationGroups = ref(new Set<ModelRequestAnalysisGroupKey>())
-const activeNavigationGroup = ref<ModelRequestAnalysisGroupKey>()
 const activeNavigationTarget = ref('')
 const highlightedTarget = ref('')
 const activeOccurrence = ref<ModelRequestOccurrence>()
@@ -645,10 +641,7 @@ onMounted(() => {
 })
 
 watch(visibleNavigationGroups, () => {
-  nextTick(() => {
-    ensureActiveNavigationGroup()
-    scheduleNavigationTracking()
-  })
+  nextTick(scheduleNavigationTracking)
 }, { flush: 'post' })
 
 watch(() => props.detail.id, (next, previous) => {
@@ -659,7 +652,6 @@ watch(() => props.detail.id, (next, previous) => {
   expandedTools.value = new Set()
   expandedTextTargets.value = new Set()
   collapsedNavigationGroups.value = new Set()
-  activeNavigationGroup.value = visibleNavigationGroups.value[0]?.key
   activeNavigationTarget.value = ''
   locator.reset()
   const scroller = findScroller()
@@ -683,8 +675,7 @@ function setupNavigationTracking() {
     navigationResizeObserver.observe(navigationScroller)
     if (navigationElement.value) navigationResizeObserver.observe(navigationElement.value)
   }
-  ensureActiveNavigationGroup()
-  updateActiveNavigationGroup()
+  updateActiveNavigationTarget()
 }
 
 function teardownNavigationTracking() {
@@ -700,41 +691,17 @@ function scheduleNavigationTracking() {
   if (navigationFrame) return
   navigationFrame = requestAnimationFrame(() => {
     navigationFrame = 0
-    updateActiveNavigationGroup()
+    updateActiveNavigationTarget()
   })
 }
 
-function ensureActiveNavigationGroup() {
-  if (visibleNavigationGroups.value.some(group => group.key === activeNavigationGroup.value)) return
-  activeNavigationGroup.value = visibleNavigationGroups.value[0]?.key
-}
-
-function updateActiveNavigationGroup() {
+function updateActiveNavigationTarget() {
   const content = contentElement.value
   const scroller = navigationScroller ?? findScroller()
   if (!content || !scroller) return
   const scrollerRect = scroller.getBoundingClientRect()
   const scrollerTop = scrollerRect.top
   navigationElement.value?.style.setProperty('--webqq-model-analysis-nav-height', `${scroller.clientHeight}px`)
-  const visibleKeys = new Set(visibleNavigationGroups.value.map(group => group.key))
-  const positions = [...content.querySelectorAll<HTMLElement>('[data-analysis-group]')]
-    .flatMap((element) => {
-      const key = element.dataset.analysisGroup as ModelRequestAnalysisGroupKey | undefined
-      return key && visibleKeys.has(key) ? [{ key, top: element.getBoundingClientRect().top }] : []
-    })
-  const active = resolveActiveAnalysisGroup(
-    positions,
-    scrollerTop,
-    scroller.clientHeight,
-  )
-  if (active && active !== activeNavigationGroup.value) {
-    activeNavigationGroup.value = active
-    collapsedNavigationGroups.value = new Set(resolveCollapsedAnalysisGroups(
-      positions,
-      scrollerTop,
-      scroller.clientHeight,
-    ))
-  }
   const navigationTargets = new Set(visibleNavigationGroups.value.flatMap(group => group.items.map(item => item.target)))
   const targetPositions = [...content.querySelectorAll<HTMLElement>('[id]')]
     .flatMap((element) => navigationTargets.has(element.id)

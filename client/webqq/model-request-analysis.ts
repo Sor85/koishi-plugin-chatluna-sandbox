@@ -67,39 +67,6 @@ export function normalizeAnalysisQuery(value: string | undefined): string {
   return value?.trim().toLocaleLowerCase('zh-CN') ?? ''
 }
 
-/**
- * 用滚动容器上方约四分之一处作为阅读探针，返回探针最后越过的分析分类。
- * 这样长卡片仍保持所属分类，下一分类进入主要阅读区域后才切换导航。
- */
-export function resolveActiveAnalysisGroup(
-  positions: readonly { key: ModelRequestAnalysisGroupKey, top: number }[],
-  scrollerTop: number,
-  scrollerHeight: number,
-): ModelRequestAnalysisGroupKey | undefined {
-  if (!positions.length) return undefined
-  const probeTop = analysisProbeTop(scrollerTop, scrollerHeight)
-  let active = positions[0].key
-  for (const position of positions) {
-    if (position.top > probeTop) break
-    active = position.key
-  }
-  return active
-}
-
-/** 折叠阅读探针已经越过、且当前不再阅读的分类；尚未读到的分类保持展开。 */
-export function resolveCollapsedAnalysisGroups(
-  positions: readonly { key: ModelRequestAnalysisGroupKey, top: number }[],
-  scrollerTop: number,
-  scrollerHeight: number,
-): ModelRequestAnalysisGroupKey[] {
-  const probeTop = analysisProbeTop(scrollerTop, scrollerHeight)
-  const passed = positions.filter(position => position.top <= probeTop)
-  const active = passed.at(-1)?.key
-  if (!active) return []
-  return [...new Set(passed.slice(0, -1).map(position => position.key))]
-    .filter(key => key !== active)
-}
-
 /** 返回阅读探针当前经过的具体导航目标，用于同步左侧条目。 */
 export function resolveActiveAnalysisTarget(
   positions: readonly { target: string, top: number }[],
