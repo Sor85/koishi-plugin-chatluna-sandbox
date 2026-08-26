@@ -227,7 +227,6 @@
         <aside v-if="selectedRow" class="webqq-model-trajectory-inspector" aria-label="轨迹请求分析">
           <header>
             <div>
-              <Badge variant="outline">{{ kindLabel(selectedRow.kind, selectedRow.toolEvent) }}</Badge>
               <span v-if="selectedRequest" class="webqq-model-trajectory-inspector-title">{{ requestLabel(selectedRow.requestId) }}</span>
             </div>
             <div class="webqq-model-trajectory-inspector-actions">

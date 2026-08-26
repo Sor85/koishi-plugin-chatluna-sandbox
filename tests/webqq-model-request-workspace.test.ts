@@ -204,6 +204,7 @@ describe('WebQQ 模型请求工作台', () => {
     expect(trajectorySource).toContain('轨迹事件账本')
     expect(trajectorySource).toContain('打开原始请求')
     expect(trajectorySource).toMatch(/<header>[\s\S]*打开原始请求[\s\S]*<\/header>/)
+    expect(trajectorySource).not.toContain('<Badge variant="outline">{{ kindLabel(selectedRow.kind, selectedRow.toolEvent) }}</Badge>')
     expect(trajectorySource).toContain("'open-request': [payload:")
     expect(trajectorySource).toContain(`emit('open-request', {
     recordId: request.id,
@@ -317,7 +318,7 @@ describe('WebQQ 模型请求工作台', () => {
     expect(styles).toMatch(/\.webqq-model-request-list-pane\s*\{[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\)/s)
     expect(styles).toMatch(/\.webqq-model-request-list-toolbar\s*\{[^}]*border-bottom:\s*1px solid var\(--webqq-border\)/s)
     expect(styles).not.toContain('.webqq-model-request-filters {')
-    expect(styles).toMatch(/\.webqq-model-trajectory-ledger\.has-inspector\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(500px, 42%\)/s)
+    expect(styles).toMatch(/\.webqq-model-trajectory-ledger\.has-inspector\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(480px, 42%\)/s)
     expect(styles).toMatch(/\.webqq-model-trajectory-inspector-close\s*\{[^}]*position:\s*absolute[^}]*top:\s*0[^}]*right:\s*0/s)
     expect(styles).toMatch(/\.webqq-model-analysis\.is-inspector \.webqq-model-analysis-main \{[^}]*display: block/s)
     expect(styles).toMatch(/\.webqq-model-analysis\.is-inspector \.webqq-model-analysis-content \{[^}]*max-height: none/s)

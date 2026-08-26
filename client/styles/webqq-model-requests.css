@@ -1162,6 +1162,8 @@
 }
 
 .webqq-model-trajectory-inspector {
+  container-type: inline-size;
+  container-name: webqq-trajectory-inspector;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   align-content: start;
@@ -2116,15 +2118,16 @@
 }
 .webqq-model-analysis-tool-summary > svg:first-child { color: var(--webqq-role); }
 .webqq-model-analysis-tool-copy {
-  display: flex;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
   align-items: center;
   gap: 8px;
   min-width: 0;
   overflow: hidden;
 }
-/* 名称不收缩。max-width:100% 只在整行只剩名称时才允许省略，避免挤掉箭头。 */
+/* 工具摘要在分析页和轨迹检查器中使用同一套收缩顺序：名称优先，描述省略，属性统计保持完整。 */
 .webqq-model-analysis-tool-copy > strong {
-  flex: 0 0 auto;
+  min-width: 0;
   max-width: 100%;
   overflow: hidden;
   color: var(--webqq-role);
@@ -2132,9 +2135,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* 描述吃剩余宽度。container 按自身已分配宽度查询：≤3em 时只能露出 1～2 个字，直接隐藏。 */
 .webqq-model-analysis-tool-copy > .webqq-model-analysis-tool-desc {
-  flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
   container-type: inline-size;
@@ -2149,8 +2150,10 @@
 @container (max-width: 3em) {
   .webqq-model-analysis-tool-desc > span { display: none; }
 }
+@container webqq-trajectory-inspector (max-width: 500px) {
+  .webqq-model-analysis-tool-desc > span { display: none; }
+}
 .webqq-model-analysis-tool-copy > small {
-  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   color: var(--webqq-muted);
