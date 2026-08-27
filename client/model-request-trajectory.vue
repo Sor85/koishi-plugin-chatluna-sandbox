@@ -119,15 +119,13 @@
             </Button>
           </div>
         </div>
-        <label class="webqq-model-trajectory-search">
-          <IconSearch aria-hidden="true" />
-          <Input v-model="searchQuery" type="search" aria-label="搜索轨迹事件" placeholder="搜索" />
-        </label>
-      </div>
-
-      <TooltipProvider :delay-duration="500">
-        <div v-if="compositionTracks.length" class="webqq-model-trajectory-composition-shell">
-          <div class="webqq-model-trajectory-composition-zoom" role="group" aria-label="轨道缩放">
+        <div class="webqq-model-trajectory-control-query">
+          <div
+            v-if="compositionTracks.length"
+            class="webqq-model-trajectory-composition-zoom"
+            role="group"
+            aria-label="轨道缩放"
+          >
             <template v-if="compositionZoom > COMPOSITION_ZOOM_MIN">
               <Button
                 class="webqq-model-trajectory-composition-zoom-value"
@@ -157,6 +155,15 @@
               <IconZoomIn aria-hidden="true" />
             </Button>
           </div>
+          <label class="webqq-model-trajectory-search">
+            <IconSearch aria-hidden="true" />
+            <Input v-model="searchQuery" type="search" aria-label="搜索轨迹事件" placeholder="搜索" />
+          </label>
+        </div>
+      </div>
+
+      <TooltipProvider :delay-duration="500">
+        <div v-if="compositionTracks.length" class="webqq-model-trajectory-composition-shell">
           <section
             class="webqq-model-trajectory-composition"
             :style="{ minHeight: `${Math.max(50, compositionTracks.length * 14 + 8)}px` }"

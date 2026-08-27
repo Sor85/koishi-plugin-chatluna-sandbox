@@ -822,8 +822,8 @@
 }
 
 /* 横向折叠：用 0fr → 1fr 插值到真实内容宽，宽屏向右展开。
-   旧实现 max-width: 100% + flex-wrap 会让这一组按整行计宽，剩余空间被搜索框的
-   margin-left: auto 吃掉，按钮在组内换行，看起来像向下长高。 */
+   旧实现 max-width: 100% + flex-wrap 会让这一组按整行计宽，按钮在组内换行，
+   看起来像向下长高。 */
 .webqq-model-trajectory-control-filters {
   display: grid;
   grid-template-columns: 1fr;
@@ -859,11 +859,18 @@
   font-size: var(--webqq-font-xs);
 }
 
+.webqq-model-trajectory-control-query {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 8px;
+  margin-left: auto;
+}
+
 .webqq-model-trajectory-search {
   position: relative;
+  flex: 0 1 164px;
   width: min(164px, 32%);
-  /* 过滤开关左对齐铺开，搜索框始终靠右。 */
-  margin-left: auto;
 }
 
 .webqq-model-trajectory-search > svg {
@@ -890,39 +897,12 @@
 }
 
 .webqq-model-trajectory-composition-zoom {
-  position: absolute;
-  top: 2px;
-  right: 4px;
+  position: relative;
   z-index: 2;
   display: flex;
   align-items: center;
+  flex: 0 0 auto;
   gap: 1px;
-  padding: 1px;
-  border: 1px solid color-mix(in srgb, var(--webqq-border) 78%, transparent);
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--webqq-surface) 92%, transparent);
-  isolation: isolate;
-}
-
-.webqq-workspace.is-frosted .webqq-model-trajectory-composition-zoom {
-  background: transparent;
-}
-
-.webqq-workspace.is-frosted .webqq-model-trajectory-composition-zoom::before {
-  position: absolute;
-  z-index: 0;
-  inset: 0;
-  border-radius: inherit;
-  background: color-mix(in srgb, var(--webqq-surface) 62%, transparent);
-  -webkit-backdrop-filter: saturate(180%) blur(14px);
-  backdrop-filter: saturate(180%) blur(14px);
-  content: "";
-  pointer-events: none;
-}
-
-.webqq-workspace.is-frosted .webqq-model-trajectory-composition-zoom > * {
-  position: relative;
-  z-index: 1;
 }
 
 .webqq-model-trajectory-composition-zoom [data-slot="button"] {
