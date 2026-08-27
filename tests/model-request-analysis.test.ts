@@ -399,7 +399,16 @@ describe('模型请求分析展示模型', () => {
     expect(view).toContain('v-show="!collapsedNavigationGroups.has(group.key)"')
     expect(view).toContain('collapsedNavigationGroups.value = new Set()')
     expect(view).toContain('next.has(group) ? next.delete(group) : next.add(group)')
-    expect(styles).toMatch(/\.webqq-model-request-analysis \.webqq-model-analysis-nav \{[^}]*position: sticky;[^}]*top: 0;[^}]*max-height: var\(--webqq-model-analysis-nav-height[^}]*overflow: auto;/s)
+    expect(styles).toMatch(/\.webqq-model-request-analysis \.webqq-model-analysis-nav \{[^}]*position: sticky;[^}]*top: calc\(var\(--webqq-model-trajectory-sticky-height[^}]*- 16px\);[^}]*max-height: calc\(var\(--webqq-model-analysis-nav-height[^}]*- var\(--webqq-model-trajectory-sticky-height[^}]*\+ 16px\);[^}]*overflow: auto;/s)
+  })
+
+  it('分析页的过滤工具栏和请求组成轨道一起保持吸顶', () => {
+    const trajectory = readFileSync(resolve('client/model-request-trajectory.vue'), 'utf8')
+    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+
+    expect(trajectory).toMatch(/webqq-model-trajectory-sticky-header[\s\S]*webqq-model-trajectory-controls[\s\S]*webqq-model-trajectory-composition-shell/)
+    expect(trajectory).toContain("style.setProperty('--webqq-model-trajectory-sticky-height'")
+    expect(styles).toMatch(/\.webqq-model-request-analysis \.webqq-model-trajectory-sticky-header \{[^}]*position: sticky;[^}]*top: -16px;[^}]*z-index:/s)
   })
 
   it('滚动阅读右侧时只跟随当前条目，不自动改变左侧分类折叠状态', () => {

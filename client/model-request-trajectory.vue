@@ -1,5 +1,5 @@
 <template>
-  <section class="webqq-model-trajectory" :class="{ 'is-analysis': analysis }" aria-label="模型请求轨迹">
+  <section ref="trajectoryElement" class="webqq-model-trajectory" :class="{ 'is-analysis': analysis }" aria-label="模型请求轨迹">
     <header v-if="showModeSwitch || mode === 'conversation'" class="webqq-model-trajectory-scope">
       <div v-if="showModeSwitch" class="webqq-model-trajectory-mode" role="tablist" aria-label="轨迹范围">
         <Button
@@ -31,7 +31,8 @@
     <div v-if="loading && !trajectory" class="webqq-model-request-empty">正在组装轨迹…</div>
     <div v-else-if="!trajectory?.rows.length" class="webqq-model-request-empty">当前记录没有可投影的轨迹</div>
     <template v-else>
-      <div class="webqq-model-trajectory-controls" role="toolbar" aria-label="轨迹显示控制">
+      <div ref="stickyHeaderElement" class="webqq-model-trajectory-sticky-header">
+        <div class="webqq-model-trajectory-controls" role="toolbar" aria-label="轨迹显示控制">
         <div class="webqq-model-trajectory-control-actions">
           <Button
             v-if="mode === 'conversation'"
@@ -215,7 +216,8 @@
         <div v-else class="webqq-model-trajectory-composition-empty">
           {{ mode === 'conversation' ? '当前会话没有可投影的请求组成' : '当前请求体没有可统计的提示词内容' }}
         </div>
-      </TooltipProvider>
+        </TooltipProvider>
+      </div>
 
       <p v-if="mode === 'conversation' && hasUnknownTiming" class="webqq-model-trajectory-timing-note">
         进行中的请求仅标记开始位置；TTFT 与解码阶段尚无独立时间证据
@@ -320,7 +322,7 @@ import {
   IconZoomIn,
   IconZoomOut,
 } from '@tabler/icons-vue'
-import { computed, nextTick, ref, useId, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
 import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
@@ -382,6 +384,9 @@ const emit = defineEmits<{
   'locate-result': [result: { seq: number, located: boolean }]
 }>()
 
+const trajectoryElement = ref<HTMLElement>()
+const stickyHeaderElement = ref<HTMLElement>()
+let stickyHeaderResizeObserver: ResizeObserver | undefined
 const ledgerElement = ref<HTMLElement>()
 const ledgerScrollRestore = createScrollRestore({
   measure: () => {
@@ -564,6 +569,24 @@ watch(() => selectedRow.value?.requestId, (requestId) => {
 })
 
 watch(() => props.restoreState?.seq, restoreTrajectoryPosition, { immediate: true })
+
+watch(stickyHeaderElement, (header) => {
+  stickyHeaderResizeObserver?.disconnect()
+  stickyHeaderResizeObserver = undefined
+  if (!props.analysis || !header) {
+    trajectoryElement.value?.style.removeProperty('--webqq-model-trajectory-sticky-height')
+    return
+  }
+  const updateStickyHeight = () => {
+    trajectoryElement.value?.style.setProperty('--webqq-model-trajectory-sticky-height', `${header.offsetHeight}px`)
+  }
+  updateStickyHeight()
+  if (typeof ResizeObserver === 'undefined') return
+  stickyHeaderResizeObserver = new ResizeObserver(updateStickyHeight)
+  stickyHeaderResizeObserver.observe(header)
+}, { flush: 'post' })
+
+onBeforeUnmount(() => stickyHeaderResizeObserver?.disconnect())
 
 function restoreTrajectoryPosition() {
   const state = props.restoreState

@@ -1309,6 +1309,15 @@
   border-radius: 8px;
 }
 
+.webqq-model-request-analysis .webqq-model-trajectory-sticky-header {
+  position: sticky;
+  /* 详情滚动容器有 16px 内边距；向上抵消它，让吸顶区贴住滚动视口顶边。 */
+  top: -16px;
+  z-index: 4;
+  background: var(--webqq-surface);
+  box-shadow: 0 2px 6px rgb(15 23 42 / 8%);
+}
+
 .webqq-model-request-analysis .webqq-model-analysis-main {
   overflow: visible;
 }
@@ -1320,9 +1329,9 @@
 
 .webqq-model-request-analysis .webqq-model-analysis-nav {
   position: sticky;
-  top: 0;
+  top: calc(var(--webqq-model-trajectory-sticky-height, 0px) - 16px);
   align-self: start;
-  max-height: var(--webqq-model-analysis-nav-height, 100vh);
+  max-height: calc(var(--webqq-model-analysis-nav-height, 100vh) - var(--webqq-model-trajectory-sticky-height, 0px) + 16px);
   overflow: auto;
   padding-bottom: 44px;
 }
