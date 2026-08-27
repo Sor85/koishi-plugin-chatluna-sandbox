@@ -34,8 +34,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "prepublishOnly": "yarn test && yarn typecheck && yarn build",
-    "build:css": "tailwindcss -i client/styles/tailwind.source.css -o client/styles/tailwind.generated.css",
-    "watch:css": "tailwindcss -i client/styles/tailwind.source.css -o client/styles/tailwind.generated.css --watch"
+    "build:css": "node scripts/build-css.mjs"
   },
   "keywords": [
     "bot",
@@ -93,6 +92,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "koishi": "^4.18.10",
+    "postcss": "8.5.19",
     "reka-ui": "^2.10.1",
     "shx": "^0.4.0",
     "tailwind-merge": "^3.6.0",

@@ -316,15 +316,27 @@
 
 /* 浮层同样要显式落基准字号：teleport 到 body 之后拿不到 .webqq-workspace 上的
    font-size，漏写 font-size 的节点会退回浏览器默认 16px，和面板内 11~13px 的
-   文本对不上。这些面板本体没有 shadcn 的 text-* 工具类，覆盖不会打断组件默认值。 */
+   文本对不上。这些面板本体没有 shadcn 的 text-* 工具类，覆盖不会打断组件默认值。
+
+   tab-size 与 -webkit-tap-highlight-color 原先来自 Tailwind preflight 写在 html 上的
+   那条规则；preflight 限定作用域后该规则被整条丢弃（它同时会把字体族换成 Tailwind 的
+   --font-sans，见 docs/adr/0068），需要的两项在这里显式声明。
+   选择器列表与 webqq-tokens.css 的令牌规则一致。 */
+.chatluna-sandbox-page,
 .sandbox-dialog-content,
+[data-slot="dialog-overlay"],
 .sandbox-popover-content,
 .sandbox-select-content,
+[data-slot="tooltip-content"],
 [data-slot="chatluna-sandbox-context-menu-content"],
 [data-slot="chatluna-sandbox-context-menu-sub-content"],
-.chatluna-sandbox-secondary-page {
+.chatluna-sandbox-secondary-page,
+.chatluna-sandbox-forward-modal-backdrop,
+.chatluna-sandbox-image-preview {
   font-size: var(--webqq-font-md);
   line-height: 1.5;
+  tab-size: 4;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .chatluna-sandbox-solid-secondary-surface:not(.is-frosted) {

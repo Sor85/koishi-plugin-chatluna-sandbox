@@ -7,7 +7,9 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const sourceRoot = resolve(root, 'src')
 const clientRoot = resolve(root, 'client')
 const tsup = resolve(root, 'node_modules/tsup/dist/cli-default.js')
-const tailwind = resolve(root, 'node_modules/@tailwindcss/cli/dist/index.mjs')
+// Tailwind 必须经 build-css.mjs 调用：CLI 原始产物的 preflight 没有作用域，会重置整个
+// 控制台和同页其他插件的 UI。直接在这里调 @tailwindcss/cli 会让开发环境重新开始污染宿主。
+const buildCss = resolve(root, 'scripts/build-css.mjs')
 // build:css 的输出文件被 gitignore 且由本 watcher 生成，必须排除在监听之外，否则每次重建都会自触发。
 const generatedCss = resolve(root, 'client/styles/tailwind.generated.css')
 
@@ -58,7 +60,7 @@ const serverBuilder = createBuilder('服务端构建', [tsup, 'src/index.ts', '-
 // Console devMode 直接加载 client/ 源码时会缺失全部 Tailwind 工具类（样式整体退化，
 // 且宿主 vite 没有 Tailwind 插件无法现场生成，详见 docs/adr/0053）。
 // 由本 watcher 在启动时兜底重建，并跟随 client 源码变化持续重建。
-const cssBuilder = createBuilder('Tailwind 预编译', [tailwind, '-i', 'client/styles/tailwind.source.css', '-o', 'client/styles/tailwind.generated.css'])
+const cssBuilder = createBuilder('Tailwind 预编译', [buildCss])
 
 let serverSnapshot = new Map()
 let clientSnapshot = new Map()

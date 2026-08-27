@@ -7,18 +7,22 @@
    9px 只给时间轴与组成图的微标签用；正文默认是 --webqq-font-md。
    头像首字母不属于这份标度，它按 --webqq-avatar-size 派生（见 webqq-primitives.css）。
 
-   选择器列表要覆盖所有渲染根：.chatluna-sandbox-page 是 Koishi k-layout 的主容器，
-   兜住工作区之外的浮层与观察层；Dialog/Popover/Select/右键菜单 teleport 到 body，
-   拿不到页面容器上的令牌，必须各自列一遍——漏掉任何一个，那棵子树里的
-   var(--webqq-font-*) 会解析失败并静默退回继承字号。 */
+   选择器列表必须与 scripts/sandbox-style-roots.mjs 的 SANDBOX_STYLE_ROOTS 逐项一致
+   （由 tests/sandbox-style-roots.test.ts 断言）：`.chatluna-sandbox-page` 是 Koishi
+   k-layout 的主容器，其余全部是 teleport / Portal 到 body 的浮层根，它们不在页面容器的
+   继承树里。漏掉任何一个，那棵子树里的 var(--webqq-font-*) 会解析失败并静默退回浏览器
+   默认的 16px；同一份清单还决定 Tailwind preflight 的作用域，见 docs/adr/0068。 */
 .chatluna-sandbox-page,
-.webqq-workspace,
 .sandbox-dialog-content,
+[data-slot="dialog-overlay"],
 .sandbox-popover-content,
 .sandbox-select-content,
+[data-slot="tooltip-content"],
 [data-slot="chatluna-sandbox-context-menu-content"],
 [data-slot="chatluna-sandbox-context-menu-sub-content"],
-.chatluna-sandbox-secondary-page {
+.chatluna-sandbox-secondary-page,
+.chatluna-sandbox-forward-modal-backdrop,
+.chatluna-sandbox-image-preview {
   --webqq-font-3xs: 9px;
   --webqq-font-2xs: 10px;
   --webqq-font-xs: 11px;

@@ -37,25 +37,12 @@ function collectStyleSources() {
 }
 
 describe('排版标度', () => {
-  it('把整套字号标度和等宽栈定义在所有渲染根上', () => {
+  it('把整套字号标度和等宽栈定义在渲染根上', () => {
     const tokens = readFileSync(resolve('client/styles/webqq-tokens.css'), 'utf8')
     const scaleRule = tokens.slice(0, tokens.indexOf('}'))
 
-    // teleport 到 body 的浮层拿不到 .webqq-workspace 上的令牌，漏掉任何一个渲染根，
-    // 那棵子树里的 var(--webqq-font-*) 会解析失败并静默退回继承字号。
-    for (const root of [
-      '.chatluna-sandbox-page',
-      '.webqq-workspace',
-      '.sandbox-dialog-content',
-      '.sandbox-popover-content',
-      '.sandbox-select-content',
-      '[data-slot="chatluna-sandbox-context-menu-content"]',
-      '[data-slot="chatluna-sandbox-context-menu-sub-content"]',
-      '.chatluna-sandbox-secondary-page',
-    ]) {
-      expect(scaleRule).toContain(root)
-    }
-
+    // 令牌规则的选择器列表必须覆盖全部渲染根，这一项由 tests/sandbox-style-roots.test.ts
+    // 与 SANDBOX_STYLE_ROOTS 逐项比对；这里只校验标度本身。
     for (const [token, value] of Object.entries(SCALE)) {
       expect(scaleRule).toContain(`${token}: ${value};`)
     }
@@ -70,11 +57,15 @@ describe('排版标度', () => {
     expect(workspaceRule).toContain('font-size: var(--webqq-font-md)')
     expect(workspaceRule).toContain('line-height: 1.5')
 
-    // 浮层基准写在原语层：Dialog/Popover/Select/右键菜单/二级页各自是独立的继承树。
-    const overlayBaseRule = primitives
-      .slice(primitives.indexOf('.chatluna-sandbox-secondary-page {'))
+    // 浮层基准写在原语层：Dialog/Popover/Select/右键菜单/二级页/自建 teleport 浮层
+    // 各自是独立的继承树。这条规则同时补上 preflight 限定作用域后丢掉的 tab-size。
+    const overlayBaseRule = primitives.slice(0, primitives.indexOf('tab-size: 4'))
+    const overlayRuleBody = primitives
+      .slice(primitives.indexOf('tab-size: 4'))
       .split('}')[0]
-    expect(overlayBaseRule).toContain('font-size: var(--webqq-font-md)')
+    expect(overlayBaseRule).toContain('.chatluna-sandbox-secondary-page')
+    expect(overlayBaseRule.slice(overlayBaseRule.lastIndexOf('{'))).toContain('font-size: var(--webqq-font-md)')
+    expect(overlayRuleBody).toContain('-webkit-tap-highlight-color: transparent')
   })
 
   it('头像首字母按直径派生，不再逐处硬编码', () => {
