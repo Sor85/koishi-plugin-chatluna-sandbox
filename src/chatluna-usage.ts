@@ -1,7 +1,7 @@
 import type { SandboxModelRequestRecord, SandboxModelRequestUsage } from './types'
 
 interface ModelRequestStoreLike {
-  getRawRecords(input?: { limit?: number }): SandboxModelRequestRecord[]
+  getRawRecords(input?: { limit?: number }): Promise<SandboxModelRequestRecord[]>
   update(recordId: string, input: { chatlunaRequestId?: string }): unknown
 }
 
@@ -54,16 +54,16 @@ export function toSandboxModelRequestUsage(row: ChatLunaUsageListRow): SandboxMo
   }
 }
 
-export function linkChatLunaUsageRequest(
+export async function linkChatLunaUsageRequest(
   stores: ModelRequestStoreLike[],
   payload: ChatLunaModelUsageEvent,
-): string | undefined {
+): Promise<string | undefined> {
   const requestId = payload.context?.requestId?.trim()
   if (!requestId) return
   const createdAt = payload.createdAt ? Date.parse(String(payload.createdAt)) : Date.now()
   let best: { store: ModelRequestStoreLike, record: SandboxModelRequestRecord, score: number } | undefined
   for (const store of stores) {
-    for (const record of store.getRawRecords({ limit: 50 })) {
+    for (const record of await store.getRawRecords({ limit: 50 })) {
       if (record.chatlunaRequestId) continue
       const delta = Math.abs(Date.parse(record.createdAt) - createdAt)
       if (!Number.isFinite(delta) || delta > USAGE_MATCH_WINDOW_MS) continue

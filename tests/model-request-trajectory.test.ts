@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { SandboxModelRequestStore } from '../src/model-request'
-import { buildSandboxModelRequestTrajectory } from '../src/model-request-trajectory'
+import { buildSandboxModelRequestTrajectoryFromStore } from '../src/model-request-trajectory'
 import {
   geminiGenerateContentRequest,
   openAiChatJsonResponse,
@@ -37,14 +37,14 @@ function createStore() {
   return { store, first, second }
 }
 
-function trajectoryFor(store: SandboxModelRequestStore, recordId: string, mode: 'request' | 'conversation') {
-  return buildSandboxModelRequestTrajectory({ record: store.getRecord(recordId)!, mode, store })
+async function trajectoryFor(store: SandboxModelRequestStore, recordId: string, mode: 'request' | 'conversation') {
+  return buildSandboxModelRequestTrajectoryFromStore({ record: (await store.getRecord(recordId))!, mode, store })
 }
 
 describe('模型请求轨迹投影', () => {
-  it('把共享模型证据投影映射为请求边界、请求行与响应行', () => {
+  it('把共享模型证据投影映射为请求边界、请求行与响应行', async () => {
     const { store, first } = createStore()
-    const trajectory = trajectoryFor(store, first.id, 'request')
+    const trajectory = await trajectoryFor(store, first.id, 'request')
 
     expect(trajectory.records).toHaveLength(1)
     expect(trajectory.rows.map(({ kind, toolEvent, source }) => ({ kind, toolEvent, source }))).toEqual([
@@ -64,9 +64,9 @@ describe('模型请求轨迹投影', () => {
     expect(trajectory.rows[0]?.evidenceId).toBeUndefined()
   })
 
-  it('轨迹行携带模型证据身份，请求与响应工具事件保留调用标识和工具名', () => {
+  it('轨迹行携带模型证据身份，请求与响应工具事件保留调用标识和工具名', async () => {
     const { store, first } = createStore()
-    const trajectory = trajectoryFor(store, first.id, 'request')
+    const trajectory = await trajectoryFor(store, first.id, 'request')
 
     expect(trajectory.rows.find(({ toolEvent }) => toolEvent === 'definition')).toMatchObject({
       evidenceId: 'req:tool-definition:tools.0.function',
@@ -94,9 +94,9 @@ describe('模型请求轨迹投影', () => {
     expect(trajectory.rows.every(({ id, requestId }) => id.startsWith(`${requestId}:`))).toBe(true)
   })
 
-  it('请求组成统计与轨迹行共享同一模型证据身份', () => {
+  it('请求组成统计与轨迹行共享同一模型证据身份', async () => {
     const { store, first } = createStore()
-    const trajectory = trajectoryFor(store, first.id, 'request')
+    const trajectory = await trajectoryFor(store, first.id, 'request')
 
     expect(trajectory.promptComposition).toEqual([
       { kind: 'system', evidenceId: 'req:message:messages.0', characters: 6 },
@@ -112,7 +112,7 @@ describe('模型请求轨迹投影', () => {
     }
   })
 
-  it('按提示词出现顺序拆成多段，不把同类消息合并成一条轨道', () => {
+  it('按提示词出现顺序拆成多段，不把同类消息合并成一条轨道', async () => {
     const store = new SandboxModelRequestStore()
     const record = store.append({
       status: 'success',
@@ -131,7 +131,7 @@ describe('模型请求轨迹投影', () => {
       responseBodyStatus: 'unavailable',
     })
 
-    expect(trajectoryFor(store, record.id, 'request').promptComposition).toEqual([
+    expect((await trajectoryFor(store, record.id, 'request')).promptComposition).toEqual([
       { kind: 'system', evidenceId: 'req:message:messages.0', characters: 2 },
       { kind: 'user', evidenceId: 'req:message:messages.1', characters: 3 },
       { kind: 'assistant', evidenceId: 'req:message:messages.2', characters: 2 },
@@ -139,7 +139,7 @@ describe('模型请求轨迹投影', () => {
     ])
   })
 
-  it('Gemini 与 Responses 请求同样区分工具声明和工具交互', () => {
+  it('Gemini 与 Responses 请求同样区分工具声明和工具交互', async () => {
     const store = new SandboxModelRequestStore()
     const gemini = store.append({
       status: 'success', durationMs: 10, attribution: 'unattributed', entities: {},
@@ -151,12 +151,12 @@ describe('模型请求轨迹投影', () => {
     })
 
     for (const record of [gemini, responses]) {
-      const { promptComposition } = trajectoryFor(store, record.id, 'request')
+      const { promptComposition } = await trajectoryFor(store, record.id, 'request')
       expect(promptComposition.find(({ kind }) => kind === 'tool-definition')?.characters).toBeGreaterThan(0)
       expect(promptComposition.find(({ kind }) => kind === 'tool-interaction')?.characters).toBeGreaterThan(0)
     }
 
-    const geminiTrajectory = trajectoryFor(store, gemini.id, 'request')
+    const geminiTrajectory = await trajectoryFor(store, gemini.id, 'request')
     expect(geminiTrajectory.rows.filter(({ kind }) => kind === 'system').map(({ preview, evidenceId }) => ({ preview, evidenceId }))).toEqual([
       { preview: 'Gemini 系统一', evidenceId: 'req:message:systemInstruction.parts.0' },
       { preview: 'Gemini 系统二', evidenceId: 'req:message:systemInstruction.parts.1' },
@@ -172,7 +172,7 @@ describe('模型请求轨迹投影', () => {
     ])
   })
 
-  it('请求事件按分析页顺序排列，并在请求消息后展示 Variables', () => {
+  it('请求事件按分析页顺序排列，并在请求消息后展示 Variables', async () => {
     const store = new SandboxModelRequestStore()
     const first = store.append({
       status: 'success',
@@ -190,7 +190,7 @@ describe('模型请求轨迹投影', () => {
       responseBodyStatus: 'unavailable',
     })
 
-    const trajectory = trajectoryFor(store, first.id, 'request')
+    const trajectory = await trajectoryFor(store, first.id, 'request')
     expect(trajectory.rows.map(({ kind, variableName }) => ({ kind, variableName }))).toEqual([
       { kind: 'request', variableName: undefined },
       { kind: 'system', variableName: undefined },
@@ -217,7 +217,7 @@ describe('模型请求轨迹投影', () => {
     expect(trajectory.promptComposition.reduce((sum, item) => sum + item.characters, 0)).toBe(6)
   })
 
-  it('把多个变量按实际范围拆成独立片段且不重复计算消息大小', () => {
+  it('把多个变量按实际范围拆成独立片段且不重复计算消息大小', async () => {
     const store = new SandboxModelRequestStore()
     const first = store.append({
       status: 'success',
@@ -235,7 +235,7 @@ describe('模型请求轨迹投影', () => {
       responseBodyStatus: 'unavailable',
     })
 
-    const trajectory = trajectoryFor(store, first.id, 'request')
+    const trajectory = await trajectoryFor(store, first.id, 'request')
     expect(trajectory.promptComposition.map(({ kind, characters, variableName }) => ({ kind, characters, variableName }))).toEqual([
       { kind: 'user', characters: 2, variableName: undefined },
       { kind: 'user', characters: 2, variableName: 'city' },
@@ -248,7 +248,7 @@ describe('模型请求轨迹投影', () => {
       .toEqual(trajectory.rows.filter(({ kind }) => kind === 'variable').map(({ evidenceId }) => evidenceId))
   })
 
-  it('按同一记录库和 conversationId 组成完整会话 Step，不混入其他会话', () => {
+  it('按同一记录库和 conversationId 组成完整会话 Step，不混入其他会话', async () => {
     const { store, second } = createStore()
     store.append({
       status: 'success',
@@ -257,7 +257,7 @@ describe('模型请求轨迹投影', () => {
       entities: { scopeId: 'main', conversationId: 'conversation-other' },
       requestBodyAvailable: false,
     })
-    const trajectory = trajectoryFor(store, second.id, 'conversation')
+    const trajectory = await trajectoryFor(store, second.id, 'conversation')
 
     expect(trajectory.mode).toBe('conversation')
     expect(trajectory.conversationId).toBe('conversation-1')
@@ -277,9 +277,9 @@ describe('模型请求轨迹投影', () => {
     expect(new Set(trajectory.rows.map(({ id }) => id)).size).toBe(trajectory.rows.length)
   })
 
-  it('响应不可用或采集失败时不生成响应行', () => {
+  it('响应不可用或采集失败时不生成响应行', async () => {
     const { store, second } = createStore()
-    const trajectory = trajectoryFor(store, second.id, 'request')
+    const trajectory = await trajectoryFor(store, second.id, 'request')
 
     expect(trajectory.rows.some(({ source }) => source === 'response')).toBe(false)
     expect(trajectory.rows.map(({ kind }) => kind)).toEqual(['request', 'user'])

@@ -8,7 +8,7 @@ import {
 } from '../src/chatluna-usage'
 
 describe('ChatLuna Usage 模型请求关联', () => {
-  it('把 chatluna-usage 行转换为模型请求详情用量', () => {
+  it('把 chatluna-usage 行转换为模型请求详情用量', async () => {
     expect(toSandboxModelRequestUsage({
       inputTokens: 14228,
       outputTokens: 218,
@@ -36,7 +36,7 @@ describe('ChatLuna Usage 模型请求关联', () => {
     })
   })
 
-  it('在 model-usage 事件到达时把 ChatLuna requestId 关联到最近请求', () => {
+  it('在 model-usage 事件到达时把 ChatLuna requestId 关联到最近请求', async () => {
     const store = new SandboxModelRequestStore()
     const record = store.append({
       status: 'success',
@@ -47,12 +47,12 @@ describe('ChatLuna Usage 模型请求关联', () => {
       requestBodyAvailable: false,
     })
 
-    expect(linkChatLunaUsageRequest([store], {
+    expect(await linkChatLunaUsageRequest([store], {
       model: 'gpt-5',
       createdAt: record.createdAt,
       context: { requestId: 'chatluna-request-1' },
     })).toBe(record.id)
-    expect(store.getRecord(record.id)?.chatlunaRequestId).toBe('chatluna-request-1')
+    expect((await store.getRecord(record.id))?.chatlunaRequestId).toBe('chatluna-request-1')
   })
 
   it('优先按 requestId 从 chatluna-usage 读取规范用量', async () => {

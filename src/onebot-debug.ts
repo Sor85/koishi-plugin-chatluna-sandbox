@@ -12,7 +12,12 @@ import type {
   SandboxOneBotDebugStatus,
 } from './types'
 import { SandboxOneBotDebugCursorExpiredError } from './types'
-import { getOneBotProfileBaseline } from './onebot-profiles'
+import { getOneBotProfileBaseline, listOneBotImplementationProfiles } from './onebot-profiles'
+import {
+  InMemoryRecordRows,
+  SerialWriteQueue,
+  type SandboxRecordScopeSummary,
+} from './record-store'
 
 export const DEFAULT_DEBUG_RECORD_LIMIT = 5000
 export const DEFAULT_DEBUG_RECORD_MAX_BYTES = 50 * 1024 * 1024
@@ -126,33 +131,47 @@ function readEntityId(payload: unknown, ...keys: string[]): string | undefined {
   }
 }
 
-function matchesActionFilter(record: SandboxOneBotDebugRecord, action: string): boolean {
-  if (record.action === action || record.requestedAction === action || record.matchedAlias === action) return true
-  const capability = getOneBotProfileBaseline(record.implementation).capabilities
-    .find((item) => item.action === record.action)
-  return !!capability && (capability.action === action || capability.aliases?.includes(action) === true)
+/**
+ * 按实现展开 action 别名。`action` 过滤要覆盖能力矩阵声明的全部别名，而别名归属取决于
+ * 记录自身的 implementation，无法写成一条等值条件；这里预先摊平成「精确名 + 每个实现下
+ * 的规范 action 集合」，让内存与数据库适配器基于同一份事实各自实现。
+ */
+export function resolveOneBotDebugActionFilter(action: string): SandboxOneBotDebugActionFilter {
+  const aliasTargets: SandboxOneBotDebugActionFilter['aliasTargets'] = []
+  for (const implementation of listOneBotImplementationProfiles()) {
+    const actions = getOneBotProfileBaseline(implementation).capabilities
+      .filter((capability) => capability.aliases?.includes(action) === true)
+      .map((capability) => capability.action)
+    if (actions.length) aliasTargets.push({ implementation, actions })
+  }
+  return { action, aliasTargets }
+}
+
+function matchesResolvedActionFilter(record: SandboxOneBotDebugRecord, filter: SandboxOneBotDebugActionFilter): boolean {
+  if (record.action === filter.action || record.requestedAction === filter.action || record.matchedAlias === filter.action) return true
+  return filter.aliasTargets.some(({ implementation, actions }) => (
+    record.implementation === implementation && actions.includes(record.action)
+  ))
+}
+
+/** 内存适配器与数据库适配器必须给出等价结果；内存侧直接复用这个谓词。 */
+export function matchesOneBotDebugQuery(record: SandboxOneBotDebugRecord, query: SandboxOneBotDebugPersistenceQuery): boolean {
+  if (query.botId && record.botId !== query.botId) return false
+  if (query.direction && record.direction !== query.direction) return false
+  if (query.action && !matchesResolvedActionFilter(record, query.action)) return false
+  if (query.requestedAction && record.requestedAction !== query.requestedAction) return false
+  if (query.errorsOnly && record.status !== 'error') return false
+  if (query.beforeSequence !== undefined) {
+    return query.order === 'asc' ? record.sequence > query.beforeSequence : record.sequence < query.beforeSequence
+  }
+  return true
 }
 
 export function resolveOneBotDebugOrder(input: Pick<GetSandboxOneBotDebugRecordsInput, 'order'>): 'asc' | 'desc' {
   return input.order === 'asc' ? 'asc' : 'desc'
 }
 
-function compareOneBotDebugSequence(left: number, right: number, order: 'asc' | 'desc'): number {
-  return order === 'asc' ? left - right : right - left
-}
-
-function isBeforeOneBotDebugPageCursor(
-  record: Pick<SandboxOneBotDebugRecord, 'sequence'>,
-  input: GetSandboxOneBotDebugRecordsInput,
-): boolean {
-  if (input.beforeSequence === undefined) return true
-  // 倒序向更早翻页，正序向更晚翻页；字段名沿用 beforeSequence，语义随 order 翻转。
-  return resolveOneBotDebugOrder(input) === 'asc'
-    ? record.sequence > input.beforeSequence
-    : record.sequence < input.beforeSequence
-}
-
-function estimateRecordBytes(record: SandboxOneBotDebugRecord): number {
+export function estimateOneBotDebugRecordBytes(record: SandboxOneBotDebugRecord): number {
   return Buffer.byteLength(JSON.stringify(record), 'utf8')
 }
 
@@ -174,10 +193,51 @@ export function createOneBotDebugError(error: unknown, traceId = Random.id()): S
   return { code, message, retryable, traceId }
 }
 
+export interface SandboxOneBotDebugActionFilter {
+  /** 精确匹配 action、requestedAction 或 matchedAlias 的名字。 */
+  action: string
+  /** 每个实现下「别名包含该名字」的规范 action 集合。 */
+  aliasTargets: Array<{ implementation: SandboxImplementationProfile, actions: string[] }>
+}
+
+export interface SandboxOneBotDebugPersistenceQuery {
+  botId?: string
+  direction?: SandboxOneBotDebugDirection
+  action?: SandboxOneBotDebugActionFilter
+  requestedAction?: string
+  errorsOnly?: boolean
+  order: 'asc' | 'desc'
+  beforeSequence?: number
+  /** 调用方会多取一条用于判断 hasMore。 */
+  limit: number
+}
+
+export type SandboxOneBotDebugScopeSummary = SandboxRecordScopeSummary
+
+/**
+ * 调试记录按行持久化：追加是单行写入，回收是按序号区间删除，读取由适配器完成过滤、
+ * 排序与分页。整个记录数组不再作为单行 JSON 整体重写。
+ */
 export interface SandboxOneBotDebugPersistence {
-  load(): Promise<{ nextSequence: number, records: SandboxOneBotDebugRecord[] }>
-  replaceAll(nextSequence: number, records: SandboxOneBotDebugRecord[]): Promise<void>
-  clear(): Promise<void>
+  /** 读取作用域摘要，不加载任何记录正文。 */
+  summarize(): Promise<SandboxOneBotDebugScopeSummary>
+  /** 追加单行；nextSequence 是作用域的最新高水位。 */
+  append(record: SandboxOneBotDebugRecord, bytes: number, nextSequence: number): Promise<SandboxOneBotDebugScopeSummary>
+  find(recordId: string): Promise<SandboxOneBotDebugRecord | undefined>
+  query(query: SandboxOneBotDebugPersistenceQuery): Promise<SandboxOneBotDebugRecord[]>
+  /** 从最旧开始按序号区间删除，直到同时满足条数与字节上限。 */
+  reclaim(limits: { maxRecords: number, maxBytes: number }): Promise<SandboxOneBotDebugScopeSummary>
+  /** 清空作用域记录，但保留 nextSequence 高水位。 */
+  clear(nextSequence: number): Promise<SandboxOneBotDebugScopeSummary>
+}
+
+/** 进程内调试记录行库；行库机制来自共享实现，这里只注入调试记录的过滤谓词。 */
+export class InMemoryOneBotDebugRecords
+  extends InMemoryRecordRows<SandboxOneBotDebugRecord, SandboxOneBotDebugPersistenceQuery>
+  implements SandboxOneBotDebugPersistence {
+  constructor() {
+    super(matchesOneBotDebugQuery)
+  }
 }
 
 export interface AppendOneBotDebugRecordInput {
@@ -201,69 +261,46 @@ export interface SandboxOneBotDebugStoreOptions {
 }
 
 export class SandboxOneBotDebugStore {
-  private records: SandboxOneBotDebugRecord[] = []
   private nextSequence = 1
-  private totalBytes = 0
+  private summary: SandboxOneBotDebugScopeSummary = { nextSequence: 1, recordCount: 0, totalBytes: 0 }
   private readonly maxRecords: number
   private readonly maxBytes: number
-  private readonly persistence?: SandboxOneBotDebugPersistence
-  private persistenceQueue = Promise.resolve()
-  private ready = Promise.resolve()
-  private persistenceAuthoritative = true
+  private persistence: SandboxOneBotDebugPersistence
+  private readonly ready: Promise<void>
+  private readonly writes: SerialWriteQueue
+  /** 已分配序号但尚未落盘的记录；恢复完成时按持久化高水位重新编号。 */
+  private staged: SandboxOneBotDebugRecord[] = []
 
-  constructor(options: SandboxOneBotDebugStoreOptions | number = {}) {
-    // 兼容旧构造签名 debugRecordLimit: number。
-    if (typeof options === 'number') {
-      this.maxRecords = options
-      this.maxBytes = DEFAULT_DEBUG_RECORD_MAX_BYTES
-      return
-    }
+  constructor(options: SandboxOneBotDebugStoreOptions = {}) {
     this.maxRecords = options.maxRecords ?? DEFAULT_DEBUG_RECORD_LIMIT
     this.maxBytes = options.maxBytes ?? DEFAULT_DEBUG_RECORD_MAX_BYTES
-    this.persistence = options.persistence
-    if (this.persistence) {
-      this.ready = this.persistence.load().then((state) => {
-        const capturedDuringLoad = this.records
-        const persisted = state.records
-          .slice()
-          .sort((left, right) => left.sequence - right.sequence)
-        let nextSequence = Math.max(
-          state.nextSequence,
-          persisted.reduce((max, record) => Math.max(max, record.sequence + 1), 1),
-        )
-        // 数据库恢复是异步的，启动期可能已经收到 OneBot 记录。不能直接替换内存数组，
-        // 否则恢复完成的瞬间会丢失这些记录，且后续写入可能覆盖数据库历史。
-        const captured = capturedDuringLoad.map((record) => ({
-          ...record,
-          sequence: nextSequence++,
-        }))
-        this.records = [...persisted, ...captured]
-        this.nextSequence = nextSequence
-        this.totalBytes = this.records.reduce((sum, record) => sum + estimateRecordBytes(record), 0)
-        this.reclaimOverflow()
-      }).catch(() => {
-        // 加载失败时不能把当前内存状态当成权威数据回写，否则可能清空数据库历史。
-        this.persistenceAuthoritative = false
-      })
-    }
+    this.persistence = options.persistence ?? new InMemoryOneBotDebugRecords()
+    this.ready = this.persistence.summarize().then((summary) => {
+      // 数据库恢复是异步的，启动期可能已经收到 OneBot 记录。它们先用临时序号占位，
+      // 这里按持久化高水位重新编号，避免恢复瞬间与历史记录撞号。
+      let nextSequence = Math.max(1, summary.nextSequence)
+      for (const record of this.staged) record.sequence = nextSequence++
+      this.nextSequence = nextSequence
+      this.summary = { ...summary, nextSequence }
+    }).catch(() => {
+      // 记录库不可读时不能把当前内存状态当成权威数据回写，否则会清空数据库历史。
+      // 降级为进程内记录库：调试证据仍然可见，只是本次运行不再落盘。
+      this.persistence = new InMemoryOneBotDebugRecords()
+    })
+    this.writes = new SerialWriteQueue(this.ready)
   }
 
   waitForReady(): Promise<void> {
     return this.ready
   }
 
-  async waitForPersistence(): Promise<void> {
-    await this.ready
-    await this.persistenceQueue
+  waitForPersistence(): Promise<void> {
+    return this.writes.settle()
   }
 
-  getCapacity(): SandboxOneBotDebugCapacity {
-    return {
-      recordCount: this.records.length,
-      totalBytes: this.totalBytes,
-      maxRecords: this.maxRecords,
-      maxBytes: this.maxBytes,
-    }
+  async getCapacity(): Promise<SandboxOneBotDebugCapacity> {
+    await this.waitForPersistence()
+    return this.readCapacity()
   }
 
   append(input: AppendOneBotDebugRecordInput): SandboxOneBotDebugRecord {
@@ -293,17 +330,22 @@ export class SandboxOneBotDebugStore {
       error: input.error,
     }
     this.nextSequence += 1
-    this.records.push(record)
-    this.totalBytes += estimateRecordBytes(record)
-    this.reclaimOverflow()
-    this.queuePersist()
+    this.staged.push(record)
+    this.writes.push(async () => {
+      // record.sequence 可能已被恢复流程重新编号，这里读到的是最终值。
+      this.summary = await this.persistence.append(record, estimateOneBotDebugRecordBytes(record), this.nextSequence)
+      await this.reclaimOverflow()
+      const index = this.staged.indexOf(record)
+      if (index >= 0) this.staged.splice(index, 1)
+    })
     // 广播与即时返回使用折叠投影，避免 MCP 事件流被超大 Base64 淹没。
     return presentOneBotDebugRecord(record, false)
   }
 
-  getRecords(input: GetSandboxOneBotDebugRecordsInput = {}): SandboxOneBotDebugRecordsPage {
+  async getRecords(input: GetSandboxOneBotDebugRecordsInput = {}): Promise<SandboxOneBotDebugRecordsPage> {
     const limit = Math.min(Math.max(Number(input.limit ?? DEFAULT_DEBUG_PAGE_SIZE) || DEFAULT_DEBUG_PAGE_SIZE, 1), MAX_DEBUG_PAGE_SIZE)
-    const earliestCursor = this.records[0]?.sequence
+    await this.waitForPersistence()
+    const earliestCursor = this.summary.earliestSequence
     if (input.beforeSequence !== undefined) {
       if (!Number.isInteger(input.beforeSequence) || input.beforeSequence < 1) {
         throw new Error('beforeSequence 必须是正整数')
@@ -317,69 +359,54 @@ export class SandboxOneBotDebugStore {
       }
     }
 
-    const order = resolveOneBotDebugOrder(input)
-    const filtered = this.records.filter((record) => (
-      (!input.botId || record.botId === input.botId)
-      && (!input.direction || record.direction === input.direction)
-      && (!input.action || matchesActionFilter(record, input.action))
-      && (!input.requestedAction || record.requestedAction === input.requestedAction)
-      && (!input.errorsOnly || record.status === 'error')
-      && isBeforeOneBotDebugPageCursor(record, input)
-    ))
-    // 按 sequence 稳定排序；插入新记录不影响既有 beforeSequence 窗口。
-    filtered.sort((left, right) => compareOneBotDebugSequence(left.sequence, right.sequence, order))
-    const page = filtered.slice(0, limit)
-    const hasMore = filtered.length > page.length
+    // 多取一条用于判断 hasMore，避免为了计数再查一次全表。
+    const rows = await this.persistence.query({
+      ...(input.botId ? { botId: input.botId } : {}),
+      ...(input.direction ? { direction: input.direction } : {}),
+      ...(input.action ? { action: resolveOneBotDebugActionFilter(input.action) } : {}),
+      ...(input.requestedAction ? { requestedAction: input.requestedAction } : {}),
+      ...(input.errorsOnly ? { errorsOnly: true } : {}),
+      order: resolveOneBotDebugOrder(input),
+      ...(input.beforeSequence !== undefined ? { beforeSequence: input.beforeSequence } : {}),
+      limit: limit + 1,
+    })
+    const page = rows.slice(0, limit)
+    const hasMore = rows.length > page.length
     return {
       records: page.map((record) => presentOneBotDebugRecord(record, false)),
       hasMore,
       nextCursor: hasMore ? page[page.length - 1]?.sequence : undefined,
       earliestCursor,
-      capacity: this.getCapacity(),
+      capacity: this.readCapacity(),
     }
   }
 
-  getRecord(recordId: string, includeLargeValues = false): SandboxOneBotDebugRecord | undefined {
-    const record = this.records.find(({ id }) => id === recordId)
+  async getRecord(recordId: string, includeLargeValues = false): Promise<SandboxOneBotDebugRecord | undefined> {
+    await this.waitForPersistence()
+    const record = await this.persistence.find(recordId)
     return record ? presentOneBotDebugRecord(record, includeLargeValues) : undefined
   }
 
-  clear(): number {
-    const count = this.records.length
-    this.records = []
-    this.totalBytes = 0
+  clear(): Promise<number> {
     // sequence 不因清理而回退，避免跨清理复用。
-    this.queuePersist(true)
-    return count
+    return this.writes.run(async () => {
+      const cleared = this.summary.recordCount
+      this.summary = await this.persistence.clear(this.nextSequence)
+      return cleared
+    }).catch(() => 0)
   }
 
-  private reclaimOverflow(): void {
-    while (
-      this.records.length > this.maxRecords
-      || this.totalBytes > this.maxBytes
-    ) {
-      const removed = this.records.shift()
-      if (!removed) break
-      this.totalBytes -= estimateRecordBytes(removed)
+  private readCapacity(): SandboxOneBotDebugCapacity {
+    return {
+      recordCount: this.summary.recordCount,
+      totalBytes: this.summary.totalBytes,
+      maxRecords: this.maxRecords,
+      maxBytes: this.maxBytes,
     }
-    if (this.totalBytes < 0) this.totalBytes = 0
   }
 
-  private queuePersist(clear = false): void {
-    const persistence = this.persistence
-    if (!persistence) return
-    this.persistenceQueue = Promise.all([this.ready, this.persistenceQueue])
-      .then(async () => {
-        if (!this.persistenceAuthoritative) return
-        const nextSequence = this.nextSequence
-        const records = structuredClone(this.records)
-        if (clear) {
-          await persistence.clear()
-          await persistence.replaceAll(nextSequence, [])
-        } else {
-          await persistence.replaceAll(nextSequence, records)
-        }
-      })
-      .catch(() => undefined)
+  private async reclaimOverflow(): Promise<void> {
+    if (this.summary.recordCount <= this.maxRecords && this.summary.totalBytes <= this.maxBytes) return
+    this.summary = await this.persistence.reclaim({ maxRecords: this.maxRecords, maxBytes: this.maxBytes })
   }
 }

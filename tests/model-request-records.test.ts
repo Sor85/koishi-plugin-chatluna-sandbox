@@ -45,10 +45,10 @@ function appendRecord(
 }
 
 describe('模型请求记录库', () => {
-  it('列表省略请求体与协议派生计数，详情保留完整请求体并给出证据计数', () => {
+  it('列表省略请求体与协议派生计数，详情保留完整请求体并给出证据计数', async () => {
     const store = new SandboxModelRequestStore()
     const created = appendRecord(store)
-    const page = store.getRecords()
+    const page = (await store.getRecords())
     expect(page.records).toHaveLength(1)
     expect(page.records[0]).not.toHaveProperty('requestBody')
     expect(page.records[0]).not.toHaveProperty('responseBodyRaw')
@@ -59,7 +59,7 @@ describe('模型请求记录库', () => {
       status: 'success',
       model: 'gpt-4o',
     })
-    expect(store.getRecord(created.id)).toMatchObject({
+    expect((await store.getRecord(created.id))).toMatchObject({
       id: created.id,
       requestBody: { model: 'gpt-4o', messages: [{ role: 'user', content: 'hi' }] },
       responseBodyStatus: 'complete',
@@ -71,38 +71,38 @@ describe('模型请求记录库', () => {
     })
   })
 
-  it('列表只暴露预设快照摘要，详情保留模板源码并派生预设变量', () => {
+  it('列表只暴露预设快照摘要，详情保留模板源码并派生预设变量', async () => {
     const store = new SandboxModelRequestStore()
     const created = appendRecord(store, {
       presetSnapshots: [presetSnapshot],
       requestBody: { model: 'gpt-4o', messages: [{ role: 'system', content: 'Hello Alice.' }] },
     })
 
-    expect(store.getRecords().records[0]).toMatchObject({
+    expect((await store.getRecords()).records[0]).toMatchObject({
       presetSnapshotSummaries: [{ kind: 'core', presetName: 'demo', templateCount: 1, capturedAt: presetSnapshot.capturedAt }],
     })
-    expect(JSON.stringify(store.getRecords().records[0])).not.toContain('Hello {name}')
-    expect(store.getRecord(created.id)?.presetSnapshots).toEqual([presetSnapshot])
-    expect(store.getRecord(created.id)?.variables).toEqual([
+    expect(JSON.stringify((await store.getRecords()).records[0])).not.toContain('Hello {name}')
+    expect((await store.getRecord(created.id))?.presetSnapshots).toEqual([presetSnapshot])
+    expect((await store.getRecord(created.id))?.variables).toEqual([
       expect.objectContaining({ name: 'name', status: 'observed', value: 'Alice' }),
     ])
-    expect(store.getRawRecords()[0]?.presetSnapshots).toEqual([presetSnapshot])
+    expect((await store.getRawRecords())[0]?.presetSnapshots).toEqual([presetSnapshot])
   })
 
-  it('没有运行时预设快照的记录照常返回详情，变量为空', () => {
+  it('没有运行时预设快照的记录照常返回详情，变量为空', async () => {
     const store = new SandboxModelRequestStore()
     const created = appendRecord(store)
-    expect(store.getRecord(created.id)?.variables).toEqual([])
+    expect((await store.getRecord(created.id))?.variables).toEqual([])
   })
 
-  it('没有采集到请求体时不产生字段数与证据计数', () => {
+  it('没有采集到请求体时不产生字段数与证据计数', async () => {
     const store = new SandboxModelRequestStore()
     const created = appendRecord(store, {
       requestBodyAvailable: false,
       requestBody: undefined,
       presetSnapshots: [presetSnapshot],
     })
-    const detail = store.getRecord(created.id)!
+    const detail = (await store.getRecord(created.id))!
 
     expect(detail).not.toHaveProperty('requestBodyKeyCount')
     expect(detail).not.toHaveProperty('evidenceCounts')
@@ -110,18 +110,18 @@ describe('模型请求记录库', () => {
     expect(detail.variables).toEqual([])
   })
 
-  it('采集到的请求体不是对象时证据计数取零，字段数仍然缺省', () => {
+  it('采集到的请求体不是对象时证据计数取零，字段数仍然缺省', async () => {
     const store = new SandboxModelRequestStore()
     for (const requestBody of ['纯文本请求体', [{ role: 'user', content: 'hi' }], 42] as const) {
       const created = appendRecord(store, { requestBody })
-      const detail = store.getRecord(created.id)!
+      const detail = (await store.getRecord(created.id))!
 
       expect(detail).not.toHaveProperty('requestBodyKeyCount')
       expect(detail.evidenceCounts, JSON.stringify(requestBody)).toEqual({ requestMessageCount: 0, toolDefinitionCount: 0 })
     }
   })
 
-  it('按 Gemini generateContent 结构统计请求消息和展平后的函数声明工具', () => {
+  it('按 Gemini generateContent 结构统计请求消息和展平后的函数声明工具', async () => {
     const store = new SandboxModelRequestStore()
     const created = appendRecord(store, {
       url: 'http://192.168.5.3/v1beta/models/gemini:generateContent',
@@ -139,13 +139,13 @@ describe('模型请求记录库', () => {
       },
     })
 
-    expect(store.getRecord(created.id)).toMatchObject({
+    expect((await store.getRecord(created.id))).toMatchObject({
       requestBodyKeyCount: 5,
       evidenceCounts: { requestMessageCount: 2, toolDefinitionCount: 2 },
     })
   })
 
-  it('同一条记录从 pending 更新为 success 或 error，不新增序号', () => {
+  it('同一条记录从 pending 更新为 success 或 error，不新增序号', async () => {
     const store = new SandboxModelRequestStore()
     const pending = appendRecord(store, {
       status: 'pending',
@@ -153,7 +153,7 @@ describe('模型请求记录库', () => {
       responseBodyStatus: 'pending',
       responseBodyRaw: undefined,
     })
-    const success = store.update(pending.id, {
+    const success = await store.update(pending.id, {
       status: 'success',
       durationMs: 40,
       responseBodyStatus: 'complete',
@@ -169,43 +169,43 @@ describe('模型请求记录库', () => {
       responseBodyStatus: 'complete',
       responseBodyRaw: 'done',
     })
-    expect(store.getRecords().records).toHaveLength(1)
+    expect((await store.getRecords()).records).toHaveLength(1)
 
     const failed = appendRecord(store, { status: 'pending', durationMs: 0, model: 'gpt-4.1' })
-    store.update(failed.id, { status: 'error', durationMs: 8, error: createModelRequestError(new Error('timeout')) })
-    expect(store.getRecord(failed.id)).toMatchObject({
+    await store.update(failed.id, { status: 'error', durationMs: 8, error: createModelRequestError(new Error('timeout')) })
+    expect((await store.getRecord(failed.id))).toMatchObject({
       status: 'error',
       error: { code: 'transient_error', retryable: true, message: 'timeout' },
     })
-    expect(store.getRecords({ errorsOnly: true }).records.map(({ id }) => id)).toEqual([failed.id])
+    expect((await store.getRecords({ errorsOnly: true })).records.map(({ id }) => id)).toEqual([failed.id])
   })
 
-  it('按稳定序号新到旧分页，回收后的游标返回 cursor_expired', () => {
+  it('按稳定序号新到旧分页，回收后的游标返回 cursor_expired', async () => {
     const store = new SandboxModelRequestStore({ maxRecords: 2 })
     appendRecord(store, { model: 'one' })
     appendRecord(store, { model: 'two' })
     appendRecord(store, { model: 'three' })
-    const page = store.getRecords({ limit: 1 })
+    const page = (await store.getRecords({ limit: 1 }))
     expect(page.records.map(({ model }) => model)).toEqual(['three'])
     expect(page.hasMore).toBe(true)
-    expect(store.getRecords({ limit: 1, beforeSequence: page.nextCursor }).records.map(({ model }) => model)).toEqual(['two'])
-    expect(() => store.getRecords({ beforeSequence: 1 })).toThrow(SandboxModelRequestCursorExpiredError)
+    expect((await store.getRecords({ limit: 1, beforeSequence: page.nextCursor })).records.map(({ model }) => model)).toEqual(['two'])
+    await expect(store.getRecords({ beforeSequence: 1 })).rejects.toThrow(SandboxModelRequestCursorExpiredError)
   })
 
-  it('支持按创建时间和记录 ID 做跨库分页游标', () => {
+  it('支持按创建时间和记录 ID 做跨库分页游标', async () => {
     const store = new SandboxModelRequestStore()
     const created = appendRecord(store, { model: 'one' })
-    expect(store.getRecords({ beforeCreatedAt: '1970-01-01T00:00:00.000Z' }).records).toEqual([])
-    expect(store.getRecords({ beforeCreatedAt: created.createdAt, beforeId: created.id }).records).toEqual([])
-    expect(store.getRecords({ beforeCreatedAt: '2999-01-01T00:00:00.000Z' }).records.map(({ id }) => id)).toEqual([created.id])
+    expect((await store.getRecords({ beforeCreatedAt: '1970-01-01T00:00:00.000Z' })).records).toEqual([])
+    expect((await store.getRecords({ beforeCreatedAt: created.createdAt, beforeId: created.id })).records).toEqual([])
+    expect((await store.getRecords({ beforeCreatedAt: '2999-01-01T00:00:00.000Z' })).records.map(({ id }) => id)).toEqual([created.id])
   })
 
-  it('支持按时间正序返回记录', () => {
+  it('支持按时间正序返回记录', async () => {
     const store = new SandboxModelRequestStore()
     appendRecord(store, { model: 'one' })
     appendRecord(store, { model: 'two' })
-    expect(store.getRecords({ order: 'asc' }).records.map(({ model }) => model)).toEqual(['one', 'two'])
-    expect(store.getRecords({ order: 'desc' }).records.map(({ model }) => model)).toEqual(['two', 'one'])
+    expect((await store.getRecords({ order: 'asc' })).records.map(({ model }) => model)).toEqual(['one', 'two'])
+    expect((await store.getRecords({ order: 'desc' })).records.map(({ model }) => model)).toEqual(['two', 'one'])
   })
 })
 
@@ -226,11 +226,11 @@ describe('模型请求详情的协议形状计数', () => {
   ]
 
   for (const shape of SHAPES) {
-    it(`${shape.name} 的请求消息数与工具定义数与共享模型证据投影一致`, () => {
+    it(`${shape.name} 的请求消息数与工具定义数与共享模型证据投影一致`, async () => {
       const store = new SandboxModelRequestStore()
       const created = appendRecord(store, { requestBody: shape.requestBody })
 
-      expect(store.getRecord(created.id)).toMatchObject({
+      expect((await store.getRecord(created.id))).toMatchObject({
         requestBodyKeyCount: shape.keyCount,
         evidenceCounts: {
           requestMessageCount: shape.requestMessageCount,

@@ -1024,7 +1024,7 @@ export class SandboxMcpService {
       if (args.scope === 'unattributed') {
         throw new SandboxMcpError('invalid_arguments', 'MCP 不能清理未归属模型请求记录')
       }
-      return { cleared: this.resolveControl(args, true).clearModelRequestRecords() }
+      return { cleared: await this.resolveControl(args, true).clearModelRequestRecords() }
     }
     const activeControl = this.resolveControl(args, tool !== 'get_scene_snapshot' && tool !== 'list_conversations' && tool !== 'get_conversation' && tool !== 'get_forward_message' && tool !== 'list_pending_requests' && tool !== 'get_capability_matrix' && tool !== 'export_scene' && tool !== 'list_onebot_debug_records' && tool !== 'get_onebot_debug_record')
     if (tool === 'get_scene_snapshot') return activeControl.getSnapshot()
@@ -1062,7 +1062,7 @@ export class SandboxMcpService {
       }
       try {
         await activeControl.waitForPersistence()
-        return activeControl.getOneBotDebugRecords({
+        return await activeControl.getOneBotDebugRecords({
           botId: typeof args.botId === 'string' ? args.botId : undefined,
           direction: args.direction === 'action' || args.direction === 'event' ? args.direction : undefined,
           action: typeof args.action === 'string' ? args.action : undefined,
@@ -1084,7 +1084,7 @@ export class SandboxMcpService {
     if (tool === 'get_onebot_debug_record') {
       try {
         await activeControl.waitForPersistence()
-        return activeControl.getOneBotDebugRecord({
+        return await activeControl.getOneBotDebugRecord({
           recordId: requireString(args.recordId, 'recordId'),
           includeLargeValues: args.includeLargeValues === true,
         })
@@ -1092,7 +1092,7 @@ export class SandboxMcpService {
         throw new SandboxMcpError('record_not_found', error instanceof Error ? error.message : '调试记录不存在')
       }
     }
-    if (tool === 'clear_onebot_debug_records') return { cleared: activeControl.clearOneBotDebugRecords() }
+    if (tool === 'clear_onebot_debug_records') return { cleared: await activeControl.clearOneBotDebugRecords() }
     throw new SandboxMcpError('tool_not_found', `工具不存在：${tool}`)
   }
 
@@ -1550,7 +1550,7 @@ export class SandboxMcpService {
     return { kind: 'space' as const, spaceId }
   }
 
-  private listModelRequestRecords(args: Record<string, unknown>) {
+  private async listModelRequestRecords(args: Record<string, unknown>) {
     const query: GetSandboxModelRequestRecordsInput = {
       botId: typeof args.botId === 'string' ? args.botId : undefined,
       conversationId: typeof args.conversationId === 'string' ? args.conversationId : undefined,
@@ -1565,17 +1565,17 @@ export class SandboxMcpService {
     }
     try {
       const scope = this.resolveModelRequestScope(args)
-      if (scope.kind === 'unattributed') return this.requireUnattributedModelRequests().getRecords(query)
+      if (scope.kind === 'unattributed') return await this.requireUnattributedModelRequests().getRecords(query)
       if (scope.kind === 'all') {
         const limit = Math.min(Math.max(Number(query.limit ?? DEFAULT_MODEL_REQUEST_PAGE_SIZE) || DEFAULT_MODEL_REQUEST_PAGE_SIZE, 1), MAX_MODEL_REQUEST_PAGE_SIZE)
         const federatedQuery = { ...query, beforeSequence: undefined }
-        return mergeModelRequestRecordPages([
+        return mergeModelRequestRecordPages(await Promise.all([
           this.control.getModelRequestRecords(federatedQuery),
           ...(this.testSpaces?.listSpaces() ?? []).map((space) => this.resolveControl({ spaceId: space.id }, false).getModelRequestRecords(federatedQuery)),
-        ], limit, query.order === 'asc' ? 'asc' : 'desc')
+        ]), limit, query.order === 'asc' ? 'asc' : 'desc')
       }
-      if (scope.kind === 'main') return this.control.getModelRequestRecords(query)
-      return this.resolveControl({ spaceId: scope.spaceId }, false).getModelRequestRecords(query)
+      if (scope.kind === 'main') return await this.control.getModelRequestRecords(query)
+      return await this.resolveControl({ spaceId: scope.spaceId }, false).getModelRequestRecords(query)
     } catch (error) {
       if (error instanceof SandboxModelRequestCursorExpiredError) {
         throw new SandboxMcpError('cursor_expired', error.message, false, error.earliestCursor === undefined
@@ -1586,17 +1586,17 @@ export class SandboxMcpService {
     }
   }
 
-  private getModelRequestRecord(args: Record<string, unknown>) {
+  private async getModelRequestRecord(args: Record<string, unknown>) {
     const recordId = requireString(args.recordId, 'recordId')
     try {
       const scope = this.resolveModelRequestScope(args)
       if (scope.kind === 'unattributed') {
-        const record = this.requireUnattributedModelRequests().getRecord(recordId)
+        const record = await this.requireUnattributedModelRequests().getRecord(recordId)
         if (!record) throw new Error(`模型请求记录不存在：${recordId}`)
         return record
       }
-      if (scope.kind === 'main') return this.control.getModelRequestRecord({ recordId })
-      return this.resolveControl({ spaceId: scope.spaceId }, false).getModelRequestRecord({ recordId })
+      if (scope.kind === 'main') return await this.control.getModelRequestRecord({ recordId })
+      return await this.resolveControl({ spaceId: scope.spaceId }, false).getModelRequestRecord({ recordId })
     } catch (error) {
       if (error instanceof SandboxMcpError) throw error
       throw new SandboxMcpError('record_not_found', error instanceof Error ? error.message : '模型请求记录不存在')

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Config, inject } from '../src'
+import { DEFAULT_SCENE_MESSAGE_LIMIT, DEFAULT_SCENE_MESSAGE_MAX_BYTES } from '../src/control-service'
 
 describe('插件持久化配置', () => {
   it('默认使用内存模式，并将 Database 与 ChatLuna Usage 声明为可选服务', () => {
@@ -16,5 +17,13 @@ describe('插件持久化配置', () => {
     expect(Config.dict.modelRequestRecordLimit.meta.default).toBe(500)
     expect(Config.dict.modelRequestRecordLimit.meta.description).toBe('每个空间保留的模型请求记录上限')
     expect(Config.dict.webQQChatStyle).toBeUndefined()
+  })
+
+  it('场景消息保留上限可配置，且描述说明会丢弃历史消息', () => {
+    if (!Config.dict) throw new Error('配置 Schema 缺少字段定义')
+    expect(Config.dict.sceneMessageLimit.meta.default).toBe(DEFAULT_SCENE_MESSAGE_LIMIT)
+    expect(Config.dict.sceneMessageLimit.meta.description).toContain('丢弃')
+    expect(Config.dict.sceneMessageMaxBytes.meta.default).toBe(DEFAULT_SCENE_MESSAGE_MAX_BYTES)
+    expect(Config.dict.sceneMessageMaxBytes.meta.description).toContain('丢弃')
   })
 })

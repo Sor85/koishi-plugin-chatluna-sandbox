@@ -67,7 +67,7 @@ describe('OneBot 调试 Console 协议', () => {
       requestedAction: 'get_login_info',
       source: { type: 'main', name: '主环境' },
     })
-    expect(Reflect.apply(clearRecords, undefined, [])).toEqual({ cleared: 1 })
+    expect(await Reflect.apply(clearRecords, undefined, [])).toEqual({ cleared: 1 })
     expect(await Reflect.apply(listRecords, undefined, [{}])).toMatchObject({ records: [], hasMore: false })
   })
 
@@ -117,8 +117,8 @@ describe('OneBot 调试 Console 协议', () => {
         { requestedAction: 'space-event', source: { type: 'test-space', spaceId: first.id, name: '空间 A' } },
       ],
     })
-    expect(listeners.get('chatluna-sandbox/clear-debug-records')?.({})).toEqual({ cleared: 2 })
-    expect(control.getOneBotDebugRecords()).toMatchObject({ records: [], hasMore: false })
-    expect(first.control.getOneBotDebugRecords()).toMatchObject({ records: [], hasMore: false })
+    expect(await listeners.get('chatluna-sandbox/clear-debug-records')?.({})).toEqual({ cleared: 2 })
+    expect(await control.getOneBotDebugRecords()).toMatchObject({ records: [], hasMore: false })
+    expect(await first.control.getOneBotDebugRecords()).toMatchObject({ records: [], hasMore: false })
   })
 })

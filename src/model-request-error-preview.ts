@@ -30,7 +30,7 @@ export async function seedDevelopmentModelRequestErrors(control: SandboxControlS
   let created = 0
   for (const preview of PREVIEW_ERRORS) {
     const interactionId = `${PREVIEW_INTERACTION_PREFIX}${preview.code}`
-    if (control.getModelRequestRecords({ interactionId, limit: 1 }).records.length) continue
+    if ((await control.getModelRequestRecords({ interactionId, limit: 1 })).records.length) continue
     const model = `error-preview-${preview.code}`
     control.recordModelRequest({
       status: 'error',

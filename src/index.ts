@@ -1,6 +1,11 @@
 import { Context, Schema } from 'koishi'
 import { registerConsole } from './console'
-import { SandboxControlService, SandboxRuntimeBotRegistry } from './control-service'
+import {
+  DEFAULT_SCENE_MESSAGE_LIMIT,
+  DEFAULT_SCENE_MESSAGE_MAX_BYTES,
+  SandboxControlService,
+  SandboxRuntimeBotRegistry,
+} from './control-service'
 import {
   KoishiDatabaseModelRequestPersistence,
   KoishiDatabaseOneBotDebugPersistence,
@@ -27,6 +32,7 @@ import type { SandboxAppearance, SandboxModelRequestEntities, SandboxPersistence
 
 export * from './control-service'
 export * from './persistence'
+export * from './record-store'
 export * from './onebot-debug'
 export * from './model-request'
 export * from './model-request-collector'
@@ -47,6 +53,8 @@ export const inject = {
 
 export interface Config extends SandboxAppearance {
   persistenceMode: SandboxPersistenceMode
+  sceneMessageLimit: number
+  sceneMessageMaxBytes: number
   modelRequestRecordLimit: number
   mcp: SandboxMcpServerConfig
 }
@@ -66,6 +74,10 @@ export const Config: Schema<Config> = Schema.object({
   sandboxAccentColor: Schema.string().default('#2563eb').role('color').description('Sandbox 强调色'),
   sandboxMarkRecalledMessages: Schema.boolean().default(true).description('仅影响 Sandbox 展示：开启时保留撤回气泡并显示撤回线，关闭时只显示撤回事件'),
   modelRequestRecordLimit: Schema.number().min(1).default(500).description('每个空间保留的模型请求记录上限'),
+  sceneMessageLimit: Schema.number().min(1).default(DEFAULT_SCENE_MESSAGE_LIMIT)
+    .description('每个空间保留的场景消息条数上限；主环境与每个 AI 测试空间各自独立，超出后从最旧消息开始丢弃，被丢弃的历史消息不可恢复'),
+  sceneMessageMaxBytes: Schema.number().min(64 * 1024).default(DEFAULT_SCENE_MESSAGE_MAX_BYTES)
+    .description('每个空间场景 JSON 的字节上限；达到后继续从最旧消息开始丢弃，被丢弃的历史消息不可恢复'),
   mcp: Schema.object({
     enabled: Schema.boolean().default(false).description('启用独立 MCP Streamable HTTP 端点'),
     host: Schema.string().default('127.0.0.1').description('监听地址'),
@@ -151,6 +163,8 @@ export function apply(ctx: Context, config: Config) {
       debugPersistence: createDebugPersistence('main'),
       modelRequestPersistence: createModelRequestPersistence(MAIN_MODEL_REQUEST_SCOPE_ID),
       modelRequestRecordLimit: config.modelRequestRecordLimit,
+      sceneMessageLimit: config.sceneMessageLimit,
+      sceneMessageMaxBytes: config.sceneMessageMaxBytes,
     })
     const testSpaces = new SandboxTestSpaceService(
       inner,
@@ -159,6 +173,10 @@ export function apply(ctx: Context, config: Config) {
       createDebugPersistence,
       createModelRequestPersistence,
       config.modelRequestRecordLimit,
+      {
+        sceneMessageLimit: config.sceneMessageLimit,
+        sceneMessageMaxBytes: config.sceneMessageMaxBytes,
+      },
     )
     const resolvePresetRuntimeTarget = ({ botId, conversationId }: Pick<PresetRuntimeResolvedTarget, 'botId' | 'conversationId'>): PresetRuntimeResolvedTarget | undefined => {
       const belongsToTarget = (snapshot: ReturnType<SandboxControlService['getSnapshot']>) => {
@@ -232,7 +250,10 @@ export function apply(ctx: Context, config: Config) {
       ...testSpaces.listSpaces().map((space) => testSpaces.getControl(space.id).getModelRequestStore()),
     ]
     inner.on('chatluna/model-usage', (payload) => {
-      linkChatLunaUsageRequest(modelRequestStores(), payload)
+      // 记录库读取是异步的，事件回调不可等待；失败只写日志，不影响 ChatLuna 主流程。
+      void linkChatLunaUsageRequest(modelRequestStores(), payload).catch((error) => {
+        inner.logger('chatluna-sandbox').warn('ChatLuna 用量事件关联模型请求失败。', error)
+      })
     })
     inner.provide('chatlunaSandbox', control, true)
     const presetService = new SandboxPresetService({

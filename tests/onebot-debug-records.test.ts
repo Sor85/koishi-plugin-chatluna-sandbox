@@ -29,7 +29,7 @@ describe('OneBot 调试记录', () => {
       message: '这是一段不应完整进入调试记录的消息正文'.repeat(8),
     })
 
-    const page = control.getOneBotDebugRecords({ direction: 'action' })
+    const page = (await control.getOneBotDebugRecords({ direction: 'action' }))
     const [record] = page.records
     expect(record).toEqual(expect.objectContaining({
       botId: '20001',
@@ -52,7 +52,7 @@ describe('OneBot 调试记录', () => {
 
     control.createBot({ id: '20002', name: 'LLBot 测试机器人', implementation: 'llbot', enabled: true })
     await control.getRuntimeBot('20002').internal._request('get_version_info', {})
-    expect(control.getOneBotDebugRecords({ botId: '20002' }).records).toContainEqual(expect.objectContaining({
+    expect((await control.getOneBotDebugRecords({ botId: '20002' })).records).toContainEqual(expect.objectContaining({
       botId: '20002',
       implementation: 'llbot',
       requestedAction: 'get_version_info',
@@ -68,7 +68,7 @@ describe('OneBot 调试记录', () => {
       content: '用于调试记录的私聊消息',
     })
 
-    const [record] = control.getOneBotDebugRecords({ direction: 'event', action: 'message.private' }).records
+    const [record] = (await control.getOneBotDebugRecords({ direction: 'event', action: 'message.private' })).records
     expect(record).toEqual(expect.objectContaining({
       botId: '20001',
       implementation: 'napcat',
@@ -93,20 +93,20 @@ describe('OneBot 调试记录', () => {
 
     await expect(control.bot.internal._request('host_only_action', { user_id: 10001 })).rejects.toThrow('不支持 OneBot action')
 
-    const [record] = control.getOneBotDebugRecords({
+    const [record] = (await control.getOneBotDebugRecords({
       botId: '20001',
       direction: 'action',
       requestedAction: 'host_only_action',
       errorsOnly: true,
-    }).records
+    })).records
     expect(record.error).toEqual({
       code: 'action_unsupported',
       message: expect.stringContaining('不支持 OneBot action'),
       retryable: false,
       traceId: expect.any(String),
     })
-    expect(control.clearOneBotDebugRecords()).toBe(1)
-    expect(control.getOneBotDebugRecords()).toMatchObject({ records: [], hasMore: false })
+    expect((await control.clearOneBotDebugRecords())).toBe(1)
+    expect((await control.getOneBotDebugRecords())).toMatchObject({ records: [], hasMore: false })
   })
 
   it('action 过滤覆盖别名，requestedAction 过滤仅精确匹配', async () => {
@@ -114,21 +114,21 @@ describe('OneBot 调试记录', () => {
     await control.bot.internal._request('friend_poke', { user_id: 10001 })
     await control.bot.internal._request('get_group_info', { group_id: 30001 })
 
-    expect(control.getOneBotDebugRecords({ action: 'send_poke' }).records).toContainEqual(expect.objectContaining({
+    expect((await control.getOneBotDebugRecords({ action: 'send_poke' })).records).toContainEqual(expect.objectContaining({
       requestedAction: 'friend_poke',
       action: 'send_poke',
       matchedAlias: 'friend_poke',
       status: 'success',
     }))
-    expect(control.getOneBotDebugRecords({ action: 'friend_poke' }).records).toContainEqual(expect.objectContaining({
+    expect((await control.getOneBotDebugRecords({ action: 'friend_poke' })).records).toContainEqual(expect.objectContaining({
       action: 'send_poke',
       matchedAlias: 'friend_poke',
     }))
-    expect(control.getOneBotDebugRecords({ requestedAction: 'friend_poke' }).records).toHaveLength(1)
-    expect(control.getOneBotDebugRecords({
+    expect((await control.getOneBotDebugRecords({ requestedAction: 'friend_poke' })).records).toHaveLength(1)
+    expect((await control.getOneBotDebugRecords({
       action: 'send_poke',
       requestedAction: 'get_group_info',
-    }).records).toEqual([])
+    })).records).toEqual([])
   })
 
   it('调试记录使用有界内存缓冲区并支持稳定新到旧分页', async () => {
@@ -138,7 +138,7 @@ describe('OneBot 调试记录', () => {
     await control.bot.internal._request('get_version_info', {})
     await control.bot.internal._request('get_friend_list', {})
 
-    const firstPage = control.getOneBotDebugRecords({ limit: 2 })
+    const firstPage = (await control.getOneBotDebugRecords({ limit: 2 }))
     expect(firstPage.records.map(({ requestedAction, sequence }) => ({ requestedAction, sequence }))).toEqual([
       { requestedAction: 'get_friend_list', sequence: 4 },
       { requestedAction: 'get_version_info', sequence: 3 },
@@ -147,7 +147,7 @@ describe('OneBot 调试记录', () => {
     expect(firstPage.nextCursor).toBe(3)
 
     await control.bot.internal._request('get_group_list', {})
-    const secondPage = control.getOneBotDebugRecords({ limit: 2, beforeSequence: firstPage.nextCursor })
+    const secondPage = (await control.getOneBotDebugRecords({ limit: 2, beforeSequence: firstPage.nextCursor }))
     // 插入新记录后，原分页窗口不会跳过/重复旧记录。
     expect(secondPage.records.map(({ requestedAction, sequence }) => ({ requestedAction, sequence }))).toEqual([
       { requestedAction: 'get_login_info', sequence: 2 },
@@ -161,10 +161,10 @@ describe('OneBot 调试记录', () => {
     await control.bot.internal._request('get_status', {})
     await control.bot.internal._request('get_login_info', {})
     await control.bot.internal._request('get_version_info', {})
-    const page = control.getOneBotDebugRecords({ limit: 10 })
+    const page = (await control.getOneBotDebugRecords({ limit: 10 }))
     expect(page.records.map(({ sequence }) => sequence)).toEqual([3, 2])
     expect(page.earliestCursor).toBe(2)
-    expect(() => control.getOneBotDebugRecords({ beforeSequence: 1 })).toThrowError(
+    await expect(control.getOneBotDebugRecords({ beforeSequence: 1 })).rejects.toThrowError(
       expect.objectContaining({ code: 'cursor_expired', earliestCursor: 2 }),
     )
   })
@@ -174,11 +174,11 @@ describe('OneBot 调试记录', () => {
     await control.bot.internal._request('get_status', {})
     await control.bot.internal._request('get_login_info', {})
 
-    expect(control.getOneBotDebugRecords({ order: 'asc' }).records.map(({ requestedAction }) => requestedAction)).toEqual([
+    expect((await control.getOneBotDebugRecords({ order: 'asc' })).records.map(({ requestedAction }) => requestedAction)).toEqual([
       'get_status',
       'get_login_info',
     ])
-    expect(control.getOneBotDebugRecords({ order: 'desc' }).records.map(({ requestedAction }) => requestedAction)).toEqual([
+    expect((await control.getOneBotDebugRecords({ order: 'desc' })).records.map(({ requestedAction }) => requestedAction)).toEqual([
       'get_login_info',
       'get_status',
     ])
@@ -191,7 +191,7 @@ describe('OneBot 调试记录', () => {
     await control.bot.internal._request('get_version_info', {})
     await control.bot.internal._request('get_friend_list', {})
 
-    const firstPage = control.getOneBotDebugRecords({ limit: 2, order: 'asc' })
+    const firstPage = (await control.getOneBotDebugRecords({ limit: 2, order: 'asc' }))
     expect(firstPage.records.map(({ requestedAction, sequence }) => ({ requestedAction, sequence }))).toEqual([
       { requestedAction: 'get_status', sequence: 1 },
       { requestedAction: 'get_login_info', sequence: 2 },
@@ -200,7 +200,7 @@ describe('OneBot 调试记录', () => {
     expect(firstPage.nextCursor).toBe(2)
 
     await control.bot.internal._request('get_group_list', {})
-    const secondPage = control.getOneBotDebugRecords({ limit: 2, order: 'asc', beforeSequence: firstPage.nextCursor })
+    const secondPage = (await control.getOneBotDebugRecords({ limit: 2, order: 'asc', beforeSequence: firstPage.nextCursor }))
     expect(secondPage.records.map(({ requestedAction, sequence }) => ({ requestedAction, sequence }))).toEqual([
       { requestedAction: 'get_version_info', sequence: 3 },
       { requestedAction: 'get_friend_list', sequence: 4 },

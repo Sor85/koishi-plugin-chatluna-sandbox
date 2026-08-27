@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type {} from '@koishijs/console'
 import { lookupChatLunaUsage, type ChatLunaUsageLookup } from './chatluna-usage'
-import { buildSandboxModelRequestTrajectory } from './model-request-trajectory'
+import { buildSandboxModelRequestTrajectoryFromStore } from './model-request-trajectory'
 import type { SandboxControlService } from './control-service'
 import type { ListSandboxMcpCallRecordsInput, SandboxMcpCallRecordsPage } from './mcp/call-records'
 import type { SandboxMcpService } from './mcp/service'
@@ -102,11 +102,11 @@ interface ConsoleEventMap {
   'chatluna-sandbox/bot-deliveries': (input?: SpaceScoped<GetSandboxBotDeliveriesInput>) => Promise<SandboxBotDelivery[]>
   'chatluna-sandbox/debug-records': (input?: SpaceScoped<GetSandboxOneBotDebugRecordsInput>) => Promise<SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord>>
   'chatluna-sandbox/debug-record': (input: SpaceScoped<GetSandboxOneBotDebugRecordInput>) => Promise<SandboxConsoleOneBotDebugRecord>
-  'chatluna-sandbox/clear-debug-records': (input?: { spaceId?: string }) => ClearSandboxOneBotDebugRecordsResult
-  'chatluna-sandbox/model-request-records': (input: ListSandboxModelRequestRecordsInput) => SandboxModelRequestRecordsPage<SandboxConsoleModelRequestListItem>
+  'chatluna-sandbox/clear-debug-records': (input?: { spaceId?: string }) => Promise<ClearSandboxOneBotDebugRecordsResult>
+  'chatluna-sandbox/model-request-records': (input: ListSandboxModelRequestRecordsInput) => Promise<SandboxModelRequestRecordsPage<SandboxConsoleModelRequestListItem>>
   'chatluna-sandbox/model-request-record': (input: ReadSandboxModelRequestRecordInput) => Promise<SandboxConsoleModelRequestDetail>
-  'chatluna-sandbox/model-request-trajectory': (input: ReadSandboxModelRequestTrajectoryInput) => SandboxModelRequestTrajectory
-  'chatluna-sandbox/clear-model-request-records': (input: SandboxModelRequestScope) => ClearSandboxModelRequestRecordsResult
+  'chatluna-sandbox/model-request-trajectory': (input: ReadSandboxModelRequestTrajectoryInput) => Promise<SandboxModelRequestTrajectory>
+  'chatluna-sandbox/clear-model-request-records': (input: SandboxModelRequestScope) => Promise<ClearSandboxModelRequestRecordsResult>
   'chatluna-sandbox/preset-catalog': (input?: { kind?: PresetDocumentKind }) => Promise<SandboxPresetDocument[]>
   'chatluna-sandbox/preset-read': (input: ReadSandboxPresetInput) => Promise<SandboxPresetDocument>
   'chatluna-sandbox/preset-create': (input: CreatePresetInput) => Promise<SandboxPresetDocument>
@@ -216,12 +216,12 @@ export function registerConsole(
     return rest
   }
   const mainSource: SandboxEntitySource = { type: 'main', name: '主环境' }
-  const getDebugPage = (
+  const getDebugPage = async (
     activeControl: SandboxControlService,
     source: SandboxEntitySource,
     input: GetSandboxOneBotDebugRecordsInput,
-  ): SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord> => {
-    const page = activeControl.getOneBotDebugRecords(input)
+  ): Promise<SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord>> => {
+    const page = await activeControl.getOneBotDebugRecords(input)
     return {
       ...page,
       records: page.records.map((record) => ({ ...record, source })),
@@ -249,14 +249,14 @@ export function registerConsole(
     }))
     await Promise.all([control.waitForPersistence(), ...spaceControls.map(({ control: activeControl }) => activeControl.waitForPersistence())])
     // 联邦视图跨多个独立 sequence，仅聚合首页；精确游标分页必须带 spaceId。
-    const pages = [
+    const pages = await Promise.all([
       getDebugPage(control, mainSource, { ...query, beforeSequence: undefined }),
       ...spaceControls.map(({ space, control: activeControl }) => getDebugPage(activeControl, {
         type: 'test-space',
         spaceId: space.id,
         name: space.name,
       }, { ...query, beforeSequence: undefined })),
-    ]
+    ])
     const limit = Math.min(Math.max(Number(query.limit ?? 50) || 50, 1), 200)
     const sign = query.order === 'asc' ? 1 : -1
     const records = pages
@@ -287,20 +287,20 @@ export function registerConsole(
       const spaceControl = testSpaces.getControl(space.id)
       await spaceControl.waitForPersistence()
       return {
-        ...spaceControl.getOneBotDebugRecord(query),
+        ...await spaceControl.getOneBotDebugRecord(query),
         source: { type: 'test-space', spaceId: space.id, name: space.name },
       }
     }
     await control.waitForPersistence()
     try {
-      return { ...control.getOneBotDebugRecord(query), source: mainSource }
+      return { ...await control.getOneBotDebugRecord(query), source: mainSource }
     } catch (error) {
       for (const space of testSpaces?.listSpaces() ?? []) {
         try {
           const spaceControl = testSpaces!.getControl(space.id)
           await spaceControl.waitForPersistence()
           return {
-            ...spaceControl.getOneBotDebugRecord(query),
+            ...await spaceControl.getOneBotDebugRecord(query),
             source: { type: 'test-space', spaceId: space.id, name: space.name },
           }
         } catch {
@@ -310,12 +310,12 @@ export function registerConsole(
       throw error
     }
   }
-  const clearDebugRecords = (input: { spaceId?: string } = {}): ClearSandboxOneBotDebugRecordsResult => {
-    if (input.spaceId) return { cleared: resolveControl(input, true).clearOneBotDebugRecords() }
-    let cleared = control.clearOneBotDebugRecords()
+  const clearDebugRecords = async (input: { spaceId?: string } = {}): Promise<ClearSandboxOneBotDebugRecordsResult> => {
+    if (input.spaceId) return { cleared: await resolveControl(input, true).clearOneBotDebugRecords() }
+    let cleared = await control.clearOneBotDebugRecords()
     for (const space of testSpaces?.listSpaces() ?? []) {
       // 主调试页展示的是联邦视图，清理必须覆盖运行中的 AI 空间，不能要求用户先接管。
-      cleared += testSpaces!.getControl(space.id).clearOneBotDebugRecords()
+      cleared += await testSpaces!.getControl(space.id).clearOneBotDebugRecords()
     }
     return { cleared }
   }
@@ -473,37 +473,36 @@ export function registerConsole(
       ...page,
       records: page.records.map((record) => ({ ...record, source })),
     })
-    return [
-      withSource(control.getModelRequestRecords(query), { type: 'main', name: '主环境' }),
-      ...(testSpaces?.listSpaces() ?? []).map((space) => withSource(
-        testSpaces!.getControl(space.id).getModelRequestRecords(query),
-        { type: 'test-space', spaceId: space.id, name: space.name },
-      )),
-    ]
+    return Promise.all([
+      control.getModelRequestRecords(query).then((page) => withSource(page, { type: 'main', name: '主环境' })),
+      ...(testSpaces?.listSpaces() ?? []).map((space) => testSpaces!.getControl(space.id)
+        .getModelRequestRecords(query)
+        .then((page) => withSource(page, { type: 'test-space', spaceId: space.id, name: space.name }))),
+    ])
   }
-  const listModelRequestRecords = (input: ListSandboxModelRequestRecordsInput): SandboxModelRequestRecordsPage<SandboxConsoleModelRequestListItem> => {
+  const listModelRequestRecords = async (input: ListSandboxModelRequestRecordsInput): Promise<SandboxModelRequestRecordsPage<SandboxConsoleModelRequestListItem>> => {
     if (input.scope === 'all') {
       const limit = Math.min(Math.max(Number(input.limit ?? DEFAULT_MODEL_REQUEST_PAGE_SIZE) || DEFAULT_MODEL_REQUEST_PAGE_SIZE, 1), MAX_MODEL_REQUEST_PAGE_SIZE)
-      return mergeModelRequestRecordPages(listAttributedModelRequestPages(input), limit, input.order === 'asc' ? 'asc' : 'desc')
+      return mergeModelRequestRecordPages(await listAttributedModelRequestPages(input), limit, input.order === 'asc' ? 'asc' : 'desc')
     }
     const source = resolveModelRequestSource(input)
     const page = input.scope === 'unattributed'
-      ? requireUnattributedModelRequests().getRecords(input)
-      : resolveModelRequestControl(input)!.getModelRequestRecords(input)
+      ? await requireUnattributedModelRequests().getRecords(input)
+      : await resolveModelRequestControl(input)!.getModelRequestRecords(input)
     return {
       ...page,
       records: page.records.map((record) => ({ ...record, source })),
     }
   }
-  const readModelRequestRecord = (input: ReadSandboxModelRequestRecordInput): SandboxConsoleModelRequestDetail => {
+  const readModelRequestRecord = async (input: ReadSandboxModelRequestRecordInput): Promise<SandboxConsoleModelRequestDetail> => {
     if (input.scope === 'all') {
       try {
-        return { ...control.getModelRequestRecord(input), source: { type: 'main', name: '主环境' } }
+        return { ...await control.getModelRequestRecord(input), source: { type: 'main', name: '主环境' } }
       } catch (error) {
         for (const space of testSpaces?.listSpaces() ?? []) {
           try {
             return {
-              ...testSpaces!.getControl(space.id).getModelRequestRecord(input),
+              ...await testSpaces!.getControl(space.id).getModelRequestRecord(input),
               source: { type: 'test-space', spaceId: space.id, name: space.name },
             }
           } catch {
@@ -515,20 +514,20 @@ export function registerConsole(
     }
     const source = resolveModelRequestSource(input)
     if (input.scope === 'unattributed') {
-      const record = requireUnattributedModelRequests().getRecord(input.recordId)
+      const record = await requireUnattributedModelRequests().getRecord(input.recordId)
       if (!record) throw new Error(`模型请求记录不存在：${input.recordId}`)
       return { ...record, source }
     }
-    return { ...resolveModelRequestControl(input)!.getModelRequestRecord(input), source }
+    return { ...await resolveModelRequestControl(input)!.getModelRequestRecord(input), source }
   }
   const getModelRequestRecord = async (input: ReadSandboxModelRequestRecordInput): Promise<SandboxConsoleModelRequestDetail> => {
-    const detail = readModelRequestRecord(input)
+    const detail = await readModelRequestRecord(input)
     // 可选服务可能晚于本插件加载或被热重载；详情读取时再解析，避免永久缓存初始化阶段的 undefined。
     const usage = await lookupChatLunaUsage(resolveChatLunaUsage(chatlunaUsage), detail)
     return usage ? { ...detail, usage } : detail
   }
-  const getModelRequestTrajectory = (input: ReadSandboxModelRequestTrajectoryInput): SandboxModelRequestTrajectory => {
-    const detail = readModelRequestRecord(input)
+  const getModelRequestTrajectory = async (input: ReadSandboxModelRequestTrajectoryInput): Promise<SandboxModelRequestTrajectory> => {
+    const detail = await readModelRequestRecord(input)
     const store = input.scope === 'all'
       ? detail.source.type === 'main'
         ? control.getModelRequestStore()
@@ -538,12 +537,12 @@ export function registerConsole(
       : input.scope === 'unattributed'
         ? requireUnattributedModelRequests()
         : resolveModelRequestControl(input)?.getModelRequestStore()
-    return buildSandboxModelRequestTrajectory({ record: detail, mode: input.mode, store })
+    return buildSandboxModelRequestTrajectoryFromStore({ record: detail, mode: input.mode, store })
   }
-  const clearModelRequestRecords = (input: SandboxModelRequestScope): ClearSandboxModelRequestRecordsResult => {
+  const clearModelRequestRecords = async (input: SandboxModelRequestScope): Promise<ClearSandboxModelRequestRecordsResult> => {
     if (input.scope === 'all') throw new Error('全部空间视图不支持一次性清理')
-    if (input.scope === 'unattributed') return { cleared: requireUnattributedModelRequests().clear() }
-    return { cleared: resolveModelRequestControl(input)!.clearModelRequestRecords() }
+    if (input.scope === 'unattributed') return { cleared: await requireUnattributedModelRequests().clear() }
+    return { cleared: await resolveModelRequestControl(input)!.clearModelRequestRecords() }
   }
 
   registerListener('chatluna-sandbox/debug-records', listDebugRecords, { authority: 4 })
@@ -614,11 +613,11 @@ declare module '@koishijs/console' {
     'chatluna-sandbox/bot-deliveries'(input?: SpaceScoped<GetSandboxBotDeliveriesInput>): Promise<SandboxBotDelivery[]>
     'chatluna-sandbox/debug-records'(input?: SpaceScoped<GetSandboxOneBotDebugRecordsInput>): Promise<SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord>>
     'chatluna-sandbox/debug-record'(input: SpaceScoped<GetSandboxOneBotDebugRecordInput>): Promise<SandboxConsoleOneBotDebugRecord>
-    'chatluna-sandbox/clear-debug-records'(input?: { spaceId?: string }): ClearSandboxOneBotDebugRecordsResult
-    'chatluna-sandbox/model-request-records'(input: ListSandboxModelRequestRecordsInput): SandboxModelRequestRecordsPage<SandboxConsoleModelRequestListItem>
+    'chatluna-sandbox/clear-debug-records'(input?: { spaceId?: string }): Promise<ClearSandboxOneBotDebugRecordsResult>
+    'chatluna-sandbox/model-request-records'(input: ListSandboxModelRequestRecordsInput): Promise<SandboxModelRequestRecordsPage<SandboxConsoleModelRequestListItem>>
     'chatluna-sandbox/model-request-record'(input: ReadSandboxModelRequestRecordInput): Promise<SandboxConsoleModelRequestDetail>
-    'chatluna-sandbox/model-request-trajectory'(input: ReadSandboxModelRequestTrajectoryInput): SandboxModelRequestTrajectory
-    'chatluna-sandbox/clear-model-request-records'(input: SandboxModelRequestScope): ClearSandboxModelRequestRecordsResult
+    'chatluna-sandbox/model-request-trajectory'(input: ReadSandboxModelRequestTrajectoryInput): Promise<SandboxModelRequestTrajectory>
+    'chatluna-sandbox/clear-model-request-records'(input: SandboxModelRequestScope): Promise<ClearSandboxModelRequestRecordsResult>
     'chatluna-sandbox/preset-catalog'(input?: { kind?: PresetDocumentKind }): Promise<SandboxPresetDocument[]>
     'chatluna-sandbox/preset-read'(input: ReadSandboxPresetInput): Promise<SandboxPresetDocument>
     'chatluna-sandbox/preset-create'(input: CreatePresetInput): Promise<SandboxPresetDocument>

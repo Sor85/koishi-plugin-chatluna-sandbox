@@ -227,6 +227,11 @@ export function getOneBotProfileBaseline(profile: SandboxImplementationProfile):
   return structuredClone(baselines[profile])
 }
 
+/** 全部已建模的 OneBot 实现。按实现展开 action 别名的查询需要遍历它们。 */
+export function listOneBotImplementationProfiles(): SandboxImplementationProfile[] {
+  return Object.keys(baselines) as SandboxImplementationProfile[]
+}
+
 export function getOneBotCapabilityMatrix(
   profile: SandboxImplementationProfile,
   disabledCapabilities: readonly string[] = [],

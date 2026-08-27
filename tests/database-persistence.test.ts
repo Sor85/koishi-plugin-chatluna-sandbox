@@ -201,7 +201,7 @@ describe('沙盒场景持久化', () => {
       media: [{ fileName: 'database.png', mimeType: 'image/png', dataBase64: Buffer.from('database').toString('base64') }],
     })
     await first.bot.internal._request('get_status', {})
-    expect(first.getOneBotDebugRecords().records).not.toEqual([])
+    expect((await first.getOneBotDebugRecords()).records).not.toEqual([])
     await first.waitForPersistence()
     expect(first.getBotDeliveries()).not.toEqual([])
     await firstApp.stop()
@@ -248,7 +248,7 @@ describe('沙盒场景持久化', () => {
     expect(second.getRuntimeBot('20099').selfId).toBe('20099')
     expect(second.getBotDeliveries()).toEqual([])
     expect(second.getChatLunaStates()).toEqual([])
-    expect(second.getOneBotDebugRecords().records).toEqual([])
+    expect((await second.getOneBotDebugRecords()).records).toEqual([])
     expect(second.getPersistenceStatus()).toEqual({
       mode: 'database',
       available: true,

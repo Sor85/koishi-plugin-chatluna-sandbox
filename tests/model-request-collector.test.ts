@@ -41,7 +41,7 @@ function chatBody(model = 'gpt-4o') {
 }
 
 describe('模型请求采集', () => {
-  it('从 Koishi baseDir 解析 portal 安装下的 ChatLuna 运行时', () => {
+  it('从 Koishi baseDir 解析 portal 安装下的 ChatLuna 运行时', async () => {
     const baseDir = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-chatluna-'))
     try {
       const packageDir = join(baseDir, 'node_modules/koishi-plugin-chatluna')
@@ -57,7 +57,7 @@ describe('模型请求采集', () => {
     }
   })
 
-  it('识别已知聊天模型路径并去掉认证 query 与用户信息', () => {
+  it('识别已知聊天模型路径并去掉认证 query 与用户信息', async () => {
     expect(isKnownChatModelRequestUrl('https://api.openai.com/v1/chat/completions')).toBe(true)
     expect(isKnownChatModelRequestUrl('https://openrouter.ai/api/v1/responses')).toBe(true)
     expect(isKnownChatModelRequestUrl('https://api.anthropic.com/v1/messages')).toBe(true)
@@ -86,7 +86,7 @@ describe('模型请求采集', () => {
     })
     await unattributed.waitForPersistence()
 
-    expect(unattributed.getRecords().records[0]).toMatchObject({ model: 'gemini-3.6-flash' })
+    expect((await unattributed.getRecords()).records[0]).toMatchObject({ model: 'gemini-3.6-flash' })
   })
   it('包装公共 fetch：记录 JSON 请求体和原始 headers，并在完成后从 pending 变为 success/error', async () => {
     const unattributed = new SandboxModelRequestStore()
@@ -116,7 +116,7 @@ describe('模型请求采集', () => {
       body: chatBody(),
     }) as Response
     await unattributed.waitForPersistence()
-    const [success] = unattributed.getRecords().records
+    const [success] = (await unattributed.getRecords()).records
     expect(success).toMatchObject({
       status: 'success',
       method: 'POST',
@@ -133,7 +133,7 @@ describe('模型请求采集', () => {
       authorization: 'Bearer secret',
     })
     expect(JSON.stringify(success)).toContain('Bearer secret')
-    expect(unattributed.getRecord(success!.id)).toMatchObject({
+    expect((await unattributed.getRecord(success!.id))).toMatchObject({
       requestBody: {
         model: 'gpt-4o',
         messages: [{ role: 'user', content: '你好' }],
@@ -148,7 +148,7 @@ describe('模型请求采集', () => {
       method: 'POST',
       body: chatBody('gpt-4.1'),
     })).rejects.toThrow('upstream timeout')
-    expect(unattributed.getRecords({ errorsOnly: true }).records[0]).toMatchObject({
+    expect((await unattributed.getRecords({ errorsOnly: true })).records[0]).toMatchObject({
       status: 'error',
       model: 'gpt-4.1',
       error: { retryable: true, message: 'upstream timeout' },
@@ -157,7 +157,7 @@ describe('模型请求采集', () => {
     status = 'http'
     await plugin.fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', body: chatBody('gpt-5') })
     await unattributed.waitForPersistence()
-    expect(unattributed.getRecords({ model: 'gpt-5' }).records[0]).toMatchObject({
+    expect((await unattributed.getRecords({ model: 'gpt-5' })).records[0]).toMatchObject({
       status: 'error',
       responseStatus: 429,
       responseBodyStatus: 'complete',
@@ -185,7 +185,7 @@ describe('模型请求采集', () => {
     await plugin.fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', body: chatBody() })
 
     expect(reported).toEqual([{
-      id: attributed.getRecords().records[0]?.id,
+      id: (await attributed.getRecords()).records[0]?.id,
       scopeId: 'space-a',
     }])
   })
@@ -218,13 +218,13 @@ describe('模型请求采集', () => {
     await plugin.fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', body: chatBody() })
     snapshot.templates[0]!.template = 'mutated after dispatch'
 
-    const record = attributed.getRecord(attributed.getRecords().records[0]!.id)
+    const record = (await attributed.getRecord((await attributed.getRecords()).records[0]!.id))
     expect(record?.presetSnapshots).toMatchObject([{
       kind: 'character',
       presetName: 'alice',
       templates: [{ template: 'System {status}' }, { template: 'Input {prompt}' }],
     }])
-    expect(attributed.getRecords().records[0]?.presetSnapshotSummaries).toEqual([{
+    expect((await attributed.getRecords()).records[0]?.presetSnapshotSummaries).toEqual([{
       kind: 'character', presetName: 'alice', capturedAt: snapshot.capturedAt, templateCount: 2,
     }])
   })
@@ -256,7 +256,7 @@ describe('模型请求采集', () => {
       })
       await unattributed.waitForPersistence()
 
-      expect(unattributed.getRecords().records[0]?.headers).toMatchObject({
+      expect((await unattributed.getRecords()).records[0]?.headers).toMatchObject({
         Authorization: 'Bearer secret',
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://github.com/ChatLunaLab/chatluna',
@@ -295,7 +295,7 @@ describe('模型请求采集', () => {
       method: 'POST',
       body: chatBody('stream-model'),
     }) as Response
-    expect(unattributed.getRecords().records[0]).toMatchObject({
+    expect((await unattributed.getRecords()).records[0]).toMatchObject({
       status: 'success',
       responseBodyStatus: 'pending',
     })
@@ -303,7 +303,7 @@ describe('模型请求采集', () => {
     controller?.enqueue(encoder.encode('data: {"delta":"好"}\n\ndata: [DONE]\n\n'))
     controller?.close()
     await unattributed.waitForPersistence()
-    expect(unattributed.getRecord(unattributed.getRecords().records[0]!.id)).toMatchObject({
+    expect((await unattributed.getRecord((await unattributed.getRecords()).records[0]!.id))).toMatchObject({
       responseBodyStatus: 'complete',
       responseBodyFormat: 'sse',
       responseBodyRaw: 'data: {"delta":"你"}\n\ndata: {"delta":"好"}\n\ndata: [DONE]\n\n',
@@ -325,7 +325,7 @@ describe('模型请求采集', () => {
       method: 'POST',
       body: JSON.stringify({ model: 'text-embedding-3-small', input: 'hi' }),
     })
-    expect(unattributed.getRecords().records).toEqual([])
+    expect((await unattributed.getRecords()).records).toEqual([])
     dispose()
     expect(plugin.prototype.fetch).toBe(original)
   })
@@ -353,8 +353,8 @@ describe('模型请求采集', () => {
     }))
 
     await plugin.fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', body: chatBody('none') })
-    expect(unattributed.getRecords().records[0]).toMatchObject({ attribution: 'unattributed', model: 'none' })
-    expect(space.control.getModelRequestRecords().records).toEqual([])
+    expect((await unattributed.getRecords()).records[0]).toMatchObject({ attribution: 'unattributed', model: 'none' })
+    expect((await space.control.getModelRequestRecords()).records).toEqual([])
 
     const session = space.control.getRuntimeBot('21001').session({
       type: 'message',
@@ -370,7 +370,7 @@ describe('模型请求采集', () => {
       session,
     )
     await plugin.fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', body: chatBody('attributed') })
-    expect(space.control.getModelRequestRecords().records[0]).toMatchObject({
+    expect((await space.control.getModelRequestRecords()).records[0]).toMatchObject({
       attribution: 'attributed',
       model: 'attributed',
       entities: { scopeId: space.id, botId: '21001', conversationId: 'private:11001:21001' },
@@ -390,10 +390,10 @@ describe('模型请求采集', () => {
       mainSession,
     )
     await plugin.fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', body: chatBody('ambiguous') })
-    expect(unattributed.getRecords({ model: 'ambiguous' }).records[0]).toMatchObject({
+    expect((await unattributed.getRecords({ model: 'ambiguous' })).records[0]).toMatchObject({
       attribution: 'unattributed',
       entities: {},
     })
-    expect(main.getModelRequestRecords().records).toEqual([])
+    expect((await main.getModelRequestRecords()).records).toEqual([])
   })
 })

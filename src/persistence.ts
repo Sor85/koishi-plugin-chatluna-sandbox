@@ -1,7 +1,27 @@
 import type { Context } from 'koishi'
-import type { SandboxOneBotDebugRecord, SandboxModelRequestRecord, SandboxPersistenceStatus, SandboxSnapshot } from './types'
-import type { SandboxOneBotDebugPersistence } from './onebot-debug'
-import type { SandboxModelRequestPersistence } from './model-request'
+import type {
+  SandboxImplementationProfile,
+  SandboxModelRequestRecord,
+  SandboxModelRequestStatus,
+  SandboxOneBotDebugDirection,
+  SandboxOneBotDebugRecord,
+  SandboxOneBotDebugStatus,
+  SandboxPersistenceStatus,
+  SandboxSnapshot,
+} from './types'
+import {
+  InMemoryOneBotDebugRecords,
+  type SandboxOneBotDebugPersistence,
+  type SandboxOneBotDebugPersistenceQuery,
+  type SandboxOneBotDebugScopeSummary,
+} from './onebot-debug'
+import {
+  InMemoryModelRequestRecords,
+  type SandboxModelRequestPersistence,
+  type SandboxModelRequestPersistenceQuery,
+  type SandboxModelRequestScopeSummary,
+} from './model-request'
+import { ScopeRowIndex } from './record-store'
 
 export type SandboxSceneLoadResult =
   | { kind: 'loaded', scene: SandboxSnapshot }
@@ -36,27 +56,77 @@ export interface SandboxTestSpacePersistence {
   delete(id: string): Promise<void>
 }
 
-export interface SandboxOneBotDebugPersistenceRecord {
+/**
+ * 作用域摘要行：只保存 nextSequence 高水位。记录条数与字节数由记录行的 bytes 列现算，
+ * 避免计数漂移；序号必须独立保存，否则清空作用域后 max(sequence)+1 会回退并复用旧序号。
+ */
+export interface SandboxRecordScopeRow {
   scopeId: string
   nextSequence: number
-  records: SandboxOneBotDebugRecord[]
   updatedAt: Date
 }
 
-export interface SandboxModelRequestPersistenceRecord {
+/** 一条 OneBot 调试记录一行。过滤用的字段单独成列，读取路径才能落到数据库侧。 */
+export interface SandboxOneBotDebugRecordRow {
   scopeId: string
-  nextSequence: number
-  records: SandboxModelRequestRecord[]
-  updatedAt: Date
+  sequence: number
+  id: string
+  createdAt: string
+  botId: string
+  implementation: SandboxImplementationProfile
+  direction: SandboxOneBotDebugDirection
+  action: string
+  requestedAction: string
+  matchedAlias: string
+  status: SandboxOneBotDebugStatus
+  /** 完整持久化内容的字节数，容量统计按这一列求和。 */
+  bytes: number
+  record: SandboxOneBotDebugRecord
+}
+
+/** 一条模型请求记录一行。 */
+export interface SandboxModelRequestRecordRow {
+  scopeId: string
+  sequence: number
+  id: string
+  createdAt: string
+  botId: string
+  conversationId: string
+  interactionId: string
+  model: string
+  status: SandboxModelRequestStatus
+  bytes: number
+  record: SandboxModelRequestRecord
 }
 
 declare module '@koishijs/core' {
   interface Tables {
     'chatluna-sandbox.scene': SandboxSceneRecord
     'chatluna-sandbox.test-space': SandboxTestSpacePersistenceRecord
-    'chatluna-sandbox.debug-records': SandboxOneBotDebugPersistenceRecord
-    'chatluna-sandbox.model-requests': SandboxModelRequestPersistenceRecord
+    'chatluna-sandbox.debug-record': SandboxOneBotDebugRecordRow
+    'chatluna-sandbox.debug-scope': SandboxRecordScopeRow
+    'chatluna-sandbox.model-request': SandboxModelRequestRecordRow
+    'chatluna-sandbox.model-request-scope': SandboxRecordScopeRow
   }
+}
+
+// 表名使用 "chatluna-sandbox." 前缀：dataview-next 等工具按点号前缀归属插件；
+// ctx.inject 回调里的 model.extend 拿不到插件运行时名称，仅靠上下文会被归为未知来源。
+const SCENE_TABLE = 'chatluna-sandbox.scene'
+const SCENE_ID = 'main'
+const TEST_SPACE_TABLE = 'chatluna-sandbox.test-space'
+const DEBUG_RECORD_TABLE = 'chatluna-sandbox.debug-record'
+const DEBUG_SCOPE_TABLE = 'chatluna-sandbox.debug-scope'
+const MODEL_REQUEST_RECORD_TABLE = 'chatluna-sandbox.model-request'
+const MODEL_REQUEST_SCOPE_TABLE = 'chatluna-sandbox.model-request-scope'
+
+type SandboxRecordRowQuery = Record<string, unknown>
+
+interface SandboxRecordRowCursor {
+  limit?: number
+  offset?: number
+  fields?: string[]
+  sort?: Record<string, 'asc' | 'desc'>
 }
 
 interface SandboxSceneDatabase {
@@ -70,25 +140,21 @@ interface SandboxTestSpaceDatabase {
   remove(table: 'chatluna-sandbox.test-space', query: { id: string }): Promise<unknown>
 }
 
-interface SandboxOneBotDebugDatabase {
-  get(table: 'chatluna-sandbox.debug-records', query: { scopeId: string }): Promise<SandboxOneBotDebugPersistenceRecord[]>
-  upsert(table: 'chatluna-sandbox.debug-records', rows: SandboxOneBotDebugPersistenceRecord[]): Promise<unknown>
-  remove(table: 'chatluna-sandbox.debug-records', query: { scopeId: string }): Promise<unknown>
+export interface SandboxOneBotDebugDatabase {
+  get(table: 'chatluna-sandbox.debug-record', query: SandboxRecordRowQuery, cursor?: SandboxRecordRowCursor): Promise<SandboxOneBotDebugRecordRow[]>
+  get(table: 'chatluna-sandbox.debug-scope', query: { scopeId: string }): Promise<SandboxRecordScopeRow[]>
+  upsert(table: 'chatluna-sandbox.debug-record', rows: SandboxOneBotDebugRecordRow[]): Promise<unknown>
+  upsert(table: 'chatluna-sandbox.debug-scope', rows: SandboxRecordScopeRow[]): Promise<unknown>
+  remove(table: 'chatluna-sandbox.debug-record' | 'chatluna-sandbox.debug-scope', query: SandboxRecordRowQuery): Promise<unknown>
 }
 
-interface SandboxModelRequestDatabase {
-  get(table: 'chatluna-sandbox.model-requests', query: { scopeId: string }): Promise<SandboxModelRequestPersistenceRecord[]>
-  upsert(table: 'chatluna-sandbox.model-requests', rows: SandboxModelRequestPersistenceRecord[]): Promise<unknown>
-  remove(table: 'chatluna-sandbox.model-requests', query: { scopeId: string }): Promise<unknown>
+export interface SandboxModelRequestDatabase {
+  get(table: 'chatluna-sandbox.model-request', query: SandboxRecordRowQuery, cursor?: SandboxRecordRowCursor): Promise<SandboxModelRequestRecordRow[]>
+  get(table: 'chatluna-sandbox.model-request-scope', query: { scopeId: string }): Promise<SandboxRecordScopeRow[]>
+  upsert(table: 'chatluna-sandbox.model-request', rows: SandboxModelRequestRecordRow[]): Promise<unknown>
+  upsert(table: 'chatluna-sandbox.model-request-scope', rows: SandboxRecordScopeRow[]): Promise<unknown>
+  remove(table: 'chatluna-sandbox.model-request' | 'chatluna-sandbox.model-request-scope', query: SandboxRecordRowQuery): Promise<unknown>
 }
-
-// 表名使用 "chatluna-sandbox." 前缀：dataview-next 等工具按点号前缀归属插件；
-// ctx.inject 回调里的 model.extend 拿不到插件运行时名称，仅靠上下文会被归为未知来源。
-const SCENE_TABLE = 'chatluna-sandbox.scene'
-const SCENE_ID = 'main'
-const TEST_SPACE_TABLE = 'chatluna-sandbox.test-space'
-const DEBUG_TABLE = 'chatluna-sandbox.debug-records'
-const MODEL_REQUEST_TABLE = 'chatluna-sandbox.model-requests'
 
 /** database 是可选服务，且 Minato 的注册晚于 ready；所有首次读取都要给它这段等待窗口。 */
 const DATABASE_READY_TIMEOUT_MS = 10_000
@@ -124,116 +190,312 @@ export function registerSandboxTestSpaceModel(ctx: Context): void {
 }
 
 export function registerSandboxModelRequestModel(ctx: Context): void {
-  ctx.model.extend(MODEL_REQUEST_TABLE, {
+  // 主键是作用域 + 单调序号：追加、单行更新与按区间回收都只命中自己那一行。
+  ctx.model.extend(MODEL_REQUEST_RECORD_TABLE, {
+    scopeId: 'string(64)',
+    sequence: 'unsigned',
+    id: 'string(64)',
+    createdAt: 'string(64)',
+    botId: 'string(64)',
+    conversationId: 'string(255)',
+    interactionId: 'string(64)',
+    model: 'string(255)',
+    status: 'string(32)',
+    bytes: 'unsigned',
+    record: 'json',
+  }, { primary: ['scopeId', 'sequence'] })
+  ctx.model.extend(MODEL_REQUEST_SCOPE_TABLE, {
     scopeId: 'string(64)',
     nextSequence: 'unsigned',
-    records: 'json',
     updatedAt: 'timestamp',
   }, { primary: 'scopeId' })
 }
 
 export function registerSandboxOneBotDebugModel(ctx: Context): void {
-  ctx.model.extend(DEBUG_TABLE, {
+  ctx.model.extend(DEBUG_RECORD_TABLE, {
+    scopeId: 'string(64)',
+    sequence: 'unsigned',
+    id: 'string(64)',
+    createdAt: 'string(64)',
+    botId: 'string(64)',
+    implementation: 'string(32)',
+    direction: 'string(16)',
+    action: 'string(128)',
+    requestedAction: 'string(128)',
+    matchedAlias: 'string(128)',
+    status: 'string(32)',
+    bytes: 'unsigned',
+    record: 'json',
+  }, { primary: ['scopeId', 'sequence'] })
+  ctx.model.extend(DEBUG_SCOPE_TABLE, {
     scopeId: 'string(64)',
     nextSequence: 'unsigned',
-    records: 'json',
     updatedAt: 'timestamp',
   }, { primary: 'scopeId' })
 }
 
-export class MemoryOneBotDebugPersistence implements SandboxOneBotDebugPersistence {
-  private store = new Map<string, { nextSequence: number, records: SandboxOneBotDebugRecord[] }>()
-
-  constructor(private scopeId: string) {}
-
-  async load() {
-    const current = this.store.get(this.scopeId)
-    return current
-      ? { nextSequence: current.nextSequence, records: structuredClone(current.records) }
-      : { nextSequence: 1, records: [] }
-  }
-
-  async replaceAll(nextSequence: number, records: SandboxOneBotDebugRecord[]) {
-    this.store.set(this.scopeId, {
-      nextSequence,
-      records: structuredClone(records),
-    })
-  }
-
-  async clear() {
-    this.store.delete(this.scopeId)
+// 内存 Adapter 与数据库 Adapter 共用同一 Interface：进程内跨控制服务实例可恢复，进程退出后不保留。
+export class MemoryOneBotDebugPersistence extends InMemoryOneBotDebugRecords {
+  constructor(readonly scopeId: string) {
+    super()
   }
 }
 
+export class MemoryModelRequestPersistence extends InMemoryModelRequestRecords {
+  constructor(readonly scopeId: string) {
+    super()
+  }
+}
+
+/** 倒序向更早翻页、正序向更晚翻页；两个适配器的序号游标语义必须一致。 */
+function sequenceCursorCondition(order: 'asc' | 'desc', beforeSequence: number) {
+  return order === 'asc' ? { $gt: beforeSequence } : { $lt: beforeSequence }
+}
+
 export class KoishiDatabaseOneBotDebugPersistence implements SandboxOneBotDebugPersistence {
+  private index = new ScopeRowIndex()
+
   constructor(
     private scopeId: string,
     private getDatabase: () => SandboxOneBotDebugDatabase | undefined,
+    private readyTimeoutMs = DATABASE_READY_TIMEOUT_MS,
   ) {}
 
-  async load() {
+  async summarize(): Promise<SandboxOneBotDebugScopeSummary> {
     // Database 是可选服务，可能在 Store 构造后才注册；不能把服务未就绪伪装成空库，
-    // 否则重启后的首次调试记录写入会覆盖数据库中的历史记录。
-    const database = await waitForDatabase(this.getDatabase, DATABASE_READY_TIMEOUT_MS)
-    if (!database) throw new Error(`等待 Koishi Database 服务 ${DATABASE_READY_TIMEOUT_MS}ms 后仍不可用`)
-    const [record] = await database.get(DEBUG_TABLE, { scopeId: this.scopeId })
-    if (!record) return { nextSequence: 1, records: [] }
-    return {
-      nextSequence: Math.max(1, Number(record.nextSequence) || 1),
-      records: structuredClone(record.records ?? []),
-    }
+    // 否则重启后的首次调试记录写入会与数据库中的历史记录撞号。
+    const database = await waitForDatabase(this.getDatabase, this.readyTimeoutMs)
+    if (!database) throw new Error(`等待 Koishi Database 服务 ${this.readyTimeoutMs}ms 后仍不可用`)
+    const [scope] = await database.get(DEBUG_SCOPE_TABLE, { scopeId: this.scopeId })
+    // 只取序号与体积两列：恢复容量统计不需要记录正文。
+    const rows = await database.get(DEBUG_RECORD_TABLE, { scopeId: this.scopeId }, {
+      fields: ['sequence', 'bytes'],
+      sort: { sequence: 'asc' },
+    })
+    this.index.reset(rows, Number(scope?.nextSequence) || 1)
+    return this.index.summary()
   }
 
-  async replaceAll(nextSequence: number, records: SandboxOneBotDebugRecord[]) {
-    const database = this.getDatabase()
-    if (!database) return
-    await database.upsert(DEBUG_TABLE, [{
+  async append(record: SandboxOneBotDebugRecord, bytes: number, nextSequence: number) {
+    const database = this.requireDatabase()
+    await database.upsert(DEBUG_RECORD_TABLE, [{
       scopeId: this.scopeId,
-      nextSequence,
-      records: structuredClone(records),
+      sequence: record.sequence,
+      id: record.id,
+      createdAt: record.createdAt,
+      botId: record.botId,
+      implementation: record.implementation,
+      direction: record.direction,
+      action: record.action,
+      requestedAction: record.requestedAction,
+      // 缺省值写空串而不是 undefined：Minato 会丢弃 undefined 字段，过滤条件也就无法判定"未设置"。
+      matchedAlias: record.matchedAlias ?? '',
+      status: record.status,
+      bytes,
+      record: structuredClone(record),
+    }])
+    this.index.put(record.sequence, bytes, nextSequence)
+    await this.saveScope(database)
+    return this.index.summary()
+  }
+
+  async find(recordId: string) {
+    const database = this.requireDatabase()
+    const [row] = await database.get(DEBUG_RECORD_TABLE, { scopeId: this.scopeId, id: recordId }, { limit: 1 })
+    return row ? structuredClone(row.record) : undefined
+  }
+
+  async query(query: SandboxOneBotDebugPersistenceQuery) {
+    const database = this.requireDatabase()
+    const rows = await database.get(DEBUG_RECORD_TABLE, this.toRowQuery(query), {
+      sort: { sequence: query.order },
+      limit: Math.max(0, query.limit),
+    })
+    return rows.map((row) => structuredClone(row.record))
+  }
+
+  async reclaim(limits: { maxRecords: number, maxBytes: number }) {
+    const database = this.requireDatabase()
+    const cutoff = this.index.resolveCutoff(limits)
+    // 按序号区间删除，不整表重写；索引在删除成功后才收敛，删除失败时下一轮会重新试算。
+    if (cutoff !== undefined) {
+      await database.remove(DEBUG_RECORD_TABLE, { scopeId: this.scopeId, sequence: { $lte: cutoff } })
+      this.index.dropThrough(cutoff)
+    }
+    return this.index.summary()
+  }
+
+  async clear(nextSequence: number) {
+    const database = this.requireDatabase()
+    await database.remove(DEBUG_RECORD_TABLE, { scopeId: this.scopeId })
+    this.index.clear(nextSequence)
+    await this.saveScope(database)
+    return this.index.summary()
+  }
+
+  private toRowQuery(query: SandboxOneBotDebugPersistenceQuery): SandboxRecordRowQuery {
+    const rowQuery: SandboxRecordRowQuery = { scopeId: this.scopeId }
+    if (query.botId) rowQuery.botId = query.botId
+    if (query.direction) rowQuery.direction = query.direction
+    if (query.requestedAction) rowQuery.requestedAction = query.requestedAction
+    if (query.errorsOnly) rowQuery.status = 'error'
+    if (query.beforeSequence !== undefined) rowQuery.sequence = sequenceCursorCondition(query.order, query.beforeSequence)
+    if (query.action) {
+      rowQuery.$or = [
+        { action: query.action.action },
+        { requestedAction: query.action.action },
+        { matchedAlias: query.action.action },
+        ...query.action.aliasTargets.map(({ implementation, actions }) => ({ implementation, action: { $in: actions } })),
+      ]
+    }
+    return rowQuery
+  }
+
+  private async saveScope(database: SandboxOneBotDebugDatabase) {
+    await database.upsert(DEBUG_SCOPE_TABLE, [{
+      scopeId: this.scopeId,
+      nextSequence: this.index.readNextSequence(),
       updatedAt: new Date(),
     }])
   }
 
-  async clear() {
+  private requireDatabase(): SandboxOneBotDebugDatabase {
     const database = this.getDatabase()
-    if (!database) return
-    await database.remove(DEBUG_TABLE, { scopeId: this.scopeId })
+    if (!database) throw new Error('Koishi Database 服务不可用，OneBot 调试记录未能落盘')
+    return database
   }
-}
-
-export class MemoryModelRequestPersistence implements SandboxModelRequestPersistence {
-  private store = new Map<string, { nextSequence: number, records: SandboxModelRequestRecord[] }>()
-  constructor(private scopeId: string) {}
-  async load() {
-    const current = this.store.get(this.scopeId)
-    return current ? { nextSequence: current.nextSequence, records: structuredClone(current.records) } : { nextSequence: 1, records: [] }
-  }
-  async replaceAll(nextSequence: number, records: SandboxModelRequestRecord[]) {
-    this.store.set(this.scopeId, { nextSequence, records: structuredClone(records) })
-  }
-  async clear() { this.store.delete(this.scopeId) }
 }
 
 export class KoishiDatabaseModelRequestPersistence implements SandboxModelRequestPersistence {
-  constructor(private scopeId: string, private getDatabase: () => SandboxModelRequestDatabase | undefined) {}
-  async load() {
+  private index = new ScopeRowIndex()
+
+  constructor(
+    private scopeId: string,
+    private getDatabase: () => SandboxModelRequestDatabase | undefined,
+    private readyTimeoutMs = DATABASE_READY_TIMEOUT_MS,
+  ) {}
+
+  async summarize(): Promise<SandboxModelRequestScopeSummary> {
     // database 是可选服务，Minato 可能在本插件构造 Store 后才完成注册。这里等待服务，
-    // 不能把“尚未可用”伪装成空库，否则重启后的首次请求会覆盖全部历史记录。
-    const database = await waitForDatabase(this.getDatabase, DATABASE_READY_TIMEOUT_MS)
-    if (!database) throw new Error(`等待 Koishi Database 服务 ${DATABASE_READY_TIMEOUT_MS}ms 后仍不可用`)
-    const [record] = await database.get(MODEL_REQUEST_TABLE, { scopeId: this.scopeId })
-    return record ? { nextSequence: Math.max(1, Number(record.nextSequence) || 1), records: structuredClone(record.records ?? []) } : { nextSequence: 1, records: [] }
+    // 不能把"尚未可用"伪装成空库，否则重启后的首次请求会与全部历史记录撞号。
+    const database = await waitForDatabase(this.getDatabase, this.readyTimeoutMs)
+    if (!database) throw new Error(`等待 Koishi Database 服务 ${this.readyTimeoutMs}ms 后仍不可用`)
+    const [scope] = await database.get(MODEL_REQUEST_SCOPE_TABLE, { scopeId: this.scopeId })
+    const rows = await database.get(MODEL_REQUEST_RECORD_TABLE, { scopeId: this.scopeId }, {
+      fields: ['sequence', 'bytes'],
+      sort: { sequence: 'asc' },
+    })
+    this.index.reset(rows, Number(scope?.nextSequence) || 1)
+    return this.index.summary()
   }
-  async replaceAll(nextSequence: number, records: SandboxModelRequestRecord[]) {
-    const database = this.getDatabase()
-    if (!database) return
-    await database.upsert(MODEL_REQUEST_TABLE, [{ scopeId: this.scopeId, nextSequence, records: structuredClone(records), updatedAt: new Date() }])
+
+  async append(record: SandboxModelRequestRecord, bytes: number, nextSequence: number) {
+    const database = this.requireDatabase()
+    await database.upsert(MODEL_REQUEST_RECORD_TABLE, [this.toRow(record, bytes)])
+    this.index.put(record.sequence, bytes, nextSequence)
+    await this.saveScope(database)
+    return this.index.summary()
   }
-  async clear() {
+
+  async find(recordId: string) {
+    const database = this.requireDatabase()
+    const [row] = await database.get(MODEL_REQUEST_RECORD_TABLE, { scopeId: this.scopeId, id: recordId }, { limit: 1 })
+    return row ? structuredClone(row.record) : undefined
+  }
+
+  async replace(record: SandboxModelRequestRecord, bytes: number) {
+    const database = this.requireDatabase()
+    // 只有仍然存在的行才回写；否则容量回收删掉的记录会被 update 复活。
+    if (this.index.has(record.sequence)) {
+      await database.upsert(MODEL_REQUEST_RECORD_TABLE, [this.toRow(record, bytes)])
+      this.index.put(record.sequence, bytes)
+    }
+    return this.index.summary()
+  }
+
+  async query(query: SandboxModelRequestPersistenceQuery) {
+    const database = this.requireDatabase()
+    const rows = await database.get(MODEL_REQUEST_RECORD_TABLE, this.toRowQuery(query), {
+      sort: { sequence: query.order },
+      limit: Math.max(0, query.limit),
+    })
+    return rows.map((row) => structuredClone(row.record))
+  }
+
+  async reclaim(limits: { maxRecords: number, maxBytes: number }) {
+    const database = this.requireDatabase()
+    const cutoff = this.index.resolveCutoff(limits)
+    if (cutoff !== undefined) {
+      await database.remove(MODEL_REQUEST_RECORD_TABLE, { scopeId: this.scopeId, sequence: { $lte: cutoff } })
+      this.index.dropThrough(cutoff)
+    }
+    return this.index.summary()
+  }
+
+  async clear(nextSequence: number) {
+    const database = this.requireDatabase()
+    await database.remove(MODEL_REQUEST_RECORD_TABLE, { scopeId: this.scopeId })
+    this.index.clear(nextSequence)
+    await this.saveScope(database)
+    return this.index.summary()
+  }
+
+  private toRow(record: SandboxModelRequestRecord, bytes: number): SandboxModelRequestRecordRow {
+    return {
+      scopeId: this.scopeId,
+      sequence: record.sequence,
+      id: record.id,
+      createdAt: record.createdAt,
+      // 缺省值写空串而不是 undefined：Minato 会丢弃 undefined 字段，过滤条件也就无法判定"未设置"。
+      botId: record.entities.botId ?? '',
+      conversationId: record.entities.conversationId ?? '',
+      interactionId: record.interactionId ?? '',
+      model: record.model ?? '',
+      status: record.status,
+      bytes,
+      record: structuredClone(record),
+    }
+  }
+
+  private toRowQuery(query: SandboxModelRequestPersistenceQuery): SandboxRecordRowQuery {
+    const rowQuery: SandboxRecordRowQuery = { scopeId: this.scopeId }
+    if (query.botId) rowQuery.botId = query.botId
+    if (query.conversationId) rowQuery.conversationId = query.conversationId
+    if (query.interactionId) rowQuery.interactionId = query.interactionId
+    if (query.model) rowQuery.model = query.model
+    if (query.errorsOnly) rowQuery.status = 'error'
+    if (query.beforeSequence !== undefined) {
+      rowQuery.sequence = sequenceCursorCondition(query.order, query.beforeSequence)
+    } else if (query.beforeCreatedAt) {
+      // createdAt 是 ISO 8601，字节序等于时间序；同刻并列时才用 id 决胜，
+      // 此时的字符串比较由驱动排序规则决定，与内存侧的 localeCompare 只在同刻同前缀时可能不同。
+      const strict = query.order === 'asc' ? { $gt: query.beforeCreatedAt } : { $lt: query.beforeCreatedAt }
+      if (query.beforeId) {
+        rowQuery.$or = [
+          { createdAt: strict },
+          { createdAt: query.beforeCreatedAt, id: query.order === 'asc' ? { $gt: query.beforeId } : { $lt: query.beforeId } },
+        ]
+      } else {
+        rowQuery.createdAt = query.order === 'asc'
+          ? { $gte: query.beforeCreatedAt }
+          : { $lte: query.beforeCreatedAt }
+      }
+    }
+    return rowQuery
+  }
+
+  private async saveScope(database: SandboxModelRequestDatabase) {
+    await database.upsert(MODEL_REQUEST_SCOPE_TABLE, [{
+      scopeId: this.scopeId,
+      nextSequence: this.index.readNextSequence(),
+      updatedAt: new Date(),
+    }])
+  }
+
+  private requireDatabase(): SandboxModelRequestDatabase {
     const database = this.getDatabase()
-    if (!database) return
-    await database.remove(MODEL_REQUEST_TABLE, { scopeId: this.scopeId })
+    if (!database) throw new Error('Koishi Database 服务不可用，模型请求记录未能落盘')
+    return database
   }
 }
 

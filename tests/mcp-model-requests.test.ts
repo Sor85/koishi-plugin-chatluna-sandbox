@@ -79,7 +79,7 @@ describe('模型请求 MCP 工具', () => {
       code: 'invalid_arguments',
     })
     expect(await service.callTool(credential.token, 'clear_model_request_records', { spaceId: created.spaceId })).toEqual({ cleared: 1 })
-    expect(spaceControl.getModelRequestRecords().records).toEqual([])
-    expect(unattributed.getRecords().records).toHaveLength(1)
+    expect((await spaceControl.getModelRequestRecords()).records).toEqual([])
+    expect((await unattributed.getRecords()).records).toHaveLength(1)
   })
 })

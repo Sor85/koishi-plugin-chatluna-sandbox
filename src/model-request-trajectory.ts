@@ -23,7 +23,8 @@ import {
 interface BuildSandboxModelRequestTrajectoryOptions {
   record: SandboxModelRequestDetail
   mode: 'request' | 'conversation'
-  store?: SandboxModelRequestStore
+  /** 会话模式下同会话的原始记录，按 sequence 正序；缺省表示无法聚合，只呈现当前请求。 */
+  conversationRecords?: readonly SandboxModelRequestRecord[]
 }
 
 interface ProjectedRow {
@@ -42,11 +43,39 @@ interface ProjectedRow {
 
 const CONVERSATION_RECORD_LIMIT = 200
 
+/**
+ * 读取会话模式需要的同会话记录。记录库的读取是异步的，而轨迹投影本身是纯函数；
+ * 这个薄封装是唯一需要 Store 的地方，投影因此保持可单测、可复用。
+ */
+export async function readSandboxModelRequestConversationRecords(
+  record: Pick<SandboxModelRequestDetail, 'entities'>,
+  store: SandboxModelRequestStore | undefined,
+): Promise<SandboxModelRequestRecord[] | undefined> {
+  const conversationId = record.entities.conversationId
+  if (!store || !conversationId) return
+  return store.getRawRecords({ conversationId, order: 'asc', limit: CONVERSATION_RECORD_LIMIT })
+}
+
+export async function buildSandboxModelRequestTrajectoryFromStore(options: {
+  record: SandboxModelRequestDetail
+  mode: 'request' | 'conversation'
+  store?: SandboxModelRequestStore
+}): Promise<SandboxModelRequestTrajectory> {
+  const conversationRecords = options.mode === 'conversation'
+    ? await readSandboxModelRequestConversationRecords(options.record, options.store)
+    : undefined
+  return buildSandboxModelRequestTrajectory({
+    record: options.record,
+    mode: options.mode,
+    ...(conversationRecords ? { conversationRecords } : {}),
+  })
+}
+
 export function buildSandboxModelRequestTrajectory(
   options: BuildSandboxModelRequestTrajectoryOptions,
 ): SandboxModelRequestTrajectory {
-  const sourceRecords = options.mode === 'conversation'
-    ? resolveConversationRecords(options.record, options.store)
+  const sourceRecords = options.mode === 'conversation' && options.conversationRecords
+    ? options.conversationRecords
     : [options.record]
   const records = sourceRecords.map(record => presentModelRequestRecord(record, 'list') as SandboxModelRequestListItem)
   const rows: SandboxModelRequestTrajectoryRow[] = []
@@ -99,7 +128,7 @@ export function buildSandboxModelRequestTrajectory(
     records,
     rows,
     promptComposition,
-    complete: options.mode === 'request' || !options.store || sourceRecords.length < CONVERSATION_RECORD_LIMIT,
+    complete: options.mode === 'request' || !options.conversationRecords || sourceRecords.length < CONVERSATION_RECORD_LIMIT,
   }
 }
 
@@ -296,15 +325,6 @@ function push(
   count: number,
 ): void {
   if (count > 0) target.push({ kind, evidenceId, characters: count })
-}
-
-function resolveConversationRecords(
-  record: SandboxModelRequestDetail,
-  store: SandboxModelRequestStore | undefined,
-): SandboxModelRequestRecord[] {
-  const conversationId = record.entities.conversationId
-  if (!store || !conversationId) return [record]
-  return store.getRawRecords({ conversationId, order: 'asc', limit: CONVERSATION_RECORD_LIMIT })
 }
 
 function variableStatusLabel(status: SandboxModelRequestVariable['status']): string {

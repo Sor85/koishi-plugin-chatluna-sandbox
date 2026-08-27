@@ -182,14 +182,16 @@ describe('ChatLuna 多机器人对话状态', () => {
       originError: new Error('provider rejected request'),
     }, 'chatluna:direct')
 
-    expect(control.getModelRequestRecords({ model: 'direct-model' }).records[0]).toMatchObject({
+    // 错误归档要先查最近的失败请求再单行更新，只能在后台完成；收尾等待覆盖它。
+    await control.waitForPersistence()
+    expect((await control.getModelRequestRecords({ model: 'direct-model' })).records[0]).toMatchObject({
       chatlunaError: {
         code: 103,
         message: 'API 请求失败 (103)',
         originMessage: 'provider rejected request',
       },
     })
-    expect(control.getModelRequestRecords({ model: 'group-model' }).records[0]?.chatlunaError).toBeUndefined()
+    expect((await control.getModelRequestRecords({ model: 'group-model' })).records[0]?.chatlunaError).toBeUndefined()
   })
 
   it('ChatLuna 会话同时映射多个机器人时不把错误串到任意模型请求', async () => {
@@ -208,7 +210,8 @@ describe('ChatLuna 多机器人对话状态', () => {
 
     await emit(app, 'chatluna/after-chat-error', { errorCode: 103, message: 'API 请求失败 (103)' }, 'chatluna:shared-error')
 
-    expect(control.getModelRequestRecord({ recordId: request.id }).chatlunaError).toBeUndefined()
+    await control.waitForPersistence()
+    expect((await control.getModelRequestRecord({ recordId: request.id })).chatlunaError).toBeUndefined()
   })
 
   it('兼容 chatluna-character 的思考开始与结束事件', async () => {

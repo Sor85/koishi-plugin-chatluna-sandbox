@@ -92,6 +92,10 @@ export interface SandboxControlServiceOptions {
   modelRequestPersistence?: SandboxModelRequestPersistence
   modelRequestRecordLimit?: number
   modelRequestRecordMaxBytes?: number
+  /** 场景保留的消息条数上限；超出后从最旧消息开始淘汰。 */
+  sceneMessageLimit?: number
+  /** 场景 JSON 的字节上限；超出后继续从最旧消息开始淘汰。 */
+  sceneMessageMaxBytes?: number
   initialScene?: SandboxSnapshot
   runtimeBots?: SandboxRuntimeBotRegistry
   runtimeActive?: boolean
@@ -134,6 +138,12 @@ const DEFAULT_DATABASE_READY_TIMEOUT_MS = 10_000
 const MAX_GROUP_MUTE_SECONDS = 30 * 24 * 60 * 60
 // 防止插件或 WebQQ 多选无限塞 node 导致场景膨胀。
 const MAX_FORWARD_NODES = 100
+
+// 场景是整块落盘的：每次领域变更都要把完整场景写一遍，没有上限时单次写入规模随累计
+// 消息数线性增长，总写入量随消息数呈平方增长。这两个默认值把单次写入钉在恒定上界，
+// 代价是超出窗口的历史消息真正丢弃，不做归档。
+export const DEFAULT_SCENE_MESSAGE_LIMIT = 2000
+export const DEFAULT_SCENE_MESSAGE_MAX_BYTES = 8 * 1024 * 1024
 
 export function createEmptyScene(): SandboxSnapshot {
   return { revision: 0, participants: [], groups: [], conversations: [], messages: [], forwards: [], friendships: [], requests: [] }
@@ -227,6 +237,8 @@ export class SandboxControlService {
   private contextDisposers: Array<() => void> = []
   private disposePromise?: Promise<void>
   private databaseReadyTimeoutMs: number
+  private sceneMessageLimit: number
+  private sceneMessageMaxBytes: number
   private disposed = false
 
   constructor(private ctx: Context, options: SandboxControlServiceOptions = {}) {
@@ -235,6 +247,8 @@ export class SandboxControlService {
     this.runtimeBotsActive = options.runtimeActive ?? true
     this.runtimeBotRegistry = options.runtimeBots ?? new SandboxRuntimeBotRegistry()
     this.databaseReadyTimeoutMs = options.databaseReadyTimeoutMs ?? DEFAULT_DATABASE_READY_TIMEOUT_MS
+    this.sceneMessageLimit = Math.max(1, Math.trunc(options.sceneMessageLimit ?? DEFAULT_SCENE_MESSAGE_LIMIT))
+    this.sceneMessageMaxBytes = Math.max(1, Math.trunc(options.sceneMessageMaxBytes ?? DEFAULT_SCENE_MESSAGE_MAX_BYTES))
     this.persistence = options.persistence
     if (this.persistence) {
       this.sceneReady = new Promise((resolve) => {
@@ -265,6 +279,9 @@ export class SandboxControlService {
     // database 服务可能晚于本插件加载，构造时的可用性不可信；数据库模式的清理决策移到 ready 读取场景之后。
     if (!this.persistence) this.mediaStorage.clear()
     this.ensureStableAvatars()
+    // 传入的初始场景可能来自更宽上限时期的快照（例如恢复 AI 测试空间），必须先收敛到
+    // 当前上限再冻结：initialScene 在上限内是 resetScene 不会写出超限场景的前提。
+    this.reclaimSceneMessages()
     // 初始场景在默认头像落盘后再冻结，reset 才能恢复到可显示的实体头像集合。
     this.initialScene = structuredClone(this.scene)
     this.chatLunaState = new SandboxChatLunaStateStore(ctx, (botParticipantId, conversationId) => {
@@ -364,6 +381,8 @@ export class SandboxControlService {
     sanitized.revision = this.scene.revision + 1
     this.scene = sanitized
     this.ensureStableAvatars()
+    // 导入的场景同样受保留上限约束，否则一次 import_scene 就能绕过整块落盘的写入上界。
+    this.reclaimSceneMessages()
     this.mediaStorage.reclaimUnreferenced(this.getMediaReferences())
     this.botDeliveries = []
     this.chatLunaState.clear()
@@ -538,17 +557,17 @@ export class SandboxControlService {
     }
   }
 
-  getOneBotDebugRecords(input: GetSandboxOneBotDebugRecordsInput = {}): SandboxOneBotDebugRecordsPage {
+  getOneBotDebugRecords(input: GetSandboxOneBotDebugRecordsInput = {}): Promise<SandboxOneBotDebugRecordsPage> {
     return this.oneBotDebug.getRecords(input)
   }
 
-  getOneBotDebugRecord(input: GetSandboxOneBotDebugRecordInput): SandboxOneBotDebugRecord {
-    const record = this.oneBotDebug.getRecord(input.recordId, input.includeLargeValues === true)
+  async getOneBotDebugRecord(input: GetSandboxOneBotDebugRecordInput): Promise<SandboxOneBotDebugRecord> {
+    const record = await this.oneBotDebug.getRecord(input.recordId, input.includeLargeValues === true)
     if (!record) throw new Error(`调试记录不存在：${input.recordId}`)
     return record
   }
 
-  clearOneBotDebugRecords(): number {
+  clearOneBotDebugRecords(): Promise<number> {
     return this.oneBotDebug.clear()
   }
 
@@ -569,22 +588,27 @@ export class SandboxControlService {
   private archiveChatLunaModelRequestError(error: unknown, target: SandboxChatLunaErrorTarget): void {
     const chatlunaError = readChatLunaRequestError(error)
     if (!chatlunaError) return
-    const record = findLatestFailedModelRequest(this.modelRequests.getRawRecords(), target.conversationId)
-    if (!record) return
-    this.modelRequests.update(record.id, { chatlunaError })
+    // ChatLuna 的错误回调是同步的，记录查找与单行更新只能在后台完成；
+    // 收尾等待通过 trackUpdate 覆盖它，避免关机时丢掉这次归档。
+    const task = this.modelRequests.getRawRecords().then(async (records) => {
+      const record = findLatestFailedModelRequest(records, target.conversationId)
+      if (!record) return
+      await this.modelRequests.update(record.id, { chatlunaError })
+    }).catch(() => undefined)
+    this.modelRequests.trackUpdate(task)
   }
 
-  getModelRequestRecords(input: GetSandboxModelRequestRecordsInput = {}): SandboxModelRequestRecordsPage {
+  getModelRequestRecords(input: GetSandboxModelRequestRecordsInput = {}): Promise<SandboxModelRequestRecordsPage> {
     return this.modelRequests.getRecords(input)
   }
 
-  getModelRequestRecord(input: GetSandboxModelRequestRecordInput): SandboxModelRequestDetail {
-    const record = this.modelRequests.getRecord(input.recordId)
+  async getModelRequestRecord(input: GetSandboxModelRequestRecordInput): Promise<SandboxModelRequestDetail> {
+    const record = await this.modelRequests.getRecord(input.recordId)
     if (!record) throw new Error(`模型请求记录不存在：${input.recordId}`)
     return record
   }
 
-  clearModelRequestRecords(): number {
+  clearModelRequestRecords(): Promise<number> {
     return this.modelRequests.clear()
   }
 
@@ -645,12 +669,14 @@ export class SandboxControlService {
 
   resetScene(): void {
     this.chatLunaState.clear()
-    this.oneBotDebug.clear()
-    this.modelRequests.clear()
+    // 清理与场景重置同步入队；收尾等待走 waitForPersistence，不阻塞领域调用方。
+    void this.oneBotDebug.clear()
+    void this.modelRequests.clear()
     this.botDeliveries = []
     // 恢复到本实例的初始场景而非全局默认场景：测试空间的初始场景是空白，
     // 直接 createDefaultScene() 会引入默认机器人 20001，与主场景在全局
     // 运行时注册表中的同 ID 机器人冲突，导致空间内 reset 必定失败。
+    // initialScene 在构造时已经收敛到保留上限内，因此这里不必再次淘汰。
     this.scene = structuredClone(this.initialScene)
     this.ensureStableAvatars()
     this.mediaStorage.reclaimUnreferenced(this.getMediaReferences())
@@ -2135,9 +2161,12 @@ export class SandboxControlService {
     if (result.kind === 'loaded') {
       // 未发布阶段直接补齐 forwards，避免本地旧快照缺字段导致读取路径崩溃。
       this.scene = this.normalizeSceneForwards(structuredClone(result.scene))
+      // 配置调小上限后，恢复的旧场景必须立刻收敛，否则第一次写入仍然是超限的完整场景。
+      // 必须排在头像规范化之前：后者结尾按最终引用集回收媒体，淘汰要先落定。
+      const trimmed = this.reclaimSceneMessages()
       const normalized = await this.normalizePersistedAvatars()
       this.syncRuntimeBots()
-      if (normalized) {
+      if (normalized || trimmed) {
         await persistence.save(this.getSnapshot())
       }
       // 恢复不会产生新的领域变更，因此保留持久化 revision；广播只负责唤醒可能提前挂载的客户端。
@@ -2220,9 +2249,48 @@ export class SandboxControlService {
 
   private commitSceneMutation(): void {
     this.scene.revision += 1
+    // 保留上限必须在媒体回收和落盘之前收敛，否则被淘汰消息的媒体会多活一个 revision，
+    // 而这一轮写入的仍然是超限后的完整场景。
+    this.reclaimSceneMessages()
     this.mediaStorage.reclaimUnreferenced(this.getMediaReferences())
     this.queueScenePersistence()
     this.notifySceneMutation()
+  }
+
+  /**
+   * 条数上限与场景 JSON 字节上限同时约束场景消息，达到任一上限就从最旧消息开始淘汰。
+   * 级联清理会话的 messageIds、因此失去引用的合并转发资源与机器人投递记录；媒体回收
+   * 由调用方在本函数之后按引用集统一执行。
+   */
+  private reclaimSceneMessages(): boolean {
+    const overflow = this.scene.messages.length - this.sceneMessageLimit
+    const removed: SandboxMessage[] = overflow > 0 ? this.scene.messages.splice(0, overflow) : []
+    // 字节上限按整块落盘的真实体积收敛。逐条 stringify 是 O(n²)，这里按当前平均单条
+    // 体积估算需要淘汰的条数，再用实测字节数复核，循环至多迭代常数次。
+    while (this.scene.messages.length) {
+      const sceneBytes = Buffer.byteLength(JSON.stringify(this.scene), 'utf8')
+      if (sceneBytes <= this.sceneMessageMaxBytes) break
+      const messagesBytes = Buffer.byteLength(JSON.stringify(this.scene.messages), 'utf8')
+      const average = Math.max(1, Math.ceil(messagesBytes / this.scene.messages.length))
+      const drop = Math.min(
+        this.scene.messages.length,
+        Math.max(1, Math.ceil((sceneBytes - this.sceneMessageMaxBytes) / average)),
+      )
+      removed.push(...this.scene.messages.splice(0, drop))
+      // 消息之外的场景内容（参与者、群、转发、请求）本身可能就超过字节上限；
+      // 消息清空后无法继续收敛，此时循环由 length 条件终止而不是无限重试。
+    }
+    if (!removed.length) return false
+
+    const removedIds = new Set(removed.map(({ id }) => id))
+    for (const conversation of this.scene.conversations) {
+      if (!conversation.messageIds.some((id) => removedIds.has(id))) continue
+      conversation.messageIds = conversation.messageIds.filter((id) => !removedIds.has(id))
+    }
+    this.botDeliveries = this.botDeliveries.filter(({ messageId }) => !removedIds.has(messageId))
+    // 失去外层引用的合并转发资源必须一起回收，否则 getMediaReferences 会永久钉住节点媒体。
+    this.pruneUnreferencedForwards()
+    return true
   }
 
   private notifySceneMutation(): void {

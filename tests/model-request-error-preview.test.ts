@@ -22,7 +22,7 @@ describe('开发环境 ChatLuna 错误预览', () => {
     expect(await seedDevelopmentModelRequestErrors(control)).toBe(11)
     expect(await seedDevelopmentModelRequestErrors(control)).toBe(0)
 
-    const records = control.getModelRequestRecords({ errorsOnly: true, limit: 50 }).records
+    const records = (await control.getModelRequestRecords({ errorsOnly: true, limit: 50 })).records
     expect(records.map(record => record.chatlunaError?.code).sort((a, b) => Number(a) - Number(b))).toEqual([
       1, 2, 100, 101, 102, 103, 104, 301, 303, 307, 309,
     ])
@@ -41,6 +41,6 @@ describe('开发环境 ChatLuna 错误预览', () => {
     await app.start()
 
     expect(await seedDevelopmentModelRequestErrors(control)).toBe(0)
-    expect(control.getModelRequestRecords().records).toEqual([])
+    expect((await control.getModelRequestRecords()).records).toEqual([])
   })
 })

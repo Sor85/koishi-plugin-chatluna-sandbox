@@ -42,6 +42,11 @@ export function trimSnapshotMessages(snapshot: SandboxSnapshot, limit: number): 
   }
 }
 
+export interface SandboxTestSpaceRetention {
+  sceneMessageLimit?: number
+  sceneMessageMaxBytes?: number
+}
+
 interface SandboxTestSpaceRecord extends Omit<SandboxTestSpaceSummary, 'snapshot'> {
   control: SandboxControlService
 }
@@ -60,6 +65,7 @@ export class SandboxTestSpaceService {
     private createDebugPersistence?: (scopeId: string) => SandboxOneBotDebugPersistence,
     private createModelRequestPersistence?: (scopeId: string) => SandboxModelRequestPersistence,
     private modelRequestRecordLimit?: number,
+    private retention: SandboxTestSpaceRetention = {},
   ) {
     ctx.on('ready', async () => {
       if (!this.persistence) return
@@ -255,6 +261,9 @@ export class SandboxTestSpaceService {
       debugPersistence: this.createDebugPersistence?.(id),
       modelRequestPersistence: this.createModelRequestPersistence?.(id),
       modelRequestRecordLimit: this.modelRequestRecordLimit,
+      // 每个空间独立持有场景消息配额，与主环境和其他空间互不共享。
+      sceneMessageLimit: this.retention.sceneMessageLimit,
+      sceneMessageMaxBytes: this.retention.sceneMessageMaxBytes,
     })
   }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { SandboxModelRequestStore } from '../src/model-request'
-import { buildSandboxModelRequestTrajectory } from '../src/model-request-trajectory'
+import { buildSandboxModelRequestTrajectoryFromStore } from '../src/model-request-trajectory'
 import {
   buildModelRequestAnalysisNavigation,
   modelAnalysisTargetId,
@@ -33,7 +33,7 @@ const FIXTURES: readonly Fixture[] = [
   { name: 'Gemini generateContent', requestBody: geminiGenerateContentRequest, responseBodyRaw: openAiChatJsonResponse, responseBodyFormat: 'json' },
 ]
 
-function buildViews(fixture: Fixture) {
+async function buildViews(fixture: Fixture) {
   const store = new SandboxModelRequestStore()
   const appended = store.append({
     status: 'success',
@@ -48,8 +48,8 @@ function buildViews(fixture: Fixture) {
     responseBodyFormat: fixture.responseBodyFormat,
     responseBodyRaw: fixture.responseBodyRaw,
   })
-  const detail = store.getRecord(appended.id)!
-  const trajectory = buildSandboxModelRequestTrajectory({ record: detail, mode: 'request', store })
+  const detail = (await store.getRecord(appended.id))!
+  const trajectory = await buildSandboxModelRequestTrajectoryFromStore({ record: detail, mode: 'request', store })
   const conversation = parseModelRequestConversationDetail(detail)
   const navigation = buildModelRequestAnalysisNavigation(conversation, detail)
   return { detail, trajectory, conversation, navigation }
@@ -57,8 +57,8 @@ function buildViews(fixture: Fixture) {
 
 describe('模型证据身份跨视图契约', () => {
   for (const fixture of FIXTURES) {
-    it(`${fixture.name} 的轨迹行、组成分段与分析目标指向同一条证据`, () => {
-      const { trajectory, conversation, navigation } = buildViews(fixture)
+    it(`${fixture.name} 的轨迹行、组成分段与分析目标指向同一条证据`, async () => {
+      const { trajectory, conversation, navigation } = await buildViews(fixture)
 
       const rowEvidenceIds = trajectory.rows.flatMap(({ evidenceId }) => evidenceId ? [evidenceId] : [])
       expect(rowEvidenceIds.length).toBeGreaterThan(0)
@@ -92,8 +92,8 @@ describe('模型证据身份跨视图契约', () => {
     })
   }
 
-  it('请求工具调用与响应工具事件都能从轨迹定位到具体分析卡片', () => {
-    const { trajectory, conversation, navigation } = buildViews(FIXTURES[0]!)
+  it('请求工具调用与响应工具事件都能从轨迹定位到具体分析卡片', async () => {
+    const { trajectory, conversation, navigation } = await buildViews(FIXTURES[0]!)
 
     const requestCall = trajectory.rows.find(row => row.source === 'request' && row.toolEvent === 'call')!
     expect(resolveAnalysisEvidenceTarget(navigation, requestCall.evidenceId))
@@ -107,8 +107,8 @@ describe('模型证据身份跨视图契约', () => {
     expect(resolveAnalysisEvidenceTarget(navigation, responseContent.evidenceId)).toBe('model-analysis-response')
   })
 
-  it('多个 SSE 分片合并出的响应事实仍然定位到同一目标并保留全部来源', () => {
-    const { trajectory, conversation, navigation } = buildViews(FIXTURES[1]!)
+  it('多个 SSE 分片合并出的响应事实仍然定位到同一目标并保留全部来源', async () => {
+    const { trajectory, conversation, navigation } = await buildViews(FIXTURES[1]!)
     const contentRows = trajectory.rows.filter(row => row.source === 'response' && row.kind === 'assistant')
 
     expect(contentRows.map(({ preview }) => preview)).toEqual(['思考 · 思考', '北京晴'])
@@ -119,8 +119,8 @@ describe('模型证据身份跨视图契约', () => {
     expect(conversation.response?.reasoning).toEqual(['思考'])
   })
 
-  it('展示用 provider 与模型名不参与协议识别，同一份证据在自定义网关下结果不变', () => {
-    const gateway = buildViews(FIXTURES[0]!)
+  it('展示用 provider 与模型名不参与协议识别，同一份证据在自定义网关下结果不变', async () => {
+    const gateway = await buildViews(FIXTURES[0]!)
     const store = new SandboxModelRequestStore()
     const appended = store.append({
       status: 'success',
@@ -135,13 +135,13 @@ describe('模型证据身份跨视图契约', () => {
       responseBodyFormat: 'json',
       responseBodyRaw: openAiChatJsonResponse,
     })
-    const trajectory = buildSandboxModelRequestTrajectory({ record: store.getRecord(appended.id)!, mode: 'request', store })
+    const trajectory = await buildSandboxModelRequestTrajectoryFromStore({ record: (await store.getRecord(appended.id))!, mode: 'request', store })
 
     expect(trajectory.rows.map(({ evidenceId }) => evidenceId))
       .toEqual(gateway.trajectory.rows.map(({ evidenceId }) => evidenceId))
   })
 
-  it('pending 请求补齐响应后，已有请求证据身份保持稳定', () => {
+  it('pending 请求补齐响应后，已有请求证据身份保持稳定', async () => {
     const store = new SandboxModelRequestStore()
     const appended = store.append({
       status: 'pending',
@@ -152,7 +152,7 @@ describe('模型证据身份跨视图契约', () => {
       requestBody: openAiChatRequest,
       responseBodyStatus: 'pending',
     })
-    const before = buildSandboxModelRequestTrajectory({ record: store.getRecord(appended.id)!, mode: 'request', store })
+    const before = await buildSandboxModelRequestTrajectoryFromStore({ record: (await store.getRecord(appended.id))!, mode: 'request', store })
     store.update(appended.id, {
       status: 'success',
       durationMs: 120,
@@ -160,7 +160,7 @@ describe('模型证据身份跨视图契约', () => {
       responseBodyFormat: 'json',
       responseBodyRaw: openAiChatJsonResponse,
     })
-    const after = buildSandboxModelRequestTrajectory({ record: store.getRecord(appended.id)!, mode: 'request', store })
+    const after = await buildSandboxModelRequestTrajectoryFromStore({ record: (await store.getRecord(appended.id))!, mode: 'request', store })
 
     const requestIdsBefore = before.rows.filter(row => row.source === 'request').map(({ evidenceId }) => evidenceId)
     const requestIdsAfter = after.rows.filter(row => row.source === 'request').map(({ evidenceId }) => evidenceId)

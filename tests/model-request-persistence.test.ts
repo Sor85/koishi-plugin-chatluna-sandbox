@@ -1,9 +1,14 @@
 import { App } from '@koishijs/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SandboxControlService, SandboxRuntimeBotRegistry } from '../src/control-service'
-import { MemoryModelRequestPersistence, KoishiDatabaseModelRequestPersistence } from '../src/persistence'
+import {
+  MemoryModelRequestPersistence,
+  KoishiDatabaseModelRequestPersistence,
+  type SandboxModelRequestDatabase,
+} from '../src/persistence'
 import type { SandboxModelRequestRecord } from '../src/types'
 import { SandboxTestSpaceService } from '../src/test-spaces'
+import { createEvidenceRecordDatabase, type FakeDatabase } from './helpers/fake-database'
 
 const runningApps: App[] = []
 
@@ -25,23 +30,26 @@ describe('模型请求记录持久化与生命周期', () => {
       requestBodyAvailable: false,
       responseBodyStatus: 'unavailable',
     }
-    let database: {
-      get: (table: 'chatluna-sandbox.model-requests', query: { scopeId: string }) => Promise<Array<{
-        scopeId: string
-        nextSequence: number
-        records: SandboxModelRequestRecord[]
-        updatedAt: Date
-      }>>
-      upsert: (table: 'chatluna-sandbox.model-requests', rows: Array<{
-        scopeId: string
-        nextSequence: number
-        records: SandboxModelRequestRecord[]
-        updatedAt: Date
-      }>) => Promise<void>
-      remove: (table: 'chatluna-sandbox.model-requests', query: { scopeId: string }) => Promise<void>
-    } | undefined
-    const writes: Array<{ nextSequence: number, records: SandboxModelRequestRecord[] }> = []
-    const persistence = new KoishiDatabaseModelRequestPersistence('main', () => database)
+    const stored = createEvidenceRecordDatabase()
+    await stored.upsert('chatluna-sandbox.model-request', [{
+      scopeId: 'main',
+      sequence: historical.sequence,
+      id: historical.id,
+      createdAt: historical.createdAt,
+      botId: '',
+      conversationId: '',
+      interactionId: '',
+      model: historical.model,
+      status: historical.status,
+      bytes: Buffer.byteLength(JSON.stringify(historical), 'utf8'),
+      record: historical,
+    }])
+    await stored.upsert('chatluna-sandbox.model-request-scope', [{ scopeId: 'main', nextSequence: 8, updatedAt: new Date() }])
+    let database: FakeDatabase | undefined
+    const persistence = new KoishiDatabaseModelRequestPersistence(
+      'main',
+      () => database as unknown as SandboxModelRequestDatabase | undefined,
+    )
     const app = new App()
     runningApps.push(app)
     const control = new SandboxControlService(app, { modelRequestPersistence: persistence })
@@ -51,32 +59,22 @@ describe('模型请求记录持久化与生命周期', () => {
       attribution: 'attributed', entities: { scopeId: 'main' }, requestBodyAvailable: false,
     })
     setTimeout(() => {
-      database = {
-        get: async () => [{
-          scopeId: 'main',
-          nextSequence: 8,
-          records: [historical],
-          updatedAt: new Date(),
-        }],
-        upsert: async (_table, rows) => {
-          writes.push({ nextSequence: rows[0]!.nextSequence, records: structuredClone(rows[0]!.records) })
-        },
-        remove: async () => {},
-      }
+      database = stored
     }, 30)
 
     await control.waitForPersistence()
-    expect(control.getModelRequestRecords().records.map(({ id, model, sequence }) => ({ id, model, sequence }))).toEqual([
+    expect((await control.getModelRequestRecords()).records.map(({ id, model, sequence }) => ({ id, model, sequence }))).toEqual([
       expect.objectContaining({ model: 'startup-model', sequence: 8 }),
       { id: 'historical', model: 'historical-model', sequence: 7 },
     ])
-    expect(writes.at(-1)).toMatchObject({
-      nextSequence: 9,
-      records: [
-        expect.objectContaining({ id: 'historical', sequence: 7 }),
-        expect.objectContaining({ model: 'startup-model', sequence: 8 }),
-      ],
-    })
+    // 启动期请求只插入自己那一行，历史行不被重写。
+    const rows = await stored.get('chatluna-sandbox.model-request', { scopeId: 'main' }, { sort: { sequence: 'asc' } })
+    expect(rows.map((row) => (row as { sequence: number }).sequence)).toEqual([7, 8])
+    expect(stored.writes.filter(({ table, operation }) => (
+      table === 'chatluna-sandbox.model-request' && operation === 'upsert'
+    )).every(({ rows: written }) => written === 1)).toBe(true)
+    const [scope] = await stored.get('chatluna-sandbox.model-request-scope', { scopeId: 'main' })
+    expect((scope as unknown as { nextSequence: number }).nextSequence).toBe(9)
   })
 
   it('共享内存 Adapter 后跨控制服务实例恢复记录，且 sequence 不回退', async () => {
@@ -97,7 +95,7 @@ describe('模型请求记录持久化与生命周期', () => {
 
     const second = new SandboxControlService(app, { modelRequestPersistence: persistence })
     await second.waitForPersistence()
-    expect(second.getModelRequestRecords().records.map(({ model, sequence }) => ({ model, sequence }))).toEqual([
+    expect((await second.getModelRequestRecords()).records.map(({ model, sequence }) => ({ model, sequence }))).toEqual([
       { model: 'second', sequence: 2 },
       { model: 'first', sequence: 1 },
     ])
@@ -105,7 +103,7 @@ describe('模型请求记录持久化与生命周期', () => {
       status: 'success', durationMs: 3, model: 'third',
       attribution: 'attributed', entities: { scopeId: 'main' }, requestBodyAvailable: false,
     })
-    expect(second.getModelRequestRecords().records[0]).toMatchObject({ model: 'third', sequence: 3 })
+    expect((await second.getModelRequestRecords()).records[0]).toMatchObject({ model: 'third', sequence: 3 })
   })
 
   it('重置场景只清理对应空间记录，完成空间仍保留记录', async () => {
@@ -132,15 +130,15 @@ describe('模型请求记录持久化与生命周期', () => {
     })
 
     space.control.resetScene()
-    expect(space.control.getModelRequestRecords().records).toEqual([])
-    expect(main.getModelRequestRecords().records).toHaveLength(1)
+    expect((await space.control.getModelRequestRecords()).records).toEqual([])
+    expect((await main.getModelRequestRecords()).records).toHaveLength(1)
 
     space.control.recordModelRequest({
       status: 'success', durationMs: 1, model: 'kept-after-complete',
       attribution: 'attributed', entities: { scopeId: space.id }, requestBodyAvailable: false,
     })
     spaces.completeSpace(space.id)
-    expect(space.control.getModelRequestRecords().records).toHaveLength(1)
+    expect((await space.control.getModelRequestRecords()).records).toHaveLength(1)
   })
 
   it('删除测试空间时清理其独立模型请求记录', async () => {
@@ -170,6 +168,6 @@ describe('模型请求记录持久化与生命周期', () => {
       runtimeActive: false,
     })
     await recreated.waitForPersistence()
-    expect(recreated.getModelRequestRecords().records).toEqual([])
+    expect((await recreated.getModelRequestRecords()).records).toEqual([])
   })
 })

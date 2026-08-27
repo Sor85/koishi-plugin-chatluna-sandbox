@@ -1,6 +1,6 @@
 # 02 — 证据记录改为按行持久化
 
-Status: ready-for-agent
+Status: resolved
 
 ## What to build
 
@@ -12,22 +12,41 @@ Status: ready-for-agent
 
 ## Acceptance criteria
 
-- [ ] 每条记录独立一行，主键为作用域 + 序号
-- [ ] append 只产生单行 insert，不重写其他行
-- [ ] update 只产生单行 update
-- [ ] 容量回收按序号区间删除，不整表重写
-- [ ] 单次写入体积不随记录总数增长（用探针断言）
-- [ ] 列表默认从新到旧返回 50 条、单次最多 200 条（ADR 0047 / 0054 不变）
-- [ ] 稳定序号游标语义不变，读取已回收位置返回 `cursor_expired` 与当前最早游标
-- [ ] 按 botId / conversationId / interactionId / model / errorsOnly 过滤结果与改造前一致
-- [ ] 条数与字节双上限行为不变，容量统计仍按完整持久化内容计算
-- [ ] 大值折叠行为不变（超过 8 KiB 的 Base64 仍只在单条详情显式展开时返回完整内容）
-- [ ] 内存适配器与数据库适配器共用同一套断言
-- [ ] 主环境、各测试空间、未归属分类仍是彼此独立的记录库
-- [ ] 相关测试、类型检查和构建通过
+- [x] 每条记录独立一行，主键为作用域 + 序号
+- [x] append 只产生单行 insert，不重写其他行
+- [x] update 只产生单行 update
+- [x] 容量回收按序号区间删除，不整表重写
+- [x] 单次写入体积不随记录总数增长（用探针断言）
+- [x] 列表默认从新到旧返回 50 条、单次最多 200 条（ADR 0047 / 0054 不变）
+- [x] 稳定序号游标语义不变，读取已回收位置返回 `cursor_expired` 与当前最早游标
+- [x] 按 botId / conversationId / interactionId / model / errorsOnly 过滤结果与改造前一致
+- [x] 条数与字节双上限行为不变，容量统计仍按完整持久化内容计算
+- [x] 大值折叠行为不变（超过 8 KiB 的 Base64 仍只在单条详情显式展开时返回完整内容）
+- [x] 内存适配器与数据库适配器共用同一套断言
+- [x] 主环境、各测试空间、未归属分类仍是彼此独立的记录库
+- [x] 相关测试、类型检查和构建通过
 
 ## Notes
 
 现状实测：20 次请求（每次 1 append + 3 update）触发 80 次 `replaceAll`，累计写入 19.78 MB；单作用域字节上限 50 MB，单行 JSON 可逼近该值并超过 MySQL `max_allowed_packet` 的常见默认值。
 
 相关决策：ADR 0070。
+
+## Answer
+
+已实现。两类证据记录改为一行一条，主键 `[scopeId, sequence]`：
+
+- 持久化契约从 `load/replaceAll/clear` 改为记录库接口
+  `summarize/append/find/replace/query/reclaim/clear`（`src/onebot-debug.ts`、`src/model-request.ts`）。
+  追加是单行 insert，补充响应体或错误是单行 update，容量回收是 `sequence <= cutoff` 的区间 delete。
+- 过滤、排序、分页游标下移到适配器：数据库侧用去规范化列 + Minato 查询，
+  内存侧复用同一份纯谓词 `matchesOneBotDebugQuery` / `matchesModelRequestQuery`。
+  `action` 别名按实现摊平为「精确名 + 每个实现下的规范 action 集合」后再查询。
+- 容量统计与回收决策由共享的 `ScopeRowIndex`（`src/record-store.ts`）承担，
+  仍按每行完整持久化内容的字节数求和；`nextSequence` 单独存作用域行，清空后不回退。
+- Store 变为异步读取门面，读取等待串行写入队列稳定，因此仍能读到已提交状态；
+  记录库不可读时降级为进程内行库，证据仍可见但本次运行不落盘。
+
+验收测试：`tests/evidence-record-persistence.test.ts`（内存与数据库适配器共用同一套断言，
+含单行写入与写入体积不随记录数增长的探针）、`tests/debug-records-persistence.test.ts`、
+`tests/model-request-persistence.test.ts`，以及既有分页、折叠与 Console/MCP 契约测试。

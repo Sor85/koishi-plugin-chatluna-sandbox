@@ -1,9 +1,14 @@
 import { App } from '@koishijs/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SandboxControlService, SandboxRuntimeBotRegistry } from '../src/control-service'
-import { MemoryOneBotDebugPersistence, KoishiDatabaseOneBotDebugPersistence } from '../src/persistence'
+import {
+  MemoryOneBotDebugPersistence,
+  KoishiDatabaseOneBotDebugPersistence,
+  type SandboxOneBotDebugDatabase,
+} from '../src/persistence'
 import type { SandboxOneBotDebugRecord } from '../src/types'
 import { SandboxTestSpaceService } from '../src/test-spaces'
+import { createEvidenceRecordDatabase, type FakeDatabase } from './helpers/fake-database'
 
 const runningApps: App[] = []
 
@@ -28,23 +33,28 @@ describe('OneBot 调试记录持久化与分页', () => {
       result: {},
       entities: {},
     }
-    let database: {
-      get: (table: 'chatluna-sandbox.debug-records', query: { scopeId: string }) => Promise<Array<{
-        scopeId: string
-        nextSequence: number
-        records: SandboxOneBotDebugRecord[]
-        updatedAt: Date
-      }>>
-      upsert: (table: 'chatluna-sandbox.debug-records', rows: Array<{
-        scopeId: string
-        nextSequence: number
-        records: SandboxOneBotDebugRecord[]
-        updatedAt: Date
-      }>) => Promise<void>
-      remove: (table: 'chatluna-sandbox.debug-records', query: { scopeId: string }) => Promise<void>
-    } | undefined
-    const writes: Array<{ nextSequence: number, records: SandboxOneBotDebugRecord[] }> = []
-    const persistence = new KoishiDatabaseOneBotDebugPersistence('main', () => database)
+    const stored = createEvidenceRecordDatabase()
+    await stored.upsert('chatluna-sandbox.debug-record', [{
+      scopeId: 'main',
+      sequence: historical.sequence,
+      id: historical.id,
+      createdAt: historical.createdAt,
+      botId: historical.botId,
+      implementation: historical.implementation,
+      direction: historical.direction,
+      action: historical.action,
+      requestedAction: historical.requestedAction,
+      matchedAlias: '',
+      status: historical.status,
+      bytes: Buffer.byteLength(JSON.stringify(historical), 'utf8'),
+      record: historical,
+    }])
+    await stored.upsert('chatluna-sandbox.debug-scope', [{ scopeId: 'main', nextSequence: 8, updatedAt: new Date() }])
+    let database: FakeDatabase | undefined
+    const persistence = new KoishiDatabaseOneBotDebugPersistence(
+      'main',
+      () => database as unknown as SandboxOneBotDebugDatabase | undefined,
+    )
     const app = new App()
     runningApps.push(app)
     const control = new SandboxControlService(app, { debugPersistence: persistence })
@@ -54,27 +64,22 @@ describe('OneBot 调试记录持久化与分页', () => {
       requestedAction: 'startup_action', action: 'startup_action', status: 'success', durationMs: 1,
     })
     setTimeout(() => {
-      database = {
-        get: async () => [{ scopeId: 'main', nextSequence: 8, records: [historical], updatedAt: new Date() }],
-        upsert: async (_table, rows) => {
-          writes.push({ nextSequence: rows[0]!.nextSequence, records: structuredClone(rows[0]!.records) })
-        },
-        remove: async () => {},
-      }
+      database = stored
     }, 30)
 
     await control.waitForPersistence()
-    expect(control.getOneBotDebugRecords({ limit: 10 }).records.map(({ requestedAction, sequence }) => ({ requestedAction, sequence }))).toEqual([
+    expect((await control.getOneBotDebugRecords({ limit: 10 })).records.map(({ requestedAction, sequence }) => ({ requestedAction, sequence }))).toEqual([
       { requestedAction: 'startup_action', sequence: 8 },
       { requestedAction: 'historical_action', sequence: 7 },
     ])
-    expect(writes.at(-1)).toMatchObject({
-      nextSequence: 9,
-      records: [
-        expect.objectContaining({ requestedAction: 'historical_action', sequence: 7 }),
-        expect.objectContaining({ requestedAction: 'startup_action', sequence: 8 }),
-      ],
-    })
+    const rows = await stored.get('chatluna-sandbox.debug-record', { scopeId: 'main' }, { sort: { sequence: 'asc' } })
+    expect(rows.map((row) => (row as { sequence: number }).sequence)).toEqual([7, 8])
+    // 启动期记录只插入自己那一行，历史行不被重写。
+    expect(stored.writes.filter(({ table, operation }) => (
+      table === 'chatluna-sandbox.debug-record' && operation === 'upsert'
+    )).every(({ rows: written }) => written === 1)).toBe(true)
+    const [scope] = await stored.get('chatluna-sandbox.debug-scope', { scopeId: 'main' })
+    expect((scope as unknown as { nextSequence: number }).nextSequence).toBe(9)
   })
 
   it('共享内存 Adapter 后跨控制服务实例恢复记录，且 sequence 不回退', async () => {
@@ -89,14 +94,14 @@ describe('OneBot 调试记录持久化与分页', () => {
 
     const second = new SandboxControlService(app, { debugPersistence: persistence })
     await second.waitForPersistence()
-    const restored = second.getOneBotDebugRecords({ limit: 10 })
+    const restored = (await second.getOneBotDebugRecords({ limit: 10 }))
     expect(restored.records.map(({ requestedAction, sequence }) => ({ requestedAction, sequence }))).toEqual([
       { requestedAction: 'get_login_info', sequence: 2 },
       { requestedAction: 'get_status', sequence: 1 },
     ])
 
     await second.bot.internal._request('get_version_info', {})
-    const afterAppend = second.getOneBotDebugRecords({ limit: 10 })
+    const afterAppend = (await second.getOneBotDebugRecords({ limit: 10 }))
     expect(afterAppend.records[0]).toMatchObject({ requestedAction: 'get_version_info', sequence: 3 })
   })
 
@@ -123,7 +128,7 @@ describe('OneBot 调试记录持久化与分页', () => {
       status: 'success',
       durationMs: 1,
     })
-    expect(control.getOneBotDebugRecords().records).toHaveLength(1)
+    expect((await control.getOneBotDebugRecords()).records).toHaveLength(1)
     await control.waitForPersistence()
 
     spaces.deleteSpace(space.id)
@@ -133,6 +138,6 @@ describe('OneBot 调试记录持久化与分页', () => {
       runtimeActive: false,
     })
     await recreated.waitForPersistence()
-    expect(recreated.getOneBotDebugRecords().records).toEqual([])
+    expect((await recreated.getOneBotDebugRecords()).records).toEqual([])
   })
 })

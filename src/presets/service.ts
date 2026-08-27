@@ -169,7 +169,7 @@ export class SandboxPresetService {
     const expression = resolveExpression(document.expressions, input.expression)
     if (!expression) return failure('expression-not-found', '预设表达式不存在或坐标已变化', input.scope)
 
-    const recordAndSnapshot = findLatestMatchingRequest(
+    const recordAndSnapshot = await findLatestMatchingRequest(
       resolvedScope.store,
       resolvedScope.scopeId,
       document,
@@ -278,21 +278,21 @@ function resolveExpression(
   ))
 }
 
-function findLatestMatchingRequest(
+async function findLatestMatchingRequest(
   store: SandboxModelRequestStore,
   scopeId: string,
   document: SandboxPresetDocument,
-): { record: SandboxModelRequestRecord, snapshot: SandboxPresetRuntimeSnapshot } | undefined {
+): Promise<{ record: SandboxModelRequestRecord, snapshot: SandboxPresetRuntimeSnapshot } | undefined> {
   let beforeSequence: number | undefined
   do {
-    const page = store.getRecords({ order: 'desc', limit: 200, beforeSequence })
+    const page = await store.getRecords({ order: 'desc', limit: 200, beforeSequence })
     for (const item of page.records) {
       if (item.attribution !== 'attributed' || item.status !== 'success') continue
       if (item.entities.scopeId !== scopeId || !item.requestBodyAvailable) continue
       if (!item.presetSnapshotSummaries?.some((snapshot) => (
         snapshot.kind === document.kind && snapshot.presetName === document.displayName
       ))) continue
-      const record = store.getRecord(item.id)
+      const record = await store.getRecord(item.id)
       if (!record || record.requestBody === undefined) continue
       const snapshot = record.presetSnapshots?.find((candidate) => snapshotMatchesDocument(candidate, document))
       if (snapshot) return { record, snapshot }

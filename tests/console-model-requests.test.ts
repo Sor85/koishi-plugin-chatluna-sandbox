@@ -64,13 +64,13 @@ describe('模型请求 Console 协议', () => {
       throw new Error('模型请求记录监听器未注册')
     }
 
-    expect(Reflect.apply(listRecords, undefined, [{ scope: 'space', spaceId: 'main' }])).toMatchObject({
+    expect(await Reflect.apply(listRecords, undefined, [{ scope: 'space', spaceId: 'main' }])).toMatchObject({
       records: [expect.objectContaining({ id: mainRecord.id, model: 'main-model' })],
     })
-    expect(Reflect.apply(listRecords, undefined, [{ scope: 'space', spaceId: space.id }])).toMatchObject({
+    expect(await Reflect.apply(listRecords, undefined, [{ scope: 'space', spaceId: space.id }])).toMatchObject({
       records: [expect.objectContaining({ model: 'space-model' })],
     })
-    const unattributedPage = Reflect.apply(listRecords, undefined, [{ scope: 'unattributed' }]) as { records: Array<{ id: string }> }
+    const unattributedPage = await Reflect.apply(listRecords, undefined, [{ scope: 'unattributed' }]) as { records: Array<{ id: string }> }
     expect(unattributedPage.records[0]).toMatchObject({ id: unattributedRecord.id, model: 'lost-model' })
     expect(unattributedPage.records[0]).not.toHaveProperty('requestBody')
     expect(unattributedPage.records[0]).not.toHaveProperty('responseBodyRaw')
@@ -82,22 +82,22 @@ describe('模型请求 Console 协议', () => {
       responseStatus: 500,
       responseBodyRaw: JSON.stringify({ error: 'failed' }),
     })
-    expect(Reflect.apply(getTrajectory, undefined, [{ scope: 'unattributed', recordId: unattributedRecord.id, mode: 'request' }])).toMatchObject({
+    expect(await Reflect.apply(getTrajectory, undefined, [{ scope: 'unattributed', recordId: unattributedRecord.id, mode: 'request' }])).toMatchObject({
       mode: 'request',
       records: [expect.objectContaining({ id: unattributedRecord.id })],
       rows: [expect.objectContaining({ kind: 'request', requestId: unattributedRecord.id })],
     })
 
-    const allPage = Reflect.apply(listRecords, undefined, [{ scope: 'all' }]) as { records: Array<{ model: string, source: { type: string } }> }
+    const allPage = await Reflect.apply(listRecords, undefined, [{ scope: 'all' }]) as { records: Array<{ model: string, source: { type: string } }> }
     expect(allPage.records.map(({ model }) => model).sort()).toEqual(['main-model', 'space-model'])
     expect(allPage.records.some(({ source }) => source.type === 'unattributed')).toBe(false)
-    expect(() => Reflect.apply(clearRecords, undefined, [{ scope: 'all' }])).toThrow('全部空间视图不支持一次性清理')
+    await expect(Reflect.apply(clearRecords, undefined, [{ scope: 'all' }])).rejects.toThrow('全部空间视图不支持一次性清理')
 
-    expect(Reflect.apply(clearRecords, undefined, [{ scope: 'space', spaceId: space.id }])).toEqual({ cleared: 1 })
-    expect(space.control.getModelRequestRecords().records).toEqual([])
-    expect(control.getModelRequestRecords().records).toHaveLength(1)
-    expect(Reflect.apply(clearRecords, undefined, [{ scope: 'unattributed' }])).toEqual({ cleared: 1 })
-    expect(unattributed.getRecords().records).toEqual([])
+    expect(await Reflect.apply(clearRecords, undefined, [{ scope: 'space', spaceId: space.id }])).toEqual({ cleared: 1 })
+    expect((await space.control.getModelRequestRecords()).records).toEqual([])
+    expect((await control.getModelRequestRecords()).records).toHaveLength(1)
+    expect(await Reflect.apply(clearRecords, undefined, [{ scope: 'unattributed' }])).toEqual({ cleared: 1 })
+    expect((await unattributed.getRecords()).records).toEqual([])
   })
 
   it('在详情读取时解析后加载的 ChatLuna Usage 服务', async () => {

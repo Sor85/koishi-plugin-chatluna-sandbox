@@ -31,7 +31,7 @@ function longPlainText(minChars = LARGE_BASE64_CHAR_THRESHOLD + 32): string {
 }
 
 describe('折叠调试记录中的大型值', () => {
-  it('按内容识别嵌套 Base64/data-url/base64:// 并生成摘要，列表永不展开', () => {
+  it('按内容识别嵌套 Base64/data-url/base64:// 并生成摘要，列表永不展开', async () => {
     const store = new SandboxOneBotDebugStore({ maxRecords: 100, maxBytes: 50 * 1024 * 1024 })
     const body = pngBase64()
     const dataUrl = `data:image/png;base64,${body}`
@@ -88,15 +88,15 @@ describe('折叠调试记录中的大型值', () => {
     expect(projected.result).toEqual({ ok: true, data: summary })
     expect(JSON.stringify(projected)).not.toContain(body.slice(0, 64))
 
-    const page = store.getRecords({ limit: 10 })
+    const page = (await store.getRecords({ limit: 10 }))
     expect(page.records[0]?.payload).toEqual(projected.payload)
     expect(page.capacity.recordCount).toBe(1)
     expect(page.capacity.totalBytes).toBeGreaterThan(body.length)
 
-    const expanded = store.getRecord(projected.id, true)
+    const expanded = (await store.getRecord(projected.id, true))
     expect(expanded?.payload).toEqual(nested)
     expect(expanded?.result).toEqual({ ok: true, data: body })
-    expect(store.getRecord(projected.id, false)?.payload).toEqual(projected.payload)
+    expect((await store.getRecord(projected.id, false))?.payload).toEqual(projected.payload)
   })
 
   it('容量按完整持久化内容统计，折叠投影不影响 totalBytes', async () => {
@@ -120,18 +120,18 @@ describe('折叠调试记录中的大型值', () => {
     })
     await store.waitForPersistence()
 
-    const page = store.getRecords()
+    const page = (await store.getRecords())
     expect(JSON.stringify(page.records[0]?.payload)).not.toContain(body.slice(0, 32))
     expect(page.capacity.totalBytes).toBeGreaterThan(body.length)
     // 持久化保留完整原始值。
     const reloaded = new SandboxOneBotDebugStore({ persistence })
     await reloaded.waitForReady()
-    const full = reloaded.getRecord(projected.id, true)
+    const full = (await reloaded.getRecord(projected.id, true))
     expect(full?.payload).toEqual({ file: body })
-    expect(reloaded.getCapacity().totalBytes).toBe(page.capacity.totalBytes)
+    expect((await reloaded.getCapacity()).totalBytes).toBe(page.capacity.totalBytes)
   })
 
-  it('非 Base64 长文本不被误折叠，消息正文仍按既有规则脱敏', () => {
+  it('非 Base64 长文本不被误折叠，消息正文仍按既有规则脱敏', async () => {
     const store = new SandboxOneBotDebugStore()
     const text = longPlainText()
     const projected = store.append({
@@ -244,13 +244,13 @@ describe('控制服务与 Console 单条详情', () => {
       payload: { file: body },
     })
 
-    expect(control.getOneBotDebugRecord({ recordId: projected.id }).payload).toEqual({
+    expect((await control.getOneBotDebugRecord({ recordId: projected.id })).payload).toEqual({
       file: expect.objectContaining({ kind: 'large-value', mimeType: 'image/png' }),
     })
-    expect(control.getOneBotDebugRecord({
+    expect((await control.getOneBotDebugRecord({
       recordId: projected.id,
       includeLargeValues: true,
-    }).payload).toEqual({ file: body })
+    })).payload).toEqual({ file: body })
 
     const { registerConsole } = await import('../src/console')
     const listeners = new Map<string, (...args: any[]) => any>()
