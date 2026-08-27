@@ -4,7 +4,7 @@
 .webqq-space-overview.is-zooming .webqq-space-card { content-visibility: visible; }
 .webqq-space-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
 .webqq-space-toolbar h1, .webqq-space-toolbar p { margin: 0; }
-.webqq-space-toolbar h1 { margin-bottom: 8px; font-size: 24px; font-weight: 700; }
+.webqq-space-toolbar h1 { margin-bottom: 8px; font-size: var(--webqq-font-3xl); font-weight: 700; }
 .webqq-space-toolbar p { color: var(--webqq-muted); }
 .webqq-space-filter { width: 144px; }
 .webqq-space-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; }
@@ -15,10 +15,10 @@
 .webqq-space-card.is-running:hover { box-shadow: 0 24px 60px var(--webqq-accent-shadow); }
 .webqq-space-card footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-top: 1px solid var(--webqq-border); }
 .webqq-space-card footer strong, .webqq-space-card footer small { display: block; }
-.webqq-space-card footer small { margin-top: 3px; color: var(--webqq-muted); font-size: 12px; }
+.webqq-space-card footer small { margin-top: 3px; color: var(--webqq-muted); font-size: var(--webqq-font-sm); }
 .webqq-space-card-actions { display: flex; align-items: center; gap: 6px; }
 /* 卡片操作（接管/归还/重新激活）与"主环境"徽章同一视觉语言：无边框浅底胶囊。 */
-.webqq-space-card-actions [data-slot="button"][data-variant="outline"] { height: 22px; padding: 0 10px; border: 0; border-radius: 999px; color: var(--webqq-muted); background: var(--webqq-hover); font-size: 12px; font-weight: 500; }
+.webqq-space-card-actions [data-slot="button"][data-variant="outline"] { height: 22px; padding: 0 10px; border: 0; border-radius: 999px; color: var(--webqq-muted); background: var(--webqq-hover); font-size: var(--webqq-font-sm); font-weight: 500; }
 .webqq-space-card-actions [data-slot="button"][data-variant="outline"]:hover:not(:disabled) { color: var(--webqq-text); background: color-mix(in srgb, var(--webqq-hover) 70%, var(--webqq-border)); }
 .webqq-space-create { place-items: center; place-content: center; gap: 10px; border-style: dashed; color: var(--webqq-muted); }
 /* 已访问空间克隆离开前的真实工作区 DOM；冷启动空间用固定 1440×760 画布兜底。两者都由 JS 按 contain 居中，卡片比例变化时完整页面不会被裁掉。 */
@@ -40,7 +40,7 @@
 .webqq-agent-cursor-float { display: flex; align-items: flex-start; }
 /* ego #cursorImage 的双层光晕投影；transform-origin 50% 100% 让点击挤压向笔尖下压。 */
 .webqq-agent-cursor-float svg { flex: none; color: var(--webqq-accent); transform-origin: 50% 100%; filter: drop-shadow(2px 3px 5px rgb(79 161 255 / 100%)) drop-shadow(-1px -1px 2px rgb(52 107 241 / 100%)); }
-.webqq-agent-cursor-label { margin-top: 14px; margin-left: -4px; max-width: 240px; overflow: hidden; padding: 3px 10px; border-radius: 999px; color: var(--webqq-text); background: rgb(255 255 255 / 42%); box-shadow: 0 0 0 1px rgb(0 0 0 / 6%), 0 16px 48px rgb(0 0 0 / 35%); backdrop-filter: blur(10px); font-size: 12px; font-weight: 600; line-height: 16px; text-overflow: ellipsis; white-space: nowrap; }
+.webqq-agent-cursor-label { margin-top: 14px; margin-left: -4px; max-width: 240px; overflow: hidden; padding: 3px 10px; border-radius: 999px; color: var(--webqq-text); background: rgb(255 255 255 / 42%); box-shadow: 0 0 0 1px rgb(0 0 0 / 6%), 0 16px 48px rgb(0 0 0 / 35%); backdrop-filter: blur(10px); font-size: var(--webqq-font-sm); font-weight: 600; line-height: 16px; text-overflow: ellipsis; white-space: nowrap; }
 /* ego cursor-click：400ms ease-out 挤压（scale 0.85 + 下压 2px），即点击涟漪反馈。 */
 @keyframes webqq-agent-cursor-click { 0% { transform: scale(1); } 40% { transform: scale(0.85) translateY(2px); } 100% { transform: scale(1); } }
 .webqq-agent-cursor.is-clicking .webqq-agent-cursor-float svg { animation: webqq-agent-cursor-click 400ms ease-out; }
@@ -96,9 +96,9 @@
 @keyframes sandbox-agent-control-orbit { to { transform: rotate(360deg); } }
 @keyframes sandbox-agent-control-orbit-reverse { from { transform: rotate(180deg); } to { transform: rotate(-180deg); } }
 .webqq-agent-taskbar-text { display: flex; min-width: 0; flex-direction: column; margin-right: 4px; text-align: left; }
-.webqq-agent-taskbar-title { overflow: hidden; max-width: 220px; font-size: 12px; font-weight: 600; line-height: 15px; text-overflow: ellipsis; white-space: nowrap; }
-.webqq-agent-taskbar-subtitle { color: rgb(193 217 244); font-size: 11px; line-height: 15px; white-space: nowrap; }
-.webqq-agent-taskbar button { flex: none; padding: 6px 14px; border: 0; border-radius: 999px; font-size: 13px; font-weight: 600; line-height: 18px; }
+.webqq-agent-taskbar-title { overflow: hidden; max-width: 220px; font-size: var(--webqq-font-sm); font-weight: 600; line-height: 15px; text-overflow: ellipsis; white-space: nowrap; }
+.webqq-agent-taskbar-subtitle { color: rgb(193 217 244); font-size: var(--webqq-font-xs); line-height: 15px; white-space: nowrap; }
+.webqq-agent-taskbar button { flex: none; padding: 6px 14px; border: 0; border-radius: 999px; font-size: var(--webqq-font-md); font-weight: 600; line-height: 18px; }
 .webqq-agent-taskbar-takeover { color: #fff; background: rgb(54 50 49); }
 .webqq-agent-taskbar-takeover:hover { background: rgb(70 65 64); }
 .webqq-agent-taskbar-terminate { color: #ff5449; background: rgb(54 50 49); }

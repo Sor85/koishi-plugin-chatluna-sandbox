@@ -59,7 +59,7 @@
   }
 
   .webqq-brand strong {
-    font-size: 13px;
+    font-size: var(--webqq-font-md);
   }
 
   /* 顶栏保持 40px 触控目标，并收紧文字按钮的横向间距以适配 Koishi 活动栏后的窄视口。 */

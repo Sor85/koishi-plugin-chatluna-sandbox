@@ -26,7 +26,7 @@
   border-radius: 999px;
   color: color-mix(in srgb, var(--webqq-text) 58%, transparent);
   background: rgb(148 163 184 / 14%);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   line-height: 18px;
   text-align: center;
 }
@@ -75,7 +75,7 @@
 .chatluna-sandbox-message-recalled-label {
   align-self: flex-end;
   color: var(--webqq-muted);
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
   line-height: 16px;
 }
 
@@ -131,7 +131,7 @@
   border-radius: 50%;
   color: #fff;
   background: var(--webqq-accent);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   font-weight: 700;
 }
 
@@ -225,7 +225,7 @@
   margin-top: 4px;
   background: transparent;
   color: var(--webqq-muted);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   gap: 2px;
   line-height: 18px;
   /* 指标行必须始终单行：容器变窄时换行会把箭头挤到第二行，看起来像凭空多了一行。 */
@@ -256,7 +256,7 @@
   align-items: center;
   justify-content: flex-end;
   margin-right: 8px;
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   gap: 6px;
   line-height: 18px;
   opacity: 0;
@@ -343,7 +343,7 @@
   border-radius: 6px;
   background: rgb(255 255 255 / 72%);
   color: var(--webqq-muted);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   line-height: 18px;
   overflow: hidden;
   overflow-wrap: anywhere;
@@ -397,7 +397,7 @@
   flex: 0 0 auto;
   align-self: flex-end;
   color: var(--webqq-muted);
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
   line-height: 16px;
   white-space: nowrap;
   opacity: 0;
@@ -414,7 +414,7 @@
   padding: 1px 6px;
   border-radius: 5px;
   color: #334155;
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
   font-weight: 600;
   line-height: 16px;
   white-space: nowrap;
@@ -452,7 +452,7 @@
   color: var(--webqq-text);
   background: var(--webqq-bubble-bg);
   box-shadow: 0 2px 8px rgb(15 23 42 / 8%);
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
   line-height: 19px;
   text-align: left;
   word-break: break-word;
@@ -471,7 +471,7 @@
   padding: 6px 12px;
   color: var(--webqq-muted);
   background: color-mix(in srgb, var(--webqq-panel) 82%, transparent);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .webqq-history-more:hover:not(:disabled),
@@ -499,7 +499,7 @@
   color: rgb(40 40 44 / 62%);
   background: rgb(148 163 184 / 16%);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   line-height: 17px;
   text-align: left;
 }
@@ -559,7 +559,7 @@
 
 .chatluna-sandbox-message-forward-entry::after {
   content: "›";
-  font-size: 20px;
+  font-size: var(--webqq-font-2xl);
   line-height: 16px;
 }
 
@@ -629,7 +629,7 @@
 .chatluna-sandbox-message-file small,
 .chatluna-sandbox-message-media-loading {
   color: var(--webqq-muted);
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
 }
 
 .chatluna-sandbox-message-row.is-outgoing .chatluna-sandbox-message-file small,
@@ -816,7 +816,7 @@
   border-radius: 999px;
   color: var(--webqq-accent);
   background: var(--webqq-reaction-bg);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   line-height: 18px;
   white-space: nowrap;
 }
@@ -859,7 +859,9 @@
   border-radius: inherit;
   color: #fff;
   background: var(--webqq-accent);
-  font-size: 9px;
+  /* 表态头像不是 .webqq-identity-avatar，拿不到 webqq-primitives.css 里那条共享规则，
+     这里按同一个公式（直径 1/3，下限 9px）重复一次；18px 直径落在下限上。 */
+  font-size: clamp(9px, calc(var(--webqq-avatar-size, 38px) / 3), 32px);
 }
 
 .chatluna-sandbox-message-reaction-avatar-image.is-bot {
@@ -878,7 +880,7 @@
 }
 
 .chatluna-sandbox-message-reaction-label {
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   line-height: 18px;
 }
 
@@ -903,7 +905,7 @@
 
 .chatluna-sandbox-emoji-picker-section > header {
   color: var(--webqq-muted);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   line-height: 16px;
 }
 
@@ -939,7 +941,7 @@
   grid-column: 1 / -1;
   margin: 8px 0;
   color: var(--webqq-muted);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   text-align: center;
 }
 

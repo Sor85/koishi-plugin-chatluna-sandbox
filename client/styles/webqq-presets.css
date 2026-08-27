@@ -19,19 +19,20 @@
 
 .webqq-preset-header h1 {
   margin: 0 0 8px;
-  font-size: 24px;
+  font-size: var(--webqq-font-3xl);
   font-weight: 700;
 }
 
 .webqq-preset-header p {
   margin: 0;
   color: var(--webqq-muted);
+  font-size: var(--webqq-font-md);
 }
 
 .webqq-preset-document-header p {
   margin: 4px 0 0;
   color: var(--webqq-muted);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .webqq-preset-header-actions,
@@ -108,7 +109,7 @@
   justify-content: space-between;
   padding: 6px 8px;
   color: var(--webqq-muted);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .webqq-preset-list-item {
@@ -146,10 +147,15 @@
   white-space: nowrap;
 }
 
+/* 列表项主标题与其他工作台列表统一到 md；small/time 是 xs，靠继承会拉到 16px。 */
+.webqq-preset-list-item strong {
+  font-size: var(--webqq-font-md);
+}
+
 .webqq-preset-list-item small,
 .webqq-preset-list-item time {
   color: var(--webqq-muted);
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
 }
 
 .webqq-preset-editor-pane {
@@ -168,11 +174,13 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  /* 编辑器面板标题与聊天顶栏标题同档；其下的说明文案是 sm。 */
+  font-size: var(--webqq-font-lg);
 }
 
 .webqq-preset-save-status {
   color: var(--webqq-muted);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .webqq-preset-save-status[data-status="dirty"],
@@ -190,7 +198,7 @@
 
 .webqq-preset-diagnostics p {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .webqq-preset-source-editor {
@@ -228,7 +236,7 @@
 
 .webqq-preset-source-editor .cm-scroller {
   overflow: auto;
-  font-family: "SFMono-Regular", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+  font-family: var(--webqq-font-mono);
   font-variant-ligatures: none;
   scrollbar-gutter: stable;
 }
@@ -284,7 +292,7 @@ body[data-sandbox-frosted] .webqq-preset-source-editor .cm-tooltip {
 .webqq-preset-expression-tooltip-label,
 .webqq-preset-expression-tooltip time {
   color: var(--webqq-muted);
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
 }
 
 .webqq-preset-expression-tooltip-value {
@@ -340,7 +348,7 @@ body[data-sandbox-frosted] .webqq-preset-source-editor .cm-tooltip {
 
 .webqq-preset-expression-tooltip.is-error {
   color: var(--webqq-danger, #b91c1c);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .webqq-preset-token-comment {
@@ -407,7 +415,7 @@ body[data-sandbox-frosted] .webqq-preset-source-editor .cm-tooltip {
 .webqq-preset-editor-footer p {
   margin: 0;
   color: var(--webqq-muted);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .webqq-preset-editor-footer p.is-error {
@@ -438,7 +446,7 @@ label.webqq-preset-dialog-fields {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
 }
 
 @media (max-width: 960px) {

@@ -28,7 +28,7 @@ describe('WebQQ 顶部导航与会话栏', () => {
     expect(source).toContain('v-for="item in visibleNavigationItems"')
     expect(source).toContain('class="webqq-rail-label">{{ item.label }}</span>')
     expect(sidebarStyles).toMatch(/\.webqq-rail-button\s*\{[^}]*gap:\s*7px[^}]*padding:\s*0 14px/s)
-    expect(sidebarStyles).toMatch(/\.webqq-rail-label\s*\{[^}]*font-size:\s*13px/s)
+    expect(sidebarStyles).toMatch(/\.webqq-rail-label\s*\{[^}]*font-size:\s*var\(--webqq-font-md\)/s)
     expect(source).not.toContain('<div class="webqq-sidebar-root"')
     expect(source).toContain("const searchQuery = ref('')")
     expect(source).toContain("const sidebarTab = ref<SidebarTab>('recent')")

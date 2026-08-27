@@ -165,7 +165,7 @@ onMounted(() => void loadMcpCapabilities())
 
 .environment-header h1 {
   margin: 0 0 8px;
-  font-size: 24px;
+  font-size: var(--webqq-font-3xl);
   font-weight: 700;
 }
 
@@ -175,6 +175,7 @@ onMounted(() => void loadMcpCapabilities())
 .environment-empty {
   margin: 0;
   color: var(--webqq-muted);
+  font-size: var(--webqq-font-md);
 }
 
 .environment-split {
@@ -217,7 +218,7 @@ onMounted(() => void loadMcpCapabilities())
 .environment-detail-toolbar h2 {
   margin: 0;
   color: var(--webqq-text);
-  font-size: 16px;
+  font-size: var(--webqq-font-xl);
   font-weight: 600;
 }
 
@@ -226,7 +227,7 @@ onMounted(() => void loadMcpCapabilities())
 }
 
 .environment-detail-toolbar p {
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .environment-navigation {
@@ -293,7 +294,7 @@ onMounted(() => void loadMcpCapabilities())
   color: #fff;
   /* 普通用户与 WebQQ 会话列表同用主题色；机器人/群组由 is-bot、is-group 覆盖。 */
   background: var(--webqq-accent);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   font-weight: 700;
 }
 
@@ -316,12 +317,12 @@ onMounted(() => void loadMcpCapabilities())
 }
 
 .directory-copy strong {
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
 }
 
 .directory-copy small {
   margin-top: 3px;
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
 }
 
 .environment-empty {

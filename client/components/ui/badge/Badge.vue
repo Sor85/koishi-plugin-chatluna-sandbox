@@ -33,7 +33,7 @@ const props = defineProps<Props>()
   padding: 0 6px;
   border: 0;
   border-radius: 5px;
-  font-size: 10px;
+  font-size: var(--webqq-font-2xs);
   font-weight: 500;
   line-height: 1;
   white-space: nowrap;

@@ -62,7 +62,7 @@
   color: var(--webqq-muted);
   background: var(--webqq-panel);
   box-shadow: 0 8px 18px rgb(15 23 42 / 8%);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .webqq-composer-reply span {
@@ -107,7 +107,7 @@
   color: var(--webqq-text);
   background: var(--webqq-panel);
   box-shadow: 0 8px 18px rgb(15 23 42 / 8%);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   line-height: 16px;
 }
 
@@ -264,7 +264,7 @@
   border-radius: 50%;
   color: #fff;
   background: var(--webqq-accent);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   font-weight: 700;
 }
 
@@ -431,7 +431,7 @@
   color: var(--webqq-text);
   background: color-mix(in srgb, var(--webqq-accent) 16%, var(--webqq-panel) 84%);
   box-shadow: 0 0 0 2px var(--webqq-panel);
-  font-size: 10px;
+  font-size: var(--webqq-font-2xs);
   font-weight: 700;
   line-height: 1;
   text-align: left;
@@ -577,7 +577,7 @@
   border-radius: 999px;
   color: var(--webqq-accent);
   background: color-mix(in srgb, var(--webqq-accent) 14%, transparent);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   line-height: 18px;
   white-space: nowrap;
   vertical-align: 1px;
@@ -629,7 +629,7 @@
   width: 28px;
   height: 28px;
   flex: none;
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
 }
 
 .chatluna-sandbox-mention-menu-meta {
@@ -642,7 +642,7 @@
 
 .chatluna-sandbox-mention-menu-meta strong {
   overflow: hidden;
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
   font-weight: 600;
   line-height: 16px;
   text-overflow: ellipsis;
@@ -652,7 +652,7 @@
 .chatluna-sandbox-mention-menu-meta small {
   overflow: hidden;
   color: var(--webqq-muted);
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
   line-height: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -661,7 +661,7 @@
 .chatluna-sandbox-mention-menu-empty {
   padding: 10px 8px;
   color: var(--webqq-muted);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   text-align: center;
 }
 
@@ -698,7 +698,7 @@
   max-width: 100%;
   overflow: hidden;
   color: #dc2626;
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

@@ -115,7 +115,7 @@
   outline: none;
   color: var(--webqq-text);
   background: transparent;
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
 }
 
 .chatluna-sandbox-message-search-field input::placeholder {
@@ -201,7 +201,7 @@
   margin: 0;
   padding: 10px 4px 4px;
   color: var(--webqq-muted);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   text-align: center;
 }
 
@@ -242,7 +242,6 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  font-size: 10.667px;
 }
 
 .chatluna-sandbox-message-search-hit-body {
@@ -263,7 +262,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--webqq-text);
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -272,13 +271,13 @@
 .chatluna-sandbox-message-search-hit-meta time {
   flex: none;
   color: var(--webqq-muted);
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
 }
 
 .chatluna-sandbox-message-search-hit-summary {
   overflow: hidden;
   color: var(--webqq-muted);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   line-height: 1.45;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -294,7 +293,7 @@
   border-radius: 10px;
   color: var(--webqq-muted);
   background: transparent;
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .chatluna-sandbox-message-search-more:hover,
@@ -327,10 +326,15 @@
   display: block;
 }
 
+/* 会话标题要比副标题明确高一档：只靠继承时它会落在基准 md 上，和 sm 副标题几乎等大。 */
+.chatluna-sandbox-chat-title > div > strong {
+  font-size: var(--webqq-font-lg);
+}
+
 .chatluna-sandbox-chat-title > div > span {
   margin-top: 2px;
   color: var(--webqq-muted);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .webqq-welcome {
@@ -343,22 +347,25 @@
 }
 
 .webqq-avatar-large {
+  /* 首字母字号由 --webqq-avatar-size 派生（见 webqq-primitives.css），
+     这里漏写变量会让 68px 头像沿用 .webqq-avatar 的 38px 基准。 */
+  --webqq-avatar-size: 68px;
+
   width: 68px;
   height: 68px;
   margin-bottom: 12px;
   border-radius: 50%;
-  font-size: 24px;
 }
 
 .webqq-welcome strong {
-  font-size: 17px;
+  font-size: var(--webqq-font-2xl);
 }
 
 .webqq-welcome p {
   max-width: 300px;
   margin: 6px 0 0;
   color: var(--webqq-muted);
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
 }
 
 .webqq-welcome.is-bot .webqq-avatar-large {
@@ -367,13 +374,12 @@
   width: 88px;
   height: 88px;
   margin-bottom: 24px;
-  font-size: 32px;
 }
 
 .webqq-welcome.is-bot strong {
   margin: 0;
   color: var(--webqq-text);
-  font-size: 22px;
+  font-size: var(--webqq-font-3xl);
   font-weight: 700;
   line-height: 28px;
 }
@@ -384,7 +390,7 @@
   gap: 6px;
   margin-top: 8px;
   color: var(--webqq-muted);
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
   line-height: 18px;
 }
 
@@ -408,7 +414,7 @@
   max-width: 360px;
   margin: 24px 0 0;
   color: var(--webqq-text);
-  font-size: 18px;
+  font-size: var(--webqq-font-2xl);
   font-weight: 650;
   line-height: 26px;
 }

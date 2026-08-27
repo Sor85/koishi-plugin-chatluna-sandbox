@@ -46,7 +46,7 @@
   border: 0;
   color: var(--webqq-muted);
   background: transparent;
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .webqq-avatar-editor-trigger .webqq-identity-avatar {
@@ -84,7 +84,7 @@
 
 .webqq-avatar-picker-header p {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .webqq-avatar-picker-grid {
@@ -176,13 +176,13 @@
 }
 
 .webqq-avatar-picker-upload-copy strong {
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
   line-height: 18px;
 }
 
 .webqq-avatar-picker-upload-copy small {
   color: var(--webqq-muted);
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
   line-height: 16px;
 }
 
@@ -227,13 +227,13 @@
 }
 
 .chatluna-sandbox-group-members-heading strong {
-  font-size: 14px;
+  font-size: var(--webqq-font-lg);
   line-height: 20px;
 }
 
 .chatluna-sandbox-group-members-heading p {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   line-height: 18px;
 }
 
@@ -243,7 +243,7 @@
   border-radius: 999px;
   color: var(--webqq-accent);
   background: color-mix(in srgb, var(--webqq-accent) 10%, transparent);
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
   font-weight: 600;
   line-height: 18px;
 }
@@ -350,13 +350,13 @@
 }
 
 .chatluna-sandbox-group-member-copy strong {
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   line-height: 17px;
 }
 
 .chatluna-sandbox-group-member-copy small {
   color: var(--webqq-muted);
-  font-size: 10px;
+  font-size: var(--webqq-font-2xs);
   line-height: 14px;
 }
 
@@ -419,12 +419,12 @@
 }
 
 .chatluna-sandbox-group-member-editor-heading strong {
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
 }
 
 .chatluna-sandbox-group-member-editor-heading small {
   color: var(--webqq-muted);
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
 }
 
 .chatluna-sandbox-group-member-controls {
@@ -493,7 +493,7 @@ body:not([data-sandbox-frosted]) .chatluna-sandbox-secondary-page.chatluna-sandb
 }
 
 .chatluna-sandbox-secondary-page-header strong {
-  font-size: 14px;
+  font-size: var(--webqq-font-lg);
   line-height: 20px;
 }
 
@@ -545,7 +545,6 @@ body:not([data-sandbox-frosted]) .chatluna-sandbox-secondary-page.chatluna-sandb
   border: 0;
   border-radius: 50%;
   box-shadow: 0 8px 22px rgb(15 23 42 / 12%);
-  font-size: 28px;
   /* 资料头像完整铺满圆形区域；重叠挖空只允许出现在发送消息控件。 */
   -webkit-mask-image: none;
   mask-image: none;
@@ -559,14 +558,14 @@ body:not([data-sandbox-frosted]) .chatluna-sandbox-secondary-page.chatluna-sandb
 .chatluna-sandbox-profile-card-hero h2 {
   margin: 0;
   color: var(--webqq-text);
-  font-size: 18px;
+  font-size: var(--webqq-font-2xl);
   line-height: 26px;
 }
 
 .chatluna-sandbox-profile-card-hero p {
   margin: 4px 0 0;
   color: var(--webqq-muted);
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
   line-height: 20px;
 }
 
@@ -584,7 +583,7 @@ body:not([data-sandbox-frosted]) .chatluna-sandbox-secondary-page.chatluna-sandb
 .chatluna-sandbox-profile-card-section h3 {
   margin: 0;
   color: var(--webqq-muted);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   font-weight: 600;
   line-height: 18px;
   letter-spacing: 0.02em;
@@ -602,7 +601,7 @@ body:not([data-sandbox-frosted]) .chatluna-sandbox-secondary-page.chatluna-sandb
   grid-template-columns: max-content minmax(0, 1fr);
   align-items: center;
   gap: 16px;
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
   line-height: 20px;
 }
 
@@ -674,7 +673,7 @@ body[data-sandbox-color-scheme="dark"] .webqq-form-error {
   min-width: 0;
   overflow: hidden;
   color: #334155;
-  font-size: 14px;
+  font-size: var(--webqq-font-lg);
   line-height: 20px;
   white-space: nowrap;
   text-align: center;
@@ -713,7 +712,7 @@ body[data-sandbox-color-scheme="dark"] .webqq-form-error {
 .chatluna-sandbox-forward-modal-empty {
   padding: 28px 0;
   color: #94a3b8;
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
   line-height: 19px;
   text-align: center;
 }

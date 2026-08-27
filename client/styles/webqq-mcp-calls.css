@@ -28,7 +28,7 @@
 
 .webqq-mcp-call-header h1 {
   margin: 0 0 8px;
-  font-size: 24px;
+  font-size: var(--webqq-font-3xl);
   font-weight: 700;
 }
 
@@ -37,6 +37,7 @@
 .webqq-mcp-call-detail p {
   margin: 0;
   color: var(--webqq-muted);
+  font-size: var(--webqq-font-md);
 }
 
 .webqq-mcp-call-actions,
@@ -49,7 +50,7 @@
 .webqq-mcp-call-live {
   min-height: 40px;
   color: var(--webqq-muted);
-  font-size: 14px;
+  font-size: var(--webqq-font-lg);
   white-space: nowrap;
 }
 
@@ -91,7 +92,7 @@
 .webqq-mcp-call-list-toolbar h2 {
   margin: 0;
   color: var(--webqq-text);
-  font-size: 16px;
+  font-size: var(--webqq-font-xl);
   font-weight: 600;
 }
 
@@ -107,7 +108,7 @@
   border: 0;
   color: var(--webqq-muted);
   background: transparent;
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
 }
 
 .webqq-mcp-call-filter-trigger {
@@ -253,7 +254,7 @@
 .webqq-mcp-call-detail time,
 .webqq-mcp-call-timing,
 .webqq-mcp-call-trace {
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
 }
 
 .webqq-workspace .sandbox-badge.webqq-mcp-call-status-success {
@@ -364,7 +365,7 @@
 .webqq-mcp-call-payloads h2,
 .webqq-mcp-call-section-heading strong {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
 }
 
 .webqq-mcp-call-payloads pre {
@@ -375,8 +376,8 @@
   border-radius: 12px;
   color: var(--webqq-text);
   background: var(--webqq-surface-muted);
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
+  font-family: var(--webqq-font-mono);
+  font-size: var(--webqq-font-sm);
   line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;

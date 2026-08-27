@@ -33,7 +33,7 @@ describe('环境管理组件传输边界', () => {
     expect(source).not.toContain('<h1>模拟 QQ 环境</h1>')
     expect(source).not.toContain('集中查看')
     expect(source).not.toContain('<small>环境管理</small>')
-    expect(source).toMatch(/\.environment-header h1\s*\{[^}]*font-size:\s*24px[^}]*font-weight:\s*700/s)
+    expect(source).toMatch(/\.environment-header h1\s*\{[^}]*font-size:\s*var\(--webqq-font-3xl\)[^}]*font-weight:\s*700/s)
     expect(source).toContain('SandboxDirectoryBot')
     expect(source).toContain("source: { type: 'main' as const, name: '主环境' }")
     expect(source).toContain("source: { type: 'test-space' as const, spaceId: space.id, name: space.name }")

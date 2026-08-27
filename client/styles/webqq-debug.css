@@ -28,7 +28,7 @@
 
 .webqq-debug-header h1 {
   margin: 0 0 8px;
-  font-size: 24px;
+  font-size: var(--webqq-font-3xl);
   font-weight: 700;
 }
 
@@ -37,6 +37,7 @@
 .webqq-debug-detail p {
   margin: 0;
   color: var(--webqq-muted);
+  font-size: var(--webqq-font-md);
 }
 
 .webqq-debug-actions,
@@ -49,7 +50,7 @@
 .webqq-debug-live {
   min-height: 40px;
   color: var(--webqq-muted);
-  font-size: 14px;
+  font-size: var(--webqq-font-lg);
   white-space: nowrap;
 }
 
@@ -91,7 +92,7 @@
 .webqq-debug-list-toolbar h2 {
   margin: 0;
   color: var(--webqq-text);
-  font-size: 16px;
+  font-size: var(--webqq-font-xl);
   font-weight: 600;
 }
 
@@ -107,7 +108,7 @@
   border: 0;
   color: var(--webqq-muted);
   background: transparent;
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
 }
 
 .webqq-debug-filter-trigger {
@@ -150,7 +151,6 @@
   height: 20px;
   flex: none;
   border-radius: 50%;
-  font-size: 9px;
 }
 
 .webqq-debug-bot-copy {
@@ -243,6 +243,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--webqq-text);
+  font-size: var(--webqq-font-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -278,7 +279,7 @@
 .webqq-debug-detail time,
 .webqq-debug-timing,
 .webqq-debug-trace {
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
 }
 
 .webqq-workspace .sandbox-badge.webqq-debug-status-success {
@@ -394,7 +395,7 @@
 .webqq-debug-payloads h2,
 .webqq-debug-section-heading strong {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
 }
 
 .webqq-debug-payloads pre {
@@ -405,8 +406,8 @@
   border-radius: 12px;
   color: var(--webqq-text);
   background: var(--webqq-surface-muted);
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
+  font-family: var(--webqq-font-mono);
+  font-size: var(--webqq-font-sm);
   line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -415,7 +416,7 @@
 
 .webqq-debug-fold {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   color: var(--webqq-text-muted, #64748b);
 }
 

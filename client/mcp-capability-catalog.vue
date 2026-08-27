@@ -140,13 +140,13 @@ function formatSchema(schema: Record<string, unknown>) {
   background: var(--webqq-surface-muted);
 }
 
-.mcp-capability-summary strong { font-size: 20px; }
+.mcp-capability-summary strong { font-size: var(--webqq-font-2xl); }
 .mcp-capability-summary span,
 .mcp-capability-protocol > span,
 .mcp-capability-card small,
 .mcp-capability-schema > span,
 .mcp-capability-empty,
-.mcp-capability-state { color: var(--webqq-muted); font-size: 12px; }
+.mcp-capability-state { color: var(--webqq-muted); font-size: var(--webqq-font-sm); }
 
 .mcp-capability-protocol,
 .mcp-capability-toolbar,
@@ -192,7 +192,7 @@ function formatSchema(schema: Record<string, unknown>) {
 .mcp-capability-card.is-resource > span { min-width: 0; }
 .mcp-capability-card strong,
 .mcp-capability-card small { display: block; }
-.mcp-capability-card strong { overflow-wrap: anywhere; font-size: 13px; }
+.mcp-capability-card strong { overflow-wrap: anywhere; font-size: var(--webqq-font-md); }
 .mcp-capability-card small { margin-top: 4px; overflow-wrap: anywhere; }
 .mcp-capability-badges { flex-shrink: 0; }
 
@@ -205,7 +205,7 @@ function formatSchema(schema: Record<string, unknown>) {
   border-radius: 8px;
   color: var(--webqq-text);
   background: var(--webqq-surface-muted);
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }

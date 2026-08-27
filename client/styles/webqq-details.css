@@ -18,7 +18,7 @@
 }
 
 .webqq-info-header strong {
-  font-size: 15px;
+  font-size: var(--webqq-font-lg);
   line-height: 21px;
 }
 
@@ -57,7 +57,7 @@
 .chatluna-sandbox-group-members h3 {
   margin: 0;
   color: var(--webqq-text);
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
   line-height: 18px;
 }
 
@@ -91,7 +91,7 @@
 
 .webqq-info-error {
   color: #dc2626;
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
   line-height: 16px;
 }
 
@@ -112,7 +112,7 @@
   color: var(--webqq-text);
   background: transparent;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   line-height: 17px;
 }
 
@@ -132,7 +132,7 @@
   border-radius: 7px;
   color: #fff;
   background: var(--webqq-accent);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .webqq-announcement-editor button:disabled {
@@ -184,7 +184,7 @@
 
 .chatluna-sandbox-group-announcement p {
   color: var(--webqq-text);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   line-height: 17px;
   overflow-wrap: anywhere;
 }
@@ -192,7 +192,7 @@
 .chatluna-sandbox-group-announcement time {
   margin-top: 6px;
   color: var(--webqq-muted);
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
   line-height: 16px;
 }
 
@@ -214,7 +214,7 @@
   outline: 0;
   color: var(--webqq-text);
   background: rgb(255 255 255 / 48%);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .chatluna-sandbox-group-member-list {
@@ -245,13 +245,13 @@
 }
 
 .chatluna-sandbox-group-member strong {
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   line-height: 17px;
 }
 
 .chatluna-sandbox-group-member small {
   color: var(--webqq-muted);
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
   line-height: 16px;
 }
 
@@ -267,7 +267,7 @@
   border-radius: 5px;
   color: #9a5b00;
   background: #fff3cf;
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
   font-style: normal;
   line-height: 16px;
 }
@@ -285,7 +285,7 @@
   padding: 18px 8px;
   color: var(--webqq-muted);
   text-align: center;
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .webqq-private-info {
@@ -315,18 +315,17 @@
   width: 76px;
   height: 76px;
   border-radius: 50%;
-  font-size: 25.333px;
 }
 
 .webqq-profile-hero h2 {
   margin: 16px 0 4px;
-  font-size: 17px;
+  font-size: var(--webqq-font-2xl);
 }
 
 .webqq-profile-hero p {
   margin: 0;
   color: var(--webqq-muted);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .webqq-online {
@@ -335,7 +334,7 @@
   gap: 6px;
   margin-top: 12px;
   color: #16a34a;
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .webqq-online i {
@@ -356,7 +355,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 8px 0;
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
 }
 
 .webqq-profile-details dt {
@@ -380,12 +379,12 @@
 
 .webqq-section-title h3 {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
 }
 
 .webqq-section-title span {
   color: var(--webqq-muted);
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
 }
 
 .webqq-user-directory button {
@@ -415,10 +414,10 @@
 }
 
 .webqq-user-directory strong {
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
 }
 
 .webqq-user-directory small {
   color: var(--webqq-muted);
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
 }

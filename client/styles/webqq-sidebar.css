@@ -35,7 +35,7 @@
 }
 
 .webqq-brand strong {
-  font-size: 14px;
+  font-size: var(--webqq-font-lg);
   font-weight: 700;
   line-height: 20px;
 }
@@ -51,7 +51,7 @@
 }
 
 .webqq-rail-label {
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
   font-weight: 600;
   line-height: 18px;
 }
@@ -115,7 +115,7 @@
   border-radius: 8px 8px 0 0;
   color: var(--webqq-muted);
   background: transparent;
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
   transition: background 160ms ease, color 160ms ease;
 }
 
@@ -192,7 +192,7 @@
   border-radius: 8px;
   color: #64748b;
   background: transparent;
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
   font-weight: 600;
 }
 
@@ -211,7 +211,7 @@
   padding: 42px 12px;
   color: var(--webqq-muted);
   text-align: center;
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
 }
 
 .webqq-notification-empty.is-error {
@@ -247,7 +247,7 @@
   border-radius: 50%;
   color: var(--webqq-accent);
   background: color-mix(in srgb, var(--webqq-accent) 12%, transparent);
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
   font-weight: 700;
 }
 
@@ -262,7 +262,7 @@
 }
 
 .webqq-notification-main strong {
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
   line-height: 18px;
   overflow-wrap: anywhere;
 }
@@ -271,7 +271,7 @@
   margin-top: 1px;
   overflow: hidden;
   color: var(--webqq-muted);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   line-height: 17px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -280,7 +280,7 @@
 .webqq-notification-main small {
   margin-top: 4px;
   color: #9ca3af;
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   line-height: 17px;
   overflow-wrap: anywhere;
 }
@@ -305,7 +305,7 @@
   border-radius: 7px;
   color: var(--webqq-accent);
   background: color-mix(in srgb, var(--webqq-accent) 12%, transparent);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .webqq-notification-actions button:last-child {
@@ -316,7 +316,7 @@
 .webqq-notification-time {
   margin-top: auto;
   color: #9ca3af;
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   line-height: 18px;
   text-align: right;
   white-space: nowrap;
@@ -394,7 +394,7 @@
   outline: none;
   color: var(--webqq-text);
   background: color-mix(in srgb, var(--webqq-panel) 46%, transparent);
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
 }
 
 .chatluna-sandbox-search input:focus {
@@ -452,7 +452,7 @@
 }
 
 .webqq-session-copy strong {
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
   line-height: 18px;
   font-weight: 600;
 }
@@ -460,7 +460,7 @@
 .webqq-session-copy small,
 .webqq-session time {
   color: var(--webqq-muted);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .webqq-session-copy small {
@@ -481,7 +481,7 @@
   right: 12px;
   padding: 2px 6px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: var(--webqq-font-2xs);
   line-height: 16px;
   transform: translateY(-50%);
 }
@@ -511,5 +511,5 @@
   padding: 24px;
   text-align: center;
   color: var(--webqq-muted);
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
 }

@@ -164,7 +164,7 @@ onMounted(() => void refresh())
 .credential-list { min-height: 0; overflow: auto; padding: 20px 28px 28px; }
 .credential-toolbar, .credential-card, .credential-actions { display: flex; align-items: center; }
 .credential-toolbar { justify-content: space-between; gap: 16px; margin-bottom: 12px; }
-.credential-toolbar p, .credential-card small, .credential-empty, .credential-meta { margin: 0; color: var(--webqq-muted); font-size: 12px; }
+.credential-toolbar p, .credential-card small, .credential-empty, .credential-meta { margin: 0; color: var(--webqq-muted); font-size: var(--webqq-font-sm); }
 .credential-card { justify-content: space-between; gap: 16px; padding: 12px; border: 1px solid var(--webqq-border); border-radius: 12px; }
 .credential-card + .credential-card { margin-top: 8px; }
 .credential-summary { display: grid; gap: 4px; min-width: 0; padding: 0; border: 0; background: transparent; text-align: left; }
@@ -174,7 +174,7 @@ onMounted(() => void refresh())
 .scope-grid legend { margin-bottom: 8px; font-weight: 600; }
 .scope-grid label { display: flex; align-items: center; gap: 8px; }
 .credential-token-field { display: grid; gap: 8px; }
-.credential-token { display: block; overflow-wrap: anywhere; padding: 8px 12px; border: 1px solid var(--webqq-border); border-radius: 8px; background: var(--webqq-surface-muted, transparent); font-size: 12px; }
-.credential-error { color: #dc2626; font-size: 12px; }
+.credential-token { display: block; overflow-wrap: anywhere; padding: 8px 12px; border: 1px solid var(--webqq-border); border-radius: 8px; background: var(--webqq-surface-muted, transparent); font-size: var(--webqq-font-sm); }
+.credential-error { color: #dc2626; font-size: var(--webqq-font-sm); }
 @media (max-width: 560px) { .credential-list { padding-right: 14px; padding-left: 14px; } .credential-toolbar, .credential-card { align-items: flex-start; flex-direction: column; } }
 </style>

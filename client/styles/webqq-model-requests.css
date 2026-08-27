@@ -45,7 +45,7 @@
 
 .webqq-model-request-header h1 {
   margin: 0 0 8px;
-  font-size: 24px;
+  font-size: var(--webqq-font-3xl);
   font-weight: 700;
 }
 
@@ -54,6 +54,7 @@
 .webqq-model-request-detail p {
   margin: 0;
   color: var(--webqq-muted);
+  font-size: var(--webqq-font-md);
 }
 
 .webqq-model-request-actions {
@@ -121,6 +122,8 @@
 
 .webqq-model-request-bot-name strong {
   min-width: 0;
+  /* 列表项主标题与侧栏会话名保持同一档；继承 16px 时会比同行的 2xs 时间戳大出一倍。 */
+  font-size: var(--webqq-font-md);
 }
 
 .webqq-model-request-list-toolbar,
@@ -146,7 +149,7 @@
 .webqq-model-request-list-toolbar h2 {
   margin: 0;
   color: var(--webqq-text);
-  font-size: 16px;
+  font-size: var(--webqq-font-xl);
   font-weight: 600;
 }
 
@@ -162,7 +165,7 @@
   border: 0;
   color: var(--webqq-muted);
   background: transparent;
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
 }
 
 .webqq-model-request-filter-trigger {
@@ -201,7 +204,7 @@
 .webqq-model-request-live {
   gap: 8px;
   color: var(--webqq-muted);
-  font-size: 14px;
+  font-size: var(--webqq-font-lg);
 }
 
 .webqq-model-request-live [data-slot="switch"] {
@@ -314,7 +317,7 @@
 .webqq-model-request-detail time,
 .webqq-model-request-item time,
 .webqq-model-request-timing {
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
 }
 
 .webqq-model-request-overview,
@@ -340,6 +343,8 @@
 
 .webqq-model-request-section-heading > span {
   gap: 7px;
+  /* 与列表面板标题、分析页 h3 同一档：区块标题统一 xl，别靠继承凑巧落在 16px。 */
+  font-size: var(--webqq-font-xl);
 }
 
 .webqq-model-request-section-heading svg,
@@ -374,14 +379,14 @@
 .webqq-model-request-overview-grid article > span,
 .webqq-model-request-usage-grid article > span {
   color: var(--webqq-muted);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .webqq-model-request-overview-grid article > strong {
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--webqq-text);
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
   text-align: right;
   user-select: text;
 }
@@ -403,7 +408,7 @@
 .webqq-model-request-usage-grid article > strong {
   overflow: hidden;
   color: var(--webqq-text);
-  font-size: 18px;
+  font-size: var(--webqq-font-2xl);
   font-variant-numeric: tabular-nums;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -461,7 +466,7 @@
   min-width: 0;
   padding: 0;
   color: var(--webqq-muted);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .webqq-model-request-header-toggle svg {
@@ -487,12 +492,12 @@
   align-items: baseline;
   flex-wrap: wrap;
   gap: 4px 8px;
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--webqq-font-mono);
 }
 
 .webqq-model-request-endpoint strong {
   color: var(--webqq-accent);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   letter-spacing: 0.03em;
 }
 
@@ -513,7 +518,7 @@
 
 .webqq-model-request-error-diagnostic .webqq-model-request-section-heading a {
   color: #b91c1c;
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -528,7 +533,7 @@
 .webqq-model-request-error-details dt {
   align-self: start;
   color: var(--webqq-muted);
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
   font-weight: 600;
   line-height: 22px;
 }
@@ -551,8 +556,8 @@
 .webqq-workspace .sandbox-badge.webqq-model-request-error-code {
   min-height: 22px;
   padding: 2px 8px;
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
+  font-family: var(--webqq-font-mono);
+  font-size: var(--webqq-font-sm);
   font-weight: 600;
   line-height: 1.2;
   white-space: nowrap;
@@ -560,8 +565,8 @@
 
 .webqq-model-request-error-trace {
   color: var(--webqq-muted);
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
+  font-family: var(--webqq-font-mono);
+  font-size: var(--webqq-font-sm);
   white-space: nowrap;
 }
 
@@ -575,7 +580,7 @@
 
 .webqq-model-request-error-note {
   color: var(--webqq-muted) !important;
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
 }
 
 .webqq-workspace[data-color-mode="dark"] .webqq-model-request-error-diagnostic {
@@ -723,7 +728,7 @@
 .webqq-model-trajectory-summary {
   gap: 12px;
   color: var(--webqq-muted);
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
 }
 
 .webqq-model-trajectory-controls {
@@ -779,7 +784,7 @@
   height: 22px;
   padding-inline: 6px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
 }
 
 .webqq-model-trajectory-search {
@@ -803,7 +808,7 @@
   padding-left: 25px;
   border-radius: 4px;
   background: var(--webqq-surface);
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
 }
 
 .webqq-model-trajectory-composition-shell {
@@ -835,7 +840,7 @@
 
 .webqq-model-trajectory-composition-zoom .webqq-model-trajectory-composition-zoom-value {
   min-width: 40px;
-  font-size: 9px;
+  font-size: var(--webqq-font-3xs);
   font-variant-numeric: tabular-nums;
 }
 
@@ -856,7 +861,7 @@
 .webqq-model-trajectory-composition-labels {
   padding-right: 6px;
   color: var(--webqq-muted);
-  font-size: 9px;
+  font-size: var(--webqq-font-3xs);
   text-align: right;
 }
 
@@ -931,7 +936,7 @@
   padding: 18px 12px;
   border-bottom: 1px solid var(--webqq-border);
   color: var(--webqq-muted);
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
   text-align: center;
 }
 
@@ -947,7 +952,7 @@
 .webqq-model-trajectory-lane-labels {
   position: relative;
   color: var(--webqq-muted);
-  font-size: 9px;
+  font-size: var(--webqq-font-3xs);
   line-height: 1;
 }
 
@@ -1020,13 +1025,13 @@
   padding: 5px 8px 5px 56px;
   border-bottom: 1px solid var(--webqq-border);
   color: var(--webqq-muted);
-  font-size: 10px;
+  font-size: var(--webqq-font-2xs);
 }
 
 .webqq-model-trajectory-filter-empty {
   padding: 32px 16px;
   color: var(--webqq-muted);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   text-align: center;
 }
 
@@ -1063,7 +1068,7 @@
   color: var(--webqq-muted);
   background: color-mix(in srgb, var(--webqq-surface-muted) 62%, var(--webqq-surface));
   font: inherit;
-  font-size: 10px;
+  font-size: var(--webqq-font-2xs);
   text-align: left;
 }
 
@@ -1132,7 +1137,7 @@
   border-bottom: 1px solid var(--webqq-border);
   color: var(--webqq-text);
   background: transparent;
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   text-align: left;
 }
 
@@ -1164,7 +1169,7 @@
   border-radius: 4px;
   color: var(--webqq-muted);
   background: var(--webqq-surface-muted);
-  font-size: 10px;
+  font-size: var(--webqq-font-2xs);
   font-weight: 650;
   line-height: 13px;
   text-align: center;
@@ -1275,7 +1280,7 @@
 
 .webqq-model-trajectory [data-slot="tooltip-content"] span {
   color: color-mix(in srgb, currentColor 78%, transparent);
-  font-size: 10px;
+  font-size: var(--webqq-font-2xs);
 }
 
 @container (max-width: 620px) {
@@ -1355,7 +1360,7 @@
 .webqq-model-request-response-meta {
   margin: 0;
   color: var(--webqq-muted);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .webqq-model-response-preview {
@@ -1407,7 +1412,7 @@
   overflow-wrap: anywhere;
   color: var(--webqq-text);
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
   line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;
@@ -1449,7 +1454,7 @@
   flex-wrap: wrap;
   gap: 6px 16px;
   color: var(--webqq-muted);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .webqq-model-request-response-raw {
@@ -1462,8 +1467,8 @@
   border-radius: 8px;
   color: var(--webqq-text);
   background: color-mix(in srgb, var(--webqq-surface-muted) 52%, transparent);
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 13px;
+  font-family: var(--webqq-font-mono);
+  font-size: var(--webqq-font-md);
   line-height: 1.6;
   overflow-wrap: anywhere;
   tab-size: 2;
@@ -1489,8 +1494,8 @@
   min-width: 0;
   overflow: hidden;
   color: var(--webqq-text);
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 13px;
+  font-family: var(--webqq-font-mono);
+  font-size: var(--webqq-font-md);
   line-height: 1.6;
 }
 
@@ -1566,7 +1571,7 @@
   display: block;
   padding: 2px 0 2px 17px;
   color: var(--webqq-muted);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .webqq-model-request-json-key {
@@ -1583,7 +1588,7 @@
 
 .webqq-model-request-json-preview {
   margin-left: 4px;
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 
 .webqq-model-request-json-value,
@@ -1671,7 +1676,7 @@
   color: var(--webqq-muted);
   background: transparent;
   font-family: inherit;
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
   line-height: 18px;
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -1767,18 +1772,21 @@
 
 .webqq-model-analysis-boundary-title {
   gap: 7px;
+  /* 边界条是导航栏里的分隔行，配套的 meta/small 都是 2xs；标题不写字号会继承
+     成 16px，在 10px 元信息旁边像误插进来的正文。 */
+  font-size: var(--webqq-font-xs);
 }
 
 .webqq-model-analysis-boundary-title small {
   margin-left: auto;
   color: var(--webqq-muted);
-  font-size: 10px;
+  font-size: var(--webqq-font-2xs);
 }
 
 .webqq-model-analysis-boundary-meta {
   overflow: hidden;
   color: var(--webqq-muted);
-  font-size: 10px;
+  font-size: var(--webqq-font-2xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1833,12 +1841,15 @@
   color: inherit;
   background: transparent;
   font: inherit;
+  /* font: inherit 会把字号一起拉回继承值；导航项是 xs，分组标题只比它大一档，
+     不显式写就会继承成 16px，把整条导航栏的层级压垮。 */
+  font-size: var(--webqq-font-sm);
   text-align: left;
 }
 .webqq-model-analysis-nav-heading:hover,
 .webqq-model-analysis-nav-heading:focus-visible { background: var(--webqq-hover); }
 .webqq-model-analysis-nav-heading svg { flex: 0 0 auto; color: var(--webqq-role); }
-.webqq-model-analysis-nav-heading small { margin-left: auto; color: var(--webqq-muted); }
+.webqq-model-analysis-nav-heading small { margin-left: auto; color: var(--webqq-muted); font-size: var(--webqq-font-xs); }
 .webqq-model-analysis-nav-heading .webqq-model-analysis-nav-chevron {
   color: var(--webqq-muted);
   transition: transform 0.16s ease;
@@ -1855,7 +1866,7 @@
   color: var(--webqq-text);
   background: transparent;
   font: inherit;
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
   text-align: left;
 }
 .webqq-model-analysis-nav-item:hover,
@@ -1906,7 +1917,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--webqq-muted);
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1914,10 +1925,11 @@
 .webqq-model-analysis-heading { justify-content: space-between; gap: 12px; }
 .webqq-model-analysis-heading h3,
 .webqq-model-analysis-variables h3,
-.webqq-model-analysis-tools h3 { margin: 0; color: var(--webqq-text); font-size: 16px; }
+.webqq-model-analysis-tools h3 { margin: 0; color: var(--webqq-text); font-size: var(--webqq-font-xl); }
+/* 计数括号是标题的附属信息，必须比标题小一档；只改 font-weight 会让它跟着 h3 停在 xl。 */
 .webqq-model-analysis-heading h3 span,
 .webqq-model-analysis-variables h3 span,
-.webqq-model-analysis-tools h3 span { color: var(--webqq-muted); font-weight: 500; }
+.webqq-model-analysis-tools h3 span { color: var(--webqq-muted); font-size: var(--webqq-font-md); font-weight: 500; }
 
 .webqq-model-analysis-card,
 .webqq-model-analysis-tool-card {
@@ -1951,11 +1963,11 @@
   border-radius: 6px;
   color: var(--webqq-role);
   background: color-mix(in srgb, var(--webqq-role) 12%, var(--webqq-surface));
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
   font-weight: 700;
   text-transform: lowercase;
 }
-.webqq-model-analysis-index, .webqq-model-analysis-path, .webqq-model-analysis-chars { color: var(--webqq-muted); font-size: 11px; }
+.webqq-model-analysis-index, .webqq-model-analysis-path, .webqq-model-analysis-chars { color: var(--webqq-muted); font-size: var(--webqq-font-xs); }
 .webqq-model-analysis-path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .webqq-model-analysis-chars {
   flex: 0 0 auto;
@@ -1968,8 +1980,8 @@
 
 .webqq-model-analysis-section { display: grid; gap: 8px; padding: 14px 16px; }
 .webqq-model-analysis-section + .webqq-model-analysis-section { border-top: 1px solid var(--webqq-border); }
-.webqq-model-analysis-section > strong { color: var(--webqq-muted); font-size: 11px; text-transform: uppercase; }
-.webqq-model-analysis-section pre, .webqq-model-analysis-tool-call pre { margin: 0; overflow-wrap: anywhere; color: var(--webqq-text); font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; user-select: text; }
+.webqq-model-analysis-section > strong { color: var(--webqq-muted); font-size: var(--webqq-font-xs); text-transform: uppercase; }
+.webqq-model-analysis-section pre, .webqq-model-analysis-tool-call pre { margin: 0; overflow-wrap: anywhere; color: var(--webqq-text); font-family: var(--webqq-font-mono); font-size: var(--webqq-font-md); line-height: 1.7; white-space: pre-wrap; word-break: break-word; user-select: text; }
 .webqq-model-analysis-text-wrap { position: relative; }
 .webqq-model-analysis-section.is-collapsed .webqq-model-analysis-text-wrap > pre {
   max-height: var(--webqq-model-analysis-collapse-height);
@@ -1979,7 +1991,7 @@
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 48px), transparent);
   mask-image: linear-gradient(to bottom, #000 calc(100% - 48px), transparent);
 }
-.webqq-model-analysis-expand { display: flex; width: 100%; align-items: center; justify-content: center; gap: 4px; padding: 4px 0; border: 0; color: var(--webqq-accent); background: transparent; font-size: 11px; }
+.webqq-model-analysis-expand { display: flex; width: 100%; align-items: center; justify-content: center; gap: 4px; padding: 4px 0; border: 0; color: var(--webqq-accent); background: transparent; font-size: var(--webqq-font-xs); }
 .webqq-model-analysis-expand svg { flex-shrink: 0; transition: transform 160ms ease; }
 .webqq-model-analysis-section:not(.is-collapsed) .webqq-model-analysis-expand svg { transform: rotate(180deg); }
 .webqq-model-analysis-tool-call { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--webqq-border); border-radius: 6px; background: var(--webqq-surface-muted); }
@@ -1992,9 +2004,9 @@
 .webqq-model-analysis-tool-call > div { justify-content: space-between; gap: 12px; }
 .webqq-model-analysis-tool-call.is-call > div > strong,
 .webqq-model-analysis-tool-call.is-result > div > strong { color: var(--webqq-role); }
-.webqq-model-analysis-tool-call span { color: var(--webqq-muted); font-size: 11px; }
-.webqq-model-analysis-link { width: max-content; padding: 0; border: 0; color: var(--webqq-accent); background: transparent; font-size: 11px; text-decoration: underline; }
-.webqq-model-analysis-response-meta { gap: 16px; padding: 10px 16px; border-top: 1px solid var(--webqq-border); color: var(--webqq-muted); font-size: 11px; }
+.webqq-model-analysis-tool-call span { color: var(--webqq-muted); font-size: var(--webqq-font-xs); }
+.webqq-model-analysis-link { width: max-content; padding: 0; border: 0; color: var(--webqq-accent); background: transparent; font-size: var(--webqq-font-xs); text-decoration: underline; }
+.webqq-model-analysis-response-meta { gap: 16px; padding: 10px 16px; border-top: 1px solid var(--webqq-border); color: var(--webqq-muted); font-size: var(--webqq-font-xs); }
 .webqq-model-analysis-json { min-height: 180px; padding: 12px; }
 .webqq-model-analysis-json .webqq-model-request-json-viewer { min-height: 160px; }
 .webqq-model-analysis-empty { padding: 28px 16px; color: var(--webqq-muted); text-align: center; }
@@ -2046,8 +2058,8 @@
 .webqq-model-analysis-image figcaption,
 .webqq-model-analysis-source-path {
   color: var(--webqq-muted);
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 10px;
+  font-family: var(--webqq-font-mono);
+  font-size: var(--webqq-font-2xs);
 }
 .webqq-model-analysis-source-path { padding: 0 2px 8px; overflow-wrap: anywhere; }
 .webqq-model-analysis-raw-text {
@@ -2057,15 +2069,15 @@
   overflow-wrap: anywhere;
   color: var(--webqq-text);
   background: var(--webqq-surface-muted);
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
+  font-family: var(--webqq-font-mono);
+  font-size: var(--webqq-font-sm);
   line-height: 1.65;
   white-space: pre-wrap;
   word-break: break-word;
   user-select: text;
 }
 .webqq-model-analysis-response-heading { padding-top: 4px; }
-.webqq-model-analysis-response-heading h3 { margin: 0; color: var(--webqq-text); font-size: 16px; }
+.webqq-model-analysis-response-heading h3 { margin: 0; color: var(--webqq-text); font-size: var(--webqq-font-xl); }
 
 .webqq-model-analysis-variables {
   display: grid;
@@ -2099,13 +2111,13 @@
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--webqq-text);
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
+  font-family: var(--webqq-font-mono);
+  font-size: var(--webqq-font-sm);
 }
 .webqq-model-analysis-variable-preset {
   margin-left: auto;
   color: var(--webqq-muted);
-  font-size: 11px;
+  font-size: var(--webqq-font-xs);
 }
 .webqq-model-analysis-variable-card.is-collapsed > header { border-bottom: 0; }
 .webqq-model-analysis-variable-card:not(.is-collapsed) .webqq-model-analysis-collapse svg { transform: rotate(180deg); }
@@ -2203,7 +2215,7 @@
   max-width: min(100%, var(--webqq-model-history-content-max-width, 100%));
   min-width: 0;
   color: var(--webqq-text);
-  font-size: 13px;
+  font-size: var(--webqq-font-md);
   line-height: 1.55;
 }
 .webqq-model-history-content-line {
@@ -2253,7 +2265,7 @@
   margin: 0;
   padding: 14px 16px;
   color: var(--webqq-muted);
-  font-size: 12px;
+  font-size: var(--webqq-font-sm);
 }
 .webqq-model-analysis-variable-empty {
   display: flex;
@@ -2267,7 +2279,7 @@
   border-radius: 999px;
   color: var(--webqq-role-variable);
   background: color-mix(in srgb, var(--webqq-role-variable) 9%, transparent);
-  font-size: 10px;
+  font-size: var(--webqq-font-2xs);
   font-weight: 700;
 }
 
@@ -2310,13 +2322,18 @@
   min-width: 0;
   overflow: hidden;
 }
-/* 工具摘要在分析页和轨迹检查器中使用同一套收缩顺序：名称优先，描述省略，属性统计保持完整。 */
+/* 工具摘要在分析页和轨迹检查器中使用同一套收缩顺序：名称优先，描述省略，属性统计保持完整。
+   三段文本必须显式各占一档字号：三者原先都没写 font-size，工具名和描述一起继承成
+   16px、属性统计被 Tailwind preflight 的 small{80%} 变成 12.8px，等宽的英文工具名
+   和同字号的中文描述放在一行时，中文字面高度接近字号本身、等宽 Latin 只有六成，
+   看起来就是"描述比工具名大一号"。名称 md > 描述 sm > 统计 xs，层级才和颜色一致。 */
 .webqq-model-analysis-tool-copy > strong {
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
   color: var(--webqq-role);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--webqq-font-mono);
+  font-size: var(--webqq-font-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2329,6 +2346,7 @@
   display: block;
   overflow: hidden;
   color: var(--webqq-muted);
+  font-size: var(--webqq-font-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2342,6 +2360,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--webqq-muted);
+  font-size: var(--webqq-font-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2367,7 +2386,7 @@
 .webqq-model-analysis-tool-card.is-expanded .webqq-model-analysis-tool-summary > .webqq-model-analysis-tool-chevron { transform: rotate(180deg); }
 .webqq-model-analysis-tool-detail { display: grid; gap: 12px; padding: 16px; border-top: 1px solid var(--webqq-border); }
 .webqq-model-analysis-tool-detail p, .webqq-model-analysis-tool-detail h4 { margin: 0; }
-.webqq-model-analysis-tool-detail h4 { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; font-weight: 500; }
+.webqq-model-analysis-tool-detail h4 { font-family: var(--webqq-font-mono); font-size: var(--webqq-font-sm); font-weight: 500; }
 .webqq-model-analysis-tool-detail h4 small { margin-left: 8px; color: var(--webqq-muted); }
 .webqq-model-analysis-tool-schema.webqq-model-request-json-viewer {
   min-height: 0;
