@@ -321,6 +321,63 @@
   padding-top: 16px;
 }
 
+/* 轨迹账本自己持有滚动；详情外壳只负责分配高度，禁止再出现第二条最外层滚动条。 */
+.webqq-model-request-detail.is-trajectory-view {
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.webqq-model-request-detail.is-trajectory-view > .webqq-model-trajectory {
+  position: relative;
+  display: block;
+  height: 100%;
+  min-height: 0;
+}
+
+.webqq-model-request-detail.is-trajectory-view .webqq-model-trajectory-header {
+  position: absolute;
+  z-index: 4;
+  inset: 0 0 auto;
+  overflow: clip;
+  border-radius: 7px 7px 0 0;
+}
+
+.webqq-model-request-detail.is-trajectory-view .webqq-model-trajectory-header::before {
+  z-index: 0;
+}
+
+.webqq-model-request-detail.is-trajectory-view .webqq-model-trajectory-header > * {
+  position: relative;
+  z-index: 1;
+}
+
+.webqq-model-request-detail.is-trajectory-view .webqq-model-trajectory-ledger {
+  height: 100%;
+  min-height: 0;
+}
+
+.webqq-model-request-detail.is-trajectory-view .webqq-model-trajectory-table {
+  scroll-padding-top: var(--webqq-model-trajectory-sticky-height, 0px);
+}
+
+.webqq-model-request-detail.is-trajectory-view .webqq-model-trajectory-table::before {
+  display: block;
+  height: var(--webqq-model-trajectory-sticky-height, 0px);
+  content: "";
+}
+
+.webqq-model-request-detail.is-trajectory-view .webqq-model-trajectory-inspector {
+  padding-top: calc(12px + var(--webqq-model-trajectory-sticky-height, 0px));
+}
+
+.webqq-model-request-detail.is-trajectory-view :is(
+  .webqq-model-trajectory-table,
+  .webqq-model-trajectory-inspector
+) {
+  height: 100%;
+  max-height: none;
+}
+
 .webqq-model-request-summary,
 .webqq-model-request-meta,
 .webqq-model-request-trace,
@@ -662,6 +719,11 @@
   border-radius: 8px;
   background: var(--webqq-surface);
   container-type: inline-size;
+}
+
+/* 毛玻璃头部需要穿透轨迹根容器，才能采样其后方正在滚动的账本内容。 */
+.webqq-workspace.is-frosted .webqq-model-trajectory {
+  background: transparent;
 }
 
 .webqq-workspace[data-color-mode="dark"] .webqq-model-trajectory {
@@ -1319,19 +1381,22 @@
   border-radius: 8px;
 }
 
-.webqq-model-trajectory-sticky-header {
+.webqq-model-trajectory-header {
   position: relative;
   isolation: isolate;
 }
 
-.webqq-model-request-analysis .webqq-model-trajectory-sticky-header {
+.webqq-model-request-analysis .webqq-model-trajectory-header {
   position: sticky;
   top: 0;
   z-index: 4;
+  overflow: clip;
+  border-radius: 7px 7px 0 0;
 }
 
-/* filter 放在无后代的伪元素上，避免形成会破坏内部浮层的 Backdrop Root。 */
-.webqq-model-trajectory-sticky-header::before {
+/* 摘要、过滤工具栏和组成轨道共用一个背景层；filter 放在无后代的伪元素上，
+   避免形成会破坏内部浮层的 Backdrop Root。 */
+.webqq-model-trajectory-header::before {
   position: absolute;
   z-index: -1;
   inset: 0;
@@ -1341,12 +1406,13 @@
   pointer-events: none;
 }
 
-.webqq-workspace.is-frosted .webqq-model-trajectory-sticky-header::before {
+.webqq-workspace.is-frosted .webqq-model-trajectory-header::before {
   background: color-mix(in srgb, var(--webqq-surface) 72%, transparent);
   backdrop-filter: saturate(180%) blur(20px);
 }
 
-.webqq-workspace.is-frosted .webqq-model-trajectory-sticky-header :is(
+.webqq-workspace.is-frosted .webqq-model-trajectory-header :is(
+  .webqq-model-trajectory-scope,
   .webqq-model-trajectory-controls,
   .webqq-model-trajectory-composition-shell,
   .webqq-model-trajectory-composition-empty

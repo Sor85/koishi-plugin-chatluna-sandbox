@@ -1,6 +1,10 @@
 <template>
   <section ref="trajectoryElement" class="webqq-model-trajectory" :class="{ 'is-analysis': analysis }" aria-label="模型请求轨迹">
-    <header v-if="showModeSwitch || mode === 'conversation'" class="webqq-model-trajectory-scope">
+    <div v-if="loading && !trajectory" class="webqq-model-request-empty">正在组装轨迹…</div>
+    <div v-else-if="!trajectory?.rows.length" class="webqq-model-request-empty">当前记录没有可投影的轨迹</div>
+    <template v-else>
+      <div ref="stickyHeaderElement" class="webqq-model-trajectory-header">
+        <header v-if="showModeSwitch || mode === 'conversation'" class="webqq-model-trajectory-scope">
       <div v-if="showModeSwitch" class="webqq-model-trajectory-mode" role="tablist" aria-label="轨迹范围">
         <Button
           size="sm"
@@ -26,12 +30,9 @@
         <span>{{ trajectory?.records.length ?? 0 }} 次请求</span>
         <span>{{ trajectory?.rows.length ?? 0 }} 条事件</span>
       </div>
-    </header>
+        </header>
 
-    <div v-if="loading && !trajectory" class="webqq-model-request-empty">正在组装轨迹…</div>
-    <div v-else-if="!trajectory?.rows.length" class="webqq-model-request-empty">当前记录没有可投影的轨迹</div>
-    <template v-else>
-      <div ref="stickyHeaderElement" class="webqq-model-trajectory-sticky-header">
+      <div class="webqq-model-trajectory-sticky-header">
         <div class="webqq-model-trajectory-controls" role="toolbar" aria-label="轨迹显示控制">
         <div class="webqq-model-trajectory-control-actions">
           <Button
@@ -218,10 +219,10 @@
         </div>
         </TooltipProvider>
       </div>
-
-      <p v-if="mode === 'conversation' && hasUnknownTiming" class="webqq-model-trajectory-timing-note">
-        进行中的请求仅标记开始位置；TTFT 与解码阶段尚无独立时间证据
-      </p>
+        <p v-if="mode === 'conversation' && hasUnknownTiming" class="webqq-model-trajectory-timing-note">
+          进行中的请求仅标记开始位置；TTFT 与解码阶段尚无独立时间证据
+        </p>
+      </div>
 
       <ModelRequestConversationAnalysis
         v-if="analysis && detail"
@@ -573,7 +574,7 @@ watch(() => props.restoreState?.seq, restoreTrajectoryPosition, { immediate: tru
 watch(stickyHeaderElement, (header) => {
   stickyHeaderResizeObserver?.disconnect()
   stickyHeaderResizeObserver = undefined
-  if (!props.analysis || !header) {
+  if (!header) {
     trajectoryElement.value?.style.removeProperty('--webqq-model-trajectory-sticky-height')
     return
   }

@@ -406,19 +406,23 @@ describe('模型请求分析展示模型', () => {
     const trajectory = readFileSync(resolve('client/model-request-trajectory.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
 
-    expect(trajectory).toMatch(/webqq-model-trajectory-sticky-header[\s\S]*webqq-model-trajectory-controls[\s\S]*webqq-model-trajectory-composition-shell/)
+    expect(trajectory).toMatch(/webqq-model-trajectory-header[\s\S]*webqq-model-trajectory-scope[\s\S]*webqq-model-trajectory-sticky-header[\s\S]*webqq-model-trajectory-controls[\s\S]*webqq-model-trajectory-composition-shell/)
+    expect(trajectory).toContain('ref="stickyHeaderElement" class="webqq-model-trajectory-header"')
     expect(trajectory).toContain("style.setProperty('--webqq-model-trajectory-sticky-height'")
-    const stickyRule = styles.slice(styles.indexOf('.webqq-model-request-analysis .webqq-model-trajectory-sticky-header {')).split('}')[0]
-    const stickyBackdropRule = styles.slice(styles.indexOf('.webqq-model-trajectory-sticky-header::before {')).split('}')[0]
-    const frostedStickyRule = styles.slice(styles.indexOf('.webqq-workspace.is-frosted .webqq-model-trajectory-sticky-header::before {')).split('}')[0]
+    const stickyRule = styles.slice(styles.indexOf('.webqq-model-request-analysis .webqq-model-trajectory-header {')).split('}')[0]
+    const stickyBackdropRule = styles.match(/\.webqq-model-trajectory-header::before \{\n  position: absolute;[\s\S]*?\n\}/)?.[0] ?? ''
+    const frostedStickyRule = styles.match(/\.webqq-workspace\.is-frosted \.webqq-model-trajectory-header::before \{[\s\S]*?\n\}/)?.[0] ?? ''
     expect(stickyRule).toContain('top: 0')
+    expect(stickyRule).toContain('overflow: clip')
+    expect(stickyRule).toContain('border-radius: 7px 7px 0 0')
     expect(stickyRule).not.toContain('backdrop-filter:')
     expect(stickyBackdropRule).toContain('inset: 0')
     expect(stickyBackdropRule).toContain('background: var(--webqq-surface)')
     expect(stickyBackdropRule).not.toContain('box-shadow:')
     expect(frostedStickyRule).toContain('background: color-mix(in srgb, var(--webqq-surface) 72%, transparent)')
     expect(frostedStickyRule).toContain('backdrop-filter: saturate(180%) blur(20px)')
-    expect(styles).toContain('.webqq-workspace.is-frosted .webqq-model-trajectory-sticky-header :is(')
+    expect(styles).toContain('.webqq-workspace.is-frosted .webqq-model-trajectory-header :is(')
+    expect(styles).toMatch(/\.webqq-workspace\.is-frosted \.webqq-model-trajectory-header :is\([\s\S]*?\.webqq-model-trajectory-scope,[\s\S]*?\.webqq-model-trajectory-controls,[\s\S]*?\.webqq-model-trajectory-composition-shell/)
   })
 
   it('滚动阅读右侧时只跟随当前条目，不自动改变左侧分类折叠状态', () => {
