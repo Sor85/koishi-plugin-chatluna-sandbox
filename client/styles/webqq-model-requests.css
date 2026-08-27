@@ -1314,8 +1314,33 @@
   /* 详情滚动容器有 16px 内边距；向上抵消它，让吸顶区贴住滚动视口顶边。 */
   top: -16px;
   z-index: 4;
+  isolation: isolate;
+}
+
+/* 背景层向上覆盖被抵消的详情内边距，避免半透明吸顶区顶部漏出卡片内容。
+   filter 放在无后代的伪元素上，避免形成会破坏内部浮层的 Backdrop Root。 */
+.webqq-model-request-analysis .webqq-model-trajectory-sticky-header::before {
+  position: absolute;
+  z-index: -1;
+  inset: -16px 0 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--webqq-border) 72%, transparent);
   background: var(--webqq-surface);
-  box-shadow: 0 2px 6px rgb(15 23 42 / 8%);
+  box-shadow: 0 6px 18px rgb(15 23 42 / 10%);
+  content: "";
+  pointer-events: none;
+}
+
+.webqq-workspace.is-frosted .webqq-model-request-analysis .webqq-model-trajectory-sticky-header::before {
+  background: color-mix(in srgb, var(--webqq-surface) 72%, transparent);
+  backdrop-filter: saturate(180%) blur(20px);
+}
+
+.webqq-workspace.is-frosted .webqq-model-request-analysis :is(
+  .webqq-model-trajectory-controls,
+  .webqq-model-trajectory-composition-shell,
+  .webqq-model-trajectory-composition-empty
+) {
+  background: transparent;
 }
 
 .webqq-model-request-analysis .webqq-model-analysis-main {

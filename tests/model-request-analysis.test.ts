@@ -408,7 +408,15 @@ describe('模型请求分析展示模型', () => {
 
     expect(trajectory).toMatch(/webqq-model-trajectory-sticky-header[\s\S]*webqq-model-trajectory-controls[\s\S]*webqq-model-trajectory-composition-shell/)
     expect(trajectory).toContain("style.setProperty('--webqq-model-trajectory-sticky-height'")
-    expect(styles).toMatch(/\.webqq-model-request-analysis \.webqq-model-trajectory-sticky-header \{[^}]*position: sticky;[^}]*top: -16px;[^}]*z-index:/s)
+    const stickyRule = styles.slice(styles.indexOf('.webqq-model-request-analysis .webqq-model-trajectory-sticky-header {')).split('}')[0]
+    const stickyBackdropRule = styles.slice(styles.indexOf('.webqq-model-request-analysis .webqq-model-trajectory-sticky-header::before {')).split('}')[0]
+    const frostedStickyRule = styles.slice(styles.indexOf('.webqq-workspace.is-frosted .webqq-model-request-analysis .webqq-model-trajectory-sticky-header::before {')).split('}')[0]
+    expect(stickyRule).toContain('top: -16px')
+    expect(stickyRule).not.toContain('backdrop-filter:')
+    expect(stickyBackdropRule).toContain('inset: -16px 0 0')
+    expect(stickyBackdropRule).toContain('background: var(--webqq-surface)')
+    expect(frostedStickyRule).toContain('background: color-mix(in srgb, var(--webqq-surface) 72%, transparent)')
+    expect(frostedStickyRule).toContain('backdrop-filter: saturate(180%) blur(20px)')
   })
 
   it('滚动阅读右侧时只跟随当前条目，不自动改变左侧分类折叠状态', () => {
