@@ -182,7 +182,7 @@
       <section class="webqq-model-request-detail-pane" aria-label="模型请求详情">
         <div v-if="detailLoading && !detail" class="webqq-model-request-empty">正在读取请求详情…</div>
         <div v-else-if="!detail" class="webqq-model-request-empty">选择一条记录查看请求体和响应体</div>
-        <article v-else ref="detailElement" v-webqq-scrollbar class="webqq-model-request-detail">
+        <article v-else ref="detailElement" v-webqq-scrollbar class="webqq-model-request-detail" :class="{ 'has-sticky-trajectory': detailView === 'trajectory' || bodyView === 'analysis' }">
           <header>
             <div class="webqq-model-request-item-title">
               <span class="webqq-model-request-bot">

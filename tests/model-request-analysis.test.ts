@@ -399,7 +399,7 @@ describe('模型请求分析展示模型', () => {
     expect(view).toContain('v-show="!collapsedNavigationGroups.has(group.key)"')
     expect(view).toContain('collapsedNavigationGroups.value = new Set()')
     expect(view).toContain('next.has(group) ? next.delete(group) : next.add(group)')
-    expect(styles).toMatch(/\.webqq-model-request-analysis \.webqq-model-analysis-nav \{[^}]*position: sticky;[^}]*top: calc\(var\(--webqq-model-trajectory-sticky-height[^}]*- 16px\);[^}]*max-height: calc\(var\(--webqq-model-analysis-nav-height[^}]*- var\(--webqq-model-trajectory-sticky-height[^}]*\+ 16px\);[^}]*overflow: auto;/s)
+    expect(styles).toMatch(/\.webqq-model-request-analysis \.webqq-model-analysis-nav \{[^}]*position: sticky;[^}]*top: var\(--webqq-model-trajectory-sticky-height[^}]*max-height: calc\(var\(--webqq-model-analysis-nav-height[^}]*- var\(--webqq-model-trajectory-sticky-height[^}]*overflow: auto;/s)
   })
 
   it('分析页的过滤工具栏和请求组成轨道一起保持吸顶', () => {
@@ -409,14 +409,16 @@ describe('模型请求分析展示模型', () => {
     expect(trajectory).toMatch(/webqq-model-trajectory-sticky-header[\s\S]*webqq-model-trajectory-controls[\s\S]*webqq-model-trajectory-composition-shell/)
     expect(trajectory).toContain("style.setProperty('--webqq-model-trajectory-sticky-height'")
     const stickyRule = styles.slice(styles.indexOf('.webqq-model-request-analysis .webqq-model-trajectory-sticky-header {')).split('}')[0]
-    const stickyBackdropRule = styles.slice(styles.indexOf('.webqq-model-request-analysis .webqq-model-trajectory-sticky-header::before {')).split('}')[0]
-    const frostedStickyRule = styles.slice(styles.indexOf('.webqq-workspace.is-frosted .webqq-model-request-analysis .webqq-model-trajectory-sticky-header::before {')).split('}')[0]
-    expect(stickyRule).toContain('top: -16px')
+    const stickyBackdropRule = styles.slice(styles.indexOf('.webqq-model-trajectory-sticky-header::before {')).split('}')[0]
+    const frostedStickyRule = styles.slice(styles.indexOf('.webqq-workspace.is-frosted .webqq-model-trajectory-sticky-header::before {')).split('}')[0]
+    expect(stickyRule).toContain('top: 0')
     expect(stickyRule).not.toContain('backdrop-filter:')
-    expect(stickyBackdropRule).toContain('inset: -16px 0 0')
+    expect(stickyBackdropRule).toContain('inset: 0')
     expect(stickyBackdropRule).toContain('background: var(--webqq-surface)')
+    expect(stickyBackdropRule).not.toContain('box-shadow:')
     expect(frostedStickyRule).toContain('background: color-mix(in srgb, var(--webqq-surface) 72%, transparent)')
     expect(frostedStickyRule).toContain('backdrop-filter: saturate(180%) blur(20px)')
+    expect(styles).toContain('.webqq-workspace.is-frosted .webqq-model-trajectory-sticky-header :is(')
   })
 
   it('滚动阅读右侧时只跟随当前条目，不自动改变左侧分类折叠状态', () => {
