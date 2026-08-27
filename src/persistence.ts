@@ -90,6 +90,19 @@ const TEST_SPACE_TABLE = 'chatluna-sandbox.test-space'
 const DEBUG_TABLE = 'chatluna-sandbox.debug-records'
 const MODEL_REQUEST_TABLE = 'chatluna-sandbox.model-requests'
 
+/** database 是可选服务，且 Minato 的注册晚于 ready；所有首次读取都要给它这段等待窗口。 */
+const DATABASE_READY_TIMEOUT_MS = 10_000
+
+async function waitForDatabase<T>(resolveDatabase: () => T | undefined, timeoutMs: number): Promise<T | undefined> {
+  const deadline = Date.now() + timeoutMs
+  let database = resolveDatabase()
+  while (!database && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, Math.min(25, Math.max(1, deadline - Date.now()))))
+    database = resolveDatabase()
+  }
+  return database
+}
+
 export function registerSandboxSceneModel(ctx: Context): void {
   ctx.model.extend(SCENE_TABLE, {
     id: 'string(64)',
@@ -161,13 +174,8 @@ export class KoishiDatabaseOneBotDebugPersistence implements SandboxOneBotDebugP
   async load() {
     // Database 是可选服务，可能在 Store 构造后才注册；不能把服务未就绪伪装成空库，
     // 否则重启后的首次调试记录写入会覆盖数据库中的历史记录。
-    const deadline = Date.now() + 10_000
-    let database = this.getDatabase()
-    while (!database && Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, Math.min(25, Math.max(1, deadline - Date.now()))))
-      database = this.getDatabase()
-    }
-    if (!database) throw new Error('等待 Koishi Database 服务 10000ms 后仍不可用')
+    const database = await waitForDatabase(this.getDatabase, DATABASE_READY_TIMEOUT_MS)
+    if (!database) throw new Error(`等待 Koishi Database 服务 ${DATABASE_READY_TIMEOUT_MS}ms 后仍不可用`)
     const [record] = await database.get(DEBUG_TABLE, { scopeId: this.scopeId })
     if (!record) return { nextSequence: 1, records: [] }
     return {
@@ -212,13 +220,8 @@ export class KoishiDatabaseModelRequestPersistence implements SandboxModelReques
   async load() {
     // database 是可选服务，Minato 可能在本插件构造 Store 后才完成注册。这里等待服务，
     // 不能把“尚未可用”伪装成空库，否则重启后的首次请求会覆盖全部历史记录。
-    const deadline = Date.now() + 10_000
-    let database = this.getDatabase()
-    while (!database && Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, Math.min(25, Math.max(1, deadline - Date.now()))))
-      database = this.getDatabase()
-    }
-    if (!database) throw new Error('等待 Koishi Database 服务 10000ms 后仍不可用')
+    const database = await waitForDatabase(this.getDatabase, DATABASE_READY_TIMEOUT_MS)
+    if (!database) throw new Error(`等待 Koishi Database 服务 ${DATABASE_READY_TIMEOUT_MS}ms 后仍不可用`)
     const [record] = await database.get(MODEL_REQUEST_TABLE, { scopeId: this.scopeId })
     return record ? { nextSequence: Math.max(1, Number(record.nextSequence) || 1), records: structuredClone(record.records ?? []) } : { nextSequence: 1, records: [] }
   }
@@ -237,24 +240,30 @@ export class KoishiDatabaseModelRequestPersistence implements SandboxModelReques
 // database 是可选服务，可能在本插件之后才加载；构造时缓存服务实例会让持久化永远不可用，
 // 必须通过 getter 在每次调用时解析当前服务。
 export class KoishiDatabaseTestSpacePersistence implements SandboxTestSpacePersistence {
-  constructor(private getDatabase: () => SandboxTestSpaceDatabase | undefined) {}
+  constructor(
+    private getDatabase: () => SandboxTestSpaceDatabase | undefined,
+    private readyTimeoutMs = DATABASE_READY_TIMEOUT_MS,
+  ) {}
 
   async loadAll(): Promise<SandboxTestSpacePersistenceRecord[]> {
-    const database = this.getDatabase()
-    if (!database) return []
+    // ready 事件早于 Minato 注册 database 服务。这里必须等待服务出现，不能把
+    // "尚未就绪"当成空库返回：那会让每次重启都丢掉全部 AI 测试空间，而且未恢复的
+    // 空间再也不会被 delete，数据库行与磁盘媒体目录会无限累积。
+    const database = await waitForDatabase(this.getDatabase, this.readyTimeoutMs)
+    if (!database) throw new Error(`等待 Koishi Database 服务 ${this.readyTimeoutMs}ms 后仍不可用`)
     const records = await database.get(TEST_SPACE_TABLE, {})
     return records.map((record) => structuredClone(record))
   }
 
   async save(record: SandboxTestSpacePersistenceRecord): Promise<void> {
     const database = this.getDatabase()
-    if (!database) return
+    if (!database) throw new Error('Koishi Database 服务不可用，AI 测试空间未能落盘')
     await database.upsert(TEST_SPACE_TABLE, [structuredClone(record)])
   }
 
   async delete(id: string): Promise<void> {
     const database = this.getDatabase()
-    if (!database) return
+    if (!database) throw new Error('Koishi Database 服务不可用，AI 测试空间未能删除')
     await database.remove(TEST_SPACE_TABLE, { id })
   }
 }

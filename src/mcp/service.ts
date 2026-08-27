@@ -45,6 +45,7 @@ export interface SandboxMcpServiceOptions {
   dataDirectory: string
   eventLimit?: number
   callRecordLimit?: number
+  uploadedMediaLimit?: number
   readPerMinute?: number
   mutationPerMinute?: number
   waitPerMinute?: number
@@ -698,12 +699,16 @@ export class SandboxMcpService {
   private callRecords: SandboxMcpCallRecord[] = []
   private epoch = randomUUID()
   private sequence = 0
-  private uploadedMedia = new Map<string, SandboxMedia & { dataBase64: string }>()
+  // 只缓存媒体元数据。正文由 SandboxMediaStorage 按内容寻址落盘，发送时从磁盘读取；
+  // 在这里保留 dataBase64 既会让每次上传常驻十几 MB 内存，也会让附加字段随
+  // send_message 一路写进场景快照与数据库。按插入顺序限量，避免长会话无界增长。
+  private uploadedMedia = new Map<string, SandboxMedia>()
   private idempotency = new Map<string, { argumentsHash: string; result: unknown }>()
   private confirmations = new Map<string, { credentialId: string; tool: string; argumentsHash: string; revision: number; expiresAt: number }>()
   private credentialFile: string
   private eventLimit: number
   private callRecordLimit: number
+  private uploadedMediaLimit: number
   private readPerMinute: number
   private mutationPerMinute: number
   private waitPerMinute: number
@@ -723,6 +728,7 @@ export class SandboxMcpService {
     this.credentialFile = join(options.dataDirectory, 'mcp-credentials.json')
     this.eventLimit = options.eventLimit ?? 1000
     this.callRecordLimit = options.callRecordLimit ?? 500
+    this.uploadedMediaLimit = options.uploadedMediaLimit ?? 256
     this.readPerMinute = options.readPerMinute ?? 120
     this.mutationPerMinute = options.mutationPerMinute ?? 60
     this.waitPerMinute = options.waitPerMinute ?? 120
@@ -1136,8 +1142,19 @@ export class SandboxMcpService {
     const digest = createHash('sha256').update(Buffer.from(dataBase64, 'base64')).digest('hex')
     if (args.sha256 !== undefined && args.sha256 !== digest) throw new SandboxMcpError('digest_mismatch', '媒体摘要不匹配')
     const media = control.storeMedia({ fileName: requireString(args.fileName, 'fileName'), mimeType: requireString(args.mimeType, 'mimeType'), dataBase64 })
-    this.uploadedMedia.set(this.mediaCacheKey(args, media.id), { ...media, dataBase64 })
+    this.rememberUploadedMedia(this.mediaCacheKey(args, media.id), media)
     return { mediaId: media.id, sha256: digest, media }
+  }
+
+  private rememberUploadedMedia(key: string, media: SandboxMedia): void {
+    // 先删后加，让 Map 的插入顺序反映最近使用，淘汰的总是最旧的上传。
+    this.uploadedMedia.delete(key)
+    this.uploadedMedia.set(key, media)
+    while (this.uploadedMedia.size > this.uploadedMediaLimit) {
+      const oldest = this.uploadedMedia.keys().next()
+      if (oldest.done) break
+      this.uploadedMedia.delete(oldest.value)
+    }
   }
 
   private async sendMessage(control: SandboxControlService, args: Record<string, unknown>) {

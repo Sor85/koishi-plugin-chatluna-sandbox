@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { rmSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { Context } from 'koishi'
 import { createEmptyScene, SandboxControlService, type SandboxRuntimeBotRegistry } from './control-service'
@@ -62,13 +63,35 @@ export class SandboxTestSpaceService {
   ) {
     ctx.on('ready', async () => {
       if (!this.persistence) return
+      let records: SandboxTestSpacePersistenceRecord[]
       try {
-        for (const record of await this.persistence.loadAll()) this.restoreSpace(record)
+        records = await this.persistence.loadAll()
       } catch (error) {
         ctx.logger('chatluna-sandbox').error('AI 测试空间恢复失败。', error)
+        return
+      }
+      // 逐条隔离：多个已保存空间可能持有同一个机器人 ID，而运行时注册表只允许一个活动
+      // 占用者。共用一个 try 会让第一次冲突吞掉后面所有空间，表现为重启后空间凭空消失。
+      for (const record of records) {
+        try {
+          this.restoreSpace(record)
+        } catch (error) {
+          ctx.logger('chatluna-sandbox').error(`AI 测试空间恢复失败：${record.id}`, error)
+        }
       }
     })
-    ctx.on('dispose', () => this.persistenceQueue)
+    // Koishi 的 dispose 是 fire-and-forget（cordis scope.reset 不 await 任何 disposer），
+    // 返回 Promise 不会让宿主等待。这里只保证挂起的写入被显式收尾并把失败写进日志，
+    // 而不是静默丢弃；真正的"关机零丢失"需要宿主提供可等待的关机钩子。
+    ctx.on('dispose', () => {
+      void this.persistenceQueue.catch((error) => {
+        ctx.logger('chatluna-sandbox').error('AI 测试空间关机收尾持久化失败。', error)
+      })
+      // 内存模式的空间不落盘，重启后无法恢复，它们的媒体目录在关机后纯属垃圾；
+      // 不清理会让每次插件重载都在 data/chatluna-sandbox/spaces 下堆积孤儿目录。
+      if (this.persistence) return
+      for (const space of this.spaces.values()) this.destroySpaceDirectory(space.id)
+    })
   }
 
   createSpace(input: CreateSandboxTestSpaceInput): SandboxTestSpaceSummary & { control: SandboxControlService } {
@@ -202,7 +225,11 @@ export class SandboxTestSpaceService {
     space.control.clearOneBotDebugRecords()
     space.control.clearModelRequestRecords()
     void space.control.waitForPersistence().finally(() => {
-      void space.control.dispose()
+      void space.control.dispose().finally(() => {
+        // 空间目录由本服务分配（spaces/<id>/），删除空间后必须整棵回收，
+        // 否则每个被删空间都会留下一份完整的媒体正文占用磁盘。
+        this.destroySpaceDirectory(spaceId)
+      })
     })
     const persistence = this.persistence
     if (persistence) this.queuePersistenceTask(() => persistence.delete(spaceId))
@@ -224,23 +251,48 @@ export class SandboxTestSpaceService {
       initialScene: scene,
       runtimeActive,
       runtimeBots: this.runtimeBots,
-      mediaDirectory: resolve(this.ctx.baseDir, 'data/chatluna-sandbox/spaces', id, 'media'),
+      mediaDirectory: resolve(this.spaceDirectory(id), 'media'),
       debugPersistence: this.createDebugPersistence?.(id),
       modelRequestPersistence: this.createModelRequestPersistence?.(id),
       modelRequestRecordLimit: this.modelRequestRecordLimit,
     })
   }
 
+  // 每个空间独占 data/chatluna-sandbox/spaces/<id>/ 整棵子树；回收时必须删到这一层，
+  // 只删内部的 media 会留下一串空的 <id>/ 目录持续堆积。
+  private spaceDirectory(id: string): string {
+    return resolve(this.ctx.baseDir, 'data/chatluna-sandbox/spaces', id)
+  }
+
+  private destroySpaceDirectory(id: string): void {
+    try {
+      rmSync(this.spaceDirectory(id), { recursive: true, force: true })
+    } catch (error) {
+      this.ctx.logger('chatluna-sandbox').warn(`AI 测试空间目录清理失败：${id}`, error)
+    }
+  }
+
   private restoreSpace(stored: SandboxTestSpacePersistenceRecord): void {
     if (this.spaces.has(stored.id)) return
-    const control = this.createControl(stored.id, stored.scene, stored.status === 'running' || stored.status === 'taken-over')
+    const shouldBeActive = stored.status === 'running' || stored.status === 'taken-over'
+    let control: SandboxControlService
+    try {
+      control = this.createControl(stored.id, stored.scene, shouldBeActive)
+    } catch (error) {
+      // 机器人 ID 已被其他已恢复空间占用时，仍然恢复这个空间的场景数据，只是不接管运行时。
+      // 直接丢弃会让用户的历史测试空间在重启后凭空消失，而它的场景本身完全可读。
+      if (!shouldBeActive) throw error
+      this.ctx.logger('chatluna-sandbox').warn(`AI 测试空间的机器人运行时不可用，已以停用状态恢复：${stored.id}`, error)
+      control = this.createControl(stored.id, stored.scene, false)
+    }
     const record: SandboxTestSpaceRecord = {
       id: stored.id,
       name: stored.name,
       status: stored.status,
       createdAt: stored.createdAt,
       updatedAt: stored.updatedAt,
-      completedAt: stored.completedAt,
+      // 空串是"未结束"的落盘表示（见 queuePersistence），不能当成真实时间戳恢复。
+      completedAt: stored.completedAt || undefined,
       control,
     }
     this.spaces.set(record.id, record)
@@ -272,7 +324,10 @@ export class SandboxTestSpaceService {
       status: record.status,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
-      completedAt: record.completedAt,
+      // Minato 的 Model.format() 会丢弃值为 undefined 的字段，upsert 因此不会清空
+      // 数据库里的旧 completedAt。reactivateSpace 之后必须显式写空串，否则重启恢复的
+      // running/taken-over 空间会带着上一次结束时的 completedAt。
+      completedAt: record.completedAt ?? '',
       scene: record.control.getSnapshot(),
     }
     this.queuePersistenceTask(() => persistence.save(stored))

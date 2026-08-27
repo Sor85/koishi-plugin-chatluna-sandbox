@@ -273,7 +273,11 @@ export function apply(ctx: Context, config: Config) {
       inner.on('dispose', () => {
         disposeModelRequestCollector()
         presetSnapshots.dispose()
-        void unattributedModelRequests.waitForPersistence()
+        // Koishi 的 dispose 不可等待（cordis scope.reset 不 await disposer），
+        // 这里只保证收尾写入的失败进日志，而不是被静默丢弃。
+        void unattributedModelRequests.waitForPersistence().catch((error) => {
+          inner.logger('chatluna-sandbox').error('未归属模型请求关机收尾持久化失败。', error)
+        })
         mcpServer.stop()
       })
     } catch (error) {
@@ -288,7 +292,9 @@ export function apply(ctx: Context, config: Config) {
       inner.on('dispose', () => {
         disposeModelRequestCollector()
         presetSnapshots.dispose()
-        void unattributedModelRequests.waitForPersistence()
+        void unattributedModelRequests.waitForPersistence().catch((error) => {
+          inner.logger('chatluna-sandbox').error('未归属模型请求关机收尾持久化失败。', error)
+        })
       })
     }
   })

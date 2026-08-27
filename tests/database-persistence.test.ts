@@ -45,6 +45,13 @@ async function createControl(
   options: { databaseReadyTimeoutMs?: number } = {},
 ) {
   const app = new App()
+  // 数据库模式下未显式指定 mediaDirectory 时，控制服务会落到 <baseDir>/data/chatluna-sandbox/media；
+  // 不隔离 baseDir 会把媒体写进仓库工作区。
+  if (!mediaDirectory) {
+    const baseDir = await mkdtemp(join(tmpdir(), 'chatluna-sandbox-persistence-base-'))
+    temporaryDirectories.push(baseDir)
+    app.baseDir = baseDir
+  }
   let control: SandboxControlService | undefined
   app.plugin((ctx) => {
     control = new SandboxControlService(ctx, { persistence, mediaDirectory, ...options })
@@ -109,6 +116,10 @@ describe('沙盒场景持久化', () => {
       },
     }
     const app = new App()
+    // 未指定 mediaDirectory 时媒体目录派生自 baseDir，必须隔离到临时目录。
+    const baseDir = await mkdtemp(join(tmpdir(), 'chatluna-sandbox-late-database-base-'))
+    temporaryDirectories.push(baseDir)
+    app.baseDir = baseDir
     let control: SandboxControlService | undefined
     app.plugin((ctx) => {
       control = new SandboxControlService(ctx, {

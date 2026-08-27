@@ -5,7 +5,7 @@ import { SandboxBot } from './bot'
 import { BUILTIN_AVATARS, findBuiltinAvatarByReference, getBuiltinAvatarReference, pickUnusedBuiltinAvatar } from './builtin-avatars'
 import { SandboxChatLunaStateStore, type SandboxChatLunaErrorTarget } from './chatluna-state'
 import { findLatestFailedModelRequest, readChatLunaRequestError } from './chatluna-error'
-import { SandboxMediaStorage, MAX_MEDIA_SIZE } from './media-storage'
+import { SandboxMediaStorage, MAX_MEDIA_SIZE, toMediaMetadata } from './media-storage'
 import { SandboxOneBotDebugStore, createOneBotDebugError, type AppendOneBotDebugRecordInput, type SandboxOneBotDebugPersistence } from './onebot-debug'
 import {
   SandboxModelRequestStore,
@@ -215,6 +215,8 @@ export class SandboxControlService {
   private oneBotDebug: SandboxOneBotDebugStore
   private modelRequests: SandboxModelRequestStore
   private mediaStorage: SandboxMediaStorage
+  private mediaDirectory: string
+  private ownsMediaDirectory: boolean
   private persistence?: SandboxScenePersistence
   private scenePersistenceAuthoritative = true
   private sceneReady = Promise.resolve()
@@ -251,12 +253,15 @@ export class SandboxControlService {
     })
     // 内存模式默认使用实例级媒体目录，避免并行测试/多实例共享默认目录时互相 clear 与写冲突。
     // Database 模式仍使用共享目录，以便场景引用在重启后继续命中同一媒体文件。
-    this.mediaStorage = new SandboxMediaStorage(options.mediaDirectory ?? (
+    // 只有本类自己生成的实例级目录才由本类负责删除；调用方显式传入的目录归调用方管理。
+    this.ownsMediaDirectory = !options.mediaDirectory && !this.persistence
+    this.mediaDirectory = options.mediaDirectory ?? (
       this.persistence
         ? resolve(ctx.baseDir, 'data/chatluna-sandbox/media')
         // 内存模式使用独立目录，避免与 Database 共享 media 目录互相回收。
         : resolve(ctx.baseDir, 'data/chatluna-sandbox/ephemeral-media', randomUUID().replaceAll('-', ''))
-    ))
+    )
+    this.mediaStorage = new SandboxMediaStorage(this.mediaDirectory)
     // database 服务可能晚于本插件加载，构造时的可用性不可信；数据库模式的清理决策移到 ready 读取场景之后。
     if (!this.persistence) this.mediaStorage.clear()
     this.ensureStableAvatars()
@@ -368,7 +373,11 @@ export class SandboxControlService {
   }
 
   storeMedia(input: { fileName: string; mimeType: string; dataBase64: string }): SandboxMedia {
-    return this.mediaStorage.save(input)
+    const media = this.mediaStorage.save(input)
+    // 上传与发送是两步契约（MCP upload_media → send_message）。钉住正文，
+    // 否则两步之间的任意场景变更会把尚未被引用的媒体当成孤儿回收。
+    this.mediaStorage.pin(media.id)
+    return media
   }
 
   async importAvatar(kind: 'user' | 'bot' | 'group', entityId: string, input?: string): Promise<string | undefined> {
@@ -478,7 +487,7 @@ export class SandboxControlService {
   storeMediaBatch(inputs: Array<{ fileName: string; mimeType: string; dataBase64: string }>): SandboxMedia[] {
     const media: SandboxMedia[] = []
     try {
-      for (const input of inputs) media.push(this.mediaStorage.save(input))
+      for (const input of inputs) media.push(this.storeMedia(input))
       return media
     } catch (error) {
       for (const item of media) this.mediaStorage.remove(item)
@@ -618,10 +627,20 @@ export class SandboxControlService {
       this.debugRecordListeners.clear()
       this.runtimeBotsActive = false
       const runtimeDisposal = this.disposeRuntimeBots()
-      await this.waitForPersistence()
+      try {
+        await this.waitForPersistence()
+      } finally {
+        // 实例级临时目录只属于本实例，必须在落盘收尾后同步删除；
+        // 否则每次插件重载都会在 data/chatluna-sandbox/ephemeral-media 下留一个孤儿目录。
+        if (this.ownsMediaDirectory) this.mediaStorage.destroy()
+      }
       await runtimeDisposal
     })()
     return this.disposePromise
+  }
+
+  getMediaDirectory(): string {
+    return this.mediaDirectory
   }
 
   resetScene(): void {
@@ -1589,7 +1608,7 @@ export class SandboxControlService {
       const nickname = node.nickname.trim() || userId
       if (!userId) throw new Error(`合并转发节点 #${index + 1} 缺少 user_id`)
       const content = node.content.trim()
-      const media = node.media?.length ? structuredClone(node.media) : undefined
+      const media = node.media?.length ? node.media.map(toMediaMetadata) : undefined
       if (!content && !media?.length && !node.forwardId) {
         throw new Error(`合并转发节点 #${index + 1} 不能为空`)
       }
@@ -1676,7 +1695,7 @@ export class SandboxControlService {
     const context = this.getMessageContext(input)
     const media: SandboxMedia[] = []
     try {
-      for (const file of input.media) media.push(this.mediaStorage.save(file))
+      for (const file of input.media) media.push(this.storeMedia(file))
     } catch (error) {
       for (const saved of media) this.mediaStorage.remove(saved)
       throw error
@@ -2037,7 +2056,9 @@ export class SandboxControlService {
       createdAt: new Date().toISOString(),
       replyToMessageId,
       broadcastId,
-      media,
+      // 只保留媒体元数据：上游（MCP 上传缓存）会把 dataBase64 挂在同一个对象上，
+      // 直接存进场景会让正文 base64 随每次整场景落盘写进数据库。
+      media: media?.map(toMediaMetadata),
       event,
       ...(forwardId ? { forwardId } : {}),
     }

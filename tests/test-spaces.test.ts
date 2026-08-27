@@ -1,17 +1,31 @@
 import { App } from 'koishi'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createEmptyScene, SandboxControlService, SandboxRuntimeBotRegistry } from '../src/control-service'
 import { SandboxTestSpaceService, trimSnapshotMessages } from '../src/test-spaces'
 import type { SandboxTestSpacePersistence, SandboxTestSpacePersistenceRecord } from '../src/persistence'
 
 const apps: App[] = []
+const temporaryDirectories: string[] = []
 afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.stop()))
+  for (const directory of temporaryDirectories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
 
-function createServices() {
+/** 空间媒体目录派生自 ctx.baseDir；不隔离会把媒体写进仓库工作区。 */
+function isolatedApp(): App {
   const app = new App()
+  const baseDir = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-spaces-base-'))
+  temporaryDirectories.push(baseDir)
+  app.baseDir = baseDir
   apps.push(app)
+  return app
+}
+
+function createServices() {
+  const app = isolatedApp()
   const runtimeBots = new SandboxRuntimeBotRegistry()
   const main = new SandboxControlService(app, { runtimeBots })
   const spaces = new SandboxTestSpaceService(app, runtimeBots)
@@ -115,16 +129,14 @@ describe('AI 测试空间', () => {
       save: async (record) => { records.set(record.id, structuredClone(record)) },
       delete: async (id) => { records.delete(id) },
     }
-    const firstApp = new App()
-    apps.push(firstApp)
+    const firstApp = isolatedApp()
     const firstSpaces = new SandboxTestSpaceService(firstApp, new SandboxRuntimeBotRegistry(), persistence)
     const created = firstSpaces.createSpace({ name: '持久化测试' })
     created.control.createUser({ id: '11001', name: '测试成员' })
     firstSpaces.completeSpace(created.id)
     await firstSpaces.waitForPersistence()
 
-    const secondApp = new App()
-    apps.push(secondApp)
+    const secondApp = isolatedApp()
     const restoredSpaces = new SandboxTestSpaceService(secondApp, new SandboxRuntimeBotRegistry(), persistence)
     await secondApp.start()
 
