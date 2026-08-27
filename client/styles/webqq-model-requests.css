@@ -901,7 +901,28 @@
   border: 1px solid color-mix(in srgb, var(--webqq-border) 78%, transparent);
   border-radius: 5px;
   background: color-mix(in srgb, var(--webqq-surface) 92%, transparent);
-  box-shadow: 0 1px 3px rgb(15 23 42 / 8%);
+  isolation: isolate;
+}
+
+.webqq-workspace.is-frosted .webqq-model-trajectory-composition-zoom {
+  background: transparent;
+}
+
+.webqq-workspace.is-frosted .webqq-model-trajectory-composition-zoom::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--webqq-surface) 62%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  backdrop-filter: saturate(180%) blur(14px);
+  content: "";
+  pointer-events: none;
+}
+
+.webqq-workspace.is-frosted .webqq-model-trajectory-composition-zoom > * {
+  position: relative;
+  z-index: 1;
 }
 
 .webqq-model-trajectory-composition-zoom [data-slot="button"] {

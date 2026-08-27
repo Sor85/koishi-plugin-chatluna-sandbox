@@ -128,25 +128,25 @@
       <TooltipProvider :delay-duration="500">
         <div v-if="compositionTracks.length" class="webqq-model-trajectory-composition-shell">
           <div class="webqq-model-trajectory-composition-zoom" role="group" aria-label="轨道缩放">
-            <Button
-              class="webqq-model-trajectory-composition-zoom-value"
-              size="sm"
-              variant="ghost"
-              :disabled="compositionZoom === COMPOSITION_ZOOM_MIN"
-              aria-label="重置轨道缩放"
-              @click="setCompositionZoom(COMPOSITION_ZOOM_MIN)"
-            >
-              {{ Math.round(compositionZoom * 100) }}%
-            </Button>
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              :disabled="compositionZoom <= COMPOSITION_ZOOM_MIN"
-              aria-label="缩小轨道"
-              @click="setCompositionZoom(compositionZoom - COMPOSITION_ZOOM_STEP)"
-            >
-              <IconZoomOut aria-hidden="true" />
-            </Button>
+            <template v-if="compositionZoom > COMPOSITION_ZOOM_MIN">
+              <Button
+                class="webqq-model-trajectory-composition-zoom-value"
+                size="sm"
+                variant="ghost"
+                aria-label="重置轨道缩放"
+                @click="setCompositionZoom(COMPOSITION_ZOOM_MIN)"
+              >
+                {{ Math.round(compositionZoom * 100) }}%
+              </Button>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                aria-label="缩小轨道"
+                @click="setCompositionZoom(compositionZoom - COMPOSITION_ZOOM_STEP)"
+              >
+                <IconZoomOut aria-hidden="true" />
+              </Button>
+            </template>
             <Button
               size="icon-sm"
               variant="ghost"
