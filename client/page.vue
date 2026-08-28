@@ -37,7 +37,7 @@
         <AiTestSpaceOverview
           v-if="currentView === 'spaces'"
           :spaces="testSpaces"
-          :main-snapshot="mainSnapshot"
+          :thumbnail-models="thumbnailModels"
           :thumbnail-captures="thumbnailCaptures"
           :appearance="appearance"
           :color-mode="resolvedColorMode"
@@ -46,7 +46,7 @@
           @action="handleTestSpaceAction"
         />
         <main v-else-if="currentView === 'profile'" class="chatluna-sandbox-chat is-environment">
-          <EnvironmentManager :snapshot="environmentModel" :test-spaces="testSpaces" />
+          <EnvironmentManager :directory="environmentDirectory" :port="mcpAdminPort" />
         </main>
         <OneBotDebugWorkspace
           v-else-if="currentView === 'debug'"
@@ -207,6 +207,8 @@ import WebqqSidebar from './webqq-sidebar.vue'
 import WorkspaceOverlayHost from './workspace-overlay-host.vue'
 import { useResolvedColorMode, useFrostedSurfaceFlag } from './webqq/color-scheme'
 import { rememberFloatingPanelAnchor } from './webqq/floating-panel'
+import { createKoishiMcpAdminPort } from './webqq/koishi-mcp-admin-port'
+import { createKoishiTestSpacePort } from './webqq/koishi-test-space-port'
 import { createKoishiWorkspacePort } from './webqq/koishi-workspace-port'
 import { createMcpActivitySync } from './webqq/mcp-activity-sync'
 import { createSceneMutationSync } from './webqq/scene-sync'
@@ -214,10 +216,13 @@ import { createWorkspaceController } from './webqq/workspace-controller'
 import { createWorkspaceLayout } from './webqq/workspace-layout'
 import { createWebqqWorkspaceShell } from './webqq/workspace-shell'
 import { createAiTestSpaceShell } from './webqq/test-space-shell'
-import { getSandboxBots, type SandboxDirectoryBot } from '../src/types'
 
 const activeSpaceId = ref<string>()
 const workspaceController = createWorkspaceController(createKoishiWorkspacePort(() => activeSpaceId.value), window.localStorage)
+// 总览要读主场景与任意测试空间的头像媒体，因此另配一个不跟随当前活动空间的工作区端口。
+const mainWorkspacePort = createKoishiWorkspacePort()
+const testSpacePort = createKoishiTestSpacePort()
+const mcpAdminPort = createKoishiMcpAdminPort()
 const workspaceLayout = createWorkspaceLayout()
 const overlayHostRef = ref<InstanceType<typeof WorkspaceOverlayHost>>()
 const {
@@ -241,7 +246,6 @@ const {
   evidenceNavigation,
   presetDiscardGuard,
   presetWorkspaceModel,
-  environmentModel,
   handleSidebarNotification,
   kickGroupMember,
   loadEarlierMessages,
@@ -355,35 +359,37 @@ function mentionGroupMember(targetId: string) {
   }
 }
 
-const { createTestSpace, enterTestSpace, handleTestSpaceAction, mainSnapshot, selectNavigation, testSpaces, thumbnailCaptures } = createAiTestSpaceShell(
-  workspaceController,
+const resolvedColorMode = useResolvedColorMode(appearance)
+const {
+  botDirectory,
+  createTestSpace,
+  enterTestSpace,
+  environmentDirectory,
+  handleTestSpaceAction,
+  selectNavigation,
+  spaceOptions,
+  testSpaces,
+  thumbnailCaptures,
+  thumbnailModels,
+} = createAiTestSpaceShell({
+  controller: workspaceController,
+  testSpacePort,
+  mainWorkspacePort,
   activeSpaceId,
   currentView,
   selectWorkspaceNavigation,
-)
+  appearance,
+  colorMode: resolvedColorMode,
+  resolveAvatar,
+})
 
 const isWebqqView = computed(() => currentView.value === 'messages' || currentView.value === 'contacts')
-const modelRequestSpaces = computed(() => [
-  { id: 'main', name: '主环境' },
-  ...testSpaces.value.map((space) => ({ id: space.id, name: space.name })),
-])
-const modelRequestBots = computed<SandboxDirectoryBot[]>(() => [
-  ...getSandboxBots(mainSnapshot.value).map((bot) => ({
-    ...bot,
-    avatar: resolveAvatar(bot.avatar),
-    source: { type: 'main' as const, name: '主环境' },
-  })),
-  ...testSpaces.value.flatMap((space) => getSandboxBots(space.snapshot).map((bot) => ({
-    ...bot,
-    avatar: resolveAvatar(bot.avatar),
-    source: { type: 'test-space' as const, spaceId: space.id, name: space.name },
-  }))),
-])
-const debugBots = modelRequestBots
-const resolvedColorMode = useResolvedColorMode(appearance)
+const modelRequestSpaces = spaceOptions
+const modelRequestBots = botDirectory
+const debugBots = botDirectory
 useFrostedSurfaceFlag(appearance)
 const disposeSceneMutationSync = createSceneMutationSync(workspaceController, () => activeSpaceId.value)
-const { running: mcpRunning, dispose: disposeMcpActivitySync } = createMcpActivitySync()
+const { running: mcpRunning, dispose: disposeMcpActivitySync } = createMcpActivitySync(mcpAdminPort)
 onBeforeUnmount(() => {
   disposeSceneMutationSync()
   disposeMcpActivitySync()

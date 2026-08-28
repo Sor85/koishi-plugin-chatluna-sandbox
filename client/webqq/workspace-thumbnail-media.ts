@@ -13,26 +13,23 @@ export function collectAvatarMediaIds(snapshot: Pick<SandboxSnapshot, 'participa
   )]
 }
 
-export function resolveThumbnailAvatar(
-  reference: string | undefined,
-  mediaSources: Record<string, string>,
-  previous?: string,
-) {
+/**
+ * 未命中媒体时交出空串而不是原引用：`sandbox-media://` 不是浏览器能取的 URL，
+ * 交给 `<img>` 只会得到一个碎图，交出空串才会退回字母头像。
+ */
+export function resolveThumbnailAvatar(reference: string | undefined, mediaSources: Record<string, string>) {
   const id = reference?.match(MEDIA_REF)?.[1]
   if (!id) return reference ?? ''
-  if (mediaSources[id]) return mediaSources[id]
-  // 轮询会带回 sandbox-media 引用；已成功的 data URL 必须保留，否则缩略图会闪回字母头像。
-  if (previous?.startsWith('data:')) return previous
-  return ''
+  return mediaSources[id] ?? ''
 }
 
 export function mediaSourcesFromCache(
   mediaIds: readonly string[],
-  cache: Map<string, string>,
+  cache: Readonly<Record<string, string>>,
   spaceId?: string,
 ) {
   return Object.fromEntries(mediaIds.flatMap((id) => {
-    const cached = cache.get(thumbnailMediaCacheKey(spaceId, id))
+    const cached = cache[thumbnailMediaCacheKey(spaceId, id)]
     return cached ? [[id, cached]] : []
   }))
 }
@@ -40,19 +37,16 @@ export function mediaSourcesFromCache(
 export function applyThumbnailAvatars(
   snapshot: SandboxSnapshot,
   mediaSources: Record<string, string>,
-  previous?: Pick<SandboxSnapshot, 'participants' | 'groups'>,
 ): SandboxSnapshot {
-  const previousParticipants = Object.fromEntries(previous?.participants.map(({ id, avatar }) => [id, avatar]) ?? [])
-  const previousGroups = Object.fromEntries(previous?.groups.map(({ id, avatar }) => [id, avatar]) ?? [])
   return {
     ...snapshot,
     participants: snapshot.participants.map((participant) => ({
       ...participant,
-      avatar: resolveThumbnailAvatar(participant.avatar, mediaSources, previousParticipants[participant.id]),
+      avatar: resolveThumbnailAvatar(participant.avatar, mediaSources),
     })),
     groups: snapshot.groups.map((group) => ({
       ...group,
-      avatar: resolveThumbnailAvatar(group.avatar, mediaSources, previousGroups[group.id]),
+      avatar: resolveThumbnailAvatar(group.avatar, mediaSources),
     })),
   }
 }

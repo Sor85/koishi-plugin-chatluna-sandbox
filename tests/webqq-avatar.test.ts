@@ -59,7 +59,6 @@ describe('WebQQ 共享头像', () => {
     expect(shellSource).toContain('data:${content.mimeType};base64,${content.dataBase64}')
     expect(shellSource).toContain('avatar: resolveAvatar(entry.avatar)')
     expect(shellSource).toContain('avatar: resolveAvatar(group.avatar)')
-    expect(shellSource).toContain('const environmentModel = computed(() => ({')
     expect(sidebarSource).toContain(':avatar="group.avatar"')
   })
 })

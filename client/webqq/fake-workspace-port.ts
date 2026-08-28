@@ -30,6 +30,7 @@ import type {
   SendMessageInput,
   SetGroupAnnouncementInput,
 } from '../../src/types'
+import { FakePortRecorder } from './fake-port-recorder'
 import type { WorkspacePort } from './workspace-port'
 import type {
   ClearModelRequestRecordsQuery,
@@ -56,13 +57,7 @@ import type {
 
 export type WorkspacePortOperation = keyof WorkspacePort
 
-export interface WorkspacePortCall {
-  operation: WorkspacePortOperation
-  input: unknown
-}
-
 export class FakeWorkspacePort implements WorkspacePort {
-  readonly calls: WorkspacePortCall[] = []
   workspaceResult: SandboxWorkspaceState
   historyResult: SandboxMessageHistory = { messages: [], forwards: [] }
   searchResult: SandboxMessageSearchResult = { hits: [] }
@@ -108,22 +103,22 @@ export class FakeWorkspacePort implements WorkspacePort {
   mcpCallRecordsResult: SandboxMcpCallRecordsPage = { records: [] }
   mcpCallRecordResult?: SandboxMcpCallRecord
   clearMcpCallRecordsResult = { cleared: 0 }
-  private readonly failures = new Map<WorkspacePortOperation, unknown[]>()
+  private readonly recorder = new FakePortRecorder<WorkspacePortOperation>()
 
   constructor(workspace: SandboxWorkspaceState) {
     this.workspaceResult = workspace
   }
 
+  get calls() {
+    return this.recorder.calls
+  }
+
   rejectNext(operation: WorkspacePortOperation, error: unknown) {
-    this.failures.set(operation, [...this.failures.get(operation) ?? [], error])
+    this.recorder.rejectNext(operation, error)
   }
 
   private invoke<T>(operation: WorkspacePortOperation, input: unknown, result: T): Promise<T> {
-    this.calls.push({ operation, input })
-    const [failure, ...remaining] = this.failures.get(operation) ?? []
-    if (remaining.length) this.failures.set(operation, remaining)
-    else this.failures.delete(operation)
-    return failure ? Promise.reject(failure) : Promise.resolve(result)
+    return this.recorder.invoke(operation, input, result)
   }
 
   getWorkspace(input?: GetSandboxWorkspaceInput) {
@@ -166,7 +161,7 @@ export class FakeWorkspacePort implements WorkspacePort {
     return this.invoke('setMessageReaction', input, this.workspaceResult)
   }
 
-  getMediaContent(input: GetMediaContentInput) {
+  getMediaContent(input: GetMediaContentInput & { spaceId?: string }) {
     return this.invoke('getMediaContent', input, this.mediaContentResult)
   }
 

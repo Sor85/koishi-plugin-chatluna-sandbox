@@ -1,7 +1,7 @@
 import { Context, icons } from '@koishijs/client'
 import Page from './page.vue'
 import SandboxActivityIcon from './sandbox-activity-icon.vue'
-import { installContextMcpActivityReceiver } from './webqq/mcp-activity-sync'
+import { installContextMcpActivityReceiver } from './webqq/koishi-mcp-admin-port'
 import { installContextMutationReceiver } from './webqq/scene-sync'
 import './style.css'
 

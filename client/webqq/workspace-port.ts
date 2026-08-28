@@ -63,7 +63,11 @@ export interface WorkspacePort {
   recallMessage(input: RecallMessageInput): Promise<SandboxWorkspaceState>
   clearConversationMessages(input: ClearConversationMessagesInput): Promise<SandboxWorkspaceState>
   setMessageReaction(input: SetMessageReactionInput): Promise<SandboxWorkspaceState>
-  getMediaContent(input: GetMediaContentInput): Promise<SandboxMediaContent>
+  /**
+   * 显式给出 spaceId 时读该空间的媒体，省略时读端口当前定域的工作区。
+   * 空间缩略图要绘制任意测试空间，因此必须能越过隐式定域。
+   */
+  getMediaContent(input: GetMediaContentInput & { spaceId?: string }): Promise<SandboxMediaContent>
   setGroupAnnouncement(input: SetGroupAnnouncementInput): Promise<SandboxWorkspaceState>
   deleteGroupAnnouncement(input: DeleteGroupAnnouncementInput): Promise<SandboxWorkspaceState>
   manageEnvironment(input: ManageSandboxEnvironmentInput): Promise<SandboxWorkspaceState>

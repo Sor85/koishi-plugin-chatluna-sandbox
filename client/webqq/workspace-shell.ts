@@ -325,17 +325,6 @@ export function createWebqqWorkspaceShell(
     groups: snapshot.value.groups.map((group) => ({ ...group, avatar: resolveAvatar(group.avatar) })),
     accentColor: appearance.value.sandboxAccentColor,
   }))
-  const environmentModel = computed(() => ({
-    ...snapshot.value,
-    participants: snapshot.value.participants.map((participant) => ({
-      ...participant,
-      avatar: resolveAvatar(participant.avatar),
-    })),
-    groups: snapshot.value.groups.map((group) => ({
-      ...group,
-      avatar: resolveAvatar(group.avatar),
-    })),
-  }))
   const debugWorkspaceModel = computed(() => ({
     records: workspaceController.oneBotDebugRecords.value,
     detail: workspaceController.oneBotDebugRecord.value,
@@ -1000,7 +989,6 @@ export function createWebqqWorkspaceShell(
     debugWorkspaceModel,
     mcpCallVisitKey,
     mcpCallWorkspaceModel,
-    environmentModel,
     modelRequestVisitKey,
     modelRequestWorkspaceModel,
     evidenceNavigation,

@@ -3,6 +3,9 @@ import type { WorkspacePort } from './workspace-port'
 
 export function createKoishiWorkspacePort(resolveSpaceId: () => string | undefined = () => undefined): WorkspacePort {
   const scoped = <Input extends object>(input: Input): Input & { spaceId?: string } => {
+    const explicit = (input as { spaceId?: string }).spaceId
+    // 显式定域优先：调用方已经指名 spaceId 时不得被当前活动空间覆盖。
+    if (explicit !== undefined) return input as Input & { spaceId?: string }
     const spaceId = resolveSpaceId()
     return spaceId ? { ...input, spaceId } : input
   }

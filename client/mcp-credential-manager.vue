@@ -57,106 +57,43 @@
 </template>
 
 <script setup lang="ts">
-import { send } from '@koishijs/client'
 import { IconPlus } from '@tabler/icons-vue'
-import { onMounted, ref } from 'vue'
+import { onMounted } from 'vue'
 import { Button } from './components/ui/button'
 import { Checkbox } from './components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './components/ui/dialog'
 import { Input } from './components/ui/input'
 import { Label } from './components/ui/label'
+import { createMcpCredentialAdmin, formatMcpScopes, MCP_SCOPE_OPTIONS } from './webqq/mcp-admin-shell'
+import type { McpAdminPort } from './webqq/mcp-admin-port'
 import { vWebqqScrollbar } from './webqq-scrollbar'
-import type { SandboxMcpScope } from '../src/mcp/types'
 
-type Credential = { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }
-const credentials = ref<Credential[]>([])
-const formOpen = ref(false)
-const tokenOpen = ref(false)
-const saving = ref(false)
-const editing = ref<Credential | null>(null)
-const name = ref('')
-const scopes = ref<SandboxMcpScope[]>(['read'])
-const createdToken = ref('')
-const error = ref('')
-const allScopes = [
-  { value: 'read' as const, label: '读取' },
-  { value: 'interact' as const, label: '交互' },
-  { value: 'manage' as const, label: '环境管理' },
-  { value: 'debug' as const, label: '调试' },
-]
+const props = defineProps<{ port: McpAdminPort }>()
+const allScopes = MCP_SCOPE_OPTIONS
+const formatScopes = formatMcpScopes
+const {
+  createdToken,
+  credentials,
+  editing,
+  error,
+  formOpen,
+  name,
+  openCreate,
+  openEdit,
+  refresh,
+  revokeCredential,
+  rotateToken,
+  saving,
+  scopes,
+  submitForm,
+  toggleCredential,
+  toggleScope,
+  tokenOpen,
+} = createMcpCredentialAdmin(props.port)
 
-async function refresh() { credentials.value = await send('chatluna-sandbox/mcp-credentials') }
-function formatScopes(values: SandboxMcpScope[]) {
-  return values.map((scope) => allScopes.find((item) => item.value === scope)?.label ?? scope).join(' · ')
-}
 function formatTime(value: string) {
   return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
 }
-function resetForm() {
-  name.value = ''
-  scopes.value = ['read']
-  error.value = ''
-}
-function openCreate() {
-  editing.value = null
-  resetForm()
-  formOpen.value = true
-}
-function openEdit(credential: Credential) {
-  editing.value = credential
-  name.value = credential.name
-  scopes.value = [...credential.scopes]
-  error.value = ''
-  formOpen.value = true
-}
-function toggleScope(scope: SandboxMcpScope, enabled: boolean) { scopes.value = enabled ? [...new Set([...scopes.value, scope])] : scopes.value.filter((item) => item !== scope) }
-function validateForm() {
-  error.value = ''
-  if (!name.value.trim() || !scopes.value.length) {
-    error.value = '请填写名称并至少选择一项权限。'
-    return false
-  }
-  return true
-}
-async function submitForm() {
-  if (editing.value) await saveCredential()
-  else await createCredential()
-}
-async function createCredential() {
-  if (!validateForm()) return
-  saving.value = true
-  try {
-    const result = await send('chatluna-sandbox/create-mcp-credential', { name: name.value, scopes: scopes.value })
-    createdToken.value = result.token
-    resetForm()
-    formOpen.value = false
-    tokenOpen.value = true
-    await refresh()
-  } catch (cause) { error.value = cause instanceof Error ? cause.message : '创建凭证失败' } finally { saving.value = false }
-}
-async function saveCredential() {
-  if (!editing.value || !validateForm()) return
-  saving.value = true
-  try {
-    await send('chatluna-sandbox/update-mcp-credential', { id: editing.value.id, name: name.value, scopes: scopes.value })
-    formOpen.value = false
-    editing.value = null
-    await refresh()
-  } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存凭证失败' } finally { saving.value = false }
-}
-async function rotateToken() {
-  if (!editing.value) return
-  saving.value = true
-  error.value = ''
-  try {
-    const updated = await send('chatluna-sandbox/rotate-mcp-credential-token', { id: editing.value.id })
-    editing.value = updated
-    createdToken.value = updated.token
-    await refresh()
-  } catch (cause) { error.value = cause instanceof Error ? cause.message : '重新生成 Token 失败' } finally { saving.value = false }
-}
-async function toggleCredential(credential: Credential) { await send('chatluna-sandbox/set-mcp-credential-enabled', { id: credential.id, enabled: !credential.enabled }); await refresh() }
-async function revokeCredential(id: string) { await send('chatluna-sandbox/revoke-mcp-credential', { id }); await refresh() }
 onMounted(() => void refresh())
 </script>
 

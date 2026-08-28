@@ -24,87 +24,39 @@
 </template>
 
 <script setup lang="ts">
-import { send } from '@koishijs/client'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AgentCursor from './agent-cursor.vue'
 import WebqqChatPane from './webqq-chat-pane.vue'
 import WebqqDetailsPanel from './webqq-details-panel.vue'
 import WebqqSidebar from './webqq-sidebar.vue'
-import { buildWorkspaceThumbnailModels } from './webqq/workspace-thumbnail-model'
 import {
   instantiateWorkspaceThumbnail,
   isWorkspaceThumbnailView,
   restoreWorkspaceThumbnailScroll,
   type WorkspaceThumbnailCapture,
 } from './webqq/workspace-thumbnail-capture'
+import type { WorkspaceThumbnailModels } from './webqq/workspace-thumbnail-model'
 import { calculateContainedWorkspaceThumbnailTransform } from './webqq/workspace-thumbnail-scale'
-import {
-  applyThumbnailAvatars,
-  collectAvatarMediaIds,
-  mediaSourcesFromCache,
-  thumbnailMediaCacheKey,
-} from './webqq/workspace-thumbnail-media'
-import type { SandboxAppearance, SandboxSnapshot } from '../src/types'
+import type { SandboxAppearance } from '../src/types'
 
 const THUMBNAIL_CANVAS_WIDTH = 1440
 const THUMBNAIL_CANVAS_HEIGHT = 760
-const thumbnailMediaCache = new Map<string, string>()
 
 const props = defineProps<{
-  snapshot: SandboxSnapshot
+  models: WorkspaceThumbnailModels
   capture?: WorkspaceThumbnailCapture
-  spaceId?: string
   appearance: SandboxAppearance
   colorMode: 'light' | 'dark'
   running?: boolean
 }>()
 const thumbnailRef = ref<HTMLElement>()
 const liveHostRef = ref<HTMLElement>()
-const resolvedSnapshot = ref(props.snapshot)
-const models = computed(() => buildWorkspaceThumbnailModels(resolvedSnapshot.value, props.appearance, props.colorMode))
 const liveCapture = computed(() => {
   const capture = props.capture
   if (!capture) return
   return isWorkspaceThumbnailView(capture.element.getAttribute('data-mobile-view')) ? capture : undefined
 })
 let resizeObserver: ResizeObserver | undefined
-let mediaLoadGeneration = 0
-
-function applyCachedAvatars(snapshot: SandboxSnapshot) {
-  const mediaIds = collectAvatarMediaIds(snapshot)
-  return applyThumbnailAvatars(
-    snapshot,
-    mediaSourcesFromCache(mediaIds, thumbnailMediaCache, props.spaceId),
-    resolvedSnapshot.value,
-  )
-}
-
-resolvedSnapshot.value = applyCachedAvatars(props.snapshot)
-
-async function resolveSnapshotMedia() {
-  if (liveCapture.value) return
-  const generation = ++mediaLoadGeneration
-  const snapshot = props.snapshot
-  resolvedSnapshot.value = applyCachedAvatars(snapshot)
-  const missingIds = collectAvatarMediaIds(snapshot).filter((id) => !thumbnailMediaCache.has(thumbnailMediaCacheKey(props.spaceId, id)))
-  if (!missingIds.length) return
-  const operatorId = previewOperatorId()
-  if (!operatorId) return
-  await Promise.all(missingIds.map(async (mediaId) => {
-    try {
-      const content = await send('chatluna-sandbox/media-content', { spaceId: props.spaceId, operatorId, mediaId })
-      thumbnailMediaCache.set(thumbnailMediaCacheKey(props.spaceId, mediaId), `data:${content.mimeType};base64,${content.dataBase64}`)
-    } catch {}
-  }))
-  if (generation !== mediaLoadGeneration) return
-  resolvedSnapshot.value = applyCachedAvatars(props.snapshot)
-}
-
-function previewOperatorId() {
-  return props.snapshot.participants.find(({ kind }) => kind === 'user')?.id
-    ?? props.snapshot.participants[0]?.id
-    ?? ''
-}
 
 function renderCapture() {
   const host = liveHostRef.value
@@ -152,15 +104,10 @@ function scaleThumbnail() {
 watch(liveCapture, () => {
   renderCapture()
   void nextTick(scaleThumbnail)
-  void resolveSnapshotMedia()
-})
-watch(() => props.snapshot, () => {
-  void resolveSnapshotMedia()
 })
 onMounted(() => {
   renderCapture()
   void nextTick(scaleThumbnail)
-  void resolveSnapshotMedia()
   resizeObserver = new ResizeObserver(scaleThumbnail)
   if (thumbnailRef.value) resizeObserver.observe(thumbnailRef.value)
 })

@@ -71,7 +71,7 @@ describe('WebQQ 顶部导航与会话栏', () => {
     expect(pageSource).toContain(':mcp-running="mcpRunning"')
     expect(pageSource).toContain('createMcpActivitySync')
     expect(readFileSync(resolve('client/index.ts'), 'utf8')).toContain('installContextMcpActivityReceiver')
-    expect(readFileSync(resolve('client/webqq/mcp-activity-sync.ts'), 'utf8')).toContain("receive<McpActivityPayload>('chatluna-sandbox/mcp-activity'")
+    expect(readFileSync(resolve('client/webqq/koishi-mcp-admin-port.ts'), 'utf8')).toContain("receive<McpActivityPayload>('chatluna-sandbox/mcp-activity'")
     expect(sidebarStyles).toMatch(/\.webqq-rail-button\.is-rail-pin-end\s*\{[^}]*margin-left:\s*auto/s)
     expect(sidebarStyles).toContain('.webqq-rail-button.is-mcp-running')
     expect(sidebarStyles).not.toContain('@keyframes webqq-rail-mcp-glow')

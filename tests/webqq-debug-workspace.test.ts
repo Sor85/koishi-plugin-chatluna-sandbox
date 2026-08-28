@@ -14,7 +14,7 @@ describe('WebQQ OneBot 调试工作台', () => {
     expect(sidebarSource).toContain('IconBug')
     expect(pageSource).toContain("currentView === 'debug'")
     expect(pageSource).toContain('<OneBotDebugWorkspace')
-    expect(pageSource).toContain('avatar: resolveAvatar(bot.avatar)')
+    expect(pageSource).toContain('const debugBots = botDirectory')
     expect(pageSource).toContain('@query="loadOneBotDebugRecords"')
     expect(pageSource).toContain('@open="loadOneBotDebugRecord"')
     expect(pageSource).toContain('@clear="clearOneBotDebugRecords"')

@@ -23,15 +23,15 @@ function snapshot(avatar: string): SandboxSnapshot {
 }
 
 describe('空间缩略图头像解析', () => {
-  it('未命中缓存时不把 sandbox-media 引用交给 <img>，并保留已成功的 data URL', () => {
+  it('未命中缓存时不把 sandbox-media 引用交给 <img>，命中时换成 data URL', () => {
     expect(resolveThumbnailAvatar(`sandbox-media://${mediaId}`, {})).toBe('')
-    expect(resolveThumbnailAvatar(`sandbox-media://${mediaId}`, {}, 'data:image/png;base64,abc')).toBe('data:image/png;base64,abc')
-    expect(resolveThumbnailAvatar(`sandbox-media://${mediaId}`, { [mediaId]: 'data:image/png;base64,new' }, 'data:image/png;base64,abc')).toBe('data:image/png;base64,new')
+    expect(resolveThumbnailAvatar(`sandbox-media://${mediaId}`, { [mediaId]: 'data:image/png;base64,new' })).toBe('data:image/png;base64,new')
     expect(resolveThumbnailAvatar('https://example.com/a.png', {})).toBe('https://example.com/a.png')
+    expect(resolveThumbnailAvatar(undefined, {})).toBe('')
   })
 
   it('快照轮询时用缓存同步替换引用，避免先闪回字母头像', () => {
-    const cache = new Map([[thumbnailMediaCacheKey(undefined, mediaId), 'data:image/png;base64,cached']])
+    const cache = { [thumbnailMediaCacheKey(undefined, mediaId)]: 'data:image/png;base64,cached' }
     const ids = collectAvatarMediaIds(snapshot(`sandbox-media://${mediaId}`))
     expect(ids).toEqual([mediaId])
     const resolved = applyThumbnailAvatars(

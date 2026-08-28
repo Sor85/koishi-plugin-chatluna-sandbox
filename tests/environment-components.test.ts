@@ -20,7 +20,7 @@ describe('环境管理组件传输边界', () => {
     const source = readFileSync(resolve('client/environment-manager.vue'), 'utf8')
     const page = readFileSync(resolve('client/page.vue'), 'utf8')
 
-    expect(page).toContain('<EnvironmentManager :snapshot="environmentModel" :test-spaces="testSpaces" />')
+    expect(page).toContain('<EnvironmentManager :directory="environmentDirectory" :port="mcpAdminPort" />')
     expect(source).toContain('<h1>环境管理</h1>')
     expect(source).toContain('<p>查看模拟 QQ 环境中的普通用户、机器人、群组、MCP 凭证和能力</p>')
     expect(source).toContain('class="environment-split"')
@@ -35,12 +35,11 @@ describe('环境管理组件传输边界', () => {
     expect(source).not.toContain('<small>环境管理</small>')
     expect(source).toMatch(/\.environment-header h1\s*\{[^}]*font-size:\s*var\(--webqq-font-3xl\)[^}]*font-weight:\s*700/s)
     expect(source).toContain('SandboxDirectoryBot')
-    expect(source).toContain("source: { type: 'main' as const, name: '主环境' }")
-    expect(source).toContain("source: { type: 'test-space' as const, spaceId: space.id, name: space.name }")
-    expect(source).toContain('getSandboxBots(space.snapshot)')
     expect(source).toContain('{{ bot.source.name }}')
-    expect(source).toContain('getSandboxUsers(props.snapshot)')
-    expect(source).toContain('props.snapshot.groups')
+    // 三份目录由环境目录区域模型交出（行为见 environment-directory-model 测试），
+    // 组件不再自己从完整工作区快照派生。
+    expect(source).toContain('directory: EnvironmentDirectoryModel')
+    expect(source).not.toContain('SandboxSnapshot')
   })
 
   it('跨区域 Dialog 由窄输入 OverlayHost 统一渲染', () => {
@@ -229,7 +228,7 @@ describe('环境管理组件传输边界', () => {
     const shim = readFileSync(resolve('client/koishi-client-shim.d.ts'), 'utf8')
 
     expect(manager).toContain("'mcp-capabilities'")
-    expect(manager).toContain("send('chatluna-sandbox/mcp-capabilities')")
+    expect(manager).toContain('createMcpCapabilityCatalogLoader(props.port)')
     expect(manager).toContain('label: \'MCP 能力\'')
     expect(manager).toContain('<McpCapabilityCatalog')
     expect(catalog).not.toContain("from '@koishijs/client'")
@@ -256,8 +255,7 @@ describe('环境管理组件传输边界', () => {
     expect(source).toContain('可查看 Token，并修改名称和权限范围。')
     expect(source).toContain('class="credential-token"')
     expect(source).toContain('editing.token')
-    expect(source).toContain("send('chatluna-sandbox/rotate-mcp-credential-token'")
-    expect(source).toContain("send('chatluna-sandbox/update-mcp-credential'")
+    expect(source).toContain('createMcpCredentialAdmin(props.port)')
     expect(source).toContain('{{ editing ? \'保存\' : \'创建\' }}')
     expect(source).not.toContain('createOpen')
     expect(source).not.toContain('明文 Token 无法再次查看')

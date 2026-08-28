@@ -2,14 +2,11 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-/** 客户端唯一允许发送 Koishi RPC 的文件。 */
-const WORKSPACE_PORT_ADAPTER = 'client/webqq/koishi-workspace-port.ts'
-
-/** 区域投影下沉：把完整工作区快照换成区域视图模型。 */
-const OWNER_REGION_PROJECTION = '后续工作：区域投影下沉'
-
-/** 扩展工作区端口：把端口覆盖不到的能力补进端口接口。 */
-const OWNER_EXTEND_PORT = '后续工作：扩展工作区端口'
+/**
+ * 客户端端口适配器的命名约定。规则按这个形状判定而不是列举文件名：新增适配器只要叫
+ * `koishi-<能力>-port.ts` 就自动被认作合法持有者，其余任何文件默认受约束。
+ */
+const PORT_ADAPTER_PATTERN = /(?:^|\/)koishi-[a-z0-9-]+-port\.ts$/
 
 interface ArchitecturePredicate {
   readonly evidence: string
@@ -47,12 +44,12 @@ const rules: readonly ArchitectureRule[] = [
       .map(({ evidence }) => evidence),
   },
   {
-    name: '发送 Koishi RPC 的函数只允许出现在客户端工作区端口适配器里',
+    name: '收发 Koishi RPC 的函数只允许出现在客户端端口适配器里',
     extensions: ['.ts', '.vue'],
     findViolations: (file, source) => {
-      if (file === WORKSPACE_PORT_ADAPTER) return []
-      const calls = [...source.matchAll(/\bsend\s*\(/g)]
-      return calls.length ? [`${calls.length} 处 send() 调用绕过工作区端口`] : []
+      if (PORT_ADAPTER_PATTERN.test(file)) return []
+      const calls = [...source.matchAll(/\b(send|receive)\s*\(/g)].map((match) => match[1]!)
+      return calls.length ? [`${calls.length} 处 ${[...new Set(calls)].sort().join(' / ')}() 调用绕过端口`] : []
     },
   },
 ]
@@ -69,63 +66,11 @@ interface ArchitectureExemption {
 /**
  * 已知违规的显式豁免清单，与守卫断言放在同一处，改客户端代码的人立刻看到。
  * 理由与负责人均为必填；豁免不是放行，是有主的债务。
+ *
+ * 当前为空：九条历史违规已由区域投影下沉与扩展端口两批工作消化完，两条规则因此是
+ * 无例外的不变量。清单与它的三条守卫断言保留，下一次真有取舍时按同一形状登记。
  */
-const exemptions: readonly ArchitectureExemption[] = [
-  {
-    file: 'client/workspace-thumbnail.vue',
-    rule: 'UI 模块不读取完整工作区快照',
-    reason: '缩略图按定义要绘制整个工作区，参与者与群组的头像、分布都来自完整快照，没有更小的输入能表达它。',
-    owner: OWNER_REGION_PROJECTION,
-  },
-  {
-    file: 'client/ai-test-space-overview.vue',
-    rule: 'UI 模块不读取完整工作区快照',
-    reason: '总览自己不读快照字段，只是把主环境与各测试空间的快照透传给缩略图；缩略图改吃区域视图模型后这条随之消失。',
-    owner: OWNER_REGION_PROJECTION,
-  },
-  {
-    file: 'client/environment-manager.vue',
-    rule: 'UI 模块不读取完整工作区快照',
-    reason: '环境管理页读参与者与群组做目录展示与计数，它需要的是参与者目录与群组目录这两个区域视图模型，而不是整份快照。',
-    owner: OWNER_REGION_PROJECTION,
-  },
-  {
-    file: 'client/page.vue',
-    rule: 'UI 模块不读取完整工作区快照',
-    reason: '主页面从主环境与测试空间的完整快照派生机器人目录再传给下游区域；派生是控制模块的职责，装配不该做这件事。',
-    owner: OWNER_REGION_PROJECTION,
-  },
-  {
-    file: 'client/webqq/test-space-shell.ts',
-    rule: '发送 Koishi RPC 的函数只允许出现在客户端工作区端口适配器里',
-    reason: '测试空间的列举、创建、接管、归还、终止、重新激活与删除七类能力都不在工作区端口接口里，端口覆盖不全。',
-    owner: OWNER_EXTEND_PORT,
-  },
-  {
-    file: 'client/mcp-credential-manager.vue',
-    rule: '发送 Koishi RPC 的函数只允许出现在客户端工作区端口适配器里',
-    reason: 'MCP 凭证的列举、创建、更新、轮换令牌、启停与吊销都不在工作区端口接口里，端口覆盖不全。',
-    owner: OWNER_EXTEND_PORT,
-  },
-  {
-    file: 'client/webqq/mcp-activity-sync.ts',
-    rule: '发送 Koishi RPC 的函数只允许出现在客户端工作区端口适配器里',
-    reason: 'MCP 活动订阅不在工作区端口接口里，端口覆盖不全；它此前因为守卫不扫描 TypeScript 文件而完全隐形。',
-    owner: OWNER_EXTEND_PORT,
-  },
-  {
-    file: 'client/environment-manager.vue',
-    rule: '发送 Koishi RPC 的函数只允许出现在客户端工作区端口适配器里',
-    reason: 'MCP 能力目录查询不在工作区端口接口里，端口覆盖不全。',
-    owner: OWNER_EXTEND_PORT,
-  },
-  {
-    file: 'client/workspace-thumbnail.vue',
-    rule: '发送 Koishi RPC 的函数只允许出现在客户端工作区端口适配器里',
-    reason: '端口的媒体读取按当前工作区隐式定域，而缩略图要按显式空间读任意测试空间的头像媒体，端口没有这个形状。',
-    owner: OWNER_EXTEND_PORT,
-  },
-]
+const exemptions: readonly ArchitectureExemption[] = []
 
 /**
  * 类型声明文件不含运行时代码，`send` 在里面只是被声明的重载签名。
@@ -155,11 +100,55 @@ describe('WebQQ 模块化架构', () => {
     expect(findAllViolations().filter((violation) => !isExempted(violation, exemptions))).toEqual([])
   })
 
+  /**
+   * 两条规则的谓词自测。这条不依赖豁免清单里有没有条目：清单清空后，
+   * 「移除任一豁免必须报错」变成空循环，只有喂合成源码才能证明规则还活着。
+   */
+  it('两条规则各自认得出违规写法，也不误报同名局部变量', () => {
+    const [snapshotRule, rpcRule] = rules
+    if (!snapshotRule || !rpcRule) throw new Error('架构规则缺失')
+
+    expect(snapshotRule.findViolations('client/x.vue', 'const props = defineProps<{ snapshot: SandboxSnapshot }>()')).not.toEqual([])
+    expect(snapshotRule.findViolations('client/x.vue', 'const bots = getSandboxBots(input)')).not.toEqual([])
+    expect(snapshotRule.findViolations('client/x.vue', 'const users = getSandboxUsers(input)')).not.toEqual([])
+    expect(snapshotRule.findViolations('client/x.vue', 'props.snapshot.participants.length')).not.toEqual([])
+    expect(snapshotRule.findViolations('client/x.vue', 'model.snapshot.groups.length')).not.toEqual([])
+    // 聊天区域把本地搜索条件变量展开进查询参数，变量同名但不是工作区快照，不得误报。
+    expect(snapshotRule.findViolations('client/x.vue', 'await requestSearch({ conversationId, ...snapshot, limit: 30 })')).toEqual([])
+    expect(snapshotRule.findViolations('client/x.vue', 'const models = buildWorkspaceThumbnailModels(input)')).toEqual([])
+
+    expect(rpcRule.findViolations('client/x.vue', "await send('chatluna-sandbox/workspace')")).not.toEqual([])
+    expect(rpcRule.findViolations('client/webqq/x.ts', "receive('chatluna-sandbox/mcp-activity', handler)")).not.toEqual([])
+    expect(rpcRule.findViolations('client/webqq/koishi-x-port.ts', "await send('chatluna-sandbox/workspace')")).toEqual([])
+    expect(rpcRule.findViolations('client/webqq/x-port.ts', "await send('chatluna-sandbox/workspace')")).not.toEqual([])
+  })
+
+  /**
+   * 豁免机制自测。清单为空时下面那条「移除任一豁免」是空循环，只有喂合成数据才能
+   * 证明匹配是按文件与规则成对判定的——放宽成只比文件名会让一条豁免掩盖同一文件的另一条规则。
+   */
+  it('豁免按文件与规则成对匹配，移除后违规重新暴露', () => {
+    const snapshotViolation = 'client/x.vue 违反「UI 模块不读取完整工作区快照」：出现完整工作区快照类型名 SandboxSnapshot'
+    const rpcViolation = 'client/x.vue 违反「收发 Koishi RPC 的函数只允许出现在客户端端口适配器里」：1 处 send() 调用绕过端口'
+    const exemption: ArchitectureExemption = {
+      file: 'client/x.vue',
+      rule: 'UI 模块不读取完整工作区快照',
+      reason: '合成条目，仅用于自测豁免匹配。',
+      owner: '无',
+    }
+
+    expect(isExempted(snapshotViolation, [exemption])).toBe(true)
+    // 同一文件的另一条规则不得被这条豁免顺带放行。
+    expect(isExempted(rpcViolation, [exemption])).toBe(false)
+    // 同一条规则在另一个文件上也不得被放行。
+    expect(isExempted(snapshotViolation.replace('client/x.vue', 'client/y.vue'), [exemption])).toBe(false)
+    expect(isExempted(snapshotViolation, [])).toBe(false)
+  })
+
   it('每条豁免都写明理由与负责消化它的后续工作', () => {
     for (const exemption of exemptions) {
       expect(exemption.reason.trim(), `${exemption.file} / ${exemption.rule} 缺少理由`).not.toBe('')
       expect(exemption.owner.trim(), `${exemption.file} / ${exemption.rule} 缺少负责人`).not.toBe('')
-      expect([OWNER_REGION_PROJECTION, OWNER_EXTEND_PORT], `${exemption.file} 的负责人不在已知后续工作里`).toContain(exemption.owner)
     }
   })
 
