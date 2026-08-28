@@ -407,20 +407,18 @@ describe('模型请求分析展示模型', () => {
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
 
     expect(trajectory).toMatch(/webqq-model-trajectory-header[\s\S]*webqq-model-trajectory-scope[\s\S]*webqq-model-trajectory-sticky-header[\s\S]*webqq-model-trajectory-controls[\s\S]*webqq-model-trajectory-composition-shell/)
-    expect(trajectory).toContain('ref="stickyHeaderElement" class="webqq-model-trajectory-header"')
+    expect(trajectory).toContain('ref="stickyHeaderElement" class="webqq-model-trajectory-header webqq-overlay-header"')
     expect(trajectory).toContain("style.setProperty('--webqq-model-trajectory-sticky-height'")
     const stickyRule = styles.slice(styles.indexOf('.webqq-model-request-analysis .webqq-model-trajectory-header {')).split('}')[0]
-    const stickyBackdropRule = styles.match(/\.webqq-model-trajectory-header::before \{\n  position: absolute;[\s\S]*?\n\}/)?.[0] ?? ''
-    const frostedStickyRule = styles.match(/\.webqq-workspace\.is-frosted \.webqq-model-trajectory-header::before \{[\s\S]*?\n\}/)?.[0] ?? ''
+    // 背景层与毛玻璃已收敛到 .webqq-overlay-header 共享 ::before（由 webqq-region-css 用例守卫），
+    // 组件局部的 ::before 只补自己的分隔线，不再重复声明背景。
+    const stickyDividerRule = styles.slice(styles.indexOf('\n.webqq-model-trajectory-header::before {')).split('}')[0]
     expect(stickyRule).toContain('top: 0')
     expect(stickyRule).toContain('overflow: clip')
     expect(stickyRule).toContain('border-radius: 7px 7px 0 0')
     expect(stickyRule).not.toContain('backdrop-filter:')
-    expect(stickyBackdropRule).toContain('inset: 0')
-    expect(stickyBackdropRule).toContain('background: var(--webqq-surface)')
-    expect(stickyBackdropRule).not.toContain('box-shadow:')
-    expect(frostedStickyRule).toContain('background: color-mix(in srgb, var(--webqq-surface) 72%, transparent)')
-    expect(frostedStickyRule).toContain('backdrop-filter: saturate(180%) blur(20px)')
+    expect(stickyDividerRule).toContain('border-bottom: 1px solid')
+    expect(stickyDividerRule).not.toContain('box-shadow:')
     expect(styles).toContain('.webqq-workspace.is-frosted .webqq-model-trajectory-header :is(')
     expect(styles).toMatch(/\.webqq-workspace\.is-frosted \.webqq-model-trajectory-header :is\([\s\S]*?\.webqq-model-trajectory-scope,[\s\S]*?\.webqq-model-trajectory-controls,[\s\S]*?\.webqq-model-trajectory-composition-shell/)
   })
