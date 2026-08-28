@@ -74,7 +74,7 @@ describe('模型证据身份跨视图契约', () => {
       // 否则同一次调用会同时出现在 ASSISTANT 和 TOOL CALL 两行。
       const messageIds = new Set(conversation.messages.map(({ evidenceId }) => evidenceId))
       const rowMessageIds = trajectory.rows.flatMap(row => (
-        row.source === 'request' && row.toolEvent !== 'definition' && row.toolEvent !== 'call' && row.evidenceId
+        row.source === 'request' && row.kind !== 'tool-definition' && row.kind !== 'tool-call' && row.evidenceId
           ? [row.evidenceId]
           : []
       ))
@@ -85,21 +85,21 @@ describe('模型证据身份跨视图契约', () => {
       }
       const callIds = new Set(conversation.messages.flatMap(({ toolCalls }) => toolCalls.map(({ evidenceId }) => evidenceId)))
       expect(new Set(trajectory.rows.flatMap(row => (
-        row.source === 'request' && row.toolEvent === 'call' && row.evidenceId ? [row.evidenceId] : []
+        row.source === 'request' && row.kind === 'tool-call' && row.evidenceId ? [row.evidenceId] : []
       )))).toEqual(callIds)
       expect(conversation.tools.map(({ evidenceId }) => evidenceId))
-        .toEqual(trajectory.rows.flatMap(row => row.toolEvent === 'definition' && row.evidenceId ? [row.evidenceId] : []))
+        .toEqual(trajectory.rows.flatMap(row => row.kind === 'tool-definition' && row.evidenceId ? [row.evidenceId] : []))
     })
   }
 
   it('请求工具调用与响应工具事件都能从轨迹定位到具体分析卡片', async () => {
     const { trajectory, conversation, navigation } = await buildViews(FIXTURES[0]!)
 
-    const requestCall = trajectory.rows.find(row => row.source === 'request' && row.toolEvent === 'call')!
+    const requestCall = trajectory.rows.find(row => row.source === 'request' && row.kind === 'tool-call')!
     expect(resolveAnalysisEvidenceTarget(navigation, requestCall.evidenceId))
       .toBe(modelAnalysisTargetId(conversation.messages.flatMap(({ toolCalls }) => toolCalls)[0]!.evidenceId))
 
-    const responseCall = trajectory.rows.find(row => row.source === 'response' && row.toolEvent === 'call')!
+    const responseCall = trajectory.rows.find(row => row.source === 'response' && row.kind === 'tool-call')!
     expect(resolveAnalysisEvidenceTarget(navigation, responseCall.evidenceId))
       .toBe(modelAnalysisTargetId(conversation.response!.toolCalls[0]!.evidenceId))
 

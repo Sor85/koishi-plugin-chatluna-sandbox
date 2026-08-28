@@ -47,18 +47,20 @@ describe('模型请求轨迹投影', () => {
     const trajectory = await trajectoryFor(store, first.id, 'request')
 
     expect(trajectory.records).toHaveLength(1)
-    expect(trajectory.rows.map(({ kind, toolEvent, source }) => ({ kind, toolEvent, source }))).toEqual([
-      { kind: 'request', toolEvent: undefined, source: undefined },
-      { kind: 'system', toolEvent: undefined, source: 'request' },
-      { kind: 'user', toolEvent: undefined, source: 'request' },
-      { kind: 'assistant', toolEvent: undefined, source: 'request' },
-      { kind: 'tool', toolEvent: 'definition', source: 'request' },
-      { kind: 'tool', toolEvent: 'call', source: 'request' },
-      { kind: 'tool', toolEvent: 'result', source: 'request' },
-      { kind: 'assistant', toolEvent: undefined, source: 'response' },
-      { kind: 'assistant', toolEvent: undefined, source: 'response' },
-      { kind: 'tool', toolEvent: 'call', source: 'response' },
+    expect(trajectory.rows.map(({ kind, source }) => ({ kind, source }))).toEqual([
+      { kind: 'request', source: undefined },
+      { kind: 'system', source: 'request' },
+      { kind: 'user', source: 'request' },
+      { kind: 'assistant', source: 'request' },
+      { kind: 'tool-definition', source: 'request' },
+      { kind: 'tool-call', source: 'request' },
+      { kind: 'tool-result', source: 'request' },
+      { kind: 'assistant', source: 'response' },
+      { kind: 'assistant', source: 'response' },
+      { kind: 'tool-call', source: 'response' },
     ])
+    // 行种类是一维基础证据种类：判断这一行是定义、调用还是结果不需要读第二个字段。
+    expect(trajectory.rows.every(row => !('toolEvent' in row))).toBe(true)
     expect(trajectory.rows.map(({ index }) => index)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     expect(trajectory.rows[0]).toMatchObject({ preview: 'openai / gpt-4.1 · 120 ms', status: 'success', requestId: first.id })
     expect(trajectory.rows[0]?.evidenceId).toBeUndefined()
@@ -68,19 +70,18 @@ describe('模型请求轨迹投影', () => {
     const { store, first } = createStore()
     const trajectory = await trajectoryFor(store, first.id, 'request')
 
-    expect(trajectory.rows.find(({ toolEvent }) => toolEvent === 'definition')).toMatchObject({
+    expect(trajectory.rows.find(({ kind }) => kind === 'tool-definition')).toMatchObject({
       evidenceId: 'req:tool-definition:tools.0.function',
       toolName: 'lookup',
       preview: '工具定义 · lookup',
     })
     expect(trajectory.rows.find(({ callId }) => callId === 'call-1')).toMatchObject({
       evidenceId: 'req:tool-call:messages.2.tool_calls.0',
-      kind: 'tool',
-      toolEvent: 'call',
+      kind: 'tool-call',
       source: 'request',
       toolName: 'lookup',
     })
-    expect(trajectory.rows.find(({ toolEvent }) => toolEvent === 'result')).toMatchObject({
+    expect(trajectory.rows.find(({ kind, source }) => kind === 'tool-result' && source === 'request')).toMatchObject({
       evidenceId: 'req:message:messages.3',
       toolName: 'lookup',
       callId: 'call-1',
@@ -161,7 +162,7 @@ describe('模型请求轨迹投影', () => {
       { preview: 'Gemini 系统一', evidenceId: 'req:message:systemInstruction.parts.0' },
       { preview: 'Gemini 系统二', evidenceId: 'req:message:systemInstruction.parts.1' },
     ])
-    expect(geminiTrajectory.rows.some(({ toolEvent }) => toolEvent === 'definition')).toBe(true)
+    expect(geminiTrajectory.rows.some(({ kind }) => kind === 'tool-definition')).toBe(true)
     expect(geminiTrajectory.promptComposition.map(({ kind }) => kind)).toEqual([
       'system',
       'system',
@@ -263,7 +264,7 @@ describe('模型请求轨迹投影', () => {
     expect(trajectory.conversationId).toBe('conversation-1')
     expect(trajectory.records.map(({ sequence }) => sequence)).toEqual([1, 2])
     expect(trajectory.rows.filter(({ kind }) => kind === 'request')).toHaveLength(2)
-    expect(trajectory.rows.some(({ toolEvent }) => toolEvent === 'definition')).toBe(true)
+    expect(trajectory.rows.some(({ kind }) => kind === 'tool-definition')).toBe(true)
     expect(trajectory.promptComposition.map(({ kind, requestId }) => ({ kind, requestId }))).toEqual([
       { kind: 'system', requestId: trajectory.records[0]?.id },
       { kind: 'user', requestId: trajectory.records[0]?.id },

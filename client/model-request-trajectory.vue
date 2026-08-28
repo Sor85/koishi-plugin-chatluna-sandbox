@@ -170,7 +170,7 @@
             aria-label="请求体提示词内容占比"
           >
             <div class="webqq-model-trajectory-composition-labels" aria-hidden="true">
-              <span v-for="track in compositionTracks" :key="track.kind">{{ promptKindLabel(track.kind) }}</span>
+              <span v-for="track in compositionTracks" :key="track.kind">{{ evidenceTitleLabel(track.kind) }}</span>
             </div>
             <div
               ref="compositionViewport"
@@ -201,18 +201,18 @@
                         type="button"
                         class="webqq-model-trajectory-composition-bar"
                         :class="[
-                          promptBarClass(segment.kind),
+                          `is-${segment.kind}`,
                           { 'is-variable': segment.variableId, 'is-selected': isCompositionSegmentSelected(segment) },
                         ]"
                         :style="{ left: `${segment.left}%`, width: `${segment.width}%` }"
                         :aria-label="segment.variableName
                           ? `变量 ${segment.variableName} 占请求体提示内容的 ${formatPercentage(segment.percentage)}`
-                          : `${promptKindLabel(segment.kind)} 占请求体提示内容的 ${formatPercentage(segment.percentage)}`"
+                          : `${evidenceTitleLabel(segment.kind)} 占请求体提示内容的 ${formatPercentage(segment.percentage)}`"
                         @click="selectPromptSegment(segment)"
                       />
                     </TooltipTrigger>
                     <TooltipContent side="top">
-                      <strong>{{ segment.variableName ? `Variable · ${segment.variableName}` : promptKindLabel(segment.kind) }} · {{ formatPercentage(segment.percentage) }}</strong>
+                      <strong>{{ segment.variableName ? `${evidenceTitleLabel('variable')} · ${segment.variableName}` : evidenceTitleLabel(segment.kind) }} · {{ formatPercentage(segment.percentage) }}</strong>
                       <span>{{ segment.characters.toLocaleString('zh-CN') }} 个字符</span>
                     </TooltipContent>
                   </Tooltip>
@@ -268,7 +268,6 @@
               :class="[
                 `is-${row.kind}`,
                 row.source === 'response' ? 'is-response' : '',
-                row.toolEvent === 'definition' ? 'is-tool-definition' : '',
                 {
                   'is-selected': row.id === selectedRowId,
                   'is-search-muted': isRowSearchMuted(row),
@@ -277,7 +276,7 @@
               role="row"
               @click="selectedRowId = row.id"
             >
-              <span role="cell" class="webqq-model-trajectory-kind">{{ kindLabel(row.kind, row.toolEvent) }}</span>
+              <span role="cell" class="webqq-model-trajectory-kind">{{ kindLabel(row.kind) }}</span>
               <span role="cell" class="webqq-model-trajectory-preview">{{ row.preview }}</span>
             </button>
           </template>
@@ -349,9 +348,8 @@ import {
   MODEL_EVIDENCE_FILTER_KINDS,
   isEvidenceVisible,
   toggleFilterMember,
-  trajectoryRowFilterKind,
-  type ModelEvidenceFilterKind,
 } from './webqq/model-request-filter'
+import { sandboxEvidenceLabels, type SandboxEvidenceKind } from '../src/evidence-kind'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type {
   SandboxModelRequestDetail,
@@ -429,10 +427,10 @@ let suppressCompositionClickUntil = 0
 const requestsCollapsed = ref(false)
 const trajectorySortOrder = ref<ModelRequestTrajectorySortOrder>('desc')
 const collapsedRequestIds = ref<ReadonlySet<string>>(new Set())
-const hiddenKinds = ref<ReadonlySet<ModelEvidenceFilterKind>>(new Set())
+const hiddenKinds = ref<ReadonlySet<SandboxEvidenceKind>>(new Set())
 const filtersExpanded = ref(false)
 // 常用证据种类和「耗时」「请求」一起留在工具栏外层；VARIABLE 紧邻 TOOL DEFS 左侧。
-const PINNED_FILTER_KINDS: readonly ModelEvidenceFilterKind[] = ['system', 'user', 'variable', 'tool-definition']
+const PINNED_FILTER_KINDS: readonly SandboxEvidenceKind[] = ['system', 'user', 'variable', 'tool-definition']
 const pinnedKindOptions = MODEL_EVIDENCE_FILTER_KINDS.filter(({ kind }) => PINNED_FILTER_KINDS.includes(kind))
 const collapsedKindOptions = MODEL_EVIDENCE_FILTER_KINDS.filter(({ kind }) => !PINNED_FILTER_KINDS.includes(kind))
 const moreFiltersId = useId()
@@ -566,7 +564,9 @@ const evidenceFilter = computed(() => ({
 }))
 const ledgerRows = computed(() => props.trajectory?.rows.filter((row) => {
   if (requestsCollapsed.value && row.kind !== 'request') return false
-  return isEvidenceVisible(evidenceFilter.value, trajectoryRowFilterKind(row))
+  // 请求边界行没有对应的模型证据（它是请求本身），因此不参与种类过滤；
+  // 否则把整条请求过滤掉之后账本会连边界一起消失，看不出还有哪些请求。
+  return isEvidenceVisible(evidenceFilter.value, row.kind === 'request' ? undefined : row.kind)
 }) ?? [])
 const orderedLedgerRows = computed(() => orderModelRequestTrajectoryRows(ledgerRows.value, trajectorySortOrder.value))
 // 每行的可搜索文本按轨迹折叠成小写一次。原先每次重渲染都要为每一行重新
@@ -574,7 +574,7 @@ const orderedLedgerRows = computed(() => orderModelRequestTrajectoryRows(ledgerR
 const rowSearchTexts = computed(() => {
   const texts = new Map<string, string>()
   for (const row of props.trajectory?.rows ?? []) {
-    texts.set(row.id, [row.preview, kindLabel(row.kind, row.toolEvent), row.toolName, row.callId, requestLabel(row.requestId)]
+    texts.set(row.id, [row.preview, kindLabel(row.kind), row.toolName, row.callId, requestLabel(row.requestId)]
       .filter(Boolean)
       .join('\n')
       .toLocaleLowerCase('zh-CN'))
@@ -794,18 +794,9 @@ function openSelectedRequest() {
   })
 }
 
-function promptKindLabel(kind: SandboxModelRequestPromptKind) {
-  if (kind === 'system') return 'System'
-  if (kind === 'user') return 'User'
-  if (kind === 'assistant') return 'Assistant'
-  if (kind === 'tool-definition') return 'Tool Defs'
-  return 'Tool I/O'
-}
-
-function promptBarClass(kind: SandboxModelRequestPromptKind) {
-  if (kind === 'tool-definition') return 'is-tool-definition'
-  if (kind === 'tool-interaction') return 'is-tool-interaction'
-  return `is-${kind}`
+function evidenceTitleLabel(kind: SandboxModelRequestPromptKind | SandboxEvidenceKind) {
+  // 标题与图例语境统一取词首大写变体；工具交互是聚合，它的标签同样来自证据种类 module。
+  return sandboxEvidenceLabels(kind).title
 }
 
 function formatPercentage(value: number) {
@@ -821,17 +812,9 @@ function requestLabel(requestId: string | undefined) {
   return (requestId === undefined ? undefined : requestLabelById.value.get(requestId)) ?? '模型请求'
 }
 
-function kindLabel(kind: SandboxModelRequestTrajectoryKind, toolEvent?: SandboxModelRequestTrajectoryRow['toolEvent']) {
-  if (kind === 'system') return 'SYSTEM'
-  if (kind === 'user') return 'USER'
-  if (kind === 'assistant') return 'ASSISTANT'
-  if (kind === 'variable') return 'VARIABLE'
-  if (kind === 'tool') {
-    if (toolEvent === 'definition') return 'TOOL DEFS'
-    if (toolEvent === 'result') return 'TOOL RESULT'
-    return 'TOOL CALL'
-  }
-  return 'REQUEST'
+function kindLabel(kind: SandboxModelRequestTrajectoryKind) {
+  // 请求边界行是账本特有的行类型而不是证据种类，因此它的标签留在视图这一侧。
+  return kind === 'request' ? 'REQUEST' : sandboxEvidenceLabels(kind).badge
 }
 
 function statusClass(status: SandboxModelRequestStatus | undefined) {

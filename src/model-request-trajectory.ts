@@ -11,7 +11,8 @@ import type {
 } from './types'
 import { presentModelRequestListItem, type SandboxModelRequestStore } from './model-request'
 import { normalizeEvidencePreviewText } from './evidence-preview-text'
-import { deriveModelRequestVariables } from './model-request-variables'
+import { deriveModelRequestVariables, modelRequestVariableStatusLabel } from './model-request-variables'
+import { sandboxEvidenceAggregate } from './evidence-kind'
 import {
   countMessageCharacters,
   countToolCallCharacters,
@@ -34,7 +35,6 @@ interface ProjectedRow {
   preview: string
   callId?: string
   toolName?: string
-  toolEvent?: 'definition' | 'call' | 'result'
   variableId?: string
   variableName?: string
   variablePresetName?: string
@@ -44,6 +44,8 @@ interface ProjectedRow {
 
 const CONVERSATION_RECORD_LIMIT = 200
 const TRAJECTORY_PREVIEW_LENGTH = 180
+/** 组成图的工具交互档。合并了哪两种基础证据由证据种类 module 声明，这里只引用聚合身份。 */
+const TOOL_INTERACTION_KIND = sandboxEvidenceAggregate('tool-interaction').id
 
 /**
  * 读取会话模式需要的同会话记录。记录库的读取是异步的，而轨迹投影本身是纯函数；
@@ -144,10 +146,9 @@ function projectRequestRows(
 ): ProjectedRow[] {
   const rows: ProjectedRow[] = projection.toolDefinitions.map(definition => ({
     evidenceId: definition.evidenceId,
-    kind: 'tool' as const,
+    kind: 'tool-definition' as const,
     preview: `工具定义 · ${definition.name}`,
     toolName: definition.name,
-    toolEvent: 'definition' as const,
   }))
   for (const message of projection.requestMessages) {
     rows.push(...messageRows(message))
@@ -156,7 +157,7 @@ function projectRequestRows(
     rows.push({
       evidenceId: `variable:${variable.id}`,
       kind: 'variable',
-      preview: `${variable.name} · ${variable.status === 'observed' ? compactText(variable.value ?? '') || '空值' : variableStatusLabel(variable.status)}`,
+      preview: `${variable.name} · ${variable.status === 'observed' ? compactText(variable.value ?? '') || '空值' : modelRequestVariableStatusLabel(variable.status)}`,
       variableId: variable.id,
       variableName: variable.name,
       variablePresetName: variable.presetName,
@@ -180,11 +181,10 @@ function messageRows(message: ModelEvidenceMessage): ProjectedRow[] {
   if (message.role === 'tool') {
     rows.push({
       evidenceId: message.evidenceId,
-      kind: 'tool',
+      kind: 'tool-result',
       preview: `${message.toolName ?? '工具结果'} · ${compactText(message.text) || '无输出'}`,
       ...(message.toolName ? { toolName: message.toolName } : {}),
       ...(message.toolCallId ? { callId: message.toolCallId } : {}),
-      toolEvent: 'result',
     })
     return rows
   }
@@ -200,11 +200,10 @@ function messageRows(message: ModelEvidenceMessage): ProjectedRow[] {
   for (const call of message.toolCalls) {
     rows.push({
       evidenceId: call.evidenceId,
-      kind: 'tool',
+      kind: 'tool-call',
       preview: `${call.name} · ${compactText(call.arguments ?? '') || '无参数'}`,
       toolName: call.name,
       ...(call.callId ? { callId: call.callId } : {}),
-      toolEvent: 'call',
     })
   }
   return rows
@@ -221,21 +220,19 @@ function projectResponseRows(projection: ModelEvidenceProjection): ProjectedRow[
     if (event.kind === 'tool-call') {
       return [{
         evidenceId: event.evidenceId,
-        kind: 'tool',
+        kind: 'tool-call',
         preview: `${event.name ?? '工具调用'} · ${compactText(event.arguments ?? '') || '无参数'}`,
         ...(event.name ? { toolName: event.name } : {}),
         ...(event.callId ? { callId: event.callId } : {}),
-        toolEvent: 'call',
       }]
     }
     if (event.kind === 'tool-result') {
       return [{
         evidenceId: event.evidenceId,
-        kind: 'tool',
+        kind: 'tool-result',
         preview: `${event.name ?? '工具结果'} · ${compactText(event.text ?? '') || '无输出'}`,
         ...(event.name ? { toolName: event.name } : {}),
         ...(event.callId ? { callId: event.callId } : {}),
-        toolEvent: 'result',
       }]
     }
     return []
@@ -249,7 +246,9 @@ function projectPromptComposition(
   const sequence: SandboxModelRequestPromptCompositionItem[] = []
   const variablesByEvidenceId = groupObservedVariablesByEvidenceId(variables)
   for (const message of projection.requestMessages) {
-    const kind: SandboxModelRequestPromptKind = message.role === 'tool' ? 'tool-interaction' : message.role
+    // 请求消息里的工具结果与工具调用成对出现，组成图按字符占比把它们统计为同一档工具交互；
+    // 合并规则本身由证据种类 module 的工具交互聚合声明。
+    const kind: SandboxModelRequestPromptKind = message.role === 'tool' ? TOOL_INTERACTION_KIND : message.role
     const messageCharacters = countMessageCharacters(message)
     if (kind === 'system' || kind === 'user') {
       pushMessageComposition(sequence, kind, message.evidenceId, messageCharacters, variablesByEvidenceId.get(message.evidenceId) ?? [])
@@ -257,7 +256,7 @@ function projectPromptComposition(
       push(sequence, kind, message.evidenceId, messageCharacters)
     }
     for (const call of message.toolCalls) {
-      push(sequence, 'tool-interaction', call.evidenceId, countToolCallCharacters(call))
+      push(sequence, TOOL_INTERACTION_KIND, call.evidenceId, countToolCallCharacters(call))
     }
   }
 
@@ -330,13 +329,6 @@ function push(
   count: number,
 ): void {
   if (count > 0) target.push({ kind, evidenceId, characters: count })
-}
-
-function variableStatusLabel(status: SandboxModelRequestVariable['status']): string {
-  if (status === 'ambiguous') return '展开值存在歧义'
-  if (status === 'stale') return '预设快照已变化'
-  if (status === 'unsupported') return '表达式不支持定位'
-  return '未在模型请求中观察到展开值'
 }
 
 function requestPreview(record: SandboxModelRequestRecord): string {

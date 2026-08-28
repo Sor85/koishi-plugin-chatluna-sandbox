@@ -227,7 +227,8 @@ describe('WebQQ 模型请求工作台', () => {
     expect(trajectorySource).toContain('COMPOSITION_ZOOM_MAX = 10')
     expect(trajectorySource).toContain('viewport.scrollLeft = Math.max(contentX * next - anchor, 0)')
     expect(trajectorySource).toContain("'is-variable': segment.variableId")
-    expect(trajectorySource).toContain('Variable · ${segment.variableName}')
+    // 变量分段的标题标签同样来自证据种类 module，不在视图里硬编码一份。
+    expect(trajectorySource).toContain("`${evidenceTitleLabel('variable')} · ${segment.variableName}`")
     expect(trajectorySource).toContain('当前会话没有可投影的请求组成')
     expect(trajectorySource).toContain("mode === 'request'")
     expect(trajectorySource).toContain("mode === 'conversation'")
@@ -235,7 +236,7 @@ describe('WebQQ 模型请求工作台', () => {
     expect(trajectorySource).toContain('轨迹事件账本')
     expect(trajectorySource).toContain('打开原始请求')
     expect(trajectorySource).toMatch(/<header>[\s\S]*打开原始请求[\s\S]*<\/header>/)
-    expect(trajectorySource).not.toContain('<Badge variant="outline">{{ kindLabel(selectedRow.kind, selectedRow.toolEvent) }}</Badge>')
+    expect(trajectorySource).not.toContain('<Badge variant="outline">{{ kindLabel(selectedRow.kind) }}</Badge>')
     expect(trajectorySource).toContain("'open-request': [payload:")
     expect(trajectorySource).toContain(`emit('open-request', {
     recordId: request.id,
@@ -391,7 +392,8 @@ describe('WebQQ 模型请求工作台', () => {
     expect(toggleRequestCollapsedSource).toContain('const requestId = row.requestId')
     expect(toggleRequestCollapsedSource).toContain('collapsedRequestIds.value = next')
     expect(toggleRequestCollapsedSource).not.toContain('selectedRowId.value')
-    expect(trajectorySource).toContain("if (kind === 'variable') return 'VARIABLE'")
+    // 账本种类列的标签来自证据种类 module 的徽标变体，视图里不再有第二张标签表。
+    expect(trajectorySource).toContain("kind === 'request' ? 'REQUEST' : sandboxEvidenceLabels(kind).badge")
     expect(trajectorySource).toContain("['system', 'user', 'variable', 'tool-definition']")
     expect(trajectorySource).not.toContain('请求侧')
     expect(trajectorySource).toContain('VARIABLE')

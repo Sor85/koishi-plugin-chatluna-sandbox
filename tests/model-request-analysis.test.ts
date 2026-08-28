@@ -5,6 +5,7 @@ import {
   buildModelRequestAnalysisNavigation,
   exceedsAnalysisLineLimit,
   isPreviewableConversationImage,
+  matchesAnalysisSearch,
   modelAnalysisTargetId,
   normalizeAnalysisQuery,
   resolveActiveAnalysisTarget,
@@ -12,6 +13,7 @@ import {
   shouldExpandAnalysisText,
 } from '../client/webqq/model-request-analysis'
 import { parseModelRequestConversationDetail } from '../client/webqq/model-request-conversation'
+import { modelRequestVariableStatusLabel } from '../src/model-request-variables'
 import type { SandboxModelRequestDetail } from '../src/types'
 
 function detail(): SandboxModelRequestDetail {
@@ -77,7 +79,7 @@ describe('模型请求分析展示模型', () => {
     }]
     const navigationWithVariables = buildModelRequestAnalysisNavigation(parseModelRequestConversationDetail(request), request)
     expect(navigationWithVariables.groups.map(({ key }) => key)).toEqual([
-      'system', 'user', 'variables', 'response', 'assistant', 'tool',
+      'system', 'user', 'variable', 'response', 'assistant', 'tool',
     ])
 
     expect(navigation.groups.find(({ key }) => key === 'assistant')?.items[1]).toMatchObject({
@@ -189,7 +191,7 @@ describe('模型请求分析展示模型', () => {
     const navigation = buildModelRequestAnalysisNavigation(parseModelRequestConversationDetail(request), request)
 
     const weather = navigation.groups.flatMap(({ items }) => items).filter(({ searchText }) => searchText.includes(normalizeAnalysisQuery('北京')))
-    expect(weather.map(({ label }) => label)).toEqual(['响应', 'ASSISTANT', 'TOOL CALL'])
+    expect(weather.map(({ label }) => label)).toEqual(['RESPONSE', 'ASSISTANT', 'TOOL CALL'])
     expect(navigation.searchText).toContain('查询天气')
     expect(navigation.searchText).toContain('北京晴朗')
     expect(navigation.searchText).toContain('weather')
@@ -218,7 +220,7 @@ describe('模型请求分析展示模型', () => {
     expect(styles).not.toContain('#0891b2')
     expect(styles).toContain('.webqq-model-analysis-card.is-response { --webqq-role: var(--webqq-role-response); }')
     expect(styles).toContain('.webqq-model-analysis-nav-group.is-response { --webqq-role: var(--webqq-role-response); }')
-    expect(styles).toContain('.webqq-model-analysis-card.is-tool { --webqq-role: var(--webqq-role-tool-interaction); }')
+    expect(styles).toContain('.webqq-model-analysis-card.is-tool-result { --webqq-role: var(--webqq-role-tool-interaction); }')
     expect(styles).toContain('.webqq-model-analysis-tool-card { --webqq-role: var(--webqq-role-tool); }')
     expect(styles).toContain('color: var(--webqq-role);')
     expect(styles).toContain('.webqq-model-trajectory-row.is-tool-definition .webqq-model-trajectory-kind')
@@ -228,7 +230,7 @@ describe('模型请求分析展示模型', () => {
     expect(view).toContain('class="webqq-model-analysis-tool-call is-call"')
     expect(view).toContain('class="webqq-model-analysis-tool-call is-result"')
     expect(trajectory).toContain("row.source === 'response' ? 'is-response' : ''")
-    expect(trajectory).toContain("row.toolEvent === 'definition' ? 'is-tool-definition' : ''")
+    expect(styles).toContain('.webqq-model-trajectory-row.is-tool-call .webqq-model-trajectory-kind,')
   })
 
   it('左侧 Variables 列出预设表达式名，并定位右侧变量值卡片', () => {
@@ -246,9 +248,9 @@ describe('模型请求分析展示模型', () => {
       range: { start: 0, end: 4 },
     }]
     const navigation = buildModelRequestAnalysisNavigation(parseModelRequestConversationDetail(request), request)
-    const variables = navigation.groups.find(({ key }) => key === 'variables')
+    const variables = navigation.groups.find(({ key }) => key === 'variable')
 
-    expect(variables).toMatchObject({ label: 'Variables', count: 1 })
+    expect(variables).toMatchObject({ label: 'Variable', count: 1 })
     expect(variables?.items[0]).toMatchObject({
       kind: 'variable', label: 'VARIABLE', preview: 'weather', searchText: expect.stringContaining('长沙晴朗'),
     })
@@ -259,6 +261,58 @@ describe('模型请求分析展示模型', () => {
     expect(view).toContain(':value="variable.value ?? \'\'"')
     expect(view).toContain('variablesVisible')
     expect(view).toContain("isEvidenceVisible(evidenceFilter.value, 'variable')")
+  })
+
+  it('变量状态不是已观察时，搜索状态说明文案在导航项与右侧卡片两侧结论一致', () => {
+    const request = detail()
+    request.variables = [{
+      id: 'character:0:["system"]#0',
+      name: 'weather',
+      presetKind: 'character',
+      presetName: 'koishi',
+      path: ['system'],
+      occurrence: 0,
+      status: 'ambiguous',
+    }]
+    const navigation = buildModelRequestAnalysisNavigation(parseModelRequestConversationDetail(request), request)
+    const item = navigation.groups.find(({ key }) => key === 'variable')!.items[0]!
+    // 卡片正文显示的状态说明与导航项的搜索文本必须是同一份文案，否则搜到的词在正文里找不到。
+    const status = normalizeAnalysisQuery(modelRequestVariableStatusLabel('ambiguous'))
+    const query = normalizeAnalysisQuery('歧义')
+
+    expect(status).toContain(query)
+    expect(item.searchText).toContain(status)
+    // 左侧导航项与右侧卡片读同一张搜索文本表：不可能出现导航说有、正文说没有。
+    expect(matchesAnalysisSearch(navigation, item.id, query)).toBe(true)
+    expect(matchesAnalysisSearch(navigation, 'character:0:["system"]#0', query)).toBe(true)
+  })
+
+  it('搜索已观察变量的展开值或不命中的词时，导航与卡片同时命中或同时置灰', () => {
+    const request = detail()
+    request.variables = [{
+      id: 'character:0:["system"]#0',
+      name: 'weather',
+      presetKind: 'character',
+      presetName: 'koishi',
+      path: ['system'],
+      occurrence: 0,
+      status: 'observed',
+      value: '长沙晴朗',
+      evidenceId: 'req:message:messages.0',
+      range: { start: 0, end: 4 },
+    }]
+    const navigation = buildModelRequestAnalysisNavigation(parseModelRequestConversationDetail(request), request)
+    const item = navigation.groups.find(({ key }) => key === 'variable')!.items[0]!
+
+    for (const [word, matched] of [['长沙', true], ['koishi', true], ['weather', true], ['不存在的词', false]] as const) {
+      const query = normalizeAnalysisQuery(word)
+      expect(item.searchText.includes(query), word).toBe(matched)
+      expect(matchesAnalysisSearch(navigation, item.id, query), word).toBe(matched)
+    }
+    // 空查询不置灰任何一侧。
+    expect(matchesAnalysisSearch(navigation, item.id, '')).toBe(true)
+    // 状态是已观察时不再混入状态说明文案，两侧同样不命中。
+    expect(matchesAnalysisSearch(navigation, item.id, normalizeAnalysisQuery('歧义'))).toBe(false)
   })
 
   it('history_new 和 history_last 默认渲染消息预览，并保留原始 XML 切换', () => {

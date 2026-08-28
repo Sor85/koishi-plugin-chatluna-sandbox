@@ -51,6 +51,19 @@ export function deriveModelRequestVariables(
   })
 }
 
+/**
+ * 模型请求变量未被唯一证明时的状态说明文案。
+ *
+ * 轨迹行预览、分析导航项的搜索文本与右侧变量卡片正文共用这一份文案；
+ * 任何一侧自己再写一份，搜索这些文案时就会出现一侧命中、另一侧置灰。
+ */
+export function modelRequestVariableStatusLabel(status: SandboxModelRequestVariable['status']): string {
+  if (status === 'ambiguous') return '展开值存在歧义'
+  if (status === 'stale') return '预设快照已变化'
+  if (status === 'unsupported') return '表达式不支持定位'
+  return '未在模型请求中观察到展开值'
+}
+
 function documentFromRuntimeSnapshot(snapshot: SandboxPresetRuntimeSnapshot): PresetSourceDocument {
   if (snapshot.kind === 'character') {
     const fields = Object.fromEntries(snapshot.templates.flatMap((template) => (

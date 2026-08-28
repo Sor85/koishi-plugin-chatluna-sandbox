@@ -70,7 +70,9 @@ describe('模型请求视图的重复计算', () => {
     // 搜索文本按会话折叠一次，而不是每次渲染重新 toLocaleLowerCase 整段会话。
     expect(view).toContain('const messageSearchTexts = computed(')
     expect(view).toContain('const toolSearchTexts = computed(')
-    expect(view).toContain('const variableSearchTexts = computed(')
+    // 变量的搜索文本由导航项派生一次，卡片按 id 读回来，而不是每次渲染再拼一遍。
+    expect(view).toContain('matchesAnalysisSearch(navigation.value, variable.id, normalizedSearch.value)')
+    expect(view).not.toContain('const variableSearchTexts = computed(')
     // 一个 Provider 覆盖整段分析。
     expect(count(view, '<TooltipProvider')).toBe(1)
     // 滚动跟随只量导航条目指向的锚点，并缓存解析结果。

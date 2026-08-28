@@ -3,18 +3,32 @@ import type {
   SandboxModelRequestStatus,
   SandboxModelRequestVariable,
 } from '../../src/types'
+import {
+  isSandboxEvidenceAggregateMember,
+  sandboxEvidenceLabels,
+  type SandboxEvidenceKind,
+  type SandboxEvidenceAggregateMemberKind,
+} from '../../src/evidence-kind'
 import { normalizeEvidencePreviewText } from '../../src/evidence-preview-text'
+import { modelRequestVariableStatusLabel } from '../../src/model-request-variables'
 import type {
   ModelConversationMessage,
   ModelRequestConversation,
 } from './model-request-conversation'
 
-export type ModelRequestAnalysisGroupKey = 'system' | 'user' | 'assistant' | 'tool' | 'variables' | 'response'
-export type ModelRequestAnalysisItemKind = 'message' | 'tool-call' | 'tool-result' | 'tool-definition' | 'variable' | 'response'
+/**
+ * 分析导航的分组键：五种基础证据种类加工具分组聚合。
+ *
+ * 三种工具证据收在一个分组标题下，因此工具用聚合键；其余基础种类各自成组。
+ * 取哪几档是视图决策，粒度差异因此是显式选择而不是又一套分类词汇。
+ */
+export type ModelRequestAnalysisGroupKey =
+  | Exclude<SandboxEvidenceKind, SandboxEvidenceAggregateMemberKind<'tool'>>
+  | 'tool'
 
 export interface ModelRequestAnalysisNavigationItem {
   id: string
-  kind: ModelRequestAnalysisItemKind
+  kind: SandboxEvidenceKind
   label: string
   index?: number
   preview: string
@@ -45,16 +59,9 @@ export interface ModelRequestAnalysisNavigation {
   groups: ModelRequestAnalysisNavigationGroup[]
   /** evidenceId → 分析视图定位目标。跨视图定位只依赖这张表，不再重算角色内序号。 */
   targets: Record<string, string>
+  /** 导航项 id → 已归一化的搜索文本。右侧卡片的命中判定也读这张表，两侧不可能派生出两套口径。 */
+  searchTexts: Record<string, string>
   searchText: string
-}
-
-const GROUP_LABELS: Record<ModelRequestAnalysisGroupKey, string> = {
-  system: 'System',
-  user: 'User',
-  assistant: 'Assistant',
-  tool: 'Tool',
-  variables: 'Variables',
-  response: '响应',
 }
 
 export const MODEL_ANALYSIS_RESPONSE_TARGET = 'model-analysis-response'
@@ -102,20 +109,24 @@ export function buildModelRequestAnalysisNavigation(
 ): ModelRequestAnalysisNavigation {
   const grouped = new Map<ModelRequestAnalysisGroupKey, ModelRequestAnalysisNavigationItem[]>()
   const targets: Record<string, string> = {}
+  const searchTexts: Record<string, string> = {}
   const add = (key: ModelRequestAnalysisGroupKey, item: ModelRequestAnalysisNavigationItem) => {
     const items = grouped.get(key) ?? []
-    items.push({ ...item, searchText: normalizeAnalysisQuery(item.searchText) })
+    const searchText = normalizeAnalysisQuery(item.searchText)
+    items.push({ ...item, searchText })
     grouped.set(key, items)
+    searchTexts[item.id] = searchText
     if (item.evidenceId) targets[item.evidenceId] = item.target
   }
 
   for (const message of conversation.messages) {
-    add(message.role, messageNavigationItem(message))
+    const group = analysisGroupKey(message.kind)
+    add(group, messageNavigationItem(message))
     for (const call of message.toolCalls) {
-      add(message.role, {
+      add(group, {
         id: call.evidenceId,
         kind: 'tool-call',
-        label: 'TOOL CALL',
+        label: sandboxEvidenceLabels('tool-call').badge,
         index: message.index,
         preview: call.name,
         evidenceId: call.evidenceId,
@@ -128,7 +139,7 @@ export function buildModelRequestAnalysisNavigation(
   conversation.tools.forEach((tool, index) => add('tool', {
     id: tool.evidenceId,
     kind: 'tool-definition',
-    label: 'TOOL DEFS',
+    label: sandboxEvidenceLabels('tool-definition').badge,
     preview: tool.name,
     evidenceId: tool.evidenceId,
     // 第一个工具定义定位到 TOOL DEFS 区块头，让整段能力目录一起进入视野。
@@ -137,7 +148,7 @@ export function buildModelRequestAnalysisNavigation(
   }))
 
   for (const variable of detail.variables ?? []) {
-    add('variables', variableNavigationItem(variable))
+    add('variable', variableNavigationItem(variable))
   }
 
   const response = conversation.response
@@ -145,7 +156,7 @@ export function buildModelRequestAnalysisNavigation(
     add('response', {
       id: 'response',
       kind: 'response',
-      label: '响应',
+      label: sandboxEvidenceLabels('response').badge,
       preview: compactAnalysisText(response.content.join('\n') || response.statusMessage || '本次响应'),
       target: MODEL_ANALYSIS_RESPONSE_TARGET,
       searchText: response.searchText,
@@ -156,7 +167,7 @@ export function buildModelRequestAnalysisNavigation(
       add('response', {
         id: call.evidenceId,
         kind: 'tool-call',
-        label: 'TOOL CALL',
+        label: sandboxEvidenceLabels('tool-call').badge,
         preview: call.name,
         evidenceId: call.evidenceId,
         target: modelAnalysisTargetId(call.evidenceId),
@@ -167,7 +178,7 @@ export function buildModelRequestAnalysisNavigation(
       add('response', {
         id: result.evidenceId,
         kind: 'tool-result',
-        label: 'TOOL RESULT',
+        label: sandboxEvidenceLabels('tool-result').badge,
         preview: result.name || result.id || '工具结果',
         evidenceId: result.evidenceId,
         target: modelAnalysisTargetId(result.evidenceId),
@@ -176,10 +187,10 @@ export function buildModelRequestAnalysisNavigation(
     }
   }
 
-  const order: ModelRequestAnalysisGroupKey[] = ['system', 'user', 'variables', 'response', 'assistant', 'tool']
+  const order: ModelRequestAnalysisGroupKey[] = ['system', 'user', 'variable', 'response', 'assistant', 'tool']
   const groups = order.flatMap((key) => {
     const items = grouped.get(key) ?? []
-    return items.length ? [{ key, label: GROUP_LABELS[key], count: items.length, items }] : []
+    return items.length ? [{ key, label: sandboxEvidenceLabels(key).title, count: items.length, items }] : []
   })
   return {
     boundary: {
@@ -192,8 +203,29 @@ export function buildModelRequestAnalysisNavigation(
     },
     groups,
     targets,
+    searchTexts,
     searchText: normalizeAnalysisQuery(conversation.searchText),
   }
+}
+
+/** 三种工具证据收在工具分组下；聚合成员由证据种类 module 声明，这里不重列一遍。 */
+function analysisGroupKey(kind: SandboxEvidenceKind): ModelRequestAnalysisGroupKey {
+  return isSandboxEvidenceAggregateMember('tool', kind) ? 'tool' : kind
+}
+
+/**
+ * 导航项与右侧卡片共用的命中判定。
+ *
+ * 搜索文本只在导航项上派生一次，卡片按同一个 id 读回来；
+ * 卡片自己重算一份就会出现「导航说有、正文说没有」。
+ */
+export function matchesAnalysisSearch(
+  navigation: Pick<ModelRequestAnalysisNavigation, 'searchTexts'>,
+  id: string,
+  query: string,
+): boolean {
+  if (!query) return true
+  return Boolean(navigation.searchTexts[id]?.includes(query))
 }
 
 /** 轨迹行、组成分段和分析导航共用同一张证据身份表；找不到时退回请求边界。 */
@@ -238,11 +270,13 @@ export function formatEvidencePath(path: readonly string[]): string {
 }
 
 function variableNavigationItem(variable: SandboxModelRequestVariable): ModelRequestAnalysisNavigationItem {
-  const statusText = variable.status === 'observed' ? variable.value ?? '' : variableStatusLabel(variable.status)
+  const statusText = variable.status === 'observed'
+    ? variable.value ?? ''
+    : modelRequestVariableStatusLabel(variable.status)
   return {
     id: variable.id,
     kind: 'variable',
-    label: 'VARIABLE',
+    label: sandboxEvidenceLabels('variable').badge,
     preview: variable.name,
     evidenceId: `variable:${variable.id}`,
     target: modelAnalysisVariableTargetId(variable.id),
@@ -250,18 +284,11 @@ function variableNavigationItem(variable: SandboxModelRequestVariable): ModelReq
   }
 }
 
-function variableStatusLabel(status: SandboxModelRequestVariable['status']): string {
-  if (status === 'ambiguous') return '展开值存在歧义'
-  if (status === 'stale') return '预设快照已变化'
-  if (status === 'unsupported') return '表达式不支持定位'
-  return '未在模型请求中观察到展开值'
-}
-
 function messageNavigationItem(message: ModelConversationMessage): ModelRequestAnalysisNavigationItem {
   return {
     id: message.evidenceId,
-    kind: message.role === 'tool' ? 'tool-result' : 'message',
-    label: message.role === 'tool' ? 'TOOL RESULT' : message.role.toUpperCase(),
+    kind: message.kind,
+    label: sandboxEvidenceLabels(message.kind).badge,
     index: message.index,
     preview: compactAnalysisText(message.content || message.reasoning || message.toolCalls[0]?.name || '无文本内容'),
     evidenceId: message.evidenceId,

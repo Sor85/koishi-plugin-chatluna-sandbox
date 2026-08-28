@@ -1280,7 +1280,8 @@
   background: color-mix(in srgb, var(--webqq-role-response) 12%, var(--webqq-surface));
 }
 
-.webqq-model-trajectory-row.is-tool .webqq-model-trajectory-kind {
+.webqq-model-trajectory-row.is-tool-call .webqq-model-trajectory-kind,
+.webqq-model-trajectory-row.is-tool-result .webqq-model-trajectory-kind {
   color: var(--webqq-role-tool-interaction);
   background: color-mix(in srgb, var(--webqq-role-tool-interaction) 13%, var(--webqq-surface));
 }
@@ -1937,7 +1938,7 @@
 .webqq-model-analysis-nav-group.is-assistant { --webqq-role: var(--webqq-role-assistant); }
 .webqq-model-analysis-nav-group.is-response { --webqq-role: var(--webqq-role-response); }
 .webqq-model-analysis-nav-group.is-tool { --webqq-role: var(--webqq-role-tool); }
-.webqq-model-analysis-nav-group.is-variables { --webqq-role: var(--webqq-role-variable); }
+.webqq-model-analysis-nav-group.is-variable { --webqq-role: var(--webqq-role-variable); }
 .webqq-model-analysis-nav-heading {
   justify-content: flex-start;
   gap: 6px;
@@ -2051,7 +2052,7 @@
 .webqq-model-analysis-card.is-user { --webqq-role: var(--webqq-role-user); }
 .webqq-model-analysis-card.is-assistant { --webqq-role: var(--webqq-role-assistant); }
 .webqq-model-analysis-card.is-response { --webqq-role: var(--webqq-role-response); }
-.webqq-model-analysis-card.is-tool { --webqq-role: var(--webqq-role-tool-interaction); }
+.webqq-model-analysis-card.is-tool-result { --webqq-role: var(--webqq-role-tool-interaction); }
 .webqq-model-analysis-tool-card { --webqq-role: var(--webqq-role-tool); }
 .webqq-model-analysis-card.is-located,
 .webqq-model-analysis-tool-card.is-located,

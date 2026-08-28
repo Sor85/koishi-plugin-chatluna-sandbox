@@ -1,81 +1,44 @@
-import type { SandboxModelRequestTrajectoryRow } from '../../src/types'
-import type { ModelRequestAnalysisGroupKey, ModelRequestAnalysisItemKind } from './model-request-analysis'
+import {
+  SANDBOX_EVIDENCE_KINDS,
+  sandboxEvidenceLabels,
+  type SandboxEvidenceKind,
+} from '../../src/evidence-kind'
 
 /**
  * 模型证据显示过滤。
  *
- * 轨迹账本、分析导航和分析卡片共用同一份过滤定义：种类取自用户在两个视图里看到的同一套标签
- * （SYSTEM / USER / ASSISTANT / VARIABLE / TOOL DEFS / TOOL CALL / TOOL RESULT）。任何一侧自己重算一套判定，
- * 都会让同一条证据在两个视图里出现和消失得不一致。
+ * 轨迹账本、分析导航和分析卡片共用同一份过滤定义：种类就是证据种类 module 的基础证据种类本身，
+ * 标签也来自那里。任何一侧自己重算一套判定或另列一张标签表，都会让同一条证据在两个视图里
+ * 出现和消失得不一致，或者在同屏读出两种说法。
  */
-export type ModelEvidenceFilterKind =
-  | 'system'
-  | 'user'
-  | 'assistant'
-  | 'variable'
-  | 'tool-definition'
-  | 'tool-call'
-  | 'tool-result'
-
 export interface ModelEvidenceFilter {
-  hiddenKinds: ReadonlySet<ModelEvidenceFilterKind>
+  hiddenKinds: ReadonlySet<SandboxEvidenceKind>
 }
 
-export const MODEL_EVIDENCE_FILTER_KINDS: readonly { kind: ModelEvidenceFilterKind, label: string }[] = [
-  { kind: 'system', label: 'SYSTEM' },
-  { kind: 'user', label: 'USER' },
-  { kind: 'assistant', label: 'ASSISTANT' },
-  { kind: 'variable', label: 'VARIABLE' },
-  { kind: 'tool-definition', label: 'TOOL DEFS' },
-  { kind: 'tool-call', label: 'TOOL CALL' },
-  { kind: 'tool-result', label: 'TOOL RESULT' },
-]
+/**
+ * 过滤开关暴露的种类：八种基础证据种类里的七种，不含模型响应。
+ *
+ * 暴露哪个子集是视图决策，与组成图只用聚合后的五档、导航只用聚合后的六档同理。
+ * 因此模型响应种类不参与过滤：响应分组不会被 ASSISTANT 之类的开关连带隐藏。
+ */
+export const MODEL_EVIDENCE_FILTER_KINDS: readonly { kind: SandboxEvidenceKind, label: string }[] =
+  SANDBOX_EVIDENCE_KINDS
+    .filter(kind => kind !== 'response')
+    .map(kind => ({ kind, label: sandboxEvidenceLabels(kind).badge }))
 
 export const EMPTY_MODEL_EVIDENCE_FILTER: ModelEvidenceFilter = {
   hiddenKinds: new Set(),
 }
 
 /**
- * 轨迹行 → 过滤种类。
+ * 判断一条证据当前是否可见。
  *
- * 请求边界行没有对应的模型证据（它是请求本身），返回 undefined 表示不参与种类过滤，
+ * `kind` 为 undefined 表示这一条不参与种类过滤——请求边界行没有对应的模型证据（它是请求本身），
  * 否则把整条请求过滤掉之后账本会连边界一起消失，看不出还有哪些请求。
  */
-export function trajectoryRowFilterKind(
-  row: Pick<SandboxModelRequestTrajectoryRow, 'kind' | 'toolEvent'>,
-): ModelEvidenceFilterKind | undefined {
-  if (row.kind === 'request') return undefined
-  if (row.kind === 'variable') return 'variable'
-  if (row.kind !== 'tool') return row.kind
-  if (row.toolEvent === 'definition') return 'tool-definition'
-  if (row.toolEvent === 'result') return 'tool-result'
-  return 'tool-call'
-}
-
-/** 请求消息角色 → 过滤种类。tool 角色的消息就是请求里携带的工具结果。 */
-export function messageRoleFilterKind(role: 'system' | 'user' | 'assistant' | 'tool'): ModelEvidenceFilterKind {
-  return role === 'tool' ? 'tool-result' : role
-}
-
-/** 分析导航项 → 过滤种类。message 类导航项的分组键就是消息角色。 */
-export function analysisItemFilterKind(
-  itemKind: ModelRequestAnalysisItemKind,
-  groupKey: ModelRequestAnalysisGroupKey,
-): ModelEvidenceFilterKind | undefined {
-  if (itemKind === 'tool-call') return 'tool-call'
-  if (itemKind === 'tool-result') return 'tool-result'
-  if (itemKind === 'tool-definition') return 'tool-definition'
-  if (itemKind === 'variable') return 'variable'
-  // 响应分组头部代表整张响应卡片，不属于任何单一角色，不参与种类过滤。
-  if (itemKind === 'response') return undefined
-  if (groupKey === 'system' || groupKey === 'user' || groupKey === 'assistant') return messageRoleFilterKind(groupKey)
-  // tool 角色的消息在导航里种类是 tool-result，走不到这里；response 分组头部没有单一角色。
-  return undefined
-}
-
 export function isEvidenceVisible(
   filter: ModelEvidenceFilter,
-  kind: ModelEvidenceFilterKind | undefined,
+  kind: SandboxEvidenceKind | undefined,
 ): boolean {
   return !(kind !== undefined && filter.hiddenKinds.has(kind))
 }

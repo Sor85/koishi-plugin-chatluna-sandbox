@@ -24,11 +24,12 @@ describe('模型请求对话视图归一化', () => {
       tools: [{ type: 'function', function: { name: 'weather', description: '查询天气', parameters: { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] } } }],
     } }))
 
-    expect(conversation.messages.map(({ index, role, path }) => ({ index, role, path }))).toEqual([
-      { index: 0, role: 'system', path: ['messages', '0'] },
-      { index: 1, role: 'user', path: ['messages', '1'] },
-      { index: 2, role: 'assistant', path: ['messages', '2'] },
-      { index: 3, role: 'tool', path: ['messages', '3'] },
+    expect(conversation.messages.map(({ index, kind, path }) => ({ index, kind, path }))).toEqual([
+      { index: 0, kind: 'system', path: ['messages', '0'] },
+      { index: 1, kind: 'user', path: ['messages', '1'] },
+      { index: 2, kind: 'assistant', path: ['messages', '2'] },
+      // tool 角色的请求消息就是请求里携带的工具结果，卡片按这一档基础证据种类归类。
+      { index: 3, kind: 'tool-result', path: ['messages', '3'] },
     ])
     expect(conversation.messages[2]?.toolCalls[0]).toMatchObject({ id: 'call-1', name: 'weather', arguments: '{"city":"北京"}' })
     expect(conversation.messages[3]?.toolCallId).toBe('call-1')
@@ -44,7 +45,7 @@ describe('模型请求对话视图归一化', () => {
       ],
       tools: [{ name: 'lookup', input_schema: { type: 'object' } }],
     } }))
-    expect(anthropic.messages[0]).toMatchObject({ role: 'system', content: 'Anthropic 系统', path: ['system', '0'] })
+    expect(anthropic.messages[0]).toMatchObject({ kind: 'system', content: 'Anthropic 系统', path: ['system', '0'] })
 
     const gemini = parseModelRequestConversationDetail(detail({ requestBody: {
       systemInstruction: {
@@ -59,11 +60,11 @@ describe('模型请求对话视图归一化', () => {
       ],
       tools: [{ functionDeclarations: [{ name: 'lookup', description: '查询', parameters: { type: 'object' } }] }],
     } }))
-    expect(gemini.messages.slice(0, 2).map(({ role, content, path }) => ({ role, content, path }))).toEqual([
-      { role: 'system', content: 'Gemini 系统一', path: ['systemInstruction', 'parts', '0'] },
-      { role: 'system', content: 'Gemini 系统二', path: ['systemInstruction', 'parts', '1'] },
+    expect(gemini.messages.slice(0, 2).map(({ kind, content, path }) => ({ kind, content, path }))).toEqual([
+      { kind: 'system', content: 'Gemini 系统一', path: ['systemInstruction', 'parts', '0'] },
+      { kind: 'system', content: 'Gemini 系统二', path: ['systemInstruction', 'parts', '1'] },
     ])
-    expect(gemini.messages.map(({ role }) => role)).toEqual(['system', 'system', 'assistant', 'tool'])
+    expect(gemini.messages.map(({ kind }) => kind)).toEqual(['system', 'system', 'assistant', 'tool-result'])
     expect(gemini.messages[2]?.toolCalls[0]).toMatchObject({ name: 'lookup' })
     expect(gemini.tools[0]).toMatchObject({ name: 'lookup', path: ['tools', '0', 'functionDeclarations', '0'] })
   })
@@ -81,7 +82,7 @@ describe('模型请求对话视图归一化', () => {
       responseBodyRaw: 'data: {"choices":[{"delta":{"reasoning_content":"思考"}}]}\n\ndata: {"choices":[{"delta":{"content":"答案"},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":2}}\n\ndata: [DONE]\n\n',
     }))
 
-    expect(conversation.messages.map(({ role }) => role)).toEqual(['user', 'assistant', 'tool'])
+    expect(conversation.messages.map(({ kind }) => kind)).toEqual(['user', 'assistant', 'tool-result'])
     expect(conversation.messages[1]?.toolCalls[0]).toMatchObject({ id: 'call-1', name: 'search' })
     expect(conversation.messages[2]).toMatchObject({ toolCallId: 'call-1', content: '新闻结果' })
     expect(conversation.response).toMatchObject({ format: 'sse', reasoning: ['思考'], content: ['答案'], finishReasons: ['stop'] })
@@ -122,7 +123,7 @@ describe('模型请求对话视图归一化', () => {
     } }))
 
     expect(conversation.messages[0]).toMatchObject({
-      role: 'user',
+      kind: 'user',
       content: '查询订单',
       contentParts: [
         { kind: 'text', value: '查询订单' },
@@ -130,12 +131,12 @@ describe('模型请求对话视图归一化', () => {
       ],
     })
     expect(conversation.messages[1]).toMatchObject({
-      role: 'assistant',
+      kind: 'assistant',
       reasoning: '需要查询工具',
       toolCalls: [{ id: 'call-1', name: 'lookupOrder', arguments: '{\n  "id": 42\n}' }],
     })
     expect(conversation.messages[2]).toMatchObject({
-      role: 'tool',
+      kind: 'tool-result',
       toolCallId: 'call-1',
       content: '{\n  "status": "paid"\n}',
     })
@@ -161,10 +162,10 @@ describe('模型请求对话视图归一化', () => {
       }],
     } }))
 
-    expect(conversation.messages.map(({ role, content }) => ({ role, content }))).toEqual([
-      { role: 'assistant', content: '调用前' },
-      { role: 'tool', content: '工具结果' },
-      { role: 'assistant', content: '调用后' },
+    expect(conversation.messages.map(({ kind, content }) => ({ kind, content }))).toEqual([
+      { kind: 'assistant', content: '调用前' },
+      { kind: 'tool-result', content: '工具结果' },
+      { kind: 'assistant', content: '调用后' },
     ])
     expect(conversation.messages[0]).toMatchObject({
       path: ['messages', '0', 'parts', '0'],
@@ -195,10 +196,10 @@ describe('模型请求对话视图归一化', () => {
       tools: [{ functionDeclarations: [{ name: 'gemini', parameters: { type: 'object' } }] }],
     } }))
 
-    expect(conversation.messages.slice(0, 3).map(({ role, content, path }) => ({ role, content, path }))).toEqual([
-      { role: 'system', content: '第一条系统约束', path: ['system_instruction'] },
-      { role: 'system', content: '第二条系统约束', path: ['system', '0'] },
-      { role: 'system', content: '第三条系统约束', path: ['system', '1'] },
+    expect(conversation.messages.slice(0, 3).map(({ kind, content, path }) => ({ kind, content, path }))).toEqual([
+      { kind: 'system', content: '第一条系统约束', path: ['system_instruction'] },
+      { kind: 'system', content: '第二条系统约束', path: ['system', '0'] },
+      { kind: 'system', content: '第三条系统约束', path: ['system', '1'] },
     ])
     expect(conversation.messages[3]?.contentParts).toEqual([
       { kind: 'text', value: '识别图片' },

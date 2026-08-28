@@ -85,7 +85,7 @@
             :key="message.evidenceId"
             class="webqq-model-analysis-card"
             :class="[
-              `is-${message.role}`,
+              `is-${message.kind}`,
               {
                 'is-collapsed': isCardCollapsed(modelAnalysisTargetId(message.evidenceId)),
                 'is-muted': normalizedSearch && !messageMatches(message),
@@ -97,7 +97,7 @@
               @mousedown="preventCardHeaderDoubleClickSelection"
               @click="toggleCardFromHeader($event, modelAnalysisTargetId(message.evidenceId))"
             >
-              <span class="webqq-model-analysis-role"><AnalysisHighlightedText :value="roleLabel(message.role)" :query="normalizedSearch" /></span>
+              <span class="webqq-model-analysis-role"><AnalysisHighlightedText :value="evidenceBadgeLabel(message.kind)" :query="normalizedSearch" /></span>
               <span class="webqq-model-analysis-index">#{{ message.index }}</span>
               <span class="webqq-model-analysis-path">{{ formatEvidencePath(message.path) }}</span>
               <span class="webqq-model-analysis-chars">{{ message.characters }} chars</span>
@@ -220,7 +220,7 @@
                   @mousedown="preventCardHeaderDoubleClickSelection"
                   @click="toggleCardFromHeader($event, modelAnalysisVariableTargetId(variable.id))"
                 >
-                  <span class="webqq-model-analysis-role">variable</span>
+                  <span class="webqq-model-analysis-role">{{ evidenceBadgeLabel('variable') }}</span>
                   <strong><AnalysisHighlightedText :value="variable.name" :query="normalizedSearch" /></strong>
                   <span class="webqq-model-analysis-variable-preset">{{ variable.presetName }}</span>
                   <Tooltip v-if="historyPreview(variable)">
@@ -268,7 +268,7 @@
                     :search-query="normalizedSearch"
                     compact
                   />
-                  <p v-else class="webqq-model-analysis-variable-status">{{ variableStatusLabel(variable.status) }}</p>
+                  <p v-else class="webqq-model-analysis-variable-status">{{ modelRequestVariableStatusLabel(variable.status) }}</p>
                 </div>
               </article>
             </div>
@@ -291,7 +291,7 @@
               @mousedown="preventCardHeaderDoubleClickSelection"
               @click="toggleCardFromHeader($event, MODEL_ANALYSIS_RESPONSE_TARGET)"
             >
-              <span class="webqq-model-analysis-role">响应</span>
+              <span class="webqq-model-analysis-role">{{ evidenceBadgeLabel('response') }}</span>
               <span class="webqq-model-analysis-path">{{ responseFormatLabel }}</span>
               <span class="webqq-model-analysis-chars">{{ responseCharacters }} chars</span>
               <Tooltip>
@@ -488,6 +488,7 @@ import {
   exceedsAnalysisLineLimit,
   formatEvidencePath,
   isPreviewableConversationImage,
+  matchesAnalysisSearch,
   MODEL_ANALYSIS_RESPONSE_TARGET,
   MODEL_ANALYSIS_TOOLS_TARGET,
   modelAnalysisTargetId,
@@ -511,20 +512,19 @@ import {
 import { buildModelRequestJsonTree, type ModelRequestJsonNode } from './model-request-json'
 import {
   EMPTY_MODEL_EVIDENCE_FILTER,
-  analysisItemFilterKind,
   isEvidenceVisible,
-  messageRoleFilterKind,
   type ModelEvidenceFilter,
 } from './model-request-filter'
 import {
   parseModelRequestConversationDetail,
   type ModelConversationContentPart,
   type ModelConversationMessage,
-  type ModelConversationRole,
   type ModelConversationTool,
   type ModelConversationToolCall,
   type ModelRequestConversation,
 } from './model-request-conversation'
+import { sandboxEvidenceLabels, type SandboxEvidenceKind } from '../../src/evidence-kind'
+import { modelRequestVariableStatusLabel } from '../../src/model-request-variables'
 import type { SandboxModelRequestDetail, SandboxModelRequestStatus, SandboxModelRequestTrajectory, SandboxModelRequestVariable } from '../../src/types'
 
 const props = defineProps<{
@@ -548,15 +548,13 @@ const response = computed(() => conversation.value.response!)
 const navigation = computed(() => buildModelRequestAnalysisNavigation(conversation.value, props.detail))
 const evidenceFilter = computed(() => props.filter ?? EMPTY_MODEL_EVIDENCE_FILTER)
 const visibleNavigationGroups = computed(() => navigation.value.groups.flatMap((group) => {
-  const items = group.items.filter(item => isEvidenceVisible(
-    evidenceFilter.value,
-    analysisItemFilterKind(item.kind, group.key),
-  ))
+  // 导航项的种类就是基础证据种类，可以直接参与过滤判定，不需要先翻译一次。
+  const items = group.items.filter(item => isEvidenceVisible(evidenceFilter.value, item.kind))
   return items.length ? [{ ...group, count: items.length, items }] : []
 }))
 const visibleMessages = computed(() => conversation.value.messages.filter(message => isEvidenceVisible(
   evidenceFilter.value,
-  messageRoleFilterKind(message.role),
+  message.kind,
 )))
 const variablesVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'variable'))
 const requestToolCallsVisible = computed(() => isEvidenceVisible(evidenceFilter.value, 'tool-call'))
@@ -596,12 +594,6 @@ const toolSearchTexts = computed(() => new Map(
   conversation.value.tools.map(tool => [tool.evidenceId, tool.searchText.toLocaleLowerCase('zh-CN')]),
 ))
 const responseSearchText = computed(() => response.value.searchText.toLocaleLowerCase('zh-CN'))
-const variableSearchTexts = computed(() => new Map(
-  (props.detail.variables ?? []).map(variable => [
-    variable.id,
-    `${variable.name}\n${variable.value ?? ''}\n${variable.presetName}`.toLocaleLowerCase('zh-CN'),
-  ]),
-))
 const responseMatches = computed(() => !normalizedSearch.value || responseSearchText.value.includes(normalizedSearch.value))
 const responseCharacters = computed(() => [
   ...response.value.content,
@@ -847,16 +839,16 @@ function toggleNavigationGroup(group: ModelRequestAnalysisGroupKey) {
 }
 
 function itemMatches(item: ModelRequestAnalysisNavigationItem) {
-  return !normalizedSearch.value || item.searchText.includes(normalizedSearch.value)
+  return matchesAnalysisSearch(navigation.value, item.id, normalizedSearch.value)
 }
 
 function messageMatches(message: ModelConversationMessage) {
   return !normalizedSearch.value || Boolean(messageSearchTexts.value.get(message.evidenceId)?.includes(normalizedSearch.value))
 }
 
+/** 变量卡片与左侧导航项读同一张搜索文本表；卡片自己重算一份会让两侧对同一个查询词给出相反结论。 */
 function variableMatches(variable: SandboxModelRequestVariable) {
-  if (!normalizedSearch.value) return true
-  return Boolean(variableSearchTexts.value.get(variable.id)?.includes(normalizedSearch.value))
+  return matchesAnalysisSearch(navigation.value, variable.id, normalizedSearch.value)
 }
 
 function toolMatches(tool: ModelConversationTool) {
@@ -898,13 +890,6 @@ function toolCallArgumentsJsonTree(call: ModelConversationToolCall): ModelReques
 
 function toolParametersJsonTree(tool: ModelConversationTool): ModelRequestJsonNode {
   return cachedJsonTree(`parameters:${tool.evidenceId}`, 'parameters', () => tool.parameters || {})
-}
-
-function variableStatusLabel(status: SandboxModelRequestVariable['status']) {
-  if (status === 'ambiguous') return '该表达式在请求消息中存在多个可能的展开范围，无法唯一确定变量值。'
-  if (status === 'stale') return '运行时预设模板与表达式不一致。'
-  if (status === 'unsupported') return '该表达式不支持映射为模型请求变量。'
-  return '该表达式未在这次模型请求中产生可观察值。'
 }
 
 async function locateRequestedEvidence() {
@@ -1031,11 +1016,9 @@ function toggleToolFromSummary(path: string) {
   toggleTool(path)
 }
 
-function roleLabel(role: ModelConversationRole) {
-  if (role === 'system') return 'system'
-  if (role === 'user') return 'user'
-  if (role === 'assistant') return 'assistant'
-  return 'tool'
+function evidenceBadgeLabel(kind: SandboxEvidenceKind) {
+  // 徽标语境统一取全大写变体；`.webqq-model-analysis-role` 自己做小写排版。
+  return sandboxEvidenceLabels(kind).badge
 }
 
 function groupIcon(group: ModelRequestAnalysisGroupKey): Component {
@@ -1043,7 +1026,7 @@ function groupIcon(group: ModelRequestAnalysisGroupKey): Component {
   if (group === 'user') return IconUser
   if (group === 'assistant') return IconRobot
   if (group === 'tool') return IconTool
-  if (group === 'variables') return IconBraces
+  if (group === 'variable') return IconBraces
   return IconMessage
 }
 

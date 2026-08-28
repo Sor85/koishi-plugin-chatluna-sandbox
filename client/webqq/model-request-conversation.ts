@@ -1,4 +1,5 @@
 import type { SandboxModelRequestDetail, SandboxModelRequestUsage } from '../../src/types'
+import type { SandboxEvidenceKind } from '../../src/evidence-kind'
 import {
   countMessageCharacters,
   projectModelEvidence,
@@ -8,7 +9,11 @@ import {
   type ModelEvidenceSource,
 } from '../../src/model-evidence'
 
-export type ModelConversationRole = 'system' | 'user' | 'assistant' | 'tool'
+/** 请求消息卡片能落在哪些基础证据种类上。tool 角色的消息就是请求里携带的工具结果。 */
+export type ModelConversationMessageKind = Extract<
+  SandboxEvidenceKind,
+  'system' | 'user' | 'assistant' | 'tool-result'
+>
 export type ModelConversationSource = 'request' | 'response'
 export type ModelConversationFormat = 'json' | 'sse' | 'text'
 
@@ -25,7 +30,7 @@ export interface ModelConversationMessage {
   evidenceId: string
   /** 卡片显示序号。跨视图定位一律使用 evidenceId，序号只是给人看的。 */
   index: number
-  role: ModelConversationRole
+  kind: ModelConversationMessageKind
   source: ModelConversationSource
   content: string
   contentParts: readonly ModelConversationContentPart[]
@@ -150,10 +155,12 @@ function createMessage(message: ModelEvidenceMessage, index: number): ModelConve
     name: call.name,
     ...(call.arguments !== undefined ? { arguments: call.arguments } : {}),
   }))
+  // 投影的消息角色描述协议识别结果；卡片按基础证据种类归类，因此 tool 角色落在工具结果这一档。
+  const kind: ModelConversationMessageKind = message.role === 'tool' ? 'tool-result' : message.role
   return {
     evidenceId: message.evidenceId,
     index,
-    role: message.role,
+    kind,
     source: 'request',
     content: message.text,
     contentParts: message.contentParts,

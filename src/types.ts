@@ -1,3 +1,5 @@
+import type { SandboxEvidenceCompositionKind, SandboxEvidenceKind } from './evidence-kind'
+
 // 账号资料、好友备注、群成员资料和机器人运行资料保持独立类型，避免把备注/群名片误当成全局资料。
 export type SandboxAccountSex = 'male' | 'female' | 'unknown'
 
@@ -593,7 +595,13 @@ export interface SandboxModelRequestRecordsPage<T extends SandboxModelRequestLis
   capacity: SandboxModelRequestCapacity
 }
 
-export type SandboxModelRequestTrajectoryKind = 'system' | 'user' | 'variable' | 'assistant' | 'tool' | 'request'
+/**
+ * 轨迹账本的行种类：一维基础证据种类，外加视图特有的请求边界行。
+ *
+ * 请求边界不是证据，而是「一次模型请求从这里开始」的结构标记；
+ * 隐藏全部证据种类后仍要能看出有哪些请求，因此它不并入基础证据种类。
+ */
+export type SandboxModelRequestTrajectoryKind = SandboxEvidenceKind | 'request'
 
 export interface SandboxModelRequestTrajectoryRow {
   id: string
@@ -604,7 +612,6 @@ export interface SandboxModelRequestTrajectoryRow {
   evidenceId?: string
   callId?: string
   toolName?: string
-  toolEvent?: 'definition' | 'call' | 'result'
   variableId?: string
   variableName?: string
   variablePresetName?: string
@@ -617,12 +624,8 @@ export interface SandboxModelRequestTrajectoryRow {
   status?: SandboxModelRequestStatus
 }
 
-export type SandboxModelRequestPromptKind =
-  | 'system'
-  | 'user'
-  | 'assistant'
-  | 'tool-definition'
-  | 'tool-interaction'
+/** 请求组成项的种类：基础证据种类的子集加工具交互聚合，聚合成员由证据种类 module 声明。 */
+export type SandboxModelRequestPromptKind = SandboxEvidenceCompositionKind
 
 export interface SandboxModelRequestPromptCompositionItem {
   kind: SandboxModelRequestPromptKind
