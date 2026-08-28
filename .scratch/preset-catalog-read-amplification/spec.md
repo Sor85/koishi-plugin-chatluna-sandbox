@@ -1,6 +1,6 @@
 # 预设目录读取放大规格
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 

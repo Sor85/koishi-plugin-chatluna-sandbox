@@ -26,18 +26,32 @@ function expectRepositoryError(code: string) {
 }
 
 describe('文件系统预设仓库', () => {
-  it('只列出对应固定根目录中的 .yml 普通文件，并按文件名稳定排序', async () => {
+  it('只读取对应固定根目录中的 .yml 普通文件，按文件名稳定排序并交出完整文档', async () => {
     const { coreRoot, characterRoot, repository } = await createRepository()
     await mkdir(join(coreRoot, 'directory.yml'))
     await writeFile(join(coreRoot, 'z.yml'), 'prompts: []\n')
-    await writeFile(join(coreRoot, 'a.yml'), 'prompts: []\n')
+    await writeFile(join(coreRoot, 'a.yml'), 'keywords:\n  - alpha\nprompts:\n  - content: "Hi {name}"\n')
     await writeFile(join(coreRoot, 'legacy.txt'), 'ignored')
     await writeFile(join(coreRoot, 'other.yaml'), 'ignored')
     await writeFile(join(characterRoot, 'character.yml'), 'system: hi\ninput: there\n')
     await symlink(join(coreRoot, 'a.yml'), join(coreRoot, 'linked.yml'))
 
-    expect((await repository.list('core')).map(({ fileName }) => fileName)).toEqual(['a.yml', 'z.yml'])
-    expect((await repository.list('character')).map(({ fileName }) => fileName)).toEqual(['character.yml'])
+    const core = await repository.readAll('core')
+
+    expect(core.map(({ fileName }) => fileName)).toEqual(['a.yml', 'z.yml'])
+    expect((await repository.readAll('character')).map(({ fileName }) => fileName)).toEqual(['character.yml'])
+    // 按目录读取一次就交出完整内容与解析结果，调用方不需要再按文件名读一遍。
+    expect(core[0]).toEqual(await repository.read('core', 'a.yml'))
+    expect(core[0]).toEqual(expect.objectContaining({
+      source: expect.stringContaining('keywords:'),
+      revision: expect.stringMatching(/^[a-f0-9]{64}$/),
+      size: expect.any(Number),
+      modifiedAt: expect.any(String),
+      document: expect.objectContaining({
+        displayName: 'alpha',
+        expressions: [expect.objectContaining({ content: 'name' })],
+      }),
+    }))
   })
 
   it('创建和读取时保留原始 YAML，并返回可复查的内容 revision 与语义文档', async () => {
@@ -225,7 +239,7 @@ describe('文件系统预设仓库', () => {
       expectedRevision: renamed.revision,
       confirmed: true,
     })
-    expect(await repository.list('core')).toEqual([])
+    expect(await repository.readAll('core')).toEqual([])
   })
 
   it('拒绝路径穿越、非 .yml 名称、目标碰撞与文件 symlink', async () => {
@@ -259,7 +273,7 @@ describe('文件系统预设仓库', () => {
     await rm(coreRoot, { recursive: true })
     await symlink(replacement, coreRoot)
 
-    await expect(repository.list('core')).rejects.toEqual(expectRepositoryError('unsafe-root'))
+    await expect(repository.readAll('core')).rejects.toEqual(expectRepositoryError('unsafe-root'))
     expect(await readdir(replacement)).toEqual([])
   })
 

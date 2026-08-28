@@ -178,4 +178,29 @@ status: "not a {template_field}"
       severity: 'error',
     }))
   })
+
+  it('把展示名称当作解析产物交出：核心预设取第一个关键词，Character 预设取名称字段', () => {
+    expect(parsePresetSourceDocument('core', `keywords:\n  - first\n  - second\nprompts: []\n`).displayName).toBe('first')
+    expect(parsePresetSourceDocument('character', `name: Alice\nsystem: hi\ninput: there\n`).displayName).toBe('Alice')
+
+    expect(parsePresetSourceDocument('core', 'prompts: []\n').displayName).toBeUndefined()
+    expect(parsePresetSourceDocument('core', `keywords: []\nprompts: []\n`).displayName).toBeUndefined()
+    expect(parsePresetSourceDocument('core', `keywords:\n  - "   "\nprompts: []\n`).displayName).toBeUndefined()
+    expect(parsePresetSourceDocument('core', `keywords:\n  - 42\nprompts: []\n`).displayName).toBeUndefined()
+    expect(parsePresetSourceDocument('core', `keywords: not-a-list\nprompts: []\n`).displayName).toBeUndefined()
+    expect(parsePresetSourceDocument('character', 'system: hi\ninput: there\n').displayName).toBeUndefined()
+    expect(parsePresetSourceDocument('character', `name: "  "\nsystem: hi\n`).displayName).toBeUndefined()
+  })
+
+  it('展示名称的缺失判定与文档诊断一致：只有 YAML 语法错误才没有展示名称', () => {
+    const malformed = parsePresetSourceDocument('core', `keywords:\n  - broken\nprompts:\n  - content: "unterminated\n`)
+    expect(malformed.diagnostics.some(({ code }) => code === 'yaml-parse-error')).toBe(true)
+    expect(malformed.displayName).toBeUndefined()
+
+    // 模板字段类型诊断不是解析失败：文档仍然可读，展示名称照旧交出。
+    const wrongTemplateType = parsePresetSourceDocument('character', `name: Alice\nsystem: [not, text]\ninput: ok\n`)
+    expect(wrongTemplateType.diagnostics.some(({ code }) => code === 'template-field-not-string')).toBe(true)
+    expect(wrongTemplateType.diagnostics.some(({ code }) => code === 'yaml-parse-error')).toBe(false)
+    expect(wrongTemplateType.displayName).toBe('Alice')
+  })
 })

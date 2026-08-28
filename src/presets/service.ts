@@ -1,5 +1,4 @@
 import { resolve } from 'node:path'
-import { isScalar, isSeq, parseDocument } from 'yaml'
 import { projectModelEvidence } from '../model-evidence'
 import { MAIN_MODEL_REQUEST_SCOPE_ID, type SandboxModelRequestStore } from '../model-request'
 import type { SandboxModelRequestRecord, SandboxPresetRuntimeSnapshot } from '../types'
@@ -115,11 +114,8 @@ export class SandboxPresetService {
 
   async catalog(kind?: PresetDocumentKind): Promise<SandboxPresetDocument[]> {
     const kinds: PresetDocumentKind[] = kind ? [kind] : ['core', 'character']
-    const documents = await Promise.all(kinds.flatMap(async (documentKind) => {
-      const summaries = await this.repository.list(documentKind)
-      return Promise.all(summaries.map(({ fileName }) => this.read({ kind: documentKind, fileName })))
-    }))
-    return documents.flat().sort((left, right) => (
+    const files = await Promise.all(kinds.map((documentKind) => this.repository.readAll(documentKind)))
+    return files.flat().map((file) => this.present(file)).sort((left, right) => (
       left.kind.localeCompare(right.kind)
       || left.displayName?.localeCompare(right.displayName ?? '')
       || left.fileName.localeCompare(right.fileName)
@@ -217,7 +213,7 @@ export class SandboxPresetService {
     return {
       kind: file.kind,
       fileName: file.fileName,
-      displayName: readDisplayName(file.kind, file.source),
+      displayName: file.document.displayName,
       source: file.source,
       revision: file.revision,
       size: file.size,
@@ -250,19 +246,6 @@ export class SandboxPresetService {
 
 export function expressionStableId(expression: Pick<PresetTemplateExpression, 'path' | 'occurrence'>): string {
   return `${JSON.stringify(expression.path)}#${expression.occurrence}`
-}
-
-function readDisplayName(kind: PresetDocumentKind, source: string): string | undefined {
-  const yaml = parseDocument(source, { prettyErrors: false })
-  if (yaml.errors.length) return
-  if (kind === 'character') {
-    const name = yaml.get('name', true)
-    return isScalar(name) && typeof name.value === 'string' && name.value.trim() ? name.value : undefined
-  }
-  const keywords = yaml.get('keywords', true)
-  if (!isSeq(keywords)) return
-  const first = keywords.items[0]
-  return isScalar(first) && typeof first.value === 'string' && first.value.trim() ? first.value : undefined
 }
 
 function resolveExpression(

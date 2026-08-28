@@ -49,6 +49,7 @@ export interface PresetSourceDiagnostic {
 export interface PresetSourceDocument {
   kind: PresetDocumentKind
   source: string
+  displayName?: string
   templateFields: PresetTemplateField[]
   expressions: PresetTemplateExpression[]
   diagnostics: PresetSourceDiagnostic[]

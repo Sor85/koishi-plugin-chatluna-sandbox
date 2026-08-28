@@ -37,15 +37,12 @@ export interface PresetRepositoryRoots {
   characterRoot: string
 }
 
-export interface PresetSummary {
+export interface PresetFile {
   kind: PresetDocumentKind
   fileName: string
   revision: string
   size: number
   modifiedAt: string
-}
-
-export interface PresetFile extends PresetSummary {
   source: string
   document: PresetSourceDocument
 }
@@ -76,7 +73,7 @@ export interface DeletePresetInput {
 }
 
 export interface PresetRepository {
-  list(kind: PresetDocumentKind): Promise<PresetSummary[]>
+  readAll(kind: PresetDocumentKind): Promise<PresetFile[]>
   read(kind: PresetDocumentKind, fileName: string): Promise<PresetFile>
   create(input: CreatePresetInput): Promise<PresetFile>
   save(input: SavePresetInput): Promise<PresetFile>
@@ -122,27 +119,22 @@ export class FileSystemPresetRepository implements PresetRepository {
     }
   }
 
-  async list(kind: PresetDocumentKind): Promise<PresetSummary[]> {
+  async readAll(kind: PresetDocumentKind): Promise<PresetFile[]> {
     const root = await this.requireRoot(kind)
     const entries = await readdir(root.realPath, { withFileTypes: true })
-    const summaries: PresetSummary[] = []
+    const files: PresetFile[] = []
     for (const entry of entries) {
       if (!entry.name.endsWith('.yml') || !entry.isFile()) continue
       try {
-        const file = await this.read(kind, entry.name)
-        summaries.push({
-          kind: file.kind,
-          fileName: file.fileName,
-          revision: file.revision,
-          size: file.size,
-          modifiedAt: file.modifiedAt,
-        })
+        // 串行读取：不安全文件靠异常跳过，改成并发就得把跳过改写成结果过滤。
+        const snapshot = await this.readRegularFileSnapshot(this.filePath(root, entry.name))
+        files.push(this.toPresetFile(kind, entry.name, snapshot.source, snapshot.modifiedAt))
       } catch (error) {
         if (error instanceof PresetRepositoryError && error.code === 'unsafe-file') continue
         throw error
       }
     }
-    return summaries.sort((left, right) => left.fileName.localeCompare(right.fileName))
+    return files.sort((left, right) => left.fileName.localeCompare(right.fileName))
   }
 
   async read(kind: PresetDocumentKind, fileName: string): Promise<PresetFile> {

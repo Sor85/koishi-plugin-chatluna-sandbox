@@ -63,6 +63,47 @@ describe('预设应用服务', () => {
     })
   })
 
+  it('目录先按文档种类再按展示名称排序，文件名只作最后的比较依据', async () => {
+    const { coreRoot, characterRoot, service } = await createService()
+    await writeFile(join(coreRoot, 'aaa.yml'), 'keywords:\n  - zulu\nprompts: []\n')
+    await writeFile(join(coreRoot, 'zzz.yml'), 'keywords:\n  - alpha\nprompts: []\n')
+    await writeFile(join(characterRoot, 'mmm.yml'), 'name: Mika\nsystem: hi\ninput: there\n')
+
+    const catalog = await service.catalog()
+
+    expect(catalog.map(({ fileName, displayName }) => [fileName, displayName])).toEqual([
+      ['mmm.yml', 'Mika'],
+      ['zzz.yml', 'alpha'],
+      ['aaa.yml', 'zulu'],
+    ])
+  })
+
+  it('缺少展示名称与 YAML 有语法错误的预设仍在目录里，并保持既有的文件名兜底位置', async () => {
+    const { coreRoot, characterRoot, service } = await createService()
+    await writeFile(join(coreRoot, 'zeta.yml'), 'keywords:\n  - beta\nprompts: []\n')
+    await writeFile(join(coreRoot, 'alpha.yml'), 'keywords:\n  - alpha\nprompts: []\n')
+    await writeFile(join(coreRoot, 'b-no-display.yml'), 'prompts: []\n')
+    await writeFile(join(coreRoot, 'a-no-display.yml'), 'prompts: []\n')
+    await writeFile(join(coreRoot, 'broken.yml'), 'keywords:\n  - broken\nprompts:\n  - content: "unterminated\n')
+    await writeFile(join(characterRoot, 'zoe.yml'), 'name: Zoe\nsystem: hi\ninput: there\n')
+
+    const catalog = await service.catalog()
+
+    // 缺少展示名称的预设让比较退回文件名，因此这一组核心预设整体按文件名排列。
+    expect(catalog.map(({ fileName, displayName }) => [fileName, displayName])).toEqual([
+      ['zoe.yml', 'Zoe'],
+      ['a-no-display.yml', undefined],
+      ['alpha.yml', 'alpha'],
+      ['b-no-display.yml', undefined],
+      ['broken.yml', undefined],
+      ['zeta.yml', 'beta'],
+    ])
+    // 语法错误的预设仍然可被打开修复，只是不显示从损坏内容里猜出来的名字。
+    expect(catalog.find(({ fileName }) => fileName === 'broken.yml')?.diagnostics)
+      .toContainEqual(expect.objectContaining({ code: 'yaml-parse-error' }))
+    await expect(service.catalog('character')).resolves.toHaveLength(1)
+  })
+
   it('通过仓库执行创建、保存、重命名和删除，并保留显式确认语义', async () => {
     const { service } = await createService()
     const created = await service.create({

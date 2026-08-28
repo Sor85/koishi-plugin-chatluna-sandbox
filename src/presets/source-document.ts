@@ -3,6 +3,7 @@ import {
   isScalar,
   isSeq,
   parseDocument,
+  type Document,
   type Scalar,
 } from 'yaml'
 import type {
@@ -70,7 +71,23 @@ export function parsePresetSourceDocument(kind: PresetDocumentKind, source: stri
 
   const expressions = locatedFields.flatMap((field) => scanTemplateExpressions(field, source))
   const templateFields = locatedFields.map(({ path, range, value }) => ({ path, range, value }))
-  return { kind, source, templateFields, expressions, diagnostics }
+  // 展示名称和模板字段一样是这次解析的产物：语法树已经在手上，不需要再跑一遍普通解析。
+  // 「解析失败」只有一套口径——本次解析报出的 yaml-parse-error 诊断。
+  const displayName = diagnostics.some(({ code }) => code === 'yaml-parse-error')
+    ? undefined
+    : readDisplayName(kind, yaml)
+  return { kind, source, displayName, templateFields, expressions, diagnostics }
+}
+
+function readDisplayName(kind: PresetDocumentKind, yaml: Document): string | undefined {
+  if (kind === 'character') return trimmedScalarString(yaml.get('name', true))
+  const keywords = yaml.get('keywords', true)
+  return isSeq(keywords) ? trimmedScalarString(keywords.items[0]) : undefined
+}
+
+function trimmedScalarString(node: unknown): string | undefined {
+  if (!isScalar(node) || typeof node.value !== 'string' || !node.value.trim()) return undefined
+  return node.value
 }
 
 function collectTemplateField(
