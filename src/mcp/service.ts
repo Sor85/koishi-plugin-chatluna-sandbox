@@ -41,18 +41,23 @@ import {
   type SandboxMcpToolCapability,
 } from './types'
 
-export interface SandboxMcpServiceOptions {
+// 测试凭证配额：四档调用频率上限与三档并发上限。执行位置在本服务的额度消耗与
+// 并发包装两处，与承载 MCP 的 HTTP 监听器无关；监听器不参与限流判定。
+export interface SandboxMcpQuotaConfig {
+  readPerMinute: number
+  mutationPerMinute: number
+  waitPerMinute: number
+  uploadPerMinute: number
+  maxConcurrentMutations: number
+  maxConcurrentWaits: number
+  maxConcurrentUploads: number
+}
+
+export interface SandboxMcpServiceOptions extends Partial<SandboxMcpQuotaConfig> {
   dataDirectory: string
   eventLimit?: number
   callRecordLimit?: number
   uploadedMediaLimit?: number
-  readPerMinute?: number
-  mutationPerMinute?: number
-  waitPerMinute?: number
-  uploadPerMinute?: number
-  maxConcurrentMutations?: number
-  maxConcurrentWaits?: number
-  maxConcurrentUploads?: number
   testSpaces?: SandboxTestSpaceService
   unattributedModelRequests?: SandboxModelRequestStore
 }

@@ -24,7 +24,7 @@ import { installModelRequestCollector, resolveChatLunaPluginClass } from './mode
 import { seedDevelopmentModelRequestErrors } from './model-request-error-preview'
 import { MAIN_MODEL_REQUEST_SCOPE_ID, SandboxModelRequestStore, UNATTRIBUTED_MODEL_REQUEST_SCOPE_ID, type SandboxModelRequestPersistence } from './model-request'
 import { SandboxMcpHttpServer, type SandboxMcpServerConfig } from './mcp/server'
-import { SandboxMcpService } from './mcp/service'
+import { SandboxMcpService, type SandboxMcpQuotaConfig } from './mcp/service'
 import { SandboxTestSpaceService } from './test-spaces'
 import { resolve } from 'node:path'
 import { PresetRuntimeSnapshotTracker, SandboxPresetService, type PresetRuntimeResolvedTarget } from './presets'
@@ -51,12 +51,16 @@ export const inject = {
   optional: ['database', 'chatluna_usage'],
 }
 
+// 用户可见的 MCP 配置分组同时覆盖两个归属：传输交给监听器，配额交给测试控制服务。
+// 依 ADR-0025，配额只能由插件全局配置调整，因此它们与传输并列出现在同一分组里。
+export interface SandboxMcpConfig extends SandboxMcpServerConfig, SandboxMcpQuotaConfig {}
+
 export interface Config extends SandboxAppearance {
   persistenceMode: SandboxPersistenceMode
   sceneMessageLimit: number
   sceneMessageMaxBytes: number
   modelRequestRecordLimit: number
-  mcp: SandboxMcpServerConfig
+  mcp: SandboxMcpConfig
 }
 
 export const Config: Schema<Config> = Schema.object({
@@ -281,7 +285,18 @@ export function apply(ctx: Context, config: Config) {
         testSpaces,
         unattributedModelRequests,
       })
-      const mcpServer = new SandboxMcpHttpServer(inner, mcp, config.mcp)
+      const mcpServer = new SandboxMcpHttpServer(inner, mcp, {
+        // 逐字段构造传输配置：整体传入 config.mcp 会让读代码的人以为监听器也需要配额字段。
+        enabled: config.mcp.enabled,
+        host: config.mcp.host,
+        port: config.mcp.port,
+        path: config.mcp.path,
+        allowedSources: config.mcp.allowedSources,
+        allowedOrigins: config.mcp.allowedOrigins,
+        allowInsecureRemote: config.mcp.allowInsecureRemote,
+        tlsCertPath: config.mcp.tlsCertPath,
+        tlsKeyPath: config.mcp.tlsKeyPath,
+      })
       // chatluna-usage 位于另一个 loader group，Cordis 会为服务建立隔离映射；复用 usage 插件的 Context 才能解析到同一实例。
       const getChatLunaUsage = () => findChatLunaUsage(inner)
       registerConsole(inner.console, control, config, mcp, testSpaces, unattributedModelRequests, getChatLunaUsage, presetService)

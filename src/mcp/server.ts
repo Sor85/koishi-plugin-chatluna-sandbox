@@ -10,6 +10,8 @@ import type { Context } from 'koishi'
 import { SandboxMcpError } from './types'
 import { SandboxMcpService, TOOL_DEFINITIONS } from './service'
 
+// 只描述传输：监听地址、端口、路径、TLS、来源与 Origin 白名单、启用开关。
+// 测试凭证的频率与并发配额由测试控制服务（SandboxMcpQuotaConfig）执行，不在此声明。
 export interface SandboxMcpServerConfig {
   enabled: boolean
   host: string
@@ -20,13 +22,6 @@ export interface SandboxMcpServerConfig {
   allowInsecureRemote: boolean
   tlsCertPath?: string
   tlsKeyPath?: string
-  readPerMinute: number
-  mutationPerMinute: number
-  waitPerMinute: number
-  uploadPerMinute: number
-  maxConcurrentMutations: number
-  maxConcurrentWaits: number
-  maxConcurrentUploads: number
 }
 
 function isLoopback(host: string): boolean {

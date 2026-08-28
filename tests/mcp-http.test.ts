@@ -31,13 +31,6 @@ describe('MCP Streamable HTTP', () => {
       allowedSources: ['127.0.0.0/8', '::1/128'],
       allowedOrigins: ['https://allowed.example'],
       allowInsecureRemote: false,
-      readPerMinute: 120,
-      mutationPerMinute: 60,
-      waitPerMinute: 120,
-      uploadPerMinute: 30,
-      maxConcurrentMutations: 4,
-      maxConcurrentWaits: 8,
-      maxConcurrentUploads: 2,
     })
     await server.start()
     cleanups.push(async () => { await server.stop(); await app.stop() })
@@ -88,8 +81,6 @@ describe('MCP Streamable HTTP', () => {
     const credential = service.createCredential('旧版 SDK 凭证', ['read'])
     const server = new SandboxMcpHttpServer(app, service, {
       enabled: true, host: '127.0.0.1', port: 0, path: '/mcp', allowedSources: ['127.0.0.1'], allowedOrigins: [], allowInsecureRemote: false,
-      readPerMinute: 120, mutationPerMinute: 60, waitPerMinute: 120, uploadPerMinute: 30,
-      maxConcurrentMutations: 4, maxConcurrentWaits: 8, maxConcurrentUploads: 2,
     })
     await server.start()
     cleanups.push(async () => { await server.stop(); await app.stop() })
@@ -113,8 +104,6 @@ describe('MCP Streamable HTTP', () => {
     const service = new SandboxMcpService(control, { dataDirectory: directory })
     const server = new SandboxMcpHttpServer(app, service, {
       enabled: true, host: '0.0.0.0', port: 0, path: '/mcp', allowedSources: [], allowedOrigins: [], allowInsecureRemote: false,
-      readPerMinute: 120, mutationPerMinute: 60, waitPerMinute: 120, uploadPerMinute: 30,
-      maxConcurrentMutations: 4, maxConcurrentWaits: 8, maxConcurrentUploads: 2,
     })
     cleanups.push(() => app.stop())
     await expect(server.start()).rejects.toThrow('必须配置 TLS')
