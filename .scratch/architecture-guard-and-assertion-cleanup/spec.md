@@ -1,6 +1,6 @@
 # 架构守卫规则化与源码断言清理规格
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 
