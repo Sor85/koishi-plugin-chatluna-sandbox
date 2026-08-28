@@ -3,6 +3,7 @@ import type {
   SandboxModelRequestStatus,
   SandboxModelRequestVariable,
 } from '../../src/types'
+import { normalizeEvidencePreviewText } from '../../src/evidence-preview-text'
 import type {
   ModelConversationMessage,
   ModelRequestConversation,
@@ -222,7 +223,7 @@ export function exceedsAnalysisLineLimit(
 }
 
 export function compactAnalysisText(value: string, length = 80): string {
-  const text = value.replace(/\s+/g, ' ').trim()
+  const text = normalizeEvidencePreviewText(value, length)
   if (!text) return '无文本内容'
   return text.length > length ? `${text.slice(0, Math.max(0, length - 1))}…` : text
 }

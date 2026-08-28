@@ -6,40 +6,41 @@
     :style="{ '--webqq-model-history-collapse-height': collapsedHeight }"
   >
     <div class="webqq-model-history-preview" role="list" aria-label="历史消息预览">
-      <article
-        v-for="(message, index) in messages"
-        :key="`${message.messageId || message.id || message.name || 'message'}:${index}`"
-        class="webqq-model-history-message"
-        :class="{ 'is-bot': isBotMessage(message) }"
-        role="listitem"
-      >
-        <HistoryQuote v-if="message.quote" :message="message.quote" />
-        <div class="webqq-model-history-line">
-          <div v-if="metadata(message).length" class="webqq-model-history-meta" aria-label="消息元数据">
-            <TooltipProvider v-for="item in metadata(message)" :key="item.key" :delay-duration="500">
-              <Tooltip>
+      <!-- 一个 Provider 覆盖整段历史：每条消息各自挂一个 Provider 会让组件实例随消息数线性增长。 -->
+      <TooltipProvider :delay-duration="500">
+        <article
+          v-for="entry in displayMessages"
+          :key="entry.key"
+          class="webqq-model-history-message"
+          :class="{ 'is-bot': entry.isBot }"
+          role="listitem"
+        >
+          <HistoryQuote v-if="entry.message.quote" :message="entry.message.quote" />
+          <div class="webqq-model-history-line">
+            <div v-if="entry.metadata.length" class="webqq-model-history-meta" aria-label="消息元数据">
+              <Tooltip v-for="item in entry.metadata" :key="item.key">
                 <TooltipTrigger as-child>
                   <Badge
                     variant="secondary"
-                    :class="metadataClass(message, item)"
+                    :class="metadataClass(entry, item)"
                     tabindex="0"
                   >{{ item.value }}</Badge>
                 </TooltipTrigger>
                 <TooltipContent>{{ item.label }}：{{ item.value }}</TooltipContent>
               </Tooltip>
-            </TooltipProvider>
+            </div>
+            <span class="webqq-model-history-content">
+              <span
+                v-for="(line, lineIndex) in entry.lines"
+                :key="lineIndex"
+                class="webqq-model-history-content-line"
+                :class="{ 'is-single-visual-line': singleVisualLines.has(entry.lineKeys[lineIndex]!) }"
+                :data-history-content-line="entry.lineKeys[lineIndex]"
+              >{{ line }}</span>
+            </span>
           </div>
-          <span class="webqq-model-history-content">
-            <span
-              v-for="(line, lineIndex) in contentLines(message)"
-              :key="lineIndex"
-              class="webqq-model-history-content-line"
-              :class="{ 'is-single-visual-line': singleVisualLines.has(contentLineKey(message, index, lineIndex)) }"
-              :data-history-content-line="contentLineKey(message, index, lineIndex)"
-            >{{ line }}</span>
-          </span>
-        </div>
-      </article>
+        </article>
+      </TooltipProvider>
     </div>
     <button
       v-if="collapsible"
@@ -77,6 +78,47 @@ const previewElement = ref<HTMLElement>()
 const characters = computed(() => props.characters ?? props.messages.reduce((total, message) => total + historyMessageCharacters(message), 0))
 const singleVisualLines = ref(new Set<string>())
 let resizeObserver: ResizeObserver | undefined
+let measureFrame = 0
+
+interface MetadataItem {
+  key: 'name' | 'id' | 'timestamp'
+  label: string
+  value: string
+}
+
+interface HistoryDisplayMessage {
+  key: string
+  message: ModelRequestHistoryMessage
+  metadata: MetadataItem[]
+  lines: string[]
+  lineKeys: string[]
+  isBot: boolean
+}
+
+/**
+ * 逐条消息的渲染事实预先算好。
+ *
+ * 元数据数组、内容分行和行标识原先都是模板里的函数调用：元数据一条消息算两次，
+ * 分行与行标识每次重渲染都重算一遍，长 history 变量下这些分配比渲染本身还贵。
+ */
+const displayMessages = computed<HistoryDisplayMessage[]>(() => props.messages.map((message, index) => {
+  const isBot = Boolean(props.botId && message.id === props.botId)
+  const items = [
+    message.name ? { key: 'name', label: '名称', value: message.name } : undefined,
+    message.id ? { key: 'id', label: 'ID', value: message.id } : undefined,
+    message.timestamp ? { key: 'timestamp', label: '时间', value: message.timestamp } : undefined,
+  ].filter((item): item is MetadataItem => item !== undefined)
+  const identity = message.messageId || message.id || message.name || 'message'
+  const lines = (message.content || '（空消息）').split(/\r\n|\r|\n/)
+  return {
+    key: `${identity}:${index}`,
+    message,
+    metadata: isBot ? items.reverse() : items,
+    lines,
+    lineKeys: lines.map((_line, lineIndex) => `${identity}:${index}:${lineIndex}`),
+    isBot,
+  }
+}))
 
 function historyMessageCharacters(message: ModelRequestHistoryMessage): number {
   return (message.name?.length ?? 0)
@@ -86,6 +128,16 @@ function historyMessageCharacters(message: ModelRequestHistoryMessage): number {
     + (message.quote ? historyMessageCharacters(message.quote) : 0)
 }
 
+// 量测会写回 CSS 变量，而写回本身可能再次触发 ResizeObserver；合并到一帧执行，
+// 并在结果没有变化时不写响应式状态，让这个回路自然收敛。
+function scheduleMeasure() {
+  if (measureFrame) return
+  measureFrame = requestAnimationFrame(() => {
+    measureFrame = 0
+    measurePreview()
+  })
+}
+
 function measurePreview() {
   const preview = previewElement.value?.querySelector<HTMLElement>('.webqq-model-history-preview')
   if (!preview) return
@@ -93,33 +145,58 @@ function measurePreview() {
   collapsible.value = preview.scrollHeight > props.maxHeight + 1
 }
 
+interface MeasuredMessage {
+  message: HTMLElement
+  line: HTMLElement
+  content: HTMLElement
+}
+
 function measureContentWidths(preview: HTMLElement) {
-  const previewRect = preview.getBoundingClientRect()
-  const cardCenter = previewRect.left + previewRect.width / 2
-  const nextSingleVisualLines = new Set<string>()
+  const parts: MeasuredMessage[] = []
   for (const message of preview.querySelectorAll<HTMLElement>('.webqq-model-history-message')) {
     const line = message.querySelector<HTMLElement>('.webqq-model-history-line')
     const content = message.querySelector<HTMLElement>('.webqq-model-history-content')
-    content?.style.removeProperty('--webqq-model-history-content-max-width')
-    if (!line || !content) continue
+    if (line && content) parts.push({ message, line, content })
+  }
 
+  // 清除、读取、写回分成三趟。读写交替时每条消息都会强制一次重排，长 history 下这正是卡顿来源。
+  for (const { content } of parts) content.style.removeProperty('--webqq-model-history-content-max-width')
+  const previewRect = preview.getBoundingClientRect()
+  const cardCenter = previewRect.left + previewRect.width / 2
+  const widths = parts.map(({ message, line }) => {
     const lineRect = line.getBoundingClientRect()
     const width = message.classList.contains('is-bot')
       ? lineRect.right - cardCenter
       : cardCenter - lineRect.left
-    const constrainedWidth = Math.max(0, Math.min(lineRect.width, width))
-    content.style.setProperty('--webqq-model-history-content-max-width', `${constrainedWidth}px`)
+    return Math.max(0, Math.min(lineRect.width, width))
+  })
+  parts.forEach(({ content }, index) => {
+    content.style.setProperty('--webqq-model-history-content-max-width', `${widths[index]}px`)
+  })
 
-    for (const contentLine of content.querySelectorAll<HTMLElement>('[data-history-content-line]')) {
-      if (visualLineCount(contentLine) <= 1) {
-        const key = contentLine.dataset.historyContentLine
-        if (key) nextSingleVisualLines.add(key)
-      }
-    }
-  }
+  const nextSingleVisualLines = measureSingleVisualLines(parts)
   if (!sameSet(singleVisualLines.value, nextSingleVisualLines)) {
     singleVisualLines.value = nextSingleVisualLines
   }
+}
+
+function measureSingleVisualLines(parts: readonly MeasuredMessage[]): Set<string> {
+  const contentLines = parts.flatMap(({ content }) => [...content.querySelectorAll<HTMLElement>('[data-history-content-line]')])
+  const single = new Set<string>()
+  if (!contentLines.length) return single
+  // 内容行是等行高的块级纯文本，用高度判断折行；逐行建 Range 再取 getClientRects
+  // 会随行数线性增加强制重排，长 history 变量下是最贵的一段量测。
+  const lineHeight = Number.parseFloat(getComputedStyle(contentLines[0]!).lineHeight)
+  const measurable = Number.isFinite(lineHeight) && lineHeight > 0
+  for (const contentLine of contentLines) {
+    const key = contentLine.dataset.historyContentLine
+    if (!key) continue
+    const wrapped = measurable
+      ? contentLine.getBoundingClientRect().height > lineHeight * 1.5
+      : visualLineCount(contentLine) > 1
+    if (!wrapped) single.add(key)
+  }
+  return single
 }
 
 function sameSet(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean {
@@ -138,7 +215,6 @@ watch(
     await nextTick()
     measurePreview()
   },
-  { deep: true },
 )
 
 onMounted(async () => {
@@ -146,43 +222,20 @@ onMounted(async () => {
   measurePreview()
   const preview = previewElement.value?.querySelector<HTMLElement>('.webqq-model-history-preview')
   if (typeof ResizeObserver === 'undefined' || !preview) return
-  resizeObserver = new ResizeObserver(measurePreview)
+  resizeObserver = new ResizeObserver(scheduleMeasure)
   resizeObserver.observe(preview)
 })
 
-onBeforeUnmount(() => resizeObserver?.disconnect())
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
+  if (measureFrame) cancelAnimationFrame(measureFrame)
+  measureFrame = 0
+})
 
-interface MetadataItem {
-  key: 'name' | 'id' | 'timestamp'
-  label: string
-  value: string
-}
-
-function metadata(message: ModelRequestHistoryMessage): MetadataItem[] {
-  const items = [
-    message.name ? { key: 'name', label: '名称', value: message.name } : undefined,
-    message.id ? { key: 'id', label: 'ID', value: message.id } : undefined,
-    message.timestamp ? { key: 'timestamp', label: '时间', value: message.timestamp } : undefined,
-  ].filter((item): item is MetadataItem => item !== undefined)
-  return isBotMessage(message) ? items.reverse() : items
-}
-
-function isBotMessage(message: ModelRequestHistoryMessage): boolean {
-  return Boolean(props.botId && message.id === props.botId)
-}
-
-function contentLines(message: ModelRequestHistoryMessage): string[] {
-  return (message.content || '（空消息）').split(/\r\n|\r|\n/)
-}
-
-function contentLineKey(message: ModelRequestHistoryMessage, messageIndex: number, lineIndex: number): string {
-  return `${message.messageId || message.id || message.name || 'message'}:${messageIndex}:${lineIndex}`
-}
-
-function metadataClass(message: ModelRequestHistoryMessage, item: MetadataItem): string | undefined {
+function metadataClass(entry: HistoryDisplayMessage, item: MetadataItem): string | undefined {
   if (item.key === 'id') return 'is-id'
   if (item.key !== 'name' || !props.botId) return undefined
-  return isBotMessage(message) ? 'is-name is-bot' : 'is-name is-user'
+  return entry.isBot ? 'is-name is-bot' : 'is-name is-user'
 }
 
 const HistoryQuote = defineComponent({

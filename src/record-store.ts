@@ -139,11 +139,22 @@ export class InMemoryRecordRows<Record extends SandboxRecordRow, Query extends S
   }
 
   async query(query: Query): Promise<Record[]> {
+    return this.select(query).map((record) => structuredClone(record))
+  }
+
+  /**
+   * 只读出记录的一部分。投影先在存有的行上执行，再拷贝投影结果，因此读取路径不需要的子树
+   * （模型请求的请求体与响应原文）既不会被深拷贝，也不会被交给调用方。
+   */
+  async queryProjected<Projected>(query: Query, project: (record: Record) => Projected): Promise<Projected[]> {
+    return this.select(query).map((record) => structuredClone(project(record)))
+  }
+
+  private select(query: Query): Record[] {
     return [...this.bodies.values()]
       .filter((record) => this.matches(record, query))
       .sort((left, right) => (query.order === 'asc' ? 1 : -1) * (left.sequence - right.sequence))
       .slice(0, Math.max(0, query.limit))
-      .map((record) => structuredClone(record))
   }
 
   async reclaim(limits: SandboxRecordCapacityLimits): Promise<SandboxRecordScopeSummary> {

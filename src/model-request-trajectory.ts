@@ -1,6 +1,5 @@
 import type {
   SandboxModelRequestDetail,
-  SandboxModelRequestListItem,
   SandboxModelRequestPromptCompositionItem,
   SandboxModelRequestPromptKind,
   SandboxModelRequestRecord,
@@ -10,7 +9,9 @@ import type {
   SandboxModelRequestTrajectoryRow,
   SandboxModelRequestVariable,
 } from './types'
-import { presentModelRequestRecord, type SandboxModelRequestStore } from './model-request'
+import { presentModelRequestListItem, type SandboxModelRequestStore } from './model-request'
+import { normalizeEvidencePreviewText } from './evidence-preview-text'
+import { deriveModelRequestVariables } from './model-request-variables'
 import {
   countMessageCharacters,
   countToolCallCharacters,
@@ -42,6 +43,7 @@ interface ProjectedRow {
 }
 
 const CONVERSATION_RECORD_LIMIT = 200
+const TRAJECTORY_PREVIEW_LENGTH = 180
 
 /**
  * 读取会话模式需要的同会话记录。记录库的读取是异步的，而轨迹投影本身是纯函数；
@@ -77,7 +79,7 @@ export function buildSandboxModelRequestTrajectory(
   const sourceRecords = options.mode === 'conversation' && options.conversationRecords
     ? options.conversationRecords
     : [options.record]
-  const records = sourceRecords.map(record => presentModelRequestRecord(record, 'list') as SandboxModelRequestListItem)
+  const records = sourceRecords.map(record => presentModelRequestListItem(record))
   const rows: SandboxModelRequestTrajectoryRow[] = []
   const promptComposition: SandboxModelRequestPromptCompositionItem[] = []
   let index = 1
@@ -90,6 +92,11 @@ export function buildSandboxModelRequestTrajectory(
         ? { responseBodyRaw: record.responseBodyRaw, responseBodyFormat: record.responseBodyFormat }
         : {}),
     })
+    // 变量派生只读投影的请求消息，因此可以直接复用这一份投影。会话模式下每条记录都要派生变量，
+    // 经由详情投影绕一圈会让同一条记录被重复投影三次、重复派生变量两次。
+    const variables = record.requestBody !== undefined && record.presetSnapshots?.length
+      ? deriveModelRequestVariables(record.presetSnapshots, projection)
+      : []
 
     rows.push({
       id: `${record.id}:request`,
@@ -102,7 +109,7 @@ export function buildSandboxModelRequestTrajectory(
       status: record.status,
     })
 
-    for (const row of projectRequestRows(projection, record)) {
+    for (const row of projectRequestRows(projection, variables)) {
       rows.push({
         id: `${record.id}:${row.evidenceId}`,
         index: index++,
@@ -114,8 +121,7 @@ export function buildSandboxModelRequestTrajectory(
     for (const row of projectResponseRows(projection)) {
       rows.push({ id: `${record.id}:${row.evidenceId}`, index: index++, requestId: record.id, source: 'response', ...row })
     }
-    const detail = presentModelRequestRecord(record, 'detail') as SandboxModelRequestDetail
-    for (const item of projectPromptComposition(projection, detail.variables)) {
+    for (const item of projectPromptComposition(projection, variables)) {
       promptComposition.push(options.mode === 'conversation' ? { ...item, requestId: record.id } : item)
     }
   }
@@ -134,7 +140,7 @@ export function buildSandboxModelRequestTrajectory(
 
 function projectRequestRows(
   projection: ModelEvidenceProjection,
-  record: SandboxModelRequestRecord,
+  variables: readonly SandboxModelRequestVariable[],
 ): ProjectedRow[] {
   const rows: ProjectedRow[] = projection.toolDefinitions.map(definition => ({
     evidenceId: definition.evidenceId,
@@ -146,8 +152,7 @@ function projectRequestRows(
   for (const message of projection.requestMessages) {
     rows.push(...messageRows(message))
   }
-  const detail = presentModelRequestRecord(record, 'detail') as SandboxModelRequestDetail
-  for (const variable of detail.variables) {
+  for (const variable of variables) {
     rows.push({
       evidenceId: `variable:${variable.id}`,
       kind: 'variable',
@@ -343,8 +348,8 @@ function requestPreview(record: SandboxModelRequestRecord): string {
 }
 
 function compactText(value: string): string {
-  const normalized = value.replace(/\s+/g, ' ').trim()
-  return normalized.length > 180 ? `${normalized.slice(0, 177)}…` : normalized
+  const normalized = normalizeEvidencePreviewText(value, TRAJECTORY_PREVIEW_LENGTH)
+  return normalized.length > TRAJECTORY_PREVIEW_LENGTH ? `${normalized.slice(0, 177)}…` : normalized
 }
 
 export function statusLabel(status: SandboxModelRequestStatus): string {

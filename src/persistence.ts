@@ -17,11 +17,19 @@ import {
 } from './onebot-debug'
 import {
   InMemoryModelRequestRecords,
+  toModelRequestRecordHeader,
   type SandboxModelRequestPersistence,
   type SandboxModelRequestPersistenceQuery,
+  type SandboxModelRequestRecordHeader,
   type SandboxModelRequestScopeSummary,
 } from './model-request'
 import { ScopeRowIndex } from './record-store'
+
+/** 记录里唯一没有上限的两个字段；列表读取从不投影它们。 */
+export interface SandboxModelRequestRecordBodies {
+  requestBody?: unknown
+  responseBodyRaw?: string
+}
 
 export type SandboxSceneLoadResult =
   | { kind: 'loaded', scene: SandboxSnapshot }
@@ -84,7 +92,13 @@ export interface SandboxOneBotDebugRecordRow {
   record: SandboxOneBotDebugRecord
 }
 
-/** 一条模型请求记录一行。 */
+/**
+ * 一条模型请求记录一行。
+ *
+ * 记录被拆成两列：`header` 是列表读取需要的全部字段，`bodies` 只装请求体与响应原文。
+ * 这两个字段是记录里唯一没有上限的部分，单列存放时列表读取会连它们一起取出并反序列化；
+ * 拆列之后列表查询只投影 `header`，翻页与自动刷新不再按请求体体积付代价。
+ */
 export interface SandboxModelRequestRecordRow {
   scopeId: string
   sequence: number
@@ -96,7 +110,8 @@ export interface SandboxModelRequestRecordRow {
   model: string
   status: SandboxModelRequestStatus
   bytes: number
-  record: SandboxModelRequestRecord
+  header: SandboxModelRequestRecordHeader
+  bodies: SandboxModelRequestRecordBodies
 }
 
 declare module '@koishijs/core' {
@@ -202,7 +217,8 @@ export function registerSandboxModelRequestModel(ctx: Context): void {
     model: 'string(255)',
     status: 'string(32)',
     bytes: 'unsigned',
-    record: 'json',
+    header: 'json',
+    bodies: 'json',
   }, { primary: ['scopeId', 'sequence'] })
   ctx.model.extend(MODEL_REQUEST_SCOPE_TABLE, {
     scopeId: 'string(64)',
@@ -250,6 +266,21 @@ export class MemoryModelRequestPersistence extends InMemoryModelRequestRecords {
 /** 倒序向更早翻页、正序向更晚翻页；两个适配器的序号游标语义必须一致。 */
 function sequenceCursorCondition(order: 'asc' | 'desc', beforeSequence: number) {
   return order === 'asc' ? { $gt: beforeSequence } : { $lt: beforeSequence }
+}
+
+/** 把拆列存放的记录头与正文合回一条完整记录。缺省的正文字段不会变成显式 undefined。 */
+function fromModelRequestRow(row: SandboxModelRequestRecordRow): SandboxModelRequestRecord {
+  return structuredClone({ ...row.header, ...row.bodies ?? {} })
+}
+
+/**
+ * 行是否可读。
+ *
+ * 记录头与正文拆列之前，整条记录存在单独一列里；那些行在新结构下读不出记录身份。
+ * 这里直接丢弃它们，而不是重建旧列：模型请求记录是本地验证证据，不承担跨结构迁移。
+ */
+function isReadableModelRequestRow(row: Pick<SandboxModelRequestRecordRow, 'header'>): boolean {
+  return Boolean(row.header && typeof row.header === 'object' && typeof row.header.id === 'string')
 }
 
 export class KoishiDatabaseOneBotDebugPersistence implements SandboxOneBotDebugPersistence {
@@ -400,7 +431,7 @@ export class KoishiDatabaseModelRequestPersistence implements SandboxModelReques
   async find(recordId: string) {
     const database = this.requireDatabase()
     const [row] = await database.get(MODEL_REQUEST_RECORD_TABLE, { scopeId: this.scopeId, id: recordId }, { limit: 1 })
-    return row ? structuredClone(row.record) : undefined
+    return row && isReadableModelRequestRow(row) ? fromModelRequestRow(row) : undefined
   }
 
   async replace(record: SandboxModelRequestRecord, bytes: number) {
@@ -419,7 +450,19 @@ export class KoishiDatabaseModelRequestPersistence implements SandboxModelReques
       sort: { sequence: query.order },
       limit: Math.max(0, query.limit),
     })
-    return rows.map((row) => structuredClone(row.record))
+    return rows.filter(isReadableModelRequestRow).map((row) => fromModelRequestRow(row))
+  }
+
+  async queryHeaders(query: SandboxModelRequestPersistenceQuery) {
+    const database = this.requireDatabase()
+    // 只投影记录头：请求体与响应原文留在存储里，驱动不必反序列化它们，也不必跨进程搬运。
+    // sequence 一并选出，排序列必须在投影里。
+    const rows = await database.get(MODEL_REQUEST_RECORD_TABLE, this.toRowQuery(query), {
+      fields: ['sequence', 'header'],
+      sort: { sequence: query.order },
+      limit: Math.max(0, query.limit),
+    })
+    return rows.filter(isReadableModelRequestRow).map((row) => structuredClone(row.header))
   }
 
   async reclaim(limits: { maxRecords: number, maxBytes: number }) {
@@ -453,7 +496,11 @@ export class KoishiDatabaseModelRequestPersistence implements SandboxModelReques
       model: record.model ?? '',
       status: record.status,
       bytes,
-      record: structuredClone(record),
+      header: structuredClone(toModelRequestRecordHeader(record)),
+      bodies: structuredClone({
+        ...(record.requestBody !== undefined ? { requestBody: record.requestBody } : {}),
+        ...(record.responseBodyRaw !== undefined ? { responseBodyRaw: record.responseBodyRaw } : {}),
+      }),
     }
   }
 

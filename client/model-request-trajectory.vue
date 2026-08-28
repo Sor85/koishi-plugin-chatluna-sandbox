@@ -441,14 +441,26 @@ const searchQuery = ref('')
 const internalAnalysisLocateRequest = ref<LocateRequest>()
 const inspectorLocateSignal = ref<LocateRequest>()
 const analysisLocateRequest = computed(() => props.externalLocate ?? internalAnalysisLocateRequest.value)
-const selectedRow = computed(() => props.trajectory?.rows.find(({ id }) => id === selectedRowId.value))
+const inspectorLocateRequest = computed(() => inspectorLocateSignal.value)
+// 请求身份表。账本每一行、每一条时间分段都要问「这是第几次请求、叫什么」；
+// 逐行 find/findIndex 会让轨迹随会话请求数变成平方级，而这张表每份轨迹只建一次。
+const requestOrderById = computed(() => new Map(
+  (props.trajectory?.records ?? []).map((record, index) => [record.id, index]),
+))
+const requestLabelById = computed(() => new Map(
+  (props.trajectory?.records ?? []).map(record => [
+    record.id,
+    [record.provider, record.model].filter(Boolean).join(' / ') || '模型请求',
+  ]),
+))
+const rowById = computed(() => new Map((props.trajectory?.rows ?? []).map(row => [row.id, row])))
+const selectedRow = computed(() => rowById.value.get(selectedRowId.value))
 const selectedRequest = computed(() => props.trajectory?.records.find(({ id }) => id === selectedRow.value?.requestId))
 const inspectorDetail = computed(() => {
   const requestId = selectedRow.value?.requestId
   if (!requestId || props.detail?.id !== requestId) return undefined
   return props.detail
 })
-const inspectorLocateRequest = computed(() => inspectorLocateSignal.value)
 const normalizedSearch = computed(() => searchQuery.value.trim().toLocaleLowerCase('zh-CN'))
 const promptComposition = computed(() => {
   const items = props.trajectory?.promptComposition ?? []
@@ -557,6 +569,27 @@ const ledgerRows = computed(() => props.trajectory?.rows.filter((row) => {
   return isEvidenceVisible(evidenceFilter.value, trajectoryRowFilterKind(row))
 }) ?? [])
 const orderedLedgerRows = computed(() => orderModelRequestTrajectoryRows(ledgerRows.value, trajectorySortOrder.value))
+// 每行的可搜索文本按轨迹折叠成小写一次。原先每次重渲染都要为每一行重新
+// toLocaleLowerCase 五个字段并顺带 find 一次请求标签，输入一个字就要重扫整份账本。
+const rowSearchTexts = computed(() => {
+  const texts = new Map<string, string>()
+  for (const row of props.trajectory?.rows ?? []) {
+    texts.set(row.id, [row.preview, kindLabel(row.kind, row.toolEvent), row.toolName, row.callId, requestLabel(row.requestId)]
+      .filter(Boolean)
+      .join('\n')
+      .toLocaleLowerCase('zh-CN'))
+  }
+  return texts
+})
+const searchMutedRowIds = computed(() => {
+  const query = normalizedSearch.value
+  if (!query) return undefined
+  const muted = new Set<string>()
+  for (const row of props.trajectory?.rows ?? []) {
+    if (!rowSearchTexts.value.get(row.id)?.includes(query)) muted.add(row.id)
+  }
+  return muted
+})
 watch(() => props.trajectory, (trajectory) => {
   // 轨迹行 id 由 evidenceId 派生，刷新后同一条证据仍是同一个 id，因此仍然存在的选中行要保留；
   // 只有证据真的消失才清空。否则 pending 请求自动刷新每轮都会把用户正在看的行和检查器一起丢掉。
@@ -617,7 +650,7 @@ const timingBounds = computed(() => {
   return { start, end: Math.max(end, start + 1) }
 })
 const totalDuration = computed(() => timingBounds.value.end - timingBounds.value.start)
-const timingSegments = computed(() => requestRows.value.map((row) => {
+const timingSegments = computed(() => requestRows.value.map((row, rowIndex) => {
   const start = row.startedAt ? Date.parse(row.startedAt) : timingBounds.value.start
   const durationMs = Math.max(row.durationMs ?? 0, row.status === 'pending' ? 0 : 1)
   const left = ((start - timingBounds.value.start) / totalDuration.value) * 100
@@ -628,7 +661,7 @@ const timingSegments = computed(() => requestRows.value.map((row) => {
     : 0
   const normalizedLeft = actualDuration.value
     ? Math.min(left, 99.25)
-    : (requestRows.value.indexOf(row) / Math.max(requestRows.value.length, 1)) * 100
+    : (rowIndex / Math.max(requestRows.value.length, 1)) * 100
   return {
     id: row.requestId ?? row.id,
     label: `${requestOrdinal(row.requestId)} · ${requestLabel(row.requestId)}`,
@@ -643,15 +676,8 @@ const requestBoundaries = computed(() => timingSegments.value.slice(1).map(({ id
 const compositionBoundaries = computed(() => props.mode === 'conversation' ? requestBoundaries.value : [])
 const hasUnknownTiming = computed(() => requestRows.value.some(({ status, durationMs }) => status === 'pending' || durationMs === undefined))
 
-function rowMatchesSearch(row: SandboxModelRequestTrajectoryRow) {
-  const query = normalizedSearch.value
-  if (!query) return true
-  return [row.preview, kindLabel(row.kind, row.toolEvent), row.toolName, row.callId, requestLabel(row.requestId)]
-    .some((value) => value?.toLocaleLowerCase('zh-CN').includes(query))
-}
-
 function isRowSearchMuted(row: SandboxModelRequestTrajectoryRow) {
-  return normalizedSearch.value.length > 0 && !rowMatchesSearch(row)
+  return Boolean(searchMutedRowIds.value?.has(row.id))
 }
 
 function isRequestRowCollapsed(row: SandboxModelRequestTrajectoryRow) {
@@ -787,13 +813,12 @@ function formatPercentage(value: number) {
 }
 
 function requestOrdinal(requestId: string | undefined) {
-  const index = props.trajectory?.records.findIndex(({ id }) => id === requestId) ?? -1
-  return index >= 0 ? `请求 ${index + 1}` : '请求'
+  const index = requestId === undefined ? undefined : requestOrderById.value.get(requestId)
+  return index === undefined ? '请求' : `请求 ${index + 1}`
 }
 
 function requestLabel(requestId: string | undefined) {
-  const request = props.trajectory?.records.find(({ id }) => id === requestId)
-  return [request?.provider, request?.model].filter(Boolean).join(' / ') || '模型请求'
+  return (requestId === undefined ? undefined : requestLabelById.value.get(requestId)) ?? '模型请求'
 }
 
 function kindLabel(kind: SandboxModelRequestTrajectoryKind, toolEvent?: SandboxModelRequestTrajectoryRow['toolEvent']) {

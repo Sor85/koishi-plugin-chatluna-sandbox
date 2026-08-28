@@ -1,0 +1,124 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { describe, expect, it } from 'vitest'
+import { normalizeEvidencePreviewText } from '../src/evidence-preview-text'
+
+function read(path: string): string {
+  return readFileSync(resolve(path), 'utf8')
+}
+
+function count(source: string, needle: string): number {
+  return source.split(needle).length - 1
+}
+
+function naive(value: string): string {
+  return value.replace(/\s+/g, ' ').trim()
+}
+
+describe('证据预览文本归一化', () => {
+  it('与整段归一化的结果在预览长度内完全一致', () => {
+    const samples = [
+      '',
+      '   ',
+      '短文本',
+      '  前后有空白  ',
+      'a\n\n\nb\t\tc',
+      `${' '.repeat(20_000)}折叠后才出现的正文${'x'.repeat(500)}`,
+      `${'词 '.repeat(30_000)}尾巴`,
+      'x'.repeat(50_000),
+      `第一行\n${'内容 '.repeat(10_000)}`,
+    ]
+    for (const sample of samples) {
+      for (const minLength of [0, 1, 80, 180, 1000]) {
+        const normalized = normalizeEvidencePreviewText(sample, minLength)
+        const expected = naive(sample)
+        if (normalized.length <= minLength) expect(normalized).toBe(expected)
+        else expect(expected.slice(0, minLength)).toBe(normalized.slice(0, minLength))
+      }
+    }
+  })
+
+  it('空白折叠让前缀不够长时继续扩大扫描范围', () => {
+    // 前 40000 个字符全是空白；只扫固定长度的前缀会得到空预览。
+    const value = `${' '.repeat(40_000)}${'正文'.repeat(200)}`
+    expect(normalizeEvidencePreviewText(value, 180).length).toBeGreaterThan(180)
+  })
+})
+
+describe('模型请求视图的重复计算', () => {
+  it('轨迹派生不再经由详情投影绕路', () => {
+    const source = read('src/model-request-trajectory.ts')
+
+    expect(source).not.toContain('presentModelRequestRecord')
+    expect(source).toContain('deriveModelRequestVariables(record.presetSnapshots, projection)')
+    expect(source).toContain('projectRequestRows(projection, variables)')
+    expect(source).toContain('projectPromptComposition(projection, variables)')
+    expect(count(source, 'projectModelEvidence(')).toBe(1)
+    expect(source).toContain('normalizeEvidencePreviewText')
+  })
+
+  it('分析页的原始 JSON 树按需挂载并缓存', () => {
+    const view = read('client/webqq/analysis-view.vue')
+
+    expect(view).toContain('v-if="rawMountedMessages.has(message.evidenceId)"')
+    expect(view).toContain('v-if="responseRawMounted"')
+    expect(view).toContain(':node="messageJsonTree(message)"')
+    expect(view).toContain(':node="responseJsonTree()"')
+    // 模板里直接构树会在每次重渲染时重建整棵树。
+    expect(view).not.toContain(':node="buildModelRequestJsonTree(')
+    expect(view).toContain('let jsonTrees = new Map<string, ModelRequestJsonNode>()')
+    // 搜索文本按会话折叠一次，而不是每次渲染重新 toLocaleLowerCase 整段会话。
+    expect(view).toContain('const messageSearchTexts = computed(')
+    expect(view).toContain('const toolSearchTexts = computed(')
+    expect(view).toContain('const variableSearchTexts = computed(')
+    // 一个 Provider 覆盖整段分析。
+    expect(count(view, '<TooltipProvider')).toBe(1)
+    // 滚动跟随只量导航条目指向的锚点，并缓存解析结果。
+    expect(view).toContain('resolveNavigationTargetElements(content)')
+    expect(view).toContain('navigationTargetsDirty')
+  })
+
+  it('轨迹账本按身份表定位请求，不再逐行扫描记录', () => {
+    const view = read('client/model-request-trajectory.vue')
+
+    expect(view).toContain('const requestOrderById = computed(')
+    expect(view).toContain('const requestLabelById = computed(')
+    expect(view).toContain('const rowById = computed(')
+    expect(view).toContain('requestOrderById.value.get(requestId)')
+    expect(view).toContain('requestLabelById.value.get(requestId)')
+    expect(view).not.toContain('records.findIndex(')
+    expect(view).not.toContain('requestRows.value.indexOf(')
+    // 行搜索文本预先折叠成小写，过滤只查一次集合。
+    expect(view).toContain('const rowSearchTexts = computed(')
+    expect(view).toContain('const searchMutedRowIds = computed(')
+    expect(view).toContain('searchMutedRowIds.value?.has(row.id)')
+  })
+
+  it('历史消息预览分趟量测并合并到一帧', () => {
+    const preview = read('client/model-request-history-preview.vue')
+    const clear = preview.indexOf("content.style.removeProperty('--webqq-model-history-content-max-width')")
+    const measureRect = preview.indexOf('const previewRect = preview.getBoundingClientRect()')
+    const write = preview.indexOf("content.style.setProperty('--webqq-model-history-content-max-width'")
+
+    // 清除、读取、写回必须分成三趟；读写交替会让每条消息各触发一次强制重排。
+    expect(clear).toBeGreaterThan(0)
+    expect(measureRect).toBeGreaterThan(clear)
+    expect(write).toBeGreaterThan(measureRect)
+    expect(preview).toContain('function scheduleMeasure()')
+    expect(preview).toContain('new ResizeObserver(scheduleMeasure)')
+    // 折行判断用行高，不再逐行建 Range。
+    expect(preview).toContain('lineHeight * 1.5')
+    // 渲染事实预先算好，模板里不再逐条调用函数。
+    expect(preview).toContain('const displayMessages = computed<HistoryDisplayMessage[]>')
+    expect(preview).not.toContain('{ deep: true }')
+    expect(count(preview, '<TooltipProvider')).toBe(1)
+  })
+
+  it('模型请求列表按空间与机器人索引目录', () => {
+    const workspace = read('client/model-request-workspace.vue')
+
+    expect(workspace).toContain('const botsByScope = computed(')
+    expect(workspace).toContain('botsByScope.value.get(')
+    expect(workspace).not.toContain('props.bots.find(')
+  })
+})

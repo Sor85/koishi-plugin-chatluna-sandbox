@@ -49,6 +49,20 @@ export interface SandboxModelRequestPersistenceQuery {
 export type SandboxModelRequestScopeSummary = SandboxRecordScopeSummary
 
 /**
+ * 列表读取真正需要的记录切片。
+ *
+ * 请求体与响应原文是记录里唯一没有上限的两个字段，而列表投影从来不读它们；把这个切片
+ * 提升成一个具名类型，读取路径就能在适配器一侧把它们留在存储里，而不是先取出整条记录再丢掉。
+ */
+export type SandboxModelRequestRecordHeader = Omit<SandboxModelRequestRecord, 'requestBody' | 'responseBodyRaw'>
+
+/** 从完整记录取出列表读取需要的切片。适配器与内存行库共用同一份口径。 */
+export function toModelRequestRecordHeader(record: SandboxModelRequestRecord): SandboxModelRequestRecordHeader {
+  const { requestBody: _requestBody, responseBodyRaw: _responseBodyRaw, ...header } = record
+  return header
+}
+
+/**
  * 模型请求记录按行持久化：追加是单行 insert，补充响应体或错误是单行 update，容量回收是
  * 按序号区间 delete，读取由适配器完成过滤、排序与分页。
  */
@@ -60,6 +74,8 @@ export interface SandboxModelRequestPersistence {
   /** 覆盖单行，按 sequence 定位；不触碰其他行。 */
   replace(record: SandboxModelRequestRecord, bytes: number): Promise<SandboxModelRequestScopeSummary>
   query(query: SandboxModelRequestPersistenceQuery): Promise<SandboxModelRequestRecord[]>
+  /** 与 query 同一套过滤、排序与分页，但不取出请求体与响应原文。 */
+  queryHeaders(query: SandboxModelRequestPersistenceQuery): Promise<SandboxModelRequestRecordHeader[]>
   /** 从最旧开始按序号区间删除，直到同时满足条数与字节上限。 */
   reclaim(limits: { maxRecords: number, maxBytes: number }): Promise<SandboxModelRequestScopeSummary>
   /** 清空作用域记录，但保留 nextSequence 高水位。 */
@@ -87,12 +103,16 @@ export function matchesModelRequestQuery(
   return query.order === 'asc' ? id > 0 : id < 0
 }
 
-/** 进程内模型请求行库；行库机制来自共享实现，这里只注入模型请求的过滤谓词。 */
+/** 进程内模型请求行库；行库机制来自共享实现，这里只注入模型请求的过滤谓词与列表切片。 */
 export class InMemoryModelRequestRecords
   extends InMemoryRecordRows<SandboxModelRequestRecord, SandboxModelRequestPersistenceQuery>
   implements SandboxModelRequestPersistence {
   constructor() {
     super(matchesModelRequestQuery)
+  }
+
+  queryHeaders(query: SandboxModelRequestPersistenceQuery): Promise<SandboxModelRequestRecordHeader[]> {
+    return this.queryProjected(query, toModelRequestRecordHeader)
   }
 }
 
@@ -161,21 +181,27 @@ function summarizePresetSnapshots(snapshots: readonly SandboxPresetRuntimeSnapsh
   }))
 }
 
-export function presentModelRequestRecord(record: SandboxModelRequestRecord, view: 'list' | 'detail'): SandboxModelRequestListItem | SandboxModelRequestDetail {
-  const base = structuredClone(record)
-  if (view === 'list') {
-    const {
-      requestBody: _requestBody,
-      responseBodyRaw: _responseBodyRaw,
-      presetSnapshots,
-      ...listItem
-    } = base
-    const presetSnapshotSummaries = summarizePresetSnapshots(presetSnapshots)
-    return {
-      ...listItem,
-      ...(presetSnapshotSummaries ? { presetSnapshotSummaries } : {}),
-    }
+/**
+ * 列表投影。入参允许带请求体与响应原文（轨迹从完整记录派生同会话列表项），但它们既不参与
+ * 投影也不参与拷贝：列表路径深拷贝整条记录再丢掉这两个字段，是列表读取里最大的一次无用功。
+ */
+export function presentModelRequestListItem(
+  record: SandboxModelRequestRecordHeader & Partial<Pick<SandboxModelRequestRecord, 'requestBody' | 'responseBodyRaw'>>,
+): SandboxModelRequestListItem {
+  const {
+    requestBody: _requestBody,
+    responseBodyRaw: _responseBodyRaw,
+    presetSnapshots,
+    ...listItem
+  } = record
+  const presetSnapshotSummaries = summarizePresetSnapshots(presetSnapshots)
+  return {
+    ...structuredClone(listItem),
+    ...(presetSnapshotSummaries ? { presetSnapshotSummaries } : {}),
   }
+}
+
+export function presentModelRequestDetail(record: SandboxModelRequestRecord): SandboxModelRequestDetail {
   // 请求体未采集时不运行投影：详情读取路径是唯一决定是否运行共享模型证据投影的地方，
   // 也是唯一从请求体读取协议结构的入口。只传入请求体——详情路径上没有消费者需要响应侧投影，
   // 不为无人使用的响应事件解析流式原文。
@@ -183,7 +209,7 @@ export function presentModelRequestRecord(record: SandboxModelRequestRecord, vie
     ? undefined
     : projectModelEvidence({ requestBody: record.requestBody })
   return {
-    ...base,
+    ...structuredClone(record),
     // 字段数是原始 JSON 事实，只有请求体确实是对象时才存在；非对象请求体不暗示它有 0 个字段。
     ...(isRequestBodyObject(record.requestBody) ? { requestBodyKeyCount: Object.keys(record.requestBody).length } : {}),
     ...(evidence
@@ -348,7 +374,8 @@ export class SandboxModelRequestStore {
       }
     }
     // 多取一条用于判断 hasMore，避免为了计数再查一次全表。
-    const rows = await this.persistence.query({
+    // 列表读取只要记录头：请求体与响应原文不参与列表投影，也就不必从存储里取出来。
+    const rows = await this.persistence.queryHeaders({
       ...this.toFilter(input),
       order: resolveModelRequestOrder(input),
       ...(input.beforeSequence !== undefined ? { beforeSequence: input.beforeSequence } : {}),
@@ -360,7 +387,7 @@ export class SandboxModelRequestStore {
     const hasMore = rows.length > records.length
     const last = records[records.length - 1]
     return {
-      records: records.map((record) => presentModelRequestRecord(record, 'list') as SandboxModelRequestListItem),
+      records: records.map((record) => presentModelRequestListItem(record)),
       hasMore,
       nextCursor: hasMore ? last?.sequence : undefined,
       nextCreatedAt: hasMore ? last?.createdAt : undefined,
@@ -373,7 +400,7 @@ export class SandboxModelRequestStore {
   async getRecord(recordId: string): Promise<SandboxModelRequestDetail | undefined> {
     await this.settle()
     const record = await this.persistence.find(recordId)
-    return record ? presentModelRequestRecord(record, 'detail') as SandboxModelRequestDetail : undefined
+    return record ? presentModelRequestDetail(record) : undefined
   }
 
   async getRawRecords(input: GetSandboxModelRequestRecordsInput = {}): Promise<SandboxModelRequestRecord[]> {

@@ -42,7 +42,8 @@ describe('模型请求记录持久化与生命周期', () => {
       model: historical.model,
       status: historical.status,
       bytes: Buffer.byteLength(JSON.stringify(historical), 'utf8'),
-      record: historical,
+      header: historical,
+      bodies: {},
     }])
     await stored.upsert('chatluna-sandbox.model-request-scope', [{ scopeId: 'main', nextSequence: 8, updatedAt: new Date() }])
     let database: FakeDatabase | undefined
@@ -75,6 +76,41 @@ describe('模型请求记录持久化与生命周期', () => {
     )).every(({ rows: written }) => written === 1)).toBe(true)
     const [scope] = await stored.get('chatluna-sandbox.model-request-scope', { scopeId: 'main' })
     expect((scope as unknown as { nextSequence: number }).nextSequence).toBe(9)
+  })
+
+  it('丢弃记录头与正文拆列之前写入的行，不让它们变成没有身份的记录', async () => {
+    const stored = createEvidenceRecordDatabase()
+    // 旧结构把整条记录放在单独一列里；新结构读不出身份，这一行应当被跳过。
+    await stored.upsert('chatluna-sandbox.model-request', [{
+      scopeId: 'main',
+      sequence: 3,
+      id: 'legacy',
+      createdAt: '2026-08-13T00:00:00.000Z',
+      botId: '',
+      conversationId: '',
+      interactionId: '',
+      model: 'legacy-model',
+      status: 'success',
+      bytes: 10,
+      record: { id: 'legacy', sequence: 3 },
+    }])
+    const persistence = new KoishiDatabaseModelRequestPersistence(
+      'main',
+      () => stored as unknown as SandboxModelRequestDatabase,
+    )
+    const app = new App()
+    runningApps.push(app)
+    const control = new SandboxControlService(app, { modelRequestPersistence: persistence })
+    await control.waitForPersistence()
+
+    control.recordModelRequest({
+      status: 'success', durationMs: 1, model: 'current-model',
+      attribution: 'attributed', entities: { scopeId: 'main' }, requestBodyAvailable: false,
+    })
+    await control.waitForPersistence()
+
+    expect((await control.getModelRequestRecords()).records.map(({ model }) => model)).toEqual(['current-model'])
+    expect(await control.getModelRequestRecord({ recordId: 'legacy' }).catch(() => 'missing')).toBe('missing')
   })
 
   it('共享内存 Adapter 后跨控制服务实例恢复记录，且 sequence 不回退', async () => {

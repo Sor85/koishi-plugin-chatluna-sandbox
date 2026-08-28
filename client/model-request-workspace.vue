@@ -693,6 +693,12 @@ const displayRecords = computed(() => resolveModelRequestListRecords(
   props.detail,
 ))
 const headersExpanded = ref(false)
+// 机器人按「空间 + 机器人」索引一次。列表每一行都要问两次头像和名称，逐行 find 会让
+// 一页记录扫机器人目录上百遍。
+const botsByScope = computed(() => new Map(props.bots.map(bot => [
+  `${bot.source.type === 'main' ? MAIN_MODEL_REQUEST_SPACE_ID : bot.source.spaceId}\u0000${bot.id}`,
+  bot,
+])))
 const copyState = ref<'idle' | 'success' | 'error'>('idle')
 const detailElement = ref<HTMLElement>()
 // 返回按钮的存在、文案与去向都由导航 module 的 returnTarget 单点派生，不再各自判断一次。
@@ -1067,13 +1073,8 @@ function confirmClear() {
 }
 
 function resolveRequestBot(record: SandboxModelRequestListItem | SandboxModelRequestDetail): Pick<SandboxDirectoryBot, 'name' | 'avatar'> {
-  const scopeId = record.entities.scopeId
   const botId = record.entities.botId
-  const bot = props.bots.find((candidate) => candidate.id === botId && (
-    candidate.source.type === 'main'
-      ? scopeId === MAIN_MODEL_REQUEST_SPACE_ID
-      : candidate.source.spaceId === scopeId
-  ))
+  const bot = botsByScope.value.get(`${record.entities.scopeId ?? ''}\u0000${botId ?? ''}`)
   if (bot) return bot
   return { name: botId ? `机器人 ${botId}` : '未归属机器人' }
 }

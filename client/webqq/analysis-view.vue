@@ -69,6 +69,8 @@
           <h3>Messages <span>({{ visibleMessages.length }})</span></h3>
         </header>
 
+        <!-- 一个 Provider 覆盖整段分析：每张卡片各自挂一个 Provider 会随消息数线性增加组件实例。 -->
+        <TooltipProvider :delay-duration="500">
         <div class="webqq-model-analysis-conversation">
           <div v-if="conversation.parseError && !conversation.messages.length" class="webqq-model-analysis-empty">
             <p>{{ conversation.parseError }}</p>
@@ -99,44 +101,45 @@
               <span class="webqq-model-analysis-index">#{{ message.index }}</span>
               <span class="webqq-model-analysis-path">{{ formatEvidencePath(message.path) }}</span>
               <span class="webqq-model-analysis-chars">{{ message.characters }} chars</span>
-              <TooltipProvider :delay-duration="500">
-                <Tooltip>
-                  <TooltipTrigger as-child>
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
-                      :aria-label="rawMessages.has(message.evidenceId) ? `查看第 ${message.index} 条消息格式化内容` : `查看第 ${message.index} 条消息原始 JSON`"
-                      @click="toggleRaw(message.evidenceId)"
-                    >
-                      <IconCode :size="16" aria-hidden="true" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{{ rawMessages.has(message.evidenceId) ? '查看格式化内容' : '查看原始 JSON' }}</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <TooltipProvider :delay-duration="500">
-                <Tooltip>
-                  <TooltipTrigger as-child>
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
-                      class="webqq-model-analysis-collapse"
-                      :aria-expanded="!isCardCollapsed(modelAnalysisTargetId(message.evidenceId))"
-                      :aria-label="isCardCollapsed(modelAnalysisTargetId(message.evidenceId)) ? `展开第 ${message.index} 条消息卡片` : `收起第 ${message.index} 条消息卡片`"
-                      @click="toggleCard(modelAnalysisTargetId(message.evidenceId))"
-                    >
-                      <IconChevronDown :size="16" aria-hidden="true" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{{ isCardCollapsed(modelAnalysisTargetId(message.evidenceId)) ? '展开消息卡片' : '收起消息卡片' }}</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    :aria-label="rawMessages.has(message.evidenceId) ? `查看第 ${message.index} 条消息格式化内容` : `查看第 ${message.index} 条消息原始 JSON`"
+                    @click="toggleRaw(message.evidenceId)"
+                  >
+                    <IconCode :size="16" aria-hidden="true" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{{ rawMessages.has(message.evidenceId) ? '查看格式化内容' : '查看原始 JSON' }}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    class="webqq-model-analysis-collapse"
+                    :aria-expanded="!isCardCollapsed(modelAnalysisTargetId(message.evidenceId))"
+                    :aria-label="isCardCollapsed(modelAnalysisTargetId(message.evidenceId)) ? `展开第 ${message.index} 条消息卡片` : `收起第 ${message.index} 条消息卡片`"
+                    @click="toggleCard(modelAnalysisTargetId(message.evidenceId))"
+                  >
+                    <IconChevronDown :size="16" aria-hidden="true" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{{ isCardCollapsed(modelAnalysisTargetId(message.evidenceId)) ? '展开消息卡片' : '收起消息卡片' }}</TooltipContent>
+              </Tooltip>
             </header>
 
-            <div v-show="!isCardCollapsed(modelAnalysisTargetId(message.evidenceId)) && rawMessages.has(message.evidenceId)" class="webqq-model-analysis-json">
+            <!-- 原始 JSON 只在第一次真的被切开后才挂载：v-show 会让每条消息的整棵原始树在打开分析页时就进入 DOM。 -->
+            <div
+              v-if="rawMountedMessages.has(message.evidenceId)"
+              v-show="!isCardCollapsed(modelAnalysisTargetId(message.evidenceId)) && rawMessages.has(message.evidenceId)"
+              class="webqq-model-analysis-json"
+            >
               <div class="webqq-model-analysis-source-path">{{ formatEvidencePath(message.path) }}</div>
               <ModelRequestJsonTree
-                :node="buildModelRequestJsonTree(message.raw, `message-${message.index}`)"
+                :node="messageJsonTree(message)"
                 :open="true"
                 :root="true"
                 :strings-expanded="true"
@@ -220,38 +223,34 @@
                   <span class="webqq-model-analysis-role">variable</span>
                   <strong><AnalysisHighlightedText :value="variable.name" :query="normalizedSearch" /></strong>
                   <span class="webqq-model-analysis-variable-preset">{{ variable.presetName }}</span>
-                  <TooltipProvider v-if="historyPreview(variable)" :delay-duration="500">
-                    <Tooltip>
-                      <TooltipTrigger as-child>
-                        <Button
-                          size="icon-sm"
-                          variant="ghost"
-                          :aria-label="rawHistoryVariables.has(variable.id) ? `查看变量 ${variable.name} 的消息预览` : `查看变量 ${variable.name} 的原始 XML`"
-                          @click="toggleHistoryRaw(variable.id)"
-                        >
-                          <IconCode :size="16" aria-hidden="true" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>{{ rawHistoryVariables.has(variable.id) ? '查看消息预览' : '查看原始 XML' }}</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                  <TooltipProvider :delay-duration="500">
-                    <Tooltip>
-                      <TooltipTrigger as-child>
-                        <Button
-                          size="icon-sm"
-                          variant="ghost"
-                          class="webqq-model-analysis-collapse"
-                          :aria-expanded="!isCardCollapsed(modelAnalysisVariableTargetId(variable.id))"
-                          :aria-label="isCardCollapsed(modelAnalysisVariableTargetId(variable.id)) ? `展开变量 ${variable.name}` : `收起变量 ${variable.name}`"
-                          @click="toggleCard(modelAnalysisVariableTargetId(variable.id))"
-                        >
-                          <IconChevronDown :size="16" aria-hidden="true" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>{{ isCardCollapsed(modelAnalysisVariableTargetId(variable.id)) ? '展开变量卡片' : '收起变量卡片' }}</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <Tooltip v-if="historyPreview(variable)">
+                    <TooltipTrigger as-child>
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        :aria-label="rawHistoryVariables.has(variable.id) ? `查看变量 ${variable.name} 的消息预览` : `查看变量 ${variable.name} 的原始 XML`"
+                        @click="toggleHistoryRaw(variable.id)"
+                      >
+                        <IconCode :size="16" aria-hidden="true" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{{ rawHistoryVariables.has(variable.id) ? '查看消息预览' : '查看原始 XML' }}</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        class="webqq-model-analysis-collapse"
+                        :aria-expanded="!isCardCollapsed(modelAnalysisVariableTargetId(variable.id))"
+                        :aria-label="isCardCollapsed(modelAnalysisVariableTargetId(variable.id)) ? `展开变量 ${variable.name}` : `收起变量 ${variable.name}`"
+                        @click="toggleCard(modelAnalysisVariableTargetId(variable.id))"
+                      >
+                        <IconChevronDown :size="16" aria-hidden="true" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{{ isCardCollapsed(modelAnalysisVariableTargetId(variable.id)) ? '展开变量卡片' : '收起变量卡片' }}</TooltipContent>
+                  </Tooltip>
                 </header>
                 <div v-show="!isCardCollapsed(modelAnalysisVariableTargetId(variable.id))" class="webqq-model-analysis-variable-body">
                   <p v-if="variable.status === 'observed' && !variable.value" class="webqq-model-analysis-variable-empty">
@@ -295,46 +294,46 @@
               <span class="webqq-model-analysis-role">响应</span>
               <span class="webqq-model-analysis-path">{{ responseFormatLabel }}</span>
               <span class="webqq-model-analysis-chars">{{ responseCharacters }} chars</span>
-              <TooltipProvider :delay-duration="500">
-                <Tooltip>
-                  <TooltipTrigger as-child>
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
-                      :disabled="response.raw === undefined"
-                      :aria-label="responseRaw ? '查看响应格式化内容' : `查看响应原始 ${responseFormatLabel}`"
-                      @click="toggleResponseRaw"
-                    >
-                      <IconCode :size="16" aria-hidden="true" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{{ responseRaw ? '查看格式化内容' : `查看原始 ${responseFormatLabel}` }}</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <TooltipProvider :delay-duration="500">
-                <Tooltip>
-                  <TooltipTrigger as-child>
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
-                      class="webqq-model-analysis-collapse"
-                      :aria-expanded="!isCardCollapsed(MODEL_ANALYSIS_RESPONSE_TARGET)"
-                      :aria-label="isCardCollapsed(MODEL_ANALYSIS_RESPONSE_TARGET) ? '展开响应卡片' : '收起响应卡片'"
-                      @click="toggleCard(MODEL_ANALYSIS_RESPONSE_TARGET)"
-                    >
-                      <IconChevronDown :size="16" aria-hidden="true" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{{ isCardCollapsed(MODEL_ANALYSIS_RESPONSE_TARGET) ? '展开响应卡片' : '收起响应卡片' }}</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    :disabled="response.raw === undefined"
+                    :aria-label="responseRaw ? '查看响应格式化内容' : `查看响应原始 ${responseFormatLabel}`"
+                    @click="toggleResponseRaw"
+                  >
+                    <IconCode :size="16" aria-hidden="true" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{{ responseRaw ? '查看格式化内容' : `查看原始 ${responseFormatLabel}` }}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    class="webqq-model-analysis-collapse"
+                    :aria-expanded="!isCardCollapsed(MODEL_ANALYSIS_RESPONSE_TARGET)"
+                    :aria-label="isCardCollapsed(MODEL_ANALYSIS_RESPONSE_TARGET) ? '展开响应卡片' : '收起响应卡片'"
+                    @click="toggleCard(MODEL_ANALYSIS_RESPONSE_TARGET)"
+                  >
+                    <IconChevronDown :size="16" aria-hidden="true" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{{ isCardCollapsed(MODEL_ANALYSIS_RESPONSE_TARGET) ? '展开响应卡片' : '收起响应卡片' }}</TooltipContent>
+              </Tooltip>
             </header>
 
-            <div v-show="!isCardCollapsed(MODEL_ANALYSIS_RESPONSE_TARGET) && responseRaw && response.raw !== undefined" class="webqq-model-analysis-json">
+            <div
+              v-if="responseRawMounted"
+              v-show="!isCardCollapsed(MODEL_ANALYSIS_RESPONSE_TARGET) && responseRaw && response.raw !== undefined"
+              class="webqq-model-analysis-json"
+            >
               <pre v-if="typeof response.raw === 'string'" class="webqq-model-analysis-raw-text">{{ response.raw }}</pre>
               <ModelRequestJsonTree
                 v-else
-                :node="buildModelRequestJsonTree(response.raw, 'response')"
+                :node="responseJsonTree()"
                 :open="true"
                 :root="true"
                 :strings-expanded="true"
@@ -370,7 +369,7 @@
                   <div><strong><AnalysisHighlightedText :value="call.name" :query="normalizedSearch" /></strong><span><AnalysisHighlightedText :value="call.id || '无调用 ID'" :query="normalizedSearch" /></span></div>
                   <div class="webqq-model-analysis-tool-schema webqq-model-request-json-viewer">
                     <ModelRequestJsonTree
-                      :node="buildModelRequestJsonTree(parseAnalysisJson(call.arguments), 'arguments')"
+                      :node="toolCallArgumentsJsonTree(call)"
                       :open="true"
                       :root="true"
                       :strings-expanded="true"
@@ -420,7 +419,7 @@
               class="webqq-model-analysis-tool-card"
               :class="{
                 'is-expanded': expandedTools.has(tool.evidenceId),
-                'is-muted': normalizedSearch && !tool.searchText.toLocaleLowerCase('zh-CN').includes(normalizedSearch),
+                'is-muted': normalizedSearch && !toolMatches(tool),
                 'is-located': highlightedTarget === modelAnalysisTargetId(tool.evidenceId),
               }"
             >
@@ -450,7 +449,7 @@
                 <h4>Parameters (JSON Schema) <small>{{ formatEvidencePath(tool.path) }}</small></h4>
                 <div class="webqq-model-analysis-tool-schema webqq-model-request-json-viewer">
                   <ModelRequestJsonTree
-                    :node="buildModelRequestJsonTree(tool.parameters || {}, 'parameters')"
+                    :node="toolParametersJsonTree(tool)"
                     :open="true"
                     :root="true"
                     :strings-expanded="true"
@@ -460,6 +459,7 @@
             </article>
           </section>
         </div>
+        </TooltipProvider>
       </div>
     </div>
   </section>
@@ -508,7 +508,7 @@ import {
   renderModelRequestOccurrence,
   type ModelRequestOccurrence,
 } from './model-request-occurrence'
-import { buildModelRequestJsonTree } from './model-request-json'
+import { buildModelRequestJsonTree, type ModelRequestJsonNode } from './model-request-json'
 import {
   EMPTY_MODEL_EVIDENCE_FILTER,
   analysisItemFilterKind,
@@ -521,6 +521,8 @@ import {
   type ModelConversationContentPart,
   type ModelConversationMessage,
   type ModelConversationRole,
+  type ModelConversationTool,
+  type ModelConversationToolCall,
   type ModelRequestConversation,
 } from './model-request-conversation'
 import type { SandboxModelRequestDetail, SandboxModelRequestStatus, SandboxModelRequestTrajectory, SandboxModelRequestVariable } from '../../src/types'
@@ -567,8 +569,15 @@ const responseVisible = computed(() => (
 ))
 const responseRaw = ref(false)
 const rawMessages = ref(new Set<string>())
+// 原始 JSON 一旦挂载就留在 DOM 里，切回格式化内容不会丢掉树内的展开状态；
+// 但从未被切开的消息不会为它构造整棵树。
+const rawMountedMessages = ref(new Set<string>())
+const responseRawMounted = ref(false)
 const rawHistoryVariables = ref(new Set<string>())
 const historyPreviewCache = new Map<string, readonly ModelRequestHistoryMessage[] | undefined>()
+// 原始 JSON 树按证据身份缓存。模板里直接调用 buildModelRequestJsonTree 会让每次重渲染
+// （搜索输入、折叠、定位高亮）都重建整棵树；缓存随会话投影一起失效。
+let jsonTrees = new Map<string, ModelRequestJsonNode>()
 const collapsedCards = ref(new Set<string>())
 const expandedTools = ref(new Set<string>())
 const expandedTextTargets = ref(new Set<string>())
@@ -578,7 +587,22 @@ const collapsedNavigationGroups = ref(new Set<ModelRequestAnalysisGroupKey>())
 const activeNavigationTarget = ref('')
 const highlightedTarget = ref('')
 const activeOccurrence = ref<ModelRequestOccurrence>()
-const responseMatches = computed(() => !normalizedSearch.value || response.value.searchText.toLocaleLowerCase('zh-CN').includes(normalizedSearch.value))
+// 搜索文本按会话投影预先折叠成小写一次。逐次渲染或逐个按键都重新 toLocaleLowerCase 整段会话，
+// 代价随请求体大小线性增长，而这些文本在同一条记录内不变。
+const messageSearchTexts = computed(() => new Map(
+  conversation.value.messages.map(message => [message.evidenceId, message.searchText.toLocaleLowerCase('zh-CN')]),
+))
+const toolSearchTexts = computed(() => new Map(
+  conversation.value.tools.map(tool => [tool.evidenceId, tool.searchText.toLocaleLowerCase('zh-CN')]),
+))
+const responseSearchText = computed(() => response.value.searchText.toLocaleLowerCase('zh-CN'))
+const variableSearchTexts = computed(() => new Map(
+  (props.detail.variables ?? []).map(variable => [
+    variable.id,
+    `${variable.name}\n${variable.value ?? ''}\n${variable.presetName}`.toLocaleLowerCase('zh-CN'),
+  ]),
+))
+const responseMatches = computed(() => !normalizedSearch.value || responseSearchText.value.includes(normalizedSearch.value))
 const responseCharacters = computed(() => [
   ...response.value.content,
   ...response.value.reasoning,
@@ -592,6 +616,9 @@ let suppressToolSummary = false
 let navigationScroller: HTMLElement | undefined
 let navigationResizeObserver: ResizeObserver | undefined
 let navigationFrame = 0
+// 导航锚点的 DOM 解析结果按可见分组缓存；分组变化或节点被卸载时才重新解析。
+let navigationTargetElements: Array<{ target: string, element: HTMLElement }> = []
+let navigationTargetsDirty = true
 
 // 定位的全部决策与帧时序都在 evidence-locator 里；这里只交出 DOM、渲染状态与计时出口。
 const locator = createEvidenceLocator({
@@ -653,16 +680,21 @@ const locator = createEvidenceLocator({
 
 watch(normalizedSearch, async (query) => {
   if (!query) return
+  // 展开是集合替换；逐条 expandCard 会为每一条命中复制一次整个集合。
+  const cards = new Set(collapsedCards.value)
   for (const message of conversation.value.messages) {
-    if (message.searchText.toLocaleLowerCase('zh-CN').includes(query)) expandCard(modelAnalysisTargetId(message.evidenceId))
+    if (messageMatches(message)) cards.delete(modelAnalysisTargetId(message.evidenceId))
   }
-  if (response.value.searchText.toLocaleLowerCase('zh-CN').includes(query)) expandCard(MODEL_ANALYSIS_RESPONSE_TARGET)
-  for (const tool of conversation.value.tools) {
-    if (tool.searchText.toLocaleLowerCase('zh-CN').includes(query)) expandTool(tool.evidenceId)
-  }
+  if (responseSearchText.value.includes(query)) cards.delete(MODEL_ANALYSIS_RESPONSE_TARGET)
   for (const variable of props.detail.variables) {
-    if (variableMatches(variable)) expandCard(modelAnalysisVariableTargetId(variable.id))
+    if (variableMatches(variable)) cards.delete(modelAnalysisVariableTargetId(variable.id))
   }
+  if (cards.size !== collapsedCards.value.size) collapsedCards.value = cards
+  const tools = new Set(expandedTools.value)
+  for (const tool of conversation.value.tools) {
+    if (toolMatches(tool)) tools.add(tool.evidenceId)
+  }
+  if (tools.size !== expandedTools.value.size) expandedTools.value = tools
   // 轨迹检查器已经选中了具体账本行，搜索只高亮匹配卡片，不再抢走当前定位。
   if (props.layout === 'inspector') return
   const first = visibleNavigationGroups.value.flatMap(group => group.items).find(itemMatches)
@@ -673,12 +705,27 @@ watch(() => props.locateRequest?.seq, () => {
   void locateRequestedEvidence()
 })
 
+watch(conversation, () => {
+  jsonTrees = new Map()
+})
+
+// 原始视图一旦被切开就把它登记为已挂载；再次切回格式化内容时树留在 DOM 里，展开状态不丢。
+watch(rawMessages, (next) => {
+  if ([...next].every(evidenceId => rawMountedMessages.value.has(evidenceId))) return
+  rawMountedMessages.value = new Set([...rawMountedMessages.value, ...next])
+})
+
+watch(responseRaw, (raw) => {
+  if (raw) responseRawMounted.value = true
+})
+
 onMounted(() => {
   void locateRequestedEvidence()
   nextTick(setupNavigationTracking)
 })
 
 watch(visibleNavigationGroups, () => {
+  navigationTargetsDirty = true
   nextTick(scheduleNavigationTracking)
 }, { flush: 'post' })
 
@@ -686,13 +733,17 @@ watch(() => props.detail.id, (next, previous) => {
   if (next === previous) return
   responseRaw.value = false
   rawMessages.value = new Set()
+  rawMountedMessages.value = new Set()
+  responseRawMounted.value = false
   rawHistoryVariables.value = new Set()
   historyPreviewCache.clear()
+  jsonTrees = new Map()
   collapsedCards.value = new Set()
   expandedTools.value = new Set()
   expandedTextTargets.value = new Set()
   collapsedNavigationGroups.value = new Set()
   activeNavigationTarget.value = ''
+  navigationTargetsDirty = true
   locator.reset()
   const scroller = findScroller()
   if (scroller) scroller.scrollTop = 0
@@ -723,6 +774,8 @@ function teardownNavigationTracking() {
   navigationScroller = undefined
   navigationResizeObserver?.disconnect()
   navigationResizeObserver = undefined
+  navigationTargetElements = []
+  navigationTargetsDirty = true
   if (navigationFrame) cancelAnimationFrame(navigationFrame)
   navigationFrame = 0
 }
@@ -742,16 +795,31 @@ function updateActiveNavigationTarget() {
   const scrollerRect = scroller.getBoundingClientRect()
   const scrollerTop = scrollerRect.top
   navigationElement.value?.style.setProperty('--webqq-model-analysis-nav-height', `${scroller.clientHeight}px`)
-  const navigationTargets = new Set(visibleNavigationGroups.value.flatMap(group => group.items.map(item => item.target)))
-  const targetPositions = [...content.querySelectorAll<HTMLElement>('[id]')]
-    .flatMap((element) => navigationTargets.has(element.id)
-      ? [{ target: element.id, top: element.getBoundingClientRect().top }]
-      : [])
+  // 只量导航条目真正指向的那些锚点。滚动的每一帧都重新扫一遍 content 的 [id] 子树，
+  // 会随消息数与原始 JSON 树的节点数一起变慢，而锚点集合只在过滤变化时才变。
+  const targetPositions = resolveNavigationTargetElements(content)
+    .map(({ target, element }) => ({ target, top: element.getBoundingClientRect().top }))
+    .sort((left, right) => left.top - right.top)
   const nextTarget = resolveActiveAnalysisTarget(targetPositions, scrollerTop, scroller.clientHeight)
   if (nextTarget && nextTarget !== activeNavigationTarget.value) {
     activeNavigationTarget.value = nextTarget
     nextTick(() => scrollNavigationTargetIntoView(nextTarget))
   }
+}
+
+function resolveNavigationTargetElements(content: HTMLElement) {
+  if (!navigationTargetsDirty && navigationTargetElements.every(({ element }) => element.isConnected)) {
+    return navigationTargetElements
+  }
+  navigationTargetsDirty = false
+  navigationTargetElements = visibleNavigationGroups.value
+    .flatMap(group => group.items)
+    .flatMap((item) => {
+      // 属性选择器而不是 #id：证据身份里的 : 和 . 在 id 选择器里是语法字符。
+      const element = content.querySelector<HTMLElement>(`[id="${item.target}"]`)
+      return element ? [{ target: item.target, element }] : []
+    })
+  return navigationTargetElements
 }
 
 function scrollNavigationTargetIntoView(target: string) {
@@ -783,14 +851,16 @@ function itemMatches(item: ModelRequestAnalysisNavigationItem) {
 }
 
 function messageMatches(message: ModelConversationMessage) {
-  return !normalizedSearch.value || message.searchText.toLocaleLowerCase('zh-CN').includes(normalizedSearch.value)
+  return !normalizedSearch.value || Boolean(messageSearchTexts.value.get(message.evidenceId)?.includes(normalizedSearch.value))
 }
 
 function variableMatches(variable: SandboxModelRequestVariable) {
   if (!normalizedSearch.value) return true
-  return `${variable.name}\n${variable.value ?? ''}\n${variable.presetName}`
-    .toLocaleLowerCase('zh-CN')
-    .includes(normalizedSearch.value)
+  return Boolean(variableSearchTexts.value.get(variable.id)?.includes(normalizedSearch.value))
+}
+
+function toolMatches(tool: ModelConversationTool) {
+  return !normalizedSearch.value || Boolean(toolSearchTexts.value.get(tool.evidenceId)?.includes(normalizedSearch.value))
 }
 
 function historyPreview(variable: SandboxModelRequestVariable): readonly ModelRequestHistoryMessage[] | undefined {
@@ -804,6 +874,30 @@ function toggleHistoryRaw(variableId: string) {
   const next = new Set(rawHistoryVariables.value)
   next.has(variableId) ? next.delete(variableId) : next.add(variableId)
   rawHistoryVariables.value = next
+}
+
+function cachedJsonTree(cacheKey: string, rootKey: string, read: () => unknown): ModelRequestJsonNode {
+  const cached = jsonTrees.get(cacheKey)
+  if (cached) return cached
+  const tree = buildModelRequestJsonTree(read(), rootKey)
+  jsonTrees.set(cacheKey, tree)
+  return tree
+}
+
+function messageJsonTree(message: ModelConversationMessage): ModelRequestJsonNode {
+  return cachedJsonTree(`message:${message.evidenceId}`, `message-${message.index}`, () => message.raw)
+}
+
+function responseJsonTree(): ModelRequestJsonNode {
+  return cachedJsonTree('response', 'response', () => response.value.raw)
+}
+
+function toolCallArgumentsJsonTree(call: ModelConversationToolCall): ModelRequestJsonNode {
+  return cachedJsonTree(`arguments:${call.evidenceId}`, 'arguments', () => parseAnalysisJson(call.arguments))
+}
+
+function toolParametersJsonTree(tool: ModelConversationTool): ModelRequestJsonNode {
+  return cachedJsonTree(`parameters:${tool.evidenceId}`, 'parameters', () => tool.parameters || {})
 }
 
 function variableStatusLabel(status: SandboxModelRequestVariable['status']) {
