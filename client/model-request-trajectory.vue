@@ -241,7 +241,7 @@
         @locate-result="emit('locate-result', $event)"
       />
       <div v-else class="webqq-model-trajectory-ledger" :class="{ 'has-inspector': selectedRow }">
-        <div ref="ledgerElement" v-webqq-scrollbar class="webqq-model-trajectory-table" role="table" aria-label="轨迹事件账本">
+        <div ref="ledgerElement" v-webqq-scrollbar="{ showOverlay: false }" class="webqq-model-trajectory-table" role="table" aria-label="轨迹事件账本">
           <div v-if="!ledgerRows.length" class="webqq-model-trajectory-filter-empty">当前过滤条件下没有事件</div>
           <template v-for="row in orderedLedgerRows" :key="row.id">
             <button
