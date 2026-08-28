@@ -440,8 +440,10 @@ const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
         description: '按顺序原子应用的环境变更；任一项失败则整体不生效',
         items: { oneOf: ENVIRONMENT_CHANGE_SCHEMAS },
       },
+      idempotencyKey: IDEMPOTENCY_KEY,
     },
-    required: ['spaceId', 'expectedRevision', 'changes'],
+    required: ['spaceId', 'expectedRevision', 'changes', 'idempotencyKey'],
+    description: 'expectedRevision 只能拒绝重复提交，无法告知上一次是否已经生效；响应丢失后请用同一 idempotencyKey 与同一参数重试，服务端会返回首次结果。',
   },
   create_test_space: {
     type: 'object',
@@ -874,6 +876,7 @@ export class SandboxMcpService {
       apply_environment_changes: {
         spaceId: '<create_test_space.spaceId>',
         expectedRevision: 0,
+        idempotencyKey: 'example-environment-1',
         changes: [
           { action: 'create-user', data: { id: '10001', name: '测试用户' } },
           { action: 'create-bot', data: { id: '20002', name: '被测机器人', implementation: 'napcat' } },
@@ -1057,7 +1060,9 @@ export class SandboxMcpService {
       && (!args.recipientBotId || Reflect.get(event.data as object, 'recipientBotId') === args.recipientBotId))
     if (tool === 'wait_for_onebot_action') return this.waitForOneBotAction(args)
     if (tool === 'wait_for_chatluna_state') return this.waitForChatLuna(activeControl, args)
-    if (tool === 'apply_environment_changes') return this.applyEnvironmentChanges(activeControl, args)
+    // expectedRevision 只能拒绝重复提交：响应在网络上丢失后重试会拿到 revision_conflict，
+    // 消费者无从判断上一次是否已经生效。幂等键补上「重试返回首次结果」这条路径。
+    if (tool === 'apply_environment_changes') return this.withIdempotency(credential, tool, args, async () => this.applyEnvironmentChanges(activeControl, args))
     if (tool === 'prepare_destructive_action') return this.prepareDestructiveAction(activeControl, credential, args)
     if (tool === 'delete_environment_entity') return this.runDestructive(activeControl, credential, tool, args, () => this.deleteEnvironmentEntity(activeControl, args))
     if (tool === 'reset_scene') return this.runDestructive(activeControl, credential, tool, args, () => activeControl.resetScene())

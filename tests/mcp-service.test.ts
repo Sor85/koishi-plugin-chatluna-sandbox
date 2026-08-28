@@ -286,6 +286,7 @@ describe('SandboxMcpService', () => {
     const revision = control.getSnapshot().revision
     await service.callTool(credential.token, 'apply_environment_changes', {
       expectedRevision: revision,
+      idempotencyKey: 'atomic-change-1',
       changes: [{ action: 'create-user', data: { id: '10009', name: '临时用户' } }],
     })
     expect(control.getSnapshot().participants).toContainEqual(expect.objectContaining({
@@ -296,6 +297,7 @@ describe('SandboxMcpService', () => {
     }))
     await expect(service.callTool(credential.token, 'apply_environment_changes', {
       expectedRevision: revision,
+      idempotencyKey: 'atomic-change-2',
       changes: [{ action: 'create-user', data: { id: '10010', name: '过期变更' } }],
     })).rejects.toMatchObject({ code: 'revision_conflict' })
 
@@ -313,6 +315,35 @@ describe('SandboxMcpService', () => {
     await expect(service.callTool(credential.token, 'delete_environment_entity', {
       kind: 'user', id: '10001', confirmationToken: prepared.confirmationToken,
     })).rejects.toMatchObject({ code: 'confirmation_required' })
+  })
+
+  it('环境变更用幂等键让丢失响应后的重试返回首次结果', async () => {
+    const { control, service, credential } = createService(['read', 'manage'])
+    const expectedRevision = control.getSnapshot().revision
+    const changes = [{ action: 'create-user', data: { id: '10009', name: '幂等用户' } }]
+
+    await expect(service.callTool(credential.token, 'apply_environment_changes', { expectedRevision, changes }))
+      .rejects.toMatchObject({ code: 'invalid_arguments', message: 'idempotencyKey 不能为空' })
+
+    const first = await service.callTool(credential.token, 'apply_environment_changes', {
+      expectedRevision, idempotencyKey: 'replay-1', changes,
+    })
+    expect(first).toMatchObject({ revision: expectedRevision + 1, affected: ['create-user'] })
+
+    // 响应丢失后同键同参重试：拿回首次结果，而不是 expectedRevision 已过期导致的 revision_conflict；
+    // 环境也不会被改第二次。
+    expect(await service.callTool(credential.token, 'apply_environment_changes', {
+      expectedRevision, idempotencyKey: 'replay-1', changes,
+    })).toEqual(first)
+    expect(control.getSnapshot().revision).toBe(expectedRevision + 1)
+    expect(control.getSnapshot().participants.filter(({ id }) => id === '10009')).toHaveLength(1)
+
+    // 同键换参数是调用方的编程错误，必须暴露而不是静默返回上一次的结果。
+    await expect(service.callTool(credential.token, 'apply_environment_changes', {
+      expectedRevision, idempotencyKey: 'replay-1',
+      changes: [{ action: 'create-user', data: { id: '10010', name: '换参用户' } }],
+    })).rejects.toMatchObject({ code: 'idempotency_conflict' })
+    expect(control.getSnapshot().participants.some(({ id }) => id === '10010')).toBe(false)
   })
 
   it('按凭证限制调用频率并记录脱敏 MCP 调用', async () => {
@@ -427,11 +458,13 @@ describe('SandboxMcpService', () => {
     await service.callTool(rotated.token, 'apply_environment_changes', {
       spaceId: created.spaceId,
       expectedRevision: created.revision,
+      idempotencyKey: 'shared-space-setup-1',
       changes: [{ action: 'create-user', data: { id: '11001', name: '轮换后创建' } }],
     })
     await expect(service.callTool(readOnly.token, 'apply_environment_changes', {
       spaceId: created.spaceId,
       expectedRevision: 1,
+      idempotencyKey: 'shared-space-setup-2',
       changes: [],
     })).rejects.toMatchObject({ code: 'permission_denied' })
 
@@ -442,6 +475,7 @@ describe('SandboxMcpService', () => {
     await expect(service.callTool(rotated.token, 'apply_environment_changes', {
       spaceId: created.spaceId,
       expectedRevision: 1,
+      idempotencyKey: 'shared-space-setup-3',
       changes: [],
     })).rejects.toMatchObject({ code: 'space_taken_over' })
   })
@@ -488,6 +522,7 @@ describe('SandboxMcpService', () => {
     await service.callTool(credential.token, 'apply_environment_changes', {
       spaceId: created.spaceId,
       expectedRevision: created.revision,
+      idempotencyKey: 'update-bot-setup-1',
       changes: [{
         action: 'create-bot',
         data: { id: '21001', name: '被测机器人', implementation: 'llbot', enabled: false, avatar: `data:image/png;base64,${Buffer.from('avatar-a').toString('base64')}`, disabledCapabilities: ['set_qq_profile'] },
@@ -498,6 +533,7 @@ describe('SandboxMcpService', () => {
     await service.callTool(credential.token, 'apply_environment_changes', {
       spaceId: created.spaceId,
       expectedRevision: control.getSnapshot().revision,
+      idempotencyKey: 'update-bot-1',
       changes: [{ action: 'update-bot', data: { id: '21001', name: 'koishi' } }],
     })
     expect(control.getSnapshot().participants[0]).toEqual({
@@ -513,6 +549,7 @@ describe('SandboxMcpService', () => {
     await service.callTool(credential.token, 'apply_environment_changes', {
       spaceId: created.spaceId,
       expectedRevision: control.getSnapshot().revision,
+      idempotencyKey: 'update-bot-2',
       changes: [{ action: 'update-bot', data: { id: '21001', implementation: 'napcat', enabled: true } }],
     })
     expect(control.getSnapshot().participants[0]).toMatchObject({ name: 'koishi', implementation: 'napcat', enabled: true })
@@ -520,6 +557,7 @@ describe('SandboxMcpService', () => {
     await expect(service.callTool(credential.token, 'apply_environment_changes', {
       spaceId: created.spaceId,
       expectedRevision: control.getSnapshot().revision,
+      idempotencyKey: 'update-bot-3',
       changes: [{ action: 'update-bot', data: { id: '21001', implementation: 'gocq' } }],
     })).rejects.toMatchObject({ code: 'invalid_arguments' })
   })

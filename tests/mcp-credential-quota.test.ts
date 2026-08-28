@@ -32,6 +32,8 @@ function callQuery(service: SandboxMcpService, token: string) {
 function callMutation(service: SandboxMcpService, control: SandboxControlService, token: string, userId: string) {
   return service.callTool(token, 'apply_environment_changes', {
     expectedRevision: control.getSnapshot().revision,
+    // 每位用户一把幂等键：配额用例要的是每次调用都真的执行，不能被幂等缓存挡回去。
+    idempotencyKey: `quota-mutation-${userId}`,
     changes: [{ action: 'create-user', data: { id: userId, name: `配额用户 ${userId}` } }],
   })
 }
@@ -167,10 +169,12 @@ describe('测试凭证并发上限', () => {
 
     const inFlight = service.callTool(credential.token, 'apply_environment_changes', {
       expectedRevision: revision,
+      idempotencyKey: 'concurrency-mutation-1',
       changes: [{ action: 'create-user', data: { id: '10601', name: '并发用户甲' } }],
     })
     const error = await rejection(service.callTool(credential.token, 'apply_environment_changes', {
       expectedRevision: revision,
+      idempotencyKey: 'concurrency-mutation-2',
       changes: [{ action: 'create-user', data: { id: '10602', name: '并发用户乙' } }],
     }))
 

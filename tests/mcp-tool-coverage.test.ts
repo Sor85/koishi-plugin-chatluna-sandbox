@@ -128,6 +128,7 @@ describe('MCP 读取类工具', () => {
     if (!target) throw new Error('NapCat 基线没有任何受支持能力')
     await service.callTool(credential.token, 'apply_environment_changes', {
       expectedRevision: control.getSnapshot().revision,
+      idempotencyKey: 'capability-override-1',
       changes: [{ action: 'set-capabilities', data: { id: '20001', disabledCapabilities: [target.id] } }],
     })
 
@@ -394,6 +395,7 @@ describe('MCP 破坏性场景工具', () => {
     const mainRevision = main.control.getSnapshot().revision
     await main.service.callTool(main.credential.token, 'apply_environment_changes', {
       expectedRevision: mainRevision,
+      idempotencyKey: 'reset-main-setup-1',
       changes: [{ action: 'create-user', data: { id: '10009', name: '重置前新增' } }],
     })
     const mainConfirmation = await prepareDestructive(main.service, main.credential.token, 'reset_scene', {}, mainRevision + 1)

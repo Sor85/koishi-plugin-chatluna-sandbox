@@ -57,12 +57,19 @@
 
 未做。本票唯一的修复只触及一句参数描述，没有触及 WebQQ 可见的空间控制状态；重新激活的身份归属经断言确认实现本来就正确，无需修改，因此该条件判据不成立。
 
-### 与 ADR-0021 的冲突（本票不修复，需要重新讨论）
+### 与 ADR-0021 / 0022 / 0023 的冲突（已单独修订）
 
 补覆盖时发现：`reset_scene`、`clear_scene`、`import_scene` 都不接受 `idempotencyKey`，调用即执行。同样情况还有 `apply_environment_changes`、`prepare_destructive_action` 与 `delete_environment_entity`——六个 `manage` 工具全都没有幂等键。
 
 与 ADR-0021「MCP 状态修改必须幂等」冲突：该决策写的是「所有 `interact` 和 `manage` MCP 工具必须携带 `idempotencyKey`」，实现里只有五个测试空间生命周期工具（`create`/`complete`/`fail`/`reactivate`/`delete_test_space`）以及消息与关系类 `interact` 工具真的走了 `withIdempotency`。`upload_media` 属 `interact` 也没有幂等键。
 
-不在本票内改：给六个对外工具增加必填参数属于对外契约的行为变更，规格 Out of Scope 明确「本规格不改变对外形状」。按 `docs/agents/domain.md` 的要求显式指出而不静默覆盖——本票的测试如实断言了现状（三个破坏性工具不带幂等键即可执行），不把这条冲突固化成「已验证的正确行为」。
+进一步核对后发现冲突不止一条：ADR-0023 自己也写着破坏性操作要「携带令牌、`expectedSceneRevision` 与 `idempotencyKey` 执行」，而 ADR-0022 写着所有 `manage` 工具必须提交 `expectedSceneRevision`——实现里破坏性工具执行时两者都不带，改由确认令牌统一承担；且实现的参数名是 `expectedRevision`，与三条 ADR 的写法不一致。
 
-建议重新讨论 ADR-0021，因为破坏性操作已经由 ADR-0023 的一次性、版本绑定确认令牌提供了比幂等键更强的重放保护，`prepare_destructive_action` 本身也是只读的令牌签发；决策的措辞若继续保持「所有」，实现就必须为这六个工具补参数。需要判定的是收窄措辞还是补齐实现。
+按 `docs/agents/domain.md` 的要求显式指出而不静默覆盖：本票的测试如实断言了现状（三个破坏性工具不带幂等键即可执行），没有把冲突固化成「已验证的正确行为」。
+
+已按下述结论处理（用户确认）：ADR-0021、ADR-0022、ADR-0023 三条决策一并修订，并为唯一的真缺口补齐实现。
+
+- 事件等待、`upload_media`（内容寻址天然幂等）与 `prepare_destructive_action`（只签发令牌）写入 ADR-0021 的豁免，附各自理由。
+- 四个破坏性工具由 ADR-0023 的一次性、版本绑定令牌覆盖，不叠加幂等键；ADR-0023 有意让它们无法盲目重试，与 ADR-0021「重试返回首次结果」的语义本就冲突，实现选对了。同时从 ADR-0023 句中删去 `expectedSceneRevision 与 idempotencyKey`——令牌已把两者包进去；ADR-0022 补记破坏性操作在执行时不重复提交场景版本。
+- 三条 ADR 里的 `expectedSceneRevision` 统一改为实现中的参数名 `expectedRevision`。
+- `apply_environment_changes` 是唯一的真缺口：它此前接受 `idempotencyKey` 却默默忽略，而 ADR-0021 正教消费者传它。已改为必填并真正经 `withIdempotency`，同时更新工具调用示例资源。详见该票之外的提交说明。
