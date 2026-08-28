@@ -80,13 +80,19 @@
 }
 
 .webqq-debug-list-toolbar {
+  z-index: 2;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   min-height: 56px;
   padding: 12px 16px;
   border-bottom: 1px solid var(--webqq-border);
-  background: var(--webqq-surface);
+  background: transparent;
+  --webqq-overlay-header-surface: var(--webqq-surface);
+}
+
+.webqq-debug-list-toolbar::before {
+  border-radius: 15px 15px 0 0;
 }
 
 .webqq-debug-list-toolbar h2 {
@@ -202,7 +208,9 @@
   grid-auto-rows: max-content;
   gap: 8px;
   height: 100%;
-  padding: 8px;
+  margin-top: -56px;
+  padding: 64px 8px 8px;
+  scroll-padding-top: 64px;
 }
 
 .webqq-debug-item {

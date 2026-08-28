@@ -9,7 +9,7 @@
 
     <div class="environment-split">
       <section class="environment-list-pane" aria-label="环境管理范围">
-        <header class="environment-list-toolbar">
+        <header class="environment-list-toolbar webqq-overlay-header">
           <h2>管理范围</h2>
         </header>
         <nav class="environment-navigation" aria-label="环境目录类型">
@@ -214,6 +214,22 @@ onMounted(() => void loadMcpCapabilities())
   background: var(--webqq-surface);
 }
 
+.environment-list-toolbar {
+  z-index: 2;
+  --webqq-overlay-header-surface: var(--webqq-surface);
+}
+
+.environment-list-toolbar::before {
+  border-radius: 15px 15px 0 0;
+}
+
+/* 左侧目录滚动到标题后方，保留原来的首项位置。 */
+.environment-navigation {
+  margin-top: -56px;
+  padding-top: 64px;
+  scroll-padding-top: 64px;
+}
+
 .environment-list-toolbar h2,
 .environment-detail-toolbar h2 {
   margin: 0;
@@ -235,7 +251,9 @@ onMounted(() => void loadMcpCapabilities())
   min-height: 0;
   flex-direction: column;
   gap: 4px;
-  padding: 8px;
+  padding-right: 8px;
+  padding-bottom: 8px;
+  padding-left: 8px;
 }
 
 .environment-navigation [data-slot="button"] {

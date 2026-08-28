@@ -137,13 +137,19 @@
 }
 
 .webqq-model-request-list-toolbar {
+  z-index: 2;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   min-height: 56px;
   padding: 12px 16px;
   border-bottom: 1px solid var(--webqq-border);
-  background: var(--webqq-surface);
+  background: transparent;
+  --webqq-overlay-header-surface: var(--webqq-surface);
+}
+
+.webqq-model-request-list-toolbar::before {
+  border-radius: 15px 15px 0 0;
 }
 
 .webqq-model-request-list-toolbar h2 {
@@ -269,6 +275,12 @@
   min-height: 0;
   overflow: auto;
   padding: 8px;
+}
+
+.webqq-model-request-list {
+  margin-top: -56px;
+  padding-top: 64px;
+  scroll-padding-top: 64px;
 }
 
 .webqq-model-request-item {
@@ -1382,11 +1394,6 @@
   border-radius: 8px;
 }
 
-.webqq-model-trajectory-header {
-  position: relative;
-  isolation: isolate;
-}
-
 .webqq-model-request-analysis .webqq-model-trajectory-header {
   position: sticky;
   top: 0;
@@ -1395,21 +1402,9 @@
   border-radius: 7px 7px 0 0;
 }
 
-/* 摘要、过滤工具栏和组成轨道共用一个背景层；filter 放在无后代的伪元素上，
-   避免形成会破坏内部浮层的 Backdrop Root。 */
+/* 轨迹头部沿用覆盖式表头的共享背景层，只补充自身的分隔线。 */
 .webqq-model-trajectory-header::before {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
   border-bottom: 1px solid color-mix(in srgb, var(--webqq-border) 72%, transparent);
-  background: var(--webqq-surface);
-  content: "";
-  pointer-events: none;
-}
-
-.webqq-workspace.is-frosted .webqq-model-trajectory-header::before {
-  background: color-mix(in srgb, var(--webqq-surface) 72%, transparent);
-  backdrop-filter: saturate(180%) blur(20px);
 }
 
 .webqq-workspace.is-frosted .webqq-model-trajectory-header :is(

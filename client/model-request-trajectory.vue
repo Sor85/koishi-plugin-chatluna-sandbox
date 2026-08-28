@@ -3,7 +3,7 @@
     <div v-if="loading && !trajectory" class="webqq-model-request-empty">正在组装轨迹…</div>
     <div v-else-if="!trajectory?.rows.length" class="webqq-model-request-empty">当前记录没有可投影的轨迹</div>
     <template v-else>
-      <div ref="stickyHeaderElement" class="webqq-model-trajectory-header">
+      <div ref="stickyHeaderElement" class="webqq-model-trajectory-header webqq-overlay-header">
         <header v-if="showModeSwitch || mode === 'conversation'" class="webqq-model-trajectory-scope">
       <div v-if="showModeSwitch" class="webqq-model-trajectory-mode" role="tablist" aria-label="轨迹范围">
         <Button

@@ -26,6 +26,27 @@
   height: 0;
 }
 
+/* 覆盖滚动内容的页内表头共用同一层级语义。实际模糊只放在无后代的
+   ::before 上，避免表头本身成为 Backdrop Root，破坏其中 Popover/Select 的毛玻璃。 */
+.webqq-overlay-header {
+  position: relative;
+  isolation: isolate;
+}
+
+.webqq-overlay-header::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: var(--webqq-overlay-header-surface, var(--webqq-surface));
+  content: "";
+  pointer-events: none;
+}
+
+.webqq-workspace.is-frosted .webqq-overlay-header::before {
+  background: color-mix(in srgb, var(--webqq-overlay-header-surface, var(--webqq-surface)) 72%, transparent);
+  backdrop-filter: saturate(180%) blur(20px);
+}
+
 .chatluna-sandbox-scrollbar-overlay {
   position: fixed;
   z-index: 100;

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 describe('WebQQ 区域样式', () => {
   it('按视觉区域加载且入口不保留区域规则', () => {
     const entry = readFileSync(resolve('client/style.css'), 'utf8')
-    const files = ['sidebar', 'chat', 'messages', 'composer', 'details']
+    const files = ['sidebar', 'chat', 'messages', 'composer', 'details', 'debug', 'mcp-calls', 'model-requests', 'presets']
     const sources = Object.fromEntries(files.map((name) => [name, readFileSync(resolve(`client/styles/webqq-${name}.css`), 'utf8')]))
 
     expect(files.map((name) => entry.indexOf(`@import "./styles/webqq-${name}.css";`)))
@@ -18,6 +18,8 @@ describe('WebQQ 区域样式', () => {
       /\.webqq-sidebar-tabs-row \{[^}]*backdrop-filter:/s,
     )
     expect(sources.chat).toContain('.chatluna-sandbox-chat-header')
+    // 毛玻璃表头必须与滚动内容实际重叠；仅声明 backdrop-filter 但让两者分居 Grid 行不会有视觉效果。
+    expect(sources.chat).toMatch(/\.chatluna-sandbox-chat > \.chatluna-sandbox-messages\s*\{[^}]*margin-top:\s*-76px;[^}]*padding-top:\s*96px;/s)
     expect(sources.messages).toContain('.chatluna-sandbox-message-row')
     expect(sources.composer).toContain('.webqq-composer-user-stack')
     expect(sources.details).toContain('.chatluna-sandbox-group-member')
@@ -25,6 +27,10 @@ describe('WebQQ 区域样式', () => {
     expect(sources.details).toContain('border-color: rgb(113 113 122 / 36%);\n  background: rgb(57 57 63);')
     expect(sources.details).toMatch(/\.webqq-info-header \{[^}]*background: var\(--webqq-bg\);/s)
     expect(sources.details).toMatch(/\.chatluna-sandbox-group-announcements \{[^}]*background: var\(--webqq-bg\);/s)
+    expect(sources['model-requests']).toMatch(/\.webqq-model-request-list\s*\{[^}]*margin-top:\s*-56px;[^}]*padding-top:\s*64px;/s)
+    expect(sources.debug).toMatch(/\.webqq-debug-list\s*\{[^}]*margin-top:\s*-56px;[^}]*padding-top:\s*64px;/s)
+    expect(sources['mcp-calls']).toMatch(/\.webqq-mcp-call-list\s*\{[^}]*margin-top:\s*-56px;[^}]*padding-top:\s*64px;/s)
+    expect(sources.presets).toMatch(/\.webqq-preset-groups\s*\{[^}]*margin-top:\s*-61px;[^}]*padding-top:\s*69px;/s)
     expect(entry).not.toContain('.webqq-session {')
     expect(entry).not.toContain('.chatluna-sandbox-message-row {\n  max-width: 74%')
     expect(entry).not.toContain('.webqq-composer {\n  position: absolute')
@@ -50,10 +56,31 @@ describe('WebQQ 区域样式', () => {
   it('工作区层不声明 backdrop-filter，浮层雾化态由 body 属性统一驱动', () => {
     const workspace = readFileSync(resolve('client/styles/webqq-workspace.css'), 'utf8')
     const primitives = readFileSync(resolve('client/styles/webqq-primitives.css'), 'utf8')
+    const modelRequests = readFileSync(resolve('client/model-request-trajectory.vue'), 'utf8')
+    const modelRequestWorkspace = readFileSync(resolve('client/model-request-workspace.vue'), 'utf8')
+    const debugWorkspace = readFileSync(resolve('client/onebot-debug-workspace.vue'), 'utf8')
+    const mcpCallWorkspace = readFileSync(resolve('client/mcp-call-workspace.vue'), 'utf8')
+    const presetWorkspace = readFileSync(resolve('client/preset-workspace.vue'), 'utf8')
+    const environmentManager = readFileSync(resolve('client/environment-manager.vue'), 'utf8')
+    const chatPane = readFileSync(resolve('client/webqq-chat-pane.vue'), 'utf8')
 
     // 工作区本体或一级区域出现 backdrop-filter 声明会成为 Backdrop Root 边界，
     // 静默杀死其内部控件与其上浮层的全部毛玻璃（ADR 0060）。
     expect(workspace).not.toMatch(/backdrop-filter\s*:/)
+    const overlayHeaderRule = primitives.slice(primitives.indexOf('.webqq-overlay-header::before {')).split('}')[0]
+    expect(overlayHeaderRule).toContain('background: var(--webqq-overlay-header-surface, var(--webqq-surface))')
+    const frostedOverlayHeaderRule = primitives.slice(primitives.indexOf('.webqq-workspace.is-frosted .webqq-overlay-header::before {')).split('}')[0]
+    expect(frostedOverlayHeaderRule).toContain('background: color-mix(in srgb, var(--webqq-overlay-header-surface, var(--webqq-surface)) 72%, transparent)')
+    expect(frostedOverlayHeaderRule).toContain('backdrop-filter: saturate(180%) blur(20px)')
+    expect(modelRequests).toContain('class="webqq-model-trajectory-header webqq-overlay-header"')
+    expect(modelRequestWorkspace).toContain('class="webqq-model-request-list-toolbar webqq-overlay-header"')
+    expect(debugWorkspace).toContain('class="webqq-debug-list-toolbar webqq-overlay-header"')
+    expect(mcpCallWorkspace).toContain('class="webqq-mcp-call-list-toolbar webqq-overlay-header"')
+    expect(presetWorkspace).toContain('class="webqq-preset-search webqq-overlay-header"')
+    expect(environmentManager).toContain('class="environment-list-toolbar webqq-overlay-header"')
+    expect(environmentManager).toContain('margin-top: -56px')
+    expect(environmentManager).toContain('padding-top: 64px')
+    expect(chatPane).toContain('class="chatluna-sandbox-chat-header webqq-overlay-header"')
     const frostedSurfaceRule = primitives.slice(primitives.indexOf('body[data-sandbox-frosted] :is(')).split('}')[0]
     expect(frostedSurfaceRule).toContain('background: color-mix(in srgb, var(--webqq-panel) 72%, transparent)')
     expect(frostedSurfaceRule).toContain('backdrop-filter: saturate(180%) blur(20px)')

@@ -1,6 +1,6 @@
 <template>
   <main class="chatluna-sandbox-chat" :style="{ '--webqq-composer-space': composerSpace ? `${composerSpace}px` : undefined }">
-    <header class="chatluna-sandbox-chat-header" :class="{ 'is-searching': searchOpen }">
+    <header class="chatluna-sandbox-chat-header webqq-overlay-header" :class="{ 'is-searching': searchOpen }">
       <!-- 窄屏为单栏互切布局，会话列表被隐藏，必须提供返回入口；宽屏下此按钮不显示。 -->
       <button type="button" class="webqq-icon-button chatluna-sandbox-chat-back" aria-label="返回会话列表" @click="emit('back')">
         <IconChevronLeft :size="22" aria-hidden="true" />

@@ -24,7 +24,7 @@
     <p v-if="error" class="webqq-debug-error" role="alert">{{ error }}</p>
     <div class="webqq-debug-split">
       <section class="webqq-debug-list-pane" aria-label="调试记录列表">
-        <header class="webqq-debug-list-toolbar">
+        <header class="webqq-debug-list-toolbar webqq-overlay-header">
           <h2>调用列表</h2>
           <div class="webqq-debug-list-tools">
             <button

@@ -24,7 +24,7 @@
     <p v-if="error" class="webqq-mcp-call-error" role="alert">{{ error }}</p>
     <div class="webqq-mcp-call-split">
       <section class="webqq-mcp-call-list-pane" aria-label="MCP 调用列表">
-        <header class="webqq-mcp-call-list-toolbar">
+        <header class="webqq-mcp-call-list-toolbar webqq-overlay-header">
           <h2>调用列表</h2>
           <div class="webqq-mcp-call-list-tools">
             <button

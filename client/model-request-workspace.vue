@@ -46,7 +46,7 @@
 
     <div class="webqq-model-request-split">
       <section class="webqq-model-request-list-pane" aria-label="模型请求列表">
-        <header class="webqq-model-request-list-toolbar">
+        <header class="webqq-model-request-list-toolbar webqq-overlay-header">
           <h2>请求列表</h2>
           <div class="webqq-model-request-list-tools">
             <button

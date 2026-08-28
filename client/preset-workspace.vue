@@ -21,7 +21,7 @@
 
     <div class="webqq-preset-layout">
       <aside class="webqq-preset-list-pane" aria-label="预设文件列表">
-        <label class="webqq-preset-search">
+        <label class="webqq-preset-search webqq-overlay-header">
           <IconSearch aria-hidden="true" />
           <Input v-model="searchQuery" type="search" placeholder="搜索文件名或展示名称" />
         </label>
@@ -55,38 +55,40 @@
       <section class="webqq-preset-editor-pane" aria-label="预设源码">
         <div v-if="!document" class="webqq-preset-empty is-editor">选择一个预设，或新建 YAML 文件</div>
         <template v-else>
-          <header class="webqq-preset-document-header">
-            <div>
-              <span class="webqq-preset-document-title">
-                <IconFileCode aria-hidden="true" />
-                <strong>{{ document.displayName || document.fileName }}</strong>
-                <Badge variant="outline">{{ kindLabel(document.kind) }}</Badge>
-              </span>
-            </div>
-            <div class="webqq-preset-document-actions">
-              <span v-if="showSaveStatus" class="webqq-preset-save-status" :data-status="saveStatus">
-                {{ saveStatusLabel }}
-              </span>
-              <Button variant="outline" size="sm" :disabled="saving" @click="openRenameDialog">
-                <IconPencil data-icon="inline-start" aria-hidden="true" />
-                重命名
-              </Button>
-              <Button variant="destructive" size="sm" :disabled="saving" @click="requestDirtyAction('delete')">
-                <IconTrash data-icon="inline-start" aria-hidden="true" />
-                删除
-              </Button>
-              <Button size="sm" :disabled="saving || !dirty" @click="saveDocument">
-                <IconDeviceFloppy data-icon="inline-start" aria-hidden="true" />
-                保存
-              </Button>
-            </div>
-          </header>
+          <div ref="editorOverlayElement" class="webqq-preset-editor-overlay webqq-overlay-header">
+            <header class="webqq-preset-document-header">
+              <div>
+                <span class="webqq-preset-document-title">
+                  <IconFileCode aria-hidden="true" />
+                  <strong>{{ document.displayName || document.fileName }}</strong>
+                  <Badge variant="outline">{{ kindLabel(document.kind) }}</Badge>
+                </span>
+              </div>
+              <div class="webqq-preset-document-actions">
+                <span v-if="showSaveStatus" class="webqq-preset-save-status" :data-status="saveStatus">
+                  {{ saveStatusLabel }}
+                </span>
+                <Button variant="outline" size="sm" :disabled="saving" @click="openRenameDialog">
+                  <IconPencil data-icon="inline-start" aria-hidden="true" />
+                  重命名
+                </Button>
+                <Button variant="destructive" size="sm" :disabled="saving" @click="requestDirtyAction('delete')">
+                  <IconTrash data-icon="inline-start" aria-hidden="true" />
+                  删除
+                </Button>
+                <Button size="sm" :disabled="saving || !dirty" @click="saveDocument">
+                  <IconDeviceFloppy data-icon="inline-start" aria-hidden="true" />
+                  保存
+                </Button>
+              </div>
+            </header>
 
-          <div v-if="document.diagnostics.length" class="webqq-preset-diagnostics" role="alert">
-            <strong>源码诊断</strong>
-            <p v-for="diagnostic in document.diagnostics" :key="`${diagnostic.code}:${diagnostic.range?.start ?? 0}`">
-              {{ diagnostic.message }}
-            </p>
+            <div v-if="document.diagnostics.length" class="webqq-preset-diagnostics" role="alert">
+              <strong>源码诊断</strong>
+              <p v-for="diagnostic in document.diagnostics" :key="`${diagnostic.code}:${diagnostic.range?.start ?? 0}`">
+                {{ diagnostic.message }}
+              </p>
+            </div>
           </div>
 
           <PresetSourceEditor
@@ -198,7 +200,7 @@ import {
   IconSearch,
   IconTrash,
 } from '@tabler/icons-vue'
-import { computed, markRaw, nextTick, ref, shallowRef, watch, type DeepReadonly } from 'vue'
+import { computed, markRaw, nextTick, onBeforeUnmount, ref, shallowRef, watch, type DeepReadonly } from 'vue'
 import type { StateEffect } from '@codemirror/state'
 import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
@@ -256,6 +258,8 @@ const emit = defineEmits<{
 const source = ref('')
 const searchQuery = ref('')
 const listElement = ref<HTMLElement>()
+const editorOverlayElement = ref<HTMLElement>()
+let editorOverlayResizeObserver: ResizeObserver | undefined
 const editor = ref<{ captureScrollSnapshot: () => StateEffect<unknown> | undefined }>()
 const originEditorScroll = shallowRef<StateEffect<unknown>>()
 const listScrollRestore = createScrollRestore({
@@ -352,6 +356,21 @@ watch(() => props.originRestore?.seq, async () => {
   await nextTick()
   originEditorScroll.value = undefined
 }, { immediate: true })
+
+watch(editorOverlayElement, (overlay) => {
+  editorOverlayResizeObserver?.disconnect()
+  editorOverlayResizeObserver = undefined
+  if (!overlay) return
+  const pane = overlay.closest<HTMLElement>('.webqq-preset-editor-pane')
+  if (!pane) return
+  const updateOverlayHeight = () => pane.style.setProperty('--webqq-preset-overlay-height', `${overlay.offsetHeight}px`)
+  updateOverlayHeight()
+  if (typeof ResizeObserver === 'undefined') return
+  editorOverlayResizeObserver = new ResizeObserver(updateOverlayHeight)
+  editorOverlayResizeObserver.observe(overlay)
+}, { flush: 'post' })
+
+onBeforeUnmount(() => editorOverlayResizeObserver?.disconnect())
 
 function matchesSearch(item: DeepReadonly<SandboxPresetDocument>) {
   const query = searchQuery.value.trim().toLocaleLowerCase('zh-CN')
