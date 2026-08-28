@@ -72,7 +72,9 @@ export function parsePresetSourceDocument(kind: PresetDocumentKind, source: stri
   const expressions = locatedFields.flatMap((field) => scanTemplateExpressions(field, source))
   const templateFields = locatedFields.map(({ path, range, value }) => ({ path, range, value }))
   // 展示名称和模板字段一样是这次解析的产物：语法树已经在手上，不需要再跑一遍普通解析。
-  // 「解析失败」只有一套口径——本次解析报出的 yaml-parse-error 诊断。
+  // 「解析失败」只有一套口径——本次解析报出的 yaml-parse-error 诊断。刻意不看
+  // template-field-not-string：那类诊断说明某个模板字段不是字符串，名称字段本身解析成功，
+  // 把它也算作解析失败会让这类预设突然丢掉展示名称，与「语法错误才不显示展示名称」不符。
   const displayName = diagnostics.some(({ code }) => code === 'yaml-parse-error')
     ? undefined
     : readDisplayName(kind, yaml)

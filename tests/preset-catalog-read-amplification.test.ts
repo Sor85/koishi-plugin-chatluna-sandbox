@@ -27,19 +27,30 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 
 vi.mock('yaml', async (importOriginal) => {
   const original = await importOriginal<typeof import('yaml')>()
+  const classify = (options: unknown) => (
+    (options as { keepSourceTokens?: boolean } | undefined)?.keepSourceTokens ? syntaxTreeParses : plainParses
+  )
   return {
     ...original,
     parseDocument(source: string, options?: Parameters<typeof original.parseDocument>[1]) {
-      const target = (options as { keepSourceTokens?: boolean } | undefined)?.keepSourceTokens
-        ? syntaxTreeParses
-        : plainParses
-      target.push(source)
+      classify(options).push(source)
       return original.parseDocument(source, options)
+    },
+    parseAllDocuments(source: string, options?: Parameters<typeof original.parseAllDocuments>[1]) {
+      classify(options).push(source)
+      return original.parseAllDocuments(source, options)
+    },
+    // `parse` 交出的是 JS 值而不是语法树，因此它永远算一次普通解析：
+    // 「不再运行普通 YAML 解析」这条守卫必须覆盖它，否则换个入口重新解析一遍也能全绿。
+    parse(source: string, ...rest: unknown[]) {
+      plainParses.push(source)
+      return (original.parse as (...args: unknown[]) => unknown)(source, ...rest)
     },
   }
 })
 
 const { mkdir, mkdtemp, rm, writeFile } = await import('node:fs/promises')
+const yaml = await import('yaml')
 const { SandboxModelRequestStore } = await import('../src/model-request')
 const { FileSystemPresetRepository, SandboxPresetService } = await import('../src/presets')
 
@@ -133,5 +144,11 @@ describe('预设目录读取放大', () => {
     expect(presetBodyReads()).toEqual(['single.yml'])
     expect(syntaxTreeParses).toHaveLength(1)
     expect(plainParses).toEqual([])
+
+    // 「普通解析次数为 0」只有在监视真的能捕获普通解析时才有意义。
+    yaml.parse('probe: 1')
+    yaml.parseDocument('probe: 1')
+    expect(plainParses).toEqual(['probe: 1', 'probe: 1'])
+    expect(syntaxTreeParses).toHaveLength(1)
   })
 })

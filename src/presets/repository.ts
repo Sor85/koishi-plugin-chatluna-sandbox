@@ -127,8 +127,7 @@ export class FileSystemPresetRepository implements PresetRepository {
       if (!entry.name.endsWith('.yml') || !entry.isFile()) continue
       try {
         // 串行读取：不安全文件靠异常跳过，改成并发就得把跳过改写成结果过滤。
-        const snapshot = await this.readRegularFileSnapshot(this.filePath(root, entry.name))
-        files.push(this.toPresetFile(kind, entry.name, snapshot.source, snapshot.modifiedAt))
+        files.push(await this.readPresetFile(root, kind, entry.name))
       } catch (error) {
         if (error instanceof PresetRepositoryError && error.code === 'unsafe-file') continue
         throw error
@@ -138,10 +137,7 @@ export class FileSystemPresetRepository implements PresetRepository {
   }
 
   async read(kind: PresetDocumentKind, fileName: string): Promise<PresetFile> {
-    const root = await this.requireRoot(kind)
-    const path = this.filePath(root, fileName)
-    const snapshot = await this.readRegularFileSnapshot(path)
-    return this.toPresetFile(kind, fileName, snapshot.source, snapshot.modifiedAt)
+    return this.readPresetFile(await this.requireRoot(kind), kind, fileName)
   }
 
   async create(input: CreatePresetInput): Promise<PresetFile> {
@@ -270,6 +266,11 @@ export class FileSystemPresetRepository implements PresetRepository {
     const path = join(root.realPath, fileName)
     if (dirname(path) !== root.realPath) throw new PresetRepositoryError('invalid-file-name', `无效预设文件名：${fileName}`)
     return path
+  }
+
+  private async readPresetFile(root: RootState, kind: PresetDocumentKind, fileName: string): Promise<PresetFile> {
+    const snapshot = await this.readRegularFileSnapshot(this.filePath(root, fileName))
+    return this.toPresetFile(kind, fileName, snapshot.source, snapshot.modifiedAt)
   }
 
   private async readRegularFileSnapshot(path: string): Promise<RegularFileSnapshot> {

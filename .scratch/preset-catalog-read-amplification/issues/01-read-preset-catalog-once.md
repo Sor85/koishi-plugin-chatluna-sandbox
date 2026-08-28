@@ -62,3 +62,18 @@
 `tests/preset-source-document.test.ts`（展示名称解析规则与诊断口径）。
 
 真实数据对照：对开发环境真实预设目录分别用改动前后的实现导出 `catalog()` JSON，逐字节一致。
+
+## Comments
+
+代码审查后补充：
+
+- 抽出私有 `readPresetFile(root, kind, fileName)`，`readAll()` 与 `read()` 共用
+  「`filePath` → `readRegularFileSnapshot` → `toPresetFile`」这段形状；`readAll()` 不改成调用公共
+  `read()`，以保持每个文件只读一次正文与串行语义。
+- 「目录读取过程中不再运行普通 YAML 解析」的守卫扩展到 `parse` 与 `parseAllDocuments`，
+  只监视 `parseDocument` 会让「换个入口重新解析一遍」仍然全绿；并加了一条自检断言，
+  证明监视手段真的能捕获普通解析。
+- 展示名称的缺失判定保持只看 `yaml-parse-error`，不扩展到全部诊断。spec 该句的字面读法会让
+  「有非字符串模板字段但名称字段正常」的预设突然丢掉展示名称，与 User Story 2
+  「展示名称与改动前完全一致」、User Story 8「YAML 有**语法错误**的预设不显示展示名称」以及
+  本票「用户观察到的行为完全不变」冲突。取行为不变这一侧，并在解析处写明理由，避免后来者「修回去」。
