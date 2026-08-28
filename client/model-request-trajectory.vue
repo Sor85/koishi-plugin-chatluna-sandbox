@@ -317,6 +317,7 @@
 
 <script setup lang="ts">
 import {
+  IconChevronDown,
   IconChevronLeft,
   IconChevronRight,
   IconClockHour4,
@@ -331,7 +332,6 @@ import {
   IconZoomOut,
 } from '@tabler/icons-vue'
 import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
-import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip'
