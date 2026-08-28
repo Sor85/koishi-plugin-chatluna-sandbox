@@ -482,7 +482,7 @@ const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
         type: 'object',
         properties: { testApiVersion: { type: 'number', enum: [1] }, scene: { type: 'object' } },
         required: ['testApiVersion', 'scene'],
-        description: 'export_scene 导出的文档；scene.revision 须与当前 revision 一致',
+        description: 'export_scene 导出的文档；scene.revision 会被忽略，导入后场景 revision 由服务端在当前值上递增。版本绑定由 prepare_destructive_action 的 expectedRevision 负责',
       },
       confirmationToken: { type: 'string' },
     },
@@ -975,7 +975,9 @@ export class SandboxMcpService {
       const normalized = error instanceof SandboxMcpError
         ? error
         : new SandboxMcpError('domain_error', error instanceof Error ? error.message : '工具调用失败')
-      this.appendCallRecord(credential, tool, args, context.sourceIp, 'error', undefined, normalized, Date.now() - startedAt)
+      // 记录 ID 就是对外的 traceId：消费者拿错误信封里的 traceId 调 get_mcp_call_record
+      // 即可取回这次失败的记录。此前信封里的 traceId 是当场生成的随机值，与任何记录都对不上。
+      normalized.traceId = this.appendCallRecord(credential, tool, args, context.sourceIp, 'error', undefined, normalized, Date.now() - startedAt)
       throw normalized
     }
   }
@@ -1685,13 +1687,14 @@ export class SandboxMcpService {
     result: unknown,
     error: SandboxMcpError | undefined,
     durationMs = 0,
-  ) {
+  ): string {
     const affected = result && typeof result === 'object' && Array.isArray(Reflect.get(result, 'affected'))
       ? Reflect.get(result, 'affected').map(String)
       : []
     const spaceId = resolveMcpCallSpaceId(args, result)
+    const id = randomUUID()
     this.callRecords.push({
-      id: randomUUID(),
+      id,
       createdAt: new Date().toISOString(),
       credentialName: credential.name,
       sourceIp,
@@ -1707,6 +1710,7 @@ export class SandboxMcpService {
       error: error ? summarizeMcpCallError(error) : undefined,
     })
     if (this.callRecords.length > this.callRecordLimit) this.callRecords.splice(0, this.callRecords.length - this.callRecordLimit)
+    return id
   }
 
   private consumeRateLimit(credentialId: string, category: 'read' | 'mutation' | 'wait' | 'upload', limit: number) {

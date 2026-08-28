@@ -92,6 +92,13 @@ export interface SandboxMcpExport {
 }
 
 export class SandboxMcpError extends Error {
+  /**
+   * 失败调用对应的测试调用记录 ID。由 `callTool` 在写入记录后回填，传输层错误信封原样携带，
+   * 因此消费者可以拿信封里的 traceId 直接调 `get_mcp_call_record` 取回这次失败的记录。
+   * 凭证校验阶段（尚无记录可写）抛出的错误没有该字段。
+   */
+  traceId?: string
+
   constructor(
     public code: string,
     message: string,

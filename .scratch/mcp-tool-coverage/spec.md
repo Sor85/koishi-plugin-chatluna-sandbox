@@ -1,6 +1,6 @@
 # MCP 工具覆盖规格
 
-Status: ready-for-agent
+Status: ready-for-human
 
 ## Problem Statement
 

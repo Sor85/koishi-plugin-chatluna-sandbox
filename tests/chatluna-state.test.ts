@@ -1,6 +1,7 @@
-import { App, Universal } from '@koishijs/core'
+import { App } from '@koishijs/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SandboxControlService } from '../src/control-service'
+import { createDirectSession, createGroupSession, emitChatLunaEvent } from './helpers/chatluna-state-broadcast'
 
 const runningApps: App[] = []
 
@@ -27,40 +28,19 @@ async function createControl() {
   return { app, control }
 }
 
-function createGroupSession(control: SandboxControlService, botParticipantId: string) {
-  return control.getRuntimeBot(botParticipantId).session({
-    type: 'message',
-    user: { id: '10001', name: '测试用户1' },
-    channel: { id: 'group:30001', type: Universal.Channel.Type.TEXT },
-    guild: { id: '30001', name: '测试群' },
-  })
-}
-
-function createDirectSession(control: SandboxControlService, botParticipantId: string) {
-  return control.getRuntimeBot(botParticipantId).session({
-    type: 'message',
-    user: { id: '10001', name: '测试用户1' },
-    channel: { id: `private:10001:${botParticipantId}`, type: Universal.Channel.Type.DIRECT },
-  })
-}
-
-async function emit(app: App, event: string, ...args: unknown[]) {
-  await (app.parallel as unknown as (event: string, ...args: unknown[]) => Promise<void>)(event, ...args)
-}
-
 describe('ChatLuna 多机器人对话状态', () => {
   it('同一机器人在私聊和群聊并发时分别记录状态与 Token 用量', async () => {
     const { app, control } = await createControl()
     const directSession = createDirectSession(control, '20001')
     const groupSession = createGroupSession(control, '20001')
 
-    await emit(app, 'chatluna/before-chat', 'chatluna:direct', {}, {}, {}, directSession)
-    await emit(app, 'chatluna/before-chat', 'chatluna:group', {}, {}, {}, groupSession)
-    await emit(app, 'chatluna/model-usage', {
+    await emitChatLunaEvent(app, 'chatluna/before-chat', 'chatluna:direct', {}, {}, {}, directSession)
+    await emitChatLunaEvent(app, 'chatluna/before-chat', 'chatluna:group', {}, {}, {}, groupSession)
+    await emitChatLunaEvent(app, 'chatluna/model-usage', {
       context: { conversationId: 'chatluna:direct' },
       usageMetadata: { input_tokens: 8, output_tokens: 3, total_tokens: 11 },
     })
-    await emit(app, 'chatluna/model-usage', {
+    await emitChatLunaEvent(app, 'chatluna/model-usage', {
       context: { conversationId: 'chatluna:group' },
       usageMetadata: { input_tokens: 21, output_tokens: 13, total_tokens: 34 },
     })
@@ -86,13 +66,13 @@ describe('ChatLuna 多机器人对话状态', () => {
     const firstSession = createGroupSession(control, '20001')
     const secondSession = createGroupSession(control, '20002')
 
-    await emit(app, 'chatluna/before-chat', 'chatluna:first', {}, {}, {}, firstSession)
-    await emit(app, 'chatluna/before-chat', 'chatluna:second', {}, {}, {}, secondSession)
-    await emit(app, 'chatluna/model-usage', {
+    await emitChatLunaEvent(app, 'chatluna/before-chat', 'chatluna:first', {}, {}, {}, firstSession)
+    await emitChatLunaEvent(app, 'chatluna/before-chat', 'chatluna:second', {}, {}, {}, secondSession)
+    await emitChatLunaEvent(app, 'chatluna/model-usage', {
       context: { conversationId: 'chatluna:first' },
       usageMetadata: { input_tokens: 12, output_tokens: 5, total_tokens: 17 },
     })
-    await emit(app, 'chatluna/model-usage', {
+    await emitChatLunaEvent(app, 'chatluna/model-usage', {
       context: { conversationId: 'chatluna:second' },
       usageMetadata: { input_tokens: 20, output_tokens: 8, total_tokens: 28 },
     })
@@ -114,7 +94,7 @@ describe('ChatLuna 多机器人对话状态', () => {
 
     control.getVisibleSnapshot('10001')
     control.getVisibleSnapshot('20002')
-    await emit(app, 'chatluna/after-chat', 'chatluna:first', {}, {}, {}, {}, firstSession)
+    await emitChatLunaEvent(app, 'chatluna/after-chat', 'chatluna:first', {}, {}, {}, {}, firstSession)
 
     expect(control.getChatLunaStates()).toEqual(expect.arrayContaining([
       expect.objectContaining({ botParticipantId: '20001', conversationId: 'group:30001', thinking: false }),
@@ -127,17 +107,17 @@ describe('ChatLuna 多机器人对话状态', () => {
     const firstSession = createGroupSession(control, '20001')
     const secondSession = createGroupSession(control, '20002')
 
-    await emit(app, 'chatluna/before-chat', 'chatluna:shared', {}, {}, {}, firstSession)
-    await emit(app, 'chatluna/before-chat', 'chatluna:shared', {}, {}, {}, secondSession)
-    await emit(app, 'chatluna/model-usage', {
+    await emitChatLunaEvent(app, 'chatluna/before-chat', 'chatluna:shared', {}, {}, {}, firstSession)
+    await emitChatLunaEvent(app, 'chatluna/before-chat', 'chatluna:shared', {}, {}, {}, secondSession)
+    await emitChatLunaEvent(app, 'chatluna/model-usage', {
       context: { conversationId: 'chatluna:shared' },
       usageMetadata: { input_tokens: 99, output_tokens: 99, total_tokens: 198 },
     })
-    await emit(app, 'chatluna/before-chat', 'chatluna:invalid', {}, {}, {}, {
+    await emitChatLunaEvent(app, 'chatluna/before-chat', 'chatluna:invalid', {}, {}, {}, {
       selfId: '10001',
       channelId: 'group:30001',
     })
-    await emit(app, 'chatluna/model-usage', {
+    await emitChatLunaEvent(app, 'chatluna/model-usage', {
       context: { conversationId: 'chatluna:missing' },
       usageMetadata: { input_tokens: 50, output_tokens: 50, total_tokens: 100 },
     })
@@ -145,7 +125,7 @@ describe('ChatLuna 多机器人对话状态', () => {
     expect(control.getChatLunaStates()).toHaveLength(2)
     expect(control.getChatLunaStates().every(({ usage }) => usage === undefined)).toBe(true)
 
-    await emit(app, 'chatluna/after-chat-error', new Error('测试错误'), 'chatluna:shared')
+    await emitChatLunaEvent(app, 'chatluna/after-chat-error', new Error('测试错误'), 'chatluna:shared')
     expect(control.getChatLunaStates()).toEqual([])
   })
 
@@ -154,7 +134,7 @@ describe('ChatLuna 多机器人对话状态', () => {
     const directSession = createDirectSession(control, '20001')
     const groupSession = createGroupSession(control, '20001')
 
-    await emit(app, 'chatluna/before-chat', 'chatluna:direct', {}, {}, {}, directSession)
+    await emitChatLunaEvent(app, 'chatluna/before-chat', 'chatluna:direct', {}, {}, {}, directSession)
     control.recordModelRequest({
       status: 'error',
       durationMs: 10,
@@ -176,7 +156,7 @@ describe('ChatLuna 多机器人对话状态', () => {
       error: { code: 'model_request_error', message: 'HTTP 500', retryable: false, traceId: 'group-trace' },
     })
 
-    await emit(app, 'chatluna/after-chat-error', {
+    await emitChatLunaEvent(app, 'chatluna/after-chat-error', {
       errorCode: 103,
       message: 'API 请求失败 (103)',
       originError: new Error('provider rejected request'),
@@ -196,8 +176,8 @@ describe('ChatLuna 多机器人对话状态', () => {
 
   it('ChatLuna 会话同时映射多个机器人时不把错误串到任意模型请求', async () => {
     const { app, control } = await createControl()
-    await emit(app, 'chatluna/before-chat', 'chatluna:shared-error', {}, {}, {}, createGroupSession(control, '20001'))
-    await emit(app, 'chatluna/before-chat', 'chatluna:shared-error', {}, {}, {}, createGroupSession(control, '20002'))
+    await emitChatLunaEvent(app, 'chatluna/before-chat', 'chatluna:shared-error', {}, {}, {}, createGroupSession(control, '20001'))
+    await emitChatLunaEvent(app, 'chatluna/before-chat', 'chatluna:shared-error', {}, {}, {}, createGroupSession(control, '20002'))
     const request = control.recordModelRequest({
       status: 'error',
       durationMs: 10,
@@ -208,7 +188,7 @@ describe('ChatLuna 多机器人对话状态', () => {
       error: { code: 'model_request_error', message: 'HTTP 500', retryable: false, traceId: 'shared-trace' },
     })
 
-    await emit(app, 'chatluna/after-chat-error', { errorCode: 103, message: 'API 请求失败 (103)' }, 'chatluna:shared-error')
+    await emitChatLunaEvent(app, 'chatluna/after-chat-error', { errorCode: 103, message: 'API 请求失败 (103)' }, 'chatluna:shared-error')
 
     await control.waitForPersistence()
     expect((await control.getModelRequestRecord({ recordId: request.id })).chatlunaError).toBeUndefined()
@@ -218,12 +198,12 @@ describe('ChatLuna 多机器人对话状态', () => {
     const { app, control } = await createControl()
     const session = createGroupSession(control, '20001')
 
-    await emit(app, 'chatluna_character/message_collect', session, [])
+    await emitChatLunaEvent(app, 'chatluna_character/message_collect', session, [])
     expect(control.getChatLunaStates()).toEqual([
       expect.objectContaining({ botParticipantId: '20001', conversationId: 'group:30001', thinking: true }),
     ])
 
-    await emit(app, 'chatluna_character/after-chat', { session })
+    await emitChatLunaEvent(app, 'chatluna_character/after-chat', { session })
     expect(control.getChatLunaStates()).toEqual([
       expect.objectContaining({ botParticipantId: '20001', conversationId: 'group:30001', thinking: false }),
     ])
@@ -237,8 +217,8 @@ describe('ChatLuna 多机器人对话状态', () => {
       notifications.push(control.getChatLunaStates().some(({ thinking }) => thinking))
     })
 
-    await emit(app, 'chatluna/before-chat', 'chatluna:group', {}, {}, {}, session)
-    await emit(app, 'chatluna/after-chat', 'chatluna:group', {}, {}, {}, {}, session)
+    await emitChatLunaEvent(app, 'chatluna/before-chat', 'chatluna:group', {}, {}, {}, session)
+    await emitChatLunaEvent(app, 'chatluna/after-chat', 'chatluna:group', {}, {}, {}, {}, session)
 
     expect(notifications).toEqual([true, false])
   })
@@ -250,7 +230,7 @@ describe('ChatLuna 多机器人对话状态', () => {
       notifications += 1
     })
 
-    await emit(app, 'chatluna/before-chat', 'chatluna:invalid', {}, {}, {}, {
+    await emitChatLunaEvent(app, 'chatluna/before-chat', 'chatluna:invalid', {}, {}, {}, {
       selfId: '10001',
       channelId: 'group:30001',
     })
@@ -262,13 +242,13 @@ describe('ChatLuna 多机器人对话状态', () => {
     const { app, control } = await createControl()
     const session = createGroupSession(control, '20001')
 
-    await emit(app, 'chatluna_character/message_collect', session, [])
-    await emit(app, 'chatluna/model-usage', {
+    await emitChatLunaEvent(app, 'chatluna_character/message_collect', session, [])
+    await emitChatLunaEvent(app, 'chatluna/model-usage', {
       context: { conversationId: 'chatluna:character' },
       usageMetadata: { input_tokens: 12, output_tokens: 5, total_tokens: 17 },
     })
     await control.sendMessage({ operatorId: '20001', conversationId: 'group:30001', content: '好的' })
-    await emit(app, 'chatluna_character/after-chat', {
+    await emitChatLunaEvent(app, 'chatluna_character/after-chat', {
       session,
       lastResponseMessage: { content: '已清理的回复' },
       completionMessages: [{
@@ -295,8 +275,8 @@ describe('ChatLuna 多机器人对话状态', () => {
     const { app, control } = await createControl()
     const session = createGroupSession(control, '20001')
 
-    await emit(app, 'chatluna/before-chat', 'chatluna:first-request', {}, {}, {}, session)
-    await emit(app, 'chatluna/model-usage', {
+    await emitChatLunaEvent(app, 'chatluna/before-chat', 'chatluna:first-request', {}, {}, {}, session)
+    await emitChatLunaEvent(app, 'chatluna/model-usage', {
       context: { conversationId: 'chatluna:first-request' },
       usageMetadata: { input_tokens: 8, output_tokens: 3, total_tokens: 11 },
     })
@@ -304,12 +284,12 @@ describe('ChatLuna 多机器人对话状态', () => {
     control.recordChatLunaModelRequest('main', 'request:first-b', '20001', 'group:30001')
     await control.sendMessage({ operatorId: '20001', conversationId: 'group:30001', content: '第一轮第一段' })
     await control.sendMessage({ operatorId: '20001', conversationId: 'group:30001', content: '第一轮第二段' })
-    await emit(app, 'chatluna/after-chat', 'chatluna:first-request', {}, { content: '第一轮回复' }, {}, {}, session)
+    await emitChatLunaEvent(app, 'chatluna/after-chat', 'chatluna:first-request', {}, { content: '第一轮回复' }, {}, {}, session)
 
-    await emit(app, 'chatluna/before-chat', 'chatluna:second-request', {}, {}, {}, session)
+    await emitChatLunaEvent(app, 'chatluna/before-chat', 'chatluna:second-request', {}, {}, {}, session)
     control.recordChatLunaModelRequest('main', 'request:second', '20001', 'group:30001')
     await control.sendMessage({ operatorId: '20001', conversationId: 'group:30001', content: '第二轮回复' })
-    await emit(app, 'chatluna/after-chat', 'chatluna:second-request', {}, { content: '第二轮回复' }, {}, {}, session)
+    await emitChatLunaEvent(app, 'chatluna/after-chat', 'chatluna:second-request', {}, { content: '第二轮回复' }, {}, {}, session)
 
     expect(control.getSnapshot().messages.map(({ chatLuna }) => chatLuna?.modelRequests)).toEqual([
       [
@@ -334,9 +314,9 @@ describe('ChatLuna 多机器人对话状态', () => {
     const session = createGroupSession(control, '20001')
 
     for (const round of ['第一轮想法', '第二轮想法']) {
-      await emit(app, 'chatluna_character/message_collect', session, [])
+      await emitChatLunaEvent(app, 'chatluna_character/message_collect', session, [])
       await control.sendMessage({ operatorId: '20001', conversationId: 'group:30001', content: `回复 ${round}` })
-      await emit(app, 'chatluna_character/after-chat', {
+      await emitChatLunaEvent(app, 'chatluna_character/after-chat', {
         session,
         lastResponseMessage: { content: `<think>${round}</think>回复` },
       })
@@ -349,9 +329,9 @@ describe('ChatLuna 多机器人对话状态', () => {
     const { app, control } = await createControl()
     const session = createGroupSession(control, '20001')
 
-    await emit(app, 'chatluna/before-chat', 'chatluna:group', {}, {}, {}, session)
+    await emitChatLunaEvent(app, 'chatluna/before-chat', 'chatluna:group', {}, {}, {}, session)
     await control.sendMessage({ operatorId: '20001', conversationId: 'group:30001', content: '回复正文' })
-    await emit(app, 'chatluna/after-chat', 'chatluna:group', {}, {
+    await emitChatLunaEvent(app, 'chatluna/after-chat', 'chatluna:group', {}, {
       content: '<think>核心链路思考</think>回复正文',
     }, {}, {}, session)
 
@@ -362,9 +342,9 @@ describe('ChatLuna 多机器人对话状态', () => {
     const { app, control } = await createControl()
     const session = createGroupSession(control, '20001')
 
-    await emit(app, 'chatluna_character/message_collect', session, [])
+    await emitChatLunaEvent(app, 'chatluna_character/message_collect', session, [])
     await control.sendMessage({ operatorId: '20001', conversationId: 'group:30001', content: '没有思考标签的回复' })
-    await emit(app, 'chatluna_character/after-chat', {
+    await emitChatLunaEvent(app, 'chatluna_character/after-chat', {
       session,
       lastResponseMessage: { content: '没有思考标签的回复' },
     })
@@ -380,11 +360,11 @@ describe('ChatLuna 多机器人对话状态', () => {
     const session = createGroupSession(control, '20001')
 
     // 第一轮只开始不结束，模拟 chatluna-character 遇到上游错误后不发结束事件。
-    await emit(app, 'chatluna_character/message_collect', session, [])
+    await emitChatLunaEvent(app, 'chatluna_character/message_collect', session, [])
     await new Promise((resolve) => setTimeout(resolve, 60))
-    await emit(app, 'chatluna_character/message_collect', session, [])
+    await emitChatLunaEvent(app, 'chatluna_character/message_collect', session, [])
     await control.sendMessage({ operatorId: '20001', conversationId: 'group:30001', content: '第二轮回复' })
-    await emit(app, 'chatluna_character/after-chat', {
+    await emitChatLunaEvent(app, 'chatluna_character/after-chat', {
       session,
       lastResponseMessage: { content: '<think>第二轮想法</think>回复' },
     })
@@ -398,8 +378,8 @@ describe('ChatLuna 多机器人对话状态', () => {
     const { app, control } = await createControl()
     const session = createGroupSession(control, '20001')
 
-    await emit(app, 'chatluna_character/message_collect', session, [])
-    await emit(app, 'chatluna/model-usage', {
+    await emitChatLunaEvent(app, 'chatluna_character/message_collect', session, [])
+    await emitChatLunaEvent(app, 'chatluna/model-usage', {
       context: { conversationId: 'chatluna:character-internal' },
       usageMetadata: { input_tokens: 1197, output_tokens: 938, total_tokens: 4304 },
     })

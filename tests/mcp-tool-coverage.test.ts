@@ -1,0 +1,535 @@
+import { afterEach, describe, expect, it } from 'vitest'
+import type { SandboxMcpService } from '../src/mcp/service'
+import { createDirectSession, emitChatLunaEvent } from './helpers/chatluna-state-broadcast'
+import { createMcpTestService, createStartedMcpTestService, stopMcpTestApps } from './helpers/mcp-service-harness'
+
+/**
+ * 补齐此前零覆盖的十五个对外工具，并断言它们各自的领域约束。
+ *
+ * 全部调用经 `service.callTool`——测试控制服务的工具调用入口，而不是下降到测试空间服务、
+ * 控制服务或调试记录存储各自的方法：只有经该入口才会覆盖能力范围检查、限流分类、并发包装、
+ * 幂等处理、调用记录写入，以及非结构化领域错误被归一为 `domain_error` 这条行为。
+ *
+ * 断言不止于「调用成功」。只断言调用成功是最弱的覆盖形式，本文件正是在补那类伪覆盖留下的缺口。
+ */
+
+afterEach(async () => {
+  await stopMcpTestApps()
+})
+
+describe('MCP 读取类工具', () => {
+  it('分页列出当前操作者可见会话', async () => {
+    const { service, credential } = createMcpTestService(['read'])
+
+    const all = await service.callTool(credential.token, 'list_conversations', { operatorId: '10001' }) as {
+      items: Array<{ id: string }>
+      nextOffset?: number
+    }
+    // 默认场景里 10001 只与机器人有私聊，另两位用户的私聊对它不可见。
+    expect(all.items.map(({ id }) => id)).toEqual(['private:10001:20001', 'group:30001'])
+    expect(all.nextOffset).toBeUndefined()
+
+    const firstPage = await service.callTool(credential.token, 'list_conversations', { operatorId: '10001', limit: 1 }) as {
+      items: Array<{ id: string }>
+      nextOffset?: number
+    }
+    expect(firstPage.items.map(({ id }) => id)).toEqual(['private:10001:20001'])
+    expect(firstPage.nextOffset).toBe(1)
+
+    const secondPage = await service.callTool(credential.token, 'list_conversations', { operatorId: '10001', limit: 1, offset: 1 }) as {
+      items: Array<{ id: string }>
+      nextOffset?: number
+    }
+    expect(secondPage.items.map(({ id }) => id)).toEqual(['group:30001'])
+    expect(secondPage.nextOffset).toBeUndefined()
+
+    // 另一位操作者看到的是自己的私聊，可见性随操作者变化而不是返回全量会话。
+    const other = await service.callTool(credential.token, 'list_conversations', { operatorId: '10002' }) as { items: Array<{ id: string }> }
+    expect(other.items.map(({ id }) => id)).toEqual(['private:10002:20001', 'group:30001'])
+  })
+
+  it('读取单个会话及其消息，并拒绝不可见会话', async () => {
+    const { service, credential, control } = createMcpTestService(['read', 'interact'])
+    // 未启动 App 时机器人 middleware 不会收敛，send_message 会一直等待同步回复；停用机器人后仍会写入消息。
+    control.updateBot({ id: '20001', name: 'Koishi', implementation: 'napcat', enabled: false })
+    const sent = await service.callTool(credential.token, 'send_message', {
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      content: '会话详情用例',
+      idempotencyKey: 'conversation-detail-1',
+    }) as { messageId: string }
+
+    const detail = await service.callTool(credential.token, 'get_conversation', {
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+    }) as { conversation: { id: string; messageIds: string[] }; messages: Array<{ id: string; content: string }> }
+    expect(detail.conversation.id).toBe('private:10001:20001')
+    expect(detail.conversation.messageIds).toContain(sent.messageId)
+    // 返回的消息集合必须正好是该会话引用的消息，而不是操作者可见的全部消息。
+    expect(detail.messages.map(({ id }) => id)).toEqual(detail.conversation.messageIds)
+    expect(detail.messages).toContainEqual(expect.objectContaining({ id: sent.messageId, content: '会话详情用例' }))
+
+    // 别人的私聊对当前操作者不可见，读取时按会话不存在拒绝而不是泄露内容。
+    await expect(service.callTool(credential.token, 'get_conversation', {
+      operatorId: '10001',
+      conversationId: 'private:10002:20001',
+    })).rejects.toMatchObject({ code: 'conversation_not_found' })
+  })
+
+  it('列出当前场景真实存在的待处理好友与群申请', async () => {
+    const { service, credential, control } = createMcpTestService(['read', 'interact'])
+    control.createUser({ id: '10004', name: '申请人' })
+
+    await expect(service.callTool(credential.token, 'list_pending_requests', {})).resolves.toEqual([])
+
+    const friend = await service.callTool(credential.token, 'perform_friend_action', {
+      operatorId: '10004',
+      action: 'request',
+      targetId: '10001',
+      idempotencyKey: 'pending-friend-1',
+    }) as { requestId: string }
+    const group = await service.callTool(credential.token, 'perform_group_action', {
+      operatorId: '10004',
+      action: 'request-join',
+      groupId: '30001',
+      idempotencyKey: 'pending-group-1',
+    }) as { requestId: string }
+
+    expect(await service.callTool(credential.token, 'list_pending_requests', {})).toEqual([
+      expect.objectContaining({ id: friend.requestId, type: 'friend', requesterId: '10004', targetId: '10001', status: 'pending' }),
+      expect.objectContaining({ id: group.requestId, type: 'group', subType: 'add', requesterId: '10004', groupId: '30001', status: 'pending' }),
+    ])
+
+    // 申请被处理后不再出现在待处理列表里。
+    await service.callTool(credential.token, 'handle_request', {
+      operatorId: '10001',
+      requestId: friend.requestId,
+      approve: true,
+      idempotencyKey: 'pending-friend-handle-1',
+    })
+    expect(await service.callTool(credential.token, 'list_pending_requests', {})).toEqual([
+      expect.objectContaining({ id: group.requestId }),
+    ])
+  })
+
+  it('读取能力覆盖矩阵，结果随实现配置与能力覆盖变化', async () => {
+    const { service, credential, control } = createMcpTestService(['read', 'manage'])
+    type Capability = { id: string; action: string; supported: boolean; reason?: string }
+
+    const napcat = await service.callTool(credential.token, 'get_capability_matrix', { implementation: 'napcat' }) as Capability[]
+    const llbot = await service.callTool(credential.token, 'get_capability_matrix', { implementation: 'llbot' }) as Capability[]
+    expect(napcat.length).toBeGreaterThan(0)
+    // 两套实现基线不同，因此矩阵随 implementation 变化而不是返回同一份清单。
+    expect(llbot.map(({ id }) => id)).not.toEqual(napcat.map(({ id }) => id))
+    // 省略 implementation 时按 napcat 解析。
+    expect(await service.callTool(credential.token, 'get_capability_matrix', {})).toEqual(napcat)
+
+    const target = napcat.find(({ supported }) => supported)
+    if (!target) throw new Error('NapCat 基线没有任何受支持能力')
+    await service.callTool(credential.token, 'apply_environment_changes', {
+      expectedRevision: control.getSnapshot().revision,
+      changes: [{ action: 'set-capabilities', data: { id: '20001', disabledCapabilities: [target.id] } }],
+    })
+
+    const overridden = await service.callTool(credential.token, 'get_capability_matrix', { implementation: 'napcat' }) as Capability[]
+    expect(overridden).toContainEqual(expect.objectContaining({
+      id: target.id,
+      supported: false,
+      reason: '已被机器人能力覆盖禁用',
+    }))
+    // 只有被覆盖的那一项变化，其余条目保持基线取值。
+    expect(overridden.filter(({ id }) => id !== target.id)).toEqual(napcat.filter(({ id }) => id !== target.id))
+  })
+
+  it('导出版本化场景，导出内容与当前快照一致', async () => {
+    const { service, credential } = createMcpTestService(['read'])
+
+    const exported = await service.callTool(credential.token, 'export_scene', {}) as {
+      testApiVersion: number
+      exportedAt: string
+      scene: { revision: number; participants: Array<{ id: string }> }
+    }
+    expect(exported.testApiVersion).toBe(1)
+    expect(Number.isNaN(Date.parse(exported.exportedAt))).toBe(false)
+    expect(exported.scene).toEqual(await service.callTool(credential.token, 'get_scene_snapshot', {}))
+    // 导出文档可直接作为 import_scene 的入参形状（导入回路由破坏性场景操作用例覆盖）。
+    expect(exported.scene.participants.map(({ id }) => id)).toEqual(['10001', '10002', '10003', '20001'])
+  })
+})
+
+describe('MCP 清理类工具', () => {
+  it('清理 OneBot 调试记录后记录为空且返回数量与清理前一致', async () => {
+    const { service, credential, control } = await createStartedMcpTestService(['debug'])
+    await control.bot.internal._request('get_login_info', {})
+    await control.bot.internal._request('get_friend_list', {})
+
+    const before = await service.callTool(credential.token, 'list_onebot_debug_records', {}) as { records: unknown[] }
+    expect(before.records).toHaveLength(2)
+
+    expect(await service.callTool(credential.token, 'clear_onebot_debug_records', {})).toEqual({ cleared: 2 })
+    expect(await service.callTool(credential.token, 'list_onebot_debug_records', {})).toMatchObject({ records: [] })
+  })
+
+  it('清理测试调用记录后只留下清理调用自身的记录', async () => {
+    const { service, credential } = createMcpTestService(['read', 'debug'])
+    await service.callTool(credential.token, 'get_server_info', {})
+    await service.callTool(credential.token, 'get_scene_snapshot', {})
+    await service.callTool(credential.token, 'export_scene', {})
+
+    const before = await service.callTool(credential.token, 'list_mcp_call_records', {}) as { records: Array<{ tool: string }> }
+    // 调用记录在工具执行完成之后写入，因此读取自身不出现在它返回的页里。
+    expect(before.records.map(({ tool }) => tool)).toEqual(['export_scene', 'get_scene_snapshot', 'get_server_info'])
+
+    // 同理，cleared 覆盖清理调用之前的全部记录，包括上一次读取自身留下的那条。
+    expect(await service.callTool(credential.token, 'clear_mcp_call_records', {})).toEqual({ cleared: before.records.length + 1 })
+    const after = await service.callTool(credential.token, 'list_mcp_call_records', {}) as { records: Array<{ tool: string }> }
+    expect(after.records.map(({ tool }) => tool)).toEqual(['clear_mcp_call_records'])
+  })
+})
+
+describe('MCP 交互类工具', () => {
+  it('执行群操作并改变模拟 QQ 环境，越权时明确拒绝', async () => {
+    const { service, credential, control } = await createStartedMcpTestService(['read', 'interact'])
+    control.createUser({ id: '10004', name: '群外用户' })
+    type Snapshot = {
+      groups: Array<{ id: string; members: Array<{ participantId: string; role: string }> }>
+      requests: Array<{ id: string; subType?: string; requesterId: string; targetId?: string }>
+    }
+    const snapshot = () => service.callTool(credential.token, 'get_scene_snapshot', {}) as Promise<Snapshot>
+    const members = async () => (await snapshot()).groups[0]!.members.map(({ participantId, role }) => `${participantId}:${role}`)
+
+    // 入群：产出待处理申请，但在批准前不会直接加入群。
+    const join = await service.callTool(credential.token, 'perform_group_action', {
+      operatorId: '10004', action: 'request-join', groupId: '30001', idempotencyKey: 'group-join-1',
+    }) as { requestId: string }
+    expect((await snapshot()).requests).toContainEqual(expect.objectContaining({ id: join.requestId, subType: 'add', requesterId: '10004' }))
+    expect(await members()).not.toContain('10004:member')
+
+    const invite = await service.callTool(credential.token, 'perform_group_action', {
+      operatorId: '10001', action: 'invite', groupId: '30001', targetId: '10004', idempotencyKey: 'group-invite-1',
+    }) as { requestId: string }
+    expect((await snapshot()).requests).toContainEqual(expect.objectContaining({ id: invite.requestId, subType: 'invite', requesterId: '10001', targetId: '10004' }))
+
+    // 群管理：只有群主能设置管理员，普通成员越权时领域错误被归一为 domain_error。
+    await expect(service.callTool(credential.token, 'perform_group_action', {
+      operatorId: '10003', action: 'set-admin', groupId: '30001', targetId: '10002', enabled: false, idempotencyKey: 'group-admin-denied-1',
+    })).rejects.toMatchObject({ code: 'domain_error', message: '只有群主可以设置管理员' })
+    await service.callTool(credential.token, 'perform_group_action', {
+      operatorId: '10001', action: 'set-admin', groupId: '30001', targetId: '10003', enabled: true, idempotencyKey: 'group-admin-1',
+    })
+    expect(await members()).toContain('10003:admin')
+
+    await service.callTool(credential.token, 'perform_group_action', {
+      operatorId: '10002', action: 'leave', groupId: '30001', idempotencyKey: 'group-leave-1',
+    })
+    expect(await members()).not.toContain('10002:admin')
+
+    await service.callTool(credential.token, 'perform_group_action', {
+      operatorId: '10001', action: 'poke', groupId: '30001', targetId: '10003', conversationId: 'group:30001', idempotencyKey: 'group-poke-1',
+    })
+    const conversation = await service.callTool(credential.token, 'get_conversation', {
+      operatorId: '10001', conversationId: 'group:30001',
+    }) as { messages: Array<{ authorId: string; content: string; event?: { type: string; targetId?: string } }> }
+    expect(conversation.messages.at(-1)).toMatchObject({
+      authorId: '10001',
+      content: '测试用户1 戳了戳 测试用户3',
+      event: { type: 'poke', targetId: '10003' },
+    })
+  })
+
+  it('等待 ChatLuna 状态：匹配条件生效，已结束的旧状态不会被当成当前结果', async () => {
+    const { app, service, credential, control } = await createStartedMcpTestService(['interact'])
+    const session = createDirectSession(control, '20001')
+    type WaitResult = {
+      matched: boolean
+      reason?: string
+      state?: { botParticipantId: string; conversationId: string; thinking: boolean }
+    }
+
+    const cursor = service.currentCursor()
+    // thinking=true 是瞬时状态：先启动等待，再广播状态，才能观察到它。
+    const pending = service.callTool(credential.token, 'wait_for_chatluna_state', {
+      cursor, botParticipantId: '20001', thinking: true, timeoutSeconds: 5,
+    }) as Promise<WaitResult>
+    await emitChatLunaEvent(app, 'chatluna/before-chat', 'chatluna:direct', {}, {}, {}, session)
+    expect(await pending).toMatchObject({
+      matched: true,
+      state: { botParticipantId: '20001', conversationId: 'private:10001:20001', thinking: true },
+    })
+
+    await emitChatLunaEvent(app, 'chatluna/after-chat', 'chatluna:direct', {}, {}, {}, {}, session)
+    await expect(service.callTool(credential.token, 'wait_for_chatluna_state', {
+      cursor, botParticipantId: '20001', thinking: false, timeoutSeconds: 5,
+    })).resolves.toMatchObject({ matched: true, state: { thinking: false } })
+
+    // 本轮思考已经结束，等待 thinking=true 必须超时：旧状态不会被当成当前等待结果，
+    // 不匹配的状态也不会提前结束等待，而且超时返回未匹配结果而不是抛错。
+    expect(await service.callTool(credential.token, 'wait_for_chatluna_state', {
+      cursor, botParticipantId: '20001', thinking: true, timeoutSeconds: 1,
+    })).toMatchObject({ matched: false, reason: 'timeout' })
+
+    // 会话过滤同样生效：状态只存在于私聊，按群会话等待不会命中。
+    expect(await service.callTool(credential.token, 'wait_for_chatluna_state', {
+      cursor, conversationId: 'group:30001', timeoutSeconds: 1,
+    })).toMatchObject({ matched: false, reason: 'timeout' })
+
+    await expect(service.callTool(credential.token, 'wait_for_chatluna_state', {
+      cursor: { epoch: 'stale-epoch', sequence: 0 }, timeoutSeconds: 1,
+    })).rejects.toMatchObject({ code: 'cursor_expired' })
+  })
+})
+
+describe('MCP 空间生命周期工具', () => {
+  it('标记失败只作用于运行中的空间，并停止空间内机器人', async () => {
+    const { service, credential } = createMcpTestService(['read', 'manage'], true)
+    const created = await service.callTool(credential.token, 'create_test_space', {
+      name: '失败路径空间', idempotencyKey: 'fail-space-create-1',
+    }) as { spaceId: string; revision: number }
+    const observer = await service.callTool(credential.token, 'create_test_space', {
+      name: '观察空间', idempotencyKey: 'fail-space-create-2',
+    }) as { spaceId: string; revision: number }
+    await service.callTool(credential.token, 'apply_environment_changes', {
+      spaceId: created.spaceId,
+      expectedRevision: created.revision,
+      idempotencyKey: 'fail-space-setup-1',
+      changes: [{ action: 'create-bot', data: { id: '20009', name: '空间机器人', implementation: 'napcat' } }],
+    })
+    // 机器人 ID 在全局运行时里只能有一个活动占用者，因此「另一个空间能不能建同 ID 的机器人」
+    // 就是「前一个空间的机器人是否还在运行」这件事在工具调用入口上的可观察形态。
+    const claimSameBot = (key: string) => service.callTool(credential.token, 'apply_environment_changes', {
+      spaceId: observer.spaceId,
+      expectedRevision: observer.revision,
+      idempotencyKey: key,
+      changes: [{ action: 'create-bot', data: { id: '20009', name: '同 ID 机器人', implementation: 'napcat' } }],
+    })
+    await expect(claimSameBot('fail-space-claim-1')).rejects.toMatchObject({
+      code: 'domain_error',
+      message: '机器人 ID 已被活动场景占用：20009',
+    })
+
+    await expect(service.callTool(credential.token, 'fail_test_space', {
+      spaceId: created.spaceId, idempotencyKey: 'fail-space-1',
+    })).resolves.toMatchObject({ spaceId: created.spaceId, status: 'failed' })
+    await expect(service.callTool(credential.token, 'get_test_space', { spaceId: created.spaceId }))
+      .resolves.toMatchObject({ id: created.spaceId, status: 'failed' })
+    // 空间内机器人确实停止了：同一个 ID 现在可以被另一个空间接手。
+    await expect(claimSameBot('fail-space-claim-2')).resolves.toMatchObject({ revision: observer.revision + 1 })
+    await expect(service.callTool(credential.token, 'apply_environment_changes', {
+      spaceId: created.spaceId, expectedRevision: 1, idempotencyKey: 'fail-space-setup-2', changes: [],
+    })).rejects.toMatchObject({ code: 'space_unavailable' })
+
+    await expect(service.callTool(credential.token, 'fail_test_space', {
+      spaceId: created.spaceId, idempotencyKey: 'fail-space-2',
+    })).rejects.toMatchObject({ code: 'domain_error', message: '空间当前不可修改：failed' })
+  })
+
+  it('重新激活只作用于已结束空间，并把控制权归还原 AI 控制者', async () => {
+    const { service, credential } = createMcpTestService(['read', 'manage'], true)
+    const created = await service.callTool(credential.token, 'create_test_space', {
+      name: '重新激活空间', idempotencyKey: 'reactivate-create-1',
+    }) as { spaceId: string; revision: number }
+
+    await expect(service.callTool(credential.token, 'reactivate_test_space', {
+      spaceId: created.spaceId, idempotencyKey: 'reactivate-running-1',
+    })).rejects.toMatchObject({ code: 'domain_error', message: '只有已完成或失败的空间可以重新激活' })
+
+    await service.callTool(credential.token, 'complete_test_space', {
+      spaceId: created.spaceId, idempotencyKey: 'reactivate-complete-1',
+    })
+    // WebQQ 重新激活代表用户接管，测试控制端点重新激活必须归还原 AI 控制者：
+    // 状态回到 running 而不是 taken-over，因此紧随其后的 MCP 修改可以成功。
+    await expect(service.callTool(credential.token, 'reactivate_test_space', {
+      spaceId: created.spaceId, idempotencyKey: 'reactivate-1',
+    })).resolves.toMatchObject({ spaceId: created.spaceId, status: 'running' })
+    await expect(service.callTool(credential.token, 'get_test_space', { spaceId: created.spaceId }))
+      .resolves.toMatchObject({ status: 'running' })
+    await expect(service.callTool(credential.token, 'apply_environment_changes', {
+      spaceId: created.spaceId,
+      expectedRevision: created.revision,
+      idempotencyKey: 'reactivate-setup-1',
+      changes: [{ action: 'create-user', data: { id: '11001', name: '重新激活后新增' } }],
+    })).resolves.toMatchObject({ revision: created.revision + 1 })
+  })
+
+  it('删除后的空间不再出现在空间列表里', async () => {
+    const { service, credential } = createMcpTestService(['read', 'manage'], true)
+    const removed = await service.callTool(credential.token, 'create_test_space', {
+      name: '待删除空间', idempotencyKey: 'delete-create-1',
+    }) as { spaceId: string }
+    const kept = await service.callTool(credential.token, 'create_test_space', {
+      name: '保留空间', idempotencyKey: 'delete-create-2',
+    }) as { spaceId: string }
+
+    await expect(service.callTool(credential.token, 'delete_test_space', {
+      spaceId: removed.spaceId, idempotencyKey: 'delete-1',
+    })).resolves.toMatchObject({ spaceId: removed.spaceId, deleted: true })
+
+    const spaces = await service.callTool(credential.token, 'list_test_spaces', {}) as Array<{ id: string }>
+    expect(spaces.map(({ id }) => id)).toEqual([kept.spaceId])
+    await expect(service.callTool(credential.token, 'get_test_space', { spaceId: removed.spaceId }))
+      .rejects.toMatchObject({ code: 'domain_error' })
+  })
+})
+
+/** 取得一次性确认令牌：破坏性操作的两步确认，`arguments` 必须与随后实际调用去除令牌后的参数逐字段一致。 */
+async function prepareDestructive(
+  service: SandboxMcpService,
+  token: string,
+  tool: string,
+  args: Record<string, unknown>,
+  revision: number,
+): Promise<string> {
+  const prepared = await service.callTool(token, 'prepare_destructive_action', {
+    ...(typeof args.spaceId === 'string' ? { spaceId: args.spaceId } : {}),
+    expectedRevision: revision,
+    tool,
+    arguments: args,
+  }) as { confirmationToken: string }
+  return prepared.confirmationToken
+}
+
+describe('MCP 破坏性场景工具', () => {
+  it('恢复初始场景：主场景回到默认场景，测试空间回到创建时的空白场景', async () => {
+    const main = createMcpTestService(['read', 'manage'])
+    const mainRevision = main.control.getSnapshot().revision
+    await main.service.callTool(main.credential.token, 'apply_environment_changes', {
+      expectedRevision: mainRevision,
+      changes: [{ action: 'create-user', data: { id: '10009', name: '重置前新增' } }],
+    })
+    const mainConfirmation = await prepareDestructive(main.service, main.credential.token, 'reset_scene', {}, mainRevision + 1)
+    await main.service.callTool(main.credential.token, 'reset_scene', { confirmationToken: mainConfirmation })
+    const mainScene = await main.service.callTool(main.credential.token, 'get_scene_snapshot', {}) as {
+      participants: Array<{ id: string }>
+      groups: Array<{ id: string }>
+    }
+    expect(mainScene.participants.map(({ id }) => id)).toEqual(['10001', '10002', '10003', '20001'])
+    expect(mainScene.groups.map(({ id }) => id)).toEqual(['30001'])
+
+    const spaced = createMcpTestService(['read', 'manage'], true)
+    const created = await spaced.service.callTool(spaced.credential.token, 'create_test_space', {
+      idempotencyKey: 'reset-space-create-1',
+    }) as { spaceId: string; revision: number }
+    await spaced.service.callTool(spaced.credential.token, 'apply_environment_changes', {
+      spaceId: created.spaceId,
+      expectedRevision: created.revision,
+      idempotencyKey: 'reset-space-setup-1',
+      changes: [{ action: 'create-user', data: { id: '11001', name: '空间成员' } }],
+    })
+    const spaceConfirmation = await prepareDestructive(
+      spaced.service, spaced.credential.token, 'reset_scene', { spaceId: created.spaceId }, created.revision + 1,
+    )
+    await spaced.service.callTool(spaced.credential.token, 'reset_scene', {
+      spaceId: created.spaceId, confirmationToken: spaceConfirmation,
+    })
+    // 空间的初始场景是空白，不是全局默认场景：恢复后不应凭空出现默认机器人。
+    await expect(spaced.service.callTool(spaced.credential.token, 'get_scene_snapshot', { spaceId: created.spaceId }))
+      .resolves.toMatchObject({ participants: [], groups: [], conversations: [], messages: [] })
+  })
+
+  it('清空场景后场景确实为空', async () => {
+    const { service, credential } = createMcpTestService(['read', 'manage'], true)
+    const created = await service.callTool(credential.token, 'create_test_space', {
+      idempotencyKey: 'clear-space-create-1',
+    }) as { spaceId: string; revision: number }
+    await service.callTool(credential.token, 'apply_environment_changes', {
+      spaceId: created.spaceId,
+      expectedRevision: created.revision,
+      idempotencyKey: 'clear-space-setup-1',
+      changes: [
+        { action: 'create-user', data: { id: '11001', name: '空间成员' } },
+        { action: 'create-bot', data: { id: '21001', name: '空间机器人', implementation: 'napcat' } },
+        { action: 'set-friendship', data: { firstId: '11001', secondId: '21001' } },
+      ],
+    })
+
+    const confirmation = await prepareDestructive(
+      service, credential.token, 'clear_scene', { spaceId: created.spaceId }, created.revision + 1,
+    )
+    await service.callTool(credential.token, 'clear_scene', { spaceId: created.spaceId, confirmationToken: confirmation })
+    await expect(service.callTool(credential.token, 'get_scene_snapshot', { spaceId: created.spaceId })).resolves.toMatchObject({
+      participants: [], groups: [], conversations: [], messages: [], friendships: [], requests: [],
+    })
+  })
+
+  it('导入版本化场景，导入结果与导出的场景一致', async () => {
+    const { service, credential } = createMcpTestService(['read', 'manage'], true)
+    const created = await service.callTool(credential.token, 'create_test_space', {
+      idempotencyKey: 'import-space-create-1',
+    }) as { spaceId: string; revision: number }
+    await service.callTool(credential.token, 'apply_environment_changes', {
+      spaceId: created.spaceId,
+      expectedRevision: created.revision,
+      idempotencyKey: 'import-space-setup-1',
+      changes: [
+        { action: 'create-user', data: { id: '11001', name: '导出成员' } },
+        { action: 'create-bot', data: { id: '21001', name: '导出机器人', implementation: 'llbot' } },
+        { action: 'create-group', data: { id: '31001', name: '导出群', members: [{ participantId: '11001', role: 'owner' }, { participantId: '21001', role: 'member' }] } },
+        { action: 'set-friendship', data: { firstId: '11001', secondId: '21001' } },
+      ],
+    })
+    type Scene = {
+      revision: number
+      participants: Array<{ id: string }>
+      groups: Array<{ id: string; members: Array<{ participantId: string }> }>
+      conversations: Array<{ id: string }>
+      friendships: Array<{ id: string }>
+    }
+    const exported = await service.callTool(credential.token, 'export_scene', { spaceId: created.spaceId }) as {
+      testApiVersion: number
+      scene: Scene
+    }
+
+    const clearConfirmation = await prepareDestructive(
+      service, credential.token, 'clear_scene', { spaceId: created.spaceId }, exported.scene.revision,
+    )
+    const cleared = await service.callTool(credential.token, 'clear_scene', {
+      spaceId: created.spaceId, confirmationToken: clearConfirmation,
+    }) as { revision: number }
+
+    const importConfirmation = await prepareDestructive(
+      service, credential.token, 'import_scene', { spaceId: created.spaceId, document: exported }, cleared.revision,
+    )
+    await service.callTool(credential.token, 'import_scene', {
+      spaceId: created.spaceId, document: exported, confirmationToken: importConfirmation,
+    })
+
+    const restored = await service.callTool(credential.token, 'get_scene_snapshot', { spaceId: created.spaceId }) as Scene
+    // 除 revision 由服务端单调递增外，导入结果与导出的场景逐字段一致。
+    expect({ ...restored, revision: exported.scene.revision }).toEqual(exported.scene)
+    expect(restored.revision).toBeGreaterThan(exported.scene.revision)
+
+    await expect(service.callTool(credential.token, 'import_scene', {
+      spaceId: created.spaceId,
+      document: { testApiVersion: 2, scene: exported.scene },
+      confirmationToken: await prepareDestructive(
+        service, credential.token, 'import_scene',
+        { spaceId: created.spaceId, document: { testApiVersion: 2, scene: exported.scene } },
+        restored.revision,
+      ),
+    })).rejects.toMatchObject({ code: 'unsupported_scene_version' })
+  })
+
+  it('三个破坏性场景操作缺少或持有无效确认令牌时都被拒绝', async () => {
+    const { service, credential } = createMcpTestService(['read', 'manage'], true)
+    const created = await service.callTool(credential.token, 'create_test_space', {
+      idempotencyKey: 'confirm-space-create-1',
+    }) as { spaceId: string; revision: number }
+    const document = await service.callTool(credential.token, 'export_scene', { spaceId: created.spaceId })
+    const calls: Array<[string, Record<string, unknown>]> = [
+      ['reset_scene', { spaceId: created.spaceId }],
+      ['clear_scene', { spaceId: created.spaceId }],
+      ['import_scene', { spaceId: created.spaceId, document }],
+    ]
+
+    for (const [tool, args] of calls) {
+      await expect(service.callTool(credential.token, tool, args))
+        .rejects.toMatchObject({ code: 'invalid_arguments', message: 'confirmationToken 不能为空' })
+      await expect(service.callTool(credential.token, tool, { ...args, confirmationToken: '伪造令牌' }))
+        .rejects.toMatchObject({ code: 'confirmation_required', message: '破坏性操作需要有效的一次性确认令牌' })
+    }
+
+    // 场景仍然是创建时的空白场景：三次拒绝都没有产生任何副作用。
+    await expect(service.callTool(credential.token, 'get_scene_snapshot', { spaceId: created.spaceId }))
+      .resolves.toMatchObject({ revision: created.revision, participants: [] })
+  })
+})

@@ -3,26 +3,17 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { App, h } from '@koishijs/core'
 import { afterEach, describe, expect, it } from 'vitest'
-import { SandboxControlService, SandboxRuntimeBotRegistry } from '../src/control-service'
+import { SandboxControlService } from '../src/control-service'
 import { SandboxMcpService } from '../src/mcp/service'
-import { SandboxTestSpaceService } from '../src/test-spaces'
-
-const apps: App[] = []
-
-function createService(scopes: Array<'read' | 'interact' | 'manage' | 'debug'> = ['read'], enableTestSpaces = false) {
-  const app = new App()
-  apps.push(app)
-  const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-mcp-'))
-  const runtimeBots = new SandboxRuntimeBotRegistry()
-  const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media'), runtimeBots })
-  const testSpaces = new SandboxTestSpaceService(app, runtimeBots)
-  const service = new SandboxMcpService(control, { dataDirectory: directory, testSpaces: enableTestSpaces ? testSpaces : undefined })
-  const credential = service.createCredential('测试凭证', scopes)
-  return { app, control, service, credential, directory, testSpaces }
-}
+import {
+  createMcpTestService as createService,
+  registerMcpTestApp,
+  stopMcpTestApps,
+} from './helpers/mcp-service-harness'
+import { MCP_TOOL_CATALOGUE, mcpToolCatalogueForScopes, toMcpToolCatalogue } from './helpers/mcp-tool-catalogue'
 
 afterEach(async () => {
-  await Promise.all(apps.splice(0).map((app) => app.stop()))
+  await stopMcpTestApps()
 })
 
 describe('SandboxMcpService', () => {
@@ -32,18 +23,8 @@ describe('SandboxMcpService', () => {
     expect(credential.token).toMatch(/^[A-Za-z0-9_-]{43}$/)
     expect(service.authenticate(credential.token)?.name).toBe('测试凭证')
     expect(service.getCredential(credential.id).token).toBe(credential.token)
-    expect(service.listTools(credential.token).map(({ name }) => name)).toEqual([
-      'get_server_info',
-      'list_test_spaces',
-      'get_test_space',
-      'get_scene_snapshot',
-      'list_conversations',
-      'get_conversation',
-      'get_forward_message',
-      'list_pending_requests',
-      'get_capability_matrix',
-      'export_scene',
-    ])
+    // 只读凭证发现的工具必须与完整清单里 read 能力范围的条目逐条一致：既抓改名，也抓能力范围写错。
+    expect(toMcpToolCatalogue(service.listTools(credential.token))).toEqual(mcpToolCatalogueForScopes(['read']))
     expect(readFileSync(join(directory, 'mcp-credentials.json'), 'utf8')).toContain(credential.token)
     expect(service.listCredentials()[0]).not.toHaveProperty('tokenDigest')
   })
@@ -54,7 +35,8 @@ describe('SandboxMcpService', () => {
     const catalog = service.getCapabilityCatalog()
     expect(catalog.serverCapabilities).toEqual({ tools: true, resources: true, prompts: false })
     expect(catalog.scopes).toEqual(['read', 'interact', 'manage', 'debug'])
-    expect(catalog.tools).toHaveLength(40)
+    // 完整清单断言取代数量断言：工具被误删、误加、改名或能力范围写错都会变红，数量由清单长度隐含。
+    expect(toMcpToolCatalogue(catalog.tools)).toEqual(MCP_TOOL_CATALOGUE)
     expect(catalog.resources).toHaveLength(6)
     expect(catalog.tools).toContainEqual(expect.objectContaining({
       name: 'get_server_info',
@@ -334,8 +316,7 @@ describe('SandboxMcpService', () => {
   })
 
   it('按凭证限制调用频率并记录脱敏 MCP 调用', async () => {
-    const app = new App()
-    apps.push(app)
+    const app = registerMcpTestApp(new App())
     const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-mcp-limit-'))
     const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media') })
     const service = new SandboxMcpService(control, { dataDirectory: directory, readPerMinute: 1 })

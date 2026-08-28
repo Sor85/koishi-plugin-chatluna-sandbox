@@ -155,7 +155,9 @@ export class SandboxMcpHttpServer {
         return jsonContent(await this.service.callTool(token, request.params.name, request.params.arguments ?? {}, { sourceIp }))
       } catch (error) {
         const normalized = error instanceof SandboxMcpError ? error : new SandboxMcpError('internal_error', '工具调用失败')
-        return { ...jsonContent({ code: normalized.code, message: normalized.message, retryable: normalized.retryable, recovery: normalized.recovery, details: normalized.details, retryAfterMs: normalized.retryAfterMs, revision: this.service.getRevision(), traceId: randomUUID() }), isError: true }
+        // traceId 用失败调用写下的测试调用记录 ID，消费者可据此调 get_mcp_call_record 取回该次失败；
+        // 凭证校验阶段抛出的错误还没有记录可指，只能退回随机标识。
+        return { ...jsonContent({ code: normalized.code, message: normalized.message, retryable: normalized.retryable, recovery: normalized.recovery, details: normalized.details, retryAfterMs: normalized.retryAfterMs, revision: this.service.getRevision(), traceId: normalized.traceId ?? randomUUID() }), isError: true }
       }
     })
     server.setRequestHandler(ListResourcesRequestSchema, async () => ({
