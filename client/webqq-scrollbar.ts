@@ -79,17 +79,49 @@ function readAccentColor(element: HTMLElement) {
   return getComputedStyle(root).getPropertyValue('--webqq-accent').trim()
 }
 
+function getScrollbarHeaderBottom(element: HTMLElement, shell: HTMLElement | undefined) {
+  // 滚动内容为了实现毛玻璃表头会用负 margin 延伸到表头背后；原生内容需要
+  // 延伸，但滚动条不应该一起延伸。沿祖先链寻找当前滚动区域前面的页内 header，
+  // 这样所有列表页（聊天、调试、MCP、预设、环境管理）都遵守同一条裁剪规则。
+  let branch: HTMLElement | null = element
+  while (branch && branch !== shell) {
+    const parent: HTMLElement | null = branch.parentElement
+    if (!parent) break
+    const branchIndex = Array.prototype.indexOf.call(parent.children, branch)
+    for (let index = branchIndex - 1; index >= 0; index -= 1) {
+      const sibling = parent.children[index]
+      if (sibling instanceof HTMLElement && sibling.matches('header, .webqq-overlay-header')) {
+        return sibling.getBoundingClientRect().bottom
+      }
+    }
+    branch = parent
+  }
+  return shell?.getBoundingClientRect().top ?? Number.NEGATIVE_INFINITY
+}
+
 function getVisibleScrollbarRect(element: HTMLElement) {
   const rect = element.getBoundingClientRect()
-  const shell = element.closest<HTMLElement>('.webqq-workspace')?.getBoundingClientRect()
-  if (!shell) return rect
+  const shellElement = element.closest<HTMLElement>('.webqq-workspace')
+  const shell = shellElement?.getBoundingClientRect()
+  const topBoundary = getScrollbarHeaderBottom(element, shellElement ?? undefined)
+  if (!shell) {
+    return {
+      top: Math.max(rect.top, topBoundary),
+      right: rect.right,
+      bottom: rect.bottom,
+      left: rect.left,
+      width: rect.width,
+      height: Math.max(0, rect.bottom - Math.max(rect.top, topBoundary)),
+    }
+  }
+  const top = Math.max(rect.top, shell.top, topBoundary)
   return {
-    top: Math.max(rect.top, shell.top),
+    top,
     right: Math.min(rect.right, shell.right),
     bottom: Math.min(rect.bottom, shell.bottom),
     left: Math.max(rect.left, shell.left),
     width: Math.max(0, Math.min(rect.right, shell.right) - Math.max(rect.left, shell.left)),
-    height: Math.max(0, Math.min(rect.bottom, shell.bottom) - Math.max(rect.top, shell.top)),
+    height: Math.max(0, Math.min(rect.bottom, shell.bottom) - top),
   }
 }
 

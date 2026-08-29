@@ -59,6 +59,9 @@ describe('WebQQ 消息列表', () => {
     expect(scrollbarSource).not.toContain('shouldFollowMessageListTail')
     expect(scrollbarSource).toContain('showOverlay?: boolean')
     expect(scrollbarSource).toContain("visible && state.showOverlay")
+    // 全局滚动条轨道必须在页内表头底部开始；内容可以穿过表头实现毛玻璃，但轨道不能盖住表头。
+    expect(scrollbarSource).toContain("sibling.matches('header, .webqq-overlay-header')")
+    expect(scrollbarSource).toContain('const topBoundary = getScrollbarHeaderBottom(element, shellElement ?? undefined)')
     expect(emojiPickerSource).toContain("v-webqq-scrollbar=\"{ showOverlay: false, tone: 'accent', zIndex: 140 }\"")
     expect(forwardModalSource).toContain('v-webqq-scrollbar="{ showOverlay: false }"')
     expect(forwardTargetSource).toContain("v-webqq-scrollbar=\"{ showOverlay: false, tone: 'accent' }\"")

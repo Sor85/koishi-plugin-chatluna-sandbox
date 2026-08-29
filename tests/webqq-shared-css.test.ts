@@ -28,6 +28,9 @@ describe('WebQQ 共享样式', () => {
     expect(scrollbarRule).toContain('z-index: 100')
     expect(scrollbarRule).not.toContain('z-index: 10001')
     expect(primitives).toContain('.chatluna-sandbox-workspace-zooming .chatluna-sandbox-scrollbar-overlay')
+    // 自定义滚动条的边界由 TS 统一按表头裁剪，不在各区域 CSS 中重复实现。
+    expect(primitives).toContain('.chatluna-sandbox-scrollbar-overlay')
+    expect(primitives).toContain('position: fixed')
     expect(primitives).toContain('opacity: 0 !important')
     expect(primitives).not.toContain('cursor:')
     expect(overlays).not.toContain('cursor:')
