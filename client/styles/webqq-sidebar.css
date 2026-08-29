@@ -12,12 +12,14 @@
   background: var(--webqq-rail);
 }
 
-/* 全局顶栏的毛玻璃背景统一由 .webqq-overlay-header::before 提供。
-   这里必须清除导航栏自身的区域背景，否则会与伪元素重复叠加，
-   使最终效果比聊天顶栏更不透明，削弱 backdrop-filter。 */
-.webqq-workspace.is-frosted .webqq-rail,
-.webqq-workspace.is-frosted[data-color-mode="dark"] .webqq-rail {
-  background: transparent;
+/* 全局页面切换顶栏位于消息顶栏上方；提高这一层的模糊半径，
+   让它与下方消息区域的雾化过渡更自然。 */
+.webqq-workspace.is-frosted .webqq-rail {
+  background: color-mix(in srgb, var(--webqq-rail) 72%, transparent);
+}
+
+.webqq-workspace.is-frosted .webqq-rail::before {
+  backdrop-filter: saturate(180%) blur(32px);
 }
 
 .webqq-brand {

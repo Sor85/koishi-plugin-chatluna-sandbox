@@ -24,10 +24,14 @@
   scroll-padding-top: 152px;
 }
 
-/* 聊天顶栏的毛玻璃背景统一由 .webqq-overlay-header::before 提供；
-   清除暗色模式工作区的实色覆盖，保证上下两层最终使用同一套效果。 */
-.webqq-workspace.is-frosted[data-color-mode="dark"] .chatluna-sandbox-chat-header {
-  background: transparent;
+/* 与全局页面切换顶栏保持完全一致：顶栏自身使用同等半透明表面，
+   共享毛玻璃伪元素再使用相同的强化模糊。 */
+.webqq-workspace.is-frosted .chatluna-sandbox-chat-header {
+  background: color-mix(in srgb, var(--webqq-bg) 72%, transparent);
+}
+
+.webqq-workspace.is-frosted .chatluna-sandbox-chat-header::before {
+  backdrop-filter: saturate(180%) blur(32px);
 }
 
 .chatluna-sandbox-chat-title > div > strong,
