@@ -56,6 +56,7 @@ import type {
   PerformGroupActionInput,
   RecallMessageInput,
   ClearConversationMessagesInput,
+  CreateConversationInstanceInput,
   SearchConversationMessagesInput,
   SetMessageReactionInput,
   SandboxAppearance,
@@ -66,6 +67,7 @@ import type {
   SandboxMediaContent,
   SandboxMessageHistory,
   SandboxMessageSearchResult,
+  SandboxConversationInstanceResult,
   SandboxOneBotDebugRecordsPage,
   SandboxWorkspaceState,
   SendForwardMessageInput,
@@ -88,6 +90,7 @@ interface ConsoleEventMap {
   'chatluna-sandbox/message-history': (input: SpaceScoped<GetMessageHistoryInput>) => Promise<SandboxMessageHistory>
   'chatluna-sandbox/search-conversation-messages': (input: SpaceScoped<SearchConversationMessagesInput>) => Promise<SandboxMessageSearchResult>
   'chatluna-sandbox/send-message': (input: SpaceScoped<SendMessageInput>) => Promise<SandboxWorkspaceState>
+  'chatluna-sandbox/create-conversation-instance': (input: SpaceScoped<CreateConversationInstanceInput>) => Promise<SandboxConversationInstanceResult>
   'chatluna-sandbox/send-media-message': (input: SpaceScoped<SendMediaMessageInput>) => Promise<SandboxWorkspaceState>
   'chatluna-sandbox/send-forward-message': (input: SpaceScoped<SendForwardMessageInput>) => Promise<SandboxWorkspaceState>
   'chatluna-sandbox/get-forward-message': (input: SpaceScoped<GetForwardMessageInput>) => Promise<SandboxForward>
@@ -351,6 +354,12 @@ export function registerConsole(
   registerListener('chatluna-sandbox/search-conversation-messages', async (input) => (
     await resolveReadyControl(input, false)
   ).searchConversationMessages(assertInteractionInput(withoutSpaceId(input)) as SearchConversationMessagesInput), { authority: 4 })
+  registerListener('chatluna-sandbox/create-conversation-instance', async (input) => {
+    // 与其余变更端点同口径返回完整工作区状态，外加新会话 ID，客户端一次请求完成状态替换与选中。
+    const { conversationId } = (await resolveReadyControl(input, true))
+      .createConversationInstance(assertInteractionInput(withoutSpaceId(input)) as CreateConversationInstanceInput)
+    return { ...await getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId }), conversationId }
+  }, { authority: 4 })
   registerListener('chatluna-sandbox/send-message', async (input) => {
     // 消息同步落库后立即返回，机器人投递在后台继续；派发失败已写入调试记录与日志。
     const { delivery } = (await resolveReadyControl(input, true)).startMessageSend(assertInteractionInput(withoutSpaceId(input)) as SendMessageInput)
@@ -599,6 +608,7 @@ declare module '@koishijs/console' {
     'chatluna-sandbox/message-history'(input: SpaceScoped<GetMessageHistoryInput>): Promise<SandboxMessageHistory>
     'chatluna-sandbox/search-conversation-messages'(input: SpaceScoped<SearchConversationMessagesInput>): Promise<SandboxMessageSearchResult>
     'chatluna-sandbox/send-message'(input: SpaceScoped<SendMessageInput>): Promise<SandboxWorkspaceState>
+    'chatluna-sandbox/create-conversation-instance'(input: SpaceScoped<CreateConversationInstanceInput>): Promise<SandboxConversationInstanceResult>
     'chatluna-sandbox/send-media-message'(input: SpaceScoped<SendMediaMessageInput>): Promise<SandboxWorkspaceState>
     'chatluna-sandbox/send-forward-message'(input: SpaceScoped<SendForwardMessageInput>): Promise<SandboxWorkspaceState>
     'chatluna-sandbox/get-forward-message'(input: SpaceScoped<GetForwardMessageInput>): Promise<SandboxForward>

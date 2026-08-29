@@ -1,0 +1,165 @@
+import { ref } from 'vue'
+import { describe, expect, it } from 'vitest'
+import { createFakeWorkspacePort } from '../client/webqq/fake-workspace-port'
+import { createWorkspaceController } from '../client/webqq/workspace-controller'
+import { createWorkspaceLayout } from '../client/webqq/workspace-layout'
+import { createWebqqWorkspaceShell } from '../client/webqq/workspace-shell'
+import type { SandboxSnapshot, SandboxWorkspaceState } from '../src/types'
+
+const baseSnapshot: SandboxSnapshot = {
+  revision: 3,
+  participants: [
+    { kind: 'user', id: '10001', name: '测试用户1' },
+    { kind: 'bot', id: '20001', name: 'Koishi', implementation: 'napcat', enabled: true },
+  ],
+  groups: [{
+    id: '30001',
+    name: '测试群',
+    announcements: [],
+    members: [
+      { participantId: '10001', role: 'owner' },
+      { participantId: '20001', role: 'admin' },
+    ],
+  }],
+  conversations: [
+    { id: 'private:10001:20001', type: 'direct', participantIds: ['10001', '20001'], messageIds: ['message-1'] },
+    { id: 'group:30001', type: 'group', groupId: '30001', messageIds: [] },
+  ],
+  conversationInstances: [],
+  messages: [{
+    id: 'message-1',
+    authorId: '10001',
+    conversationId: 'private:10001:20001',
+    content: '根会话消息',
+    createdAt: '2026-08-29T02:00:00.000Z',
+  }],
+  forwards: [],
+  friendships: [{ id: 'friend:10001:20001', participantIds: ['10001', '20001'], remarks: {}, createdAt: '' }],
+  requests: [],
+}
+
+function createWorkspace(snapshot: SandboxSnapshot): SandboxWorkspaceState {
+  return {
+    snapshot,
+    chatLunaStates: [],
+    persistence: { mode: 'memory', available: true, persisted: false },
+    appearance: {
+      enableSandboxFrostedGlass: true,
+      sandboxTimBubbleTail: true,
+      sandboxColorMode: 'auto',
+      sandboxAccentColor: '#2563eb',
+      sandboxMarkRecalledMessages: true,
+    },
+  }
+}
+
+function createStorage() {
+  const values = new Map<string, string>()
+  return {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+  }
+}
+
+async function createShell(snapshot: SandboxSnapshot) {
+  const port = createFakeWorkspacePort(createWorkspace(snapshot))
+  const controller = createWorkspaceController(port, createStorage())
+  await controller.load()
+  // 外壳在 setup 里注册 onMounted 做首屏加载；测试直接调用工厂时该钩子是空操作，
+  // Vue 会为此打一条 warn。这里只吞掉这一条预期噪声，其余告警照常输出。
+  const warn = console.warn
+  console.warn = (...args: unknown[]) => {
+    if (typeof args[0] === 'string' && args[0].includes('onMounted is called when there is no active component')) return
+    warn(...args)
+  }
+  try {
+    const shell = createWebqqWorkspaceShell(
+      controller,
+      createWorkspaceLayout(ref(true)),
+      () => undefined,
+    )
+    return { controller, port, shell }
+  } finally {
+    console.warn = warn
+  }
+}
+
+describe('侧栏会话树投影', () => {
+  it('没有会话实例时每个根会话都没有子项', async () => {
+    const { shell } = await createShell(baseSnapshot)
+
+    expect(shell.sidebarModel.value.conversations.map(({ id, kind, children }) => ({
+      id,
+      kind,
+      childCount: children?.length ?? 0,
+    }))).toEqual([
+      { id: 'private:10001:20001', kind: 'root', childCount: 0 },
+      { id: 'group:30001', kind: 'root', childCount: 0 },
+    ])
+  })
+
+  it('会话实例作为所属根会话的子项出现，标题与预览来自实例自己的消息', async () => {
+    const { shell } = await createShell({
+      ...baseSnapshot,
+      conversationInstances: [
+        { id: 'instance-1', rootConversationId: 'private:10001:20001', title: '换一种问法', messageIds: ['message-2'] },
+        { id: 'instance-2', rootConversationId: 'private:10001:20001', title: '再试一次', messageIds: [] },
+      ],
+      messages: [
+        ...baseSnapshot.messages,
+        {
+          id: 'message-2',
+          authorId: '10001',
+          conversationId: 'instance-1',
+          content: '实例里的提问',
+          createdAt: '2026-08-29T03:00:00.000Z',
+        },
+      ],
+    })
+
+    const [directRoot, groupRoot] = shell.sidebarModel.value.conversations
+    expect(directRoot).toMatchObject({ id: 'private:10001:20001', kind: 'root', preview: '根会话消息' })
+    expect(directRoot?.children?.map(({ id, kind, title, preview }) => ({ id, kind, title, preview }))).toEqual([
+      { id: 'instance-1', kind: 'instance', title: '换一种问法', preview: '实例里的提问' },
+      { id: 'instance-2', kind: 'instance', title: '再试一次', preview: '开始一段新对话' },
+    ])
+    // 实例只挂在自己的根会话下，不污染别的会话。
+    expect(groupRoot?.children).toEqual([])
+    // 会话树的顶层只有根会话，实例不作为独立联系人出现。
+    expect(shell.sidebarModel.value.conversations.map(({ id }) => id))
+      .toEqual(['private:10001:20001', 'group:30001'])
+  })
+
+  it('选中会话实例时聊天区标题用实例名，副标题指出它属于哪个根会话', async () => {
+    const { controller, shell } = await createShell({
+      ...baseSnapshot,
+      conversationInstances: [
+        { id: 'instance-1', rootConversationId: 'private:10001:20001', title: '换一种问法', messageIds: [] },
+      ],
+    })
+
+    controller.selectConversation('instance-1')
+
+    expect(shell.chatPaneModel.value).toMatchObject({
+      conversationId: 'instance-1',
+      title: '换一种问法',
+      subtitle: 'Koishi · 在线 · 虚拟 OneBot 机器人',
+    })
+
+    controller.selectConversation('private:10001:20001')
+    expect(shell.chatPaneModel.value).toMatchObject({
+      conversationId: 'private:10001:20001',
+      title: 'Koishi',
+      subtitle: '在线 · 虚拟 OneBot 机器人',
+    })
+  })
+
+  it('新建会话实例失败时把原因写进界面错误展示路径，不落进浏览器控制台', async () => {
+    const { port, shell } = await createShell(baseSnapshot)
+    port.rejectNext('createConversationInstance', new Error('会话不存在：private:10002:20001'))
+
+    await shell.createConversationInstance('private:10002:20001')
+
+    expect(shell.chatPaneModel.value.composer.externalError).toBe('会话不存在：private:10002:20001')
+  })
+})

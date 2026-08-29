@@ -283,7 +283,7 @@
                 <button
                   type="button"
                   class="webqq-session webqq-session-create webqq-session-child-create"
-                  @click="createConversation(conversation.id)"
+                  @click="createConversationInstance(conversation.id)"
                 >
                   <span class="webqq-session-child-mark webqq-session-child-create-mark" aria-hidden="true"><IconPlus :size="14" /></span>
                   <span class="webqq-session-copy"><strong>创建新会话</strong></span>
@@ -307,7 +307,7 @@
                   <IconUserMinus :size="16" aria-hidden="true" />
                   {{ conversation.actorRole === 'owner' ? '群主不能直接退群' : '退出群组' }}
                 </ContextMenuItem>
-                <ContextMenuItem @select="createConversation(conversation.id)">
+                <ContextMenuItem @select="createConversationInstance(conversation.id)">
                   <IconPlus :size="16" aria-hidden="true" /> 创建新会话
                 </ContextMenuItem>
                 <ContextMenuItem
@@ -374,6 +374,8 @@ export interface WebqqSidebarConversation {
   actorRole?: SandboxGroupMember['role']
   entityTarget: { type: 'user' | 'bot' | 'group', id: string }
   entityLabel: '用户' | '机器人' | '群组'
+  /** 根会话还是会话实例；会话实例作为所属根会话的子项展开。 */
+  kind?: 'root' | 'instance'
   children?: WebqqSidebarConversation[]
 }
 
@@ -432,7 +434,7 @@ const spacesBusy = computed(() => !!props.mcpRunning && !preview.value)
 const emit = defineEmits<{
   selectView: [view: WebqqSidebarModel['currentView']]
   selectConversation: [conversationId: string]
-  createConversation: [parentConversationId: string]
+  createConversationInstance: [rootConversationId: string]
   removeRecentConversation: [conversationId: string]
   manageEnvironment: [input: ManageSandboxEnvironmentInput, resolve: () => void, reject: (error: unknown) => void]
   friendAction: [input: SandboxFriendAction]
@@ -521,8 +523,8 @@ function selectConversation(conversationId: string) {
   emit('selectConversation', conversationId)
 }
 
-function createConversation(parentConversationId: string) {
-  emit('createConversation', parentConversationId)
+function createConversationInstance(rootConversationId: string) {
+  emit('createConversationInstance', rootConversationId)
 }
 
 function manageEnvironment(input: ManageSandboxEnvironmentInput, resolve: () => void, reject: (error: unknown) => void) {

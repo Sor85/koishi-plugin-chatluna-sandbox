@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  createConversationInstance,
   ensureDirectRootConversation,
   ensureGroupRootConversation,
   findDirectRootConversation,
@@ -8,6 +9,9 @@ import {
   includesConversationParticipant,
   isConversationVisible,
   listConversationIds,
+  listConversationInstances,
+  listRootConversationInstances,
+  listRootConversations,
   listVisibleConversationIds,
   listVisibleRootConversations,
   projectVisibleConversations,
@@ -16,9 +20,11 @@ import {
   requireConversation,
   requireVisibleConversation,
   resolveConversation,
+  renameConversationInstance,
   resolveConversationPeerId,
   resolveDirectConversationId,
   resolveGroupConversationId,
+  resolveRootConversationId,
 } from '../src/conversation-resolution'
 import { SandboxDomainError, type SandboxSnapshot } from '../src/types'
 
@@ -189,5 +195,141 @@ describe('会话解析', () => {
     expect(projection.conversations[0]).toMatchObject({ messageIds: ['m2'], hasMoreMessages: true })
     expect(projection.conversations[1]).toMatchObject({ messageIds: ['m3'], hasMoreMessages: false })
     expect(projection.messageIds).toEqual(new Set(['m2', 'm3']))
+  })
+})
+
+describe('会话实例解析', () => {
+  it('实例解析出自己的消息与标题，私聊参与者对来自根会话', () => {
+    const scene = createScene()
+
+    const instance = createConversationInstance(scene, { id: 'instance-1', rootConversationId: 'private:10001:20001', title: '换一种问法' })
+
+    expect(resolveConversation(scene, instance.id)).toEqual({
+      id: instance.id,
+      kind: 'instance',
+      rootConversationId: 'private:10001:20001',
+      type: 'direct',
+      participantIds: ['10001', '20001'],
+      title: '换一种问法',
+      messageIds: [],
+    })
+    // 参与者对不复制到实例上，只从根会话读。
+    expect(scene.conversationInstances).toEqual([
+      { id: instance.id, rootConversationId: 'private:10001:20001', title: '换一种问法', messageIds: [] },
+    ])
+  })
+
+  it('群组的实例仍然是群会话，群号来自根会话', () => {
+    const scene = createScene()
+
+    const instance = createConversationInstance(scene, { id: 'instance-2', rootConversationId: 'group:30001', title: '群里再试一次' })
+
+    expect(resolveConversation(scene, instance.id)).toMatchObject({ type: 'group', groupId: '30001' })
+    expect(resolveConversationPeerId(resolveConversation(scene, instance.id)!, '10001')).toBeUndefined()
+  })
+
+  it('从实例再创建实例归一化到同一个根会话，不产生第三层', () => {
+    const scene = createScene()
+    const first = createConversationInstance(scene, { id: 'instance-3', rootConversationId: 'private:10001:20001', title: '第一条支线' })
+
+    const second = createConversationInstance(scene, { id: 'instance-4', rootConversationId: first.id, title: '第二条支线' })
+
+    expect(second.rootConversationId).toBe('private:10001:20001')
+    expect(resolveRootConversationId(scene, second.id)).toBe('private:10001:20001')
+    expect(listRootConversationInstances(scene, 'private:10001:20001').map(({ id }) => id)).toEqual([first.id, second.id])
+    // 从实例出发也能问出「这条根会话下有哪些实例」。
+    expect(listRootConversationInstances(scene, first.id).map(({ id }) => id)).toEqual([first.id, second.id])
+  })
+
+  it('根会话不存在时拒绝创建实例，空名称同样拒绝', () => {
+    const scene = createScene()
+
+    expect(() => createConversationInstance(scene, { id: 'instance-5', rootConversationId: 'group:39999', title: '无主实例' }))
+      .toThrow('会话不存在：group:39999')
+    expect(() => createConversationInstance(scene, { id: 'instance-6', rootConversationId: 'group:30001', title: '   ' }))
+      .toThrow('会话名称不能为空')
+    expect(listConversationInstances(scene)).toEqual([])
+  })
+
+  it('实例可见性完全继承根会话，不引入所有权维度', () => {
+    const scene = createScene()
+    const instance = createConversationInstance(scene, { id: 'instance-7', rootConversationId: 'private:10001:20001', title: '支线' })
+
+    // 根会话的两个参与者都看得到实例：实例不是某个操作者的私有草稿。
+    expect(listVisibleConversationIds(scene, '10001').has(instance.id)).toBe(true)
+    expect(listVisibleConversationIds(scene, '20001').has(instance.id)).toBe(true)
+    expect(listVisibleConversationIds(scene, '10002').has(instance.id)).toBe(false)
+
+    scene.friendships = []
+    expect(listVisibleConversationIds(scene, '10001').has(instance.id)).toBe(false)
+  })
+
+  it('实例不出现在根会话集合里，需要全部会话的路径显式合并两个集合', () => {
+    const scene = createScene()
+    const instance = createConversationInstance(scene, { id: 'instance-8', rootConversationId: 'group:30001', title: '支线' })
+
+    expect(listRootConversations(scene).map(({ id }) => id))
+      .toEqual(['private:10001:20001', 'private:10002:20001', 'group:30001'])
+    expect(listVisibleRootConversations(scene, '10001').map(({ id }) => id))
+      .toEqual(['private:10001:20001', 'group:30001'])
+    expect(listConversationIds(scene).has(instance.id)).toBe(true)
+  })
+
+  it('删除根会话连带删除它的实例，删除实例不动根会话', () => {
+    const scene = createScene()
+    const kept = createConversationInstance(scene, { id: 'instance-9', rootConversationId: 'private:10001:20001', title: '保留' })
+    const dropped = createConversationInstance(scene, { id: 'instance-10', rootConversationId: 'group:30001', title: '连带删除' })
+
+    expect(removeConversations(scene, ({ groupId }) => groupId === '30001'))
+      .toEqual(new Set(['group:30001', dropped.id]))
+    expect(listConversationInstances(scene).map(({ id }) => id)).toEqual([kept.id])
+
+    expect(removeConversations(scene, ({ id }) => id === kept.id)).toEqual(new Set([kept.id]))
+    expect(listConversationInstances(scene)).toEqual([])
+    expect(listRootConversations(scene).map(({ id }) => id))
+      .toEqual(['private:10001:20001', 'private:10002:20001'])
+  })
+
+  it('空实例是合法状态：淘汰掉最后一条消息不删除实例本身', () => {
+    const scene = createScene()
+    const instance = createConversationInstance(scene, {
+      id: 'instance-12',
+      rootConversationId: 'group:30001',
+      title: '只有一条消息',
+      messageIds: ['m9'],
+    })
+
+    pruneConversationMessageIds(scene, new Set(['m9']))
+
+    expect(resolveConversation(scene, instance.id)).toMatchObject({ messageIds: [] })
+  })
+
+  it('可见会话投影把根会话的实例一起投影出来', () => {
+    const scene = createScene()
+    const instance = createConversationInstance(scene, {
+      id: 'instance-13',
+      rootConversationId: 'private:10001:20001',
+      title: '支线',
+      messageIds: ['m7', 'm8'],
+    })
+
+    const projection = projectVisibleConversations(scene, '10001', 1)
+
+    expect(projection.conversationInstances).toEqual([
+      { id: instance.id, rootConversationId: 'private:10001:20001', title: '支线', messageIds: ['m8'], hasMoreMessages: true },
+    ])
+    expect(projection.messageIds).toEqual(new Set(['m2', 'm3', 'm8']))
+  })
+
+  it('改名只对会话实例开放，根会话的名字由参与者关系决定', () => {
+    const scene = createScene()
+    const instance = createConversationInstance(scene, { id: 'instance-11', rootConversationId: 'group:30001', title: '新会话' })
+
+    renameConversationInstance(scene, instance.id, '  换个名字  ')
+    expect(resolveConversation(scene, instance.id)?.title).toBe('换个名字')
+
+    expect(() => renameConversationInstance(scene, 'group:30001', '群会话改名'))
+      .toThrow('会话实例不存在：group:30001')
+    expect(() => renameConversationInstance(scene, instance.id, '  ')).toThrow('会话名称不能为空')
   })
 })

@@ -350,11 +350,11 @@ import WebqqAvatar from './webqq-avatar.vue'
 import WebqqMessageReactions from './webqq-message-reactions.vue'
 import WebqqMenuExtensionMark from './webqq-menu-extension-mark.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
+import type { ResolvedConversation } from '../src/conversation-resolution'
 import {
   formatRecalledMessageEventText,
   isRecalledMessage,
   type SandboxChatLunaState,
-  type SandboxConversation,
   type SandboxForwardPreview,
   type SandboxGroup,
   type SandboxMedia,
@@ -376,7 +376,7 @@ export interface WebqqMessageListModel {
   forwardPreviews: Record<string, SandboxForwardPreview>
   participants: Record<string, MessageParticipant>
   friendMenuStates: Record<string, FriendMenuState>
-  currentConversation?: SandboxConversation
+  currentConversation?: ResolvedConversation
   currentGroup?: SandboxGroup
   currentOperatorId?: string
   title: string

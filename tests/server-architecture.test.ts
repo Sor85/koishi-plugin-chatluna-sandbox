@@ -113,6 +113,19 @@ describe('服务端会话解析架构', () => {
     expect(collectionRule.findViolations('src/conversation-resolution.ts', 'scene.conversations.find(({ id }) => id === target)')).toEqual([])
   })
 
+  /**
+   * 会话解析模块与领域类型一样被客户端一同引用。它一旦 import 'koishi'，整个 Koishi 运行时
+   * 就会被打进前端产物（实测 +460 KB）。这类回归不会报错，只会让产物默默变大，因此需要守卫。
+   */
+  it('被客户端一同引用的领域模块不依赖 Koishi 运行时', () => {
+    for (const file of ['src/conversation-resolution.ts', 'src/types.ts']) {
+      const source = readFileSync(resolve(file), 'utf8')
+      expect([...source.matchAll(/from\s+'([^']+)'/g)].map((match) => match[1]!).filter((specifier) => (
+        specifier === 'koishi' || specifier.startsWith('koishi/') || specifier.startsWith('@koishijs/')
+      )), file).toEqual([])
+    }
+  })
+
   it('豁免按文件与规则成对匹配，移除后违规重新暴露', () => {
     const violation = 'src/x.ts 违反「只有会话解析模块能直接读写会话集合」：直接读写会话集合 .conversations'
     const exemption: ArchitectureExemption = {

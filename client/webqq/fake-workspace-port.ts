@@ -5,6 +5,7 @@ import type {
   GetForwardMessageInput,
   GetMediaContentInput,
   GetMessageHistoryInput,
+  CreateConversationInstanceInput,
   GetSandboxWorkspaceInput,
   GetSandboxOneBotDebugRecordInput,
   GetSandboxOneBotDebugRecordsInput,
@@ -100,6 +101,8 @@ export class FakeWorkspacePort implements WorkspacePort {
     code: 'request-not-observed',
     message: '没有匹配的模型请求',
   }
+  /** 新建或分叉会话实例后返回的会话 ID；用例可改写它来断言选中行为。 */
+  createdConversationInstanceId = 'conversation-instance-1'
   mcpCallRecordsResult: SandboxMcpCallRecordsPage = { records: [] }
   mcpCallRecordResult?: SandboxMcpCallRecord
   clearMcpCallRecordsResult = { cleared: 0 }
@@ -127,6 +130,13 @@ export class FakeWorkspacePort implements WorkspacePort {
 
   getMessageHistory(input: GetMessageHistoryInput) {
     return this.invoke('getMessageHistory', input, this.historyResult)
+  }
+
+  createConversationInstance(input: CreateConversationInstanceInput) {
+    return this.invoke('createConversationInstance', input, {
+      ...this.workspaceResult,
+      conversationId: this.createdConversationInstanceId,
+    })
   }
 
   searchConversationMessages(input: SearchConversationMessagesInput) {

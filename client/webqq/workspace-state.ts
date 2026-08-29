@@ -1,3 +1,4 @@
+import { includesConversationParticipant, listConversations } from '../../src/conversation-resolution'
 import type { SandboxSnapshot } from '../../src/types'
 
 export type SandboxWorkspaceView = 'messages' | 'contacts' | 'profile' | 'debug' | 'mcp-calls' | 'model-requests' | 'presets' | 'spaces'
@@ -78,11 +79,10 @@ export function resolveWorkspaceSelection(
   const currentOperator = snapshot.participants.find(({ id }) => id === preferences.currentOperatorId)
     ?? snapshot.participants.find(({ kind }) => kind === 'user')
     ?? snapshot.participants[0]
+  // 会话实例也参与选中恢复：新建实例后立刻被选中，刷新页面不该把选中弹回根会话。
   const conversations = currentOperator
-    ? snapshot.conversations.filter((conversation) => conversation.type === 'direct'
-      ? conversation.participantIds.includes(currentOperator.id)
-      : snapshot.groups.find(({ id }) => id === conversation.groupId)?.members
-        .some(({ participantId }) => participantId === currentOperator.id))
+    ? listConversations(snapshot)
+      .filter((conversation) => includesConversationParticipant(snapshot, conversation, currentOperator.id))
     : []
   const activeConversation = conversations.find(({ id }) => id === preferences.activeConversationId)
     ?? conversations[0]

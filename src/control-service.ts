@@ -18,6 +18,7 @@ import type { SandboxSceneLoadResult, SandboxScenePersistence } from './persiste
 import {
   appendConversationMessageId,
   clearConversationMessageIds,
+  createConversationInstance as insertConversationInstance,
   ensureDirectRootConversation,
   ensureGroupRootConversation,
   findDirectRootConversation,
@@ -30,6 +31,7 @@ import {
   listVisibleRootConversations,
   projectVisibleConversations,
   pruneConversationMessageIds,
+  normalizeSceneConversationInstances,
   removeConversations,
   requireConversation,
   requireVisibleConversation,
@@ -46,6 +48,7 @@ import {
   createDirectConversationId,
   createGroupConversationId,
   isSandboxGroupMemberMuted,
+  type CreateConversationInstanceInput,
   type CreateSandboxBotInput,
   type CreateSandboxGroupInput,
   type CreateSandboxUserInput,
@@ -162,6 +165,8 @@ const DEFAULT_DATABASE_READY_TIMEOUT_MS = 10_000
 const MAX_GROUP_MUTE_SECONDS = 30 * 24 * 60 * 60
 // 防止插件或 WebQQ 多选无限塞 node 导致场景膨胀。
 const MAX_FORWARD_NODES = 100
+// 新建会话实例的默认名：用户不必为每次试验先想名字。
+const DEFAULT_CONVERSATION_INSTANCE_TITLE = '新会话'
 
 // 场景是整块落盘的：每次领域变更都要把完整场景写一遍，没有上限时单次写入规模随累计
 // 消息数线性增长，总写入量随消息数呈平方增长。这两个默认值把单次写入钉在恒定上界，
@@ -170,7 +175,7 @@ export const DEFAULT_SCENE_MESSAGE_LIMIT = 2000
 export const DEFAULT_SCENE_MESSAGE_MAX_BYTES = 8 * 1024 * 1024
 
 export function createEmptyScene(): SandboxSnapshot {
-  return { revision: 0, participants: [], groups: [], conversations: [], messages: [], forwards: [], friendships: [], requests: [] }
+  return { revision: 0, participants: [], groups: [], conversations: [], conversationInstances: [], messages: [], forwards: [], friendships: [], requests: [] }
 }
 
 export function createDefaultScene(): SandboxSnapshot {
@@ -216,6 +221,8 @@ export function createDefaultScene(): SandboxSnapshot {
       }],
     }],
     conversations: [...directConversations, groupConversation],
+    // 默认场景不生成会话实例：实例是复盘手段，不是开箱即用的验证前置条件。
+    conversationInstances: [],
     messages: [],
     forwards: [],
     friendships: [
@@ -735,6 +742,7 @@ export class SandboxControlService {
     return structuredClone({
       ...this.scene,
       conversations: projection.conversations,
+      conversationInstances: projection.conversationInstances,
       messages,
       forwards: this.getForwards().filter(({ id }) => visibleForwardIds.has(id)),
     })
@@ -1454,6 +1462,23 @@ export class SandboxControlService {
     return { status: 'ok', retcode: 0, data: null }
   }
 
+  /**
+   * 在某个联系人或群组下新建一个空白会话实例。
+   *
+   * 传入会话实例时归一化到它的根会话：层级严格两层。可见性完全继承根会话，因此这里只要求
+   * 目标会话对操作者可见，不引入所有权维度。
+   */
+  createConversationInstance(input: CreateConversationInstanceInput): { conversationId: string, revision: number } {
+    const target = this.getVisibleConversation(input.operatorId, input.rootConversationId)
+    const instance = insertConversationInstance(this.scene, {
+      id: Random.id(),
+      rootConversationId: target.rootConversationId,
+      title: input.title?.trim() || DEFAULT_CONVERSATION_INSTANCE_TITLE,
+    })
+    this.commitSceneMutation()
+    return { conversationId: instance.id, revision: this.scene.revision }
+  }
+
   async sendMessage(input: SendMessageInput): Promise<SendMessageResult> {
     const { result, delivery } = this.startMessageSend(input)
     await delivery
@@ -1565,7 +1590,9 @@ export class SandboxControlService {
 
   private normalizeSceneForwards(snapshot: SandboxSnapshot): SandboxSnapshot {
     snapshot.forwards = Array.isArray(snapshot.forwards) ? snapshot.forwards : []
-    return snapshot
+    // 会话实例集合与 forwards 同样在读取路径补空数组，避免旧快照或半成品导入炸掉解析。
+    snapshot.conversationInstances = Array.isArray(snapshot.conversationInstances) ? snapshot.conversationInstances : []
+    return normalizeSceneConversationInstances(snapshot)
   }
 
   private canAccessForward(operatorId: string, forwardId: string, seen = new Set<string>()): boolean {

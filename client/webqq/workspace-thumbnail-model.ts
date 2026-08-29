@@ -8,10 +8,10 @@ import {
   getSandboxUsers,
   isRecalledMessage,
   type SandboxAppearance,
-  type SandboxConversation,
   type SandboxForward,
   type SandboxSnapshot,
 } from '../../src/types'
+import { includesConversationParticipant, listRootConversations } from '../../src/conversation-resolution'
 import { buildForwardPreviewMap } from './forward-preview'
 import { formatMentionContent } from './mention'
 import { getIncomingNotificationRequests } from './notification-requests'
@@ -35,7 +35,11 @@ export function buildWorkspaceThumbnailModels(
   const users = getSandboxUsers(snapshot)
   const bots = getSandboxBots(snapshot)
   const currentOperator = snapshot.participants.find(({ id }) => id === currentOperatorId)
-  const visibleConversations = snapshot.conversations.filter((conversation) => isConversationVisible(snapshot, conversation, currentOperatorId))
+  // 缩略图只画根会话：它是工作台的小幅预览，会话实例的对话线不参与这一层信息密度。
+  const visibleConversations = currentOperatorId
+    ? listRootConversations(snapshot)
+      .filter((conversation) => includesConversationParticipant(snapshot, conversation, currentOperatorId))
+    : []
   const currentConversation = visibleConversations.find(({ id }) => id === activeConversationId)
   const currentGroup = snapshot.groups.find(({ id }) => id === currentConversation?.groupId)
   const currentPeerId = currentConversation ? getConversationPeerId(currentConversation, currentOperatorId) : undefined
@@ -198,12 +202,6 @@ export function buildWorkspaceThumbnailModels(
       participants,
     },
   }
-}
-
-function isConversationVisible(snapshot: SandboxSnapshot, conversation: SandboxConversation, operatorId?: string) {
-  if (!operatorId) return false
-  if (conversation.type === 'direct') return conversation.participantIds.includes(operatorId)
-  return snapshot.groups.find(({ id }) => id === conversation.groupId)?.members.some(({ participantId }) => participantId === operatorId) ?? false
 }
 
 function describeMessage(message: SandboxSnapshot['messages'][number], participantNames: Record<string, string>, snapshot: SandboxSnapshot) {

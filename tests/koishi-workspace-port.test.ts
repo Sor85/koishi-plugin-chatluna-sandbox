@@ -32,6 +32,7 @@ describe('Koishi 工作区端口', () => {
       createdAtEnd: '2026-08-11T00:00:00.000Z',
       limit: 10,
     })
+    await port.createConversationInstance({ operatorId: '11001', rootConversationId: 'private:11001:12001' })
 
     expect(send).toHaveBeenNthCalledWith(1, 'chatluna-sandbox/workspace', { operatorId: '11001', spaceId: 'space-1' })
     expect(send).toHaveBeenNthCalledWith(2, 'chatluna-sandbox/manage-environment', { action: 'create-user', data: { id: '11002', name: '用户' }, spaceId: 'space-1' })
@@ -53,6 +54,11 @@ describe('Koishi 工作区端口', () => {
       createdAtStart: '2026-08-10T00:00:00.000Z',
       createdAtEnd: '2026-08-11T00:00:00.000Z',
       limit: 10,
+      spaceId: 'space-1',
+    })
+    expect(send).toHaveBeenNthCalledWith(6, 'chatluna-sandbox/create-conversation-instance', {
+      operatorId: '11001',
+      rootConversationId: 'private:11001:12001',
       spaceId: 'space-1',
     })
   })

@@ -1,12 +1,14 @@
-import type { SandboxConversation, SandboxSnapshot } from '../../src/types'
+import { findDirectRootConversation, findGroupRootConversation, type ResolvedConversation } from '../../src/conversation-resolution'
+import type { SandboxSnapshot } from '../../src/types'
 
-export function getConversationPeerId(conversation: SandboxConversation, operatorId: string | undefined) {
-  if (conversation.type === 'direct') return conversation.participantIds.find((id) => id !== operatorId) ?? conversation.participantIds[0]
-  return undefined
+export function getConversationPeerId(conversation: ResolvedConversation, operatorId: string | undefined) {
+  if (conversation.type !== 'direct') return undefined
+  const participantIds = conversation.participantIds
+  return participantIds?.find((id) => id !== operatorId) ?? participantIds?.[0]
 }
 
 export function getVisibleRecentConversations(
-  conversations: SandboxConversation[],
+  conversations: readonly ResolvedConversation[],
   hiddenAtMessage: Record<string, string> = {},
 ) {
   return conversations.filter((conversation) => {
@@ -26,7 +28,7 @@ export function getFriendDirectory(snapshot: SandboxSnapshot, operatorId?: strin
       const pendingOutgoing = snapshot.requests.some(({ type, requesterId, targetId }) => type === 'friend' && requesterId === operatorId && targetId === participant.id)
       const pendingIncoming = snapshot.requests.some(({ type, requesterId, targetId }) => type === 'friend' && requesterId === participant.id && targetId === operatorId)
       const isBot = participant.kind === 'bot'
-      const conversationId = snapshot.conversations.find((conversation) => isDirectConversationBetween(conversation, operatorId, participant.id))?.id
+      const conversationId = findDirectRootConversation(snapshot, operatorId, participant.id)?.id
 
       return {
         id: participant.id,
@@ -56,9 +58,7 @@ export function getGroupDirectory(snapshot: SandboxSnapshot, operatorId?: string
     const member = group.members.find(({ participantId }) => participantId === operatorId)
     const pending = snapshot.requests.some(({ type, subType, requesterId, groupId }) => type === 'group'
       && (subType ?? 'add') === 'add' && requesterId === operatorId && groupId === group.id)
-    const conversationId = member
-      ? snapshot.conversations.find((conversation) => isGroupConversationFor(conversation, group.id))?.id
-      : undefined
+    const conversationId = member ? findGroupRootConversation(snapshot, group.id)?.id : undefined
 
     return {
       ...group,
@@ -68,15 +68,4 @@ export function getGroupDirectory(snapshot: SandboxSnapshot, operatorId?: string
       relation: member ? 'joined' as const : pending ? 'pending' as const : 'missing' as const,
     }
   })
-}
-
-function isDirectConversationBetween(conversation: SandboxConversation, firstId: string, secondId: string) {
-  return conversation.type === 'direct'
-    && conversation.participantIds.includes(firstId)
-    && conversation.participantIds.includes(secondId)
-}
-
-function isGroupConversationFor(conversation: SandboxConversation, groupId: string) {
-  return conversation.type === 'group'
-    && conversation.groupId === groupId
 }

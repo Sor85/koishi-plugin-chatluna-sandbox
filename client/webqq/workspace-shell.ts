@@ -6,11 +6,11 @@ import type { WebqqForwardTargetModel, WebqqForwardTargetOption } from '../webqq
 import type { WebqqMessageListModel } from '../webqq-message-list.vue'
 import type { WebqqSidebarModel } from '../webqq-sidebar.vue'
 import type { ListSandboxMcpCallRecordsInput } from '../../src/mcp/call-records'
+import type { ResolvedConversation } from '../../src/conversation-resolution'
 import type {
   GetSandboxOneBotDebugRecordInput,
   GetSandboxOneBotDebugRecordsInput,
   ManageSandboxEnvironmentInput,
-  SandboxConversation,
   SandboxForward,
   SandboxFriendAction,
   SandboxGroupAction,
@@ -100,7 +100,7 @@ export function createWebqqWorkspaceShell(
   const currentOperator = computed(() => snapshot.value.participants.find(({ id }) => id === currentOperatorId.value))
   const composerSenders = computed<WebqqComposerSender[]>(() => workspaceController.composer.value.participants
     .map((participant) => ({ ...participant, avatar: resolveAvatar(participant.avatar) })))
-  const visibleConversations = computed<SandboxConversation[]>(() => workspaceController.sidebar.value.conversations
+  const visibleConversations = computed<ResolvedConversation[]>(() => workspaceController.sidebar.value.conversations
     .map((conversation) => ({ ...conversation, messageIds: [...conversation.messageIds] })))
   const currentConversation = computed(() => visibleConversations.value.find(({ id }) => id === activeConversationId.value))
   const currentPeerId = computed(() => currentConversation.value
@@ -113,13 +113,16 @@ export function createWebqqWorkspaceShell(
   const presetEvidenceContext = computed(() => ({
     scope: activeSpaceIdScope(),
   }))
-  const currentConversationTitle = computed(() => currentGroup.value?.name
+  const currentRootTitle = computed(() => currentGroup.value?.name
     ?? currentPeer.value?.name
     ?? (currentConversation.value ? currentConversation.value.id : '选择一个会话'))
+  // 会话实例有自己的名字；根会话的名字由参与者关系决定，实例名不覆盖它。
+  const currentConversationTitle = computed(() => currentConversation.value?.title ?? currentRootTitle.value)
   const currentConversationSubtitle = computed(() => {
-    if (currentGroup.value) return `群聊 ${currentGroup.value.id} · ${currentGroup.value.members.length} 人`
-    if (currentBot.value) return '在线 · 虚拟 OneBot 机器人'
-    return currentPeer.value ? '在线 · 好友' : '暂无会话'
+    const instanceOf = currentConversation.value?.kind === 'instance' ? `${currentRootTitle.value} · ` : ''
+    if (currentGroup.value) return `${instanceOf}群聊 ${currentGroup.value.id} · ${currentGroup.value.members.length} 人`
+    if (currentBot.value) return `${instanceOf}在线 · 虚拟 OneBot 机器人`
+    return currentPeer.value ? `${instanceOf}在线 · 好友` : '暂无会话'
   })
   const messages = computed(() => {
     const ids = new Set(currentConversation.value?.messageIds ?? [])
@@ -262,7 +265,7 @@ export function createWebqqWorkspaceShell(
     persistence: workspace.value.persistence,
     participants: participants.value,
   }))
-  const sidebarConversations = computed(() => visibleConversations.value.map((conversation) => {
+  const toSidebarConversation = (conversation: ResolvedConversation) => {
     const group = conversation.type === 'group'
       ? snapshot.value.groups.find(({ id }) => id === conversation.groupId)
       : undefined
@@ -284,7 +287,9 @@ export function createWebqqWorkspaceShell(
     return {
       id: conversation.id,
       groupId: group?.id,
-      title: group?.name ?? peer?.name ?? conversation.id,
+      kind: conversation.kind,
+      // 会话实例有自己的名字；根会话的名字由参与者关系决定。
+      title: conversation.title ?? group?.name ?? peer?.name ?? conversation.id,
       avatar: resolveAvatar(group?.avatar ?? peer?.avatar),
       avatarKind: group ? 'group' as const : bot ? 'bot' as const : 'user' as const,
       preview: latestPreview,
@@ -297,7 +302,26 @@ export function createWebqqWorkspaceShell(
         : { type: bot ? 'bot' as const : 'user' as const, id: peerId ?? '' },
       entityLabel: group ? '群组' as const : bot ? '机器人' as const : '用户' as const,
     }
-  }))
+  }
+  /**
+   * 侧栏会话树：一层根会话，每个根会话下挂它自己的会话实例。
+   * 数据源是「根会话加其实例列表」，不是「一个扁平集合加父字段」。
+   */
+  const sidebarConversations = computed(() => {
+    const instancesByRoot = new Map<string, ReturnType<typeof toSidebarConversation>[]>()
+    for (const conversation of visibleConversations.value) {
+      if (conversation.kind !== 'instance') continue
+      const siblings = instancesByRoot.get(conversation.rootConversationId) ?? []
+      siblings.push(toSidebarConversation(conversation))
+      instancesByRoot.set(conversation.rootConversationId, siblings)
+    }
+    return visibleConversations.value
+      .filter(({ kind }) => kind === 'root')
+      .map((conversation) => ({
+        ...toSidebarConversation(conversation),
+        children: instancesByRoot.get(conversation.id) ?? [],
+      }))
+  })
   const sidebarModel = computed<WebqqSidebarModel>(() => ({
     appearance: appearance.value,
     currentView: currentView.value,
@@ -384,6 +408,16 @@ export function createWebqqWorkspaceShell(
     () => void loadVisibleMedia(),
     { immediate: true },
   )
+
+  /** 新建会话实例。失败走界面既有的错误展示路径，不落进浏览器控制台。 */
+  async function createConversationInstance(rootConversationId: string) {
+    errorMessage.value = ''
+    try {
+      await workspaceController.createConversationInstance({ rootConversationId })
+    } catch (error) {
+      errorMessage.value = error instanceof Error ? error.message : '创建会话失败'
+    }
+  }
 
   async function manageEnvironment(input: ManageSandboxEnvironmentInput, resolve: Resolve, reject: Reject) {
     try {
@@ -1021,6 +1055,7 @@ export function createWebqqWorkspaceShell(
     reportEvidenceNavigationFailure,
     returnToPresetOrigin,
     manageEnvironment,
+    createConversationInstance,
     openComposerParticipantDialog,
     openEntityDialog,
     openGroupActionDialog,

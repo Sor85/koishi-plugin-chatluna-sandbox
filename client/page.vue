@@ -24,6 +24,7 @@
           @select-view="selectNavigation"
           @select-conversation="selectConversation"
           @remove-recent-conversation="removeRecentConversation"
+          @create-conversation-instance="createConversationInstance"
           @manage-environment="manageEnvironment"
           @friend-action="performFriendAction"
           @group-action="performGroupAction"
@@ -287,6 +288,7 @@ const {
   publishAnnouncement,
   recallMessage,
   clearConversationMessages,
+  createConversationInstance,
   removeRecentConversation,
   setMessageReaction,
   requestFriend,

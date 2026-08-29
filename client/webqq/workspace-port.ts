@@ -5,6 +5,8 @@ import type {
   GetForwardMessageInput,
   GetMediaContentInput,
   GetMessageHistoryInput,
+  CreateConversationInstanceInput,
+  SandboxConversationInstanceResult,
   GetSandboxWorkspaceInput,
   GetSandboxOneBotDebugRecordInput,
   GetSandboxOneBotDebugRecordsInput,
@@ -55,6 +57,7 @@ import type {
 export interface WorkspacePort {
   getWorkspace(input?: GetSandboxWorkspaceInput): Promise<SandboxWorkspaceState>
   getMessageHistory(input: GetMessageHistoryInput): Promise<SandboxMessageHistory>
+  createConversationInstance(input: CreateConversationInstanceInput): Promise<SandboxConversationInstanceResult>
   searchConversationMessages(input: SearchConversationMessagesInput): Promise<SandboxMessageSearchResult>
   sendMessage(input: SendMessageInput): Promise<SandboxWorkspaceState>
   sendMediaMessage(input: SendMediaMessageInput): Promise<SandboxWorkspaceState>

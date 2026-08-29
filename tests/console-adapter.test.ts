@@ -342,4 +342,52 @@ describe('Koishi 控制台适配器', () => {
     })).rejects.toThrow('环境管理不接受操作者字段：operatorId')
     expect(control.getSnapshot().participants.some(({ id }) => id === '10100')).toBe(false)
   })
+
+  it('会话实例端点返回完整工作区状态与新会话 ID', async () => {
+    const app = new App()
+    let control: SandboxControlService | undefined
+    app.plugin((ctx) => {
+      control = new SandboxControlService(ctx)
+    })
+    runningApps.push(app)
+    await app.start()
+    if (!control) throw new Error('沙盒控制服务未注册')
+
+    const listeners = new Map<string, (input?: unknown) => Promise<any>>()
+    registerConsole({
+      addEntry() {},
+      addListener(event, callback) {
+        listeners.set(event, callback as (input?: unknown) => Promise<any>)
+      },
+      broadcast() {},
+    }, control, appearance)
+
+    const createListener = listeners.get('chatluna-sandbox/create-conversation-instance')
+    if (!createListener) throw new Error('控制台监听器未注册')
+
+    const created = await createListener({ operatorId: '10001', rootConversationId: 'private:10001:20001' })
+
+    // 一次请求既拿到新会话 ID，也拿到完整工作区状态，客户端不必再读一次工作区。
+    expect(created.conversationId).toEqual(expect.any(String))
+    expect(created.appearance).toEqual(appearance)
+    expect(created.persistence).toEqual({ mode: 'memory', available: true, persisted: false })
+    expect(created.snapshot.conversationInstances).toEqual([{
+      id: created.conversationId,
+      rootConversationId: 'private:10001:20001',
+      title: '新会话',
+      messageIds: [],
+      hasMoreMessages: false,
+    }])
+
+    const named = await createListener({
+      operatorId: '10001',
+      rootConversationId: 'private:10001:20001',
+      title: '  换一种问法  ',
+    })
+    expect(named.snapshot.conversationInstances.map(({ title }: { title: string }) => title))
+      .toEqual(['新会话', '换一种问法'])
+
+    await expect(createListener({ operatorId: '10001', rootConversationId: 'private:10002:20001' }))
+      .rejects.toThrow('会话不存在：private:10002:20001')
+  })
 })

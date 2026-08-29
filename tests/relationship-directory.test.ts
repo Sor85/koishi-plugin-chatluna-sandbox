@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getConversationPeerId, getFriendDirectory, getGroupDirectory, getVisibleRecentConversations } from '../client/webqq/relationship-directory'
-import type { SandboxConversation, SandboxSnapshot } from '../src/types'
+import { requireConversation, type ResolvedConversation } from '../src/conversation-resolution'
+import type { SandboxSnapshot } from '../src/types'
 
 const snapshot: SandboxSnapshot = {
   revision: 1,
@@ -28,16 +29,16 @@ const snapshot: SandboxSnapshot = {
 
 describe('当前操作者关系目录', () => {
   it('机器人视角把会话中的普通用户识别为对端', () => {
-    const conversation = snapshot.conversations.find(({ id }) => id === 'private:10001:20001')!
+    const conversation = requireConversation(snapshot, 'private:10001:20001')
 
     expect(getConversationPeerId(conversation, '10001')).toBe('20001')
     expect(getConversationPeerId(conversation, '20001')).toBe('10001')
   })
 
   it('机器人视角直接使用群组唯一的最近入口', () => {
-    const conversations: SandboxConversation[] = [
-      { id: 'group:30001', type: 'group', groupId: '30001', messageIds: [] },
-      { id: 'private:10001:20001', type: 'direct', participantIds: ['10001', '20001'], messageIds: [] },
+    const conversations: ResolvedConversation[] = [
+      { id: 'group:30001', kind: 'root', rootConversationId: 'group:30001', type: 'group', groupId: '30001', messageIds: [] },
+      { id: 'private:10001:20001', kind: 'root', rootConversationId: 'private:10001:20001', type: 'direct', participantIds: ['10001', '20001'], messageIds: [] },
     ]
 
     expect(getVisibleRecentConversations(conversations).map(({ id }) => id)).toEqual([
@@ -47,9 +48,9 @@ describe('当前操作者关系目录', () => {
   })
 
   it('移除最近会话后保留底层会话，并在新消息到达时恢复入口', () => {
-    const conversations: SandboxConversation[] = [
-      { id: 'group:30001', type: 'group', groupId: '30001', messageIds: ['message-1'] },
-      { id: 'private:10001:20001', type: 'direct', participantIds: ['10001', '20001'], messageIds: [] },
+    const conversations: Array<ResolvedConversation & { messageIds: string[] }> = [
+      { id: 'group:30001', kind: 'root', rootConversationId: 'group:30001', type: 'group', groupId: '30001', messageIds: ['message-1'] },
+      { id: 'private:10001:20001', kind: 'root', rootConversationId: 'private:10001:20001', type: 'direct', participantIds: ['10001', '20001'], messageIds: [] },
     ]
 
     expect(getVisibleRecentConversations(conversations, {

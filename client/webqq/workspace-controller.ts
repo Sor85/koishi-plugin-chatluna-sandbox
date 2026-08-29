@@ -8,13 +8,13 @@ import type {
   ManageSandboxEnvironmentInput,
   RecallMessageInput,
   ClearConversationMessagesInput,
+  CreateConversationInstanceInput,
   SearchConversationMessagesInput,
   SetMessageReactionInput,
   SandboxAppearance,
   SandboxBotProfile,
   SandboxChatLunaState,
   SandboxConsoleOneBotDebugRecord,
-  SandboxConversation,
   SandboxForward,
   SandboxFriendAction,
   SandboxGroup,
@@ -51,6 +51,11 @@ import type {
   SavePresetInput,
 } from '../../src/presets'
 import { getVisibleRecentConversations } from './relationship-directory'
+import {
+  includesConversationParticipant,
+  listConversations,
+  type ResolvedConversation,
+} from '../../src/conversation-resolution'
 import type { ListSandboxMcpCallRecordsInput } from '../../src/mcp/call-records'
 import type { SandboxMcpCallRecord, SandboxMcpCallRecordListItem } from '../../src/mcp/types'
 import {
@@ -96,13 +101,13 @@ export interface SidebarWorkspaceModel {
   readonly currentView: SandboxWorkspaceView
   readonly currentOperator?: DeepReadonly<WorkspaceParticipant>
   readonly activeConversationId?: string
-  readonly conversations: readonly DeepReadonly<SandboxConversation>[]
+  readonly conversations: readonly DeepReadonly<ResolvedConversation>[]
 }
 
 export interface ChatWorkspaceModel {
   readonly revision: number
   readonly currentOperator?: DeepReadonly<WorkspaceParticipant>
-  readonly conversation?: DeepReadonly<SandboxConversation>
+  readonly conversation?: DeepReadonly<ResolvedConversation>
   readonly messages: readonly DeepReadonly<SandboxMessage>[]
   // 当前会话消息直接引用的合并转发资源，供列表预览与后续详情展开。
   readonly forwards: readonly DeepReadonly<SandboxForward>[]
@@ -112,14 +117,14 @@ export interface ChatWorkspaceModel {
 export interface ComposerWorkspaceModel {
   readonly revision: number
   readonly currentOperator?: DeepReadonly<WorkspaceParticipant>
-  readonly conversation?: DeepReadonly<SandboxConversation>
+  readonly conversation?: DeepReadonly<ResolvedConversation>
   readonly participants: readonly DeepReadonly<WorkspaceParticipant>[]
 }
 
 export interface DetailsWorkspaceModel {
   readonly revision: number
   readonly currentOperator?: DeepReadonly<WorkspaceParticipant>
-  readonly conversation?: DeepReadonly<SandboxConversation>
+  readonly conversation?: DeepReadonly<ResolvedConversation>
   readonly bot?: DeepReadonly<SandboxBotProfile>
   readonly group?: DeepReadonly<SandboxGroup>
 }
@@ -174,12 +179,12 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     const participant = snapshot.value.participants.find(({ id }) => id === currentOperatorIdState.value)
     return participant ? { ...participant, type: participant.kind } : undefined
   })
+  // 根会话与会话实例一起列出：会话实例的可见性完全继承根会话，聊天区与侧栏都要能寻址到它。
   const conversations = computed(() => {
     const operatorId = currentOperatorIdState.value
-    return snapshot.value.conversations.filter((conversation) => conversation.type === 'direct'
-      ? conversation.participantIds.includes(operatorId ?? '')
-      : snapshot.value.groups.find(({ id }) => id === conversation.groupId)?.members
-        .some(({ participantId }) => participantId === operatorId))
+    if (!operatorId) return []
+    return listConversations(snapshot.value)
+      .filter((conversation) => includesConversationParticipant(snapshot.value, conversation, operatorId))
   })
   const visibleRecentConversations = computed(() => getVisibleRecentConversations(
     conversations.value,
@@ -202,7 +207,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   const activeBot = computed(() => {
     const conversation = activeConversation.value
     const botId = conversation?.type === 'direct'
-      ? conversation.participantIds.find((id) => snapshot.value.participants.some((participant) => participant.kind === 'bot' && participant.id === id))
+      ? conversation.participantIds?.find((id) => snapshot.value.participants.some((participant) => participant.kind === 'bot' && participant.id === id))
       : undefined
     return snapshot.value.participants.find((participant): participant is SandboxBotProfile => participant.kind === 'bot' && participant.id === botId)
   })
@@ -356,6 +361,22 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
       replaceWorkspace(await port.performFriendAction({ ...input, operatorId }))
     } catch (error) {
       throw normalizeWorkspaceError(error, '好友操作失败')
+    }
+  }
+
+  /**
+   * 新建会话实例。端点一次返回完整工作区状态与新会话 ID，因此这里只发一次请求，
+   * 不再紧跟一次工作区读取。
+   */
+  async function createConversationInstance(input: Omit<CreateConversationInstanceInput, 'operatorId'>) {
+    const operatorId = getCurrentOperatorId()
+    try {
+      const { conversationId, ...workspace } = await port.createConversationInstance({ ...input, operatorId })
+      replaceWorkspace(workspace)
+      selectConversation(conversationId)
+      return conversationId
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '创建会话失败')
     }
   }
 
@@ -809,6 +830,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     clearMcpCallRecords,
     recallMessage,
     clearConversationMessages,
+    createConversationInstance,
     removeRecentConversation,
     setMessageReaction,
     replaceWorkspace,

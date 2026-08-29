@@ -170,6 +170,21 @@ export interface SandboxGroupConversation {
 
 export type SandboxConversation = SandboxDirectConversation | SandboxGroupConversation
 
+/**
+ * 会话实例：根会话下的一条独立对话线，拥有自己的消息与标题。
+ *
+ * 只保存所属根会话 ID；参与者对与群号一律从根会话读，因此关系变更不需要同步两处。
+ * 可见性完全继承根会话，不引入创建者或所有权维度。会话实例不出现在根会话集合里，
+ * 既有「遍历根会话」的实现因此默认只看到根会话。
+ */
+export interface SandboxConversationInstance {
+  id: string
+  rootConversationId: string
+  title: string
+  messageIds: string[]
+  hasMoreMessages?: boolean
+}
+
 export function createDirectConversationId(firstId: string, secondId: string): string {
   const [left, right] = [firstId, secondId].sort()
   return `private:${left}:${right}`
@@ -720,6 +735,10 @@ export interface SandboxSnapshot {
   participants: SandboxParticipant[]
   groups: SandboxGroup[]
   conversations: SandboxConversation[]
+  // 会话实例是独立集合：既有「遍历根会话」的实现因此默认只看到根会话，需要全部会话的
+  // 少数路径（消息搜索、保留窗口裁剪、场景导出）经会话解析模块显式合并两个集合。
+  // 读取路径统一把缺失值规范成 []，以便旧测试夹具与未改动的客户端空快照继续通过类型检查。
+  conversationInstances?: SandboxConversationInstance[]
   messages: SandboxMessage[]
   // 合并转发资源与消息解耦；重启后仍可按 forwardId 展开完整 node。
   // 读取路径统一把缺失值规范成 []，以便旧测试夹具与未改动的客户端空快照继续通过类型检查。
@@ -849,6 +868,38 @@ export interface SendMessageInput {
 export interface SendMessageResult {
   messageId: string
   revision: number
+}
+
+export interface CreateConversationInstanceInput {
+  operatorId: string
+  /** 所属会话；传入会话实例时归一化到它的根会话，不产生第三层。 */
+  rootConversationId: string
+  title?: string
+}
+
+export interface BranchConversationInstanceInput {
+  operatorId: string
+  /** 分叉来源会话，可以是根会话也可以是会话实例。 */
+  conversationId: string
+  /** 分叉点消息；它及其之前的历史会被复制进新实例。 */
+  messageId: string
+  title?: string
+}
+
+/** 会话实例变更返回完整工作区状态外加新会话 ID，客户端一次请求完成状态替换与选中。 */
+export interface SandboxConversationInstanceResult extends SandboxWorkspaceState {
+  conversationId: string
+}
+
+export interface RenameConversationInstanceInput {
+  operatorId: string
+  conversationId: string
+  title: string
+}
+
+export interface DeleteConversationInstanceInput {
+  operatorId: string
+  conversationId: string
 }
 
 export interface SendForwardMessageInput {

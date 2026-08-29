@@ -114,6 +114,51 @@ describe('WebQQ 工作区控制模块', () => {
     expect(controller.details.value).toMatchObject({ revision: 7, bot: { id: '20001' } })
   })
 
+  it('新建会话实例只发一次请求，并把新会话选中', async () => {
+    const instanceId = 'conversation-instance-9'
+    const port = createFakeWorkspacePort({
+      ...workspace,
+      snapshot: {
+        ...snapshot,
+        conversationInstances: [{
+          id: instanceId,
+          rootConversationId: 'private:10001:20001',
+          title: '换一种问法',
+          messageIds: [],
+        }],
+      },
+    })
+    port.createdConversationInstanceId = instanceId
+    const controller = createWorkspaceController(port, createStorage())
+    await controller.load()
+
+    await controller.createConversationInstance({ rootConversationId: 'private:10001:20001' })
+
+    // 端点已经返回完整工作区状态，不得再补一次工作区读取。
+    expect(port.calls.map(({ operation }) => operation)).toEqual(['getWorkspace', 'createConversationInstance'])
+    expect(controller.activeConversationId.value).toBe(instanceId)
+    expect(controller.chat.value.conversation).toMatchObject({
+      id: instanceId,
+      kind: 'instance',
+      rootConversationId: 'private:10001:20001',
+      type: 'direct',
+      title: '换一种问法',
+    })
+    // 侧栏同时看到根会话与它的实例；树形由工作台外壳按 kind 组装。
+    expect(controller.sidebar.value.conversations.map(({ id }) => id)).toContain(instanceId)
+  })
+
+  it('新建会话实例失败时抛出归一化后的错误消息', async () => {
+    const port = createFakeWorkspacePort(workspace)
+    port.rejectNext('createConversationInstance', new Error('会话不存在：private:10002:20001'))
+    const controller = createWorkspaceController(port, createStorage())
+    await controller.load()
+
+    await expect(controller.createConversationInstance({ rootConversationId: 'private:10002:20001' }))
+      .rejects.toThrow('会话不存在：private:10002:20001')
+    expect(controller.activeConversationId.value).toBe('private:10001:20001')
+  })
+
   it('切换会话时同步聊天区域并保存浏览器选择', async () => {
     const port = createFakeWorkspacePort(workspace)
     const storage = createStorage()
@@ -238,7 +283,7 @@ describe('WebQQ 工作区控制模块', () => {
     ])
     expect(controller.sidebar.value.conversations
       .flatMap((conversation) => conversation.type === 'direct'
-        ? conversation.participantIds.find((id) => id !== '20001') ?? []
+        ? conversation.participantIds?.find((id) => id !== '20001') ?? []
         : [])).toEqual(['10001', '10002'])
     for (const conversationId of ['private:10001:20001', 'private:10002:20001']) {
       controller.selectConversation(conversationId)
