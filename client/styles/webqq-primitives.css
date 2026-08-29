@@ -42,11 +42,9 @@
   pointer-events: none;
 }
 
-/* 页面切换顶栏原先采用较轻的雾化；聊天顶栏也复用同一强度，
-   避免上下两层叠加后产生过重的模糊。 */
 .webqq-workspace.is-frosted .webqq-overlay-header::before {
   background: color-mix(in srgb, var(--webqq-overlay-header-surface, var(--webqq-surface)) 72%, transparent);
-  backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(20px);
 }
 
 .chatluna-sandbox-scrollbar-overlay {

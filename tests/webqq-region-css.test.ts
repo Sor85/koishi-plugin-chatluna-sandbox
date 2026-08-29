@@ -72,7 +72,7 @@ describe('WebQQ 区域样式', () => {
     expect(overlayHeaderRule).toContain('background: var(--webqq-overlay-header-surface, var(--webqq-surface))')
     const frostedOverlayHeaderRule = primitives.slice(primitives.indexOf('.webqq-workspace.is-frosted .webqq-overlay-header::before {')).split('}')[0]
     expect(frostedOverlayHeaderRule).toContain('background: color-mix(in srgb, var(--webqq-overlay-header-surface, var(--webqq-surface)) 72%, transparent)')
-    expect(frostedOverlayHeaderRule).toContain('backdrop-filter: saturate(180%) blur(16px)')
+    expect(frostedOverlayHeaderRule).toContain('backdrop-filter: saturate(180%) blur(20px)')
     expect(modelRequests).toContain('class="webqq-model-trajectory-header webqq-overlay-header"')
     expect(modelRequestWorkspace).toContain('class="webqq-model-request-list-toolbar webqq-overlay-header"')
     expect(debugWorkspace).toContain('class="webqq-debug-list-toolbar webqq-overlay-header"')
