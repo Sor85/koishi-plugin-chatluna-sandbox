@@ -1,5 +1,10 @@
 import { formatDuration } from './format-duration'
-import type { SandboxModelRequestUsage } from '../../src/types'
+import type {
+  SandboxModelRequestDetail,
+  SandboxModelRequestListItem,
+  SandboxModelRequestUsage,
+  SandboxPresetDocumentKind,
+} from '../../src/types'
 
 /**
  * 详情概览与用量格的取词。
@@ -26,6 +31,27 @@ export function formatModelRequestModelName(model: string | undefined): string {
 
 export function formatModelRequestChannelName(provider: string | undefined): string {
   return provider || MODEL_REQUEST_UNIDENTIFIED_TEXT
+}
+
+/**
+ * 模型请求来源只从运行时预设快照判断：核心 ChatLuna 预设属于主插件，Character 预设
+ * 属于 character。没有快照或同时出现两种快照时不猜测来源，避免把渠道地址误当成来源。
+ */
+export function formatModelRequestSource(
+  record: Pick<SandboxModelRequestListItem, 'presetSnapshotSummaries'>
+    | Pick<SandboxModelRequestDetail, 'presetSnapshots'>
+    | undefined,
+): string {
+  const kinds = new Set<SandboxPresetDocumentKind>([
+    ...(record && 'presetSnapshotSummaries' in record
+      ? record.presetSnapshotSummaries?.map(({ kind }) => kind) ?? []
+      : []),
+    ...(record && 'presetSnapshots' in record
+      ? record.presetSnapshots?.map(({ kind }) => kind) ?? []
+      : []),
+  ])
+  if (kinds.size !== 1) return MODEL_REQUEST_UNIDENTIFIED_TEXT
+  return kinds.has('character') ? 'character' : '主插件'
 }
 
 /** 计数类概览格：0 是有意义的事实，只有整项缺省才退到缺省符号。 */

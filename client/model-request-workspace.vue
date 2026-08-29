@@ -149,8 +149,7 @@
                     <span class="webqq-model-request-bot-name">
                       <strong>{{ resolveRequestBot(record).name }}</strong>
                       <Badge :class="statusClass(record.status)">{{ statusLabel(record.status) }}</Badge>
-                      <Badge v-if="category === 'all'" variant="outline" class="webqq-model-request-source">{{ resolveRecordSpaceName(record) }}</Badge>
-                      <Badge v-if="record.provider" variant="outline" class="webqq-model-request-provider">{{ record.provider }}</Badge>
+                      <Badge variant="outline" class="webqq-model-request-source">{{ formatModelRequestSource(record) }}</Badge>
                     </span>
                     <span class="webqq-model-request-timing">
                       <time>
@@ -253,8 +252,8 @@
             <div class="webqq-model-request-overview-grid">
               <article>
                 <IconRoute :size="17" aria-hidden="true" />
-                <span>渠道</span>
-                <strong>{{ formatModelRequestChannelName(detail.provider) }}</strong>
+                <span>来源</span>
+                <strong>{{ formatModelRequestSource(detail) }}</strong>
               </article>
               <article>
                 <IconCpu :size="17" aria-hidden="true" />
@@ -605,8 +604,8 @@ import { formatDuration } from './webqq/format-duration'
 import { formatSandboxDateTime } from './webqq/format-time'
 import {
   buildModelRequestUsageCells,
-  formatModelRequestChannelName,
   formatModelRequestCount,
+  formatModelRequestSource,
   formatModelRequestModelName,
 } from './webqq/model-request-overview'
 import {
@@ -1055,11 +1054,6 @@ function categoryLabel(value: 'all' | 'space' | 'unattributed') {
 
 function resolveSpaceName(id: string) {
   return props.spaces.find((space) => space.id === id)?.name || (id === MAIN_MODEL_REQUEST_SPACE_ID ? '主环境' : id)
-}
-
-function resolveRecordSpaceName(record: SandboxModelRequestListItem | SandboxModelRequestDetail) {
-  if (record.attribution === 'unattributed' || !record.entities.scopeId) return '未归属'
-  return resolveSpaceName(record.entities.scopeId)
 }
 
 function resolveRecordScope(record: SandboxModelRequestListItem | SandboxModelRequestDetail): SandboxModelRequestScope {

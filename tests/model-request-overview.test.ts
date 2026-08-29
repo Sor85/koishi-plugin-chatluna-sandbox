@@ -6,6 +6,7 @@ import {
   formatModelRequestLabel,
   formatModelRequestModelName,
   formatModelRequestOrdinal,
+  formatModelRequestSource,
   formatModelRequestTokenCount,
   formatModelRequestTokenRate,
 } from '../client/webqq/model-request-overview'
@@ -18,6 +19,14 @@ describe('模型请求概览取词', () => {
     expect(formatModelRequestChannelName('openai')).toBe('openai')
     expect(formatModelRequestChannelName('')).toBe('未识别')
     expect(formatModelRequestChannelName(undefined)).toBe('未识别')
+  })
+
+  it('模型请求来源只显示主插件或 character，无法唯一判断时显示未识别', () => {
+    expect(formatModelRequestSource({ presetSnapshotSummaries: [{ kind: 'core', presetName: 'demo', capturedAt: '', templateCount: 1 }] })).toBe('主插件')
+    expect(formatModelRequestSource({ presetSnapshotSummaries: [{ kind: 'character', presetName: 'alice', capturedAt: '', templateCount: 1 }] })).toBe('character')
+    expect(formatModelRequestSource({ presetSnapshotSummaries: [] })).toBe('未识别')
+    expect(formatModelRequestSource({ presetSnapshots: [{ kind: 'core', presetName: 'demo', capturedAt: '', templates: [] }] })).toBe('主插件')
+    expect(formatModelRequestSource(undefined)).toBe('未识别')
   })
 
   it('计数格把 0 当事实显示，只有整项缺省才退到缺省符号', () => {
