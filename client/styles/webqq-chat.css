@@ -16,11 +16,18 @@
 }
 
 /* 消息列表原本从独立 Grid 行开始，表头后面没有任何内容可供 backdrop-filter 采样。
-   向上扩展滚动视口并用同高内边距保留首条消息位置，让内容真正经过表头背后。 */
+   向上扩展滚动视口，跨过聊天表头和全局页面切换顶栏；用等高内边距保留首条消息
+   位置，让消息流真正经过两层毛玻璃表头背后。 */
 .chatluna-sandbox-chat > .chatluna-sandbox-messages {
-  margin-top: -76px;
-  padding-top: 96px;
-  scroll-padding-top: 96px;
+  margin-top: -132px;
+  padding-top: 152px;
+  scroll-padding-top: 152px;
+}
+
+/* 聊天顶栏的毛玻璃背景统一由 .webqq-overlay-header::before 提供；
+   清除暗色模式工作区的实色覆盖，保证上下两层最终使用同一套效果。 */
+.webqq-workspace.is-frosted[data-color-mode="dark"] .chatluna-sandbox-chat-header {
+  background: transparent;
 }
 
 .chatluna-sandbox-chat-title > div > strong,

@@ -1,5 +1,5 @@
 <template>
-        <nav class="webqq-rail" aria-label="WebQQ 主导航">
+        <nav class="webqq-rail webqq-overlay-header" aria-label="WebQQ 主导航">
           <div class="webqq-brand" aria-label="ChatLuna Sandbox">
             <span class="webqq-brand-logo" aria-hidden="true">
               <SandboxActivityIcon />

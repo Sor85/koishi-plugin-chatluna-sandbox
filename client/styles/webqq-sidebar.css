@@ -1,4 +1,8 @@
 .webqq-rail {
+  position: relative;
+  z-index: 5;
+  --webqq-overlay-header-surface: var(--webqq-rail);
+
   grid-column: 1 / -1;
   grid-row: 1;
   display: flex;
@@ -6,6 +10,14 @@
   gap: 8px;
   padding: 8px 12px;
   background: var(--webqq-rail);
+}
+
+/* 全局顶栏的毛玻璃背景统一由 .webqq-overlay-header::before 提供。
+   这里必须清除导航栏自身的区域背景，否则会与伪元素重复叠加，
+   使最终效果比聊天顶栏更不透明，削弱 backdrop-filter。 */
+.webqq-workspace.is-frosted .webqq-rail,
+.webqq-workspace.is-frosted[data-color-mode="dark"] .webqq-rail {
+  background: transparent;
 }
 
 .webqq-brand {

@@ -19,7 +19,7 @@ describe('WebQQ 区域样式', () => {
     )
     expect(sources.chat).toContain('.chatluna-sandbox-chat-header')
     // 毛玻璃表头必须与滚动内容实际重叠；仅声明 backdrop-filter 但让两者分居 Grid 行不会有视觉效果。
-    expect(sources.chat).toMatch(/\.chatluna-sandbox-chat > \.chatluna-sandbox-messages\s*\{[^}]*margin-top:\s*-76px;[^}]*padding-top:\s*96px;/s)
+    expect(sources.chat).toMatch(/\.chatluna-sandbox-chat > \.chatluna-sandbox-messages\s*\{[^}]*margin-top:\s*-132px;[^}]*padding-top:\s*152px;/s)
     expect(sources.messages).toContain('.chatluna-sandbox-message-row')
     expect(sources.composer).toContain('.webqq-composer-user-stack')
     expect(sources.details).toContain('.chatluna-sandbox-group-member')
@@ -55,6 +55,7 @@ describe('WebQQ 区域样式', () => {
 
   it('工作区层不声明 backdrop-filter，浮层雾化态由 body 属性统一驱动', () => {
     const workspace = readFileSync(resolve('client/styles/webqq-workspace.css'), 'utf8')
+    const sidebar = readFileSync(resolve('client/styles/webqq-sidebar.css'), 'utf8')
     const primitives = readFileSync(resolve('client/styles/webqq-primitives.css'), 'utf8')
     const modelRequests = readFileSync(resolve('client/model-request-trajectory.vue'), 'utf8')
     const modelRequestWorkspace = readFileSync(resolve('client/model-request-workspace.vue'), 'utf8')
@@ -81,6 +82,13 @@ describe('WebQQ 区域样式', () => {
     expect(environmentManager).toContain('margin-top: -56px')
     expect(environmentManager).toContain('padding-top: 64px')
     expect(chatPane).toContain('class="chatluna-sandbox-chat-header webqq-overlay-header"')
+    expect(readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')).toContain('<nav class="webqq-rail webqq-overlay-header"')
+    expect(primitives).toContain('.webqq-workspace.is-frosted .webqq-overlay-header::before')
+    expect(sidebar).toContain('.webqq-workspace.is-frosted .webqq-rail')
+    expect(sidebar).toContain('background: transparent')
+    expect(sidebar).not.toContain('blur(32px)')
+    expect(readFileSync(resolve('client/styles/webqq-chat.css'), 'utf8')).toContain('.webqq-workspace.is-frosted[data-color-mode="dark"] .chatluna-sandbox-chat-header')
+    expect(readFileSync(resolve('client/styles/webqq-chat.css'), 'utf8')).toContain('background: transparent')
     const frostedSurfaceRule = primitives.slice(primitives.indexOf('body[data-sandbox-frosted] :is(')).split('}')[0]
     expect(frostedSurfaceRule).toContain('background: color-mix(in srgb, var(--webqq-panel) 72%, transparent)')
     expect(frostedSurfaceRule).toContain('backdrop-filter: saturate(180%) blur(20px)')
