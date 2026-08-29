@@ -14,6 +14,7 @@ export function createKoishiWorkspacePort(resolveSpaceId: () => string | undefin
   getWorkspace: (input = {}) => send('chatluna-sandbox/workspace', scoped(input)),
   getMessageHistory: (input) => send('chatluna-sandbox/message-history', scoped(input)),
   createConversationInstance: (input) => send('chatluna-sandbox/create-conversation-instance', scoped(input)),
+  branchConversationInstance: (input) => send('chatluna-sandbox/branch-conversation-instance', scoped(input)),
   searchConversationMessages: (input) => send('chatluna-sandbox/search-conversation-messages', scoped(input)),
   sendMessage: (input) => send('chatluna-sandbox/send-message', scoped(input)),
   sendMediaMessage: (input) => send('chatluna-sandbox/send-media-message', scoped(input)),

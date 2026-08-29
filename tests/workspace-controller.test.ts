@@ -148,6 +148,35 @@ describe('WebQQ 工作区控制模块', () => {
     expect(controller.sidebar.value.conversations.map(({ id }) => id)).toContain(instanceId)
   })
 
+  it('从消息分叉会话实例同样只发一次请求，并把新会话选中', async () => {
+    const instanceId = 'conversation-instance-branch'
+    const port = createFakeWorkspacePort({
+      ...workspace,
+      snapshot: {
+        ...snapshot,
+        conversationInstances: [{
+          id: instanceId,
+          rootConversationId: 'private:10001:20001',
+          title: '分支：Koishi',
+          messageIds: [],
+        }],
+      },
+    })
+    port.createdConversationInstanceId = instanceId
+    const controller = createWorkspaceController(port, createStorage())
+    await controller.load()
+
+    await controller.branchConversationInstance({ conversationId: 'private:10001:20001', messageId: 'message-1' })
+
+    expect(port.calls.map(({ operation }) => operation)).toEqual(['getWorkspace', 'branchConversationInstance'])
+    expect(port.calls.at(-1)?.input).toEqual({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      messageId: 'message-1',
+    })
+    expect(controller.activeConversationId.value).toBe(instanceId)
+  })
+
   it('新建会话实例失败时抛出归一化后的错误消息', async () => {
     const port = createFakeWorkspacePort(workspace)
     port.rejectNext('createConversationInstance', new Error('会话不存在：private:10002:20001'))

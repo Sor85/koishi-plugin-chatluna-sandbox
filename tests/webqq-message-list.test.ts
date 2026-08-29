@@ -303,6 +303,9 @@ describe('WebQQ 消息列表', () => {
     expect(source).toContain("getMessageGroupMemberActions(message.authorId).includes('poke')")
     expect(source).toMatch(/<ContextMenuItem v-if="!model\.currentGroup && getChatFriendActions\(message\.authorId\)\.includes\('poke'\)" @select="emit\('pokeFriend', message\.authorId\)">/)
     expect(source).not.toContain('好友互动')
+    // 「创建分支」只对普通消息开放；戳一戳这类消息事件没有可分叉的对话上下文。
+    expect(source).toMatch(/<ContextMenuItem v-if="!message\.event" @select="emit\('branchConversationInstance', message\.id\)">/)
+    expect(source).toContain('创建分支')
     expect(source).toContain('hasMessageGroupMemberManagementActions(message.authorId)')
     expect(source).toContain('management-only')
     expect(reactionsSource).toContain('class="chatluna-sandbox-message-reaction"')

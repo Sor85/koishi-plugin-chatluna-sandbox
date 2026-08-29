@@ -389,5 +389,24 @@ describe('Koishi 控制台适配器', () => {
 
     await expect(createListener({ operatorId: '10001', rootConversationId: 'private:10002:20001' }))
       .rejects.toThrow('会话不存在：private:10002:20001')
+
+    const branchListener = listeners.get('chatluna-sandbox/branch-conversation-instance')
+    if (!branchListener) throw new Error('控制台监听器未注册')
+    const sent = await control.sendMessage({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      content: '分叉点',
+    })
+
+    const branched = await branchListener({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      messageId: sent.messageId,
+    })
+
+    expect(branched.conversationId).toEqual(expect.any(String))
+    expect(branched.appearance).toEqual(appearance)
+    expect(branched.snapshot.conversationInstances.find(({ id }: { id: string }) => id === branched.conversationId))
+      .toMatchObject({ rootConversationId: 'private:10001:20001', title: '分支：Koishi' })
   })
 })

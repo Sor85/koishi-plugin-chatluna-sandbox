@@ -78,7 +78,7 @@
       @reply="replyingToMessageId = $event"
       @recall-message="emit('recallMessage', $event)"
       @clear-conversation="emit('clearConversation')"
-      @branch-conversation="emit('branchConversation', $event)"
+      @branch-conversation-instance="emit('branchConversationInstance', $event)"
       @enter-selection="enterSelection"
       @toggle-selection="toggleSelection"
       @open-forward="openForwardDialog"
@@ -222,7 +222,7 @@ const emit = defineEmits<{
   ]
   recallMessage: [messageId: string]
   clearConversation: []
-  branchConversation: [messageId: string]
+  branchConversationInstance: [messageId: string]
   setMessageReaction: [messageId: string, emojiId: string, enabled: boolean]
   openModelRequest: [reference: SandboxMessageModelRequestReference]
   sendForwardMessage: [input: { conversationId: string, messageIds: string[] }, resolve: () => void, reject: (error: unknown) => void]

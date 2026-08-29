@@ -48,6 +48,7 @@ import {
   createDirectConversationId,
   createGroupConversationId,
   isSandboxGroupMemberMuted,
+  type BranchConversationInstanceInput,
   type CreateConversationInstanceInput,
   type CreateSandboxBotInput,
   type CreateSandboxGroupInput,
@@ -1477,6 +1478,53 @@ export class SandboxControlService {
     })
     this.commitSceneMutation()
     return { conversationId: instance.id, revision: this.scene.revision }
+  }
+
+  /**
+   * 从某条消息分叉出一个会话实例：该消息及其之前的历史被复制进新实例。
+   *
+   * 复制而不是「只记分叉点、读取时拼接根会话前缀」是本轮的明确取舍：后者要改动消息存储与
+   * 历史分页的验证面。代价是场景消息保留窗口的预算按分支数被摊薄。
+   */
+  branchConversationInstance(input: BranchConversationInstanceInput): { conversationId: string, revision: number } {
+    const source = this.getVisibleConversation(input.operatorId, input.conversationId)
+    const forkIndex = source.messageIds.indexOf(input.messageId)
+    if (forkIndex < 0) throw new SandboxDomainError(`消息不存在：${input.messageId}`)
+    const conversationId = Random.id()
+    const sourceMessages = source.messageIds.slice(0, forkIndex + 1)
+      .flatMap((messageId) => this.scene.messages.find(({ id }) => id === messageId) ?? [])
+    const copiedIds = new Map(sourceMessages.map(({ id }) => [id, Random.id()]))
+    const copies = sourceMessages.map((message) => {
+      const copy = structuredClone(message)
+      copy.id = copiedIds.get(message.id)!
+      copy.conversationId = conversationId
+      // 复制范围内的引用指向复制体；范围外的引用在新实例里没有对应消息，直接丢掉而不是指向原会话。
+      const replyToMessageId = message.replyToMessageId ? copiedIds.get(message.replyToMessageId) : undefined
+      if (replyToMessageId) copy.replyToMessageId = replyToMessageId
+      else delete copy.replyToMessageId
+      // 广播组表示「同一条逻辑消息的多个副本」；分支复制体是另一条消息，不能被原消息的撤回带走。
+      delete copy.broadcastId
+      return copy
+    })
+    this.scene.messages.push(...copies)
+    const instance = insertConversationInstance(this.scene, {
+      id: conversationId,
+      rootConversationId: source.rootConversationId,
+      title: input.title?.trim() || `分支：${this.describeConversation(input.operatorId, source)}`,
+      messageIds: copies.map(({ id }) => id),
+    })
+    this.commitSceneMutation()
+    return { conversationId: instance.id, revision: this.scene.revision }
+  }
+
+  /** 会话的人类可读名称：实例用自己的标题，群聊用群名称，私聊用对端昵称。 */
+  private describeConversation(operatorId: string, conversation: ResolvedConversation): string {
+    if (conversation.title) return conversation.title
+    if (conversation.type === 'group') {
+      return this.scene.groups.find(({ id }) => id === conversation.groupId)?.name ?? conversation.id
+    }
+    const peerId = resolveConversationPeerId(conversation, operatorId)
+    return peerId ? this.getParticipant(peerId).name : conversation.id
   }
 
   async sendMessage(input: SendMessageInput): Promise<SendMessageResult> {

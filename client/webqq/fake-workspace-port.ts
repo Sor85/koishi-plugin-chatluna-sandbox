@@ -5,6 +5,7 @@ import type {
   GetForwardMessageInput,
   GetMediaContentInput,
   GetMessageHistoryInput,
+  BranchConversationInstanceInput,
   CreateConversationInstanceInput,
   GetSandboxWorkspaceInput,
   GetSandboxOneBotDebugRecordInput,
@@ -134,6 +135,13 @@ export class FakeWorkspacePort implements WorkspacePort {
 
   createConversationInstance(input: CreateConversationInstanceInput) {
     return this.invoke('createConversationInstance', input, {
+      ...this.workspaceResult,
+      conversationId: this.createdConversationInstanceId,
+    })
+  }
+
+  branchConversationInstance(input: BranchConversationInstanceInput) {
+    return this.invoke('branchConversationInstance', input, {
       ...this.workspaceResult,
       conversationId: this.createdConversationInstanceId,
     })

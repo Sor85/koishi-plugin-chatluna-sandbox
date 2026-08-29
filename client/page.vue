@@ -138,6 +138,7 @@
           @search-conversation-messages="searchConversationMessages"
           @recall-message="recallMessage"
           @clear-conversation="clearConversationMessages"
+          @branch-conversation-instance="branchConversationInstance"
           @set-message-reaction="setMessageReaction"
           @open-model-request="navigateToModelRequest"
           @send-forward-message="sendForwardMessage"
@@ -289,6 +290,7 @@ const {
   recallMessage,
   clearConversationMessages,
   createConversationInstance,
+  branchConversationInstance,
   removeRecentConversation,
   setMessageReaction,
   requestFriend,

@@ -215,3 +215,139 @@ describe('会话实例端到端', () => {
       .toEqual([{ id: conversationId, messageIds: [] }])
   })
 })
+
+describe('从消息创建分支', () => {
+  it('新实例带上分叉点及其之前的历史，复制体有新身份且引用指向复制体', async () => {
+    const { app, control: resolve } = await createControl()
+    await app.start()
+    const control = resolve()
+
+    const first = await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content: '第一条' })
+    const second = await control.sendMessage({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      content: '第二条引用第一条',
+      replyToMessageId: first.messageId,
+    })
+    await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content: '分叉点之后' })
+
+    const { conversationId } = control.branchConversationInstance({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      messageId: second.messageId,
+    })
+
+    const scene = control.getSnapshot()
+    const branch = resolveConversation(scene, conversationId)!
+    const copies = branch.messageIds.map((id) => scene.messages.find((message) => message.id === id)!)
+    expect(copies.map(({ content }) => content)).toEqual(['第一条', '第二条引用第一条'])
+    // 复制体拥有新的消息身份，并归属新实例。
+    expect(copies.map(({ id }) => id)).not.toEqual([first.messageId, second.messageId])
+    expect(copies.every(({ conversationId: owner }) => owner === conversationId)).toBe(true)
+    // 复制范围内的引用指向复制体，而不是原会话里的消息。
+    expect(copies[1]?.replyToMessageId).toBe(copies[0]?.id)
+    // 原会话一条不少、一条不改。
+    expect(resolveConversation(scene, 'private:10001:20001')?.messageIds).toHaveLength(3)
+  })
+
+  it('分叉点之后的引用不会跨会话指向原消息', async () => {
+    const { app, control: resolve } = await createControl()
+    await app.start()
+    const control = resolve()
+
+    const first = await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content: '第一条' })
+    await control.sendMessage({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      content: '引用第一条',
+      replyToMessageId: first.messageId,
+    })
+
+    // 只复制到第一条：第二条的引用不在复制范围内，因此第二条根本不会出现。
+    const { conversationId } = control.branchConversationInstance({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      messageId: first.messageId,
+    })
+
+    const scene = control.getSnapshot()
+    const copies = resolveConversation(scene, conversationId)!.messageIds
+      .map((id) => scene.messages.find((message) => message.id === id)!)
+    expect(copies).toHaveLength(1)
+    expect(copies[0]).not.toHaveProperty('replyToMessageId')
+  })
+
+  it('默认标题指出来源会话，从实例再分支时指向实例名并归一化到同一根会话', async () => {
+    const { app, control: resolve } = await createControl()
+    await app.start()
+    const control = resolve()
+
+    const direct = await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content: '私聊消息' })
+    const group = await control.sendMessage({ operatorId: '10001', conversationId: 'group:30001', content: '群消息' })
+
+    const fromDirect = control.branchConversationInstance({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      messageId: direct.messageId,
+    })
+    const fromGroup = control.branchConversationInstance({
+      operatorId: '10001',
+      conversationId: 'group:30001',
+      messageId: group.messageId,
+    })
+
+    const scene = control.getSnapshot()
+    expect(resolveConversation(scene, fromDirect.conversationId)?.title).toBe('分支：Koishi')
+    expect(resolveConversation(scene, fromGroup.conversationId)?.title).toBe('分支：测试群')
+
+    const nested = control.branchConversationInstance({
+      operatorId: '10001',
+      conversationId: fromDirect.conversationId,
+      messageId: resolveConversation(scene, fromDirect.conversationId)!.messageIds[0]!,
+    })
+    const nestedConversation = resolveConversation(control.getSnapshot(), nested.conversationId)
+    expect(nestedConversation?.title).toBe('分支：分支：Koishi')
+    // 层级严格两层：从实例分叉仍然挂在同一个根会话下。
+    expect(nestedConversation?.rootConversationId).toBe('private:10001:20001')
+  })
+
+  it('在分支里发消息时插件看到的上下文包含被复制的历史', async () => {
+    const { app, control: resolve } = await createControl()
+    const observed: Array<{ channelId?: string, history: string[] }> = []
+    app.middleware(async (session) => {
+      const messages = await session.bot.getMessageList(session.channelId!)
+      observed.push({
+        channelId: session.channelId,
+        history: messages.data.map(({ content }) => content ?? ''),
+      })
+    })
+    await app.start()
+    const control = resolve()
+
+    const first = await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content: '分叉点之前' })
+    const { conversationId } = control.branchConversationInstance({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      messageId: first.messageId,
+    })
+    await control.sendMessage({ operatorId: '10001', conversationId, content: '换一种问法' })
+
+    expect(observed.at(-1)).toEqual({
+      channelId: conversationId,
+      history: ['分叉点之前', '换一种问法'],
+    })
+  })
+
+  it('分叉点消息不在该会话里时按消息不存在拒绝', async () => {
+    const { app, control: resolve } = await createControl()
+    await app.start()
+    const control = resolve()
+    const sent = await control.sendMessage({ operatorId: '10001', conversationId: 'group:30001', content: '群消息' })
+
+    expect(() => control.branchConversationInstance({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      messageId: sent.messageId,
+    })).toThrow(`消息不存在：${sent.messageId}`)
+  })
+})

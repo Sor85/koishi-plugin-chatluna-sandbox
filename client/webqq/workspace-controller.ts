@@ -8,6 +8,7 @@ import type {
   ManageSandboxEnvironmentInput,
   RecallMessageInput,
   ClearConversationMessagesInput,
+  BranchConversationInstanceInput,
   CreateConversationInstanceInput,
   SearchConversationMessagesInput,
   SetMessageReactionInput,
@@ -377,6 +378,19 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
       return conversationId
     } catch (error) {
       throw normalizeWorkspaceError(error, '创建会话失败')
+    }
+  }
+
+  /** 从某条消息分叉出一个会话实例，与新建同口径：一次请求完成状态替换与选中。 */
+  async function branchConversationInstance(input: Omit<BranchConversationInstanceInput, 'operatorId'>) {
+    const operatorId = getCurrentOperatorId()
+    try {
+      const { conversationId, ...workspace } = await port.branchConversationInstance({ ...input, operatorId })
+      replaceWorkspace(workspace)
+      selectConversation(conversationId)
+      return conversationId
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '创建会话分支失败')
     }
   }
 
@@ -831,6 +845,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     recallMessage,
     clearConversationMessages,
     createConversationInstance,
+    branchConversationInstance,
     removeRecentConversation,
     setMessageReaction,
     replaceWorkspace,

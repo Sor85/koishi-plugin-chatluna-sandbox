@@ -419,6 +419,18 @@ export function createWebqqWorkspaceShell(
     }
   }
 
+  /** 从当前会话的某条消息分叉出一个会话实例。 */
+  async function branchConversationInstance(messageId: string) {
+    const conversationId = currentConversation.value?.id
+    if (!conversationId) return
+    errorMessage.value = ''
+    try {
+      await workspaceController.branchConversationInstance({ conversationId, messageId })
+    } catch (error) {
+      errorMessage.value = error instanceof Error ? error.message : '创建会话分支失败'
+    }
+  }
+
   async function manageEnvironment(input: ManageSandboxEnvironmentInput, resolve: Resolve, reject: Reject) {
     try {
       await workspaceController.manageEnvironment(input)
@@ -1056,6 +1068,7 @@ export function createWebqqWorkspaceShell(
     returnToPresetOrigin,
     manageEnvironment,
     createConversationInstance,
+    branchConversationInstance,
     openComposerParticipantDialog,
     openEntityDialog,
     openGroupActionDialog,

@@ -185,7 +185,7 @@
               <IconExternalLink :size="16" aria-hidden="true" /> 跳转到对应请求
             </ContextMenuItem>
             <ContextMenuItem v-if="!isRecalledMessage(message)" @select="emit('reply', message.id)"><IconMessageReply :size="16" aria-hidden="true" /> 回复</ContextMenuItem>
-            <ContextMenuItem v-if="!message.event" @select="emit('branchConversation', message.id)">
+            <ContextMenuItem v-if="!message.event" @select="emit('branchConversationInstance', message.id)">
               <IconGitBranch :size="16" aria-hidden="true" /> 创建分支
             </ContextMenuItem>
             <ContextMenuItem v-if="canReactToMessage(message)" @select="emit('openReactionPicker', message.id)">
@@ -398,7 +398,7 @@ const emit = defineEmits<{
   reply: [messageId: string]
   recallMessage: [messageId: string]
   clearConversation: []
-  branchConversation: [messageId: string]
+  branchConversationInstance: [messageId: string]
   enterSelection: [messageId: string]
   toggleSelection: [messageId: string]
   openForward: [input: { messageId: string; forwardId: string }]
