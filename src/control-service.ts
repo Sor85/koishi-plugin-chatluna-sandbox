@@ -256,6 +256,14 @@ export class SandboxControlService {
   private runtimeBotRegistry: SandboxRuntimeBotRegistry
   private runtimeOwner = {}
   private botDeliveries: SandboxBotDelivery[] = []
+  /**
+   * 每个虚拟 OneBot 机器人当前正在处理的入站消息事件来自哪个会话，按嵌套顺序入栈。
+   *
+   * 只用于观察，不用于替插件寻址：原始 OneBot action 仍然只能寻址根会话。窗口从事件派发开始
+   * 到该事件的中间件链结束，也就是插件真正有机会回复的那段时间；事件派发之后异步发出的 action
+   * 不在窗口内，因此不会被归因，这是有意的下限而不是遗漏。
+   */
+  private inboundEventConversations = new Map<string, string[]>()
   private chatLunaState: SandboxChatLunaStateStore
   private initialScene: SandboxSnapshot
   private oneBotDebug: SandboxOneBotDebugStore
@@ -719,6 +727,35 @@ export class SandboxControlService {
       (!input.recipientBotId || recipientBotId === input.recipientBotId)
       && (!input.messageId || messageId === input.messageId)
     )))
+  }
+
+  /**
+   * 某个虚拟 OneBot 机器人此刻正在处理的入站消息事件来自哪个会话；不在处理入站事件时为
+   * undefined。嵌套派发取最内层。
+   *
+   * 存在的唯一理由是让机器人动作记录能观察到「回复偏离了事件来源会话」。它不参与寻址：
+   * 原始 OneBot action 仍然只能寻址根会话，沙盒不替插件把回复归位到实例。
+   */
+  getInboundEventConversationId(botId: string): string | undefined {
+    return this.inboundEventConversations.get(botId)?.at(-1)
+  }
+
+  private async withInboundEventConversation<T>(
+    botId: string,
+    conversationId: string,
+    dispatch: () => Promise<T>,
+  ): Promise<T> {
+    const stack = this.inboundEventConversations.get(botId) ?? []
+    if (!stack.length) this.inboundEventConversations.set(botId, stack)
+    stack.push(conversationId)
+    try {
+      return await dispatch()
+    } finally {
+      // 按值删除而不是 pop()：同一机器人上并发派发时出栈顺序不保证与入栈顺序相反。
+      const index = stack.lastIndexOf(conversationId)
+      if (index >= 0) stack.splice(index, 1)
+      if (!stack.length) this.inboundEventConversations.delete(botId)
+    }
   }
 
   getChatLunaStates(): SandboxChatLunaState[] {
@@ -1967,8 +2004,10 @@ export class SandboxControlService {
     })
 
     try {
-      await this.dispatchOneBotEvent(runtimeBot, session)
-      await middlewareFinished
+      await this.withInboundEventConversation(recipientBot.id, context.conversation.id, async () => {
+        await this.dispatchOneBotEvent(runtimeBot, session)
+        await middlewareFinished
+      })
     } finally {
       disposeMiddlewareWait?.()
       disposeMiddlewareWait = undefined

@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import type {
   GetSandboxOneBotDebugRecordsInput,
   SandboxImplementationProfile,
+  SandboxOneBotConversationDrift,
   SandboxOneBotDebugCapacity,
   SandboxOneBotDebugDirection,
   SandboxOneBotDebugError,
@@ -252,6 +253,7 @@ export interface AppendOneBotDebugRecordInput {
   payload?: unknown
   result?: unknown
   error?: SandboxOneBotDebugError
+  drift?: SandboxOneBotConversationDrift
 }
 
 export interface SandboxOneBotDebugStoreOptions {
@@ -328,6 +330,7 @@ export class SandboxOneBotDebugStore {
         messageId: readEntityId(input.payload, 'message_id'),
       },
       error: input.error,
+      ...(input.drift ? { drift: input.drift } : {}),
     }
     this.nextSequence += 1
     this.staged.push(record)

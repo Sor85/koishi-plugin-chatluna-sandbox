@@ -1,4 +1,4 @@
-import { App, Universal } from '@koishijs/core'
+import { App, Universal, type Session } from '@koishijs/core'
 import { readdirSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -96,12 +96,13 @@ describe('会话实例端到端', () => {
     ])
   })
 
-  it('群组的实例在插件那里仍然是群会话', async () => {
+  it('群组的实例在插件那里仍然是群会话，私聊的实例仍是私聊会话', async () => {
     const { app, control: resolve } = await createControl()
-    const observed: Array<{ channelId?: string, guildId?: string, messageType?: unknown }> = []
+    const observed: Array<{ channelId?: string, channelType?: number, guildId?: string, messageType?: unknown }> = []
     app.middleware((session) => {
       observed.push({
         channelId: session.channelId,
+        channelType: session.event.channel?.type,
         guildId: session.guildId,
         messageType: (session as { onebot?: { message_type?: unknown } }).onebot?.message_type,
       })
@@ -109,13 +110,53 @@ describe('会话实例端到端', () => {
     await app.start()
     const control = resolve()
 
-    const { conversationId } = control.createConversationInstance({
+    const group = control.createConversationInstance({
       operatorId: '10001',
       rootConversationId: 'group:30001',
     })
-    await control.sendMessage({ operatorId: '10001', conversationId, content: '群实例提问' })
+    const direct = control.createConversationInstance({
+      operatorId: '10001',
+      rootConversationId: 'private:10001:20001',
+    })
+    await control.sendMessage({ operatorId: '10001', conversationId: group.conversationId, content: '群实例提问' })
+    await control.sendMessage({ operatorId: '10001', conversationId: direct.conversationId, content: '私聊实例提问' })
 
-    expect(observed).toEqual([{ channelId: conversationId, guildId: '30001', messageType: 'group' }])
+    // 会话种类来自解析出的会话：实例 ID 没有 group: 前缀，按前缀推断会把群实例判成私聊。
+    expect(observed).toEqual([
+      {
+        channelId: group.conversationId,
+        channelType: Universal.Channel.Type.TEXT,
+        guildId: '30001',
+        messageType: 'group',
+      },
+      {
+        channelId: direct.conversationId,
+        channelType: Universal.Channel.Type.DIRECT,
+        guildId: undefined,
+        messageType: 'private',
+      },
+    ])
+  })
+
+  it('机器人不带 session 直接发消息时，channel 类型仍来自解析出的会话', async () => {
+    const { app, control: resolve } = await createControl()
+    // 组件转换在渲染 Session 上执行，因此组件看到的 channel 类型就是 sendMessage 推断出的那个。
+    app.component('probe-channel', (_attrs, _children, session) => String(session.event.channel?.type))
+    await app.start()
+    const control = resolve()
+    const bot = control.getRuntimeBot('20001')
+
+    const group = control.createConversationInstance({ operatorId: '10001', rootConversationId: 'group:30001' })
+    const direct = control.createConversationInstance({ operatorId: '10001', rootConversationId: 'private:10001:20001' })
+    await bot.sendMessage(group.conversationId, '<probe-channel/>')
+    await bot.sendMessage(direct.conversationId, '<probe-channel/>')
+
+    const scene = control.getSnapshot()
+    const contentOf = (conversationId: string) => scene.messages
+      .filter((message) => message.conversationId === conversationId)
+      .map(({ content }) => content)
+    expect(contentOf(group.conversationId)).toEqual([String(Universal.Channel.Type.TEXT)])
+    expect(contentOf(direct.conversationId)).toEqual([String(Universal.Channel.Type.DIRECT)])
   })
 
   it('消息搜索能命中实例里的消息', async () => {
@@ -219,6 +260,121 @@ describe('会话实例端到端', () => {
     // 实例最后一条消息被淘汰后实例本身仍然存在：空实例是合法状态。
     expect(listRootConversationInstances(trimmed, 'private:10001:20001').map(({ id, messageIds }) => ({ id, messageIds })))
       .toEqual([{ id: conversationId, messageIds: [] }])
+  })
+})
+
+describe('原始 OneBot 回复的会话偏离', () => {
+  /** 收到实例内的用户消息后，用原始 OneBot action 回复——真实插件里最常见的那条路径。 */
+  function replyWithRawAction(app: App, reply: (session: Session) => Promise<unknown>) {
+    app.middleware(async (session, next) => {
+      if (session.userId !== '10001') return next()
+      await reply(session)
+      return next()
+    })
+  }
+
+  async function findDriftRecord(control: SandboxControlService, action: string) {
+    const { records } = await control.getOneBotDebugRecords({ direction: 'action', action })
+    expect(records).toHaveLength(1)
+    return records[0]!
+  }
+
+  it('原始 send_private_msg 的回复落到根会话，并在调试记录里留下偏离观察', async () => {
+    const { app, control: resolve } = await createControl()
+    replyWithRawAction(app, (session) => session.bot.internal._request('send_private_msg', {
+      user_id: session.userId,
+      message: '原始 action 回复',
+    }))
+    await app.start()
+    const control = resolve()
+
+    const { conversationId } = control.createConversationInstance({
+      operatorId: '10001',
+      rootConversationId: 'private:10001:20001',
+    })
+    const asked = await control.sendMessage({ operatorId: '10001', conversationId, content: '在实例里提问' })
+
+    // 真实 QQ 的 action 表面没有「会话」这一级，沙盒不替插件把回复归位到实例。
+    const scene = control.getSnapshot()
+    const reply = scene.messages.find(({ content }) => content === '原始 action 回复')
+    expect(reply?.conversationId).toBe('private:10001:20001')
+    expect(resolveConversation(scene, conversationId)?.messageIds).toEqual([asked.messageId])
+
+    expect((await findDriftRecord(control, 'send_private_msg')).drift).toEqual({
+      kind: 'reply-left-event-conversation',
+      eventConversationId: conversationId,
+      conversationId: 'private:10001:20001',
+    })
+  })
+
+  it('原始 send_group_msg 的回复落到群根会话，并在调试记录里留下偏离观察', async () => {
+    const { app, control: resolve } = await createControl()
+    replyWithRawAction(app, (session) => session.bot.internal._request('send_group_msg', {
+      group_id: session.guildId,
+      message: '原始群回复',
+    }))
+    await app.start()
+    const control = resolve()
+
+    const { conversationId } = control.createConversationInstance({
+      operatorId: '10001',
+      rootConversationId: 'group:30001',
+    })
+    await control.sendMessage({ operatorId: '10001', conversationId, content: '在群实例里提问' })
+
+    expect(control.getSnapshot().messages.find(({ content }) => content === '原始群回复')?.conversationId)
+      .toBe('group:30001')
+    expect((await findDriftRecord(control, 'send_group_msg')).drift).toEqual({
+      kind: 'reply-left-event-conversation',
+      eventConversationId: conversationId,
+      conversationId: 'group:30001',
+    })
+  })
+
+  it('事件本来就来自根会话时不产生偏离观察', async () => {
+    const { app, control: resolve } = await createControl()
+    replyWithRawAction(app, (session) => session.bot.internal._request('send_private_msg', {
+      user_id: session.userId,
+      message: '原始 action 回复',
+    }))
+    await app.start()
+    const control = resolve()
+
+    await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content: '在根会话里提问' })
+
+    expect((await findDriftRecord(control, 'send_private_msg'))).not.toHaveProperty('drift')
+  })
+
+  it('机器人主动发起、不在处理任何入站事件时不产生偏离观察', async () => {
+    const { app, control: resolve } = await createControl()
+    await app.start()
+    const control = resolve()
+    control.createConversationInstance({ operatorId: '10001', rootConversationId: 'private:10001:20001' })
+
+    await control.getRuntimeBot('20001').internal._request('send_private_msg', {
+      user_id: '10001',
+      message: '机器人主动私聊',
+    })
+
+    expect((await findDriftRecord(control, 'send_private_msg'))).not.toHaveProperty('drift')
+  })
+
+  it('标准 Koishi 回复回到实例本身，因此不算偏离', async () => {
+    const { app, control: resolve } = await createControl()
+    replyWithRawAction(app, (session) => session.send('标准路径回复'))
+    await app.start()
+    const control = resolve()
+
+    const { conversationId } = control.createConversationInstance({
+      operatorId: '10001',
+      rootConversationId: 'private:10001:20001',
+    })
+    await control.sendMessage({ operatorId: '10001', conversationId, content: '在实例里提问' })
+
+    expect(control.getSnapshot().messages.find(({ content }) => content === '标准路径回复')?.conversationId)
+      .toBe(conversationId)
+    // 标准发送路径不经过 OneBot action，因此根本不产生机器人动作记录。
+    expect((await control.getOneBotDebugRecords({ direction: 'action' })).records).toEqual([])
   })
 })
 

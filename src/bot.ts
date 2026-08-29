@@ -37,12 +37,17 @@ import {
   type SandboxForwardNodeInput,
   type SandboxGroupMember,
   type SandboxImplementationProfile,
+  type SandboxOneBotConversationDrift,
 } from './types'
 
-function normalizeOneBotGroupId(value: unknown): string {
-  const groupId = String(value ?? '')
-  // Koishi 的 channelId 在群聊中可能是沙盒逻辑会话 ID；OneBot action 只接受真实群号。
-  return groupId.startsWith('group:') ? groupId.slice('group:'.length) : groupId
+/**
+ * 一次 OneBot action 的实际落点，由具体 handler 在写入成功后填上。
+ *
+ * 让「偏离观察」只出现在一处：handler 只报出自己写到了哪个会话，是否偏离由记录调试记录的
+ * 那一处统一判定。每次外部调用一个独立实例，避免并发 action 互相覆盖落点。
+ */
+interface OneBotActionTarget {
+  conversationId?: string
 }
 
 // OneBot 用秒级到期时间戳表示禁言，未禁言固定为 0。
@@ -90,6 +95,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     const executeRequest = async (
       capability: ReturnType<typeof resolveOneBotAction>,
       params: Record<string, unknown>,
+      target: OneBotActionTarget,
     ) => {
         const action = capability.handler
         if (action === 'get_status') {
@@ -215,7 +221,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           return { status: 'ok', retcode: 0, data: recentContacts }
         }
         if (action === 'get_group_info') {
-          const group = await this.getGuild(normalizeOneBotGroupId(params.group_id))
+          const group = await this.getGuild(this.normalizeOneBotGroupId(params.group_id))
           const memberCount = this.control.getSnapshot().groups.find(({ id }) => id === group.id)?.members.length ?? 0
           return {
             status: 'ok',
@@ -224,24 +230,27 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           }
         }
         if (action === 'get_group_member_info') {
-          const groupId = normalizeOneBotGroupId(params.group_id)
+          const groupId = this.normalizeOneBotGroupId(params.group_id)
           const member = await this.getGuildMember(groupId, String(params.user_id ?? ''))
           return { status: 'ok', retcode: 0, data: this.toOneBotGuildMember(groupId, member) }
         }
         if (action === 'get_group_member_list') {
-          const groupId = normalizeOneBotGroupId(params.group_id)
+          const groupId = this.normalizeOneBotGroupId(params.group_id)
           const members = await this.getGuildMemberList(groupId)
           return { status: 'ok', retcode: 0, data: members.data.map((member) => this.toOneBotGuildMember(groupId, member)) }
         }
         if (action === 'send_private_msg') {
           const conversationId = this.resolveDirectConversationId(String(params.user_id ?? ''))
           const messageId = await this.deliverOutboundMessage(conversationId, parseOneBotOutboundMessage(params.message))
+          target.conversationId = conversationId
           return { status: 'ok', retcode: 0, data: { message_id: getOneBotMessageSequence(messageId) } }
         }
         if (action === 'send_group_msg') {
-          const groupId = normalizeOneBotGroupId(params.group_id)
+          const groupId = this.normalizeOneBotGroupId(params.group_id)
           await this.getGuild(groupId)
-          const messageId = await this.deliverOutboundMessage(this.resolveGroupConversationId(groupId), parseOneBotOutboundMessage(params.message))
+          const conversationId = this.resolveGroupConversationId(groupId)
+          const messageId = await this.deliverOutboundMessage(conversationId, parseOneBotOutboundMessage(params.message))
+          target.conversationId = conversationId
           return { status: 'ok', retcode: 0, data: { message_id: getOneBotMessageSequence(messageId) } }
         }
         if (action === 'send_msg') {
@@ -251,7 +260,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           const targetCapability = resolveOneBotAction(this.implementation, this.disabledCapabilities, targetAction)
           if (!targetCapability) throw new Error(`OneBot action ${targetAction} is not supported`)
           // send_msg 只是协议级分流入口；直接进入具体实现，避免一次外部调用生成两条调试记录。
-          return executeRequest(targetCapability, params)
+          return executeRequest(targetCapability, params, target)
         }
         if (action === 'get_msg') {
           const message = this.requireReadableMessage(String(params.message_id ?? ''))
@@ -261,7 +270,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           return this.getOneBotMessageHistory(this.resolveDirectConversationId(String(params.user_id ?? '')), params)
         }
         if (action === 'get_group_msg_history') {
-          return this.getOneBotMessageHistory(this.resolveGroupConversationId(normalizeOneBotGroupId(params.group_id)), params)
+          return this.getOneBotMessageHistory(this.resolveGroupConversationId(this.normalizeOneBotGroupId(params.group_id)), params)
         }
         if (action === 'delete_msg') {
           await this.control.recallBotMessage(this.selfId, String(params.message_id ?? ''))
@@ -274,14 +283,14 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
         if (action === 'set_group_kick') {
           return this.control.performBotGroupAction(this.selfId, {
             action: 'kick',
-            groupId: normalizeOneBotGroupId(params.group_id),
+            groupId: this.normalizeOneBotGroupId(params.group_id),
             targetId: String(params.user_id ?? ''),
           })
         }
         if (action === 'set_group_admin') {
           return this.control.performBotGroupAction(this.selfId, {
             action: 'set-admin',
-            groupId: normalizeOneBotGroupId(params.group_id),
+            groupId: this.normalizeOneBotGroupId(params.group_id),
             targetId: String(params.user_id ?? ''),
             enabled: params.enable === true,
           })
@@ -294,7 +303,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           for (const userId of rawUserIds) {
             await this.control.performBotGroupAction(this.selfId, {
               action: 'kick',
-              groupId: normalizeOneBotGroupId(params.group_id),
+              groupId: this.normalizeOneBotGroupId(params.group_id),
               targetId: String(userId),
             })
           }
@@ -303,7 +312,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
         if (action === 'set_group_card') {
           return this.control.performBotGroupAction(this.selfId, {
             action: 'set-card',
-            groupId: normalizeOneBotGroupId(params.group_id),
+            groupId: this.normalizeOneBotGroupId(params.group_id),
             targetId: String(params.user_id ?? ''),
             card: typeof params.card === 'string' ? params.card : '',
           })
@@ -311,7 +320,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
         if (action === 'set_group_name') {
           return this.control.performBotGroupAction(this.selfId, {
             action: 'set-name',
-            groupId: normalizeOneBotGroupId(params.group_id),
+            groupId: this.normalizeOneBotGroupId(params.group_id),
             name: typeof params.group_name === 'string' ? params.group_name : '',
           })
         }
@@ -320,7 +329,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           if (!noticeId) throw new Error(`${capability.action} 缺少 notice_id`)
           this.control.deleteGroupAnnouncement({
             operatorId: this.selfId,
-            groupId: normalizeOneBotGroupId(params.group_id),
+            groupId: this.normalizeOneBotGroupId(params.group_id),
             announcementId: noticeId,
           })
           return { status: 'ok', retcode: 0, data: null }
@@ -362,26 +371,32 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
         if (action === 'send_poke') {
           const targetId = String(params.target_id ?? params.user_id ?? '')
           if (params.group_id !== undefined) {
-            const groupId = normalizeOneBotGroupId(params.group_id)
-            return this.control.performGroupAction({
+            const groupId = this.normalizeOneBotGroupId(params.group_id)
+            const conversationId = this.resolveGroupConversationId(groupId)
+            const result = await this.control.performGroupAction({
               action: 'poke',
               operatorId: this.selfId,
               groupId,
               targetId,
-              conversationId: this.resolveGroupConversationId(groupId),
+              conversationId,
             })
+            target.conversationId = conversationId
+            return result
           }
-          return this.control.performFriendAction({
+          const conversationId = this.resolveDirectConversationId(targetId)
+          const result = await this.control.performFriendAction({
             action: 'poke',
             operatorId: this.selfId,
             targetId,
-            conversationId: this.resolveDirectConversationId(targetId),
+            conversationId,
           })
+          target.conversationId = conversationId
+          return result
         }
         if (action === 'set_group_leave') {
           return this.control.performBotGroupAction(this.selfId, {
             action: 'leave',
-            groupId: normalizeOneBotGroupId(params.group_id),
+            groupId: this.normalizeOneBotGroupId(params.group_id),
           })
         }
         // set_group_ban、set_group_special_title 与 set_msg_emoji_like 现在都写入
@@ -389,7 +404,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
         if (action === 'set_group_ban') {
           return this.control.performBotGroupAction(this.selfId, {
             action: 'set-ban',
-            groupId: normalizeOneBotGroupId(params.group_id),
+            groupId: this.normalizeOneBotGroupId(params.group_id),
             targetId: String(params.user_id ?? ''),
             durationSeconds: Number(params.duration ?? 0),
           })
@@ -397,13 +412,13 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
         if (action === 'set_group_special_title') {
           return this.control.performBotGroupAction(this.selfId, {
             action: 'set-title',
-            groupId: normalizeOneBotGroupId(params.group_id),
+            groupId: this.normalizeOneBotGroupId(params.group_id),
             targetId: String(params.user_id ?? ''),
             title: typeof params.special_title === 'string' ? params.special_title : '',
           })
         }
         if (action === 'get_group_shut_list') {
-          const groupId = normalizeOneBotGroupId(params.group_id)
+          const groupId = this.normalizeOneBotGroupId(params.group_id)
           await this.getGuild(groupId)
           const group = this.control.getSnapshot().groups.find(({ id }) => id === groupId)!
           return {
@@ -434,7 +449,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           // send_forward_msg / send_group_forward_msg / send_private_forward_msg
           // 统一生成真实转发资源，不再把节点展平成普通文本。
           const conversationId = params.group_id !== undefined
-            ? this.resolveGroupConversationId(normalizeOneBotGroupId(params.group_id))
+            ? this.resolveGroupConversationId(this.normalizeOneBotGroupId(params.group_id))
             : this.resolveDirectConversationId(String(params.user_id ?? ''))
           this.getVisibleConversation(conversationId)
           const nodes = await this.parseOneBotForwardNodes(params.messages)
@@ -443,6 +458,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
             conversationId,
             nodes,
           })
+          target.conversationId = conversationId
           return {
             status: 'ok',
             retcode: 0,
@@ -481,11 +497,13 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
       const startedAt = Date.now()
       let action = requestedAction
       let matchedAlias: string | undefined
+      // 每次调用一个独立的落点槽：同一机器人上并发的 action 不能共用它。
+      const target: OneBotActionTarget = {}
       try {
         const capability = resolveOneBotAction(this.implementation, this.disabledCapabilities, requestedAction)
         action = capability.action
         matchedAlias = capability.aliases?.includes(requestedAction) ? requestedAction : undefined
-        const result = await executeRequest(capability, params)
+        const result = await executeRequest(capability, params, target)
         this.control.recordOneBotDebug({
           botId: this.selfId,
           implementation: this.implementation,
@@ -497,6 +515,9 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           durationMs: Date.now() - startedAt,
           payload: params,
           result,
+          ...(target.conversationId
+            ? { drift: this.observeConversationDrift(target.conversationId) }
+            : {}),
         })
         return result
       } catch (error) {
@@ -523,20 +544,20 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
       // 当作原始 action 名转发，导致 getGroupInfo 这类调用报「不支持的 action」。
       getGroupInfo: async (groupId, noCache = false) => {
         const result = await request('get_group_info', {
-          group_id: normalizeOneBotGroupId(groupId),
+          group_id: this.normalizeOneBotGroupId(groupId),
           no_cache: noCache,
         }) as { data?: unknown }
         return result.data
       },
       getGroupMemberList: async (groupId) => {
         const result = await request('get_group_member_list', {
-          group_id: normalizeOneBotGroupId(groupId),
+          group_id: this.normalizeOneBotGroupId(groupId),
         }) as { data?: unknown }
         return Array.isArray(result.data) ? result.data : []
       },
       getGroupMemberInfo: async (groupId, userId, noCache = false) => {
         const result = await request('get_group_member_info', {
-          group_id: normalizeOneBotGroupId(groupId),
+          group_id: this.normalizeOneBotGroupId(groupId),
           user_id: userId,
           no_cache: noCache,
         }) as { data?: unknown }
@@ -686,7 +707,11 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
       type: 'send',
       channel: {
         id: channelId,
-        type: channelId.startsWith('group:') ? Universal.Channel.Type.TEXT : Universal.Channel.Type.DIRECT,
+        // channel 类型来自解析出的会话，不按 ID 前缀推断：会话实例 ID 没有 `group:` 前缀，
+        // 按前缀推断会把群实例判成私聊 channel，群专属的组件转换与判断随之走错分支。
+        type: resolveConversation(this.control.getSnapshot(), channelId)?.type === 'group'
+          ? Universal.Channel.Type.TEXT
+          : Universal.Channel.Type.DIRECT,
       },
     })
     const transformed = await renderSession.transform(h.normalize(fragment))
@@ -853,6 +878,35 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
 
   private resolveGroupConversationId(groupId: string) {
     return resolveGroupConversationId(this.control.getSnapshot(), groupId)
+  }
+
+  /**
+   * Koishi 的 channelId 在群聊中是沙盒逻辑会话 ID；OneBot action 只接受真实群号。
+   *
+   * 群号从解析出的会话读，不按 `group:` 前缀推断：会话实例 ID 沿用随机 ID 命名空间、没有群前缀，
+   * 剥前缀会把群实例的 channelId 原样当成群号。解析不出会话时原样返回，插件直接传真实群号仍然可用。
+   */
+  private normalizeOneBotGroupId(value: unknown): string {
+    const raw = String(value ?? '')
+    return resolveConversation(this.control.getSnapshot(), raw)?.groupId ?? raw
+  }
+
+  /**
+   * 观察一次原始 OneBot action 的落点是否偏离了触发它的入站事件来源会话。
+   *
+   * 原始 action 只能寻址根会话：真实 QQ 的 action 表面没有「会话」这一级。插件在会话实例的
+   * 入站事件里用原始 action 回复时，回复因此必然落到根会话。沙盒不替它猜测归位，只把这次偏离
+   * 作为可断言的证据挂在机器人动作记录上。
+   *
+   * 只认「落点正好是来源实例的根会话」这一种：插件主动寻址别的联系人是它自己的选择，
+   * 不是沙盒无法归位造成的偏离，记进来只会变成噪声。
+   */
+  private observeConversationDrift(conversationId: string): SandboxOneBotConversationDrift | undefined {
+    const eventConversationId = this.control.getInboundEventConversationId(this.selfId)
+    if (!eventConversationId || eventConversationId === conversationId) return undefined
+    const source = resolveConversation(this.control.getSnapshot(), eventConversationId)
+    if (source?.kind !== 'instance' || source.rootConversationId !== conversationId) return undefined
+    return { kind: 'reply-left-event-conversation', eventConversationId, conversationId }
   }
 
   private getVisibleConversation(channelId: string) {

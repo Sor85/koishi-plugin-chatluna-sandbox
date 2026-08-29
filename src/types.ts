@@ -343,6 +343,22 @@ export interface SandboxOneBotDebugError {
   traceId: string
 }
 
+/**
+ * 「回复偏离了事件来源会话」的观察结果。
+ *
+ * 真实 QQ 的 OneBot action 表面没有「会话」这一级，原始 action 因此只能寻址根会话。插件在
+ * 会话实例的入站事件里用原始 action 回复时，回复必然落到根会话。沙盒不按最近一次事件或
+ * 异步上下文替插件猜测归位——那会让沙盒行为与真实环境分叉——而是把这次偏离作为证据留在
+ * 机器人动作记录上，供用户复盘并供外部测试控制器断言。它是观察结果，不是警告日志。
+ */
+export interface SandboxOneBotConversationDrift {
+  kind: 'reply-left-event-conversation'
+  /** 触发这次 action 的入站事件来自哪个会话；一定是会话实例。 */
+  eventConversationId: string
+  /** action 实际落到哪个会话；一定是上面那个实例的根会话。 */
+  conversationId: string
+}
+
 export interface SandboxOneBotDebugRecord {
   id: string
   /** 空间内单调递增、回收后也不复用的序号。 */
@@ -368,6 +384,8 @@ export interface SandboxOneBotDebugRecord {
     messageId?: string
   }
   error?: SandboxOneBotDebugError
+  /** 仅当这次 action 的落点偏离了触发它的入站事件来源会话时存在。 */
+  drift?: SandboxOneBotConversationDrift
 }
 
 export type SandboxConsoleOneBotDebugRecord = SandboxOneBotDebugRecord & { source: SandboxEntitySource }

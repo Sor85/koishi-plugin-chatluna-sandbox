@@ -376,6 +376,24 @@
   background: color-mix(in srgb, #fee2e2 46%, var(--webqq-surface));
 }
 
+/* 偏离观察是证据而不是错误，因此用中性表面而不是错误配色。 */
+.webqq-debug-observation {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--webqq-border);
+  border-radius: 10px;
+  background: var(--webqq-surface-muted);
+}
+
+.webqq-debug-observation-detail {
+  margin: 0;
+  font-size: var(--webqq-font-md);
+  color: var(--webqq-text);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
 .webqq-debug-section-heading {
   justify-content: space-between;
   gap: 12px;

@@ -203,6 +203,18 @@
             </p>
           </div>
 
+          <section v-if="detail.drift" class="webqq-debug-observation" aria-label="偏离观察">
+            <header class="webqq-debug-section-heading">
+              <span>
+                <IconGitBranch :size="17" aria-hidden="true" />
+                <strong>回复偏离了事件来源会话</strong>
+              </span>
+            </header>
+            <p class="webqq-debug-observation-detail">
+              原始 OneBot action 只能寻址根会话；事件来源 {{ detail.drift.eventConversationId }} · 实际落点 {{ detail.drift.conversationId }}
+            </p>
+          </section>
+
           <section v-if="detail.error" class="webqq-debug-error-diagnostic" aria-label="错误诊断">
             <header class="webqq-debug-section-heading">
               <span>
@@ -257,6 +269,7 @@ import {
   IconClock,
   IconCpu,
   IconFilter,
+  IconGitBranch,
   IconLink,
   IconRefresh,
   IconRobot,
