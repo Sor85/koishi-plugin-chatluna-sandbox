@@ -100,7 +100,7 @@ describe('WebQQ 预设工作台源码契约', () => {
     expect(sourceExpressions).toContain('if (input.source === input.loadedSource) return input.serverExpressions')
     expect(sourceExpressions).toContain('clickable: false')
     expect(modelRequests).toContain('navigation: EvidenceNavigation')
-    expect(modelRequests).toContain("bodyView.value = 'analysis'")
+    expect(modelRequests).toContain('showEvidenceAnalysis()')
     expect(modelRequests).toContain("mode: 'request'")
     expect(modelRequests).toContain("@locate-result=\"completeNavigationLocate\"")
     expect(modelRequests).toContain('navigationFailure')

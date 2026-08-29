@@ -108,18 +108,23 @@
 
 ## 副产物:至今没有 interface 的行为
 
-D 类那 102 条断言各自附有「本该由什么 interface 承担」。汇总起来,这是模型请求区域至今没有可执行 interface 的行为清单,可作为后续深化工作的输入:
+> **已消化。** 十三项全部拿到可执行 interface,处置见 `issues/03-give-remaining-behaviours-executable-interfaces.md`。下表保留原清单并标出各自的落点,便于回查某项行为现在归谁管。
 
-- 请求组成图的滚轮、拖拽与缩放手势,含锚点补偿、缩放上下界与点击抑制判定
-- 剪贴板复制及其降级路径
-- 请求体下载的文件名与内容
-- 请求头展开状态与树模型
-- JSON 行的手势与拖动阈值判定
-- JSON 字符串展开状态与图片预览状态
-- 轨迹账本的排序与请求组折叠
-- 详情页签与轨迹模式的状态转换
-- 概览格三态的呈现
-- 模型名称的唯一来源
-- 自动刷新策略在手动开关与进行中请求两种条件下的组合
-- 时间格式化与时区边界
-- 未归属记录清理的二次确认状态机
+D 类那 102 条断言各自附有「本该由什么 interface 承担」。汇总起来,这是模型请求区域当时没有可执行 interface 的行为清单:
+
+| 行为 | 落点 |
+| --- | --- |
+| 请求组成图的滚轮、拖拽与缩放手势,含锚点补偿、缩放上下界与点击抑制判定 | `client/webqq/composition-zoom-pan.ts` |
+| 剪贴板复制及其降级路径 | `client/webqq/model-request-body-transfer.ts`(降级的 textarea 机械动作留在视图,由 `fallbackWrite` 注入) |
+| 请求体下载的文件名与内容 | `client/webqq/model-request-body-transfer.ts` |
+| 请求头展开状态与树模型 | `client/webqq/model-request-detail-view.ts`(树模型早已由 `buildModelRequestJsonTree` 承担) |
+| JSON 行的手势与拖动阈值判定 | `client/webqq/model-request-json-row.ts` |
+| JSON 字符串展开状态与图片预览状态 | `client/webqq/model-request-json-row.ts` |
+| 轨迹账本的排序与请求组折叠 | `client/webqq/model-request-trajectory-display.ts` |
+| 详情页签与轨迹模式的状态转换 | `client/webqq/model-request-detail-view.ts` |
+| 概览格三态的呈现 | `client/webqq/model-request-overview.ts` |
+| 模型名称的唯一来源 | `client/webqq/model-request-overview.ts` |
+| 自动刷新策略在手动开关与进行中请求两种条件下的组合 | `client/webqq/model-request-live-refresh.ts` |
+| 时间格式化与时区边界 | `client/webqq/format-time.ts` |
+| 未归属记录清理的二次确认状态机 | `client/webqq/model-request-clear-confirm.ts` |
+

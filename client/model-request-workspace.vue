@@ -155,7 +155,7 @@
                     <span class="webqq-model-request-timing">
                       <time>
                         <IconCalendarTime :size="14" aria-hidden="true" />
-                        {{ formatTime(record.createdAt) }}
+                        {{ formatSandboxDateTime(record.createdAt) }}
                       </time>
                       <span>
                         <IconClock :size="14" aria-hidden="true" />
@@ -198,7 +198,7 @@
                   <span class="webqq-model-request-timing">
                     <time>
                       <IconCalendarTime :size="14" aria-hidden="true" />
-                      {{ formatTime(detail.createdAt) }}
+                      {{ formatSandboxDateTime(detail.createdAt) }}
                     </time>
                   </span>
                 </span>
@@ -254,12 +254,12 @@
               <article>
                 <IconRoute :size="17" aria-hidden="true" />
                 <span>渠道</span>
-                <strong>{{ detail.provider || '未识别' }}</strong>
+                <strong>{{ formatModelRequestChannelName(detail.provider) }}</strong>
               </article>
               <article>
                 <IconCpu :size="17" aria-hidden="true" />
                 <span>模型 ID</span>
-                <strong>{{ detail.model || '未识别' }}</strong>
+                <strong>{{ formatModelRequestModelName(detail.model) }}</strong>
               </article>
               <article>
                 <IconClock :size="17" aria-hidden="true" />
@@ -269,17 +269,17 @@
               <article>
                 <IconBraces :size="17" aria-hidden="true" />
                 <span>字段</span>
-                <strong>{{ detail.requestBodyKeyCount ?? '—' }}</strong>
+                <strong>{{ formatModelRequestCount(detail.requestBodyKeyCount) }}</strong>
               </article>
               <article>
                 <IconMessages :size="17" aria-hidden="true" />
                 <span>消息</span>
-                <strong>{{ detail.evidenceCounts?.requestMessageCount ?? '—' }}</strong>
+                <strong>{{ formatModelRequestCount(detail.evidenceCounts?.requestMessageCount) }}</strong>
               </article>
               <article>
                 <IconTools :size="17" aria-hidden="true" />
                 <span>工具</span>
-                <strong>{{ detail.evidenceCounts?.toolDefinitionCount ?? '—' }}</strong>
+                <strong>{{ formatModelRequestCount(detail.evidenceCounts?.toolDefinitionCount) }}</strong>
               </article>
             </div>
           </section>
@@ -293,7 +293,7 @@
             <div class="webqq-model-request-usage-grid">
               <article v-for="item in usageItems" :key="item.label">
                 <span>{{ item.label }}</span>
-                <strong>{{ formatUsageValue(item) }}</strong>
+                <strong>{{ item.value }}</strong>
               </article>
             </div>
           </section>
@@ -320,9 +320,9 @@
                   variant="ghost"
                   class="webqq-model-request-header-toggle"
                   :aria-expanded="headersExpanded"
-                  @click="headersExpanded = !headersExpanded"
+                  @click="toggleHeaders"
                 >
-                  {{ headersExpanded ? '收起 JSON' : `展开 JSON（${Object.keys(detail.headers).length} 项）` }}
+                  {{ modelRequestHeadersToggleLabel(headersExpanded, Object.keys(detail.headers).length) }}
                   <IconChevronDown :size="14" :class="{ 'is-expanded': headersExpanded }" aria-hidden="true" />
                 </Button>
                 <div v-if="headersExpanded" class="webqq-model-request-header-json">
@@ -553,7 +553,7 @@
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" @click="cancelClear">取消</Button>
-          <Button v-if="clearStep === 1" variant="destructive" @click="clearStep = 2">继续</Button>
+          <Button v-if="clearStep === 1" variant="destructive" @click="advanceClear">继续</Button>
           <Button v-else variant="destructive" :disabled="loading" @click="confirmClear">确认清理</Button>
         </DialogFooter>
       </DialogContent>
@@ -602,11 +602,34 @@ import ModelResponseContentPreview from './model-response-content-preview.vue'
 import WebqqAvatar from './webqq-avatar.vue'
 import { CHATLUNA_ERROR_CODE_DOCUMENTATION_URL, getChatLunaErrorPossibleCauses } from '../src/chatluna-error'
 import { formatDuration } from './webqq/format-duration'
+import { formatSandboxDateTime } from './webqq/format-time'
+import {
+  buildModelRequestUsageCells,
+  formatModelRequestChannelName,
+  formatModelRequestCount,
+  formatModelRequestModelName,
+} from './webqq/model-request-overview'
+import {
+  createModelRequestDetailView,
+  modelRequestHeadersToggleLabel,
+} from './webqq/model-request-detail-view'
+import {
+  buildModelRequestBodyDownload,
+  createModelRequestBodyCopy,
+  resolveModelRequestBodyText,
+} from './webqq/model-request-body-transfer'
+import { createModelRequestClearConfirm } from './webqq/model-request-clear-confirm'
 import { parseModelResponseConversation } from './webqq/model-request-conversation'
 import { buildModelRequestJsonTree } from './webqq/model-request-json'
 import type { EvidenceNavigation } from './webqq/evidence-navigation'
 import { createScrollRestore } from './webqq/scroll-restore'
-import { createModelRequestEnterRefresh, createModelRequestLiveRefresh } from './webqq/model-request-live-refresh'
+import {
+  createModelRequestEnterRefresh,
+  createModelRequestLiveRefresh,
+  hasPendingModelRequest,
+  resolveModelRequestRefreshLimit,
+  shouldPollModelRequests,
+} from './webqq/model-request-live-refresh'
 import {
   beginModelRequestListNavigation,
   clearModelRequestListSelection,
@@ -679,27 +702,53 @@ const selectedRecordId = computed({
   get: () => selectionState.value.selectedRecordId,
   set: (value: string) => { selectionState.value.selectedRecordId = value },
 })
-const detailView = ref<'trajectory' | 'evidence'>('evidence')
-const clearDialogOpen = ref(false)
-const clearStep = ref<1 | 2>(1)
-const bodyView = ref<'request' | 'response' | 'analysis'>('analysis')
+const {
+  detailView,
+  bodyView,
+  responseView,
+  headersExpanded,
+  trajectoryMode,
+  showNewDetail,
+  showEvidenceAnalysis,
+  showRequestBody,
+  snapshot: detailViewSnapshot,
+  restore: restoreDetailView,
+  toggleHeaders,
+} = createModelRequestDetailView()
+const {
+  open: clearDialogOpen,
+  step: clearStep,
+  begin: openClearDialog,
+  advance: advanceClear,
+  cancel: cancelClear,
+  confirm: confirmClear,
+} = createModelRequestClearConfirm({
+  clear: () => {
+    emit('clear', { scope: 'unattributed' })
+    selectedRecordId.value = ''
+  },
+})
 const navigationStatus = ref('')
 const conversationTrajectory = computed(() => props.trajectory?.mode === 'conversation' ? props.trajectory : undefined)
 const requestTrajectory = computed(() => props.trajectory?.mode === 'request' ? props.trajectory : undefined)
-const responseView = ref<'content' | 'json'>('content')
 const displayRecords = computed(() => resolveModelRequestListRecords(
   selectionState.value,
   props.records,
   props.detail,
 ))
-const headersExpanded = ref(false)
 // 机器人按「空间 + 机器人」索引一次。列表每一行都要问两次头像和名称，逐行 find 会让
 // 一页记录扫机器人目录上百遍。
 const botsByScope = computed(() => new Map(props.bots.map(bot => [
   `${bot.source.type === 'main' ? MAIN_MODEL_REQUEST_SPACE_ID : bot.source.spaceId}\u0000${bot.id}`,
   bot,
 ])))
-const copyState = ref<'idle' | 'success' | 'error'>('idle')
+const { state: copyState, copy: copyBody, reset: resetCopyState } = createModelRequestBodyCopy({
+  clipboardWriter: () => {
+    const clipboard = navigator.clipboard
+    return clipboard?.writeText ? (text: string) => clipboard.writeText(text) : undefined
+  },
+  fallbackWrite: copyTextForHttp,
+})
 const detailElement = ref<HTMLElement>()
 // 返回按钮的存在、文案与去向都由导航 module 的 returnTarget 单点派生，不再各自判断一次。
 const returnLabel = computed(() => {
@@ -724,16 +773,15 @@ const detailScrollRestore = createScrollRestore({
   }),
 })
 let inspectRecordId: string | undefined
-let copyStateTimer: number | undefined
 
-const hasPendingRequest = computed(() => (
-  props.records.some(({ status }) => status === 'pending')
-  || props.detail?.status === 'pending'
-))
+const hasPendingRequest = computed(() => hasPendingModelRequest(props.records, props.detail))
 const liveRefreshController = createModelRequestLiveRefresh({
-  isEnabled: () => liveRefresh.value || hasPendingRequest.value,
+  isEnabled: () => shouldPollModelRequests({
+    manualSwitch: liveRefresh.value,
+    hasPendingRequest: hasPendingRequest.value,
+  }),
   isVisible: () => typeof document === 'undefined' || document.visibilityState === 'visible',
-  refresh: () => refresh(Math.min(Math.max(props.records.length, MODEL_REQUEST_PAGE_SIZE), 200)),
+  refresh: () => refresh(resolveModelRequestRefreshLimit(props.records.length, MODEL_REQUEST_PAGE_SIZE)),
 })
 const enterRefresh = createModelRequestEnterRefresh(() => refresh())
 
@@ -751,26 +799,8 @@ const responseTree = computed(() => buildModelRequestJsonTree(responseConversati
 // ADR-0059 的优先级已经在响应投影 adapter 里应用过：标准化 ChatLuna 用量优先于响应体候选。
 const usage = computed<SandboxModelRequestUsage | undefined>(() => responseConversation.value.usage)
 const chatlunaErrorCauses = computed(() => getChatLunaErrorPossibleCauses(props.detail?.chatlunaError))
-const usageItems = computed(() => [
-  { label: '输入', value: usage.value?.inputTokens, format: 'token' as const },
-  { label: '输出', value: usage.value?.outputTokens, format: 'token' as const },
-  { label: '推理', value: usage.value?.reasoningTokens, format: 'token' as const },
-  { label: '缓存', value: usage.value?.cachedTokens, format: 'token' as const },
-  { label: '总 Token', value: usage.value?.totalTokens, format: 'token' as const },
-  { label: 'TTFT', value: usage.value?.ttftMs, format: 'duration' as const },
-  { label: 'TPS', value: usage.value?.tps, format: 'rate' as const },
-  { label: '总耗时', value: usage.value?.totalMs, format: 'duration' as const },
-])
-const currentBodyText = computed(() => {
-  const detail = props.detail
-  if (!detail) return ''
-  if (bodyView.value === 'request') {
-    if (!detail.requestBodyAvailable || detail.requestBody === undefined) return ''
-    return serializeBody(detail.requestBody)
-  }
-  if (bodyView.value !== 'response') return ''
-  return detail.responseBodyStatus === 'complete' ? detail.responseBodyRaw ?? '' : ''
-})
+const usageItems = computed(() => buildModelRequestUsageCells(usage.value))
+const currentBodyText = computed(() => resolveModelRequestBodyText(props.detail, bodyView.value))
 const responseBodyLabel = computed(() => {
   const detail = props.detail
   if (!detail) return ''
@@ -817,18 +847,15 @@ watch(() => props.detail?.id, () => {
     return
   }
   inspectRecordId = undefined
-  detailView.value = 'evidence'
-  bodyView.value = 'analysis'
-  responseView.value = 'content'
-  headersExpanded.value = false
+  showNewDetail()
   restoreSelectionOnEnter()
   applyViewRestore()
-  if (props.detail) fetchTrajectory(currentTrajectoryMode())
+  if (props.detail) fetchTrajectory(trajectoryMode.value)
   resetCopyState()
 })
 
 watch(detailView, () => {
-  fetchTrajectory(currentTrajectoryMode())
+  fetchTrajectory(trajectoryMode.value)
 })
 
 watch(bodyView, resetCopyState)
@@ -870,8 +897,7 @@ function applyEntryState() {
   model.value = state.model
   errorsOnly.value = state.errorsOnly
   beginModelRequestListNavigation(selectionState.value, state.recordId)
-  detailView.value = state.detailView
-  bodyView.value = state.bodyView
+  restoreDetailView(state)
   const scope = createSpaceModelRequestScope(state.spaceId)
   emit('query', createModelRequestRecordsQuery(scope, { order: sortOrder.value }))
   emit('open', { ...scope, recordId: state.recordId })
@@ -882,8 +908,7 @@ function applyEntryState() {
 
 function arriveAtNavigationTarget() {
   if (!props.navigation.arrive(props.detail, props.trajectory)) return
-  detailView.value = 'evidence'
-  bodyView.value = 'analysis'
+  showEvidenceAnalysis()
 }
 
 function completeNavigationLocate(result: { seq: number, located: boolean }) {
@@ -911,7 +936,7 @@ function refresh(limit = MODEL_REQUEST_PAGE_SIZE) {
     const scope = record ? resolveRecordScope(record) : currentScope()
     emit('open', { ...scope, recordId: selectedRecordId.value })
     // 同一条记录从进行中变为已完成时 id 不变，不能只靠详情 id watcher 重拉轨迹。
-    emit('trajectory', { ...scope, recordId: selectedRecordId.value, mode: currentTrajectoryMode() })
+    emit('trajectory', { ...scope, recordId: selectedRecordId.value, mode: trajectoryMode.value })
   }
 }
 
@@ -939,11 +964,7 @@ function openRecord(recordId: string) {
   const record = props.records.find(({ id }) => id === recordId)
   const scope = record ? resolveRecordScope(record) : currentScope()
   emit('open', { ...scope, recordId })
-  emit('trajectory', { ...scope, recordId, mode: currentTrajectoryMode() })
-}
-
-function currentTrajectoryMode() {
-  return detailView.value === 'trajectory' ? 'conversation' : 'request'
+  emit('trajectory', { ...scope, recordId, mode: trajectoryMode.value })
 }
 
 function fetchTrajectory(mode: 'request' | 'conversation') {
@@ -977,16 +998,12 @@ function openRelatedRequest(payload: {
   inspectRecordId = undefined
   props.navigation.pushViewSnapshot({
     recordId: selectedRecordId.value,
-    detailView: detailView.value,
-    bodyView: bodyView.value,
-    trajectoryMode: currentTrajectoryMode(),
+    ...detailViewSnapshot(),
+    trajectoryMode: trajectoryMode.value,
     detailScrollTop: detailElement.value?.scrollTop ?? 0,
     trajectory: payload.returnState,
   })
-  detailView.value = 'evidence'
-  bodyView.value = 'request'
-  responseView.value = 'content'
-  headersExpanded.value = false
+  showRequestBody()
   selectedRecordId.value = payload.recordId
   const record = props.trajectory?.records.find(({ id }) => id === payload.recordId)
   const scope = record ? resolveRecordScope(record) : currentScope()
@@ -1006,8 +1023,7 @@ function returnToTrajectory() {
   const state = props.navigation.beginViewReturn()
   if (!state) return
   selectedRecordId.value = state.recordId
-  detailView.value = state.detailView
-  bodyView.value = state.bodyView
+  restoreDetailView(state)
   const record = props.trajectory?.records.find(({ id }) => id === state.recordId)
   const scope = record ? resolveRecordScope(record) : currentScope()
   emit('open', { ...scope, recordId: state.recordId })
@@ -1020,8 +1036,7 @@ function applyViewRestore() {
   if (!state) return
   // 跨请求返回时 detail.id watcher 会先把页签重置到“分析”；目标详情真正到达后，
   // 必须连同轨迹和滚动位置再次恢复视图快照，否则同请求测试通过但跨请求仍会落回分析页。
-  detailView.value = state.detailView
-  bodyView.value = state.bodyView
+  restoreDetailView(state)
   void detailScrollRestore.restore(state.detailScrollTop)
 }
 
@@ -1056,22 +1071,6 @@ function resolveRecordScope(record: SandboxModelRequestListItem | SandboxModelRe
   return createSpaceModelRequestScope(MAIN_MODEL_REQUEST_SPACE_ID)
 }
 
-function openClearDialog() {
-  clearStep.value = 1
-  clearDialogOpen.value = true
-}
-
-function cancelClear() {
-  clearDialogOpen.value = false
-  clearStep.value = 1
-}
-
-function confirmClear() {
-  emit('clear', { scope: 'unattributed' })
-  selectedRecordId.value = ''
-  cancelClear()
-}
-
 function resolveRequestBot(record: SandboxModelRequestListItem | SandboxModelRequestDetail): Pick<SandboxDirectoryBot, 'name' | 'avatar'> {
   const botId = record.entities.botId
   const bot = botsByScope.value.get(`${record.entities.scopeId ?? ''}\u0000${botId ?? ''}`)
@@ -1091,26 +1090,11 @@ function statusClass(status: SandboxModelRequestStatus) {
   return 'webqq-model-request-complete'
 }
 
-async function copyCurrentBody() {
-  const text = currentBodyText.value
-  if (!text) return
-  try {
-    if (navigator.clipboard?.writeText) {
-      try {
-        await navigator.clipboard.writeText(text)
-        setCopyState('success')
-        return
-      } catch {
-        // 局域网 HTTP 不属于安全上下文，Clipboard API 会被禁用，因此继续使用同步复制后备。
-      }
-    }
-    copyTextForHttp(text)
-    setCopyState('success')
-  } catch {
-    setCopyState('error')
-  }
+function copyCurrentBody() {
+  void copyBody(currentBodyText.value)
 }
 
+/** 降级路径的 DOM 机械动作：选中一个离屏 textarea 再让浏览器执行复制命令。 */
 function copyTextForHttp(text: string) {
   const textarea = document.createElement('textarea')
   textarea.value = text
@@ -1130,64 +1114,16 @@ function copyTextForHttp(text: string) {
 }
 
 function downloadCurrentBody() {
-  const detail = props.detail
-  const text = currentBodyText.value
-  if (!detail || !text) return
-  const isRequest = bodyView.value === 'request'
-  const isJson = isRequest || detail.responseBodyFormat === 'json'
-  const extension = isJson ? 'json' : 'txt'
-  const section = isRequest ? 'request' : 'response'
-  const safeId = detail.id.replace(/[^a-zA-Z0-9_-]+/g, '-')
-  const blob = new Blob([text], { type: isJson ? 'application/json;charset=utf-8' : 'text/plain;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
+  const download = buildModelRequestBodyDownload(props.detail, bodyView.value)
+  if (!download) return
+  const url = URL.createObjectURL(new Blob([download.text], { type: download.mimeType }))
   const link = document.createElement('a')
   link.href = url
-  link.download = `model-request-${safeId}-${section}.${extension}`
+  link.download = download.fileName
   document.body.append(link)
   link.click()
   link.remove()
   window.setTimeout(() => URL.revokeObjectURL(url), 0)
-}
-
-function setCopyState(state: 'success' | 'error') {
-  if (copyStateTimer) clearTimeout(copyStateTimer)
-  copyState.value = state
-  copyStateTimer = window.setTimeout(() => {
-    copyState.value = 'idle'
-    copyStateTimer = undefined
-  }, 1600)
-}
-
-function resetCopyState() {
-  if (copyStateTimer) clearTimeout(copyStateTimer)
-  copyStateTimer = undefined
-  copyState.value = 'idle'
-}
-
-function serializeBody(value: unknown) {
-  if (typeof value === 'string') return value
-  return JSON.stringify(value, null, 2) ?? String(value)
-}
-
-function formatTokenCount(value: number | undefined) {
-  return value === undefined ? '—' : new Intl.NumberFormat('zh-CN').format(value)
-}
-
-function formatUsageValue(item: { value?: number, format: 'token' | 'duration' | 'rate' }) {
-  if (item.format === 'duration') return formatDuration(item.value ?? Number.NaN)
-  if (item.format === 'rate') return formatTokenRate(item.value)
-  return formatTokenCount(item.value)
-}
-
-function formatTokenRate(value: number | undefined) {
-  if (value === undefined || !Number.isFinite(value)) return '—'
-  return `${new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(value)} /s`
-}
-
-function formatTime(value: string) {
-  const date = new Date(value)
-  const pad = (part: number) => String(part).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 
 function formatEntities(record: SandboxModelRequestDetail) {

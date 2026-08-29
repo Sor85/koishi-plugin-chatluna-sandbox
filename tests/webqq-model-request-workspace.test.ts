@@ -48,7 +48,7 @@ describe('WebQQ 模型请求工作台', () => {
     expect(styles).toMatch(/\.webqq-model-request-item:hover\s*\{[^}]*background:\s*var\(--webqq-hover\)/s)
     expect(styles).not.toContain('.webqq-model-request-item.is-active')
     expect(workspaceSource).toContain('<WebqqAvatar')
-    expect(workspaceSource).toMatch(/webqq-model-request-bot-copy[\s\S]*webqq-model-request-bot-name[\s\S]*resolveRequestBot\(record\)\.name[\s\S]*statusLabel\(record\.status\)[\s\S]*record\.provider[\s\S]*formatTime\(record\.createdAt\)[\s\S]*formatDuration\(record\.durationMs\)/)
+    expect(workspaceSource).toMatch(/webqq-model-request-bot-copy[\s\S]*webqq-model-request-bot-name[\s\S]*resolveRequestBot\(record\)\.name[\s\S]*statusLabel\(record\.status\)[\s\S]*record\.provider[\s\S]*formatSandboxDateTime\(record\.createdAt\)[\s\S]*formatDuration\(record\.durationMs\)/)
     expect(workspaceSource).not.toMatch(/class="webqq-model-request-item"[\s\S]*record\.error\.message/)
     expect(workspaceSource).toContain("'未归属机器人'")
     expect(workspaceSource).not.toContain("record.model || '未知模型'")
@@ -63,7 +63,7 @@ describe('WebQQ 模型请求工作台', () => {
     const detailHeader = workspaceSource.match(/<article v-else[\s\S]*?<header>([\s\S]*?)<\/header>/)?.[1] ?? ''
     const pageHeader = workspaceSource.match(/<header class="webqq-model-request-header">([\s\S]*?)<\/header>/)?.[1] ?? ''
 
-    expect(workspaceSource).toMatch(/webqq-model-request-bot-copy[\s\S]*webqq-model-request-bot-name[\s\S]*resolveRequestBot\(detail\)\.name[\s\S]*formatTime\(detail\.createdAt\)/)
+    expect(workspaceSource).toMatch(/webqq-model-request-bot-copy[\s\S]*webqq-model-request-bot-name[\s\S]*resolveRequestBot\(detail\)\.name[\s\S]*formatSandboxDateTime\(detail\.createdAt\)/)
     expect(detailHeader).not.toContain('detail.durationMs')
     expect(detailHeader).toContain('webqq-model-request-detail-nav')
     expect(detailHeader).toContain('webqq-model-request-view-switch')
@@ -80,7 +80,8 @@ describe('WebQQ 模型请求工作台', () => {
     expect(workspaceSource).not.toContain('durationMs }} ms')
     expect(workspaceSource).toMatch(/webqq-model-request-overview[\s\S]*statusLabel\(detail\.status\)[\s\S]*渠道[\s\S]*模型 ID[\s\S]*耗时[\s\S]*字段[\s\S]*消息[\s\S]*工具/)
     expect(workspaceSource).not.toContain('API 密钥名称')
-    expect(workspaceSource).toMatch(/webqq-model-request-usage[\s\S]*输入[\s\S]*输出[\s\S]*推理[\s\S]*缓存[\s\S]*总 Token[\s\S]*TTFT[\s\S]*TPS[\s\S]*总耗时/)
+    // 用量格逐格渲染 module 给出的取词结果；八项、顺序与缺省符号由 model-request-overview 的行为测试守。
+    expect(workspaceSource).toMatch(/webqq-model-request-usage-grid[\s\S]*v-for="item in usageItems"[\s\S]*{{ item\.label }}[\s\S]*{{ item\.value }}/)
     expect(workspaceSource).not.toContain('usageStateLabel')
     // 概览格的计数由共享模型证据投影派生，不再读旧的请求体摘要字段。
     expect(workspaceSource).not.toContain('summary.keys')
@@ -96,7 +97,7 @@ describe('WebQQ 模型请求工作台', () => {
     expect(styles).toMatch(/\.webqq-model-request-bot-copy\s*\{[^}]*display:\s*grid[^}]*gap:\s*2px/s)
     expect(styles).toMatch(/\.webqq-model-request-bot-name\s*\{[^}]*flex-wrap:\s*wrap/s)
     // 模型名称是采集那一刻的记录事实；详情视图不得再从请求体或请求地址推断第二份。
-    expect(workspaceSource).toContain("detail.model || '未识别'")
+    // 展示名的三态取词已有 model-request-overview 的行为测试，这里只守「不得出现第二份推断」。
     expect(workspaceSource).not.toContain('detailModel')
     expect(workspaceSource).not.toContain('modelVersion')
     expect(workspaceSource).not.toContain('/models/')
@@ -277,7 +278,7 @@ describe('WebQQ 模型请求工作台', () => {
     expect(styles).toContain('.webqq-model-request-json-node.is-highlighted')
     expect(jsonSource).toContain('webqq-model-request-json-image')
     expect(jsonSource).toContain('图片预览')
-    expect(jsonSource).toContain('image - {{ formatImageSize(imageSource.source) }}')
+    expect(jsonSource).toContain('image - {{ formatModelRequestJsonImageSize(imageSource.source) }}')
     expect(jsonSource).toContain('>raw<')
     expect(jsonSource).toContain('>image<')
     expect(jsonSource).not.toContain('clipboard')

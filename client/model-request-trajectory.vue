@@ -338,15 +338,28 @@ import ModelRequestConversationAnalysis from './webqq/analysis-view.vue'
 import type { EvidenceNavigation, EvidenceViewRestore } from './webqq/evidence-navigation'
 import type { LocateRequest } from './webqq/evidence-locator'
 import {
+  buildModelRequestTrajectorySearchMutes,
+  buildModelRequestTrajectorySearchTexts,
+  filterModelRequestTrajectoryRows,
   isModelRequestTrajectoryRowCollapsed,
   orderModelRequestTrajectoryRows,
+  toggleModelRequestTrajectoryCollapse,
   type ModelRequestTrajectorySortOrder,
 } from './webqq/model-request-trajectory-display'
+import {
+  COMPOSITION_ZOOM_MAX,
+  COMPOSITION_ZOOM_MIN,
+  COMPOSITION_ZOOM_STEP,
+  createCompositionZoomPan,
+} from './webqq/composition-zoom-pan'
+import {
+  formatModelRequestLabel,
+  formatModelRequestOrdinal,
+} from './webqq/model-request-overview'
 import { createScrollRestore } from './webqq/scroll-restore'
 import { formatDuration } from './webqq/format-duration'
 import {
   MODEL_EVIDENCE_FILTER_KINDS,
-  isEvidenceVisible,
   toggleFilterMember,
 } from './webqq/model-request-filter'
 import { sandboxEvidenceLabels, type SandboxEvidenceKind } from '../src/evidence-kind'
@@ -412,18 +425,20 @@ const ledgerScrollRestore = createScrollRestore({
 const selectedRowId = ref('')
 const actualDuration = ref(true)
 const compositionViewport = ref<HTMLElement>()
-const COMPOSITION_ZOOM_MIN = 1
-const COMPOSITION_ZOOM_MAX = 10
-const COMPOSITION_ZOOM_STEP = 0.25
-const compositionZoom = ref(COMPOSITION_ZOOM_MIN)
-const compositionDragging = ref(false)
-let compositionDrag: {
-  pointerId: number
-  startX: number
-  scrollLeft: number
-  moved: boolean
-} | undefined
-let suppressCompositionClickUntil = 0
+const {
+  zoom: compositionZoom,
+  dragging: compositionDragging,
+  setZoom: setCompositionZoom,
+  handleWheel: handleCompositionWheel,
+  handlePointerDown: handleCompositionPointerDown,
+  handlePointerMove: handleCompositionPointerMove,
+  finishDrag: finishCompositionDrag,
+  consumeSuppressedClick: consumeSuppressedCompositionClick,
+} = createCompositionZoomPan({
+  viewport: () => compositionViewport.value,
+  // 轨道宽度是倍率的函数，必须等它按新倍率重排完再写滚动量。
+  afterZoom: (apply) => { void nextTick(apply) },
+})
 const requestsCollapsed = ref(false)
 const trajectorySortOrder = ref<ModelRequestTrajectorySortOrder>('desc')
 const collapsedRequestIds = ref<ReadonlySet<string>>(new Set())
@@ -446,10 +461,7 @@ const requestOrderById = computed(() => new Map(
   (props.trajectory?.records ?? []).map((record, index) => [record.id, index]),
 ))
 const requestLabelById = computed(() => new Map(
-  (props.trajectory?.records ?? []).map(record => [
-    record.id,
-    [record.provider, record.model].filter(Boolean).join(' / ') || '模型请求',
-  ]),
+  (props.trajectory?.records ?? []).map(record => [record.id, formatModelRequestLabel(record)]),
 ))
 const rowById = computed(() => new Map((props.trajectory?.rows ?? []).map(row => [row.id, row])))
 const selectedRow = computed(() => rowById.value.get(selectedRowId.value))
@@ -459,7 +471,6 @@ const inspectorDetail = computed(() => {
   if (!requestId || props.detail?.id !== requestId) return undefined
   return props.detail
 })
-const normalizedSearch = computed(() => searchQuery.value.trim().toLocaleLowerCase('zh-CN'))
 const promptComposition = computed(() => {
   const items = props.trajectory?.promptComposition ?? []
   const total = items.reduce((sum, item) => sum + item.characters, 0)
@@ -562,34 +573,22 @@ function groupCompositionTracks(
 const evidenceFilter = computed(() => ({
   hiddenKinds: hiddenKinds.value,
 }))
-const ledgerRows = computed(() => props.trajectory?.rows.filter((row) => {
-  if (requestsCollapsed.value && row.kind !== 'request') return false
-  // 请求边界行没有对应的模型证据（它是请求本身），因此不参与种类过滤；
-  // 否则把整条请求过滤掉之后账本会连边界一起消失，看不出还有哪些请求。
-  return isEvidenceVisible(evidenceFilter.value, row.kind === 'request' ? undefined : row.kind)
-}) ?? [])
+const ledgerRows = computed(() => filterModelRequestTrajectoryRows({
+  rows: props.trajectory?.rows ?? [],
+  requestsCollapsed: requestsCollapsed.value,
+  hiddenKinds: hiddenKinds.value,
+}))
 const orderedLedgerRows = computed(() => orderModelRequestTrajectoryRows(ledgerRows.value, trajectorySortOrder.value))
-// 每行的可搜索文本按轨迹折叠成小写一次。原先每次重渲染都要为每一行重新
-// toLocaleLowerCase 五个字段并顺带 find 一次请求标签，输入一个字就要重扫整份账本。
-const rowSearchTexts = computed(() => {
-  const texts = new Map<string, string>()
-  for (const row of props.trajectory?.rows ?? []) {
-    texts.set(row.id, [row.preview, kindLabel(row.kind), row.toolName, row.callId, requestLabel(row.requestId)]
-      .filter(Boolean)
-      .join('\n')
-      .toLocaleLowerCase('zh-CN'))
-  }
-  return texts
-})
-const searchMutedRowIds = computed(() => {
-  const query = normalizedSearch.value
-  if (!query) return undefined
-  const muted = new Set<string>()
-  for (const row of props.trajectory?.rows ?? []) {
-    if (!rowSearchTexts.value.get(row.id)?.includes(query)) muted.add(row.id)
-  }
-  return muted
-})
+// 可搜索文本只随轨迹变化，静音只随查询变化；两段分开才不会让每次按键重扫整份账本。
+const rowSearchTexts = computed(() => buildModelRequestTrajectorySearchTexts(
+  props.trajectory?.rows ?? [],
+  row => [row.preview, kindLabel(row.kind), row.toolName, row.callId, requestLabel(row.requestId)],
+))
+const searchMutedRowIds = computed(() => buildModelRequestTrajectorySearchMutes(
+  props.trajectory?.rows ?? [],
+  searchQuery.value,
+  rowSearchTexts.value,
+))
 watch(() => props.trajectory, (trajectory) => {
   // 轨迹行 id 由 evidenceId 派生，刷新后同一条证据仍是同一个 id，因此仍然存在的选中行要保留；
   // 只有证据真的消失才清空。否则 pending 请求自动刷新每轮都会把用户正在看的行和检查器一起丢掉。
@@ -685,79 +684,13 @@ function isRequestRowCollapsed(row: SandboxModelRequestTrajectoryRow) {
 }
 
 function toggleRequestCollapsed(row: SandboxModelRequestTrajectoryRow) {
-  const requestId = row.requestId
-  if (!requestId) return
-  const next = new Set(collapsedRequestIds.value)
-  next.has(requestId) ? next.delete(requestId) : next.add(requestId)
-  collapsedRequestIds.value = next
-}
-
-function setCompositionZoom(value: number, anchorClientX?: number) {
-  const viewport = compositionViewport.value
-  const next = Math.min(Math.max(value, COMPOSITION_ZOOM_MIN), COMPOSITION_ZOOM_MAX)
-  if (next === compositionZoom.value) return
-  const previous = compositionZoom.value
-  const anchor = viewport && anchorClientX !== undefined
-    ? Math.min(Math.max(anchorClientX - viewport.getBoundingClientRect().left, 0), viewport.clientWidth)
-    : viewport ? viewport.clientWidth / 2 : 0
-  const contentX = viewport ? (viewport.scrollLeft + anchor) / previous : 0
-  compositionZoom.value = next
-  if (viewport) {
-    void nextTick(() => {
-      viewport.scrollLeft = Math.max(contentX * next - anchor, 0)
-    })
-  }
-}
-
-function handleCompositionWheel(event: WheelEvent) {
-  // 只在轨道内容区域且按住 Ctrl 时接管滚轮；其余情况保留页面滚动和浏览器缩放。
-  if (!event.ctrlKey || event.deltaY === 0) return
-  event.preventDefault()
-  setCompositionZoom(
-    compositionZoom.value + (event.deltaY < 0 ? COMPOSITION_ZOOM_STEP : -COMPOSITION_ZOOM_STEP),
-    event.clientX,
-  )
-}
-
-function handleCompositionPointerDown(event: PointerEvent) {
-  const viewport = compositionViewport.value
-  if (!viewport || event.button !== 0) return
-  compositionDrag = {
-    pointerId: event.pointerId,
-    startX: event.clientX,
-    scrollLeft: viewport.scrollLeft,
-    moved: false,
-  }
-  viewport.setPointerCapture(event.pointerId)
-}
-
-function handleCompositionPointerMove(event: PointerEvent) {
-  const viewport = compositionViewport.value
-  const drag = compositionDrag
-  if (!viewport || !drag || drag.pointerId !== event.pointerId) return
-  const delta = event.clientX - drag.startX
-  if (!drag.moved && Math.abs(delta) < 3) return
-  drag.moved = true
-  compositionDragging.value = true
-  event.preventDefault()
-  viewport.scrollLeft = drag.scrollLeft - delta
-}
-
-function finishCompositionDrag(event: PointerEvent) {
-  const viewport = compositionViewport.value
-  const drag = compositionDrag
-  if (!viewport || !drag || drag.pointerId !== event.pointerId) return
-  if (viewport.hasPointerCapture(event.pointerId)) viewport.releasePointerCapture(event.pointerId)
-  if (drag.moved) suppressCompositionClickUntil = performance.now() + 250
-  compositionDrag = undefined
-  compositionDragging.value = false
+  collapsedRequestIds.value = toggleModelRequestTrajectoryCollapse(collapsedRequestIds.value, row.requestId)
 }
 
 function handleCompositionClickCapture(event: MouseEvent) {
-  if (performance.now() > suppressCompositionClickUntil) return
+  if (!consumeSuppressedCompositionClick()) return
   event.preventDefault()
   event.stopPropagation()
-  suppressCompositionClickUntil = 0
 }
 
 function selectPromptSegment(segment: CompositionSegment) {
@@ -804,12 +737,11 @@ function formatPercentage(value: number) {
 }
 
 function requestOrdinal(requestId: string | undefined) {
-  const index = requestId === undefined ? undefined : requestOrderById.value.get(requestId)
-  return index === undefined ? '请求' : `请求 ${index + 1}`
+  return formatModelRequestOrdinal(requestId === undefined ? undefined : requestOrderById.value.get(requestId))
 }
 
 function requestLabel(requestId: string | undefined) {
-  return (requestId === undefined ? undefined : requestLabelById.value.get(requestId)) ?? '模型请求'
+  return (requestId === undefined ? undefined : requestLabelById.value.get(requestId)) ?? formatModelRequestLabel(undefined)
 }
 
 function kindLabel(kind: SandboxModelRequestTrajectoryKind) {

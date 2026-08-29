@@ -13,7 +13,7 @@
           <div class="webqq-model-request-json-image-row">
             <span v-if="showKey" class="webqq-model-request-json-key">{{ node.key }}</span>
             <span v-if="showKey" class="webqq-model-request-json-sep">:</span>
-            <span class="webqq-model-request-json-image-summary">image - {{ formatImageSize(imageSource.source) }}</span>
+            <span class="webqq-model-request-json-image-summary">image - {{ formatModelRequestJsonImageSize(imageSource.source) }}</span>
             <button
               type="button"
               class="webqq-model-request-json-image-mode"
@@ -139,7 +139,10 @@
 import { IconChevronDown, IconChevronRight } from '@tabler/icons-vue'
 import { computed, nextTick, ref, watch } from 'vue'
 import type { ModelRequestJsonKind, ModelRequestJsonNode } from './webqq/model-request-json'
-import { normalizeModelRequestJsonString } from './webqq/model-request-json'
+import {
+  createModelRequestJsonRow,
+  formatModelRequestJsonImageSize,
+} from './webqq/model-request-json-row'
 
 defineOptions({ name: 'ModelRequestJsonTree' })
 
@@ -163,12 +166,7 @@ defineEmits<{
   'highlight-action': []
 }>()
 
-const expanded = ref(props.open)
 const nodeElement = ref<HTMLElement>()
-const localStringExpanded = ref<boolean>()
-const imageView = ref<'image' | 'raw'>('image')
-let rowPointerOrigin: { x: number, y: number } | undefined
-let suppressRowClick = false
 
 const showKey = computed(() => !props.root && props.parentKind !== 'array')
 const openingBracket = computed(() => props.node.kind === 'array' ? '[' : '{')
@@ -180,21 +178,23 @@ const isHighlighted = computed(() => {
     && target?.length === props.node.path.length
     && target.every((part, index) => part === props.node.path[index])
 })
-const stringExpanded = computed(() => {
-  if (imageSource.value && imageView.value === 'raw') return true
-  return localStringExpanded.value ?? props.stringsExpanded
-})
-const expandedString = computed(() => {
-  const value = normalizeModelRequestJsonString(String(props.node.value ?? ''))
-  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
-})
 
-watch(() => props.node.value, () => {
-  imageView.value = 'image'
-})
-
-watch(() => props.stringsExpanded, () => {
-  localStringExpanded.value = undefined
+const {
+  expanded,
+  imageView,
+  stringExpanded,
+  expandedString,
+  toggleString,
+  startPointer: startRowPointer,
+  finishPointer: finishRowPointer,
+  toggleStringFromRow,
+  toggleBranchFromRow,
+} = createModelRequestJsonRow({
+  value: () => props.node.value,
+  valueKind: () => props.node.valueKind,
+  stringsExpanded: () => props.stringsExpanded,
+  hasImage: () => Boolean(imageSource.value),
+  open: () => props.open,
 })
 
 watch(isHighlighted, async (highlighted) => {
@@ -206,49 +206,4 @@ watch(isHighlighted, async (highlighted) => {
     nodeElement.value?.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' })
   })
 }, { immediate: true })
-
-function formatImageSize(source: string) {
-  const base64 = source.slice(source.indexOf(',') + 1).replace(/\s/g, '')
-  const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0
-  const bytes = Math.max(0, Math.floor(base64.length * 3 / 4) - padding)
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-function toggleString() {
-  localStringExpanded.value = !stringExpanded.value
-}
-
-function startRowPointer(event: PointerEvent) {
-  rowPointerOrigin = { x: event.clientX, y: event.clientY }
-  suppressRowClick = false
-}
-
-function finishRowPointer(event: PointerEvent) {
-  if (!rowPointerOrigin) return
-  const distance = Math.hypot(
-    event.clientX - rowPointerOrigin.x,
-    event.clientY - rowPointerOrigin.y,
-  )
-  // 浏览器在拖选文字结束后仍可能派发 click，只屏蔽本次发生明显移动的手势；
-  // 不能根据全局 Selection 判断，否则复制后残留的旧选区会让所有字段行永久失效。
-  suppressRowClick = distance > 3
-  rowPointerOrigin = undefined
-}
-
-function consumeSuppressedRowClick(): boolean {
-  if (!suppressRowClick) return false
-  suppressRowClick = false
-  return true
-}
-
-function toggleStringFromRow() {
-  if (props.node.valueKind !== 'string' || consumeSuppressedRowClick()) return
-  toggleString()
-}
-
-function toggleBranchFromRow() {
-  if (consumeSuppressedRowClick()) return
-  expanded.value = !expanded.value
-}
 </script>
