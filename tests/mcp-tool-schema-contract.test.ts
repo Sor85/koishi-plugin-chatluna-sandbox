@@ -22,7 +22,7 @@ const TOOL_PARAMETERS: Record<string, string[]> = {
   list_test_spaces: ['testRunId'],
   get_test_space: ['spaceId', 'testRunId'],
   get_scene_snapshot: ['spaceId', 'testRunId'],
-  list_conversations: ['spaceId', 'operatorId', 'limit', 'offset', 'testRunId'],
+  list_conversations: ['spaceId', 'operatorId', 'rootConversationId', 'limit', 'offset', 'testRunId'],
   get_conversation: ['spaceId', 'operatorId', 'conversationId', 'messageLimit', 'testRunId'],
   get_forward_message: ['spaceId', 'operatorId', 'forwardId', 'messageId', 'testRunId'],
   list_pending_requests: ['spaceId', 'testRunId'],

@@ -48,6 +48,81 @@ describe('MCP 读取类工具', () => {
     expect(other.items.map(({ id }) => id)).toEqual(['private:10002:20001', 'group:30001'])
   })
 
+  it('会话列表默认只返回根会话，显式传 rootConversationId 时返回该根会话下的实例', async () => {
+    const { service, credential, control } = createMcpTestService(['read'])
+    // 默认场景不生成实例，因此显式问一个根会话时返回空列表而不是报错。
+    await expect(service.callTool(credential.token, 'list_conversations', {
+      operatorId: '10001',
+      rootConversationId: 'private:10001:20001',
+    })).resolves.toEqual({ items: [], nextOffset: undefined })
+
+    const first = control.createConversationInstance({ operatorId: '10001', rootConversationId: 'private:10001:20001', title: '第一条对话线' })
+    const second = control.createConversationInstance({ operatorId: '10001', rootConversationId: 'private:10001:20001', title: '第二条对话线' })
+    const grouped = control.createConversationInstance({ operatorId: '10001', rootConversationId: 'group:30001', title: '群里的对话线' })
+
+    // 三个实例存在之后默认列表仍然只有根会话：外部测试控制器不会把实例误当成新的联系人。
+    const roots = await service.callTool(credential.token, 'list_conversations', { operatorId: '10001' }) as { items: Array<{ id: string }> }
+    expect(roots.items.map(({ id }) => id)).toEqual(['private:10001:20001', 'group:30001'])
+
+    const instances = await service.callTool(credential.token, 'list_conversations', {
+      operatorId: '10001',
+      rootConversationId: 'private:10001:20001',
+    }) as { items: Array<{ id: string, kind: string, rootConversationId: string, title?: string, type: string }> }
+    // 只返回被问到的那个根会话下的实例，群会话的实例不混进来。
+    expect(instances.items).toEqual([
+      { id: first.conversationId, kind: 'instance', rootConversationId: 'private:10001:20001', type: 'direct', participantIds: ['10001', '20001'], messageIds: [], title: '第一条对话线' },
+      { id: second.conversationId, kind: 'instance', rootConversationId: 'private:10001:20001', type: 'direct', participantIds: ['10001', '20001'], messageIds: [], title: '第二条对话线' },
+    ])
+    expect(await service.callTool(credential.token, 'list_conversations', {
+      operatorId: '10001',
+      rootConversationId: 'group:30001',
+    })).toMatchObject({ items: [expect.objectContaining({ id: grouped.conversationId, type: 'group', groupId: '30001' })] })
+
+    // 分页对实例列表同样生效。
+    expect(await service.callTool(credential.token, 'list_conversations', {
+      operatorId: '10001', rootConversationId: 'private:10001:20001', limit: 1,
+    })).toMatchObject({ items: [expect.objectContaining({ id: first.conversationId })], nextOffset: 1 })
+    expect(await service.callTool(credential.token, 'list_conversations', {
+      operatorId: '10001', rootConversationId: 'private:10001:20001', limit: 1, offset: 1,
+    })).toEqual({ items: [expect.objectContaining({ id: second.conversationId })], nextOffset: undefined })
+
+    // 传入实例 ID 时归一化到它的根会话：层级严格两层，不存在第三层可问。
+    expect(await service.callTool(credential.token, 'list_conversations', {
+      operatorId: '10001', rootConversationId: first.conversationId,
+    })).toEqual(instances)
+
+    // 实例的可见性完全继承根会话：别人的私聊按会话不存在拒绝，而不是泄露它下面有几条对话线。
+    await expect(service.callTool(credential.token, 'list_conversations', {
+      operatorId: '10002', rootConversationId: 'private:10001:20001',
+    })).rejects.toMatchObject({ code: 'conversation_not_found' })
+    await expect(service.callTool(credential.token, 'list_conversations', {
+      operatorId: '10001', rootConversationId: 'private:10001:99999',
+    })).rejects.toMatchObject({ code: 'conversation_not_found' })
+    // 显式传了参数却不是字符串时必须显式失败：静默按「省略」处理会返回根会话列表，
+    // 而调用方以为自己拿到的是实例列表，两者形状相同、没有任何可察觉的迹象。
+    for (const rootConversationId of ['', '   ', null, 42]) {
+      await expect(service.callTool(credential.token, 'list_conversations', { operatorId: '10001', rootConversationId }))
+        .rejects.toMatchObject({ code: 'invalid_arguments' })
+    }
+  })
+
+  it('测试控制端点不提供创建或分叉会话实例的写工具', async () => {
+    // 会话实例目前是人工复盘手段：按 ADR-0017 只暴露稳定的领域测试能力，本轮不给外部
+    // 测试控制器开写入口。工具清单本身由 tests/helpers/mcp-tool-catalogue.ts 逐条守卫，
+    // 这里断言的是「尝试写入会被明确拒绝」，而不是静默成功或落到别的工具上。
+    const { service, credential } = createMcpTestService(['read', 'interact', 'manage', 'debug'])
+    for (const tool of ['create_conversation_instance', 'branch_conversation_instance', 'create_conversation', 'branch_conversation']) {
+      await expect(service.callTool(credential.token, tool, { operatorId: '10001', rootConversationId: 'private:10001:20001' }))
+        .rejects.toMatchObject({ code: 'tool_not_found' })
+    }
+    // 环境变更也不接受实例形状的动作，AI 不能绕开工具清单从这里造实例。
+    await expect(service.callTool(credential.token, 'apply_environment_changes', {
+      expectedRevision: 0,
+      idempotencyKey: 'instance-change-1',
+      changes: [{ action: 'create-conversation-instance', data: { rootConversationId: 'private:10001:20001', title: '外部造出来的实例' } }],
+    })).rejects.toMatchObject({ code: 'unsupported_change' })
+  })
+
   it('读取单个会话及其消息，并拒绝不可见会话', async () => {
     const { service, credential, control } = createMcpTestService(['read', 'interact'])
     // 未启动 App 时机器人 middleware 不会收敛，send_message 会一直等待同步回复；停用机器人后仍会写入消息。
@@ -161,6 +236,37 @@ describe('MCP 读取类工具', () => {
     expect(exported.scene).toEqual(await service.callTool(credential.token, 'get_scene_snapshot', {}))
     // 导出文档可直接作为 import_scene 的入参形状（导入回路由破坏性场景操作用例覆盖）。
     expect(exported.scene.participants.map(({ id }) => id)).toEqual(['10001', '10002', '10003', '20001'])
+  })
+
+  it('导出的场景包含会话实例及其消息归属', async () => {
+    const { service, credential, control } = createMcpTestService(['read'])
+    // 未启动 App 时机器人 middleware 不会收敛，sendMessage 会一直等待同步回复；停用机器人后仍会写入消息。
+    control.updateBot({ id: '20001', name: 'Koishi', implementation: 'napcat', enabled: false })
+    const instance = control.createConversationInstance({
+      operatorId: '10001',
+      rootConversationId: 'private:10001:20001',
+      title: '导出用的对话线',
+    })
+    const sent = await control.sendMessage({ operatorId: '10001', conversationId: instance.conversationId, content: '实例里的消息' })
+
+    const exported = await service.callTool(credential.token, 'export_scene', {}) as {
+      scene: {
+        conversationInstances: Array<{ id: string, rootConversationId: string, title: string, messageIds: string[] }>
+        conversations: Array<{ id: string, messageIds: string[] }>
+        messages: Array<{ id: string, conversationId: string }>
+      }
+    }
+
+    // 导出是整份场景：漏掉实例集合会让导入回来的场景与原场景不等价。
+    expect(exported.scene.conversationInstances).toEqual([{
+      id: instance.conversationId,
+      rootConversationId: 'private:10001:20001',
+      title: '导出用的对话线',
+      messageIds: [sent.messageId],
+    }])
+    // 消息归属跟着一起导出：实例里的消息指向实例本身，根会话没有拿到它。
+    expect(exported.scene.messages.find(({ id }) => id === sent.messageId)?.conversationId).toBe(instance.conversationId)
+    expect(exported.scene.conversations.find(({ id }) => id === 'private:10001:20001')?.messageIds).toEqual([])
   })
 })
 
@@ -439,7 +545,7 @@ describe('MCP 破坏性场景工具', () => {
   })
 
   it('清空场景后场景确实为空', async () => {
-    const { service, credential } = createMcpTestService(['read', 'manage'], true)
+    const { service, credential, testSpaces } = createMcpTestService(['read', 'manage'], true)
     const created = await service.callTool(credential.token, 'create_test_space', {
       idempotencyKey: 'clear-space-create-1',
     }) as { spaceId: string; revision: number }
@@ -453,18 +559,21 @@ describe('MCP 破坏性场景工具', () => {
         { action: 'set-friendship', data: { firstId: '11001', secondId: '21001' } },
       ],
     })
+    const spaceControl = testSpaces.getControl(created.spaceId)
+    spaceControl.createConversationInstance({ operatorId: '11001', rootConversationId: 'private:11001:21001' })
 
     const confirmation = await prepareDestructive(
-      service, credential.token, 'clear_scene', { spaceId: created.spaceId }, created.revision + 1,
+      service, credential.token, 'clear_scene', { spaceId: created.spaceId }, spaceControl.getSnapshot().revision,
     )
     await service.callTool(credential.token, 'clear_scene', { spaceId: created.spaceId, confirmationToken: confirmation })
+    // 会话实例是独立集合，清空场景必须把它一起清掉，否则留下解析不出根会话的无主对话线。
     await expect(service.callTool(credential.token, 'get_scene_snapshot', { spaceId: created.spaceId })).resolves.toMatchObject({
-      participants: [], groups: [], conversations: [], messages: [], friendships: [], requests: [],
+      participants: [], groups: [], conversations: [], conversationInstances: [], messages: [], friendships: [], requests: [],
     })
   })
 
   it('导入版本化场景，导入结果与导出的场景一致', async () => {
-    const { service, credential } = createMcpTestService(['read', 'manage'], true)
+    const { service, credential, testSpaces } = createMcpTestService(['read', 'manage'], true)
     const created = await service.callTool(credential.token, 'create_test_space', {
       idempotencyKey: 'import-space-create-1',
     }) as { spaceId: string; revision: number }
@@ -474,16 +583,31 @@ describe('MCP 破坏性场景工具', () => {
       idempotencyKey: 'import-space-setup-1',
       changes: [
         { action: 'create-user', data: { id: '11001', name: '导出成员' } },
-        { action: 'create-bot', data: { id: '21001', name: '导出机器人', implementation: 'llbot' } },
+        // 未启动 App 时机器人 middleware 不会收敛，sendMessage 会一直等待同步回复；停用后仍会写入消息。
+        { action: 'create-bot', data: { id: '21001', name: '导出机器人', implementation: 'llbot', enabled: false } },
         { action: 'create-group', data: { id: '31001', name: '导出群', members: [{ participantId: '11001', role: 'owner' }, { participantId: '21001', role: 'member' }] } },
         { action: 'set-friendship', data: { firstId: '11001', secondId: '21001' } },
       ],
+    })
+    // 用户准备好的分支要能作为测试前置条件，因此导入导出必须把实例连同它的消息归属一起带过去。
+    const spaceControl = testSpaces.getControl(created.spaceId)
+    const instance = spaceControl.createConversationInstance({
+      operatorId: '11001',
+      rootConversationId: 'private:11001:21001',
+      title: '导入前准备好的分支',
+    })
+    const sent = await spaceControl.sendMessage({
+      operatorId: '11001',
+      conversationId: instance.conversationId,
+      content: '分支里的前置消息',
     })
     type Scene = {
       revision: number
       participants: Array<{ id: string }>
       groups: Array<{ id: string; members: Array<{ participantId: string }> }>
       conversations: Array<{ id: string }>
+      conversationInstances: Array<{ id: string; rootConversationId: string; title: string; messageIds: string[] }>
+      messages: Array<{ id: string; conversationId: string }>
       friendships: Array<{ id: string }>
     }
     const exported = await service.callTool(credential.token, 'export_scene', { spaceId: created.spaceId }) as {
@@ -497,6 +621,9 @@ describe('MCP 破坏性场景工具', () => {
     const cleared = await service.callTool(credential.token, 'clear_scene', {
       spaceId: created.spaceId, confirmationToken: clearConfirmation,
     }) as { revision: number }
+    // 清空之后实例连一条都不剩，接下来恢复出来的实例只可能来自导入的文档。
+    await expect(service.callTool(credential.token, 'get_scene_snapshot', { spaceId: created.spaceId }))
+      .resolves.toMatchObject({ conversationInstances: [] })
 
     const importConfirmation = await prepareDestructive(
       service, credential.token, 'import_scene', { spaceId: created.spaceId, document: exported }, cleared.revision,
@@ -509,6 +636,14 @@ describe('MCP 破坏性场景工具', () => {
     // 除 revision 由服务端单调递增外，导入结果与导出的场景逐字段一致。
     expect({ ...restored, revision: exported.scene.revision }).toEqual(exported.scene)
     expect(restored.revision).toBeGreaterThan(exported.scene.revision)
+    // 实例的数量、归属与标题原样保留，实例里的消息仍然归属实例而不是被挪回根会话。
+    expect(restored.conversationInstances).toEqual([{
+      id: instance.conversationId,
+      rootConversationId: 'private:11001:21001',
+      title: '导入前准备好的分支',
+      messageIds: [sent.messageId],
+    }])
+    expect(restored.messages.find(({ id }) => id === sent.messageId)?.conversationId).toBe(instance.conversationId)
 
     await expect(service.callTool(credential.token, 'import_scene', {
       spaceId: created.spaceId,

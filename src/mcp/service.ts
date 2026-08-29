@@ -21,8 +21,10 @@ import { isRecalledMessage, SandboxDomainError, SandboxModelRequestCursorExpired
 import {
   ensureDirectRootConversation,
   ensureGroupRootConversation,
+  listRootConversationInstances,
   listRootConversations,
   resolveConversation,
+  type ResolvedConversation,
 } from '../conversation-resolution'
 import { getOneBotCapabilityMatrix } from '../onebot-profiles'
 import {
@@ -292,6 +294,10 @@ const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
     properties: {
       spaceId: SPACE_OPTIONAL,
       operatorId: OPERATOR_ID,
+      rootConversationId: {
+        type: 'string',
+        description: '列出该根会话下的会话实例；省略时只返回根会话。传入会话实例 ID 时归一化到它所属的根会话',
+      },
       limit: { type: 'number', minimum: 1, maximum: 200, description: '返回条数，默认 50' },
       offset: { type: 'number', minimum: 0 },
     },
@@ -640,7 +646,7 @@ const TOOL_DEFINITIONS: SandboxMcpToolCapability[] = [
   ['list_test_spaces', 'read', '列出当前 Sandbox 实例的全部 AI 测试空间'],
   ['get_test_space', 'read', '读取单个 AI 测试空间状态'],
   ['get_scene_snapshot', 'read', '读取当前模拟 QQ 场景快照'],
-  ['list_conversations', 'read', '分页列出当前操作者可见会话'],
+  ['list_conversations', 'read', '分页列出当前操作者可见的根会话；显式传 rootConversationId 时列出该根会话下的会话实例'],
   ['get_conversation', 'read', '读取单个会话及其消息'],
   ['get_forward_message', 'read', '按操作者可见性读取合并转发资源详情'],
   ['list_pending_requests', 'read', '列出当前待处理好友和群申请'],
@@ -1294,7 +1300,7 @@ export class SandboxMcpService {
     if (tool === 'prepare_destructive_action') return this.prepareDestructiveAction(activeControl, credential, args)
     if (tool === 'delete_environment_entity') return this.runDestructive(activeControl, credential, tool, args, () => this.deleteEnvironmentEntity(activeControl, args))
     if (tool === 'reset_scene') return this.runDestructive(activeControl, credential, tool, args, () => activeControl.resetScene())
-    if (tool === 'clear_scene') return this.runDestructive(activeControl, credential, tool, args, () => activeControl.replaceScene({ revision: activeControl.getSnapshot().revision, participants: [], groups: [], conversations: [], messages: [], forwards: [], friendships: [], requests: [] }))
+    if (tool === 'clear_scene') return this.runDestructive(activeControl, credential, tool, args, () => activeControl.replaceScene({ revision: activeControl.getSnapshot().revision, participants: [], groups: [], conversations: [], conversationInstances: [], messages: [], forwards: [], friendships: [], requests: [] }))
     if (tool === 'import_scene') return this.runDestructive(activeControl, credential, tool, args, () => this.importScene(activeControl, args))
     if (tool === 'list_onebot_debug_records') {
       if ('includeLargeValues' in args) {
@@ -1342,9 +1348,28 @@ export class SandboxMcpService {
     const snapshot = control.getVisibleSnapshot(operatorId, 100)
     const limit = Math.min(Math.max(Number(args.limit ?? 50), 1), 200)
     const offset = Math.max(Number(args.offset ?? 0), 0)
-    // 默认只返回根会话：会话实例不是新的联系人，把它们混进列表会让外部测试控制器误判关系。
-    const roots = listRootConversations(snapshot)
-    return { items: roots.slice(offset, offset + limit), nextOffset: offset + limit < roots.length ? offset + limit : undefined }
+    const items = this.listConversationItems(snapshot, args)
+    return { items: items.slice(offset, offset + limit), nextOffset: offset + limit < items.length ? offset + limit : undefined }
+  }
+
+  /**
+   * 会话列表的条目集合：默认只有根会话，显式传 `rootConversationId` 时换成该根会话下的会话实例。
+   *
+   * 默认不混入实例是因为实例不是新的联系人：混进列表会让外部测试控制器把一条对话线误判成一段
+   * 新增的关系，而两者的形状完全相同、没有任何可察觉的迹象。实例只在被显式问到时出现。
+   *
+   * 参数指向某个实例时归一化到它的根会话，与领域模块「层级严格两层」的口径一致——不存在第三层可问。
+   */
+  private listConversationItems(snapshot: SandboxSnapshot, args: Record<string, unknown>): ResolvedConversation[] {
+    // 显式传了却不是合法字符串时必须失败：静默按「省略」处理会返回根会话列表，而调用方以为
+    // 自己拿到的是实例列表。
+    if (args.rootConversationId === undefined) return listRootConversations(snapshot)
+    const rootConversationId = requireString(args.rootConversationId, 'rootConversationId')
+    // 快照已按可见性投影过，解析不到即等于该会话对当前操作者不存在；实例的可见性完全继承根会话。
+    if (!resolveConversation(snapshot, rootConversationId)) {
+      throw new SandboxMcpError('conversation_not_found', `会话不存在或不可见：${rootConversationId}`)
+    }
+    return listRootConversationInstances(snapshot, rootConversationId)
   }
 
   private getConversation(control: SandboxControlService, args: Record<string, unknown>) {
