@@ -23,9 +23,15 @@ import {
 import { createOneBotDebugError } from './onebot-debug'
 import { MAX_MEDIA_SIZE } from './media-storage'
 import {
-  createDirectConversationId,
-  createGroupConversationId,
-  getDirectConversationPeerId,
+  listVisibleConversationIds,
+  listVisibleRootConversations,
+  requireVisibleConversation,
+  resolveConversation,
+  resolveConversationPeerId,
+  resolveDirectConversationId,
+  resolveGroupConversationId,
+} from './conversation-resolution'
+import {
   isRecalledMessage,
   isSandboxGroupMemberMuted,
   type SandboxForwardNodeInput,
@@ -173,15 +179,15 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           const participants = new Map(snapshot.participants.map((participant) => [participant.id, participant]))
           const groups = new Map(snapshot.groups.map((group) => [group.id, group]))
           const messages = new Map(snapshot.messages.map((message) => [message.id, message]))
-          const recentContacts = snapshot.conversations.flatMap((conversation) => {
+          const recentContacts = listVisibleRootConversations(snapshot, this.selfId).flatMap((conversation) => {
             // 最近联系人摘要不得泄露撤回原文，回退到最近一条仍可读的消息。
             const latestMessage = [...conversation.messageIds].reverse()
               .map((messageId) => messages.get(messageId))
               .find((message) => message && !isRecalledMessage(message))
             if (!latestMessage) return []
-            const peerId = conversation.type === 'group'
+            const peerId = (conversation.type === 'group'
               ? conversation.groupId
-              : getDirectConversationPeerId(conversation, this.selfId)
+              : resolveConversationPeerId(conversation, this.selfId))!
             const peerName = conversation.type === 'group'
               ? groups.get(peerId)?.name ?? peerId
               : participants.get(peerId)?.name ?? peerId
@@ -228,14 +234,14 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           return { status: 'ok', retcode: 0, data: members.data.map((member) => this.toOneBotGuildMember(groupId, member)) }
         }
         if (action === 'send_private_msg') {
-          const conversationId = createDirectConversationId(this.selfId, String(params.user_id ?? ''))
+          const conversationId = this.resolveDirectConversationId(String(params.user_id ?? ''))
           const messageId = await this.deliverOutboundMessage(conversationId, parseOneBotOutboundMessage(params.message))
           return { status: 'ok', retcode: 0, data: { message_id: getOneBotMessageSequence(messageId) } }
         }
         if (action === 'send_group_msg') {
           const groupId = normalizeOneBotGroupId(params.group_id)
           await this.getGuild(groupId)
-          const messageId = await this.deliverOutboundMessage(createGroupConversationId(groupId), parseOneBotOutboundMessage(params.message))
+          const messageId = await this.deliverOutboundMessage(this.resolveGroupConversationId(groupId), parseOneBotOutboundMessage(params.message))
           return { status: 'ok', retcode: 0, data: { message_id: getOneBotMessageSequence(messageId) } }
         }
         if (action === 'send_msg') {
@@ -252,10 +258,10 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           return { status: 'ok', retcode: 0, data: this.toOneBotMessage(message) }
         }
         if (action === 'get_friend_msg_history') {
-          return this.getOneBotMessageHistory(createDirectConversationId(this.selfId, String(params.user_id ?? '')), params)
+          return this.getOneBotMessageHistory(this.resolveDirectConversationId(String(params.user_id ?? '')), params)
         }
         if (action === 'get_group_msg_history') {
-          return this.getOneBotMessageHistory(createGroupConversationId(normalizeOneBotGroupId(params.group_id)), params)
+          return this.getOneBotMessageHistory(this.resolveGroupConversationId(normalizeOneBotGroupId(params.group_id)), params)
         }
         if (action === 'delete_msg') {
           await this.control.recallBotMessage(this.selfId, String(params.message_id ?? ''))
@@ -362,14 +368,14 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
               operatorId: this.selfId,
               groupId,
               targetId,
-              conversationId: createGroupConversationId(groupId),
+              conversationId: this.resolveGroupConversationId(groupId),
             })
           }
           return this.control.performFriendAction({
             action: 'poke',
             operatorId: this.selfId,
             targetId,
-            conversationId: createDirectConversationId(this.selfId, targetId),
+            conversationId: this.resolveDirectConversationId(targetId),
           })
         }
         if (action === 'set_group_leave') {
@@ -428,8 +434,8 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           // send_forward_msg / send_group_forward_msg / send_private_forward_msg
           // 统一生成真实转发资源，不再把节点展平成普通文本。
           const conversationId = params.group_id !== undefined
-            ? createGroupConversationId(normalizeOneBotGroupId(params.group_id))
-            : createDirectConversationId(this.selfId, String(params.user_id ?? ''))
+            ? this.resolveGroupConversationId(normalizeOneBotGroupId(params.group_id))
+            : this.resolveDirectConversationId(String(params.user_id ?? ''))
           this.getVisibleConversation(conversationId)
           const nodes = await this.parseOneBotForwardNodes(params.messages)
           const result = await this.control.applyForwardMessage({
@@ -554,7 +560,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
 
   async createDirectChannel(userId: string): Promise<Universal.Channel> {
     return {
-      id: createDirectConversationId(userId, this.selfId),
+      id: this.resolveDirectConversationId(userId),
       type: Universal.Channel.Type.DIRECT,
     }
   }
@@ -841,20 +847,25 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     )
   }
 
+  private resolveDirectConversationId(userId: string) {
+    return resolveDirectConversationId(this.control.getSnapshot(), this.selfId, userId)
+  }
+
+  private resolveGroupConversationId(groupId: string) {
+    return resolveGroupConversationId(this.control.getSnapshot(), groupId)
+  }
+
   private getVisibleConversation(channelId: string) {
     // WebQQ 可见快照会截断最近消息；机器人 action 必须按完整逻辑会话判断可见性。
-    const conversation = this.control.getSnapshot().conversations.find(({ id }) => id === channelId)
-    if (!conversation) throw new Error(`会话不存在：${channelId}`)
-    if (!this.control.getVisibleSnapshot(this.selfId, 1).conversations.some(({ id }) => id === channelId)) {
+    try {
+      return requireVisibleConversation(this.control.getSnapshot(), this.selfId, channelId)
+    } catch {
       throw new Error(`会话不存在：${channelId}`)
     }
-    return conversation
   }
 
   private findAccessibleMessage(rawMessageId: string, channelId?: string) {
-    const visibleConversationIds = new Set(
-      this.control.getVisibleSnapshot(this.selfId, 1).conversations.map(({ id }) => id),
-    )
+    const visibleConversationIds = listVisibleConversationIds(this.control.getSnapshot(), this.selfId)
     const visibleMessages = this.control.getSnapshot().messages.filter(({ conversationId }) => (
       visibleConversationIds.has(conversationId)
       && (!channelId || conversationId === channelId)
@@ -897,7 +908,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
 
   private async toUniversalMessage(message: ReturnType<SandboxControlService['getSnapshot']>['messages'][number]): Promise<Universal.Message> {
     const snapshot = this.control.getSnapshot()
-    const conversation = snapshot.conversations.find(({ id }) => id === message.conversationId)
+    const conversation = resolveConversation(snapshot, message.conversationId)
     const user = await this.getUser(message.authorId)
     const reply = message.replyToMessageId
       ? snapshot.messages.find(({ id }) => id === message.replyToMessageId)
@@ -925,10 +936,8 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
 
   private toOneBotMessage(message: ReturnType<SandboxControlService['getSnapshot']>['messages'][number]) {
     const snapshot = this.control.getSnapshot()
-    const conversation = snapshot.conversations.find(({ id }) => id === message.conversationId)
-    const directPeerId = conversation?.type === 'direct'
-      ? getDirectConversationPeerId(conversation, this.selfId)
-      : undefined
+    const conversation = resolveConversation(snapshot, message.conversationId)
+    const directPeerId = conversation ? resolveConversationPeerId(conversation, this.selfId) : undefined
     const sequence = getOneBotMessageSequence(message.id)
     const participant = snapshot.participants.find(({ id }) => id === message.authorId)
     const groupMember = conversation?.groupId

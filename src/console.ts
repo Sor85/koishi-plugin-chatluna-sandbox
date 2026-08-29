@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type {} from '@koishijs/console'
 import { lookupChatLunaUsage, type ChatLunaUsageLookup } from './chatluna-usage'
+import { listConversationIds } from './conversation-resolution'
 import { buildSandboxModelRequestTrajectoryFromStore } from './model-request-trajectory'
 import type { SandboxControlService } from './control-service'
 import type { ListSandboxMcpCallRecordsInput, SandboxMcpCallRecordsPage } from './mcp/call-records'
@@ -328,7 +329,7 @@ export function registerConsole(
     }
     const visibleParticipantId = input.operatorId ?? getSandboxUsers(snapshot)[0]?.id ?? snapshot.participants[0]?.id
     const visibleSnapshot = visibleParticipantId ? activeControl.getVisibleSnapshot(visibleParticipantId, input.messageLimit) : snapshot
-    const visibleConversationIds = new Set(visibleSnapshot.conversations.map(({ id }) => id))
+    const visibleConversationIds = listConversationIds(visibleSnapshot)
     return {
       snapshot: visibleSnapshot,
       chatLunaStates: activeControl.getChatLunaStates().filter(({ conversationId }) => visibleConversationIds.has(conversationId)),

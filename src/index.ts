@@ -1,5 +1,6 @@
 import { Context, Schema } from 'koishi'
 import { registerConsole } from './console'
+import { includesConversationParticipant, resolveConversation } from './conversation-resolution'
 import {
   DEFAULT_SCENE_MESSAGE_LIMIT,
   DEFAULT_SCENE_MESSAGE_MAX_BYTES,
@@ -185,10 +186,10 @@ export function apply(ctx: Context, config: Config) {
     const resolvePresetRuntimeTarget = ({ botId, conversationId }: Pick<PresetRuntimeResolvedTarget, 'botId' | 'conversationId'>): PresetRuntimeResolvedTarget | undefined => {
       const belongsToTarget = (snapshot: ReturnType<SandboxControlService['getSnapshot']>) => {
         const botExists = snapshot.participants.some(({ id, kind }) => id === botId && kind === 'bot')
-        const conversation = snapshot.conversations.find(({ id }) => id === conversationId)
+        const conversation = resolveConversation(snapshot, conversationId)
         if (!botExists || !conversation) return false
-        if (conversation.type === 'direct') return conversation.participantIds.includes(botId)
-        return snapshot.groups.find(({ id }) => id === conversation.groupId)?.members.some(({ participantId }) => participantId === botId) ?? false
+        // 解除好友只撤销可见性，运行时预设快照仍要能归属到这一对参与者，因此按归属而不是可见性判定。
+        return includesConversationParticipant(snapshot, conversation, botId)
       }
       const matches: PresetRuntimeResolvedTarget[] = []
       if (belongsToTarget(control.getSnapshot())) {

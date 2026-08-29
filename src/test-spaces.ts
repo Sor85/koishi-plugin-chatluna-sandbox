@@ -6,6 +6,7 @@ import { createEmptyScene, SandboxControlService, type SandboxRuntimeBotRegistry
 import type { SandboxOneBotDebugPersistence } from './onebot-debug'
 import type { SandboxModelRequestPersistence } from './model-request'
 import type { SandboxTestSpacePersistence, SandboxTestSpacePersistenceRecord } from './persistence'
+import { trimConversationMessages } from './conversation-resolution'
 import type { SandboxSnapshot } from './types'
 import { SandboxDomainError } from './types'
 
@@ -27,17 +28,12 @@ export interface CreateSandboxTestSpaceInput {
 
 // Console 每 1.5s 轮询全部空间快照，裁掉历史消息避免带宽随消息量线性增长；MCP 契约仍返回完整快照，不走此函数。
 export function trimSnapshotMessages(snapshot: SandboxSnapshot, limit: number): SandboxSnapshot {
-  const conversations = snapshot.conversations.map((conversation) => ({
-    ...conversation,
-    messageIds: conversation.messageIds.slice(-limit),
-    hasMoreMessages: conversation.hasMoreMessages || conversation.messageIds.length > limit,
-  }))
-  const visibleMessageIds = new Set(conversations.flatMap(({ messageIds }) => messageIds))
-  const messages = snapshot.messages.filter(({ id }) => visibleMessageIds.has(id))
+  const trimmed = trimConversationMessages(snapshot, limit)
+  const messages = snapshot.messages.filter(({ id }) => trimmed.messageIds.has(id))
   const visibleForwardIds = new Set(messages.flatMap(({ forwardId }) => forwardId ? [forwardId] : []))
   return {
     ...snapshot,
-    conversations,
+    conversations: trimmed.conversations,
     messages,
     forwards: (snapshot.forwards ?? []).filter(({ id }) => visibleForwardIds.has(id)),
   }

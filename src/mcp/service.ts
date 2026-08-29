@@ -17,7 +17,13 @@ import {
 } from '../model-request'
 import type { SandboxTestSpaceService } from '../test-spaces'
 import type { GetSandboxModelRequestRecordsInput, SandboxForwardNodeInput, SandboxMedia, SandboxImplementationProfile, SandboxSnapshot } from '../types'
-import { createDirectConversationId, createGroupConversationId, isRecalledMessage, SandboxDomainError, SandboxModelRequestCursorExpiredError, SandboxOneBotDebugCursorExpiredError } from '../types'
+import { isRecalledMessage, SandboxDomainError, SandboxModelRequestCursorExpiredError, SandboxOneBotDebugCursorExpiredError } from '../types'
+import {
+  ensureDirectRootConversation,
+  ensureGroupRootConversation,
+  listRootConversations,
+  resolveConversation,
+} from '../conversation-resolution'
 import { getOneBotCapabilityMatrix } from '../onebot-profiles'
 import {
   matchesMcpCallRecordFilter,
@@ -1336,14 +1342,16 @@ export class SandboxMcpService {
     const snapshot = control.getVisibleSnapshot(operatorId, 100)
     const limit = Math.min(Math.max(Number(args.limit ?? 50), 1), 200)
     const offset = Math.max(Number(args.offset ?? 0), 0)
-    return { items: snapshot.conversations.slice(offset, offset + limit), nextOffset: offset + limit < snapshot.conversations.length ? offset + limit : undefined }
+    // 默认只返回根会话：会话实例不是新的联系人，把它们混进列表会让外部测试控制器误判关系。
+    const roots = listRootConversations(snapshot)
+    return { items: roots.slice(offset, offset + limit), nextOffset: offset + limit < roots.length ? offset + limit : undefined }
   }
 
   private getConversation(control: SandboxControlService, args: Record<string, unknown>) {
     const operatorId = requireString(args.operatorId, 'operatorId')
     const conversationId = requireString(args.conversationId, 'conversationId')
     const snapshot = control.getVisibleSnapshot(operatorId, Math.min(Math.max(Number(args.messageLimit ?? 50), 1), 100))
-    const conversation = snapshot.conversations.find(({ id }) => id === conversationId)
+    const conversation = resolveConversation(snapshot, conversationId)
     if (!conversation) throw new SandboxMcpError('conversation_not_found', `会话不存在或不可见：${conversationId}`)
     const messageIds = new Set(conversation.messageIds)
     return { conversation, messages: snapshot.messages.filter(({ id }) => messageIds.has(id)) }
@@ -1671,8 +1679,7 @@ export class SandboxMcpService {
         })
         // 与 set-friendship 自动创建私聊会话保持一致：建群即建群会话，
         // 否则 AI 需要先执行一次群操作才能拿到可发消息的会话。
-        const conversationId = createGroupConversationId(groupId)
-        if (!snapshot.conversations.some(({ id }) => id === conversationId)) snapshot.conversations.push({ id: conversationId, type: 'group', groupId, messageIds: [] })
+        ensureGroupRootConversation(snapshot, groupId)
       }
       else if (action === 'update-user') {
         const participant = snapshot.participants.find(({ id, kind }) => id === data.id && kind === 'user')
@@ -1726,8 +1733,7 @@ export class SandboxMcpService {
             createdAt: new Date().toISOString(),
           })
         }
-        const conversationId = createDirectConversationId(...participantIds)
-        if (data.enabled !== false && !snapshot.conversations.some(({ id }) => id === conversationId)) snapshot.conversations.push({ id: conversationId, type: 'direct', participantIds, messageIds: [] })
+        if (data.enabled !== false) ensureDirectRootConversation(snapshot, ...participantIds)
       }
       else throw new SandboxMcpError('unsupported_change', `不支持的环境变更：${action}`)
     }

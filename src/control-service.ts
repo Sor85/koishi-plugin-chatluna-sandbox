@@ -15,12 +15,36 @@ import {
 } from './model-request'
 import { toOneBotMessageSegments, toOneBotRawMessage } from './onebot-message'
 import type { SandboxSceneLoadResult, SandboxScenePersistence } from './persistence'
+import {
+  appendConversationMessageId,
+  clearConversationMessageIds,
+  ensureDirectRootConversation,
+  ensureGroupRootConversation,
+  findDirectRootConversation,
+  findGroupRootConversation,
+  findVisibleConversation,
+  isConversationVisible,
+  listConversations,
+  listConversationIds,
+  listVisibleConversationIds,
+  listVisibleRootConversations,
+  projectVisibleConversations,
+  pruneConversationMessageIds,
+  removeConversations,
+  requireConversation,
+  requireVisibleConversation,
+  resolveConversation,
+  resolveConversationPeerId,
+  resolveDirectConversationId,
+  resolveGroupConversationId,
+  validateSceneConversations,
+  type ResolvedConversation,
+} from './conversation-resolution'
 import { mergeAccountProfile, normalizeAccountProfile, sanitizeSnapshotProfiles } from './account-profile'
 import { getOneBotCapabilityMatrix, getOneBotMessageEventFields, getOneBotMessageSequence, normalizeDisabledCapabilities, resolveOneBotMessageId, type SandboxOneBotCapability } from './onebot-profiles'
 import {
   createDirectConversationId,
   createGroupConversationId,
-  getDirectConversationPeerId,
   isSandboxGroupMemberMuted,
   type CreateSandboxBotInput,
   type CreateSandboxGroupInput,
@@ -52,7 +76,6 @@ import {
   type SandboxBotProfile,
   type SandboxChatLunaState,
   type SandboxConversation,
-  type SandboxDirectConversation,
   type SandboxForward,
   type SandboxForwardNode,
   type SandboxForwardNodeInput,
@@ -124,7 +147,7 @@ export class SandboxRuntimeBotRegistry {
 interface SandboxMessageContext {
   operator: SandboxParticipant
   peer?: SandboxParticipant
-  conversation: SandboxConversation
+  conversation: ResolvedConversation
   group?: SandboxGroup
   reply?: SandboxMessage
 }
@@ -287,8 +310,7 @@ export class SandboxControlService {
     this.initialScene = structuredClone(this.scene)
     this.chatLunaState = new SandboxChatLunaStateStore(ctx, (botParticipantId, conversationId) => {
       const participant = this.scene.participants.find(({ id }) => id === botParticipantId)
-      const conversation = this.scene.conversations.find(({ id }) => id === conversationId)
-      return participant?.kind === 'bot' && !!conversation && this.isConversationVisible(botParticipantId, conversation)
+      return participant?.kind === 'bot' && !!findVisibleConversation(this.scene, botParticipantId, conversationId)
     }, () => this.notifySceneMutation(), (botParticipantId, conversationId, result, messageIds) => {
       this.archiveChatLunaResult(botParticipantId, conversationId, result, messageIds)
     }, (error, targets) => {
@@ -344,17 +366,12 @@ export class SandboxControlService {
       if (group.members.filter(({ role }) => role === 'owner').length !== 1) throw new SandboxDomainError(`群组必须且只能有一个群主：${group.id}`)
     }
     const groupIds = new Set(next.groups.map(({ id }) => id))
-    const conversationIds = new Set(next.conversations.map(({ id }) => id))
-    if (conversationIds.size !== next.conversations.length) throw new SandboxDomainError('会话 ID 不能重复')
-    for (const conversation of next.conversations) {
-      if (conversation.type === 'direct' && !conversation.participantIds.every((id) => participantIds.has(id))) throw new SandboxDomainError(`私聊包含不存在的参与者：${conversation.id}`)
-      if (conversation.type === 'group' && !groupIds.has(conversation.groupId)) throw new SandboxDomainError(`群聊引用不存在的群组：${conversation.id}`)
-    }
     const messageIds = new Set(next.messages.map(({ id }) => id))
     if (messageIds.size !== next.messages.length) throw new SandboxDomainError('消息 ID 不能重复')
+    validateSceneConversations(next, { participantIds, groupIds, messageIds })
+    const conversationIds = listConversationIds(next)
     if (next.messages.some(({ authorId, conversationId }) => !participantIds.has(authorId) || !conversationIds.has(conversationId))) throw new SandboxDomainError('消息引用不存在的参与者或会话')
     if (next.messages.some(({ media }) => media?.some(({ id, reference }) => reference !== `sandbox-media://${id}`))) throw new SandboxDomainError('消息包含无效媒体引用')
-    if (next.conversations.some((conversation) => conversation.messageIds.some((id) => !messageIds.has(id)))) throw new SandboxDomainError('会话引用不存在的消息')
     // 未发布阶段直接规范化 forwards；缺失时补空数组，避免旧测试快照或半成品导入炸掉。
     this.normalizeSceneForwards(next)
     const forwardIds = new Set(next.forwards!.map(({ id }) => id))
@@ -711,20 +728,13 @@ export class SandboxControlService {
   getVisibleSnapshot(operatorId: string, messageLimit = 50): SandboxSnapshot {
     this.getParticipant(operatorId)
     const limit = this.validateMessageLimit(messageLimit)
-    const conversations = this.scene.conversations
-      .filter((conversation) => this.isConversationVisible(operatorId, conversation))
-      .map((conversation) => ({
-        ...conversation,
-        messageIds: conversation.messageIds.slice(-limit),
-        hasMoreMessages: conversation.messageIds.length > limit,
-      }))
-    const visibleMessageIds = new Set(conversations.flatMap(({ messageIds }) => messageIds))
-    const messages = this.scene.messages.filter(({ id }) => visibleMessageIds.has(id))
+    const projection = projectVisibleConversations(this.scene, operatorId, limit)
+    const messages = this.scene.messages.filter(({ id }) => projection.messageIds.has(id))
     // 只返回当前页消息直接引用的转发资源；嵌套资源由 getForwardMessage 按需读取。
     const visibleForwardIds = new Set(messages.flatMap(({ forwardId }) => forwardId ? [forwardId] : []))
     return structuredClone({
       ...this.scene,
-      conversations,
+      conversations: projection.conversations,
       messages,
       forwards: this.getForwards().filter(({ id }) => visibleForwardIds.has(id)),
     })
@@ -860,8 +870,8 @@ export class SandboxControlService {
       && !ownedGroupIds.has(groupId ?? ''))
     this.scene.friendships = this.scene.friendships.filter(({ participantIds }) => !participantIds.includes(input.id))
     this.deleteConversations((conversation) => conversation.type === 'direct'
-      ? conversation.participantIds.includes(input.id)
-      : ownedGroupIds.has(conversation.groupId))
+      ? !!conversation.participantIds?.includes(input.id)
+      : ownedGroupIds.has(conversation.groupId ?? ''))
     this.commitSceneMutation()
   }
 
@@ -978,8 +988,8 @@ export class SandboxControlService {
       && !ownedGroupIds.has(groupId ?? ''))
     this.scene.friendships = this.scene.friendships.filter(({ participantIds }) => !participantIds.includes(input.id))
     this.deleteConversations((conversation) => conversation.type === 'direct'
-      ? conversation.participantIds.includes(input.id)
-      : ownedGroupIds.has(conversation.groupId))
+      ? !!conversation.participantIds?.includes(input.id)
+      : ownedGroupIds.has(conversation.groupId ?? ''))
     this.commitSceneMutation()
   }
 
@@ -1080,9 +1090,7 @@ export class SandboxControlService {
       if (this.isBot(target.id)) await this.dispatchBotNotice(target.id, input.operatorId, 'notify')
       const conversation = input.conversationId
         ? this.getVisibleConversation(input.operatorId, input.conversationId)
-        : this.scene.conversations.find((item) => item.type === 'direct'
-          && item.participantIds.includes(input.operatorId)
-          && item.participantIds.includes(target.id))
+        : findDirectRootConversation(this.scene, input.operatorId, target.id)
       if (!conversation) throw new SandboxDomainError('戳一戳必须在可见会话中发起')
       const group = conversation.groupId
         ? this.scene.groups.find(({ id }) => id === conversation.groupId)
@@ -1090,7 +1098,7 @@ export class SandboxControlService {
       if (group && !group.members.some(({ participantId }) => participantId === target.id)) {
         throw new SandboxDomainError('目标用户不在当前群组中')
       }
-      if (!group && (conversation.type !== 'direct' || !conversation.participantIds.includes(target.id))) {
+      if (!group && (conversation.type !== 'direct' || !conversation.participantIds?.includes(target.id))) {
         throw new SandboxDomainError('目标用户不在当前私聊中')
       }
       const getDisplayName = (participantId: string) => group?.members.find((member) => member.participantId === participantId)?.card
@@ -1291,7 +1299,7 @@ export class SandboxControlService {
     if (input.action !== 'poke') throw new SandboxDomainError(`不支持的群组操作：${Reflect.get(input, 'action') ?? 'unknown'}`)
     const conversation = input.conversationId
       ? this.getVisibleConversation(input.operatorId, input.conversationId)
-      : this.scene.conversations.find((item) => item.type === 'group' && item.groupId === group.id)
+      : findGroupRootConversation(this.scene, group.id)
     if (!conversation || conversation.groupId !== group.id) throw new SandboxDomainError('群内戳一戳必须在当前群会话中发起')
     await this.dispatchGroupNotice(group, 'notify', {
       sub_type: 'poke',
@@ -1478,7 +1486,7 @@ export class SandboxControlService {
         messages: this.toOneBotForwardNodePayloads(this.buildForwardNodes(input)),
       }
       if (conversation.type === 'group') params.group_id = Number(conversation.groupId)
-      else params.user_id = Number(getDirectConversationPeerId(conversation, input.operatorId))
+      else params.user_id = Number(resolveConversationPeerId(conversation, input.operatorId))
       const result = await this.getRuntimeBot(bot.id).internal._request('send_forward_msg', params) as {
         data?: { message_id?: number | string; forward_id?: string; res_id?: string }
       }
@@ -1565,8 +1573,7 @@ export class SandboxControlService {
     seen.add(forwardId)
     const linkedMessages = this.scene.messages.filter(({ forwardId: id }) => id === forwardId)
     for (const message of linkedMessages) {
-      const conversation = this.scene.conversations.find(({ id }) => id === message.conversationId)
-      if (conversation && this.isConversationVisible(operatorId, conversation)) return true
+      if (findVisibleConversation(this.scene, operatorId, message.conversationId)) return true
     }
     // 嵌套资源：只要某个已可见父转发的节点引用它，就允许继续读取详情。
     for (const parent of this.getForwards()) {
@@ -1581,8 +1588,7 @@ export class SandboxControlService {
     const messageId = resolveOneBotMessageId(rawMessageId, this.scene.messages.map(({ id }) => id)) ?? rawMessageId
     const message = this.scene.messages.find(({ id }) => id === messageId)
     if (!message?.forwardId) throw new SandboxDomainError(`消息不是合并转发：${rawMessageId}`)
-    const conversation = this.scene.conversations.find(({ id }) => id === message.conversationId)
-    if (!conversation || !this.isConversationVisible(operatorId, conversation)) {
+    if (!findVisibleConversation(this.scene, operatorId, message.conversationId)) {
       throw new SandboxDomainError(`消息不存在：${rawMessageId}`)
     }
     if (isRecalledMessage(message)) throw new SandboxDomainError(`消息已撤回：${rawMessageId}`)
@@ -1605,8 +1611,7 @@ export class SandboxControlService {
     const messages = uniqueIds.map((messageId) => {
       const message = this.scene.messages.find(({ id }) => id === messageId)
       if (!message) throw new SandboxDomainError(`消息不存在：${messageId}`)
-      const conversation = this.scene.conversations.find(({ id }) => id === message.conversationId)
-      if (!conversation || !this.isConversationVisible(operatorId, conversation)) {
+      if (!findVisibleConversation(this.scene, operatorId, message.conversationId)) {
         throw new SandboxDomainError(`消息不存在：${messageId}`)
       }
       if (message.event) throw new SandboxDomainError(`事件消息不能合并转发：${messageId}`)
@@ -1660,7 +1665,7 @@ export class SandboxControlService {
 
   private toForwardNodeFromMessage(message: SandboxMessage): SandboxForwardNode {
     const author = this.scene.participants.find(({ id }) => id === message.authorId)
-    const conversation = this.scene.conversations.find(({ id }) => id === message.conversationId)
+    const conversation = resolveConversation(this.scene, message.conversationId)
     const groupMember = conversation?.type === 'group'
       ? this.scene.groups.find(({ id }) => id === conversation.groupId)
         ?.members.find(({ participantId }) => participantId === message.authorId)
@@ -1757,9 +1762,7 @@ export class SandboxControlService {
   }
 
   getMediaContent(input: GetMediaContentInput): SandboxMediaContent {
-    const visibleConversationIds = new Set(this.scene.conversations
-      .filter((conversation) => this.isConversationVisible(input.operatorId, conversation))
-      .map(({ id }) => id))
+    const visibleConversationIds = listVisibleConversationIds(this.scene, input.operatorId)
     this.getParticipant(input.operatorId)
     const messageMedia = this.scene.messages
       .filter(({ conversationId }) => visibleConversationIds.has(conversationId))
@@ -1933,8 +1936,7 @@ export class SandboxControlService {
     this.getParticipant(input.operatorId)
     const message = this.scene.messages.find(({ id }) => id === input.messageId)
     if (!message) throw new SandboxDomainError(`消息不存在：${input.messageId}`)
-    const conversation = this.scene.conversations.find(({ id }) => id === message.conversationId)
-    if (!conversation || !this.isConversationVisible(input.operatorId, conversation)) {
+    if (!findVisibleConversation(this.scene, input.operatorId, message.conversationId)) {
       throw new SandboxDomainError(`消息不存在：${input.messageId}`)
     }
     // 私聊和群聊共用回应事实；会话可见性已在上方统一校验。
@@ -1977,8 +1979,7 @@ export class SandboxControlService {
     const removedMessageIds = new Set(this.scene.messages
       .filter(({ conversationId }) => conversationId === conversation.id)
       .map(({ id }) => id))
-    conversation.messageIds = []
-    conversation.hasMoreMessages = false
+    clearConversationMessageIds(this.scene, conversation.id)
     this.scene.messages = this.scene.messages.filter(({ conversationId }) => conversationId !== conversation.id)
     this.chatLunaState.deleteByConversationIds(new Set([conversation.id]))
     this.botDeliveries = this.botDeliveries.filter(({ messageId }) => !removedMessageIds.has(messageId))
@@ -1997,8 +1998,8 @@ export class SandboxControlService {
   private async recallVisibleMessage(operatorId: string, messageId: string, conversationId?: string): Promise<void> {
     const message = this.scene.messages.find(({ id }) => id === messageId)
     if (!message || (conversationId && message.conversationId !== conversationId)) throw new SandboxDomainError(`消息不存在：${messageId}`)
-    const conversation = this.scene.conversations.find(({ id }) => id === message.conversationId)
-    if (!conversation || !this.isConversationVisible(operatorId, conversation)) throw new SandboxDomainError(`消息不存在：${messageId}`)
+    const conversation = findVisibleConversation(this.scene, operatorId, message.conversationId)
+    if (!conversation) throw new SandboxDomainError(`消息不存在：${messageId}`)
     if (message.event || isRecalledMessage(message)) throw new SandboxDomainError('该消息不支持撤回')
     const group = conversation.type === 'group'
       ? this.scene.groups.find(({ id }) => id === conversation.groupId)
@@ -2029,17 +2030,18 @@ export class SandboxControlService {
       return
     }
     if (conversation.type !== 'direct') return
-    await Promise.all(conversation.participantIds.map(async (participantId) => {
+    await Promise.all(conversation.participantIds!.map(async (participantId) => {
       const bot = this.getBots().find(({ id }) => id === participantId)
       if (!bot?.enabled) return
       await this.dispatchFriendRecallNotice(bot.id, conversation, message.id)
     }))
   }
 
-  private async dispatchFriendRecallNotice(botId: string, conversation: SandboxDirectConversation, messageId: string): Promise<void> {
+  private async dispatchFriendRecallNotice(botId: string, conversation: ResolvedConversation, messageId: string): Promise<void> {
     const bot = this.runtimeBots.get(botId)
     if (!bot) return
-    const peerId = getDirectConversationPeerId(conversation, botId)
+    const peerId = resolveConversationPeerId(conversation, botId)
+    if (!peerId) return
     const session = bot.session({
       type: 'message-deleted',
       timestamp: Date.now(),
@@ -2072,8 +2074,7 @@ export class SandboxControlService {
     broadcastId?: string,
     forwardId?: string,
   ): SandboxMessage {
-    const conversation = this.scene.conversations.find(({ id }) => id === conversationId)
-    if (!conversation) throw new SandboxDomainError(`会话不存在：${conversationId}`)
+    requireConversation(this.scene, conversationId)
 
     const message: SandboxMessage = {
       id: Random.id(),
@@ -2090,7 +2091,7 @@ export class SandboxControlService {
       ...(forwardId ? { forwardId } : {}),
     }
     this.scene.messages.push(message)
-    conversation.messageIds.push(message.id)
+    appendConversationMessageId(this.scene, conversationId, message.id)
     if (!event && this.isBot(authorId)) {
       this.chatLunaState.recordReplyMessage(authorId, conversationId, message.id)
     }
@@ -2284,10 +2285,7 @@ export class SandboxControlService {
     if (!removed.length) return false
 
     const removedIds = new Set(removed.map(({ id }) => id))
-    for (const conversation of this.scene.conversations) {
-      if (!conversation.messageIds.some((id) => removedIds.has(id))) continue
-      conversation.messageIds = conversation.messageIds.filter((id) => !removedIds.has(id))
-    }
+    pruneConversationMessageIds(this.scene, removedIds)
     this.botDeliveries = this.botDeliveries.filter(({ messageId }) => !removedIds.has(messageId))
     // 失去外层引用的合并转发资源必须一起回收，否则 getMediaReferences 会永久钉住节点媒体。
     this.pruneUnreferencedForwards()
@@ -2341,18 +2339,11 @@ export class SandboxControlService {
 
   private getVisibleConversation(operatorId: string, conversationId: string) {
     this.getParticipant(operatorId)
-    const conversation = this.scene.conversations.find(({ id }) => id === conversationId)
-    if (!conversation || !this.isConversationVisible(operatorId, conversation)) throw new SandboxDomainError(`会话不存在：${conversationId}`)
-    return conversation
+    return requireVisibleConversation(this.scene, operatorId, conversationId)
   }
 
-  private isConversationVisible(operatorId: string, conversation: SandboxConversation) {
-    if (conversation.type === 'direct') {
-      if (!conversation.participantIds.includes(operatorId)) return false
-      return !!this.getFriendship(...conversation.participantIds)
-    }
-    const group = this.scene.groups.find(({ id }) => id === conversation.groupId)
-    return !!group?.members.some(({ participantId }) => participantId === operatorId)
+  private isConversationVisible(operatorId: string, conversation: ResolvedConversation) {
+    return isConversationVisible(this.scene, operatorId, conversation)
   }
 
   private resolveInboundQuote(reply: SandboxMessage) {
@@ -2380,9 +2371,8 @@ export class SandboxControlService {
     if (conversation.type === 'group' && (!group || !group.members.some(({ participantId }) => participantId === operator.id))) {
       throw new SandboxDomainError(`群聊关系不存在：${input.conversationId}`)
     }
-    const peer = conversation.type === 'direct'
-      ? this.getParticipant(getDirectConversationPeerId(conversation, input.operatorId))
-      : undefined
+    const peerId = resolveConversationPeerId(conversation, input.operatorId)
+    const peer = peerId ? this.getParticipant(peerId) : undefined
     const reply = input.replyToMessageId
       ? this.scene.messages.find(({ id, conversationId }) => id === input.replyToMessageId && conversationId === conversation.id)
       : undefined
@@ -2585,15 +2575,7 @@ export class SandboxControlService {
     if (existing) return existing
     const friendship = createFriendship(firstId, secondId)
     this.scene.friendships.push(friendship)
-    const id = createDirectConversationId(firstId, secondId)
-    if (!this.scene.conversations.some((conversation) => conversation.id === id)) {
-      this.scene.conversations.push({
-        id,
-        type: 'direct',
-        participantIds: [firstId, secondId].sort() as [string, string],
-        messageIds: [],
-      })
-    }
+    ensureDirectRootConversation(this.scene, firstId, secondId)
     return friendship
   }
 
@@ -2644,7 +2626,7 @@ export class SandboxControlService {
       user: { id: userId, name: this.getUser(userId).name },
       // channelId 使用沙盒私聊会话 ID 而非 adapter-onebot 的 `private:QQ号`，
       // 插件收到事件后 session.send() 才能直接回落到同一会话。
-      channel: { id: createDirectConversationId(userId, botId), type: Universal.Channel.Type.DIRECT },
+      channel: { id: resolveDirectConversationId(this.scene, userId, botId), type: Universal.Channel.Type.DIRECT },
     })
     if (noticeType === 'notify') {
       // adapter-onebot 把 notify/poke 映射为 type=notice、subtype=poke 并附带 targetId；
@@ -2726,7 +2708,7 @@ export class SandboxControlService {
         timestamp: Date.now(),
         guild: { id: group.id, name: group.name },
         // channelId 与消息事件一致使用沙盒群会话 ID，插件在通知回调里 session.send() 才能落回本群。
-        channel: { id: createGroupConversationId(group.id), type: Universal.Channel.Type.TEXT },
+        channel: { id: resolveGroupConversationId(this.scene, group.id), type: Universal.Channel.Type.TEXT },
         user: user ? { id: user.id, name: user.name, avatar: user.avatar, isBot: this.isBot(user.id) } : undefined,
         operator: operator ? { id: operator.id, name: operator.name, avatar: operator.avatar, isBot: this.isBot(operator.id) } : undefined,
         member: member && user ? {
@@ -2807,14 +2789,13 @@ export class SandboxControlService {
     return detail === undefined ? postType : `${postType}.${String(detail)}`
   }
 
-  private deleteConversations(predicate: (conversation: SandboxSnapshot['conversations'][number]) => boolean): void {
-    const removedIds = new Set(this.scene.conversations.filter(predicate).map(({ id }) => id))
+  private deleteConversations(predicate: (conversation: ResolvedConversation) => boolean): void {
+    const removedIds = removeConversations(this.scene, predicate)
     const removedMessageIds = new Set(this.scene.messages
       .filter(({ conversationId }) => removedIds.has(conversationId))
       .map(({ id }) => id))
     this.chatLunaState.deleteByConversationIds(removedIds)
     // 媒体回收改由 commitSceneMutation 统一按引用扫描，避免共享头像/附件被提前删除。
-    this.scene.conversations = this.scene.conversations.filter(({ id }) => !removedIds.has(id))
     this.scene.messages = this.scene.messages.filter(({ conversationId }) => !removedIds.has(conversationId))
     this.botDeliveries = this.botDeliveries.filter(({ messageId }) => !removedMessageIds.has(messageId))
     // 删除会话消息后级联清理不再被任何存活消息/嵌套节点引用的 forward，
@@ -2883,8 +2864,6 @@ export class SandboxControlService {
   private syncGroupConversations(groupId: string): void {
     const group = this.scene.groups.find(({ id }) => id === groupId)
     if (!group) return
-    const id = createGroupConversationId(groupId)
-    if (this.scene.conversations.some((conversation) => conversation.id === id)) return
-    this.scene.conversations.push({ id, type: 'group', groupId, messageIds: [] })
+    ensureGroupRootConversation(this.scene, groupId)
   }
 }
