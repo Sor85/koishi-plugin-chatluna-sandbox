@@ -10,11 +10,17 @@
 
 **Blocked by:** None — can start immediately
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] 根会话类型不再带父会话字段与标题字段
-- [ ] 领域层不再有创建会话实例与创建分支的方法
-- [ ] Console 事件表、模块声明增强、客户端端口、端口适配器、控制器、工作台外壳都不再出现这两个端点
-- [ ] 客户端端口适配器里不存在绕过类型检查的强制转换
-- [ ] 侧栏会话树组件与样式仍在库中，界面不再显示任何子项，也不发起任何请求
-- [ ] `yarn test`、`yarn typecheck`、`yarn build` 全部通过
+- [x] 根会话类型不再带父会话字段与标题字段
+- [x] 领域层不再有创建会话实例与创建分支的方法
+- [x] Console 事件表、模块声明增强、客户端端口、端口适配器、控制器、工作台外壳都不再出现这两个端点
+- [x] 客户端端口适配器里不存在绕过类型检查的强制转换
+- [x] 侧栏会话树组件与样式仍在库中，界面不再显示任何子项，也不发起任何请求
+- [x] `yarn test`、`yarn typecheck`、`yarn build` 全部通过
+
+## Comments
+
+已完成。领域与 RPC 层按 `git checkout` 整体回退（`src/types.ts`、`src/control-service.ts`、`src/console.ts`、客户端端口/适配器/假端口/控制器/工作台外壳）；侧栏会话树模板、展开态、消息右键「创建分支」菜单项与样式保留，未接数据源、未绑定事件处理器。
+
+顺带修掉一处既有失败断言：`tests/webqq-sidebar.test.ts` 仍按 `<nav class="webqq-rail"` 断言，而 7b5d3ba 已把导航类名改成 `webqq-rail webqq-overlay-header`，该断言在 HEAD 上就是红的。断言已对齐当前类名。

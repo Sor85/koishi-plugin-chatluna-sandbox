@@ -232,25 +232,63 @@
               :key="conversation.id"
             >
               <ContextMenuTrigger as-child>
+                <div class="webqq-session-tree-row">
+                  <button
+                    type="button"
+                    class="webqq-session"
+                    :class="{ 'is-active': conversation.id === activeConversationId }"
+                    @click="selectConversation(conversation.id)"
+                  >
+                    <WebqqAvatar
+                      class="webqq-avatar"
+                      :kind="conversation.avatarKind"
+                      :name="conversation.title"
+                      :avatar="conversation.avatar"
+                    />
+                    <span class="webqq-session-copy">
+                      <strong>{{ conversation.title }}</strong>
+                      <small>{{ conversation.preview }}</small>
+                    </span>
+                  </button>
+                  <button type="button" class="webqq-session-expand" :aria-expanded="isConversationExpanded(conversation.id)" :aria-label="isConversationExpanded(conversation.id) ? '收起会话' : '展开会话'" @click.stop="toggleConversationExpanded(conversation.id)">
+                    <IconChevronDown :class="{ 'is-expanded': isConversationExpanded(conversation.id) }" :size="15" aria-hidden="true" />
+                  </button>
+                </div>
+              </ContextMenuTrigger>
+              <div v-if="isConversationExpanded(conversation.id)" class="webqq-session-children">
+                <ContextMenu v-for="child in conversation.children ?? []" :key="child.id">
+                  <ContextMenuTrigger as-child>
+                    <button
+                      type="button"
+                      class="webqq-session webqq-session-child"
+                      :class="{ 'is-active': child.id === activeConversationId }"
+                      @click="selectConversation(child.id)"
+                    >
+                      <span class="webqq-session-child-mark" aria-hidden="true" />
+                      <span class="webqq-session-copy">
+                        <strong>{{ child.title }}</strong>
+                        <small>{{ child.preview }}</small>
+                      </span>
+                    </button>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent style="z-index: 140">
+                    <ContextMenuItem
+                      class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40"
+                      @select="emit('removeRecentConversation', child.id)"
+                    >
+                      <IconTrash :size="16" aria-hidden="true" /> 删除会话
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
                 <button
                   type="button"
-                  class="webqq-session"
-                  :class="{ 'is-active': conversation.id === activeConversationId }"
-                  @click="selectConversation(conversation.id)"
+                  class="webqq-session webqq-session-create webqq-session-child-create"
+                  @click="createConversation(conversation.id)"
                 >
-                  <WebqqAvatar
-                    class="webqq-avatar"
-                    :kind="conversation.avatarKind"
-                    :name="conversation.title"
-                    :avatar="conversation.avatar"
-                  />
-                  <span class="webqq-session-copy">
-                    <strong>{{ conversation.title }}</strong>
-                    <small>{{ conversation.preview }}</small>
-                  </span>
-                  <time>{{ conversation.time }}</time>
+                  <span class="webqq-session-child-mark webqq-session-child-create-mark" aria-hidden="true"><IconPlus :size="14" /></span>
+                  <span class="webqq-session-copy"><strong>创建新会话</strong></span>
                 </button>
-              </ContextMenuTrigger>
+              </div>
               <ContextMenuContent style="z-index: 140">
                 <ContextMenuItem
                   v-if="conversation.groupId"
@@ -268,6 +306,9 @@
                 >
                   <IconUserMinus :size="16" aria-hidden="true" />
                   {{ conversation.actorRole === 'owner' ? '群主不能直接退群' : '退出群组' }}
+                </ContextMenuItem>
+                <ContextMenuItem @select="createConversation(conversation.id)">
+                  <IconPlus :size="16" aria-hidden="true" /> 创建新会话
                 </ContextMenuItem>
                 <ContextMenuItem
                   class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40"
@@ -299,7 +340,7 @@
 
 <script setup lang="ts">
 import {
-  IconBell, IconBrain, IconBug, IconClock, IconEdit, IconFileCode, IconHistory, IconId, IconMessageCircle, IconPlus,
+  IconBell, IconBrain, IconBug, IconChevronDown, IconClock, IconEdit, IconFileCode, IconHistory, IconId, IconMessageCircle, IconPlus,
   IconSearch, IconSettings, IconTag, IconTrash, IconUser, IconUserMinus, IconUserPlus, IconUsers,
 } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
@@ -333,6 +374,7 @@ export interface WebqqSidebarConversation {
   actorRole?: SandboxGroupMember['role']
   entityTarget: { type: 'user' | 'bot' | 'group', id: string }
   entityLabel: '用户' | '机器人' | '群组'
+  children?: WebqqSidebarConversation[]
 }
 
 export interface WebqqSidebarFriend {
@@ -390,6 +432,7 @@ const spacesBusy = computed(() => !!props.mcpRunning && !preview.value)
 const emit = defineEmits<{
   selectView: [view: WebqqSidebarModel['currentView']]
   selectConversation: [conversationId: string]
+  createConversation: [parentConversationId: string]
   removeRecentConversation: [conversationId: string]
   manageEnvironment: [input: ManageSandboxEnvironmentInput, resolve: () => void, reject: (error: unknown) => void]
   friendAction: [input: SandboxFriendAction]
@@ -412,6 +455,7 @@ const sidebarTab = ref<SidebarTab>('recent')
 const notificationTab = ref<'friends' | 'groups'>('friends')
 const handlingRequestId = ref('')
 const notificationErrorMessage = ref('')
+const expandedConversationIds = ref<Record<string, true>>({})
 const navigationItems = [
   { id: 'messages' as const, label: '消息', icon: IconMessageCircle },
   { id: 'model-requests' as const, label: '模型请求', icon: IconBrain },
@@ -434,6 +478,16 @@ const sidebarTabs = [
   { id: 'groups' as const, label: '群组', icon: IconUsers },
 ]
 const filteredConversations = computed(() => sidebarTab.value === 'recent' ? props.model.conversations : [])
+
+function isConversationExpanded(conversationId: string) {
+  return !!expandedConversationIds.value[conversationId]
+}
+
+function toggleConversationExpanded(conversationId: string) {
+  expandedConversationIds.value = isConversationExpanded(conversationId)
+    ? Object.fromEntries(Object.entries(expandedConversationIds.value).filter(([id]) => id !== conversationId))
+    : { ...expandedConversationIds.value, [conversationId]: true }
+}
 const notificationRequests = computed(() => props.model.notificationRequests)
 const pendingNotificationCount = computed(() => notificationRequests.value.friends.length + notificationRequests.value.groups.length)
 const filteredFriendDirectory = computed(() => {
@@ -465,6 +519,10 @@ function selectSidebarTab(tab: SidebarTab) {
 
 function selectConversation(conversationId: string) {
   emit('selectConversation', conversationId)
+}
+
+function createConversation(parentConversationId: string) {
+  emit('createConversation', parentConversationId)
 }
 
 function manageEnvironment(input: ManageSandboxEnvironmentInput, resolve: () => void, reject: (error: unknown) => void) {

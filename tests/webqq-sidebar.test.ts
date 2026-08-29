@@ -10,7 +10,7 @@ describe('WebQQ 顶部导航与会话栏', () => {
     const notificationSource = readFileSync(resolve('client/notification-menu.vue'), 'utf8')
     const sidebarStyles = readFileSync(resolve('client/styles/webqq-sidebar.css'), 'utf8')
 
-    expect(source).toContain('<nav class="webqq-rail"')
+    expect(source).toContain('<nav class="webqq-rail webqq-overlay-header"')
     expect(source).toContain('<div class="webqq-brand" aria-label="ChatLuna Sandbox">')
     expect(source).toContain('<SandboxActivityIcon />')
     expect(source).toContain('<strong>ChatLuna Sandbox</strong>')

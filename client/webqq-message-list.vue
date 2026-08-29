@@ -185,6 +185,9 @@
               <IconExternalLink :size="16" aria-hidden="true" /> 跳转到对应请求
             </ContextMenuItem>
             <ContextMenuItem v-if="!isRecalledMessage(message)" @select="emit('reply', message.id)"><IconMessageReply :size="16" aria-hidden="true" /> 回复</ContextMenuItem>
+            <ContextMenuItem v-if="!message.event" @select="emit('branchConversation', message.id)">
+              <IconGitBranch :size="16" aria-hidden="true" /> 创建分支
+            </ContextMenuItem>
             <ContextMenuItem v-if="canReactToMessage(message)" @select="emit('openReactionPicker', message.id)">
               <IconMoodSmile :size="16" aria-hidden="true" /> 贴表情
             </ContextMenuItem>
@@ -320,7 +323,7 @@
 </template>
 
 <script setup lang="ts">
-import { IconArrowBackUp, IconAt, IconBell, IconCheck, IconChecks, IconClock, IconExternalLink, IconHandClick, IconId, IconMessageReply, IconMoodSmile, IconPaperclip, IconTag, IconTrash, IconUserMinus, IconUserPlus, IconUsers } from '@tabler/icons-vue'
+import { IconArrowBackUp, IconAt, IconBell, IconCheck, IconChecks, IconClock, IconExternalLink, IconGitBranch, IconHandClick, IconId, IconMessageReply, IconMoodSmile, IconPaperclip, IconTag, IconTrash, IconUserMinus, IconUserPlus, IconUsers } from '@tabler/icons-vue'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from './components/ui/context-menu'
 import { getFriendMenuActions, type FriendMenuState } from './webqq/friend-menu'
@@ -395,6 +398,7 @@ const emit = defineEmits<{
   reply: [messageId: string]
   recallMessage: [messageId: string]
   clearConversation: []
+  branchConversation: [messageId: string]
   enterSelection: [messageId: string]
   toggleSelection: [messageId: string]
   openForward: [input: { messageId: string; forwardId: string }]

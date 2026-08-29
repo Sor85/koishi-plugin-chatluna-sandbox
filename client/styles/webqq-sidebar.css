@@ -422,6 +422,78 @@
   padding: 6px 0 12px;
 }
 
+.webqq-session-tree-row {
+  position: relative;
+}
+
+.webqq-session-expand {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  color: var(--webqq-muted);
+  background: transparent;
+  transform: translateY(-50%);
+}
+
+.webqq-session-expand svg {
+  transition: transform 120ms ease;
+}
+
+.webqq-session-expand svg.is-expanded {
+  transform: rotate(180deg);
+}
+
+.webqq-session-expand:hover,
+.webqq-session-expand:focus-visible,
+.webqq-session-add:hover,
+.webqq-session-add:focus-visible {
+  color: var(--webqq-accent);
+  background: var(--webqq-hover);
+  outline: none;
+}
+
+.webqq-session-children {
+  padding: 0 0 4px 26px;
+  border-left: 1px solid color-mix(in srgb, var(--webqq-accent) 25%, transparent);
+}
+
+.webqq-session-child-create {
+  grid-template-columns: 10px minmax(0, 1fr);
+  gap: 12px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+  color: var(--webqq-accent);
+}
+
+.webqq-session-child-create-mark {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--webqq-accent) 12%, transparent);
+}
+
+.webqq-session-child {
+  grid-template-columns: 10px minmax(0, 1fr);
+  padding-left: 8px;
+  padding-right: 58px;
+}
+
+.webqq-session-child-mark {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--webqq-muted);
+}
+
 .webqq-session {
   position: relative;
   display: grid;
@@ -471,8 +543,7 @@
   font-weight: 600;
 }
 
-.webqq-session-copy small,
-.webqq-session time {
+.webqq-session-copy small {
   color: var(--webqq-muted);
   font-size: var(--webqq-font-sm);
 }
@@ -480,13 +551,6 @@
 .webqq-session-copy small {
   margin-top: 1px;
   line-height: 16px;
-}
-
-.webqq-session time {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  line-height: 18px;
 }
 
 .webqq-relation-badge {
