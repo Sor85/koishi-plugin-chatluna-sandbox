@@ -1,6 +1,6 @@
 # MCP 契约一致性与健壮性规格
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 

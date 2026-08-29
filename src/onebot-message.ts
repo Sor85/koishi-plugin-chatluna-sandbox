@@ -1,5 +1,6 @@
 import { h, type Fragment } from 'koishi'
 import type { SandboxMedia } from './types'
+import { SandboxDomainError } from './types'
 
 export interface SandboxOneBotMessageSegment {
   type: string
@@ -35,10 +36,10 @@ export function parseOneBotOutboundMessage(message: unknown): SandboxOutboundMes
   } else if (Array.isArray(message)) {
     for (const segment of message) appendOneBotSegment(result, segment)
   } else {
-    throw new Error('OneBot 消息不能为空')
+    throw new SandboxDomainError('OneBot 消息不能为空')
   }
   result.content = result.content.trim()
-  if (!result.content && !result.mediaSources.length) throw new Error('OneBot 消息不能为空')
+  if (!result.content && !result.mediaSources.length) throw new SandboxDomainError('OneBot 消息不能为空')
   return result
 }
 

@@ -409,7 +409,21 @@ export interface ClearSandboxOneBotDebugRecordsResult {
   cleared: number
 }
 
-export class SandboxOneBotDebugCursorExpiredError extends Error {
+/**
+ * 可预期的领域业务拒绝：参数不合法、权限不足、场景一致性校验不通过这类由领域规则主动作出的判定。
+ *
+ * 它存在的唯一理由是让上层能把「领域说不」与「实现出错」分开：MCP 侧按 ADR-0027 只把未预期异常
+ * 降级成 `internal_error` 并把堆栈写进 Logger，而领域拒绝的消息对外部测试控制器有用，必须原样透出。
+ * 基础设施故障（数据库不可用）与内部不变量违背不属于此类，应继续抛普通 `Error`。
+ */
+export class SandboxDomainError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'SandboxDomainError'
+  }
+}
+
+export class SandboxOneBotDebugCursorExpiredError extends SandboxDomainError {
   readonly code = 'cursor_expired' as const
 
   constructor(
@@ -421,7 +435,7 @@ export class SandboxOneBotDebugCursorExpiredError extends Error {
   }
 }
 
-export class SandboxModelRequestCursorExpiredError extends Error {
+export class SandboxModelRequestCursorExpiredError extends SandboxDomainError {
   readonly code = 'cursor_expired' as const
 
   constructor(

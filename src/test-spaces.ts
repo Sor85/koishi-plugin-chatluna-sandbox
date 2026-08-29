@@ -7,6 +7,7 @@ import type { SandboxOneBotDebugPersistence } from './onebot-debug'
 import type { SandboxModelRequestPersistence } from './model-request'
 import type { SandboxTestSpacePersistence, SandboxTestSpacePersistenceRecord } from './persistence'
 import type { SandboxSnapshot } from './types'
+import { SandboxDomainError } from './types'
 
 export type SandboxTestSpaceStatus = 'running' | 'taken-over' | 'completed' | 'failed'
 
@@ -157,14 +158,14 @@ export class SandboxTestSpaceService {
 
   requireAiControl(spaceId: string): SandboxControlService {
     const space = this.requireSpace(spaceId)
-    if (space.status === 'taken-over') throw new Error('空间已由用户接管')
-    if (space.status !== 'running') throw new Error(`空间当前不可修改：${space.status}`)
+    if (space.status === 'taken-over') throw new SandboxDomainError('空间已由用户接管')
+    if (space.status !== 'running') throw new SandboxDomainError(`空间当前不可修改：${space.status}`)
     return space.control
   }
 
   requireUserControl(spaceId: string): SandboxControlService {
     const space = this.requireSpace(spaceId)
-    if (space.status !== 'taken-over') throw new Error('请先接管测试空间')
+    if (space.status !== 'taken-over') throw new SandboxDomainError('请先接管测试空间')
     return space.control
   }
 
@@ -179,7 +180,7 @@ export class SandboxTestSpaceService {
   // WebUI 空间内任务栏的“终止任务”代表用户主动结束，因此落到 completed 而不是 failed。
   terminateSpace(spaceId: string): SandboxTestSpaceSummary {
     const space = this.requireSpace(spaceId)
-    if (space.status === 'completed' || space.status === 'failed') throw new Error('空间已结束')
+    if (space.status === 'completed' || space.status === 'failed') throw new SandboxDomainError('空间已结束')
     space.status = 'completed'
     space.completedAt = new Date().toISOString()
     space.updatedAt = space.completedAt
@@ -213,7 +214,7 @@ export class SandboxTestSpaceService {
 
   reactivateSpace(spaceId: string, status: 'running' | 'taken-over' = 'taken-over'): SandboxTestSpaceSummary {
     const space = this.requireSpace(spaceId)
-    if (space.status !== 'completed' && space.status !== 'failed') throw new Error('只有已完成或失败的空间可以重新激活')
+    if (space.status !== 'completed' && space.status !== 'failed') throw new SandboxDomainError('只有已完成或失败的空间可以重新激活')
     space.control.setRuntimeActive(true)
     // WebUI 重新激活代表用户接管，MCP 重新激活则必须归还原 AI 控制者；两条入口不能共用隐式默认身份。
     space.status = status
@@ -244,7 +245,7 @@ export class SandboxTestSpaceService {
 
   private setStatus(spaceId: string, status: 'running' | 'taken-over'): SandboxTestSpaceSummary {
     const space = this.requireSpace(spaceId)
-    if (space.status === 'completed' || space.status === 'failed') throw new Error('请先重新激活已结束空间')
+    if (space.status === 'completed' || space.status === 'failed') throw new SandboxDomainError('请先重新激活已结束空间')
     space.status = status
     space.updatedAt = new Date().toISOString()
     this.queuePersistence(space)
@@ -350,14 +351,14 @@ export class SandboxTestSpaceService {
 
   private requireRunningAiSpace(spaceId: string): SandboxTestSpaceRecord {
     const space = this.requireSpace(spaceId)
-    if (space.status === 'taken-over') throw new Error('空间已由用户接管')
-    if (space.status !== 'running') throw new Error(`空间当前不可修改：${space.status}`)
+    if (space.status === 'taken-over') throw new SandboxDomainError('空间已由用户接管')
+    if (space.status !== 'running') throw new SandboxDomainError(`空间当前不可修改：${space.status}`)
     return space
   }
 
   private requireSpace(spaceId: string): SandboxTestSpaceRecord {
     const space = this.spaces.get(spaceId)
-    if (!space) throw new Error(`AI 测试空间不存在：${spaceId}`)
+    if (!space) throw new SandboxDomainError(`AI 测试空间不存在：${spaceId}`)
     return space
   }
 

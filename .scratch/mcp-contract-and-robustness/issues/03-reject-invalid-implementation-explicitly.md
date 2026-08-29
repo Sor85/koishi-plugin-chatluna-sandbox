@@ -12,14 +12,28 @@
 
 **Blocked by:** None — can start immediately
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `get_capability_matrix` 对非法 `implementation` 抛 `invalid_arguments`
-- [ ] 省略 `implementation` 仍默认 napcat，行为不变
-- [ ] 复用 `requireImplementation`，不再在 `getCapabilityMatrix` 内二次实现判定
-- [ ] 有用例断言 `implementation: 'bogus'` 被拒绝而不是返回 napcat 矩阵
-- [ ] 该用例在未修复的实现上变红（实测确认）
-- [ ] 有用例断言 `implementation` 省略时仍返回 napcat 矩阵
-- [ ] `readResource` 的两处固定 URI 调用确认无需改动，或说明改动理由
-- [ ] 核实 `getCapabilityMatrix` 是否还有其他调用方受影响，逐个说明
-- [ ] 单元测试、类型检查与构建全绿
+- [x] `get_capability_matrix` 对非法 `implementation` 抛 `invalid_arguments`
+- [x] 省略 `implementation` 仍默认 napcat，行为不变
+- [x] 复用 `requireImplementation`，不再在 `getCapabilityMatrix` 内二次实现判定
+- [x] 有用例断言 `implementation: 'bogus'` 被拒绝而不是返回 napcat 矩阵
+- [x] 该用例在未修复的实现上变红（实测确认）
+- [x] 有用例断言 `implementation` 省略时仍返回 napcat 矩阵
+- [x] `readResource` 的两处固定 URI 调用确认无需改动，或说明改动理由
+- [x] 核实 `getCapabilityMatrix` 是否还有其他调用方受影响，逐个说明
+- [x] 单元测试、类型检查与构建全绿
+
+## Comments
+
+**调用方核实（共三处，全部覆盖）：**
+
+1. `executeTool` 的 `get_capability_matrix`（`service.ts:1125`）传用户输入的 `args.implementation`，是本票要修的那一处。
+2. `readResource` 的 `chatluna-sandbox://capabilities/napcat`（`service.ts:913`）传字面量 `'napcat'`。
+3. `readResource` 的 `chatluna-sandbox://capabilities/llbot`（`service.ts:914`）传字面量 `'llbot'`。
+
+后两处走固定 URI，不接受用户输入，参数是源码里的字面量，`requireImplementation` 对它们必然通过，因此**未改动**。改动它们只会把两个固定值搬到别处，不消除任何风险。
+
+**修法。** `getCapabilityMatrix` 的第一行改为 `implementation === undefined ? 'napcat' : requireImplementation(implementation)`，与 `apply_environment_changes` 里 `create-bot` 的处理（`service.ts:1411`）逐字一致：`undefined` 合法并默认 napcat，非法字符串不合法。
+
+**实测的红。** 新断言遍历 `'bogus'`、`'NapCat'`、`'napcat '`（尾随空格）、`''`、`null`、`42` 六个值，在未修复实现上第一个值就返回了 napcat 矩阵而不是抛错。大小写与尾随空格两项特意加进去：静默回落的旧写法对它们同样静默，而这是拼错时最常见的两种形态。

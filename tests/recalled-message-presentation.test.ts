@@ -168,10 +168,10 @@ describe('撤回消息生命周期与呈现', () => {
   })
 
   it('撤回发出 message.recalled 与 scene.changed，且不销毁场景数据', async () => {
-    const { control } = await createControl()
+    const { app, control } = await createControl()
     const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-recall-mcp-'))
     temporaryDirectories.push(directory)
-    const mcp = new SandboxMcpService(control, { dataDirectory: directory })
+    const mcp = new SandboxMcpService(app, control, { dataDirectory: directory })
     const credential = mcp.createCredential('撤回事件', ['read', 'interact'])
     const cursor = mcp.currentCursor()
     const sent = await control.sendMessage({

@@ -81,6 +81,7 @@ import {
   type UpdateSandboxGroupInput,
   type UpdateSandboxUserInput,
   isRecalledMessage,
+  SandboxDomainError,
 } from './types'
 
 export interface SandboxControlServiceOptions {
@@ -107,7 +108,7 @@ export class SandboxRuntimeBotRegistry {
 
   assertAvailable(botId: string, owner: object): void {
     const currentOwner = this.owners.get(botId)
-    if (currentOwner && currentOwner !== owner) throw new Error(`机器人 ID 已被活动场景占用：${botId}`)
+    if (currentOwner && currentOwner !== owner) throw new SandboxDomainError(`机器人 ID 已被活动场景占用：${botId}`)
   }
 
   claim(botId: string, owner: object): void {
@@ -335,42 +336,42 @@ export class SandboxControlService {
   replaceScene(snapshot: SandboxSnapshot): void {
     const next = structuredClone(snapshot)
     const participantIds = new Set(next.participants.map(({ id }) => id))
-    if (participantIds.size !== next.participants.length) throw new Error('参与者 ID 不能重复')
-    if (next.participants.some(({ id }) => !/^\d+$/.test(id))) throw new Error('参与者 ID 必须是十进制字符串')
-    if (new Set(next.groups.map(({ id }) => id)).size !== next.groups.length) throw new Error('群组 ID 不能重复')
+    if (participantIds.size !== next.participants.length) throw new SandboxDomainError('参与者 ID 不能重复')
+    if (next.participants.some(({ id }) => !/^\d+$/.test(id))) throw new SandboxDomainError('参与者 ID 必须是十进制字符串')
+    if (new Set(next.groups.map(({ id }) => id)).size !== next.groups.length) throw new SandboxDomainError('群组 ID 不能重复')
     for (const group of next.groups) {
-      if (!group.members.every(({ participantId }) => participantIds.has(participantId))) throw new Error(`群组包含不存在的成员：${group.id}`)
-      if (group.members.filter(({ role }) => role === 'owner').length !== 1) throw new Error(`群组必须且只能有一个群主：${group.id}`)
+      if (!group.members.every(({ participantId }) => participantIds.has(participantId))) throw new SandboxDomainError(`群组包含不存在的成员：${group.id}`)
+      if (group.members.filter(({ role }) => role === 'owner').length !== 1) throw new SandboxDomainError(`群组必须且只能有一个群主：${group.id}`)
     }
     const groupIds = new Set(next.groups.map(({ id }) => id))
     const conversationIds = new Set(next.conversations.map(({ id }) => id))
-    if (conversationIds.size !== next.conversations.length) throw new Error('会话 ID 不能重复')
+    if (conversationIds.size !== next.conversations.length) throw new SandboxDomainError('会话 ID 不能重复')
     for (const conversation of next.conversations) {
-      if (conversation.type === 'direct' && !conversation.participantIds.every((id) => participantIds.has(id))) throw new Error(`私聊包含不存在的参与者：${conversation.id}`)
-      if (conversation.type === 'group' && !groupIds.has(conversation.groupId)) throw new Error(`群聊引用不存在的群组：${conversation.id}`)
+      if (conversation.type === 'direct' && !conversation.participantIds.every((id) => participantIds.has(id))) throw new SandboxDomainError(`私聊包含不存在的参与者：${conversation.id}`)
+      if (conversation.type === 'group' && !groupIds.has(conversation.groupId)) throw new SandboxDomainError(`群聊引用不存在的群组：${conversation.id}`)
     }
     const messageIds = new Set(next.messages.map(({ id }) => id))
-    if (messageIds.size !== next.messages.length) throw new Error('消息 ID 不能重复')
-    if (next.messages.some(({ authorId, conversationId }) => !participantIds.has(authorId) || !conversationIds.has(conversationId))) throw new Error('消息引用不存在的参与者或会话')
-    if (next.messages.some(({ media }) => media?.some(({ id, reference }) => reference !== `sandbox-media://${id}`))) throw new Error('消息包含无效媒体引用')
-    if (next.conversations.some((conversation) => conversation.messageIds.some((id) => !messageIds.has(id)))) throw new Error('会话引用不存在的消息')
+    if (messageIds.size !== next.messages.length) throw new SandboxDomainError('消息 ID 不能重复')
+    if (next.messages.some(({ authorId, conversationId }) => !participantIds.has(authorId) || !conversationIds.has(conversationId))) throw new SandboxDomainError('消息引用不存在的参与者或会话')
+    if (next.messages.some(({ media }) => media?.some(({ id, reference }) => reference !== `sandbox-media://${id}`))) throw new SandboxDomainError('消息包含无效媒体引用')
+    if (next.conversations.some((conversation) => conversation.messageIds.some((id) => !messageIds.has(id)))) throw new SandboxDomainError('会话引用不存在的消息')
     // 未发布阶段直接规范化 forwards；缺失时补空数组，避免旧测试快照或半成品导入炸掉。
     this.normalizeSceneForwards(next)
     const forwardIds = new Set(next.forwards!.map(({ id }) => id))
-    if (forwardIds.size !== next.forwards!.length) throw new Error('合并转发 ID 不能重复')
+    if (forwardIds.size !== next.forwards!.length) throw new SandboxDomainError('合并转发 ID 不能重复')
     if (next.forwards!.some(({ authorId, nodes }) => !participantIds.has(authorId) || !Array.isArray(nodes) || !nodes.length)) {
-      throw new Error('合并转发资源无效')
+      throw new SandboxDomainError('合并转发资源无效')
     }
     if (next.forwards!.some(({ nodes }) => nodes.some(({ media }) => media?.some(({ id, reference }) => reference !== `sandbox-media://${id}`)))) {
-      throw new Error('合并转发包含无效媒体引用')
+      throw new SandboxDomainError('合并转发包含无效媒体引用')
     }
     if (next.forwards!.some(({ nodes }) => nodes.some(({ forwardId }) => !!forwardId && !forwardIds.has(forwardId)))) {
-      throw new Error('合并转发引用了不存在的嵌套资源')
+      throw new SandboxDomainError('合并转发引用了不存在的嵌套资源')
     }
     if (next.messages.some(({ forwardId }) => !!forwardId && !forwardIds.has(forwardId))) {
-      throw new Error('消息引用了不存在的合并转发资源')
+      throw new SandboxDomainError('消息引用了不存在的合并转发资源')
     }
-    if (next.friendships.some(({ participantIds: ids }) => !ids.every((id) => participantIds.has(id)))) throw new Error('好友关系引用不存在的参与者')
+    if (next.friendships.some(({ participantIds: ids }) => !ids.every((id) => participantIds.has(id)))) throw new SandboxDomainError('好友关系引用不存在的参与者')
     if (this.runtimeBotsActive) {
       for (const participant of next.participants) {
         if (participant.kind === 'bot') this.runtimeBotRegistry.assertAvailable(participant.id, this.runtimeOwner)
@@ -410,23 +411,23 @@ export class SandboxControlService {
     try {
       url = new URL(value)
     } catch {
-      throw new Error('头像必须是受管媒体引用、Data URL、base64:// 或 HTTP(S) URL')
+      throw new SandboxDomainError('头像必须是受管媒体引用、Data URL、base64:// 或 HTTP(S) URL')
     }
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('头像 URL 仅支持 HTTP(S)')
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new SandboxDomainError('头像 URL 仅支持 HTTP(S)')
     const response = await fetch(url, { signal: AbortSignal.timeout(10_000) })
-    if (!response.ok) throw new Error(`头像下载失败：HTTP ${response.status}`)
+    if (!response.ok) throw new SandboxDomainError(`头像下载失败：HTTP ${response.status}`)
     const contentLength = Number(response.headers.get('content-length'))
     if (Number.isFinite(contentLength) && contentLength > MAX_MEDIA_SIZE) {
-      throw new Error('头像大小不能超过 10 MB')
+      throw new SandboxDomainError('头像大小不能超过 10 MB')
     }
     const mimeType = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() ?? ''
     const content = Buffer.from(await response.arrayBuffer())
-    if (content.length > MAX_MEDIA_SIZE) throw new Error('头像大小不能超过 10 MB')
+    if (content.length > MAX_MEDIA_SIZE) throw new SandboxDomainError('头像大小不能超过 10 MB')
     return this.saveAvatar(`${kind}-${entityId}-avatar`, mimeType, content.toString('base64'))
   }
 
   private saveAvatar(fileName: string, mimeType: string, dataBase64: string): string {
-    if (!mimeType.startsWith('image/')) throw new Error(`头像必须是图片：${mimeType || '未知类型'}`)
+    if (!mimeType.startsWith('image/')) throw new SandboxDomainError(`头像必须是图片：${mimeType || '未知类型'}`)
     return this.mediaStorage.save({ fileName, mimeType, dataBase64 }).reference
   }
 
@@ -457,7 +458,7 @@ export class SandboxControlService {
       Buffer.from(avatar.svg).toString('base64'),
     )
     // 内容寻址必须恢复到原引用；不一致说明内置资源或哈希契约被破坏，不能静默换脸。
-    if (restored !== reference) throw new Error(`内置头像引用恢复不一致：${reference}`)
+    if (restored !== reference) throw new SandboxDomainError(`内置头像引用恢复不一致：${reference}`)
     return true
   }
 
@@ -487,9 +488,9 @@ export class SandboxControlService {
 
   private requireManagedAvatar(reference: string): string {
     const match = reference.match(/^sandbox-media:\/\/([a-f0-9]{32})$/)
-    if (!match || !this.mediaStorage.exists(match[1])) throw new Error(`头像媒体不存在：${reference}`)
+    if (!match || !this.mediaStorage.exists(match[1])) throw new SandboxDomainError(`头像媒体不存在：${reference}`)
     const media = this.mediaStorage.readById(match[1])
-    if (media.type !== 'image') throw new Error('头像媒体必须是图片')
+    if (media.type !== 'image') throw new SandboxDomainError('头像媒体必须是图片')
     return reference
   }
 
@@ -500,7 +501,7 @@ export class SandboxControlService {
     const dataUrl = value.match(/^data:([^;,]+);base64,(.+)$/s)
     if (dataUrl) return this.saveAvatar(`${kind}-${entityId}-avatar`, dataUrl[1], dataUrl[2])
     if (value.startsWith('base64://')) return this.saveAvatar(`${kind}-${entityId}-avatar.png`, 'image/png', value.slice(9))
-    throw new Error('外部头像 URL 需要先通过 importAvatar 导入受管媒体')
+    throw new SandboxDomainError('外部头像 URL 需要先通过 importAvatar 导入受管媒体')
   }
 
   storeMediaBatch(inputs: Array<{ fileName: string; mimeType: string; dataBase64: string }>): SandboxMedia[] {
@@ -545,7 +546,7 @@ export class SandboxControlService {
 
   get bot(): SandboxBot {
     const bot = this.runtimeBots.get(DEFAULT_BOT_ID) ?? this.runtimeBots.values().next().value
-    if (!bot) throw new Error('机器人运行时不存在')
+    if (!bot) throw new SandboxDomainError('机器人运行时不存在')
     return bot
   }
 
@@ -563,7 +564,7 @@ export class SandboxControlService {
 
   async getOneBotDebugRecord(input: GetSandboxOneBotDebugRecordInput): Promise<SandboxOneBotDebugRecord> {
     const record = await this.oneBotDebug.getRecord(input.recordId, input.includeLargeValues === true)
-    if (!record) throw new Error(`调试记录不存在：${input.recordId}`)
+    if (!record) throw new SandboxDomainError(`调试记录不存在：${input.recordId}`)
     return record
   }
 
@@ -604,7 +605,7 @@ export class SandboxControlService {
 
   async getModelRequestRecord(input: GetSandboxModelRequestRecordInput): Promise<SandboxModelRequestDetail> {
     const record = await this.modelRequests.getRecord(input.recordId)
-    if (!record) throw new Error(`模型请求记录不存在：${input.recordId}`)
+    if (!record) throw new SandboxDomainError(`模型请求记录不存在：${input.recordId}`)
     return record
   }
 
@@ -697,13 +698,13 @@ export class SandboxControlService {
 
   getRuntimeBot(botId: string): SandboxBot {
     const bot = this.runtimeBots.get(botId)
-    if (!bot) throw new Error(`机器人运行时不存在：${botId}`)
+    if (!bot) throw new SandboxDomainError(`机器人运行时不存在：${botId}`)
     return bot
   }
 
   getBotCapabilities(botId: string): SandboxOneBotCapability[] {
     const bot = this.getBots().find(({ id }) => id === botId)
-    if (!bot) throw new Error(`机器人不存在：${botId}`)
+    if (!bot) throw new SandboxDomainError(`机器人不存在：${botId}`)
     return getOneBotCapabilityMatrix(bot.implementation, bot.disabledCapabilities)
   }
 
@@ -735,7 +736,7 @@ export class SandboxControlService {
     let end = conversation.messageIds.length
     if (input.beforeMessageId) {
       end = conversation.messageIds.indexOf(input.beforeMessageId)
-      if (end < 0) throw new Error(`消息不存在：${input.beforeMessageId}`)
+      if (end < 0) throw new SandboxDomainError(`消息不存在：${input.beforeMessageId}`)
     }
     const start = Math.max(0, end - limit)
     const messageIds = conversation.messageIds.slice(start, end)
@@ -755,7 +756,7 @@ export class SandboxControlService {
     const query = input.query.trim()
     const hasStart = input.createdAtStart !== undefined
     const hasEnd = input.createdAtEnd !== undefined
-    if (hasStart !== hasEnd) throw new Error('消息日期筛选必须同时提供开始和结束时间')
+    if (hasStart !== hasEnd) throw new SandboxDomainError('消息日期筛选必须同时提供开始和结束时间')
 
     let createdAtStart: number | undefined
     let createdAtEnd: number | undefined
@@ -763,9 +764,9 @@ export class SandboxControlService {
       createdAtStart = Date.parse(input.createdAtStart!)
       createdAtEnd = Date.parse(input.createdAtEnd!)
       if (!Number.isFinite(createdAtStart) || !Number.isFinite(createdAtEnd)) {
-        throw new Error('消息日期筛选时间无效')
+        throw new SandboxDomainError('消息日期筛选时间无效')
       }
-      if (createdAtStart >= createdAtEnd) throw new Error('消息日期筛选结束时间必须晚于开始时间')
+      if (createdAtStart >= createdAtEnd) throw new SandboxDomainError('消息日期筛选结束时间必须晚于开始时间')
     }
     // 没有任何条件时不能回扫全量消息；仅日期筛选则允许空关键词。
     if (!query && createdAtStart === undefined) return { hits: [] }
@@ -774,7 +775,7 @@ export class SandboxControlService {
     let end = conversation.messageIds.length
     if (input.beforeMessageId) {
       end = conversation.messageIds.indexOf(input.beforeMessageId)
-      if (end < 0) throw new Error(`消息不存在：${input.beforeMessageId}`)
+      if (end < 0) throw new SandboxDomainError(`消息不存在：${input.beforeMessageId}`)
     }
     const needle = query.toLocaleLowerCase()
     const messagesById = new Map(this.scene.messages.map((message) => [message.id, message]))
@@ -808,7 +809,7 @@ export class SandboxControlService {
     const id = this.validateParticipantId(input.id)
     const name = this.validateName(input.name, '用户昵称')
     if (this.scene.participants.some((participant) => participant.id === id)) {
-      throw new Error(`参与者已存在：${id}`)
+      throw new SandboxDomainError(`参与者已存在：${id}`)
     }
 
     const profile = normalizeAccountProfile(input.profile)
@@ -827,7 +828,7 @@ export class SandboxControlService {
 
   updateUser(input: UpdateSandboxUserInput): void {
     const user = this.getUsers().find(({ id }) => id === input.id)
-    if (!user) throw new Error(`用户不存在：${input.id}`)
+    if (!user) throw new SandboxDomainError(`用户不存在：${input.id}`)
     const name = this.validateName(input.name, '用户昵称')
     const avatar = input.avatar !== undefined
       ? this.normalizeLocalAvatar('user', user.id, input.avatar)
@@ -844,7 +845,7 @@ export class SandboxControlService {
 
   deleteUser(input: DeleteSandboxUserInput): void {
     const index = this.scene.participants.findIndex(({ id, kind }) => id === input.id && kind === 'user')
-    if (index < 0) throw new Error(`用户不存在：${input.id}`)
+    if (index < 0) throw new SandboxDomainError(`用户不存在：${input.id}`)
     this.scene.participants.splice(index, 1)
     const ownedGroupIds = new Set(this.scene.groups
       .filter(({ members }) => members.some(({ participantId, role }) => participantId === input.id && role === 'owner'))
@@ -868,7 +869,7 @@ export class SandboxControlService {
     const id = this.validateParticipantId(input.id)
     const name = this.validateName(input.name, '机器人昵称')
     if (this.scene.participants.some((participant) => participant.id === id)) {
-      throw new Error(`参与者已存在：${id}`)
+      throw new SandboxDomainError(`参与者已存在：${id}`)
     }
     if (this.runtimeBotsActive) this.runtimeBotRegistry.assertAvailable(id, this.runtimeOwner)
 
@@ -900,7 +901,7 @@ export class SandboxControlService {
 
   updateBot(input: UpdateSandboxBotInput): void {
     const bot = this.getBots().find(({ id }) => id === input.id)
-    if (!bot) throw new Error(`机器人不存在：${input.id}`)
+    if (!bot) throw new SandboxDomainError(`机器人不存在：${input.id}`)
     const name = this.validateName(input.name, '机器人昵称')
     const avatar = input.avatar !== undefined
       ? this.normalizeLocalAvatar('bot', bot.id, input.avatar)
@@ -932,7 +933,7 @@ export class SandboxControlService {
     sex?: SandboxAccountSex
   }) {
     const bot = this.getBots().find(({ id }) => id === botId)
-    if (!bot) throw new Error(`机器人不存在：${botId}`)
+    if (!bot) throw new SandboxDomainError(`机器人不存在：${botId}`)
     const name = input.name !== undefined ? this.validateName(input.name, '机器人昵称') : bot.name
     const avatar = input.avatar !== undefined
       ? (await this.importAvatar('bot', bot.id, input.avatar) ?? this.createDefaultAvatar('bot'))
@@ -955,7 +956,7 @@ export class SandboxControlService {
 
   deleteBot(input: DeleteSandboxBotInput): void {
     const index = this.scene.participants.findIndex(({ id, kind }) => id === input.id && kind === 'bot')
-    if (index < 0) throw new Error(`机器人不存在：${input.id}`)
+    if (index < 0) throw new SandboxDomainError(`机器人不存在：${input.id}`)
     this.chatLunaState.deleteByBotParticipant(input.id)
     this.scene.participants.splice(index, 1)
     const runtime = this.runtimeBots.get(input.id)
@@ -984,7 +985,7 @@ export class SandboxControlService {
 
   createGroup(input: CreateSandboxGroupInput): void {
     const id = this.validateGroupId(input.id)
-    if (this.scene.groups.some((group) => group.id === id)) throw new Error(`群组已存在：${id}`)
+    if (this.scene.groups.some((group) => group.id === id)) throw new SandboxDomainError(`群组已存在：${id}`)
     const members = this.validateGroupMembers(input.members)
     this.scene.groups.push({
       id,
@@ -999,7 +1000,7 @@ export class SandboxControlService {
 
   updateGroup(input: UpdateSandboxGroupInput): void {
     const group = this.scene.groups.find(({ id }) => id === input.id)
-    if (!group) throw new Error(`群组不存在：${input.id}`)
+    if (!group) throw new SandboxDomainError(`群组不存在：${input.id}`)
     const name = this.validateName(input.name, '群名称')
     const avatar = input.avatar !== undefined
       ? this.normalizeLocalAvatar('group', group.id, input.avatar)
@@ -1014,7 +1015,7 @@ export class SandboxControlService {
 
   deleteGroup(input: DeleteSandboxGroupInput): void {
     const index = this.scene.groups.findIndex(({ id }) => id === input.id)
-    if (index < 0) throw new Error(`群组不存在：${input.id}`)
+    if (index < 0) throw new SandboxDomainError(`群组不存在：${input.id}`)
     this.scene.groups.splice(index, 1)
     this.scene.requests = this.scene.requests.filter(({ groupId }) => groupId !== input.id)
     this.deleteConversations((conversation) => conversation.groupId === input.id)
@@ -1024,11 +1025,11 @@ export class SandboxControlService {
   async performFriendAction(input: PerformFriendActionInput): Promise<PerformFriendActionResult> {
     if (this.isBot(input.operatorId)) {
       const bot = this.getBots().find(({ id }) => id === input.operatorId)!
-      if (!bot.enabled) throw new Error(`机器人已停用：${bot.id}`)
+      if (!bot.enabled) throw new SandboxDomainError(`机器人已停用：${bot.id}`)
     }
     if (this.isBot(input.operatorId) && input.action === 'handle-request') {
       const request = this.scene.requests.find(({ id, type }) => id === input.requestId && type === 'friend')
-      if (!request || request.targetId !== input.operatorId) throw new Error(`好友申请不存在：${input.requestId}`)
+      if (!request || request.targetId !== input.operatorId) throw new SandboxDomainError(`好友申请不存在：${input.requestId}`)
       await this.getRuntimeBot(input.operatorId).internal.set_friend_add_request({
         flag: input.requestId,
         approve: input.approve,
@@ -1041,15 +1042,15 @@ export class SandboxControlService {
     }
 
     const target = this.getParticipant(input.targetId)
-    if (target.id === input.operatorId) throw new Error('不能对自己执行好友操作')
+    if (target.id === input.operatorId) throw new SandboxDomainError('不能对自己执行好友操作')
     const friendship = this.getFriendship(input.operatorId, target.id)
 
     if (input.action === 'request') {
-      if (friendship) throw new Error('已经是好友关系')
+      if (friendship) throw new SandboxDomainError('已经是好友关系')
       if (this.scene.requests.some(({ type, requesterId, targetId }) => type === 'friend'
         && ((requesterId === input.operatorId && targetId === target.id)
           || (requesterId === target.id && targetId === input.operatorId)))) {
-        throw new Error('双方已有待处理的好友申请')
+        throw new SandboxDomainError('双方已有待处理的好友申请')
       }
       const request = {
         id: `request:friend:${Random.id()}`,
@@ -1066,7 +1067,7 @@ export class SandboxControlService {
       return { revision: this.scene.revision, requestId: request.id }
     }
 
-    if (!friendship) throw new Error('好友关系不存在')
+    if (!friendship) throw new SandboxDomainError('好友关系不存在')
     if (input.action === 'set-remark') {
       const remark = input.remark.trim()
       if (remark) friendship.remarks[input.operatorId] = remark
@@ -1082,15 +1083,15 @@ export class SandboxControlService {
         : this.scene.conversations.find((item) => item.type === 'direct'
           && item.participantIds.includes(input.operatorId)
           && item.participantIds.includes(target.id))
-      if (!conversation) throw new Error('戳一戳必须在可见会话中发起')
+      if (!conversation) throw new SandboxDomainError('戳一戳必须在可见会话中发起')
       const group = conversation.groupId
         ? this.scene.groups.find(({ id }) => id === conversation.groupId)
         : undefined
       if (group && !group.members.some(({ participantId }) => participantId === target.id)) {
-        throw new Error('目标用户不在当前群组中')
+        throw new SandboxDomainError('目标用户不在当前群组中')
       }
       if (!group && (conversation.type !== 'direct' || !conversation.participantIds.includes(target.id))) {
-        throw new Error('目标用户不在当前私聊中')
+        throw new SandboxDomainError('目标用户不在当前私聊中')
       }
       const getDisplayName = (participantId: string) => group?.members.find((member) => member.participantId === participantId)?.card
         || this.getParticipant(participantId).name
@@ -1105,7 +1106,7 @@ export class SandboxControlService {
       return { revision: this.scene.revision }
     }
 
-    if (input.action !== 'delete') throw new Error(`不支持的好友操作：${Reflect.get(input, 'action') ?? 'unknown'}`)
+    if (input.action !== 'delete') throw new SandboxDomainError(`不支持的好友操作：${Reflect.get(input, 'action') ?? 'unknown'}`)
 
     this.scene.friendships = this.scene.friendships.filter(({ id }) => id !== friendship.id)
     if (this.isBot(target.id)) {
@@ -1120,11 +1121,11 @@ export class SandboxControlService {
     // 主动申请入群等沙盒参与者操作则继续落到下方统一路径，避免 WebQQ 因操作者种类出现行为差异。
     if (this.isBot(input.operatorId)) {
       const bot = this.getBots().find(({ id }) => id === input.operatorId)!
-      if (!bot.enabled) throw new Error(`机器人已停用：${bot.id}`)
+      if (!bot.enabled) throw new SandboxDomainError(`机器人已停用：${bot.id}`)
       const runtime = this.getRuntimeBot(bot.id)
       if (input.action === 'handle-request') {
         const request = this.scene.requests.find(({ id, type }) => id === input.requestId && type === 'group')
-        if (!request) throw new Error(`群申请不存在：${input.requestId}`)
+        if (!request) throw new SandboxDomainError(`群申请不存在：${input.requestId}`)
         await runtime.internal.set_group_add_request({
           flag: input.requestId,
           sub_type: request.subType ?? 'add',
@@ -1167,13 +1168,13 @@ export class SandboxControlService {
     if (input.action === 'handle-request') return this.handleUserGroupRequest(input)
 
     const group = this.scene.groups.find(({ id }) => id === input.groupId)
-    if (!group) throw new Error(`群组不存在：${input.groupId}`)
+    if (!group) throw new SandboxDomainError(`群组不存在：${input.groupId}`)
 
     if (input.action === 'request-join') {
-      if (group.members.some(({ participantId }) => participantId === input.operatorId)) throw new Error('已经是群成员')
+      if (group.members.some(({ participantId }) => participantId === input.operatorId)) throw new SandboxDomainError('已经是群成员')
       if (this.scene.requests.some(({ type, subType, requesterId, groupId }) => type === 'group'
         && (subType ?? 'add') === 'add' && requesterId === input.operatorId && groupId === group.id)) {
-        throw new Error('已有待处理的入群申请')
+        throw new SandboxDomainError('已有待处理的入群申请')
       }
       const request = {
         id: `request:group:${Random.id()}`,
@@ -1194,10 +1195,10 @@ export class SandboxControlService {
     const actor = this.requireGroupMember(group, input.operatorId)
     if (input.action === 'invite') {
       const target = this.getParticipant(input.targetId)
-      if (group.members.some(({ participantId }) => participantId === target.id)) throw new Error('目标已经是群成员')
+      if (group.members.some(({ participantId }) => participantId === target.id)) throw new SandboxDomainError('目标已经是群成员')
       if (this.scene.requests.some(({ type, subType, targetId, groupId }) => type === 'group'
         && subType === 'invite' && targetId === target.id && groupId === group.id)) {
-        throw new Error('已有待处理的群邀请')
+        throw new SandboxDomainError('已有待处理的群邀请')
       }
       const request = {
         id: `request:group:${Random.id()}`,
@@ -1217,7 +1218,7 @@ export class SandboxControlService {
     }
 
     if (input.action === 'leave') {
-      if (actor.role === 'owner') throw new Error('群主不能直接退出群组')
+      if (actor.role === 'owner') throw new SandboxDomainError('群主不能直接退出群组')
       await this.dispatchGroupNotice(group, 'group_decrease', {
         sub_type: 'leave',
         operator_id: Number(input.operatorId),
@@ -1228,7 +1229,7 @@ export class SandboxControlService {
     }
 
     if (input.action === 'set-name') {
-      if (actor.role === 'member') throw new Error('只有群主或管理员可以修改群名称')
+      if (actor.role === 'member') throw new SandboxDomainError('只有群主或管理员可以修改群名称')
       const previousName = group.name
       group.name = this.validateName(input.name, '群名称')
       this.commitSceneMutation()
@@ -1253,8 +1254,8 @@ export class SandboxControlService {
     }
 
     if (input.action === 'set-admin') {
-      if (actor.role !== 'owner') throw new Error('只有群主可以设置管理员')
-      if (target.role === 'owner') throw new Error('不能修改群主权限')
+      if (actor.role !== 'owner') throw new SandboxDomainError('只有群主可以设置管理员')
+      if (target.role === 'owner') throw new SandboxDomainError('不能修改群主权限')
       target.role = input.enabled ? 'admin' : 'member'
       this.commitSceneMutation()
       await this.dispatchGroupNotice(group, 'group_admin', {
@@ -1287,11 +1288,11 @@ export class SandboxControlService {
       return { revision: this.scene.revision }
     }
 
-    if (input.action !== 'poke') throw new Error(`不支持的群组操作：${Reflect.get(input, 'action') ?? 'unknown'}`)
+    if (input.action !== 'poke') throw new SandboxDomainError(`不支持的群组操作：${Reflect.get(input, 'action') ?? 'unknown'}`)
     const conversation = input.conversationId
       ? this.getVisibleConversation(input.operatorId, input.conversationId)
       : this.scene.conversations.find((item) => item.type === 'group' && item.groupId === group.id)
-    if (!conversation || conversation.groupId !== group.id) throw new Error('群内戳一戳必须在当前群会话中发起')
+    if (!conversation || conversation.groupId !== group.id) throw new SandboxDomainError('群内戳一戳必须在当前群会话中发起')
     await this.dispatchGroupNotice(group, 'notify', {
       sub_type: 'poke',
       user_id: Number(input.operatorId),
@@ -1311,9 +1312,9 @@ export class SandboxControlService {
   }
 
   async handleBotFriendRequest(botId: string, input: { flag: string; approve: boolean; remark?: string }) {
-    if (!this.isBot(botId)) throw new Error(`机器人不存在：${botId}`)
+    if (!this.isBot(botId)) throw new SandboxDomainError(`机器人不存在：${botId}`)
     const requestIndex = this.scene.requests.findIndex(({ id, type, targetId }) => id === input.flag && type === 'friend' && targetId === botId)
-    if (requestIndex < 0) throw new Error(`好友申请不存在：${input.flag}`)
+    if (requestIndex < 0) throw new SandboxDomainError(`好友申请不存在：${input.flag}`)
     const [request] = this.scene.requests.splice(requestIndex, 1)
     if (input.approve) {
       const friendship = this.addFriendship(request.requesterId, botId)
@@ -1325,19 +1326,19 @@ export class SandboxControlService {
   }
 
   async handleBotGroupRequest(botId: string, input: { flag: string; subType: 'add' | 'invite'; approve: boolean; reason?: string }) {
-    if (!this.isBot(botId)) throw new Error(`机器人不存在：${botId}`)
+    if (!this.isBot(botId)) throw new SandboxDomainError(`机器人不存在：${botId}`)
     const requestIndex = this.scene.requests.findIndex(({ id, type, subType }) => id === input.flag
       && type === 'group' && (subType ?? 'add') === input.subType)
-    if (requestIndex < 0) throw new Error(`群申请不存在：${input.flag}`)
+    if (requestIndex < 0) throw new SandboxDomainError(`群申请不存在：${input.flag}`)
     const request = this.scene.requests[requestIndex]
     const group = this.scene.groups.find(({ id }) => id === request.groupId)
-    if (!group) throw new Error(`群组不存在：${request.groupId}`)
+    if (!group) throw new SandboxDomainError(`群组不存在：${request.groupId}`)
 
     if (input.subType === 'invite') {
-      if (request.targetId !== botId) throw new Error('只能处理发给自己的群邀请')
+      if (request.targetId !== botId) throw new SandboxDomainError('只能处理发给自己的群邀请')
     } else {
       const operator = this.requireGroupMember(group, botId)
-      if (operator.role !== 'owner' && operator.role !== 'admin') throw new Error('机器人没有审批入群申请的权限')
+      if (operator.role !== 'owner' && operator.role !== 'admin') throw new SandboxDomainError('机器人没有审批入群申请的权限')
     }
 
     this.scene.requests.splice(requestIndex, 1)
@@ -1352,7 +1353,7 @@ export class SandboxControlService {
 
   deleteBotFriend(botId: string, userId: string): void {
     const friendship = this.getFriendship(botId, userId)
-    if (!friendship) throw new Error('好友关系不存在')
+    if (!friendship) throw new SandboxDomainError('好友关系不存在')
     this.scene.friendships = this.scene.friendships.filter(({ id }) => id !== friendship.id)
     this.commitSceneMutation()
   }
@@ -1367,11 +1368,11 @@ export class SandboxControlService {
   | { action: 'set-name'; groupId: string; name: string }
   | { action: 'leave'; groupId: string }) {
     const group = this.scene.groups.find(({ id }) => id === input.groupId)
-    if (!group) throw new Error(`群组不存在：${input.groupId}`)
+    if (!group) throw new SandboxDomainError(`群组不存在：${input.groupId}`)
     const actor = this.requireGroupMember(group, botId)
 
     if (input.action === 'leave') {
-      if (actor.role === 'owner') throw new Error('群主不能直接退出群组')
+      if (actor.role === 'owner') throw new SandboxDomainError('群主不能直接退出群组')
       await this.dispatchGroupNotice(group, 'group_decrease', {
         sub_type: 'leave',
         operator_id: Number(botId),
@@ -1382,7 +1383,7 @@ export class SandboxControlService {
     }
 
     if (input.action === 'set-name') {
-      if (actor.role === 'member') throw new Error('只有群主或管理员可以修改群名称')
+      if (actor.role === 'member') throw new SandboxDomainError('只有群主或管理员可以修改群名称')
       const previousName = group.name
       group.name = this.validateName(input.name, '群名称')
       this.commitSceneMutation()
@@ -1407,8 +1408,8 @@ export class SandboxControlService {
     }
 
     if (input.action === 'set-admin') {
-      if (actor.role !== 'owner') throw new Error('只有群主可以设置管理员')
-      if (target.role === 'owner') throw new Error('不能修改群主权限')
+      if (actor.role !== 'owner') throw new SandboxDomainError('只有群主可以设置管理员')
+      if (target.role === 'owner') throw new SandboxDomainError('不能修改群主权限')
       target.role = input.enabled ? 'admin' : 'member'
       this.commitSceneMutation()
       await this.dispatchGroupNotice(group, 'group_admin', {
@@ -1454,7 +1455,7 @@ export class SandboxControlService {
   // 同步完成校验与消息落库并立即返回，机器人投递在后台继续；
   // WebQQ 依赖此方法让用户消息即时显示，不被插件处理时长（如图片渲染）阻塞。
   startMessageSend(input: SendMessageInput): { result: SendMessageResult; delivery: Promise<void> } {
-    if (!input.content.trim()) throw new Error('消息内容不能为空')
+    if (!input.content.trim()) throw new SandboxDomainError('消息内容不能为空')
     const context = this.getMessageContext(input)
     const message = this.appendMessage(input.operatorId, context.conversation.id, input.content.trim(), input.replyToMessageId)
     const elements = h.parse(message.content)
@@ -1471,7 +1472,7 @@ export class SandboxControlService {
   async sendForwardMessage(input: SendForwardMessageInput): Promise<SendForwardMessageResult> {
     if (this.isBot(input.operatorId)) {
       const bot = this.getBots().find(({ id }) => id === input.operatorId)!
-      if (!bot.enabled) throw new Error(`机器人已停用：${bot.id}`)
+      if (!bot.enabled) throw new SandboxDomainError(`机器人已停用：${bot.id}`)
       const conversation = this.getVisibleConversation(input.operatorId, input.conversationId)
       const params: Record<string, unknown> = {
         messages: this.toOneBotForwardNodePayloads(this.buildForwardNodes(input)),
@@ -1487,7 +1488,7 @@ export class SandboxControlService {
       const forwardId = message?.forwardId
         ?? (typeof result?.data?.forward_id === 'string' ? result.data.forward_id : undefined)
         ?? (typeof result?.data?.res_id === 'string' ? result.data.res_id : undefined)
-      if (!message || !forwardId) throw new Error('合并转发发送失败：未返回有效资源')
+      if (!message || !forwardId) throw new SandboxDomainError('合并转发发送失败：未返回有效资源')
       return { messageId: message.id, forwardId, revision: this.scene.revision }
     }
     const { result, delivery } = this.startForwardMessage(input)
@@ -1539,12 +1540,12 @@ export class SandboxControlService {
     this.getParticipant(input.operatorId)
     const forwardId = input.forwardId?.trim()
       || this.resolveForwardIdFromMessage(input.operatorId, input.messageId)
-    if (!forwardId) throw new Error('缺少合并转发 ID')
+    if (!forwardId) throw new SandboxDomainError('缺少合并转发 ID')
     const forward = this.getForwards().find(({ id }) => id === forwardId)
-    if (!forward) throw new Error(`合并转发不存在：${forwardId}`)
+    if (!forward) throw new SandboxDomainError(`合并转发不存在：${forwardId}`)
     // 资源本身不绑定会话：外层消息直接引用，或从已可见转发资源的嵌套节点进入，都允许展开。
     if (!this.canAccessForward(input.operatorId, forward.id)) {
-      throw new Error(`合并转发不存在：${forwardId}`)
+      throw new SandboxDomainError(`合并转发不存在：${forwardId}`)
     }
     return structuredClone(forward)
   }
@@ -1579,37 +1580,37 @@ export class SandboxControlService {
     if (!rawMessageId?.trim()) return undefined
     const messageId = resolveOneBotMessageId(rawMessageId, this.scene.messages.map(({ id }) => id)) ?? rawMessageId
     const message = this.scene.messages.find(({ id }) => id === messageId)
-    if (!message?.forwardId) throw new Error(`消息不是合并转发：${rawMessageId}`)
+    if (!message?.forwardId) throw new SandboxDomainError(`消息不是合并转发：${rawMessageId}`)
     const conversation = this.scene.conversations.find(({ id }) => id === message.conversationId)
     if (!conversation || !this.isConversationVisible(operatorId, conversation)) {
-      throw new Error(`消息不存在：${rawMessageId}`)
+      throw new SandboxDomainError(`消息不存在：${rawMessageId}`)
     }
-    if (isRecalledMessage(message)) throw new Error(`消息已撤回：${rawMessageId}`)
+    if (isRecalledMessage(message)) throw new SandboxDomainError(`消息已撤回：${rawMessageId}`)
     return message.forwardId
   }
 
   private buildForwardNodes(input: SendForwardMessageInput): SandboxForwardNode[] {
     if (input.messageIds?.length && input.nodes?.length) {
-      throw new Error('合并转发不能同时传入 messageIds 与 nodes')
+      throw new SandboxDomainError('合并转发不能同时传入 messageIds 与 nodes')
     }
     if (input.messageIds?.length) return this.buildReferenceForwardNodes(input.operatorId, input.messageIds)
     if (input.nodes?.length) return this.buildExplicitForwardNodes(input.operatorId, input.nodes)
-    throw new Error('合并转发至少需要一个消息节点')
+    throw new SandboxDomainError('合并转发至少需要一个消息节点')
   }
 
   private buildReferenceForwardNodes(operatorId: string, messageIds: string[]): SandboxForwardNode[] {
     const uniqueIds = [...new Set(messageIds.map((id) => id.trim()).filter(Boolean))]
-    if (!uniqueIds.length) throw new Error('合并转发至少需要一个消息节点')
-    if (uniqueIds.length > MAX_FORWARD_NODES) throw new Error(`合并转发节点不能超过 ${MAX_FORWARD_NODES} 条`)
+    if (!uniqueIds.length) throw new SandboxDomainError('合并转发至少需要一个消息节点')
+    if (uniqueIds.length > MAX_FORWARD_NODES) throw new SandboxDomainError(`合并转发节点不能超过 ${MAX_FORWARD_NODES} 条`)
     const messages = uniqueIds.map((messageId) => {
       const message = this.scene.messages.find(({ id }) => id === messageId)
-      if (!message) throw new Error(`消息不存在：${messageId}`)
+      if (!message) throw new SandboxDomainError(`消息不存在：${messageId}`)
       const conversation = this.scene.conversations.find(({ id }) => id === message.conversationId)
       if (!conversation || !this.isConversationVisible(operatorId, conversation)) {
-        throw new Error(`消息不存在：${messageId}`)
+        throw new SandboxDomainError(`消息不存在：${messageId}`)
       }
-      if (message.event) throw new Error(`事件消息不能合并转发：${messageId}`)
-      if (isRecalledMessage(message)) throw new Error(`已撤回消息不能合并转发：${messageId}`)
+      if (message.event) throw new SandboxDomainError(`事件消息不能合并转发：${messageId}`)
+      if (isRecalledMessage(message)) throw new SandboxDomainError(`已撤回消息不能合并转发：${messageId}`)
       return message
     })
     // 多选发送按时间稳定排序，不使用点击顺序。
@@ -1624,7 +1625,7 @@ export class SandboxControlService {
   }
 
   private buildExplicitForwardNodes(operatorId: string, nodes: SandboxForwardNodeInput[]): SandboxForwardNode[] {
-    if (nodes.length > MAX_FORWARD_NODES) throw new Error(`合并转发节点不能超过 ${MAX_FORWARD_NODES} 条`)
+    if (nodes.length > MAX_FORWARD_NODES) throw new SandboxDomainError(`合并转发节点不能超过 ${MAX_FORWARD_NODES} 条`)
     return nodes.map((node, index) => {
       if (node.type === 'reference') {
         const [built] = this.buildReferenceForwardNodes(operatorId, [node.messageId])
@@ -1632,17 +1633,17 @@ export class SandboxControlService {
       }
       const userId = node.userId.trim()
       const nickname = node.nickname.trim() || userId
-      if (!userId) throw new Error(`合并转发节点 #${index + 1} 缺少 user_id`)
+      if (!userId) throw new SandboxDomainError(`合并转发节点 #${index + 1} 缺少 user_id`)
       const content = node.content.trim()
       const media = node.media?.length ? node.media.map(toMediaMetadata) : undefined
       if (!content && !media?.length && !node.forwardId) {
-        throw new Error(`合并转发节点 #${index + 1} 不能为空`)
+        throw new SandboxDomainError(`合并转发节点 #${index + 1} 不能为空`)
       }
       if (node.forwardId && !this.getForwards().some(({ id }) => id === node.forwardId)) {
-        throw new Error(`嵌套合并转发不存在：${node.forwardId}`)
+        throw new SandboxDomainError(`嵌套合并转发不存在：${node.forwardId}`)
       }
       if (media?.some(({ id, reference }) => reference !== `sandbox-media://${id}`)) {
-        throw new Error(`合并转发节点 #${index + 1} 包含无效媒体引用`)
+        throw new SandboxDomainError(`合并转发节点 #${index + 1} 包含无效媒体引用`)
       }
       return {
         userId,
@@ -1716,7 +1717,7 @@ export class SandboxControlService {
   }
 
   startMediaMessageSend(input: SendMediaMessageInput): { result: SendMessageResult; delivery: Promise<void> } {
-    if (!input.media.length) throw new Error('至少需要一个媒体文件')
+    if (!input.media.length) throw new SandboxDomainError('至少需要一个媒体文件')
     // 先校验会话与操作者，再落盘媒体；中途任一文件校验失败时清理已写入的文件，避免留下孤儿媒体。
     const context = this.getMessageContext(input)
     const media: SandboxMedia[] = []
@@ -1773,7 +1774,7 @@ export class SandboxControlService {
     if (forwardMedia) return this.mediaStorage.read(forwardMedia)
     const avatarReference = [...this.scene.participants.map(({ avatar }) => avatar), ...this.scene.groups.map(({ avatar }) => avatar)]
       .find((reference) => reference === `sandbox-media://${input.mediaId}`)
-    if (!avatarReference) throw new Error(`媒体不存在或不可见：${input.mediaId}`)
+    if (!avatarReference) throw new SandboxDomainError(`媒体不存在或不可见：${input.mediaId}`)
     return this.mediaStorage.readById(input.mediaId)
   }
 
@@ -1803,7 +1804,7 @@ export class SandboxControlService {
     rawMessage: string,
   ): Promise<void> {
     const runtimeBot = this.runtimeBots.get(recipientBot.id)
-    if (!runtimeBot) throw new Error(`机器人运行时不存在：${recipientBot.id}`)
+    if (!runtimeBot) throw new SandboxDomainError(`机器人运行时不存在：${recipientBot.id}`)
     // ChatLuna allowQuoteReply / character 只认 session.quote.user.id === bot.userId|selfId，
     // 不依赖 @。quote 必须带齐 user 与 timestamp，character 才能拼出和真 QQ 一样的引用 XML。
     const session = runtimeBot.session({
@@ -1878,12 +1879,12 @@ export class SandboxControlService {
   setGroupAnnouncement(input: SetGroupAnnouncementInput): void {
     const participant = this.getParticipant(input.operatorId)
     const group = this.scene.groups.find(({ id }) => id === input.groupId)
-    if (!group) throw new Error(`群组不存在：${input.groupId}`)
+    if (!group) throw new SandboxDomainError(`群组不存在：${input.groupId}`)
     if (!group.members.some(({ participantId }) => participantId === participant.id)) {
-      throw new Error(`参与者不在群组中：${input.operatorId}`)
+      throw new SandboxDomainError(`参与者不在群组中：${input.operatorId}`)
     }
     const content = input.content.trim()
-    if (!content) throw new Error('群公告不能为空')
+    if (!content) throw new SandboxDomainError('群公告不能为空')
 
     group.announcements.unshift({
       id: Random.id(),
@@ -1897,13 +1898,13 @@ export class SandboxControlService {
   deleteGroupAnnouncement(input: DeleteGroupAnnouncementInput): void {
     const participant = this.getParticipant(input.operatorId)
     const group = this.scene.groups.find(({ id }) => id === input.groupId)
-    if (!group) throw new Error(`群组不存在：${input.groupId}`)
+    if (!group) throw new SandboxDomainError(`群组不存在：${input.groupId}`)
     if (!group.members.some(({ participantId }) => participantId === participant.id)) {
-      throw new Error(`参与者不在群组中：${input.operatorId}`)
+      throw new SandboxDomainError(`参与者不在群组中：${input.operatorId}`)
     }
 
     const index = group.announcements.findIndex(({ id }) => id === input.announcementId)
-    if (index < 0) throw new Error(`群公告不存在：${input.announcementId}`)
+    if (index < 0) throw new SandboxDomainError(`群公告不存在：${input.announcementId}`)
     group.announcements.splice(index, 1)
     this.commitSceneMutation()
   }
@@ -1913,7 +1914,7 @@ export class SandboxControlService {
   async setMessageReaction(input: SetMessageReactionInput): Promise<{ revision: number }> {
     if (this.isBot(input.operatorId)) {
       const bot = this.getBots().find(({ id }) => id === input.operatorId)!
-      if (!bot.enabled) throw new Error(`机器人已停用：${bot.id}`)
+      if (!bot.enabled) throw new SandboxDomainError(`机器人已停用：${bot.id}`)
       await this.getRuntimeBot(bot.id).internal._request('set_msg_emoji_like', {
         message_id: input.messageId,
         emoji_id: input.emojiId,
@@ -1928,17 +1929,17 @@ export class SandboxControlService {
   // bot action 与用户交互最终都落到这里，保证场景回应事实唯一。
   applyMessageReaction(input: SetMessageReactionInput): void {
     const emojiId = input.emojiId.trim()
-    if (!emojiId) throw new Error('表情 ID 不能为空')
+    if (!emojiId) throw new SandboxDomainError('表情 ID 不能为空')
     this.getParticipant(input.operatorId)
     const message = this.scene.messages.find(({ id }) => id === input.messageId)
-    if (!message) throw new Error(`消息不存在：${input.messageId}`)
+    if (!message) throw new SandboxDomainError(`消息不存在：${input.messageId}`)
     const conversation = this.scene.conversations.find(({ id }) => id === message.conversationId)
     if (!conversation || !this.isConversationVisible(input.operatorId, conversation)) {
-      throw new Error(`消息不存在：${input.messageId}`)
+      throw new SandboxDomainError(`消息不存在：${input.messageId}`)
     }
     // 私聊和群聊共用回应事实；会话可见性已在上方统一校验。
     // 撤回后保留历史回应，但禁止继续新增或取消，避免把历史事实改写成当前操作。
-    if (isRecalledMessage(message)) throw new Error('已撤回消息不支持修改表情回应')
+    if (isRecalledMessage(message)) throw new SandboxDomainError('已撤回消息不支持修改表情回应')
     // 与撤回一致地覆盖同一广播组，避免同一条逻辑消息的副本之间回应不一致。
     for (const target of this.scene.messages.filter(({ id, broadcastId }) => id === message.id
       || (!!message.broadcastId && broadcastId === message.broadcastId))) {
@@ -1961,7 +1962,7 @@ export class SandboxControlService {
   async recallMessage(input: RecallMessageInput): Promise<{ revision: number }> {
     if (this.isBot(input.operatorId)) {
       const bot = this.getBots().find(({ id }) => id === input.operatorId)!
-      if (!bot.enabled) throw new Error(`机器人已停用：${bot.id}`)
+      if (!bot.enabled) throw new SandboxDomainError(`机器人已停用：${bot.id}`)
       // 机器人操作者必须走自身 OneBot action（操作通道约束），保持能力校验与调试记录一致。
       await this.getRuntimeBot(bot.id).internal._request('delete_msg', { message_id: input.messageId })
       return { revision: this.scene.revision }
@@ -1995,15 +1996,15 @@ export class SandboxControlService {
   // 撤回是生命周期状态：权威场景保留正文/媒体/回复/回应/思考，仅标记 recalled 并向机器人派发 notice。
   private async recallVisibleMessage(operatorId: string, messageId: string, conversationId?: string): Promise<void> {
     const message = this.scene.messages.find(({ id }) => id === messageId)
-    if (!message || (conversationId && message.conversationId !== conversationId)) throw new Error(`消息不存在：${messageId}`)
+    if (!message || (conversationId && message.conversationId !== conversationId)) throw new SandboxDomainError(`消息不存在：${messageId}`)
     const conversation = this.scene.conversations.find(({ id }) => id === message.conversationId)
-    if (!conversation || !this.isConversationVisible(operatorId, conversation)) throw new Error(`消息不存在：${messageId}`)
-    if (message.event || isRecalledMessage(message)) throw new Error('该消息不支持撤回')
+    if (!conversation || !this.isConversationVisible(operatorId, conversation)) throw new SandboxDomainError(`消息不存在：${messageId}`)
+    if (message.event || isRecalledMessage(message)) throw new SandboxDomainError('该消息不支持撤回')
     const group = conversation.type === 'group'
       ? this.scene.groups.find(({ id }) => id === conversation.groupId)
       : undefined
     if (message.authorId !== operatorId) {
-      if (!group) throw new Error('只能撤回自己发送的消息')
+      if (!group) throw new SandboxDomainError('只能撤回自己发送的消息')
       const actor = this.requireGroupMember(group, operatorId)
       const target = this.requireGroupMember(group, message.authorId)
       this.assertCanManageMember(actor, target, '撤回成员消息')
@@ -2072,7 +2073,7 @@ export class SandboxControlService {
     forwardId?: string,
   ): SandboxMessage {
     const conversation = this.scene.conversations.find(({ id }) => id === conversationId)
-    if (!conversation) throw new Error(`会话不存在：${conversationId}`)
+    if (!conversation) throw new SandboxDomainError(`会话不存在：${conversationId}`)
 
     const message: SandboxMessage = {
       id: Random.id(),
@@ -2308,19 +2309,19 @@ export class SandboxControlService {
 
   private validateParticipantId(value: string): string {
     const id = value.trim()
-    if (!/^\d+$/.test(id)) throw new Error('QQ ID 必须是数字字符串')
+    if (!/^\d+$/.test(id)) throw new SandboxDomainError('QQ ID 必须是数字字符串')
     return id
   }
 
   private validateGroupId(value: string): string {
     const id = value.trim()
-    if (!/^\d+$/.test(id)) throw new Error('群号必须是数字字符串')
+    if (!/^\d+$/.test(id)) throw new SandboxDomainError('群号必须是数字字符串')
     return id
   }
 
   private validateName(value: string, field: string): string {
     const name = value.trim()
-    if (!name) throw new Error(`${field}不能为空`)
+    if (!name) throw new SandboxDomainError(`${field}不能为空`)
     return name
   }
 
@@ -2334,14 +2335,14 @@ export class SandboxControlService {
 
   private getUser(userId: string) {
     const user = this.getUsers().find(({ id }) => id === userId)
-    if (!user) throw new Error(`用户不存在：${userId}`)
+    if (!user) throw new SandboxDomainError(`用户不存在：${userId}`)
     return user
   }
 
   private getVisibleConversation(operatorId: string, conversationId: string) {
     this.getParticipant(operatorId)
     const conversation = this.scene.conversations.find(({ id }) => id === conversationId)
-    if (!conversation || !this.isConversationVisible(operatorId, conversation)) throw new Error(`会话不存在：${conversationId}`)
+    if (!conversation || !this.isConversationVisible(operatorId, conversation)) throw new SandboxDomainError(`会话不存在：${conversationId}`)
     return conversation
   }
 
@@ -2377,7 +2378,7 @@ export class SandboxControlService {
       ? this.scene.groups.find(({ id }) => id === conversation.groupId)
       : undefined
     if (conversation.type === 'group' && (!group || !group.members.some(({ participantId }) => participantId === operator.id))) {
-      throw new Error(`群聊关系不存在：${input.conversationId}`)
+      throw new SandboxDomainError(`群聊关系不存在：${input.conversationId}`)
     }
     const peer = conversation.type === 'direct'
       ? this.getParticipant(getDirectConversationPeerId(conversation, input.operatorId))
@@ -2385,7 +2386,7 @@ export class SandboxControlService {
     const reply = input.replyToMessageId
       ? this.scene.messages.find(({ id, conversationId }) => id === input.replyToMessageId && conversationId === conversation.id)
       : undefined
-    if (input.replyToMessageId && !reply) throw new Error(`回复消息不存在：${input.replyToMessageId}`)
+    if (input.replyToMessageId && !reply) throw new SandboxDomainError(`回复消息不存在：${input.replyToMessageId}`)
     return { operator, peer, conversation, group, reply }
   }
 
@@ -2407,7 +2408,7 @@ export class SandboxControlService {
   }
 
   private validateMessageLimit(value: number) {
-    if (!Number.isInteger(value) || value < 1 || value > 100) throw new Error('消息分页大小必须在 1 到 100 之间')
+    if (!Number.isInteger(value) || value < 1 || value > 100) throw new SandboxDomainError('消息分页大小必须在 1 到 100 之间')
     return value
   }
 
@@ -2455,11 +2456,11 @@ export class SandboxControlService {
 
   private handleUserRelationshipRequest(input: Extract<PerformFriendActionInput, { action: 'handle-request' }>): PerformFriendActionResult | Promise<PerformGroupActionResult> {
     const requestIndex = this.scene.requests.findIndex(({ id }) => id === input.requestId)
-    if (requestIndex < 0) throw new Error(`关系申请不存在：${input.requestId}`)
+    if (requestIndex < 0) throw new SandboxDomainError(`关系申请不存在：${input.requestId}`)
     const request = this.scene.requests[requestIndex]
     if (request.type === 'friend') {
-      if (this.isBot(request.targetId)) throw new Error('机器人申请必须由机器人处理')
-      if (request.targetId !== input.operatorId) throw new Error('只能处理发给自己的好友申请')
+      if (this.isBot(request.targetId)) throw new SandboxDomainError('机器人申请必须由机器人处理')
+      if (request.targetId !== input.operatorId) throw new SandboxDomainError('只能处理发给自己的好友申请')
       this.scene.requests.splice(requestIndex, 1)
       if (input.approve) this.addFriendship(request.requesterId, input.operatorId)
       this.commitSceneMutation()
@@ -2476,24 +2477,24 @@ export class SandboxControlService {
 
   private async handleUserGroupRequest(input: Extract<PerformGroupActionInput, { action: 'handle-request' }>): Promise<PerformGroupActionResult> {
     const requestIndex = this.scene.requests.findIndex(({ id, type }) => id === input.requestId && type === 'group')
-    if (requestIndex < 0) throw new Error(`群申请不存在：${input.requestId}`)
+    if (requestIndex < 0) throw new SandboxDomainError(`群申请不存在：${input.requestId}`)
     const request = this.scene.requests[requestIndex]
     const group = this.scene.groups.find(({ id }) => id === request.groupId)
-    if (!group) throw new Error(`群组不存在：${request.groupId}`)
+    if (!group) throw new SandboxDomainError(`群组不存在：${request.groupId}`)
     const subType = request.subType ?? 'add'
 
     if (subType === 'invite') {
-      if (this.isBot(request.targetId)) throw new Error('机器人邀请必须由机器人处理')
-      if (request.targetId !== input.operatorId) throw new Error('只能处理发给自己的群邀请')
+      if (this.isBot(request.targetId)) throw new SandboxDomainError('机器人邀请必须由机器人处理')
+      if (request.targetId !== input.operatorId) throw new SandboxDomainError('只能处理发给自己的群邀请')
     } else {
       const operator = this.requireGroupMember(group, input.operatorId)
-      if (operator.role !== 'owner' && operator.role !== 'admin') throw new Error('只有群主或管理员可以处理入群申请')
+      if (operator.role !== 'owner' && operator.role !== 'admin') throw new SandboxDomainError('只有群主或管理员可以处理入群申请')
     }
 
     this.scene.requests.splice(requestIndex, 1)
     if (input.approve) {
       const participantId = subType === 'invite' ? request.targetId : request.requesterId
-      if (!participantId) throw new Error('群申请缺少目标参与者')
+      if (!participantId) throw new SandboxDomainError('群申请缺少目标参与者')
       await this.addApprovedGroupMember(group, participantId, input.operatorId, subType)
     } else {
       this.commitSceneMutation()
@@ -2503,7 +2504,7 @@ export class SandboxControlService {
 
   private requireGroupMember(group: SandboxGroup, participantId: string) {
     const member = group.members.find((item) => item.participantId === participantId)
-    if (!member) throw new Error(`参与者不在群组中：${participantId}`)
+    if (!member) throw new SandboxDomainError(`参与者不在群组中：${participantId}`)
     return member
   }
 
@@ -2512,24 +2513,24 @@ export class SandboxControlService {
     target: SandboxGroup['members'][number],
     action: string,
   ) {
-    if (actor.role === 'member') throw new Error(`只有群主或管理员可以${action}`)
+    if (actor.role === 'member') throw new SandboxDomainError(`只有群主或管理员可以${action}`)
     if (target.role === 'owner' || (actor.role === 'admin' && target.role === 'admin')) {
-      throw new Error('管理员不能管理群主或其他管理员')
+      throw new SandboxDomainError('管理员不能管理群主或其他管理员')
     }
-    if (actor.participantId === target.participantId) throw new Error(`不能对自己执行${action}`)
+    if (actor.participantId === target.participantId) throw new SandboxDomainError(`不能对自己执行${action}`)
   }
 
   // 专属头衔与禁言过去只做权限校验后确认调用，插件无法验证结果；两者现在都写入
   // 群成员状态，使 WebQQ、场景快照和 OneBot 查询读到同一份事实。
   private setGroupMemberTitle(actor: SandboxGroupMember, target: SandboxGroupMember, title: string): void {
-    if (actor.role !== 'owner') throw new Error('只有群主可以设置专属头衔')
+    if (actor.role !== 'owner') throw new SandboxDomainError('只有群主可以设置专属头衔')
     target.title = this.validateOptionalName(title, '专属头衔')
     this.commitSceneMutation()
   }
 
   private setGroupMemberMute(actor: SandboxGroupMember, target: SandboxGroupMember, durationSeconds: number): void {
-    if (!Number.isFinite(durationSeconds) || durationSeconds < 0) throw new Error('禁言时长不能为负数')
-    if (durationSeconds > MAX_GROUP_MUTE_SECONDS) throw new Error('禁言时长不能超过 30 天')
+    if (!Number.isFinite(durationSeconds) || durationSeconds < 0) throw new SandboxDomainError('禁言时长不能为负数')
+    if (durationSeconds > MAX_GROUP_MUTE_SECONDS) throw new SandboxDomainError('禁言时长不能超过 30 天')
     this.assertCanManageMember(actor, target, durationSeconds > 0 ? '禁言成员' : '解除禁言')
     target.mutedUntil = durationSeconds > 0
       ? new Date(Date.now() + durationSeconds * 1000).toISOString()
@@ -2540,12 +2541,12 @@ export class SandboxControlService {
   private validateOptionalName(value: string, label: string): string | undefined {
     const trimmed = value.trim()
     if (!trimmed) return undefined
-    if (trimmed.length > 64) throw new Error(`${label}不能超过 64 个字符`)
+    if (trimmed.length > 64) throw new SandboxDomainError(`${label}不能超过 64 个字符`)
     return trimmed
   }
 
-  private async transferGroupOwner(group: SandboxGroup, actor: SandboxGroupMember, target: SandboxGroupMember) {    if (actor.role !== 'owner') throw new Error('只有群主可以转让群主身份')
-    if (actor.participantId === target.participantId) throw new Error('不能把群主身份转让给自己')
+  private async transferGroupOwner(group: SandboxGroup, actor: SandboxGroupMember, target: SandboxGroupMember) {    if (actor.role !== 'owner') throw new SandboxDomainError('只有群主可以转让群主身份')
+    if (actor.participantId === target.participantId) throw new SandboxDomainError('不能把群主身份转让给自己')
     actor.role = 'member'
     target.role = 'owner'
     this.commitSceneMutation()
@@ -2605,7 +2606,7 @@ export class SandboxControlService {
     const bot = this.getBots().find((item) => item.id === id)
     if (user) return user
     if (bot) return bot
-    throw new Error(`参与者不存在：${id}`)
+    throw new SandboxDomainError(`参与者不存在：${id}`)
   }
 
   private isBot(id: string | undefined): boolean {
@@ -2614,7 +2615,7 @@ export class SandboxControlService {
 
   private async dispatchFriendRequest(botId: string, userId: string, flag: string, comment?: string) {
     const bot = this.runtimeBots.get(botId)
-    if (!bot) throw new Error(`机器人运行时不存在：${botId}`)
+    if (!bot) throw new SandboxDomainError(`机器人运行时不存在：${botId}`)
     const session = bot.session({
       type: 'friend-request',
       timestamp: Date.now(),
@@ -2636,7 +2637,7 @@ export class SandboxControlService {
 
   private async dispatchBotNotice(botId: string, userId: string, noticeType: 'notify' | 'friend_del') {
     const bot = this.runtimeBots.get(botId)
-    if (!bot) throw new Error(`机器人运行时不存在：${botId}`)
+    if (!bot) throw new SandboxDomainError(`机器人运行时不存在：${botId}`)
     const session = bot.session({
       type: 'notice',
       timestamp: Date.now(),
@@ -2766,7 +2767,7 @@ export class SandboxControlService {
     const startedAt = Date.now()
     const payload = Reflect.get(session, 'onebot')
     const profile = this.getBots().find(({ id }) => id === bot.selfId)
-    if (!profile) throw new Error(`机器人不存在：${bot.selfId}`)
+    if (!profile) throw new SandboxDomainError(`机器人不存在：${bot.selfId}`)
     const type = this.getOneBotEventType(payload)
     try {
       await bot.dispatch(session)
@@ -2850,13 +2851,13 @@ export class SandboxControlService {
     const participantIds = new Set<string>()
     let ownerId = ''
     const result = members.map((member) => {
-      if (participantIds.has(member.participantId)) throw new Error(`群成员重复：${member.participantId}`)
+      if (participantIds.has(member.participantId)) throw new SandboxDomainError(`群成员重复：${member.participantId}`)
       const user = this.getUsers().find(({ id }) => id === member.participantId)
       const bot = this.getBots().find(({ id }) => id === member.participantId)
-      if (!user && !bot) throw new Error(`群成员不存在：${member.participantId}`)
+      if (!user && !bot) throw new SandboxDomainError(`群成员不存在：${member.participantId}`)
       if (member.role === 'owner') {
         // 普通用户和虚拟 OneBot 机器人共享同一套群角色，群主只要求是有效参与者。
-        if (ownerId) throw new Error('群组只能有一个群主')
+        if (ownerId) throw new SandboxDomainError('群组只能有一个群主')
         ownerId = member.participantId
       }
       participantIds.add(member.participantId)
@@ -2875,7 +2876,7 @@ export class SandboxControlService {
         cardChangeable: typeof member.cardChangeable === 'boolean' ? member.cardChangeable : undefined,
       }
     })
-    if (!ownerId) throw new Error('群组必须有一个群主')
+    if (!ownerId) throw new SandboxDomainError('群组必须有一个群主')
     return result
   }
 

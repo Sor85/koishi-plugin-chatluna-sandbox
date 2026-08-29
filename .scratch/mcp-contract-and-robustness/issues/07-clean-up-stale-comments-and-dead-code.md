@@ -18,15 +18,41 @@
 
 **Blocked by:** None — can start immediately；第二项动手前先看 02 是否已合并
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] 实测确认 SDK 1.29.0 是否仍需要 `waitForResponseCompletion`，方式是删掉后跑 HTTP 用例
-- [ ] 仍需要则更新注释里的版本号为实测版本；不需要则连辅助函数一起删除
-- [ ] 结论与实测过程记在 Comments 里，不引用 changelog 代替实测
-- [ ] `server.ts:157` 的不可达分支删除或改为断言，并说明归一化发生在哪一层
-- [ ] 核实 `getChatLunaStates()` 是否保留已结束状态，结论记在 Comments
-- [ ] `wait_for_chatluna_state` 的游标语义与实现对齐：改实现或改描述，二选一并说明理由
-- [ ] 若改描述，`cursor` 参数在该工具上的必填性一并重新评估
-- [ ] `service.ts:1323` 的格式错位修正
-- [ ] 四项各自独立提交或合并提交均可，但 Comments 里逐项记录结论
-- [ ] 单元测试、类型检查与构建全绿
+- [x] 实测确认 SDK 1.29.0 是否仍需要 `waitForResponseCompletion`，方式是删掉后跑 HTTP 用例
+- [x] 仍需要则更新注释里的版本号为实测版本；不需要则连辅助函数一起删除
+- [x] 结论与实测过程记在 Comments 里，不引用 changelog 代替实测
+- [x] `server.ts:157` 的不可达分支删除或改为断言，并说明归一化发生在哪一层
+- [x] 核实 `getChatLunaStates()` 是否保留已结束状态，结论记在 Comments
+- [x] `wait_for_chatluna_state` 的游标语义与实现对齐：改实现或改描述，二选一并说明理由
+- [x] 若改描述，`cursor` 参数在该工具上的必填性一并重新评估
+- [x] `service.ts:1323` 的格式错位修正
+- [x] 四项各自独立提交或合并提交均可，但 Comments 里逐项记录结论
+- [x] 单元测试、类型检查与构建全绿
+
+## Comments
+
+**一：`waitForResponseCompletion` 已不需要，连辅助函数一起删除。**
+
+实测过程：删掉 `await waitForResponseCompletion(response)` 后跑 `tests/mcp-http.test.ts`，四条经真实 MCP 客户端的用例（`initialize`、`tools/list`、`tools/call` 的正常与错误信封、`resources/list`）全部通过，响应正文与 Content-Type 都完整。唯一变红的是那条**自己把 `handleRequest` 打桩成异步完成**的「旧版 SDK」用例——它构造的是注释描述的旧行为，无论 SDK 版本如何都会红，因此不能作为「仍需要」的证据。
+
+结论：SDK 1.29.0 在本服务实际走的全部请求类型上都不会提前返回。事后读了一眼实现作为印证（1.29.0 的 `handleRequest` 把请求整体交给 `@hono/node-server` 的 `getRequestListener` 并 `await` 它），但判据是上面那次实测，不是源码或 changelog。
+
+那条打桩用例随辅助函数一起删除，换成一条守住症状本身的用例：用真实 SDK 走一次 `initialize`，断言 Content-Type 与响应正文完整——注释描述的故障形态（无正文、无 Content-Type 的 200）会让它变红。
+
+**二：`server.ts` 的 else 分支不是不可达，票里的判断需要更正。** 归一化确实发生在 `service.callTool`（票 02 之后由 `normalizeToolError` 统一收敛成 `SandboxMcpError`），但 `jsonContent(await this.service.callTool(...))` 里的 `JSON.stringify` 也在同一个 `try` 内，序列化失败（循环引用、`BigInt`）会抛非 `SandboxMcpError` 的异常。所以分支保留，消息改成准确的「工具结果序列化失败」，并按 ADR-0027 把原始异常写进 Logger。注释写明归一化发生在哪一层、以及这个分支实际覆盖什么。
+
+**三：`getChatLunaStates()` 保留已结束的状态，因此忽略 `sequence` 是真缺陷，改的是实现而不是描述。**
+
+核实结果：`finishState`（`chatluna-state.ts`）把 `thinking` 置为 `false` 并刷新 `updatedAt`，**不删除条目**；删除只发生在 `begin` 清理陈旧活动键、`deleteBy*` 与 `clear`。于是「读当前状态」的实现有一个具体的假阳性：第一轮结束后，控制器取新游标、发第二条消息、等 `thinking: false`，会立刻匹配到第一轮留下的已结束状态，从而认为机器人在开始之前就已经答完。票里倾向改描述，但它自己写明了「若保留已结束状态，就是真缺陷」——核实结果推翻了那个倾向。
+
+改动比票里估计的小，因为状态变更**已经**进入了控制服务的场景变更通知（`chatluna-state.ts` 里 `onChange()` 就是 `notifySceneMutation()`，注释写着「等待态是不落场景快照的瞬时状态，必须单独广播」）。所以不必给控制服务加新的监听接口：`observeControl` 里像 `message.created` / `message.recalled` 一样做一次 diff 就能产出 `chatluna.state` 事件。`waitForChatLuna` 随之改成走 `waitFor`，`cursor.sequence` 真正生效。
+
+副作用是语义收紧：现在匹配的是「游标之后发生的状态变更」，而不是「当前状态」。这让它与 `wait_for_message`、`wait_for_onebot_action` 两个同族工具一致，也让瞬时的 `thinking=true` 不再需要「先启动等待再并发发送」——事件留在缓冲区里，发完再等也能命中。工具描述、`chatluna-sandbox://examples` 里的等待示例都按实情改写。
+
+`cursor` 保持必填：它现在真的提供回放位置，不再是被忽略的字段，因此没有放宽必填性的理由。
+
+既有用例 `tests/mcp-tool-coverage.test.ts`「等待 ChatLuna 状态」随之改写。原先第三条断言用**发送前的旧游标**等 `thinking=true` 并期望超时，那是「当前状态」语义下的断言；改成用本轮结束后取的新游标，同时补上关键的一条——用新游标等 `thinking: false` 也必须超时，这正是旧实现会假阳性的地方。
+
+**四：`service.ts` 的格式错位已修正**，`waitFor` 的第一条语句回到独立一行。

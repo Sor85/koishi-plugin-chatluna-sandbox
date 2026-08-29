@@ -161,7 +161,7 @@ describe('MCP 折叠大型调试值', () => {
     runningApps.push(app)
     const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-fold-'))
     const control = new SandboxControlService(app)
-    const service = new SandboxMcpService(control, { dataDirectory: directory })
+    const service = new SandboxMcpService(app, control, { dataDirectory: directory })
     const credential = service.createCredential('调试凭证', ['debug', 'read'])
     const body = pngBase64()
 
@@ -181,7 +181,7 @@ describe('MCP 折叠大型调试值', () => {
     await expect(service.callTool(credential.token, 'list_onebot_debug_records', {
       includeLargeValues: true,
     })).rejects.toMatchObject({
-      code: 'invalid_argument',
+      code: 'invalid_arguments',
       message: expect.stringContaining('includeLargeValues'),
     })
 

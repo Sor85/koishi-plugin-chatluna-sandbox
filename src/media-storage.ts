@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { basename, resolve } from 'node:path'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import type { SandboxMedia, SandboxMediaContent, SandboxMediaType } from './types'
+import { SandboxDomainError } from './types'
 
 export const MAX_MEDIA_SIZE = 10 * 1024 * 1024
 
@@ -96,21 +97,21 @@ export class SandboxMediaStorage {
   save(input: { fileName: string; mimeType: string; dataBase64: string }): SandboxMedia {
     const mimeType = input.mimeType.trim().toLowerCase()
     const type = MEDIA_TYPES.get(mimeType)
-    if (!type) throw new Error(`不支持的媒体类型：${input.mimeType || '未知'}`)
+    if (!type) throw new SandboxDomainError(`不支持的媒体类型：${input.mimeType || '未知'}`)
     const name = basename(input.fileName.replaceAll('\\', '/')).trim()
-    if (!name) throw new Error('媒体文件名不能为空')
+    if (!name) throw new SandboxDomainError('媒体文件名不能为空')
     // 先按 Base64 理论长度拒绝超限输入，避免巨型字符串进入正则后耗尽调用栈或 CPU。
     const dataBase64 = input.dataBase64.trim()
     const paddingSize = dataBase64.endsWith('==') ? 2 : dataBase64.endsWith('=') ? 1 : 0
     if (Math.floor(dataBase64.length * 3 / 4) - paddingSize > MAX_MEDIA_SIZE) {
-      throw new Error('媒体大小不能超过 10 MB')
+      throw new SandboxDomainError('媒体大小不能超过 10 MB')
     }
     if (!dataBase64 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(dataBase64)) {
-      throw new Error('媒体内容不是有效的 Base64')
+      throw new SandboxDomainError('媒体内容不是有效的 Base64')
     }
     const content = Buffer.from(dataBase64, 'base64')
-    if (!content.length) throw new Error('媒体内容不能为空')
-    if (content.length > MAX_MEDIA_SIZE) throw new Error('媒体大小不能超过 10 MB')
+    if (!content.length) throw new SandboxDomainError('媒体内容不能为空')
+    if (content.length > MAX_MEDIA_SIZE) throw new SandboxDomainError('媒体大小不能超过 10 MB')
 
     // 内容寻址：相同正文复用同一媒体 ID，便于头像去重与引用感知回收。
     const id = createHash('sha256').update(content).digest('hex').slice(0, 32)
@@ -152,7 +153,7 @@ export class SandboxMediaStorage {
         dataBase64: readFileSync(this.getPath(media.id)).toString('base64'),
       }
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new Error(`媒体文件不存在：${media.id}`)
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new SandboxDomainError(`媒体文件不存在：${media.id}`)
       throw error
     }
   }
@@ -162,7 +163,7 @@ export class SandboxMediaStorage {
     try {
       media = JSON.parse(readFileSync(this.getMetadataPath(id), 'utf8')) as SandboxMedia
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new Error(`媒体文件不存在：${id}`)
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new SandboxDomainError(`媒体文件不存在：${id}`)
       throw error
     }
     return this.read(media)
@@ -203,7 +204,7 @@ export class SandboxMediaStorage {
   }
 
   private assertId(id: string): string {
-    if (!/^[a-f0-9]{32}$/.test(id)) throw new Error(`无效媒体标识：${id}`)
+    if (!/^[a-f0-9]{32}$/.test(id)) throw new SandboxDomainError(`无效媒体标识：${id}`)
     return id
   }
 
@@ -216,6 +217,6 @@ export class SandboxMediaStorage {
   }
 
   private validateReference(media: SandboxMedia): void {
-    if (media.reference !== `sandbox-media://${media.id}`) throw new Error(`无效媒体引用：${media.id}`)
+    if (media.reference !== `sandbox-media://${media.id}`) throw new SandboxDomainError(`无效媒体引用：${media.id}`)
   }
 }

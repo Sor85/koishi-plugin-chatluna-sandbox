@@ -18,7 +18,7 @@ function createService(uploadedMediaLimit?: number) {
   const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-mcp-upload-'))
   const runtimeBots = new SandboxRuntimeBotRegistry()
   const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media'), runtimeBots })
-  const service = new SandboxMcpService(control, { dataDirectory: directory, uploadedMediaLimit })
+  const service = new SandboxMcpService(app, control, { dataDirectory: directory, uploadedMediaLimit })
   const credential = service.createCredential('测试凭证', ['read', 'interact'])
   // 关闭机器人运行时：本组用例只关心上传缓存，不需要等待真实投递。
   control.updateBot({ id: '20001', name: 'Koishi', implementation: 'napcat', enabled: false })

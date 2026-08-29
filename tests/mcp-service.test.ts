@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -55,7 +56,7 @@ describe('SandboxMcpService', () => {
   })
 
   it('允许查看并修改已创建凭证的名称、权限和 Token', () => {
-    const { service, credential, directory, control } = createService(['read'])
+    const { app, service, credential, directory, control } = createService(['read'])
 
     expect(service.getCredential(credential.id)).toMatchObject({
       id: credential.id,
@@ -71,7 +72,7 @@ describe('SandboxMcpService', () => {
     expect(service.authenticate(credential.token)?.name).toBe('联调凭证')
     expect(service.listTools(credential.token).map(({ name }) => name)).toContain('list_onebot_debug_records')
 
-    const reloaded = new SandboxMcpService(control, { dataDirectory: directory })
+    const reloaded = new SandboxMcpService(app, control, { dataDirectory: directory })
     expect(reloaded.getCredential(credential.id)).toMatchObject({ name: '联调凭证', scopes: ['read', 'debug'], token: credential.token })
     expect(readFileSync(join(directory, 'mcp-credentials.json'), 'utf8')).toContain(credential.token)
     expect(() => service.updateCredential('missing', { name: 'x' })).toThrow(/凭证不存在/)
@@ -80,17 +81,18 @@ describe('SandboxMcpService', () => {
   })
 
   it('保留只有摘要的旧凭证，并允许重新生成可查看的 Token', () => {
-    const { directory, control, service, credential } = createService(['read'])
+    const { app, directory, control, service, credential } = createService(['read'])
     writeFileSync(join(directory, 'mcp-credentials.json'), `${JSON.stringify([{
       id: 'legacy-credential',
       name: '旧摘要凭证',
       scopes: ['read'],
       enabled: true,
-      tokenDigest: 'abc',
+      // 真实的旧记录带的是完整 sha256 摘要；长度不合规的摘要现在会让整条被丢弃（见凭证存储健壮性用例）。
+      tokenDigest: createHash('sha256').update('legacy-token').digest('hex'),
       createdAt: new Date().toISOString(),
     }], null, 2)}\n`)
 
-    const reloaded = new SandboxMcpService(control, { dataDirectory: directory })
+    const reloaded = new SandboxMcpService(app, control, { dataDirectory: directory })
     expect(reloaded.listCredentials()).toEqual([expect.objectContaining({
       id: 'legacy-credential',
       name: '旧摘要凭证',
@@ -350,7 +352,7 @@ describe('SandboxMcpService', () => {
     const app = registerMcpTestApp(new App())
     const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-mcp-limit-'))
     const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media') })
-    const service = new SandboxMcpService(control, { dataDirectory: directory, readPerMinute: 1 })
+    const service = new SandboxMcpService(app, control, { dataDirectory: directory, readPerMinute: 1 })
     const credential = service.createCredential('限流凭证', ['read', 'debug'])
     await service.callTool(credential.token, 'get_server_info', {}, { sourceIp: '127.0.0.1' })
     await expect(service.callTool(credential.token, 'get_scene_snapshot', {})).rejects.toMatchObject({ code: 'rate_limited', retryable: true, retryAfterMs: expect.any(Number) })

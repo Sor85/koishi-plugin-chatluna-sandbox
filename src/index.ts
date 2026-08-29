@@ -273,7 +273,7 @@ export function apply(ctx: Context, config: Config) {
       },
     })
     try {
-      const mcp = new SandboxMcpService(control, {
+      const mcp = new SandboxMcpService(inner, control, {
         dataDirectory: resolve(inner.baseDir, 'data/chatluna-sandbox'),
         readPerMinute: config.mcp.readPerMinute,
         mutationPerMinute: config.mcp.mutationPerMinute,

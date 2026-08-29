@@ -11,7 +11,7 @@ import type {
   SandboxOneBotDebugRecordsPage,
   SandboxOneBotDebugStatus,
 } from './types'
-import { SandboxOneBotDebugCursorExpiredError } from './types'
+import { SandboxDomainError, SandboxOneBotDebugCursorExpiredError } from './types'
 import { getOneBotProfileBaseline, listOneBotImplementationProfiles } from './onebot-profiles'
 import {
   InMemoryRecordRows,
@@ -348,7 +348,7 @@ export class SandboxOneBotDebugStore {
     const earliestCursor = this.summary.earliestSequence
     if (input.beforeSequence !== undefined) {
       if (!Number.isInteger(input.beforeSequence) || input.beforeSequence < 1) {
-        throw new Error('beforeSequence 必须是正整数')
+        throw new SandboxDomainError('beforeSequence 必须是正整数')
       }
       // 游标指向已回收历史：比当前最早 sequence 还旧。
       if (earliestCursor !== undefined && input.beforeSequence < earliestCursor) {

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { App } from '@koishijs/core'
 import { SandboxControlService, SandboxRuntimeBotRegistry } from '../../src/control-service'
-import { SandboxMcpService } from '../../src/mcp/service'
+import { SandboxMcpService, type SandboxMcpServiceOptions } from '../../src/mcp/service'
 import { SandboxTestSpaceService } from '../../src/test-spaces'
 
 export type SandboxMcpTestScope = 'read' | 'interact' | 'manage' | 'debug'
@@ -39,15 +39,17 @@ export async function stopMcpTestApps(): Promise<void> {
 export function createMcpTestService(
   scopes: SandboxMcpTestScope[] = ['read'],
   enableTestSpaces = false,
+  options: Partial<SandboxMcpServiceOptions> = {},
 ): McpTestHarness {
   const app = registerMcpTestApp(new App())
   const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-mcp-'))
   const runtimeBots = new SandboxRuntimeBotRegistry()
   const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media'), runtimeBots })
   const testSpaces = new SandboxTestSpaceService(app, runtimeBots)
-  const service = new SandboxMcpService(control, {
+  const service = new SandboxMcpService(app, control, {
     dataDirectory: directory,
     testSpaces: enableTestSpaces ? testSpaces : undefined,
+    ...options,
   })
   const credential = service.createCredential('测试凭证', scopes)
   return { app, control, service, credential, directory, testSpaces, runtimeBots }
@@ -68,7 +70,7 @@ export async function createStartedMcpTestService(scopes: SandboxMcpTestScope[])
   await app.start()
   if (!control) throw new Error('沙盒控制服务未注册')
   const testSpaces = new SandboxTestSpaceService(app, runtimeBots)
-  const service = new SandboxMcpService(control, { dataDirectory: directory })
+  const service = new SandboxMcpService(app, control, { dataDirectory: directory })
   const credential = service.createCredential('实时测试凭证', scopes)
   return { app, control, service, credential, directory, testSpaces, runtimeBots }
 }

@@ -123,6 +123,12 @@ describe('MCP 读取类工具', () => {
     expect(llbot.map(({ id }) => id)).not.toEqual(napcat.map(({ id }) => id))
     // 省略 implementation 时按 napcat 解析。
     expect(await service.callTool(credential.token, 'get_capability_matrix', {})).toEqual(napcat)
+    // 非法值必须显式失败：静默回落到 napcat 会让测试控制器以为自己在测另一个协议，而它拿到的
+    // 矩阵与 napcat 逐字节相同，没有任何可察觉的迹象。
+    for (const implementation of ['bogus', 'NapCat', 'napcat ', '', null, 42]) {
+      await expect(service.callTool(credential.token, 'get_capability_matrix', { implementation }))
+        .rejects.toMatchObject({ code: 'invalid_arguments' })
+    }
 
     const target = napcat.find(({ supported }) => supported)
     if (!target) throw new Error('NapCat 基线没有任何受支持能力')
@@ -238,7 +244,7 @@ describe('MCP 交互类工具', () => {
     })
   })
 
-  it('等待 ChatLuna 状态：匹配条件生效，已结束的旧状态不会被当成当前结果', async () => {
+  it('等待 ChatLuna 状态：按游标定位状态变更，上一轮结束的状态不会被当成本轮结果', async () => {
     const { app, service, credential, control } = await createStartedMcpTestService(['interact'])
     const session = createDirectSession(control, '20001')
     type WaitResult = {
@@ -248,7 +254,7 @@ describe('MCP 交互类工具', () => {
     }
 
     const cursor = service.currentCursor()
-    // thinking=true 是瞬时状态：先启动等待，再广播状态，才能观察到它。
+    // thinking=true 是瞬时状态，但状态变更进了事件流，因此发生在游标之后就能补等到。
     const pending = service.callTool(credential.token, 'wait_for_chatluna_state', {
       cursor, botParticipantId: '20001', thinking: true, timeoutSeconds: 5,
     }) as Promise<WaitResult>
@@ -263,10 +269,14 @@ describe('MCP 交互类工具', () => {
       cursor, botParticipantId: '20001', thinking: false, timeoutSeconds: 5,
     })).resolves.toMatchObject({ matched: true, state: { thinking: false } })
 
-    // 本轮思考已经结束，等待 thinking=true 必须超时：旧状态不会被当成当前等待结果，
-    // 不匹配的状态也不会提前结束等待，而且超时返回未匹配结果而不是抛错。
+    // 本轮已经结束：用结束之后取的新游标等待时，两种状态都必须超时。thinking=false 这条是关键——
+    // 直接读当前状态的实现会立刻匹配到上一轮留下的已结束状态，把它当成本轮结果。
+    const afterRound = service.currentCursor()
     expect(await service.callTool(credential.token, 'wait_for_chatluna_state', {
-      cursor, botParticipantId: '20001', thinking: true, timeoutSeconds: 1,
+      cursor: afterRound, botParticipantId: '20001', thinking: false, timeoutSeconds: 1,
+    })).toMatchObject({ matched: false, reason: 'timeout' })
+    expect(await service.callTool(credential.token, 'wait_for_chatluna_state', {
+      cursor: afterRound, botParticipantId: '20001', thinking: true, timeoutSeconds: 1,
     })).toMatchObject({ matched: false, reason: 'timeout' })
 
     // 会话过滤同样生效：状态只存在于私聊，按群会话等待不会命中。

@@ -1,15 +1,15 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { App } from '@koishijs/core'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { SandboxControlService } from '../src/control-service'
+import { SandboxControlService, SandboxRuntimeBotRegistry } from '../src/control-service'
 import { SandboxMcpHttpServer, sourceMatches } from '../src/mcp/server'
 import { SandboxMcpService } from '../src/mcp/service'
 import type { SandboxMcpScope } from '../src/mcp/types'
+import { SandboxTestSpaceService } from '../src/test-spaces'
 import { MCP_TOOL_NAMES } from './helpers/mcp-tool-catalogue'
 
 const cleanups: Array<() => Promise<void>> = []
@@ -22,12 +22,14 @@ afterEach(async () => {
 async function startHttpServer(
   name: string,
   scopes: SandboxMcpScope[],
-  options: { allowedOrigins?: string[] } = {},
+  options: { allowedOrigins?: string[]; withTestSpaces?: boolean } = {},
 ) {
   const app = new App()
   const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-mcp-http-'))
-  const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media') })
-  const service = new SandboxMcpService(control, { dataDirectory: directory })
+  const runtimeBots = new SandboxRuntimeBotRegistry()
+  const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media'), runtimeBots })
+  const testSpaces = options.withTestSpaces ? new SandboxTestSpaceService(app, runtimeBots) : undefined
+  const service = new SandboxMcpService(app, control, { dataDirectory: directory, testSpaces })
   const credential = service.createCredential(name, scopes)
   const server = new SandboxMcpHttpServer(app, service, {
     enabled: true,
@@ -42,7 +44,7 @@ async function startHttpServer(
   cleanups.push(async () => { await server.stop(); await app.stop() })
   const address = server.getAddress()
   if (!address) throw new Error('MCP 监听地址不存在')
-  return { app, control, service, credential, url: new URL(`http://127.0.0.1:${address.port}/mcp`) }
+  return { app, control, service, testSpaces, credential, url: new URL(`http://127.0.0.1:${address.port}/mcp`) }
 }
 
 /** 用真实 MCP 客户端连上传输层；返回的客户端由调用方负责关闭。 */
@@ -102,7 +104,7 @@ describe('MCP Streamable HTTP', () => {
       message: '凭证缺少 manage 权限',
       retryable: false,
       recovery: expect.any(String),
-      // revision 由 service.getRevision() 读取当前场景版本；信封无条件携带它。
+      // 不带 spaceId 的调用失败在主场景，信封版本因此是主场景版本。
       revision: snapshot.revision,
       traceId: expect.any(String),
     })
@@ -120,36 +122,53 @@ describe('MCP Streamable HTTP', () => {
     await client.close()
   })
 
+  it('测试空间里失败的工具调用信封携带该空间的场景版本', async () => {
+    const { credential, url } = await startHttpServer('空间凭证', ['read', 'manage'], { withTestSpaces: true })
+    const client = await connectClient(url, credential.token)
+    const callTool = async (name: string, args: Record<string, unknown>) => await client.callTool({ name, arguments: args }) as {
+      isError?: boolean
+      content: Array<{ type: string; text: string }>
+    }
+    const payload = (result: { content: Array<{ text: string }> }) => JSON.parse(result.content[0]!.text) as Record<string, unknown>
+
+    const space = payload(await callTool('create_test_space', { name: '信封空间', idempotencyKey: 'envelope-space-1' })) as { spaceId: string; revision: number }
+    const applied = payload(await callTool('apply_environment_changes', {
+      spaceId: space.spaceId,
+      expectedRevision: space.revision,
+      idempotencyKey: 'envelope-space-setup-1',
+      changes: [{ action: 'create-user', data: { id: '11001', name: '空间用户' } }],
+    })) as { revision: number }
+    // 主场景一直没被改过，两个版本因此必然不同：信封读错场景就会报主场景的值。
+    const main = payload(await callTool('get_scene_snapshot', {})) as { revision: number }
+    expect(main.revision).not.toBe(applied.revision)
+
+    const failed = await callTool('apply_environment_changes', {
+      spaceId: space.spaceId,
+      expectedRevision: applied.revision + 100,
+      idempotencyKey: 'envelope-space-conflict-1',
+      changes: [],
+    })
+    expect(failed.isError).toBe(true)
+    expect(payload(failed)).toMatchObject({ code: 'revision_conflict', revision: applied.revision })
+    await client.close()
+  })
+
   it('同时匹配 IPv4 与 IPv6 CIDR', () => {
     expect(sourceMatches('127.0.0.1', '127.0.0.0/8')).toBe(true)
     expect(sourceMatches('::1', '::1/128')).toBe(true)
     expect(sourceMatches('10.0.0.1', '127.0.0.0/8')).toBe(false)
   })
 
-  it('等待旧版 SDK 异步写完 initialize 响应后再关闭 transport', async () => {
-    const original = StreamableHTTPServerTransport.prototype.handleRequest
-    vi.spyOn(StreamableHTTPServerTransport.prototype, 'handleRequest').mockImplementation(function (this: StreamableHTTPServerTransport, ...args) {
-      setTimeout(() => void original.apply(this, args), 0)
-      return Promise.resolve()
-    })
+  it('用真实 SDK 处理 initialize 时响应正文与 Content-Type 完整', async () => {
+    // 曾有一层 waitForResponseCompletion 兜住「SDK 在响应写入前提前结束 handleRequest」的旧行为。
+    // SDK 1.29.0 把请求整体委托给 @hono/node-server 并 await 它，返回时响应已写完，该兜底已删除；
+    // 这条用例守住它描述的症状不再出现：无正文、无 Content-Type 的 200。
+    const { credential, url } = await startHttpServer('初始化凭证', ['read'])
 
-    const app = new App()
-    const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-mcp-legacy-'))
-    const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media') })
-    const service = new SandboxMcpService(control, { dataDirectory: directory })
-    const credential = service.createCredential('旧版 SDK 凭证', ['read'])
-    const server = new SandboxMcpHttpServer(app, service, {
-      enabled: true, host: '127.0.0.1', port: 0, path: '/mcp', allowedSources: ['127.0.0.1'], allowedOrigins: [], allowInsecureRemote: false,
-    })
-    await server.start()
-    cleanups.push(async () => { await server.stop(); await app.stop() })
-    const address = server.getAddress()
-    if (!address) throw new Error('MCP 监听地址不存在')
-
-    const response = await fetch(`http://127.0.0.1:${address.port}/mcp`, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: { authorization: `Bearer ${credential.token}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'legacy-test', version: '1' } } }),
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'initialize-test', version: '1' } } }),
     })
 
     expect(response.headers.get('content-type')).toContain('application/json')
@@ -160,7 +179,7 @@ describe('MCP Streamable HTTP', () => {
     const app = new App()
     const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-mcp-tls-'))
     const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media') })
-    const service = new SandboxMcpService(control, { dataDirectory: directory })
+    const service = new SandboxMcpService(app, control, { dataDirectory: directory })
     const server = new SandboxMcpHttpServer(app, service, {
       enabled: true, host: '0.0.0.0', port: 0, path: '/mcp', allowedSources: [], allowedOrigins: [], allowInsecureRemote: false,
     })

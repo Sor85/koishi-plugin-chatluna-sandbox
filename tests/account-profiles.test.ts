@@ -378,7 +378,7 @@ describe('类型化账号资料', () => {
     const runtimeBots = new SandboxRuntimeBotRegistry()
     const control = new SandboxControlService(app, { runtimeBots })
     const testSpaces = new SandboxTestSpaceService(app, runtimeBots)
-    const service = new SandboxMcpService(control, { dataDirectory: directory, testSpaces })
+    const service = new SandboxMcpService(app, control, { dataDirectory: directory, testSpaces })
     const credential = service.createCredential('资料凭证', ['read', 'manage'])
     const created = await service.callTool(credential.token, 'create_test_space', {
       name: '资料空间',

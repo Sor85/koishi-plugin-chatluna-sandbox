@@ -22,7 +22,7 @@ import type {
   SandboxPresetRuntimeSnapshotSummary,
   SandboxModelResponseBodyStatus,
 } from './types'
-import { SandboxModelRequestCursorExpiredError } from './types'
+import { SandboxDomainError, SandboxModelRequestCursorExpiredError } from './types'
 
 export const MAIN_MODEL_REQUEST_SCOPE_ID = 'main'
 export const UNATTRIBUTED_MODEL_REQUEST_SCOPE_ID = 'unattributed'
@@ -364,7 +364,7 @@ export class SandboxModelRequestStore {
     const earliestCursor = this.summary.earliestSequence
     if (input.beforeSequence !== undefined) {
       if (!Number.isInteger(input.beforeSequence) || input.beforeSequence < 1) {
-        throw new Error('beforeSequence 必须是正整数')
+        throw new SandboxDomainError('beforeSequence 必须是正整数')
       }
       if (earliestCursor !== undefined && input.beforeSequence < earliestCursor) {
         throw new SandboxModelRequestCursorExpiredError(

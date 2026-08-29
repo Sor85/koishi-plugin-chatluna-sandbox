@@ -17,7 +17,7 @@ function createService(scopes: Array<'read' | 'interact' | 'manage' | 'debug'> =
   const runtimeBots = new SandboxRuntimeBotRegistry()
   const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media'), runtimeBots })
   const testSpaces = new SandboxTestSpaceService(app, runtimeBots)
-  const service = new SandboxMcpService(control, {
+  const service = new SandboxMcpService(app, control, {
     dataDirectory: directory,
     testSpaces: enableTestSpaces ? testSpaces : undefined,
   })
@@ -106,7 +106,7 @@ describe('MCP 测试调用记录', () => {
     apps.push(app)
     const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-mcp-calls-limit-'))
     const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media') })
-    const service = new SandboxMcpService(control, { dataDirectory: directory, readPerMinute: 1 })
+    const service = new SandboxMcpService(app, control, { dataDirectory: directory, readPerMinute: 1 })
     const credential = service.createCredential('限流凭证', ['read'])
     const debugCredential = service.createCredential('调试凭证', ['debug'])
 

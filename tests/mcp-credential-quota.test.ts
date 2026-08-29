@@ -19,7 +19,7 @@ function createService(quota: QuotaOverrides = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-mcp-quota-'))
   const runtimeBots = new SandboxRuntimeBotRegistry()
   const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media'), runtimeBots })
-  const service = new SandboxMcpService(control, { dataDirectory: directory, ...quota })
+  const service = new SandboxMcpService(app, control, { dataDirectory: directory, ...quota })
   // 配额按档位而非能力范围区分，同一凭证需要覆盖四档才能验证互不串用。
   const credential = service.createCredential('配额凭证', ['read', 'interact', 'manage', 'debug'])
   return { app, control, service, credential }

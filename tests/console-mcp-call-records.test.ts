@@ -30,7 +30,7 @@ describe('MCP 调用记录 Console 协议', () => {
     runningApps.push(app)
     const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-console-mcp-'))
     const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media') })
-    const mcp = new SandboxMcpService(control, { dataDirectory: directory })
+    const mcp = new SandboxMcpService(app, control, { dataDirectory: directory })
     const credential = mcp.createCredential('控制台凭证', ['read'])
     await mcp.callTool(credential.token, 'get_server_info', {}, { sourceIp: '127.0.0.1' })
 
@@ -113,7 +113,7 @@ describe('MCP 调用记录 Console 协议', () => {
     const runtimeBots = new SandboxRuntimeBotRegistry()
     const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media'), runtimeBots })
     const testSpaces = new SandboxTestSpaceService(app, runtimeBots)
-    const mcp = new SandboxMcpService(control, { dataDirectory: directory, testSpaces })
+    const mcp = new SandboxMcpService(app, control, { dataDirectory: directory, testSpaces })
     const credential = mcp.createCredential('控制台凭证', ['read', 'manage'])
     const broadcasts: Array<{ type: string, body: unknown }> = []
     const listeners = new Map<string, unknown>()

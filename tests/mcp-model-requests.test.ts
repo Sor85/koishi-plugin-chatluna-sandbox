@@ -23,7 +23,7 @@ describe('模型请求 MCP 工具', () => {
     const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media'), runtimeBots })
     const testSpaces = new SandboxTestSpaceService(app, runtimeBots)
     const unattributed = new SandboxModelRequestStore()
-    const service = new SandboxMcpService(control, { dataDirectory: directory, testSpaces, unattributedModelRequests: unattributed })
+    const service = new SandboxMcpService(app, control, { dataDirectory: directory, testSpaces, unattributedModelRequests: unattributed })
     const credential = service.createCredential('调试凭证', ['read', 'manage', 'debug'])
     const created = await service.callTool(credential.token, 'create_test_space', {
       name: '模型请求空间',

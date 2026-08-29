@@ -99,6 +99,14 @@ export class SandboxMcpError extends Error {
    */
   traceId?: string
 
+  /**
+   * 失败真正发生的那个场景的版本。与 traceId 同一模式：由 `callTool` 回填，传输层错误信封原样
+   * 携带。传输层不能自己从 `arguments.spaceId` 解析——`resolveControl` 的空间三态判定（接管、
+   * 不存在、不可用）在那里复现不了。凭证校验阶段（尚无空间可指）抛出的错误没有该字段，信封退回
+   * 主场景版本。
+   */
+  revision?: number
+
   constructor(
     public code: string,
     message: string,

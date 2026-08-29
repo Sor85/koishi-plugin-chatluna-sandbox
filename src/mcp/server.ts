@@ -60,21 +60,6 @@ function jsonContent(value: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(value) }], ...(structured ? { structuredContent: structured } : {}) }
 }
 
-function waitForResponseCompletion(response: ServerResponse): Promise<void> {
-  if (response.writableEnded || response.destroyed) return Promise.resolve()
-  return new Promise((resolve) => {
-    const finish = () => {
-      response.off('finish', finish)
-      response.off('close', finish)
-      response.off('error', finish)
-      resolve()
-    }
-    response.once('finish', finish)
-    response.once('close', finish)
-    response.once('error', finish)
-  })
-}
-
 export class SandboxMcpHttpServer {
   private server?: HttpServer
 
@@ -113,31 +98,39 @@ export class SandboxMcpHttpServer {
     return address && typeof address !== 'string' ? { address: address.address, port: address.port } : undefined
   }
 
+  // 整个请求处理都在 try 内：listener 用 `void this.handleRequest(...)` 调用，任何逃出这里的异常
+  // 都会变成 unhandled rejection，同时那个 HTTP 请求永远收不到响应，一直挂到客户端超时——一个
+  // 坏凭证条目就能让端点对所有客户端表现为挂起。因此路径判定、来源校验、凭证校验、MCP 服务器与
+  // transport 的构造全部纳入 try，transport 与 mcp 在 finally 里按需关闭。
   private async handleRequest(request: import('node:http').IncomingMessage, response: import('node:http').ServerResponse) {
-    if (new URL(request.url ?? '/', 'http://localhost').pathname !== this.config.path) return this.writeJson(response, 404, { error: 'not_found' })
-    if (request.method !== 'POST') return this.writeJson(response, 405, { error: 'method_not_allowed' })
-    const sourceIp = normalizeAddress(request.socket.remoteAddress)
-    if (this.config.allowedSources.length && !this.config.allowedSources.some((rule) => sourceMatches(sourceIp, rule))) return this.writeJson(response, 403, { error: 'source_forbidden' })
-    const origin = request.headers.origin
-    if (origin && !this.config.allowedOrigins.includes(origin)) return this.writeJson(response, 403, { error: 'origin_forbidden' })
-    const authorization = request.headers.authorization ?? ''
-    const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : ''
-    if (!this.service.authenticate(token)) return this.writeJson(response, 401, { error: 'unauthorized' })
-
-    const mcp = this.createMcpServer(token, sourceIp)
-    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true })
+    let transport: StreamableHTTPServerTransport | undefined
+    let mcp: Server | undefined
     try {
+      if (new URL(request.url ?? '/', 'http://localhost').pathname !== this.config.path) return this.writeJson(response, 404, { error: 'not_found' })
+      if (request.method !== 'POST') return this.writeJson(response, 405, { error: 'method_not_allowed' })
+      const sourceIp = normalizeAddress(request.socket.remoteAddress)
+      if (this.config.allowedSources.length && !this.config.allowedSources.some((rule) => sourceMatches(sourceIp, rule))) return this.writeJson(response, 403, { error: 'source_forbidden' })
+      const origin = request.headers.origin
+      if (origin && !this.config.allowedOrigins.includes(origin)) return this.writeJson(response, 403, { error: 'origin_forbidden' })
+      const authorization = request.headers.authorization ?? ''
+      const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : ''
+      if (!this.service.authenticate(token)) return this.writeJson(response, 401, { error: 'unauthorized' })
+
+      mcp = this.createMcpServer(token, sourceIp)
+      transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true })
       await mcp.connect(transport)
+      // 不再等待响应写入完成：SDK 1.29.0 的 handleRequest 把请求整体委托给
+      // @hono/node-server 的 getRequestListener 并 await 它，返回时响应已经写完。
+      // 旧版会提前返回，那时必须额外等待 finish/close，否则客户端只能收到无正文的 200。
       await transport.handleRequest(request, response)
-      // MCP SDK 1.23.x 会在 JSON-RPC 响应真正写入前提前结束 handleRequest。
-      // 若此时立即关闭 transport，客户端只能收到无正文、无 Content-Type 的 200。
-      await waitForResponseCompletion(response)
     } catch (error) {
       this.ctx.logger('chatluna-sandbox').error('MCP 请求处理失败', error)
       if (!response.headersSent) this.writeJson(response, 500, { jsonrpc: '2.0', error: { code: -32603, message: 'Internal server error' }, id: null })
+      // 响应头已经发出时无法再改状态码，但必须收尾：不结束响应等于让请求挂到客户端超时。
+      else if (!response.writableEnded) response.end()
     } finally {
-      await transport.close().catch(() => undefined)
-      await mcp.close().catch(() => undefined)
+      if (transport) await transport.close().catch(() => undefined)
+      if (mcp) await mcp.close().catch(() => undefined)
     }
   }
 
@@ -154,10 +147,15 @@ export class SandboxMcpHttpServer {
       try {
         return jsonContent(await this.service.callTool(token, request.params.name, request.params.arguments ?? {}, { sourceIp }))
       } catch (error) {
-        const normalized = error instanceof SandboxMcpError ? error : new SandboxMcpError('internal_error', '工具调用失败')
+        // 工具错误的归一化发生在 service.callTool 里：它把领域拒绝与未预期异常都收敛成
+        // SandboxMcpError 再抛出，因此这里几乎总是走 instanceof 分支。else 分支留着不是冗余——
+        // jsonContent 的 JSON.stringify 也在本 try 内，序列化失败会抛非 SandboxMcpError 的异常。
+        const normalized = error instanceof SandboxMcpError ? error : new SandboxMcpError('internal_error', '工具结果序列化失败')
+        if (!(error instanceof SandboxMcpError)) this.ctx.logger('chatluna-sandbox').error(`MCP 工具 ${request.params.name} 的结果无法序列化。`, error)
         // traceId 用失败调用写下的测试调用记录 ID，消费者可据此调 get_mcp_call_record 取回该次失败；
-        // 凭证校验阶段抛出的错误还没有记录可指，只能退回随机标识。
-        return { ...jsonContent({ code: normalized.code, message: normalized.message, retryable: normalized.retryable, recovery: normalized.recovery, details: normalized.details, retryAfterMs: normalized.retryAfterMs, revision: this.service.getRevision(), traceId: normalized.traceId ?? randomUUID() }), isError: true }
+        // revision 同样由 callTool 回填成失败真正发生的那个空间的版本。凭证校验阶段抛出的错误既没有
+        // 记录可指，也没有空间可指，只能退回随机标识与主场景版本。
+        return { ...jsonContent({ code: normalized.code, message: normalized.message, retryable: normalized.retryable, recovery: normalized.recovery, details: normalized.details, retryAfterMs: normalized.retryAfterMs, revision: normalized.revision ?? this.service.getRevision(), traceId: normalized.traceId ?? randomUUID() }), isError: true }
       }
     })
     server.setRequestHandler(ListResourcesRequestSchema, async () => ({

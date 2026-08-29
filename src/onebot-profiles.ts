@@ -1,4 +1,5 @@
 import type { SandboxImplementationProfile } from './types'
+import { SandboxDomainError } from './types'
 
 export type SandboxOneBotCapabilitySurface = 'standard' | 'native'
 
@@ -249,9 +250,9 @@ export function resolveOneBotAction(
 ): SandboxOneBotCapability {
   const baseline = baselines[profile]
   const capability = baseline.capabilities.find((item) => item.action === action || item.aliases?.includes(action))
-  if (!capability) throw new Error(`${baseline.label} 基线不支持 OneBot action：${action}`)
-  if (disabledCapabilities.includes(capability.id)) throw new Error(`能力已被禁用：${capability.id}`)
-  if (!capability.supported) throw new Error(`${baseline.label} 暂不支持 ${capability.action}：${capability.reason}`)
+  if (!capability) throw new SandboxDomainError(`${baseline.label} 基线不支持 OneBot action：${action}`)
+  if (disabledCapabilities.includes(capability.id)) throw new SandboxDomainError(`能力已被禁用：${capability.id}`)
+  if (!capability.supported) throw new SandboxDomainError(`${baseline.label} 暂不支持 ${capability.action}：${capability.reason}`)
   return capability
 }
 
@@ -263,12 +264,12 @@ export function normalizeDisabledCapabilities(
   const supported = new Set(baselines[profile].capabilities.filter(({ supported }) => supported).map(({ id }) => id))
   const normalized = [...new Set(values.map((value) => value.trim()).filter(Boolean))]
   const unknown = normalized.find((id) => !supported.has(id))
-  if (unknown) throw new Error(`${baselines[profile].label} 基线中不存在可禁用能力：${unknown}`)
+  if (unknown) throw new SandboxDomainError(`${baselines[profile].label} 基线中不存在可禁用能力：${unknown}`)
   return normalized.length ? normalized : undefined
 }
 
 export function getOneBotMessageSequence(messageId: string): number {
-  if (!/^[\da-f]+$/i.test(messageId)) throw new Error(`消息 ID 不是十六进制：${messageId}`)
+  if (!/^[\da-f]+$/i.test(messageId)) throw new SandboxDomainError(`消息 ID 不是十六进制：${messageId}`)
   return Number.parseInt(messageId, 16)
 }
 
