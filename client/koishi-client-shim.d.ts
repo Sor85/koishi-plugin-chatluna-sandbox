@@ -19,6 +19,8 @@ declare module '@koishijs/client' {
     ClearConversationMessagesInput,
     BranchConversationInstanceInput,
     CreateConversationInstanceInput,
+    DeleteConversationInstanceInput,
+    RenameConversationInstanceInput,
     SearchConversationMessagesInput,
     SetMessageReactionInput,
     SandboxConsoleOneBotDebugRecord,
@@ -75,6 +77,8 @@ declare module '@koishijs/client' {
   export function send(event: 'chatluna-sandbox/search-conversation-messages', input: SpaceScoped<SearchConversationMessagesInput>): Promise<SandboxMessageSearchResult>
   export function send(event: 'chatluna-sandbox/create-conversation-instance', input: SpaceScoped<CreateConversationInstanceInput>): Promise<SandboxConversationInstanceResult>
   export function send(event: 'chatluna-sandbox/branch-conversation-instance', input: SpaceScoped<BranchConversationInstanceInput>): Promise<SandboxConversationInstanceResult>
+  export function send(event: 'chatluna-sandbox/rename-conversation-instance', input: SpaceScoped<RenameConversationInstanceInput>): Promise<SandboxWorkspaceState>
+  export function send(event: 'chatluna-sandbox/delete-conversation-instance', input: SpaceScoped<DeleteConversationInstanceInput>): Promise<SandboxWorkspaceState>
   export function send(event: 'chatluna-sandbox/send-message', input: SpaceScoped<SendMessageInput>): Promise<SandboxWorkspaceState>
   export function send(event: 'chatluna-sandbox/send-media-message', input: SpaceScoped<SendMediaMessageInput>): Promise<SandboxWorkspaceState>
   export function send(event: 'chatluna-sandbox/send-forward-message', input: SpaceScoped<SendForwardMessageInput>): Promise<SandboxWorkspaceState>

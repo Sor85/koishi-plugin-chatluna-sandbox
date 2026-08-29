@@ -1,4 +1,8 @@
 import { App, Universal } from '@koishijs/core'
+import { readdirSync } from 'node:fs'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SandboxControlService, createDefaultScene } from '../src/control-service'
 import { listRootConversationInstances, resolveConversation } from '../src/conversation-resolution'
@@ -6,9 +10,11 @@ import type { SandboxSnapshot } from '../src/types'
 import { createDirectSession, emitChatLunaEvent } from './helpers/chatluna-state-broadcast'
 
 const runningApps: App[] = []
+const temporaryDirectories: string[] = []
 
 afterEach(async () => {
   await Promise.all(runningApps.splice(0).map((app) => app.stop()))
+  await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
 })
 
 async function createControl(scene?: SandboxSnapshot) {
@@ -349,5 +355,145 @@ describe('从消息创建分支', () => {
       conversationId: 'private:10001:20001',
       messageId: sent.messageId,
     })).toThrow(`消息不存在：${sent.messageId}`)
+  })
+})
+
+describe('实例重命名与删除', () => {
+  it('改名后场景与可见投影里的标题同步，根会话不能改名', async () => {
+    const { app, control: resolve } = await createControl()
+    await app.start()
+    const control = resolve()
+    const first = control.createConversationInstance({ operatorId: '10001', rootConversationId: 'private:10001:20001' })
+    const second = control.createConversationInstance({ operatorId: '10001', rootConversationId: 'private:10001:20001' })
+
+    // 两个实例都用默认名，改名是把它们区分开的唯一手段。
+    expect(listRootConversationInstances(control.getSnapshot(), 'private:10001:20001').map(({ title }) => title))
+      .toEqual(['新会话', '新会话'])
+
+    control.renameConversationInstance({
+      operatorId: '10001',
+      conversationId: second.conversationId,
+      title: '  换一种问法  ',
+    })
+
+    expect(listRootConversationInstances(control.getSnapshot(), 'private:10001:20001').map(({ id, title }) => ({ id, title })))
+      .toEqual([
+        { id: first.conversationId, title: '新会话' },
+        { id: second.conversationId, title: '换一种问法' },
+      ])
+    expect(control.getVisibleSnapshot('20001').conversationInstances?.map(({ title }) => title))
+      .toEqual(['新会话', '换一种问法'])
+
+    expect(() => control.renameConversationInstance({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      title: '给根会话改名',
+    })).toThrow('会话实例不存在：private:10001:20001')
+    expect(() => control.renameConversationInstance({
+      operatorId: '10001',
+      conversationId: second.conversationId,
+      title: '   ',
+    })).toThrow('会话名称不能为空')
+  })
+
+  it('删除实例后它的消息不再存在于场景中，根会话与其他实例不受影响', async () => {
+    const { app, control: resolve } = await createControl()
+    await app.start()
+    const control = resolve()
+    const root = await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content: '根会话消息' })
+    const removed = control.createConversationInstance({ operatorId: '10001', rootConversationId: 'private:10001:20001' })
+    const kept = control.createConversationInstance({ operatorId: '10001', rootConversationId: 'private:10001:20001' })
+    const dropped = await control.sendMessage({ operatorId: '10001', conversationId: removed.conversationId, content: '要删掉的提问' })
+    const keptMessage = await control.sendMessage({ operatorId: '10001', conversationId: kept.conversationId, content: '留下的提问' })
+
+    control.deleteConversationInstance({ operatorId: '10001', conversationId: removed.conversationId })
+
+    const scene = control.getSnapshot()
+    expect(resolveConversation(scene, removed.conversationId)).toBeUndefined()
+    expect(scene.messages.map(({ id }) => id)).toEqual([root.messageId, keptMessage.messageId])
+    expect(scene.messages.some(({ id }) => id === dropped.messageId)).toBe(false)
+    expect(resolveConversation(scene, 'private:10001:20001')?.messageIds).toEqual([root.messageId])
+    expect(listRootConversationInstances(scene, 'private:10001:20001').map(({ id }) => id)).toEqual([kept.conversationId])
+    // 消息搜索不再命中被删实例里的内容。
+    expect(control.searchConversationMessages({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      query: '要删掉的提问',
+    }).hits).toEqual([])
+  })
+
+  it('根会话不可删除', async () => {
+    const { app, control: resolve } = await createControl()
+    await app.start()
+    const control = resolve()
+
+    expect(() => control.deleteConversationInstance({ operatorId: '10001', conversationId: 'private:10001:20001' }))
+      .toThrow('会话实例不存在：private:10001:20001')
+    expect(() => control.deleteConversationInstance({ operatorId: '10001', conversationId: 'group:30001' }))
+      .toThrow('会话实例不存在：group:30001')
+    expect(resolveConversation(control.getSnapshot(), 'private:10001:20001')).toBeDefined()
+  })
+
+  it('删除实例会清理失去引用的合并转发资源与媒体', async () => {
+    const mediaDirectory = await mkdtemp(join(tmpdir(), 'sandbox-instance-delete-'))
+    temporaryDirectories.push(mediaDirectory)
+    const app = new App()
+    let created: SandboxControlService | undefined
+    app.plugin((ctx) => {
+      created = new SandboxControlService(ctx, { mediaDirectory })
+    })
+    runningApps.push(app)
+    await app.start()
+    if (!created) throw new Error('沙盒控制服务未注册')
+    const control = created
+
+    const { conversationId } = control.createConversationInstance({ operatorId: '10001', rootConversationId: 'private:10001:20001' })
+    const media = control.storeMedia({
+      fileName: 'branch.png',
+      mimeType: 'image/png',
+      dataBase64: Buffer.from('branch-only-payload').toString('base64'),
+    })
+    await control.sendStoredMediaMessage({ operatorId: '10001', conversationId, content: '', media: [media] })
+    const quoted = await control.sendMessage({ operatorId: '10001', conversationId, content: '被转发的消息' })
+    const forwarded = await control.sendForwardMessage({
+      operatorId: '10001',
+      conversationId,
+      messageIds: [quoted.messageId],
+    })
+    expect(control.getSnapshot().forwards?.map(({ id }) => id)).toEqual([forwarded.forwardId])
+    expect(readdirSync(mediaDirectory)).toContain(media.id)
+
+    control.deleteConversationInstance({ operatorId: '10001', conversationId })
+
+    // 合并转发资源失去外层消息引用后一并回收，媒体随之不再被任何引用持有。
+    expect(control.getSnapshot().forwards).toEqual([])
+    expect(readdirSync(mediaDirectory)).not.toContain(media.id)
+  })
+
+  it('删除好友、被移出群与群组解散后对应根会话下的实例连带消失', async () => {
+    const { app, control: resolve } = await createControl()
+    await app.start()
+    const control = resolve()
+    const direct = control.createConversationInstance({ operatorId: '10001', rootConversationId: 'private:10001:20001' })
+    const group = control.createConversationInstance({ operatorId: '10001', rootConversationId: 'group:30001' })
+
+    await control.performFriendAction({ operatorId: '10001', action: 'delete', targetId: '20001' })
+    // 解除好友只撤销可见性，实例随根会话一起从操作者视角消失。
+    expect(control.getVisibleSnapshot('10001').conversationInstances?.map(({ id }) => id)).toEqual([group.conversationId])
+
+    // 10003 是群成员，因此本来看得到群实例；被群主移出群后它随根会话一起消失。
+    expect(control.getVisibleSnapshot('10003').conversationInstances?.map(({ id }) => id)).toEqual([group.conversationId])
+    await control.performGroupAction({ operatorId: '10001', action: 'kick', groupId: '30001', targetId: '10003' })
+    expect(control.getVisibleSnapshot('10003').conversationInstances).toEqual([])
+    // 仍在群里的参与者继续看到群实例。
+    expect(control.getVisibleSnapshot('10002').conversationInstances?.map(({ id }) => id)).toEqual([group.conversationId])
+
+    control.deleteGroup({ id: '30001' })
+    // 群组解散时根会话真的消失，实例连带清理，不留下无主的对话线。
+    expect(control.getSnapshot().conversationInstances?.map(({ id }) => id)).toEqual([direct.conversationId])
+    expect(resolveConversation(control.getSnapshot(), group.conversationId)).toBeUndefined()
+
+    control.deleteBot({ id: '20001' })
+    expect(control.getSnapshot().conversationInstances).toEqual([])
   })
 })

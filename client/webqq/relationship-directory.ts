@@ -7,17 +7,6 @@ export function getConversationPeerId(conversation: ResolvedConversation, operat
   return participantIds?.find((id) => id !== operatorId) ?? participantIds?.[0]
 }
 
-export function getVisibleRecentConversations(
-  conversations: readonly ResolvedConversation[],
-  hiddenAtMessage: Record<string, string> = {},
-) {
-  return conversations.filter((conversation) => {
-    const hiddenMarker = hiddenAtMessage[conversation.id]
-    if (hiddenMarker === undefined) return true
-    return hiddenMarker !== (conversation.messageIds.at(-1) ?? '')
-  })
-}
-
 export function getFriendDirectory(snapshot: SandboxSnapshot, operatorId?: string) {
   if (!operatorId) return []
 

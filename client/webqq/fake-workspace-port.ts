@@ -7,6 +7,8 @@ import type {
   GetMessageHistoryInput,
   BranchConversationInstanceInput,
   CreateConversationInstanceInput,
+  DeleteConversationInstanceInput,
+  RenameConversationInstanceInput,
   GetSandboxWorkspaceInput,
   GetSandboxOneBotDebugRecordInput,
   GetSandboxOneBotDebugRecordsInput,
@@ -145,6 +147,14 @@ export class FakeWorkspacePort implements WorkspacePort {
       ...this.workspaceResult,
       conversationId: this.createdConversationInstanceId,
     })
+  }
+
+  renameConversationInstance(input: RenameConversationInstanceInput) {
+    return this.invoke('renameConversationInstance', input, this.workspaceResult)
+  }
+
+  deleteConversationInstance(input: DeleteConversationInstanceInput) {
+    return this.invoke('deleteConversationInstance', input, this.workspaceResult)
   }
 
   searchConversationMessages(input: SearchConversationMessagesInput) {

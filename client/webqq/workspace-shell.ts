@@ -57,6 +57,7 @@ export interface WebqqWorkspaceOverlayHost {
   openEntity(mode: EnvironmentDialogMode, target: { type: EnvironmentEntityType, id: string }): void
   openGroupAction(mode: GroupActionMode, targetId: string, groupId: string, value: string): void
   openRemark(targetId: string, value: string): void
+  openConversationRename(conversationId: string, value: string): void
   openProfile(card: NonNullable<ReturnType<typeof buildProfileCardModel>>): void
 }
 
@@ -431,6 +432,34 @@ export function createWebqqWorkspaceShell(
     }
   }
 
+  /** 重命名会话实例：对话框预填当前名字，只有实例才有名字可改。 */
+  function openConversationRenameDialog(conversationId: string) {
+    const conversation = visibleConversations.value.find(({ id }) => id === conversationId)
+    if (conversation?.kind !== 'instance') return
+    getOverlayHost()?.openConversationRename(conversationId, conversation.title ?? '')
+  }
+
+  async function saveConversationRename(input: { conversationId: string, title: string }, resolve: Resolve, reject: Reject) {
+    errorMessage.value = ''
+    try {
+      await workspaceController.renameConversationInstance(input)
+      resolve()
+    } catch (error) {
+      errorMessage.value = error instanceof Error ? error.message : '重命名会话失败'
+      reject(error)
+    }
+  }
+
+  /** 删除会话实例：领域删除，连带清掉它的消息，刷新后不会回来。 */
+  async function deleteConversationInstance(conversationId: string) {
+    errorMessage.value = ''
+    try {
+      await workspaceController.deleteConversationInstance({ conversationId })
+    } catch (error) {
+      errorMessage.value = error instanceof Error ? error.message : '删除会话失败'
+    }
+  }
+
   async function manageEnvironment(input: ManageSandboxEnvironmentInput, resolve: Resolve, reject: Reject) {
     try {
       await workspaceController.manageEnvironment(input)
@@ -616,10 +645,6 @@ export function createWebqqWorkspaceShell(
     }
     if (currentView.value === 'model-requests') evidenceNavigation.clear()
     workspaceController.selectConversation(conversationId)
-  }
-
-  function removeRecentConversation(conversationId: string) {
-    workspaceController.removeRecentConversation(conversationId)
   }
 
   function selectNavigation(view: SandboxWorkspaceView, commit = true) {
@@ -1069,6 +1094,8 @@ export function createWebqqWorkspaceShell(
     manageEnvironment,
     createConversationInstance,
     branchConversationInstance,
+    openConversationRenameDialog,
+    deleteConversationInstance,
     openComposerParticipantDialog,
     openEntityDialog,
     openGroupActionDialog,
@@ -1083,10 +1110,10 @@ export function createWebqqWorkspaceShell(
     publishAnnouncement,
     recallMessage,
     clearConversationMessages,
-    removeRecentConversation,
     setMessageReaction,
     requestFriend,
     resolveAvatar,
+    saveConversationRename,
     saveFriendRemark,
     saveGroupAction,
     selectComposerOperator,

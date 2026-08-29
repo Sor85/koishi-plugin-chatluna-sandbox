@@ -72,13 +72,23 @@ async function createShell(snapshot: SandboxSnapshot) {
     if (typeof args[0] === 'string' && args[0].includes('onMounted is called when there is no active component')) return
     warn(...args)
   }
+  const renamePrompts: Array<{ conversationId: string, value: string }> = []
+  const overlayHost = {
+    openEntity() {},
+    openGroupAction() {},
+    openRemark() {},
+    openConversationRename(conversationId: string, value: string) {
+      renamePrompts.push({ conversationId, value })
+    },
+    openProfile() {},
+  }
   try {
     const shell = createWebqqWorkspaceShell(
       controller,
       createWorkspaceLayout(ref(true)),
-      () => undefined,
+      () => overlayHost,
     )
-    return { controller, port, shell }
+    return { controller, port, shell, renamePrompts }
   } finally {
     console.warn = warn
   }
@@ -161,5 +171,65 @@ describe('侧栏会话树投影', () => {
     await shell.createConversationInstance('private:10002:20001')
 
     expect(shell.chatPaneModel.value.composer.externalError).toBe('会话不存在：private:10002:20001')
+  })
+})
+
+describe('会话实例的重命名与删除', () => {
+  const withInstance: SandboxSnapshot = {
+    ...baseSnapshot,
+    conversationInstances: [
+      { id: 'instance-1', rootConversationId: 'private:10001:20001', title: '新会话', messageIds: [] },
+    ],
+  }
+
+  it('重命名入口预填实例当前名字，根会话不打开对话框', async () => {
+    const { shell, renamePrompts } = await createShell(withInstance)
+
+    shell.openConversationRenameDialog('instance-1')
+    expect(renamePrompts).toEqual([{ conversationId: 'instance-1', value: '新会话' }])
+
+    // 根会话的名字由参与者关系决定，它没有可改的会话名。
+    shell.openConversationRenameDialog('private:10001:20001')
+    expect(renamePrompts).toHaveLength(1)
+  })
+
+  it('保存重命名走会话实例端点，失败时通知调用方并写进界面错误', async () => {
+    const { port, shell } = await createShell(withInstance)
+    let resolved = false
+
+    await shell.saveConversationRename(
+      { conversationId: 'instance-1', title: '换一种问法' },
+      () => { resolved = true },
+      () => {},
+    )
+
+    expect(resolved).toBe(true)
+    expect(port.calls.at(-1)).toEqual({
+      operation: 'renameConversationInstance',
+      input: { operatorId: '10001', conversationId: 'instance-1', title: '换一种问法' },
+    })
+
+    port.rejectNext('renameConversationInstance', new Error('会话名称不能为空'))
+    let rejected: unknown
+    await shell.saveConversationRename({ conversationId: 'instance-1', title: '  ' }, () => {}, (error) => { rejected = error })
+
+    expect((rejected as Error).message).toBe('会话名称不能为空')
+    expect(shell.chatPaneModel.value.composer.externalError).toBe('会话名称不能为空')
+  })
+
+  it('侧栏子项的删除是领域删除，失败时把原因写进界面错误展示路径', async () => {
+    const { port, shell } = await createShell(withInstance)
+
+    await shell.deleteConversationInstance('instance-1')
+
+    expect(port.calls.at(-1)).toEqual({
+      operation: 'deleteConversationInstance',
+      input: { operatorId: '10001', conversationId: 'instance-1' },
+    })
+
+    port.rejectNext('deleteConversationInstance', new Error('会话实例不存在：instance-1'))
+    await shell.deleteConversationInstance('instance-1')
+
+    expect(shell.chatPaneModel.value.composer.externalError).toBe('会话实例不存在：instance-1')
   })
 })

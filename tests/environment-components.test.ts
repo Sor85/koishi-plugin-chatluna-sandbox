@@ -54,7 +54,8 @@ describe('环境管理组件传输边界', () => {
     expect(overlaySource).toContain('<EnvironmentEntityDialog')
     expect(overlaySource).toContain('class="chatluna-sandbox-secondary-page chatluna-sandbox-profile-card-page chatluna-sandbox-solid-secondary-surface"')
     expect(overlaySource).not.toContain('<Dialog v-model:open="profileOpen">')
-    expect(overlaySource.match(/<Dialog /g)).toHaveLength(2)
+    // 备注、群操作与会话重命名三个窄输入对话框都归 OverlayHost 渲染。
+    expect(overlaySource.match(/<Dialog /g)).toHaveLength(3)
   })
 
   it('三类实体编辑与创建表单通过二级页面选择内置或本地头像', () => {
@@ -159,8 +160,8 @@ describe('环境管理组件传输边界', () => {
     expect(entityDialog).toContain('<DialogHeader>')
     expect(entityDialog).toContain('<DialogFooter>')
     expect(entityDialog).toContain('class="webqq-secondary-form"')
-    expect(overlayHost.match(/<DialogHeader>/g)).toHaveLength(2)
-    expect(overlayHost.match(/<DialogFooter>/g)).toHaveLength(2)
+    expect(overlayHost.match(/<DialogHeader>/g)).toHaveLength(3)
+    expect(overlayHost.match(/<DialogFooter>/g)).toHaveLength(3)
     expect(createPopover).toContain('class="webqq-environment-create-popover relative"')
     expect(createPopover).toContain(":class=\"{ 'is-color-dark': colorMode === 'dark' }\"")
     expect(createPopover).toContain("colorMode: 'light' | 'dark'")

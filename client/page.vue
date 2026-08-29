@@ -23,8 +23,9 @@
           :color-mode="resolvedColorMode"
           @select-view="selectNavigation"
           @select-conversation="selectConversation"
-          @remove-recent-conversation="removeRecentConversation"
           @create-conversation-instance="createConversationInstance"
+          @open-conversation-rename-dialog="openConversationRenameDialog"
+          @delete-conversation-instance="deleteConversationInstance"
           @manage-environment="manageEnvironment"
           @friend-action="performFriendAction"
           @group-action="performGroupAction"
@@ -182,6 +183,7 @@
           @manage-environment="manageEnvironment"
           @save-remark="saveFriendRemark"
           @save-group-action="saveGroupAction"
+          @save-conversation-rename="saveConversationRename"
         />
         <AgentObserveOverlay
           v-if="observingSpace"
@@ -291,10 +293,12 @@ const {
   clearConversationMessages,
   createConversationInstance,
   branchConversationInstance,
-  removeRecentConversation,
+  openConversationRenameDialog,
+  deleteConversationInstance,
   setMessageReaction,
   requestFriend,
   resolveAvatar,
+  saveConversationRename,
   saveFriendRemark,
   saveGroupAction,
   selectComposerOperator,

@@ -16,6 +16,7 @@ import {
   listVisibleRootConversations,
   projectVisibleConversations,
   pruneConversationMessageIds,
+  removeConversationInstance,
   removeConversations,
   requireConversation,
   requireVisibleConversation,
@@ -331,5 +332,27 @@ describe('会话实例解析', () => {
     expect(() => renameConversationInstance(scene, 'group:30001', '群会话改名'))
       .toThrow('会话实例不存在：group:30001')
     expect(() => renameConversationInstance(scene, instance.id, '  ')).toThrow('会话名称不能为空')
+  })
+
+  it('删除只对会话实例开放，根会话不可删除', () => {
+    const scene = createScene()
+    const removed = createConversationInstance(scene, {
+      id: 'instance-14',
+      rootConversationId: 'private:10001:20001',
+      title: '要删掉的支线',
+      messageIds: ['m7'],
+    })
+    const kept = createConversationInstance(scene, { id: 'instance-15', rootConversationId: 'private:10001:20001', title: '留下的支线' })
+
+    expect(removeConversationInstance(scene, removed.id)).toEqual(new Set([removed.id]))
+    expect(listConversationInstances(scene).map(({ id }) => id)).toEqual([kept.id])
+
+    // 根会话的存在由参与者关系与群组决定，删除它不是一个合法的实例操作。
+    expect(() => removeConversationInstance(scene, 'private:10001:20001'))
+      .toThrow('会话实例不存在：private:10001:20001')
+    expect(() => removeConversationInstance(scene, removed.id))
+      .toThrow(`会话实例不存在：${removed.id}`)
+    expect(listRootConversations(scene).map(({ id }) => id))
+      .toEqual(['private:10001:20001', 'private:10002:20001', 'group:30001'])
   })
 })

@@ -409,4 +409,53 @@ describe('Koishi 控制台适配器', () => {
     expect(branched.snapshot.conversationInstances.find(({ id }: { id: string }) => id === branched.conversationId))
       .toMatchObject({ rootConversationId: 'private:10001:20001', title: '分支：Koishi' })
   })
+
+  it('实例改名与删除端点返回完整工作区状态', async () => {
+    const app = new App()
+    let control: SandboxControlService | undefined
+    app.plugin((ctx) => {
+      control = new SandboxControlService(ctx)
+    })
+    runningApps.push(app)
+    await app.start()
+    if (!control) throw new Error('沙盒控制服务未注册')
+
+    const listeners = new Map<string, (input?: unknown) => Promise<any>>()
+    registerConsole({
+      addEntry() {},
+      addListener(event, callback) {
+        listeners.set(event, callback as (input?: unknown) => Promise<any>)
+      },
+      broadcast() {},
+    }, control, appearance)
+
+    const createListener = listeners.get('chatluna-sandbox/create-conversation-instance')
+    const renameListener = listeners.get('chatluna-sandbox/rename-conversation-instance')
+    const deleteListener = listeners.get('chatluna-sandbox/delete-conversation-instance')
+    if (!createListener || !renameListener || !deleteListener) throw new Error('控制台监听器未注册')
+
+    const { conversationId } = await createListener({ operatorId: '10001', rootConversationId: 'private:10001:20001' })
+
+    const renamed = await renameListener({ operatorId: '10001', conversationId, title: '  换一种问法  ' })
+
+    expect(renamed.appearance).toEqual(appearance)
+    expect(renamed.persistence).toEqual({ mode: 'memory', available: true, persisted: false })
+    expect(renamed.snapshot.conversationInstances).toEqual([{
+      id: conversationId,
+      rootConversationId: 'private:10001:20001',
+      title: '换一种问法',
+      messageIds: [],
+      hasMoreMessages: false,
+    }])
+
+    const deleted = await deleteListener({ operatorId: '10001', conversationId })
+
+    expect(deleted.appearance).toEqual(appearance)
+    expect(deleted.snapshot.conversationInstances).toEqual([])
+    // 根会话没有对应的领域删除路径：端点按「会话实例不存在」拒绝。
+    await expect(deleteListener({ operatorId: '10001', conversationId: 'private:10001:20001' }))
+      .rejects.toThrow('会话实例不存在：private:10001:20001')
+    await expect(renameListener({ operatorId: '10001', conversationId: 'private:10001:20001', title: '根会话改名' }))
+      .rejects.toThrow('会话实例不存在：private:10001:20001')
+  })
 })

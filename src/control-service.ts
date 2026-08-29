@@ -32,7 +32,9 @@ import {
   projectVisibleConversations,
   pruneConversationMessageIds,
   normalizeSceneConversationInstances,
+  removeConversationInstance,
   removeConversations,
+  renameConversationInstance as renameInstanceTitle,
   requireConversation,
   requireVisibleConversation,
   resolveConversation,
@@ -73,6 +75,8 @@ import {
   type PerformGroupActionResult,
   type RecallMessageInput,
   type ClearConversationMessagesInput,
+  type DeleteConversationInstanceInput,
+  type RenameConversationInstanceInput,
   type SearchConversationMessagesInput,
   type SetMessageReactionInput,
   type SandboxBotDelivery,
@@ -1517,6 +1521,30 @@ export class SandboxControlService {
     return { conversationId: instance.id, revision: this.scene.revision }
   }
 
+  /**
+   * 给一个会话实例改名。目标是根会话时按「会话实例不存在」拒绝：根会话的名字由参与者关系
+   * 与群组决定，改名不是它的合法操作。
+   */
+  renameConversationInstance(input: RenameConversationInstanceInput): { revision: number } {
+    const target = this.getVisibleConversation(input.operatorId, input.conversationId)
+    renameInstanceTitle(this.scene, target.id, input.title)
+    this.commitSceneMutation()
+    return { revision: this.scene.revision }
+  }
+
+  /**
+   * 删除一个会话实例，连带清理它的消息、失去引用的合并转发资源以及不再被任何引用持有的媒体。
+   *
+   * 根会话不提供这条路径：它的存在由参与者关系与群组决定，解除关系或解散群组才是让它消失的
+   * 手段，那条路径由 {@link deleteConversations} 承担。
+   */
+  deleteConversationInstance(input: DeleteConversationInstanceInput): { revision: number } {
+    const target = this.getVisibleConversation(input.operatorId, input.conversationId)
+    this.cascadeRemovedConversations(removeConversationInstance(this.scene, target.id))
+    this.commitSceneMutation()
+    return { revision: this.scene.revision }
+  }
+
   /** 会话的人类可读名称：实例用自己的标题，群聊用群名称，私聊用对端昵称。 */
   private describeConversation(operatorId: string, conversation: ResolvedConversation): string {
     if (conversation.title) return conversation.title
@@ -2865,7 +2893,15 @@ export class SandboxControlService {
   }
 
   private deleteConversations(predicate: (conversation: ResolvedConversation) => boolean): void {
-    const removedIds = removeConversations(this.scene, predicate)
+    this.cascadeRemovedConversations(removeConversations(this.scene, predicate))
+  }
+
+  /**
+   * 会话消失后的级联清理，按已被移出会话集合的 ID 执行。删除根会话、删除会话实例与解散
+   * 群组走同一条清理路径，避免「删实例」漏掉其中任何一步。
+   */
+  private cascadeRemovedConversations(removedIds: ReadonlySet<string>): void {
+    if (!removedIds.size) return
     const removedMessageIds = new Set(this.scene.messages
       .filter(({ conversationId }) => removedIds.has(conversationId))
       .map(({ id }) => id))

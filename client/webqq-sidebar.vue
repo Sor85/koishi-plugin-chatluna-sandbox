@@ -272,9 +272,12 @@
                     </button>
                   </ContextMenuTrigger>
                   <ContextMenuContent style="z-index: 140">
+                    <ContextMenuItem @select="emit('openConversationRenameDialog', child.id)">
+                      <IconEdit :size="16" aria-hidden="true" /> 重命名会话
+                    </ContextMenuItem>
                     <ContextMenuItem
                       class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40"
-                      @select="emit('removeRecentConversation', child.id)"
+                      @select="emit('deleteConversationInstance', child.id)"
                     >
                       <IconTrash :size="16" aria-hidden="true" /> 删除会话
                     </ContextMenuItem>
@@ -309,12 +312,6 @@
                 </ContextMenuItem>
                 <ContextMenuItem @select="createConversationInstance(conversation.id)">
                   <IconPlus :size="16" aria-hidden="true" /> 创建新会话
-                </ContextMenuItem>
-                <ContextMenuItem
-                  class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40"
-                  @select="emit('removeRecentConversation', conversation.id)"
-                >
-                  <IconTrash :size="16" aria-hidden="true" /> 删除会话
                 </ContextMenuItem>
                 <ContextMenuItem @select="openEntityDialog('edit', conversation.entityTarget)">
                   <IconEdit :size="16" aria-hidden="true" /> 编辑{{ conversation.entityLabel }}
@@ -435,7 +432,9 @@ const emit = defineEmits<{
   selectView: [view: WebqqSidebarModel['currentView']]
   selectConversation: [conversationId: string]
   createConversationInstance: [rootConversationId: string]
-  removeRecentConversation: [conversationId: string]
+  // 根会话没有删除入口：它的存在由参与者关系与群组决定，只有会话实例可以改名与删除。
+  openConversationRenameDialog: [conversationId: string]
+  deleteConversationInstance: [conversationId: string]
   manageEnvironment: [input: ManageSandboxEnvironmentInput, resolve: () => void, reject: (error: unknown) => void]
   friendAction: [input: SandboxFriendAction]
   groupAction: [input: SandboxGroupAction]

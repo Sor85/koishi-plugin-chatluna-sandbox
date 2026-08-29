@@ -33,6 +33,8 @@ describe('Koishi 工作区端口', () => {
       limit: 10,
     })
     await port.createConversationInstance({ operatorId: '11001', rootConversationId: 'private:11001:12001' })
+    await port.renameConversationInstance({ operatorId: '11001', conversationId: 'instance-1', title: '换一种问法' })
+    await port.deleteConversationInstance({ operatorId: '11001', conversationId: 'instance-1' })
 
     expect(send).toHaveBeenNthCalledWith(1, 'chatluna-sandbox/workspace', { operatorId: '11001', spaceId: 'space-1' })
     expect(send).toHaveBeenNthCalledWith(2, 'chatluna-sandbox/manage-environment', { action: 'create-user', data: { id: '11002', name: '用户' }, spaceId: 'space-1' })
@@ -59,6 +61,17 @@ describe('Koishi 工作区端口', () => {
     expect(send).toHaveBeenNthCalledWith(6, 'chatluna-sandbox/create-conversation-instance', {
       operatorId: '11001',
       rootConversationId: 'private:11001:12001',
+      spaceId: 'space-1',
+    })
+    expect(send).toHaveBeenNthCalledWith(7, 'chatluna-sandbox/rename-conversation-instance', {
+      operatorId: '11001',
+      conversationId: 'instance-1',
+      title: '换一种问法',
+      spaceId: 'space-1',
+    })
+    expect(send).toHaveBeenNthCalledWith(8, 'chatluna-sandbox/delete-conversation-instance', {
+      operatorId: '11001',
+      conversationId: 'instance-1',
       spaceId: 'space-1',
     })
   })

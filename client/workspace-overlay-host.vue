@@ -44,6 +44,23 @@
       </DialogFooter>
     </DialogContent>
   </Dialog>
+  <Dialog v-model:open="conversationRenameOpen">
+    <DialogContent :style="{ '--webqq-accent': accentColor }">
+      <DialogHeader>
+        <DialogTitle>重命名会话</DialogTitle>
+        <DialogDescription>只有会话实例有自己的名字；联系人与群组的名字由关系决定。</DialogDescription>
+      </DialogHeader>
+      <Input
+        v-model="conversationRenameInput"
+        placeholder="输入会话名称"
+        @keydown.enter="submitConversationRename"
+      />
+      <DialogFooter>
+        <Button variant="outline" @click="conversationRenameOpen = false">取消</Button>
+        <Button @click="submitConversationRename">保存</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
   <Teleport to="body">
     <section
       v-if="profileOpen && profileCard"
@@ -129,6 +146,7 @@ const emit = defineEmits<{
   manageEnvironment: [input: ManageSandboxEnvironmentInput, resolve: Resolve, reject: Reject]
   saveRemark: [input: { targetId: string, remark: string }, resolve: Resolve, reject: Reject]
   saveGroupAction: [input: { mode: GroupActionMode, targetId: string, groupId: string, value: string }, resolve: Resolve, reject: Reject]
+  saveConversationRename: [input: { conversationId: string, title: string }, resolve: Resolve, reject: Reject]
 }>()
 
 const entityOpen = ref(false)
@@ -143,6 +161,9 @@ const groupActionTargetId = ref('')
 const groupActionGroupId = ref('')
 const groupActionInput = ref('')
 const groupActionCopy = computed(() => GROUP_ACTION_COPY[groupActionMode.value])
+const conversationRenameOpen = ref(false)
+const conversationRenameId = ref('')
+const conversationRenameInput = ref('')
 const profileOpen = ref(false)
 const profileCard = ref<ProfileCardModel>()
 const profileCardSections = computed(() => profileCard.value ? groupProfileCardFields(profileCard.value.fields) : [])
@@ -173,6 +194,12 @@ function openGroupAction(mode: GroupActionMode, targetId: string, groupId: strin
   groupActionGroupId.value = groupId
   groupActionInput.value = value
   groupActionOpen.value = true
+}
+
+function openConversationRename(conversationId: string, value: string) {
+  conversationRenameId.value = conversationId
+  conversationRenameInput.value = value
+  conversationRenameOpen.value = true
 }
 
 function openProfile(card: ProfileCardModel) {
@@ -249,5 +276,16 @@ async function submitGroupAction() {
   } catch {}
 }
 
-defineExpose({ openEntity, openGroupAction, openRemark, openProfile })
+async function submitConversationRename() {
+  if (!conversationRenameId.value) return
+  try {
+    await new Promise<void>((resolve, reject) => emit('saveConversationRename', {
+      conversationId: conversationRenameId.value,
+      title: conversationRenameInput.value,
+    }, resolve, reject))
+    conversationRenameOpen.value = false
+  } catch {}
+}
+
+defineExpose({ openConversationRename, openEntity, openGroupAction, openRemark, openProfile })
 </script>

@@ -210,46 +210,75 @@ describe('WebQQ 工作区控制模块', () => {
     })
   })
 
-  it('从最近移除会话时不删除场景数据，并回退到下一条最近会话', async () => {
-    const port = createFakeWorkspacePort(workspace)
-    const storage = createStorage(JSON.stringify({
-      currentOperatorId: '10001',
-      activeConversationId: 'private:10001:20001',
-      currentView: 'messages',
-    }))
-    const controller = createWorkspaceController(port, storage)
-    await controller.load()
-
-    controller.removeRecentConversation('private:10001:20001')
-
-    expect(controller.workspace.value.snapshot.conversations).toHaveLength(4)
-    expect(controller.workspace.value.snapshot.messages).toHaveLength(1)
-    expect(controller.sidebar.value.conversations.map(({ id }) => id)).toEqual([
-      'private:10001:10002',
-      'group:30001',
-    ])
-    expect(controller.activeConversationId.value).toBe('private:10001:10002')
-    expect(JSON.parse(storage.read('chatluna-sandbox.workspace') ?? '{}')).toMatchObject({
-      currentOperatorId: '10001',
-      activeConversationId: 'private:10001:10002',
-      hiddenRecentConversations: {
-        '10001': {
-          'private:10001:20001': 'message-1',
-        },
+  it('重命名会话实例只发一次请求，标题随返回的工作区一起更新', async () => {
+    const instanceId = 'conversation-instance-rename'
+    const withInstanceTitle = (title: string): SandboxWorkspaceState => ({
+      ...workspace,
+      snapshot: {
+        ...snapshot,
+        conversationInstances: [{ id: instanceId, rootConversationId: 'private:10001:20001', title, messageIds: [] }],
       },
     })
+    const port = createFakeWorkspacePort(withInstanceTitle('新会话'))
+    const controller = createWorkspaceController(port, createStorage())
+    await controller.load()
+    controller.selectConversation(instanceId)
+
+    port.workspaceResult = withInstanceTitle('换一种问法')
+    await controller.renameConversationInstance({ conversationId: instanceId, title: '换一种问法' })
+
+    expect(port.calls.map(({ operation }) => operation)).toEqual(['getWorkspace', 'renameConversationInstance'])
+    expect(port.calls.at(-1)?.input).toEqual({
+      operatorId: '10001',
+      conversationId: instanceId,
+      title: '换一种问法',
+    })
+    // 改名不改变选中；侧栏与聊天区读的是同一份解析结果，标题因此一起更新。
+    expect(controller.activeConversationId.value).toBe(instanceId)
+    expect(controller.sidebar.value.conversations.find(({ id }) => id === instanceId)?.title).toBe('换一种问法')
+    expect(controller.chat.value.conversation).toMatchObject({ id: instanceId, title: '换一种问法' })
   })
 
-  it('移除空会话时用空标记隐藏，并允许重新选择该逻辑会话', async () => {
-    const controller = createWorkspaceController(createFakeWorkspacePort(workspace), createStorage())
+  it('删除会话实例后它不再出现在侧栏，选中回退到仍然存在的会话', async () => {
+    const instanceId = 'conversation-instance-delete'
+    const port = createFakeWorkspacePort({
+      ...workspace,
+      snapshot: {
+        ...snapshot,
+        conversationInstances: [{
+          id: instanceId,
+          rootConversationId: 'private:10001:20001',
+          title: '要删掉的支线',
+          messageIds: [],
+        }],
+      },
+    })
+    const controller = createWorkspaceController(port, createStorage())
+    await controller.load()
+    controller.selectConversation(instanceId)
+
+    port.workspaceResult = { ...workspace, snapshot: { ...snapshot, conversationInstances: [] } }
+    await controller.deleteConversationInstance({ conversationId: instanceId })
+
+    expect(port.calls.map(({ operation }) => operation)).toEqual(['getWorkspace', 'deleteConversationInstance'])
+    expect(port.calls.at(-1)?.input).toEqual({ operatorId: '10001', conversationId: instanceId })
+    expect(controller.sidebar.value.conversations.map(({ id }) => id)).not.toContain(instanceId)
+    expect(controller.activeConversationId.value).toBe('private:10001:20001')
+  })
+
+  it('重命名与删除会话实例失败时抛出归一化后的错误消息', async () => {
+    const port = createFakeWorkspacePort(workspace)
+    const controller = createWorkspaceController(port, createStorage())
     await controller.load()
 
-    controller.removeRecentConversation('private:10001:10002')
-    expect(controller.sidebar.value.conversations.map(({ id }) => id)).not.toContain('private:10001:10002')
+    port.rejectNext('renameConversationInstance', new Error('会话实例不存在：private:10001:20001'))
+    await expect(controller.renameConversationInstance({ conversationId: 'private:10001:20001', title: '根会话改名' }))
+      .rejects.toThrow('会话实例不存在：private:10001:20001')
 
-    controller.selectConversation('private:10001:10002')
-    expect(controller.sidebar.value.conversations.map(({ id }) => id)).toContain('private:10001:10002')
-    expect(controller.activeConversationId.value).toBe('private:10001:10002')
+    port.rejectNext('deleteConversationInstance', new Error('会话实例不存在：private:10001:20001'))
+    await expect(controller.deleteConversationInstance({ conversationId: 'private:10001:20001' }))
+      .rejects.toThrow('会话实例不存在：private:10001:20001')
+    expect(controller.activeConversationId.value).toBe('private:10001:20001')
   })
 
   it('快速切换会话时只显示当前逻辑会话的 ChatLuna 状态', async () => {

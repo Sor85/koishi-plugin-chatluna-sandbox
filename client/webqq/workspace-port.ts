@@ -7,6 +7,8 @@ import type {
   GetMessageHistoryInput,
   BranchConversationInstanceInput,
   CreateConversationInstanceInput,
+  DeleteConversationInstanceInput,
+  RenameConversationInstanceInput,
   SandboxConversationInstanceResult,
   GetSandboxWorkspaceInput,
   GetSandboxOneBotDebugRecordInput,
@@ -60,6 +62,8 @@ export interface WorkspacePort {
   getMessageHistory(input: GetMessageHistoryInput): Promise<SandboxMessageHistory>
   createConversationInstance(input: CreateConversationInstanceInput): Promise<SandboxConversationInstanceResult>
   branchConversationInstance(input: BranchConversationInstanceInput): Promise<SandboxConversationInstanceResult>
+  renameConversationInstance(input: RenameConversationInstanceInput): Promise<SandboxWorkspaceState>
+  deleteConversationInstance(input: DeleteConversationInstanceInput): Promise<SandboxWorkspaceState>
   searchConversationMessages(input: SearchConversationMessagesInput): Promise<SandboxMessageSearchResult>
   sendMessage(input: SendMessageInput): Promise<SandboxWorkspaceState>
   sendMediaMessage(input: SendMediaMessageInput): Promise<SandboxWorkspaceState>

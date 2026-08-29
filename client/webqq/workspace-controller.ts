@@ -10,6 +10,8 @@ import type {
   ClearConversationMessagesInput,
   BranchConversationInstanceInput,
   CreateConversationInstanceInput,
+  DeleteConversationInstanceInput,
+  RenameConversationInstanceInput,
   SearchConversationMessagesInput,
   SetMessageReactionInput,
   SandboxAppearance,
@@ -51,7 +53,6 @@ import type {
   RenamePresetInput,
   SavePresetInput,
 } from '../../src/presets'
-import { getVisibleRecentConversations } from './relationship-directory'
 import {
   includesConversationParticipant,
   listConversations,
@@ -159,7 +160,6 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   const currentOperatorIdState = ref<string>()
   const activeConversationIdState = ref<string>()
   const currentViewState = ref<SandboxWorkspaceView>('messages')
-  const hiddenRecentConversationsState = ref<Record<string, Record<string, string>>>({})
   const oneBotDebugRecordsState = ref<SandboxConsoleOneBotDebugRecord[]>([])
   const oneBotDebugRecordState = ref<SandboxConsoleOneBotDebugRecord>()
   const modelRequestRecordsState = ref<SandboxModelRequestListItem[]>([])
@@ -187,12 +187,6 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     return listConversations(snapshot.value)
       .filter((conversation) => includesConversationParticipant(snapshot.value, conversation, operatorId))
   })
-  const visibleRecentConversations = computed(() => getVisibleRecentConversations(
-    conversations.value,
-    currentOperatorIdState.value
-      ? hiddenRecentConversationsState.value[currentOperatorIdState.value]
-      : undefined,
-  ))
   const activeConversation = computed(() => conversations.value.find(({ id }) => id === activeConversationIdState.value))
   const activeMessages = computed(() => {
     const ids = new Set(activeConversation.value?.messageIds ?? [])
@@ -221,7 +215,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     currentView: currentViewState.value,
     currentOperator: currentOperator.value,
     activeConversationId: activeConversationIdState.value,
-    conversations: visibleRecentConversations.value,
+    conversations: conversations.value,
   }))
   const chat = computed<ChatWorkspaceModel>(() => ({
     revision: snapshot.value.revision,
@@ -250,9 +244,6 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
       currentOperatorId: currentOperatorIdState.value,
       activeConversationId: activeConversationIdState.value,
       currentView: currentViewState.value,
-      ...(Object.keys(hiddenRecentConversationsState.value).length
-        ? { hiddenRecentConversations: hiddenRecentConversationsState.value }
-        : {}),
     })
   }
 
@@ -260,7 +251,6 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     currentOperatorIdState.value = preferences.currentOperatorId
     activeConversationIdState.value = preferences.activeConversationId
     currentViewState.value = preferences.currentView
-    hiddenRecentConversationsState.value = preferences.hiddenRecentConversations ?? {}
   }
 
   function replaceWorkspace(nextWorkspace: SandboxWorkspaceState) {
@@ -271,7 +261,6 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
       currentOperatorId: previousOperatorId,
       activeConversationId: previousConversationId,
       currentView: currentViewState.value,
-      hiddenRecentConversations: hiddenRecentConversationsState.value,
     })
     applySelection(selection)
     saveSelection()
@@ -293,35 +282,8 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   }
 
   function selectConversation(conversationId: string) {
-    const operatorId = currentOperatorIdState.value
-    if (operatorId && hiddenRecentConversationsState.value[operatorId]?.[conversationId] !== undefined) {
-      const { [conversationId]: _, ...remaining } = hiddenRecentConversationsState.value[operatorId]!
-      const { [operatorId]: __, ...otherOperators } = hiddenRecentConversationsState.value
-      hiddenRecentConversationsState.value = Object.keys(remaining).length
-        ? { ...otherOperators, [operatorId]: remaining }
-        : otherOperators
-    }
     activeConversationIdState.value = conversationId
     currentViewState.value = 'messages'
-    saveSelection()
-  }
-
-  function removeRecentConversation(conversationId: string) {
-    const operatorId = currentOperatorIdState.value
-    const conversation = conversations.value.find(({ id }) => id === conversationId)
-    if (!operatorId || !conversation) return
-    // “删除会话”只移除当前操作者的最近入口；记录最后一条消息作为水位，
-    // 新消息到达后会话会自动重新出现，且不会破坏逻辑会话和历史消息。
-    hiddenRecentConversationsState.value = {
-      ...hiddenRecentConversationsState.value,
-      [operatorId]: {
-        ...hiddenRecentConversationsState.value[operatorId],
-        [conversationId]: conversation.messageIds.at(-1) ?? '',
-      },
-    }
-    if (activeConversationIdState.value === conversationId) {
-      activeConversationIdState.value = visibleRecentConversations.value[0]?.id
-    }
     saveSelection()
   }
 
@@ -342,7 +304,6 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     const selection = resolveWorkspaceSelection(snapshot.value, {
       currentOperatorId: participantId,
       currentView: 'messages',
-      hiddenRecentConversations: hiddenRecentConversationsState.value,
     })
     applySelection(selection)
     currentOperatorIdState.value = participantId
@@ -391,6 +352,29 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
       return conversationId
     } catch (error) {
       throw normalizeWorkspaceError(error, '创建会话分支失败')
+    }
+  }
+
+  /** 给一个会话实例改名。改名不改变选中，端点返回的状态里侧栏与聊天区标题一起更新。 */
+  async function renameConversationInstance(input: Omit<RenameConversationInstanceInput, 'operatorId'>) {
+    const operatorId = getCurrentOperatorId()
+    try {
+      replaceWorkspace(await port.renameConversationInstance({ ...input, operatorId }))
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '重命名会话失败')
+    }
+  }
+
+  /**
+   * 删除一个会话实例。被删的实例可能正被选中，选中回退交给 {@link replaceWorkspace}：
+   * 它按新状态重解析选择，不需要这里再猜下一个该选谁。
+   */
+  async function deleteConversationInstance(input: Omit<DeleteConversationInstanceInput, 'operatorId'>) {
+    const operatorId = getCurrentOperatorId()
+    try {
+      replaceWorkspace(await port.deleteConversationInstance({ ...input, operatorId }))
+    } catch (error) {
+      throw normalizeWorkspaceError(error, '删除会话失败')
     }
   }
 
@@ -846,7 +830,8 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     clearConversationMessages,
     createConversationInstance,
     branchConversationInstance,
-    removeRecentConversation,
+    renameConversationInstance,
+    deleteConversationInstance,
     setMessageReaction,
     replaceWorkspace,
     selectConversation,

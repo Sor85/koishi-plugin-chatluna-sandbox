@@ -8,7 +8,6 @@ export interface SandboxWorkspacePreferences {
   currentOperatorId?: string
   activeConversationId?: string
   currentView: SandboxWorkspaceView
-  hiddenRecentConversations?: Record<string, Record<string, string>>
 }
 
 interface WorkspaceStorage {
@@ -21,18 +20,6 @@ const DEFAULT_PREFERENCES: SandboxWorkspacePreferences = {
   currentView: 'messages',
 }
 const WORKSPACE_VIEWS = new Set<SandboxWorkspaceView>(['messages', 'contacts', 'profile', 'debug', 'mcp-calls', 'model-requests', 'presets', 'spaces'])
-
-function readHiddenRecentConversations(value: unknown): Record<string, Record<string, string>> | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return
-  const result: Record<string, Record<string, string>> = {}
-  for (const [operatorId, entries] of Object.entries(value)) {
-    if (!entries || typeof entries !== 'object' || Array.isArray(entries)) continue
-    const hidden = Object.fromEntries(Object.entries(entries)
-      .filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
-    if (Object.keys(hidden).length) result[operatorId] = hidden
-  }
-  return Object.keys(result).length ? result : undefined
-}
 
 export function resolveDetailsVisibility(preference: SandboxDetailsPreference, wideLayout: boolean) {
   if (preference === 'open') return true
@@ -51,14 +38,12 @@ export function resolveDetailsPreferenceAfterLayoutChange(wideLayout: boolean): 
 export function loadWorkspacePreferences(storage: Pick<WorkspaceStorage, 'getItem'>): SandboxWorkspacePreferences {
   try {
     const value = JSON.parse(storage.getItem(STORAGE_KEY) ?? '{}') as Partial<SandboxWorkspacePreferences>
-    const hiddenRecentConversations = readHiddenRecentConversations(value.hiddenRecentConversations)
     return {
       currentOperatorId: typeof value.currentOperatorId === 'string' ? value.currentOperatorId : undefined,
       activeConversationId: typeof value.activeConversationId === 'string' ? value.activeConversationId : undefined,
       currentView: WORKSPACE_VIEWS.has(value.currentView as SandboxWorkspaceView)
         ? value.currentView as SandboxWorkspaceView
         : DEFAULT_PREFERENCES.currentView,
-      ...(hiddenRecentConversations ? { hiddenRecentConversations } : {}),
     }
   } catch {
     return { ...DEFAULT_PREFERENCES }
@@ -91,8 +76,5 @@ export function resolveWorkspaceSelection(
     currentOperatorId: currentOperator?.id,
     activeConversationId: activeConversation?.id,
     currentView: preferences.currentView,
-    ...(preferences.hiddenRecentConversations
-      ? { hiddenRecentConversations: preferences.hiddenRecentConversations }
-      : {}),
   }
 }

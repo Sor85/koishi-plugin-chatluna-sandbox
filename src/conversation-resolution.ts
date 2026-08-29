@@ -292,6 +292,20 @@ export function renameConversationInstance(scene: SandboxSnapshot, conversationI
   instance.title = next
 }
 
+/**
+ * 删除一个会话实例，返回被删除的会话 ID。目标不是会话实例时抛领域错误：根会话不可删除，
+ * 它的存在由参与者关系与群组决定。
+ *
+ * 与 {@link removeConversations} 同口径，只负责实例集合本身；消息、机器人投递记录、
+ * ChatLuna 状态、合并转发与媒体的级联清理由提交场景变更的一方按返回的 ID 完成。
+ */
+export function removeConversationInstance(scene: SandboxSnapshot, conversationId: string): Set<string> {
+  const instance = findInstanceRow(scene, conversationId)
+  if (!instance) throw new SandboxDomainError(`会话实例不存在：${conversationId}`)
+  scene.conversationInstances = instanceRows(scene).filter(({ id }) => id !== instance.id)
+  return new Set([instance.id])
+}
+
 /** 把一条消息挂到会话末尾。会话不存在时抛领域错误。 */
 export function appendConversationMessageId(scene: SandboxSnapshot, conversationId: string, messageId: string): void {
   const row = findRootRow(scene, conversationId) ?? findInstanceRow(scene, conversationId)

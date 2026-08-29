@@ -32,9 +32,6 @@ describe('WebQQ 顶部导航与会话栏', () => {
     expect(source).not.toContain('<div class="webqq-sidebar-root"')
     expect(source).toContain("const searchQuery = ref('')")
     expect(source).toContain("const sidebarTab = ref<SidebarTab>('recent')")
-    expect(source).toContain("@select=\"emit('removeRecentConversation', conversation.id)\"")
-    expect(source).toContain('删除会话')
-    expect(pageSource).toContain('@remove-recent-conversation="removeRecentConversation"')
     expect(source).toContain("const notificationTab = ref<'friends' | 'groups'>('friends')")
     expect(source).toContain("avatarKind: 'user' | 'bot' | 'group'")
     expect(source).toContain(':kind="conversation.avatarKind"')
@@ -103,5 +100,38 @@ describe('WebQQ 顶部导航与会话栏', () => {
     expect(pageSource).not.toContain('class="webqq-conversations"')
     expect(pageSource).toContain("'is-standalone-view': !isWebqqView")
     expect(pageSource).toContain('<WebqqDetailsPanel\n          v-if="isWebqqView"')
+  })
+})
+
+describe('会话树的改名与删除入口', () => {
+  // 侧栏是 .vue 组件，本仓库不引入组件挂载测试。按 ADR-0073，这里只用两类允许的源码文本
+  // 断言：用户可见文案，以及否定式的「已删除实现」守卫。改名与删除的行为本身由
+  // tests/webqq-conversation-tree.test.ts 在工作台外壳的 interface 上逐个执行验证。
+  it('实例子项的重命名与删除文案不被误删', () => {
+    const source = readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
+    const overlaySource = readFileSync(resolve('client/workspace-overlay-host.vue'), 'utf8')
+
+    expect(source).toContain('重命名会话')
+    expect(source).toContain('删除会话')
+    expect(overlaySource).toContain('<DialogTitle>重命名会话</DialogTitle>')
+    expect(overlaySource).toContain('placeholder="输入会话名称"')
+  })
+
+  it('根会话行不再提供删除入口，客户端最近会话隐藏标记也不会被加回来', () => {
+    const source = readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
+    const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
+    // 根会话的右键菜单是唯一带「创建新会话」菜单项的那个 ContextMenuContent。
+    const menus = [...source.matchAll(/<ContextMenuContent[\s\S]*?<\/ContextMenuContent>/g)].map(([menu]) => menu)
+    const rootMenus = menus.filter((menu) => menu.includes('创建新会话'))
+
+    expect(rootMenus).toHaveLength(1)
+    // 根会话的存在由参与者关系与群组决定；删除入口只属于会话实例子项。
+    expect(rootMenus[0]).not.toContain('删除会话')
+    // 「最近会话隐藏标记」是本票删掉的假按钮，重新加回来时这三条守卫会变红。
+    expect(source).not.toContain('removeRecentConversation')
+    expect(pageSource).not.toContain('removeRecentConversation')
+    for (const file of ['client/webqq/workspace-controller.ts', 'client/webqq/workspace-state.ts']) {
+      expect(readFileSync(resolve(file), 'utf8'), file).not.toContain('hiddenRecentConversations')
+    }
   })
 })

@@ -58,6 +58,8 @@ import type {
   ClearConversationMessagesInput,
   BranchConversationInstanceInput,
   CreateConversationInstanceInput,
+  DeleteConversationInstanceInput,
+  RenameConversationInstanceInput,
   SearchConversationMessagesInput,
   SetMessageReactionInput,
   SandboxAppearance,
@@ -93,6 +95,8 @@ interface ConsoleEventMap {
   'chatluna-sandbox/send-message': (input: SpaceScoped<SendMessageInput>) => Promise<SandboxWorkspaceState>
   'chatluna-sandbox/create-conversation-instance': (input: SpaceScoped<CreateConversationInstanceInput>) => Promise<SandboxConversationInstanceResult>
   'chatluna-sandbox/branch-conversation-instance': (input: SpaceScoped<BranchConversationInstanceInput>) => Promise<SandboxConversationInstanceResult>
+  'chatluna-sandbox/rename-conversation-instance': (input: SpaceScoped<RenameConversationInstanceInput>) => Promise<SandboxWorkspaceState>
+  'chatluna-sandbox/delete-conversation-instance': (input: SpaceScoped<DeleteConversationInstanceInput>) => Promise<SandboxWorkspaceState>
   'chatluna-sandbox/send-media-message': (input: SpaceScoped<SendMediaMessageInput>) => Promise<SandboxWorkspaceState>
   'chatluna-sandbox/send-forward-message': (input: SpaceScoped<SendForwardMessageInput>) => Promise<SandboxWorkspaceState>
   'chatluna-sandbox/get-forward-message': (input: SpaceScoped<GetForwardMessageInput>) => Promise<SandboxForward>
@@ -367,6 +371,16 @@ export function registerConsole(
       .branchConversationInstance(assertInteractionInput(withoutSpaceId(input)) as BranchConversationInstanceInput)
     return { ...await getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId }), conversationId }
   }, { authority: 4 })
+  registerListener('chatluna-sandbox/rename-conversation-instance', async (input) => {
+    (await resolveReadyControl(input, true))
+      .renameConversationInstance(assertInteractionInput(withoutSpaceId(input)) as RenameConversationInstanceInput)
+    return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
+  }, { authority: 4 })
+  registerListener('chatluna-sandbox/delete-conversation-instance', async (input) => {
+    (await resolveReadyControl(input, true))
+      .deleteConversationInstance(assertInteractionInput(withoutSpaceId(input)) as DeleteConversationInstanceInput)
+    return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
+  }, { authority: 4 })
   registerListener('chatluna-sandbox/send-message', async (input) => {
     // 消息同步落库后立即返回，机器人投递在后台继续；派发失败已写入调试记录与日志。
     const { delivery } = (await resolveReadyControl(input, true)).startMessageSend(assertInteractionInput(withoutSpaceId(input)) as SendMessageInput)
@@ -617,6 +631,8 @@ declare module '@koishijs/console' {
     'chatluna-sandbox/send-message'(input: SpaceScoped<SendMessageInput>): Promise<SandboxWorkspaceState>
     'chatluna-sandbox/create-conversation-instance'(input: SpaceScoped<CreateConversationInstanceInput>): Promise<SandboxConversationInstanceResult>
     'chatluna-sandbox/branch-conversation-instance'(input: SpaceScoped<BranchConversationInstanceInput>): Promise<SandboxConversationInstanceResult>
+    'chatluna-sandbox/rename-conversation-instance'(input: SpaceScoped<RenameConversationInstanceInput>): Promise<SandboxWorkspaceState>
+    'chatluna-sandbox/delete-conversation-instance'(input: SpaceScoped<DeleteConversationInstanceInput>): Promise<SandboxWorkspaceState>
     'chatluna-sandbox/send-media-message'(input: SpaceScoped<SendMediaMessageInput>): Promise<SandboxWorkspaceState>
     'chatluna-sandbox/send-forward-message'(input: SpaceScoped<SendForwardMessageInput>): Promise<SandboxWorkspaceState>
     'chatluna-sandbox/get-forward-message'(input: SpaceScoped<GetForwardMessageInput>): Promise<SandboxForward>

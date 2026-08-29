@@ -15,7 +15,7 @@ import { includesConversationParticipant, listRootConversations } from '../../sr
 import { buildForwardPreviewMap } from './forward-preview'
 import { formatMentionContent } from './mention'
 import { getIncomingNotificationRequests } from './notification-requests'
-import { getConversationPeerId, getFriendDirectory, getGroupDirectory, getVisibleRecentConversations } from './relationship-directory'
+import { getConversationPeerId, getFriendDirectory, getGroupDirectory } from './relationship-directory'
 import { resolveWorkspaceSelection } from './workspace-state'
 
 export interface WorkspaceThumbnailModels {
@@ -72,7 +72,7 @@ export function buildWorkspaceThumbnailModels(
       pendingIncoming: snapshot.requests.some(({ type, requesterId, targetId }) => type === 'friend' && requesterId === id && targetId === currentOperatorId),
     }]))
     : {}
-  const conversations = getVisibleRecentConversations(visibleConversations).map((conversation) => {
+  const conversations = visibleConversations.map((conversation) => {
     const group = conversation.type === 'group' ? snapshot.groups.find(({ id }) => id === conversation.groupId) : undefined
     const peerId = getConversationPeerId(conversation, currentOperatorId)
     const peer = snapshot.participants.find(({ id }) => id === peerId)
