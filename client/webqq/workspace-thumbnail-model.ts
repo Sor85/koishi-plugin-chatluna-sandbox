@@ -3,18 +3,16 @@ import type { WebqqDetailsPanelModel } from '../webqq-details-panel.vue'
 import type { WebqqForwardTargetModel, WebqqForwardTargetOption } from '../webqq-forward-target-dialog.vue'
 import type { WebqqSidebarModel } from '../webqq-sidebar.vue'
 import {
-  formatRecalledMessageEventText,
   getSandboxBots,
   getSandboxUsers,
-  isRecalledMessage,
   type SandboxAppearance,
   type SandboxForward,
   type SandboxSnapshot,
 } from '../../src/types'
 import { includesConversationParticipant, listRootConversations, readConversationMessageIds } from '../../src/conversation-resolution'
+import { buildConversationTree, toRecentForwardTargets } from './conversation-tree'
 import { buildForwardPreviewMap } from './forward-preview'
 import { buildMessageCapabilityMap } from './message-capabilities'
-import { formatMentionContent } from './mention'
 import { getIncomingNotificationRequests } from './notification-requests'
 import { getConversationPeerId, getFriendDirectory, getGroupDirectory } from './relationship-directory'
 import { resolveWorkspaceSelection } from './workspace-state'
@@ -74,39 +72,14 @@ export function buildWorkspaceThumbnailModels(
       pendingIncoming: snapshot.requests.some(({ type, requesterId, targetId }) => type === 'friend' && requesterId === id && targetId === currentOperatorId),
     }]))
     : {}
-  const conversations = visibleConversations.map((conversation) => {
-    const group = conversation.type === 'group' ? snapshot.groups.find(({ id }) => id === conversation.groupId) : undefined
-    const peerId = getConversationPeerId(conversation, currentOperatorId)
-    const peer = snapshot.participants.find(({ id }) => id === peerId)
-    const latestMessageId = readConversationMessageIds(snapshot, conversation.id).at(-1)
-    const latestMessage = snapshot.messages.find(({ id }) => id === latestMessageId)
-    return {
-      id: conversation.id,
-      groupId: group?.id,
-      // 缩略图只画根会话，因此这里的行一律是根会话行且没有实例子项。
-      kind: 'root' as const,
-      children: [],
-      title: group?.name ?? peer?.name ?? conversation.id,
-      avatar: group?.avatar ?? peer?.avatar,
-      avatarKind: group ? 'group' as const : peer?.kind === 'bot' ? 'bot' as const : 'user' as const,
-      preview: latestMessage ? describeMessage(latestMessage, participantNames, snapshot) : '开始一段新对话',
-      time: latestMessage?.createdAt
-        ? new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(new Date(latestMessage.createdAt))
-        : '',
-      actorRole: group?.members.find(({ participantId }) => participantId === currentOperatorId)?.role,
-      entityTarget: group
-        ? { type: 'group' as const, id: group.id }
-        : { type: peer?.kind === 'bot' ? 'bot' as const : 'user' as const, id: peerId ?? '' },
-      entityLabel: group ? '群组' as const : peer?.kind === 'bot' ? '机器人' as const : '用户' as const,
-    }
+  // 会话列表与工作台侧栏共用一份投影：标题、预览、时分、头像种类与群角色只有一处口径。
+  // 缩略图与侧栏的差别只在喂进去的会话上——这里只喂根会话，因此每行的子项列表一定是空的。
+  const conversations = buildConversationTree({
+    scene: snapshot,
+    conversations: visibleConversations,
+    operatorId: currentOperatorId,
   })
-  const recentTargets: WebqqForwardTargetOption[] = conversations.map((conversation) => ({
-    conversationId: conversation.id,
-    title: conversation.title,
-    subtitle: conversation.preview,
-    avatar: conversation.avatar,
-    avatarKind: conversation.avatarKind,
-  }))
+  const recentTargets: WebqqForwardTargetOption[] = toRecentForwardTargets(conversations)
   const forwardTargets: WebqqForwardTargetModel = {
     recent: recentTargets,
     friends: getFriendDirectory(snapshot, currentOperatorId).filter(({ isFriend, conversationId }) => isFriend && conversationId).map((entry) => ({
@@ -214,11 +187,4 @@ export function buildWorkspaceThumbnailModels(
       participants,
     },
   }
-}
-
-function describeMessage(message: SandboxSnapshot['messages'][number], participantNames: Record<string, string>, snapshot: SandboxSnapshot) {
-  if (!isRecalledMessage(message)) return formatMentionContent(message.content, participantNames)
-  const operatorId = message.lifecycle.operatorId
-  const operator = snapshot.participants.find(({ id }) => id === operatorId)
-  return formatRecalledMessageEventText(message, operator?.name ?? operatorId)
 }

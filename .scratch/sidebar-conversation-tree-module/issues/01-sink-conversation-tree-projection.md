@@ -28,4 +28,4 @@
 - 「最近」一列的复用关系由外壳 interface 上的一条断言守住：`forwardTargets.recent` 必须等于 `toRecentForwardTargets(sidebarModel.conversations)`。按 ADR-0073 不用肯定式源码文本断言代替它。
 - 纯结构性由 stash 基线证明：同一份确定性场景（含实例、分支物化前缀、撤回消息、at 提及、群角色、两种头像引用）分别在搬迁后与 `HEAD` 上导出 `sidebarModel.conversations` 与 `forwardTargets.recent`，两份 JSON 逐字节相同；缩略图那份只多出上面两个追加字段。
 - `tests/group-mention.test.ts` 与 `tests/webqq-page-shell.test.ts` 里各有一两条源码文本断言原本钉在外壳的这段投影上，随实现改指 `client/webqq/conversation-tree.ts`，断言意图不变。
-- 遗留（不在本规格范围）：`client/webqq/workspace-thumbnail-model.ts` 里还有一份近乎相同的会话行投影，只投根会话且没有任何测试覆盖。它可以复用本模块，但那是另一件事，需要先给它补上回归网。
+- 遗留已消化：`client/webqq/workspace-thumbnail-model.ts` 里那份近乎相同的会话行投影由票 03 补上回归网后改为复用本模块。
