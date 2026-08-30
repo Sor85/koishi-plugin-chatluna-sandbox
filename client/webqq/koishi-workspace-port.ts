@@ -1,5 +1,32 @@
-import { send } from '@koishijs/client'
-import type { WorkspacePort } from './workspace-port'
+import { receive, send } from '@koishijs/client'
+import type { SandboxSceneMutationPayload } from '../../src/console-contract'
+import type { SceneMutationListener, WorkspacePort } from './workspace-port'
+
+const mutationListeners = new Set<SceneMutationListener>()
+let receiverInstalled = false
+
+function notifyMutationListeners(payload: SandboxSceneMutationPayload) {
+  for (const listener of mutationListeners) listener(payload)
+}
+
+function installMutationReceiver() {
+  if (receiverInstalled) return
+  receiverInstalled = true
+  // Koishi receive 对同名事件只保存一个回调；页面反复挂载时若每次都注册，后卸载的页面会
+  // 留下失效回调并覆盖存活页面。这里只注册一次，再由适配器扇出给全部订阅者。
+  receive('chatluna-sandbox/scene-mutated', notifyMutationListeners)
+}
+
+interface SceneMutationContext {
+  on(event: 'chatluna-sandbox/scene-mutated', callback: SceneMutationListener): unknown
+}
+
+export function installContextSceneMutationReceiver(ctx: unknown) {
+  const context = ctx as SceneMutationContext
+  // Console 的预构建入口与插件源码可能各自持有一份 @koishijs/client；主 Context 事件总线
+  // 才是服务端广播实际抵达的位置，不能只依赖模块级 receive 单例。
+  context.on('chatluna-sandbox/scene-mutated', notifyMutationListeners)
+}
 
 export function createKoishiWorkspacePort(resolveSpaceId: () => string | undefined = () => undefined): WorkspacePort {
   const scoped = <Input extends object>(input: Input): Input & { spaceId?: string } => {
@@ -52,6 +79,12 @@ export function createKoishiWorkspacePort(resolveSpaceId: () => string | undefin
   getMcpCallRecords: (input = {}) => send('chatluna-sandbox/mcp-call-records', input),
   getMcpCallRecord: (input) => send('chatluna-sandbox/mcp-call-record', input),
   clearMcpCallRecords: () => send('chatluna-sandbox/clear-mcp-call-records'),
+  // 场景变更广播不定域：载荷自带 spaceId，订阅方按自己当前观察的空间过滤。
+  subscribeSceneMutation: (listener) => {
+    installMutationReceiver()
+    mutationListeners.add(listener)
+    return () => { mutationListeners.delete(listener) }
+  },
   }
 }
 

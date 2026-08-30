@@ -1,3 +1,4 @@
+import type { SandboxSceneMutationPayload } from '../../src/console-contract'
 import type {
   DeleteGroupAnnouncementInput,
   ClearSandboxModelRequestRecordsResult,
@@ -57,6 +58,8 @@ import type {
   SavePresetInput,
 } from '../../src/presets'
 
+export type SceneMutationListener = (payload: SandboxSceneMutationPayload) => void
+
 export interface WorkspacePort {
   getWorkspace(input?: GetSandboxWorkspaceInput): Promise<SandboxWorkspaceState>
   getMessageHistory(input: GetMessageHistoryInput): Promise<SandboxMessageHistory>
@@ -99,4 +102,12 @@ export interface WorkspacePort {
   getMcpCallRecords(input?: ListSandboxMcpCallRecordsInput): Promise<SandboxMcpCallRecordsPage>
   getMcpCallRecord(input: { recordId: string }): Promise<SandboxMcpCallRecord>
   clearMcpCallRecords(): Promise<{ cleared: number }>
+  /**
+   * 订阅服务端的场景变更广播，返回退订函数。适配器负责把一份底层广播扇出给全部订阅者，
+   * 因此一个页面退订不会让仍存活的页面失聪。
+   *
+   * 这个方法不跟随端口的隐式定域：载荷自带 spaceId，哪份沙盒场景变了由广播说了算，
+   * 订阅方按自己当前观察的空间过滤。
+   */
+  subscribeSceneMutation(listener: SceneMutationListener): () => void
 }

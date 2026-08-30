@@ -35,7 +35,8 @@ import type {
   SetGroupAnnouncementInput,
 } from '../../src/types'
 import { FakePortRecorder } from './fake-port-recorder'
-import type { WorkspacePort } from './workspace-port'
+import type { SceneMutationListener, WorkspacePort } from './workspace-port'
+import type { SandboxSceneMutationPayload } from '../../src/console-contract'
 import type {
   ClearModelRequestRecordsQuery,
   ModelRequestRecordQuery,
@@ -110,6 +111,7 @@ export class FakeWorkspacePort implements WorkspacePort {
   mcpCallRecordResult?: SandboxMcpCallRecord
   clearMcpCallRecordsResult = { cleared: 0 }
   private readonly recorder = new FakePortRecorder<WorkspacePortOperation>()
+  private readonly sceneMutationListeners = new Set<SceneMutationListener>()
 
   constructor(workspace: SandboxWorkspaceState) {
     this.workspaceResult = workspace
@@ -117,6 +119,11 @@ export class FakeWorkspacePort implements WorkspacePort {
 
   get calls() {
     return this.recorder.calls
+  }
+
+  /** 手动触发一次场景变更广播，扇出给全部订阅者。 */
+  emitSceneMutation(payload: SandboxSceneMutationPayload) {
+    for (const listener of this.sceneMutationListeners) listener(payload)
   }
 
   rejectNext(operation: WorkspacePortOperation, error: unknown) {
@@ -317,6 +324,12 @@ export class FakeWorkspacePort implements WorkspacePort {
 
   clearMcpCallRecords() {
     return this.invoke('clearMcpCallRecords', undefined, this.clearMcpCallRecordsResult)
+  }
+
+  subscribeSceneMutation(listener: SceneMutationListener) {
+    void this.invoke('subscribeSceneMutation', undefined, undefined)
+    this.sceneMutationListeners.add(listener)
+    return () => { this.sceneMutationListeners.delete(listener) }
   }
 }
 

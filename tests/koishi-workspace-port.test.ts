@@ -1,10 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
 
-const { send } = vi.hoisted(() => ({ send: vi.fn() }))
+const { receive, send } = vi.hoisted(() => ({ receive: vi.fn(), send: vi.fn() }))
 
-vi.mock('@koishijs/client', () => ({ send }))
+vi.mock('@koishijs/client', () => ({ receive, send }))
 
-import { createKoishiWorkspacePort, koishiWorkspacePort } from '../client/webqq/koishi-workspace-port'
+import {
+  createKoishiWorkspacePort,
+  installContextSceneMutationReceiver,
+  koishiWorkspacePort,
+} from '../client/webqq/koishi-workspace-port'
+
+type SceneMutationListener = (payload: { spaceId?: string, revision: number }) => void
 
 describe('Koishi 工作区端口', () => {
   it('无操作者加载工作区时发送空对象而不是缺省参数', async () => {
@@ -122,5 +128,56 @@ describe('Koishi 工作区端口', () => {
     expect(send).toHaveBeenNthCalledWith(1, 'chatluna-sandbox/mcp-call-records', { tool: 'send_message', spaceId: 'space-target' })
     expect(send).toHaveBeenNthCalledWith(2, 'chatluna-sandbox/mcp-call-record', { recordId: 'call-1' })
     expect(send).toHaveBeenNthCalledWith(3, 'chatluna-sandbox/clear-mcp-call-records')
+  })
+
+  it('无论订阅多少次都只向 Koishi 注册一次场景变更回调，并扇出给全部订阅者', () => {
+    const port = createKoishiWorkspacePort(() => 'space-1')
+    const seen: string[] = []
+
+    const unsubscribeFirst = port.subscribeSceneMutation(({ revision }) => seen.push(`first:${revision}`))
+    port.subscribeSceneMutation(({ revision }) => seen.push(`second:${revision}`))
+    // 适配器模块级只注册一次；同一进程里再建一个适配器也不得追加注册。
+    createKoishiWorkspacePort().subscribeSceneMutation(({ revision }) => seen.push(`third:${revision}`))
+
+    expect(receive.mock.calls.length).toBeLessThanOrEqual(1)
+    const broadcast = receive.mock.calls[0]?.[1] as SceneMutationListener | undefined
+    const emit = broadcast ?? ((payload: { revision: number }) => payload)
+    emit({ revision: 5 })
+    expect(seen).toEqual(['first:5', 'second:5', 'third:5'])
+
+    seen.length = 0
+    unsubscribeFirst()
+    emit({ revision: 6 })
+    expect(seen).toEqual(['second:6', 'third:6'])
+  })
+
+  it('订阅不跟随当前活动空间，广播载荷自带 spaceId', () => {
+    const port = createKoishiWorkspacePort(() => 'space-1')
+    const seen: Array<string | undefined> = []
+    const unsubscribe = port.subscribeSceneMutation(({ spaceId }) => seen.push(spaceId))
+    const broadcast = receive.mock.calls[0]?.[1] as SceneMutationListener | undefined
+
+    broadcast?.({ revision: 1 })
+    broadcast?.({ spaceId: 'space-2', revision: 2 })
+
+    expect(seen).toEqual([undefined, 'space-2'])
+    unsubscribe()
+  })
+
+  it('主 Context 广播抵达同一批订阅者', () => {
+    const port = createKoishiWorkspacePort()
+    const seen: number[] = []
+    const unsubscribe = port.subscribeSceneMutation(({ revision }) => seen.push(revision))
+    const contextListeners = new Map<string, SceneMutationListener>()
+
+    installContextSceneMutationReceiver({
+      on(event: string, callback: SceneMutationListener) {
+        contextListeners.set(event, callback)
+      },
+    })
+    contextListeners.get('chatluna-sandbox/scene-mutated')?.({ revision: 9 })
+
+    expect(seen).toEqual([9])
+    unsubscribe()
   })
 })

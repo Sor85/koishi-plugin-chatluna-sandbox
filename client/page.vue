@@ -222,7 +222,8 @@ import { createWebqqWorkspaceShell } from './webqq/workspace-shell'
 import { createAiTestSpaceShell } from './webqq/test-space-shell'
 
 const activeSpaceId = ref<string>()
-const workspaceController = createWorkspaceController(createKoishiWorkspacePort(() => activeSpaceId.value), window.localStorage)
+const workspacePort = createKoishiWorkspacePort(() => activeSpaceId.value)
+const workspaceController = createWorkspaceController(workspacePort, window.localStorage)
 // 总览要读主场景与任意测试空间的头像媒体，因此另配一个不跟随当前活动空间的工作区端口。
 const mainWorkspacePort = createKoishiWorkspacePort()
 const testSpacePort = createKoishiTestSpacePort()
@@ -396,7 +397,7 @@ const modelRequestSpaces = spaceOptions
 const modelRequestBots = botDirectory
 const debugBots = botDirectory
 useFrostedSurfaceFlag(appearance)
-const disposeSceneMutationSync = createSceneMutationSync(workspaceController, () => activeSpaceId.value)
+const disposeSceneMutationSync = createSceneMutationSync(workspacePort, workspaceController, () => activeSpaceId.value)
 const { running: mcpRunning, dispose: disposeMcpActivitySync } = createMcpActivitySync(mcpAdminPort)
 onBeforeUnmount(() => {
   disposeSceneMutationSync()

@@ -10,7 +10,7 @@
 
 **广播频道进入同一份契约，`receive` 因此和 `send` 一样有类型。** 服务端 `broadcast` 的签名也按频道名取载荷，改载荷字段两端一起变红；`scene-sync.ts` 里那份本地 `SceneMutationPayload` 与 MCP 端口里那份 `McpActivityPayload` 都收成对契约的引用。`chatluna-sandbox/mcp-activity` 同时是请求端点与广播频道，这不是重复：一个回答「现在跑着吗」，一个通知「状态变了」，契约把两者分别登记而不合并成一条。
 
-顺带暴露了一处一直存在的违规：`scene-sync.ts` 的模块级 `receive` 本就不在端口适配器里，此前靠 `receive<Payload>(...)` 的类型实参让守卫的 `receive\s*\(` 命不中而躲过检查。载荷类型收进频道映射后类型实参失去存在理由，这条违规第一次显形，已按必填理由与负责人登记进客户端架构守卫的豁免清单，负责的后续工作是把场景变更订阅按 `subscribeMcpActivity` 的形状搬进工作区端口。
+顺带暴露并消化了一处一直存在的违规：`scene-sync.ts` 的模块级 `receive` 本就不在端口适配器里，此前靠 `receive<Payload>(...)` 的类型实参让守卫的 `receive\s*\(` 命不中而躲过检查。载荷类型收进频道映射后类型实参失去存在理由，这条违规第一次显形，随即按 [ADR-0074](./0074-split-client-rpc-ports-by-capability.md) 的形状收进工作区端口：`subscribeSceneMutation` 与 MCP 管理端口的 `subscribeMcpActivity` 同形，只注册一次底层回调再扇出给全部订阅者，`scene-sync.ts` 因此只剩「这条广播是不是我正在观察的那个空间」这一件事。客户端架构守卫的豁免清单回到空。
 
 **鉴权级别留在注册点，不进契约。** `authority: 4` 是注册时的策略而不是端点的形状：同一个端点在不同宿主上可以要求不同权限，把它写进契约会让「端点是什么」和「谁能调它」共用一个变更原因。
 

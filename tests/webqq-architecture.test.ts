@@ -140,19 +140,11 @@ interface ArchitectureExemption {
  * 已知违规的显式豁免清单，与守卫断言放在同一处，改客户端代码的人立刻看到。
  * 理由与负责人均为必填；豁免不是放行，是有主的债务。
  *
- * 九条历史违规已由区域投影下沉与扩展端口两批工作消化完，消息能力判定则在收成共享判据时
- * 一并清掉。当前只剩场景变更广播这一条：它此前靠 `receive<Payload>(...)` 的类型实参让
- * `receive\s*\(` 命不中而躲过守卫，Console 契约把载荷类型收进频道映射后类型实参失去存在
- * 理由，这条一直存在的违规因此第一次暴露出来。
+ * 当前为空：九条历史违规已由区域投影下沉与扩展端口两批工作消化完，消息能力判定则在收成
+ * 共享判据时一并清掉，场景变更广播的模块级 `receive` 在收进工作区端口时消化。清单与它的
+ * 三条守卫断言保留，下一次真有取舍时按同一形状登记。
  */
-const exemptions: readonly ArchitectureExemption[] = [
-  {
-    file: 'client/webqq/scene-sync.ts',
-    rule: '收发 Koishi RPC 的函数只允许出现在客户端端口适配器里',
-    reason: '场景变更广播的模块级 receive 单例还没有对应的端口方法；MCP 活动广播已经收进 koishi-mcp-admin-port.ts 的 subscribeMcpActivity，场景变更缺同一形状的一份。',
-    owner: '把场景变更订阅按 subscribeMcpActivity 的形状搬进工作区端口，scene-sync 改为收端口而不是直接 receive。',
-  },
-]
+const exemptions: readonly ArchitectureExemption[] = []
 
 /**
  * 类型声明文件不含运行时代码，`send` 在里面只是被声明的重载签名。

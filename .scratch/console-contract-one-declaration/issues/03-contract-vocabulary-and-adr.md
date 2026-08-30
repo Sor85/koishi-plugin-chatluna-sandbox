@@ -24,5 +24,13 @@
 - `CONTEXT.md` 新增「Console 契约」条目，紧跟「WebQQ 工作台」，`_Avoid_` 列出接口定义、事件表、API 声明、RPC 协议四个应避免的叫法。条目同时写明端点集合与消费方由守卫钉住，以及鉴权级别不属于契约。
 - 新增 `docs/adr/0079-derive-console-declarations-from-one-contract.md`，覆盖三个决定：契约放在 `src/` 供两端共享（客户端已经在直接引用 `src/`，反向依赖会让服务端依赖客户端目录）、三份声明改为派生而不是靠约定同步（漂移是静默的，本轮实测已经漂了一个端点）、鉴权级别留在注册点（它是注册时的策略，不是端点的形状）。
 - **与 ADR-0074 的关系写成「对齐而不是派生」**：端口按能力拆分是客户端一侧的抽象，契约按同样的能力分组书写只为让两边读起来对得上；契约不派生端口接口，端口的方法名、可选参数与显式定域规则都是客户端自己的取舍。ADR-0074 那条决定不变，未静默覆盖。
-- ADR 里额外交代了一处规格没预判的事：`scene-sync.ts` 的模块级 `receive` 本就不在端口适配器里，此前靠 `receive<Payload>(...)` 的类型实参让守卫的 `receive\s*\(` 命不中而躲过检查。载荷类型收进频道映射后类型实参失去存在理由，这条一直存在的违规第一次显形，已按必填理由与负责人登记进 `tests/webqq-architecture.test.ts` 的豁免清单，负责的后续工作是把场景变更订阅按 `subscribeMcpActivity` 的形状搬进工作区端口。
+- ADR 里额外交代了一处规格没预判的事：`scene-sync.ts` 的模块级 `receive` 本就不在端口适配器里，此前靠 `receive<Payload>(...)` 的类型实参让守卫的 `receive\s*\(` 命不中而躲过检查。载荷类型收进频道映射后类型实参失去存在理由，这条一直存在的违规第一次显形。
 - 与既有 ADR 无冲突：ADR-0073 的架构守卫例外正是本轮守卫读源码的依据，本文引用它而不是绕过它。
+
+### 后续：豁免已消化
+
+契约收敛提交后立即把那条债务清掉，客户端架构守卫的豁免清单回到空。
+
+- `WorkspacePort` 新增 `subscribeSceneMutation`，与 MCP 管理端口的 `subscribeMcpActivity` 同形；模块级 `receive` 单例、扇出集合与 `installContextSceneMutationReceiver` 一并搬进 `koishi-workspace-port.ts`（`installContextMutationReceiver` 随之改名对齐 MCP 那侧的命名）。订阅方法不跟随端口的隐式定域：载荷自带 `spaceId`，哪份沙盒场景变了由广播说了算。
+- `scene-sync.ts` 因此只剩一件事——「这条广播是不是我正在观察的那个空间」，`FakeWorkspacePort` 补上 `subscribeSceneMutation` 与 `emitSceneMutation`。
+- 测试跟着分层而不是照搬：`scene-sync.test.ts` 改用假端口，并新增一条此前没有覆盖的行为——按当前观察空间过滤广播（主环境只收无 `spaceId` 的，空间订阅方只收自己那个 `spaceId` 的）；「只注册一次底层回调并扇出」与「主 Context 广播抵达同一批订阅者」下沉到 `koishi-workspace-port.test.ts`，与 `koishi-mcp-admin-port.test.ts` 那两条同形。
