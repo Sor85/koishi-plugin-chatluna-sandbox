@@ -1,6 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
-import { App } from '@koishijs/core'
+import { App, Logger } from '@koishijs/core'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -36,7 +36,6 @@ async function startHttpServer(
     port: 0,
     allowedSources: ['127.0.0.0/8', '::1/128'],
     allowedOrigins: options.allowedOrigins ?? [],
-    allowInsecureRemote: false,
     mcp: { enabled: true, path: '/mcp' },
     http: { enabled: false, path: '/api' },
   })
@@ -175,16 +174,30 @@ describe('MCP Streamable HTTP', () => {
     expect(await response.json()).toMatchObject({ result: { serverInfo: { name: 'koishi-plugin-chatluna-sandbox' } } })
   })
 
-  it('非回环监听缺少 TLS 时拒绝启动', async () => {
+  it('非回环监听缺少 TLS 时照常启动，并持续告警明文传输', async () => {
     const app = new App()
     const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-mcp-tls-'))
     const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media') })
     const service = new SandboxMcpService(app, control, { dataDirectory: directory })
     const server = new SandboxTestEndpointServer(app, service, {
-      host: '0.0.0.0', port: 0, allowedSources: [], allowedOrigins: [], allowInsecureRemote: false,
+      host: '0.0.0.0', port: 0, allowedSources: [], allowedOrigins: [],
       mcp: { enabled: true, path: '/mcp' }, http: { enabled: false, path: '/api' },
     })
-    cleanups.push(() => app.stop())
-    await expect(server.start()).rejects.toThrow('必须配置 TLS')
+    cleanups.push(async () => { await server.stop(); await app.stop() })
+
+    // 告警必须真的打出来：这是明文传输唯一的可见提示（ADR-0082），端点本身不再拦。
+    const printed: string[] = []
+    const original = Logger.targets.splice(0, Logger.targets.length, {
+      colors: 0,
+      print: (text: string) => { printed.push(text) },
+    } as unknown as (typeof Logger.targets)[number])
+    try {
+      await server.start()
+    } finally {
+      Logger.targets.splice(0, Logger.targets.length, ...original)
+    }
+
+    expect(server.getAddress()).toBeDefined()
+    expect(printed.join('\n')).toContain('明文 HTTP')
   })
 })

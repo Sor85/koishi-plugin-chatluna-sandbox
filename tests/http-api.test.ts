@@ -40,7 +40,6 @@ async function startEndpoint(
     port: 0,
     allowedSources: ['127.0.0.0/8', '::1/128'],
     allowedOrigins: options.allowedOrigins ?? [],
-    allowInsecureRemote: false,
     mcp: { enabled: options.mcpEnabled ?? true, path: '/mcp' },
     http: { enabled: options.httpEnabled ?? true, path: httpPath },
   })
@@ -241,7 +240,7 @@ describe('HTTP 测试接口端到端', () => {
     const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media') })
     const service = new SandboxMcpService(app, control, { dataDirectory: directory })
     const server = new SandboxTestEndpointServer(app, service, {
-      host: '127.0.0.1', port: 0, allowedSources: [], allowedOrigins: [], allowInsecureRemote: false,
+      host: '127.0.0.1', port: 0, allowedSources: [], allowedOrigins: [],
       mcp: { enabled: false, path: '/mcp' }, http: { enabled: false, path: '/api' },
     })
     cleanups.push(() => app.stop())

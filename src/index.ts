@@ -54,25 +54,25 @@ export const inject = {
 }
 
 /**
- * 端点通用设置的门禁与配额。
+ * 端点通用设置：监听、门禁与配额。
  *
  * 单独成组不是为了代码结构，而是为了配置页：Koishi 按声明顺序把嵌套分组渲染成 h2，紧跟其后的散字段
- * 会挂在上一个 h2 下面。门禁与配额如果留在 `testEndpoint` 顶层，就会视觉上落进「HTTP 测试端点」标题
- * 里，读起来像是只对 HTTP 生效——而它们对两个端点同时生效。配额共用同一份额度是安全属性（换个端点
- * 绕不开限流），更不能让人误读。依 ADR-0025，配额只能由插件全局配置调整。
+ * 会挂在上一个 h2 下面。这些字段如果留在 `testEndpoint` 顶层，就会视觉上落进「HTTP 测试端点」标题
+ * 里，读起来像是只对 HTTP 生效——而它们对两个端点同时生效。监听地址与端口同样是两个端点共用的一份
+ * （同一个监听器按路径分流），配额共用同一份额度更是安全属性（换个端点绕不开限流），都不能让人误读。
+ * 依 ADR-0025，配额只能由插件全局配置调整。
  */
 export interface SandboxTestEndpointSharedConfig extends SandboxMcpQuotaConfig {
+  host: string
+  port: number
   allowedSources: string[]
   allowedOrigins: string[]
-  allowInsecureRemote: boolean
   tlsCertPath?: string
   tlsKeyPath?: string
 }
 
-/** 用户可见的测试控制端点配置：共用监听 + 两个端点各自的开关与路径 + 共用门禁与配额。 */
+/** 用户可见的测试控制端点配置：两个端点各自的开关与路径 + 共用的监听、门禁与配额。 */
 export interface SandboxTestEndpointConfig {
-  host: string
-  port: number
   mcp: SandboxTestEndpointProtocolConfig
   http: SandboxTestEndpointProtocolConfig
   shared: SandboxTestEndpointSharedConfig
@@ -117,8 +117,6 @@ export const Config: Schema<Config> = Schema.object({
   sceneMessageMaxBytes: Schema.number().min(64 * 1024).default(DEFAULT_SCENE_MESSAGE_MAX_BYTES)
     .description('每个空间场景 JSON 的字节上限；达到后继续从最旧消息开始丢弃，被丢弃的历史消息不可恢复'),
   testEndpoint: Schema.object({
-    host: Schema.string().default('127.0.0.1').description('端点通用设置的监听地址。`127.0.0.1`只允许本机访问，改成`0.0.0.0`可被局域网访问，此时必须填写 TLS 证书'),
-    port: Schema.number().min(1).max(65535).default(61901).description('端点通用设置的监听端口。端口被占用时端点启动失败，沙盒工作台不受影响'),
     mcp: protocolSchema(
       '/mcp',
       '是否开启 MCP',
@@ -131,11 +129,12 @@ export const Config: Schema<Config> = Schema.object({
     ).description('HTTP 测试端点'),
     // 声明顺序即渲染顺序：这一组必须排在 mcp / http 之后，否则它的字段会挂到别的标题下面。
     shared: Schema.object({
-      allowedSources: Schema.array(String).default(['127.0.0.1', '::1']).description('只有这些来源 IP 能访问，支持 IPv4 CIDR 写法。留空表示不限制来源'),
-      allowedOrigins: Schema.array(String).default([]).description('只有这些浏览器 Origin 能访问，需要写全协议与端口。curl 与 AI 客户端不带 Origin，不受此项限制'),
-      allowInsecureRemote: Schema.boolean().default(false).description('监听地址不是本机、又没填 TLS 证书时仍然启动。此时测试凭证会以明文在网络上传输，不推荐开启'),
-      tlsCertPath: Schema.string().description('TLS 证书路径。监听地址不是本机时必填，否则端点拒绝启动'),
-      tlsKeyPath: Schema.string().description('TLS 私钥路径。监听地址不是本机时必填，否则端点拒绝启动'),
+      host: Schema.string().default('127.0.0.1').description('监听地址。`127.0.0.1`只允许本机访问，改成`0.0.0.0`可被局域网访问，此时建议填写 TLS 证书，否则测试凭证以明文传输'),
+      port: Schema.number().min(1).max(65535).default(61901).description('监听端口。端口被占用时端点启动失败，沙盒工作台不受影响'),
+      allowedSources: Schema.array(String).default(['127.0.0.1', '::1']).description('只有以下来源 IP 能访问，支持 IPv4 CIDR 写法。留空表示不限制来源'),
+      allowedOrigins: Schema.array(String).default([]).description('只有以下浏览器 Origin 能访问，要写全协议与端口，例如`http://localhost:5173`。浏览器请求必带 Origin 头，留空表示一律拒绝；curl 与 AI 客户端不带 Origin，不受此项限制'),
+      tlsCertPath: Schema.string().description('TLS 证书路径。监听地址不是本机时建议填写，留空则以明文 HTTP 传输测试凭证'),
+      tlsKeyPath: Schema.string().description('TLS 私钥路径。监听地址不是本机时建议填写，留空则以明文 HTTP 传输测试凭证'),
       readPerMinute: Schema.number().min(1).default(120).description('每个测试凭证每分钟的读取调用次数上限，超出返回 429'),
       mutationPerMinute: Schema.number().min(1).default(60).description('每个测试凭证每分钟的变更调用次数上限，超出返回 429'),
       waitPerMinute: Schema.number().min(1).default(120).description('每个测试凭证每分钟的等待调用次数上限，超出返回 429'),
@@ -144,7 +143,10 @@ export const Config: Schema<Config> = Schema.object({
       maxConcurrentWaits: Schema.number().min(1).default(8).description('每个测试凭证同时进行的等待调用数上限，超出返回 429'),
       maxConcurrentUploads: Schema.number().min(1).default(2).description('每个测试凭证同时进行的媒体上传数上限，超出返回 429'),
     }).description('端点通用设置'),
-  }).description('测试控制端点'),
+    // 外层刻意不写 description：配置页只在 object 有 description 时渲染 h2，而这一层已经没有自己的
+    // 字段了，给它标题只会得到一个下面什么都没有、紧接着又是一个标题的空标题。配置键仍是
+    // `testEndpoint.*`，分组只在页面上消失。
+  }),
 }).description('ChatLuna 沙盒')
 
 declare module 'koishi' {
@@ -333,11 +335,10 @@ export function apply(ctx: Context, config: Config) {
       const testEndpointServer = new SandboxTestEndpointServer(inner, mcp, {
         // 逐字段构造传输配置：监听器只要门禁与路径，不需要配额；整体铺开会让读代码的人以为它也用配额。
         // 配置页的 `shared` 分组是展示分工，监听器接口按自己需要的字段扁平声明，两者在此对接。
-        host: config.testEndpoint.host,
-        port: config.testEndpoint.port,
+        host: config.testEndpoint.shared.host,
+        port: config.testEndpoint.shared.port,
         allowedSources: config.testEndpoint.shared.allowedSources,
         allowedOrigins: config.testEndpoint.shared.allowedOrigins,
-        allowInsecureRemote: config.testEndpoint.shared.allowInsecureRemote,
         tlsCertPath: config.testEndpoint.shared.tlsCertPath,
         tlsKeyPath: config.testEndpoint.shared.tlsKeyPath,
         mcp: config.testEndpoint.mcp,

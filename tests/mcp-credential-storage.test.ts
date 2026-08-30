@@ -149,7 +149,7 @@ describe('MCP 凭证存储的健壮性', () => {
     ])
     const { app, service } = createService(directory)
     const server = new SandboxTestEndpointServer(app, service, {
-      host: '127.0.0.1', port: 0, allowedSources: ['127.0.0.0/8'], allowedOrigins: [], allowInsecureRemote: false,
+      host: '127.0.0.1', port: 0, allowedSources: ['127.0.0.0/8'], allowedOrigins: [],
       mcp: { enabled: true, path: '/mcp' }, http: { enabled: false, path: '/api' },
     })
     await server.start()

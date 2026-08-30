@@ -32,7 +32,7 @@ describe('插件持久化配置', () => {
  * 三个端点分组在插件配置页上的形状与文案分工。
  *
  * 这份守卫钉住的是用户在控制台里看到什么，而不是实现细节：把 `enabled` 或 `path` 从端点分组挪走、
- * 给某个端点改默认值、把「这个端点是干什么的」写回分组标题、或者把端点通用设置的门禁与配额挪回
+ * 给某个端点改默认值、把「这个端点是干什么的」写回分组标题、或者把端点通用设置的监听、门禁与配额挪回
  * `testEndpoint` 顶层（那样它们会视觉上挂到最后一个端点标题下面），都会让配置页与文档不符，
  * 而这些都不会让别的测试变红。
  */
@@ -58,8 +58,11 @@ describe('测试控制端点配置', () => {
     const endpoint = Config.dict?.testEndpoint
     if (!endpoint?.dict) throw new Error('测试控制端点配置分组缺失')
 
-    const titles = [endpoint, endpoint.dict.mcp, endpoint.dict.http, endpoint.dict.shared].map(({ meta }) => meta.description)
-    expect(titles).toEqual(['测试控制端点', 'MCP 测试端点', 'HTTP 测试端点', '端点通用设置'])
+    // 外层不带 description：配置页只在 object 有 description 时渲染 h2，而这一层已经没有自己的字段，
+    // 有标题就等于页面上多出一个下面什么都没有、紧接着又是一个标题的空标题。
+    expect(endpoint.meta.description).toBeUndefined()
+    const titles = [endpoint.dict.mcp, endpoint.dict.http, endpoint.dict.shared].map(({ meta }) => meta.description)
+    expect(titles).toEqual(['MCP 测试端点', 'HTTP 测试端点', '端点通用设置'])
     // 标题里出现标点就意味着它又变成了一句解释；解释归字段说明。
     for (const title of titles) {
       expect(typeof title === 'string' && /[：:；;，,。]/.test(title), String(title)).toBe(false)
@@ -67,42 +70,42 @@ describe('测试控制端点配置', () => {
   })
 
   /**
-   * 门禁与配额对两个端点同时生效，因此必须自成一组、并排在两个端点分组之后。
+   * 门禁、配额与监听对两个端点同时生效，因此必须自成一组、并排在两个端点分组之后。
    *
-   * 顺序是硬要求而不是审美：Koishi 按声明顺序渲染，散字段会挂在上一个 h2 下面。这一组若排在
-   * mcp / http 之前，共用字段就会落进「测试控制端点」标题里；若拆散回顶层，就会落进最后一个
-   * 端点的标题里，读起来像只对那一个端点生效。
+   * 顺序是硬要求而不是审美：Koishi 按声明顺序渲染，散字段会挂在上一个 h2 下面。这一组若拆散回
+   * `testEndpoint` 顶层，就会落进最后一个端点的标题里，读起来像只对那一个端点生效。
    */
-  it('共用的门禁与配额自成一组，且排在两个端点之后', () => {
+  it('共用的监听、门禁与配额自成一组，且排在两个端点之后', () => {
     const endpoint = Config.dict?.testEndpoint.dict
     if (!endpoint) throw new Error('测试控制端点配置分组缺失')
     const shared = endpoint.shared.dict
     if (!shared) throw new Error('共用配置分组缺失')
 
+    // `testEndpoint` 顶层只剩三个分组：任何散字段都会被渲染到上一个端点标题下面。
     const keys = Object.keys(endpoint)
-    expect(keys).toEqual(['host', 'port', 'mcp', 'http', 'shared'])
+    expect(keys).toEqual(['mcp', 'http', 'shared'])
     expect(keys.indexOf('shared')).toBeGreaterThan(keys.indexOf('http'))
     expect(Object.keys(shared)).toEqual([
-      'allowedSources', 'allowedOrigins', 'allowInsecureRemote', 'tlsCertPath', 'tlsKeyPath',
+      'host', 'port', 'allowedSources', 'allowedOrigins', 'tlsCertPath', 'tlsKeyPath',
       'readPerMinute', 'mutationPerMinute', 'waitPerMinute', 'uploadPerMinute',
       'maxConcurrentMutations', 'maxConcurrentWaits', 'maxConcurrentUploads',
     ])
     expect(shared.allowedSources.meta.default).toEqual(['127.0.0.1', '::1'])
-    expect(shared.allowInsecureRemote.meta.default).toBe(false)
-    // 端点分组里只留自己的开关与路径，不得各自再配一份门禁或配额。
+    // 端点分组里只留自己的开关与路径，不得各自再配一份监听、门禁或配额。
     for (const protocol of ['mcp', 'http'] as const) {
       expect(Object.keys(endpoint[protocol].dict ?? {}), protocol).toEqual(['enabled', 'path'])
     }
   })
 
-  it('监听地址与端口留在最外层，端点通用设置', () => {
-    const endpoint = Config.dict?.testEndpoint.dict
-    if (!endpoint) throw new Error('测试控制端点配置分组缺失')
+  it('监听地址与端口在端点通用设置里', () => {
+    const shared = Config.dict?.testEndpoint.dict?.shared.dict
+    if (!shared) throw new Error('共用配置分组缺失')
 
-    expect(endpoint.host.meta.default).toBe('127.0.0.1')
-    expect(endpoint.port.meta.default).toBe(61901)
-    for (const field of ['host', 'port'] as const) {
-      expect(endpoint[field].meta.description, field).toContain('端点通用设置')
+    expect(shared.host.meta.default).toBe('127.0.0.1')
+    expect(shared.port.meta.default).toBe(61901)
+    // 同一个监听器按路径分流，只有一份地址与端口；「共用」由分组标题承载，字段说明不再重复。
+    for (const [field, prefix] of [['host', '监听地址'], ['port', '监听端口']] as const) {
+      expect(shared[field].meta.description, field).toMatch(new RegExp(`^${prefix}`))
     }
   })
 
