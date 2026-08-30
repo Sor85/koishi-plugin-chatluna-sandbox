@@ -1703,8 +1703,8 @@ export class SandboxControlService {
 
   private normalizeSceneForwards(snapshot: SandboxSnapshot): SandboxSnapshot {
     snapshot.forwards = Array.isArray(snapshot.forwards) ? snapshot.forwards : []
-    // 会话实例集合与 forwards 同样在读取路径补空数组，避免旧快照或半成品导入炸掉解析。
-    snapshot.conversationInstances = Array.isArray(snapshot.conversationInstances) ? snapshot.conversationInstances : []
+    // 会话实例集合与 forwards 同样在读取路径补空数组，避免旧快照或半成品导入炸掉解析；
+    // 那条不变量归解析模块所有，这里只调用它，不自己动实例集合。
     return normalizeSceneConversationInstances(snapshot)
   }
 

@@ -78,8 +78,14 @@ function findRootRow(scene: SandboxSnapshot, conversationId: string): SandboxCon
   return scene.conversations.find(({ id }) => id === conversationId)
 }
 
+/**
+ * 实例集合的唯一读取口。
+ *
+ * 缺失与形状不对都归一成空数组：本模块是实例集合的持有者，「场景里的实例集合永远是数组」这条
+ * 不变量因此只在这里成立一次。半成品导入可能带来任意 JSON，读取路径不能假设它是数组。
+ */
 function instanceRows(scene: SandboxSnapshot): SandboxConversationInstance[] {
-  return scene.conversationInstances ?? []
+  return Array.isArray(scene.conversationInstances) ? scene.conversationInstances : []
 }
 
 function findInstanceRow(scene: SandboxSnapshot, conversationId: string): SandboxConversationInstance | undefined {
@@ -447,7 +453,7 @@ export function validateSceneConversations(scene: SandboxSnapshot, scope: Conver
   }
 }
 
-/** 把缺失的会话实例集合规范成空数组，让旧测试夹具与半成品导入不必自带该字段。 */
+/** 把缺失或形状不对的会话实例集合规范成空数组，让旧测试夹具与半成品导入不必自带该字段。 */
 export function normalizeSceneConversationInstances(scene: SandboxSnapshot): SandboxSnapshot {
   scene.conversationInstances = instanceRows(scene)
   return scene

@@ -10,10 +10,12 @@ import {
   isConversationVisible,
   listConversationIds,
   listConversationInstances,
+  listConversations,
   listRootConversationInstances,
   listRootConversations,
   listVisibleConversationIds,
   listVisibleRootConversations,
+  normalizeSceneConversationInstances,
   projectVisibleConversations,
   pruneConversationMessageIds,
   removeConversationInstance,
@@ -274,6 +276,18 @@ describe('会话实例解析', () => {
     expect(listVisibleRootConversations(scene, '10001').map(({ id }) => id))
       .toEqual(['private:10001:20001', 'group:30001'])
     expect(listConversationIds(scene).has(instance.id)).toBe(true)
+  })
+
+  it('实例集合缺失或形状不对时按空集合解析，不炸在读取路径上', () => {
+    const scene = createScene()
+    delete scene.conversationInstances
+
+    expect(listConversationInstances(scene)).toEqual([])
+    expect(listConversations(scene).map(({ id }) => id)).toEqual(listRootConversations(scene).map(({ id }) => id))
+    // 半成品导入可以带来任意 JSON：非数组同样归一成空集合，而不是让 find 抛类型错误。
+    Reflect.set(scene, 'conversationInstances', '不是数组')
+    expect(listConversationInstances(scene)).toEqual([])
+    expect(normalizeSceneConversationInstances(scene).conversationInstances).toEqual([])
   })
 
   it('删除根会话连带删除它的实例，删除实例不动根会话', () => {

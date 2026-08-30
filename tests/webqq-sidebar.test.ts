@@ -104,31 +104,41 @@ describe('WebQQ 顶部导航与会话栏', () => {
 })
 
 describe('会话树的信息密度与展开控件', () => {
-  // 侧栏是 .vue 组件，本仓库不引入组件挂载测试。按 ADR-0073 这里只用允许的三类源码断言：
-  // 用户可见内容（时间、实例数量、无障碍标签）、样式源断言，以及否定式的「已删除实现」守卫。
-  // 时间的数据来源由 tests/webqq-conversation-tree.test.ts 在工作台外壳的 interface 上验证。
+  /*
+   * 侧栏是 .vue 组件，本仓库不引入组件挂载测试。按 ADR-0073 这里只用允许的几类源码断言：
+   * 用户可见内容（时间、实例数量、无障碍标签）、样式源断言、否定式的「已删除实现」守卫，以及
+   * 一条按规则跑遍样式源的死选择器守卫。
+   *
+   * 「什么时候出现」这类条件本身不在这里断言：模板条件的写法属于实现文本，锁住它只会在等价
+   * 重构时变红。展开按钮随实例存在与否出现、页签切换后会话树消失，都由票 08 的浏览器实测逐项
+   * 执行验证（Chrome 与 Firefox 各一轮）；时间的数据来源由 tests/webqq-conversation-tree.test.ts
+   * 在工作台外壳的 interface 上验证。
+   */
   const sidebarSource = () => readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
   const sidebarStyles = () => readFileSync(resolve('client/styles/webqq-sidebar.css'), 'utf8')
 
   it('会话行与实例子项都渲染最后消息时间', () => {
     const source = sidebarSource()
 
-    expect(source).toContain('<time v-if="conversation.time">{{ conversation.time }}</time>')
-    expect(source).toContain('<time v-if="child.time">{{ child.time }}</time>')
+    expect(source).toContain('{{ conversation.time }}')
+    expect(source).toContain('{{ child.time }}')
     // 时间与会话预览共用一套弱化前景色与字号，右上角定位在样式源里只有一处。
     expect(sidebarStyles()).toMatch(/\.webqq-session-copy small,\s*\.webqq-session time\s*\{[^}]*color:\s*var\(--webqq-muted\)/s)
-    expect(sidebarStyles()).toMatch(/\.webqq-session time\s*\{[^}]*position:\s*absolute[^}]*right:\s*12px/s)
+    expect(sidebarStyles()).toMatch(/\.webqq-session time\s*\{[^}]*position:\s*absolute[^}]*top:\s*var\(--webqq-session-meta-top\)/s)
   })
 
-  it('展开按钮只在存在会话实例时出现，并显示实例数量', () => {
+  it('展开按钮显示实例数量，文案用领域词汇里的正式术语', () => {
     const source = sidebarSource()
     const expandButton = source.slice(source.indexOf('class="webqq-session-expand"') - 200, source.indexOf('webqq-session-expand-count') + 120)
 
-    expect(expandButton).toContain('v-if="instanceCount(conversation)"')
-    // 数量与无障碍标签都是用户可感知的内容：不展开就能知道这个联系人下有几条对话线。
+    // 数量与无障碍标签都是用户可感知的内容：不展开就能知道这个联系人下有几个会话实例。
     expect(expandButton).toContain('{{ instanceCount(conversation) }}')
-    expect(expandButton).toContain('条对话线')
+    expect(expandButton).toContain('个会话实例')
+    // 「对话线」是 CONTEXT.md 明确列入 Avoid 的同义词，不得用它命名这个概念。
+    expect(expandButton).not.toContain('对话线')
     expect(sidebarStyles()).toMatch(/\.webqq-session-expand-count\s*\{[^}]*font-size:\s*var\(--webqq-font-2xs\)/s)
+    // 时间与展开按钮都从行的上沿起算，行高变化不会让两者互相压住。
+    expect(sidebarStyles()).toMatch(/\.webqq-session-expand\s*\{[^}]*top:\s*calc\(var\(--webqq-session-meta-top\)/s)
   })
 
   it('「创建新会话」不再常驻子项列表末尾，只留右键入口', () => {
@@ -138,6 +148,7 @@ describe('会话树的信息密度与展开控件', () => {
     // 常驻子项按钮及其样式一起删除：它占着每个展开会话的最后一行，而右键菜单已经有同一入口。
     expect(source).not.toContain('webqq-session-child-create')
     expect(sidebarStyles()).not.toContain('webqq-session-child-create')
+    // 入口唯一：菜单项散成两处时，其中一处的行为回归不会被任何测试抓到。
     expect(menus.filter((menu) => menu.includes('创建新会话'))).toHaveLength(1)
   })
 
@@ -151,12 +162,10 @@ describe('会话树的信息密度与展开控件', () => {
     }
   })
 
-  it('会话树只出现在「最近」页签，好友与群组页签保持关系目录语义', () => {
+  it('会话树的页签收敛只有一处实现', () => {
     const source = sidebarSource()
 
-    // 页签收敛只有一处实现：v-for 直接吃 filteredConversations，不在模板里重复判断一次页签。
-    expect(source).toContain("const filteredConversations = computed(() => sidebarTab.value === 'recent' ? props.model.conversations : [])")
-    expect(source).toContain('v-for="conversation in filteredConversations"')
+    // 模板里重复判断一次页签是本票删掉的写法：数据源已经按页签收敛，两处判断迟早对不上。
     expect(source).not.toContain("sidebarTab === 'recent' ? filteredConversations : []")
   })
 })

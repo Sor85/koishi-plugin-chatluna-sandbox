@@ -14,18 +14,23 @@ interface ArchitecturePredicate {
 }
 
 /**
- * 会话集合规则的谓词，按写法形状判定而不是按变量命名。
+ * 会话集合与实例集合规则的谓词，按写法形状判定而不是按变量命名。
  *
- * 第一条只认「读或写这个集合」：`.conversations` 后面紧跟方法调用、下标或赋值。放宽到裸
+ * 每个集合两条：第一条只认「读或写这个集合」，即集合名后面紧跟方法调用、下标或赋值。放宽到裸
  * `.conversations` 会把「把解析模块投影出来的会话装回快照字段」（`conversations: trimmed.conversations`）
  * 也抓进来，那不是自己查找会话，误报会让豁免清单混进假债务；同时它天然不认领域类型里的
  * 字段声明（`conversations: SandboxConversation[]`），后者是类型定义本身而不是访问。
  *
  * 第二条堵解构旁路：`const { conversations } = scene` 之后的读写不再带 `.conversations` 前缀。
+ *
+ * 两个集合各写一份而不是合成一条带可选后缀的正则：`.conversations` 那条不会命中
+ * `.conversationInstances`（集合名后紧跟的是 `Instances` 而不是访问符），因此实例集合不写就是没有守卫。
  */
 const conversationCollectionPredicates: readonly ArchitecturePredicate[] = [
   { evidence: '直接读写会话集合 .conversations', pattern: /\.conversations\s*(?:\.\s*[A-Za-z]|\[|=[^=])/ },
   { evidence: '解构出会话集合绕过解析模块', pattern: /(?:const|let|var)\s*\{[^}]*\bconversations\b[^}]*\}\s*=/ },
+  { evidence: '直接读写实例集合 .conversationInstances', pattern: /\.conversationInstances\s*(?:\.\s*[A-Za-z]|\[|=[^=])/ },
+  { evidence: '解构出实例集合绕过解析模块', pattern: /(?:const|let|var)\s*\{[^}]*\bconversationInstances\b[^}]*\}\s*=/ },
 ]
 
 interface ArchitectureRule {
@@ -40,7 +45,7 @@ interface ArchitectureRule {
  */
 const rules: readonly ArchitectureRule[] = [
   {
-    name: '只有会话解析模块能直接读写会话集合',
+    name: '只有会话解析模块能直接读写会话集合与实例集合',
     extensions: ['.ts'],
     findViolations: (file, source) => {
       if (RESOLUTION_MODULE_PATTERN.test(file)) return []
@@ -104,13 +109,20 @@ describe('服务端会话解析架构', () => {
     expect(collectionRule.findViolations('src/x.ts', 'this.scene.conversations = remaining')).not.toEqual([])
     expect(collectionRule.findViolations('src/x.ts', 'const first = scene.conversations[0]')).not.toEqual([])
     expect(collectionRule.findViolations('src/x.ts', 'const { conversations } = scene')).not.toEqual([])
+    // 实例集合与会话集合同规则：`.conversations` 那条正则命不中它，必须各自成条。
+    expect(collectionRule.findViolations('src/x.ts', 'scene.conversationInstances.filter(({ id }) => id !== target)')).not.toEqual([])
+    expect(collectionRule.findViolations('src/x.ts', 'snapshot.conversationInstances = []')).not.toEqual([])
+    expect(collectionRule.findViolations('src/x.ts', 'const { conversationInstances } = scene')).not.toEqual([])
     // 领域类型里的字段声明不是读写，不得误报。
     expect(collectionRule.findViolations('src/x.ts', 'interface Scene { conversations: SandboxConversation[] }')).toEqual([])
     expect(collectionRule.findViolations('src/x.ts', 'return { revision: 0, conversations: [], messages: [] }')).toEqual([])
+    expect(collectionRule.findViolations('src/x.ts', 'return { revision: 0, conversationInstances: [], messages: [] }')).toEqual([])
     // 把解析模块投影出的会话装回快照字段不是自己查找会话，不得误报。
     expect(collectionRule.findViolations('src/x.ts', 'return { ...scene, conversations: projection.conversations, messages }')).toEqual([])
+    expect(collectionRule.findViolations('src/x.ts', 'return { ...scene, conversationInstances: projection.conversationInstances }')).toEqual([])
     // 解析模块自身是规则的持有者。
     expect(collectionRule.findViolations('src/conversation-resolution.ts', 'scene.conversations.find(({ id }) => id === target)')).toEqual([])
+    expect(collectionRule.findViolations('src/conversation-resolution.ts', 'scene.conversationInstances = rows')).toEqual([])
   })
 
   /**
@@ -127,10 +139,10 @@ describe('服务端会话解析架构', () => {
   })
 
   it('豁免按文件与规则成对匹配，移除后违规重新暴露', () => {
-    const violation = 'src/x.ts 违反「只有会话解析模块能直接读写会话集合」：直接读写会话集合 .conversations'
+    const violation = 'src/x.ts 违反「只有会话解析模块能直接读写会话集合与实例集合」：直接读写会话集合 .conversations'
     const exemption: ArchitectureExemption = {
       file: 'src/x.ts',
-      rule: '只有会话解析模块能直接读写会话集合',
+      rule: '只有会话解析模块能直接读写会话集合与实例集合',
       reason: '合成条目，仅用于自测豁免匹配。',
       owner: '无',
     }

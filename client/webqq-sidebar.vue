@@ -256,7 +256,7 @@
                     type="button"
                     class="webqq-session-expand"
                     :aria-expanded="isConversationExpanded(conversation.id)"
-                    :aria-label="`${isConversationExpanded(conversation.id) ? '收起' : '展开'}会话（${instanceCount(conversation)} 条对话线）`"
+                    :aria-label="`${isConversationExpanded(conversation.id) ? '收起' : '展开'}会话（${instanceCount(conversation)} 个会话实例）`"
                     @click.stop="toggleConversationExpanded(conversation.id)"
                   >
                     <span class="webqq-session-expand-count">{{ instanceCount(conversation) }}</span>
