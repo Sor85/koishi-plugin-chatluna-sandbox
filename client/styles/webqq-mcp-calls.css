@@ -232,6 +232,12 @@
   white-space: nowrap;
 }
 
+/*
+ * 时间行同时承载时间、耗时与来路。来路放在这里而不是当标题行的第四个徽标：标题行已有工具名、状态和
+ * 凭证三项，而工具名长度差异很大（`get_server_info` 与 `prepare_destructive_action` 差出一倍），
+ * 再加一项会让长工具名那几行折行、短工具名那几行不折，列表高度参差。时间行三项都是短定长文本，
+ * 折行行为对所有记录一致。
+ */
 .webqq-mcp-call-timing {
   flex-wrap: wrap;
   gap: 4px 12px;

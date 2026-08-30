@@ -63,6 +63,19 @@
                   <Input v-model="credentialName" class="webqq-mcp-call-control" placeholder="例如 测试凭证" @keyup.enter="applyFilters" />
                 </label>
                 <label>
+                  <span>来路</span>
+                  <Select v-model="transport">
+                    <SelectTrigger class="webqq-mcp-call-control" aria-label="按协议表述筛选">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent :portal-to="filterSelectPortalTarget" class="z-[120]">
+                      <SelectItem value="all">全部来路</SelectItem>
+                      <SelectItem value="mcp">MCP 客户端</SelectItem>
+                      <SelectItem value="http">HTTP 接口</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </label>
+                <label>
                   <span>空间</span>
                   <Input v-model="spaceId" class="webqq-mcp-call-control" placeholder="例如 space-1" @keyup.enter="applyFilters" />
                 </label>
@@ -75,6 +88,10 @@
                   <span>仅显示错误</span>
                 </label>
                 <Button variant="outline" size="sm" @click="resetFilters">重置</Button>
+                <div
+                  ref="filterSelectPortalTarget"
+                  class="pointer-events-none absolute inset-0 z-[120] [&_[data-reka-popper-content-wrapper]]:pointer-events-auto"
+                />
               </PopoverContent>
             </Popover>
           </div>
@@ -106,6 +123,10 @@
                   <span>
                     <IconClock :size="14" aria-hidden="true" />
                     {{ formatDuration(item.durationMs) }}
+                  </span>
+                  <span>
+                    <IconPlug :size="14" aria-hidden="true" />
+                    {{ transportShortLabel(item.transport) }}
                   </span>
                 </div>
               </div>
@@ -142,6 +163,11 @@
               <IconKey :size="17" aria-hidden="true" />
               <span class="webqq-mcp-call-meta-label">凭证</span>
               <span class="webqq-mcp-call-meta-value">{{ detail.credentialName }}</span>
+            </p>
+            <p class="webqq-mcp-call-meta">
+              <IconPlug :size="17" aria-hidden="true" />
+              <span class="webqq-mcp-call-meta-label">来路</span>
+              <span class="webqq-mcp-call-meta-value">{{ transportLabel(detail.transport) }}</span>
             </p>
             <p v-if="detail.sourceIp" class="webqq-mcp-call-meta">
               <IconWorld :size="17" aria-hidden="true" />
@@ -216,6 +242,7 @@ import {
   IconClock,
   IconFilter,
   IconKey,
+  IconPlug,
   IconRefresh,
   IconTag,
   IconTrash,
@@ -227,12 +254,13 @@ import { Button } from './components/ui/button'
 import { Checkbox } from './components/ui/checkbox'
 import { Input } from './components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
 import { Switch } from './components/ui/switch'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import { formatDuration } from './webqq/format-duration'
 import { createModelRequestEnterRefresh, createModelRequestLiveRefresh } from './webqq/model-request-live-refresh'
 import type { ListSandboxMcpCallRecordsInput } from '../src/mcp/call-records'
-import type { SandboxMcpCallRecord, SandboxMcpCallRecordListItem } from '../src/mcp/types'
+import type { SandboxMcpCallRecord, SandboxMcpCallRecordListItem, SandboxMcpCallTransport } from '../src/mcp/types'
 
 const props = defineProps<{
   records: readonly SandboxMcpCallRecordListItem[]
@@ -250,12 +278,15 @@ const emit = defineEmits<{
 
 const tool = ref('')
 const credentialName = ref('')
+// 'all' 是筛选面板自己的空值表述，不是领域里的第三种来路；发查询时它被折成 undefined。
+const transport = ref<SandboxMcpCallTransport | 'all'>('all')
 const spaceId = ref('')
 const testRunId = ref('')
 const errorsOnly = ref(false)
 const sortOrder = ref<'asc' | 'desc'>('desc')
 const liveRefresh = ref(false)
 const filterOpen = ref(false)
+const filterSelectPortalTarget = ref<HTMLElement>()
 const selectedRecordId = computed(() => props.detail?.id)
 const orderedRecords = computed(() => orderRecordsByTime(props.records, sortOrder.value))
 const liveRefreshController = createModelRequestLiveRefresh({
@@ -267,6 +298,7 @@ const enterRefresh = createModelRequestEnterRefresh(() => refresh())
 const filtersActive = computed(() => Boolean(
   tool.value.trim()
   || credentialName.value.trim()
+  || transport.value !== 'all'
   || spaceId.value.trim()
   || testRunId.value.trim()
   || errorsOnly.value,
@@ -275,6 +307,7 @@ const filterSummary = computed(() => {
   const parts: string[] = []
   if (tool.value.trim()) parts.push(tool.value.trim())
   if (credentialName.value.trim()) parts.push(credentialName.value.trim())
+  if (transport.value !== 'all') parts.push(transportLabel(transport.value))
   if (spaceId.value.trim()) parts.push(spaceId.value.trim())
   if (testRunId.value.trim()) parts.push(testRunId.value.trim())
   if (errorsOnly.value) parts.push('仅错误')
@@ -288,6 +321,9 @@ watch(() => props.visitKey, () => {
 watch(errorsOnly, () => {
   applyFilters()
 })
+watch(transport, () => {
+  applyFilters()
+})
 watch(filterOpen, (open, wasOpen) => {
   if (wasOpen && !open) applyFilters()
 })
@@ -296,6 +332,7 @@ function applyFilters() {
   emit('query', {
     tool: tool.value.trim() || undefined,
     credentialName: credentialName.value.trim() || undefined,
+    transport: transport.value === 'all' ? undefined : transport.value,
     spaceId: spaceId.value.trim() || undefined,
     testRunId: testRunId.value.trim() || undefined,
     errorsOnly: errorsOnly.value || undefined,
@@ -326,6 +363,7 @@ function orderRecordsByTime(
 function resetFilters() {
   tool.value = ''
   credentialName.value = ''
+  transport.value = 'all'
   spaceId.value = ''
   testRunId.value = ''
   errorsOnly.value = false
@@ -338,6 +376,21 @@ function openRecord(recordId: string) {
 
 function statusLabel(status: SandboxMcpCallRecordListItem['status']) {
   return status === 'error' ? '错误' : '成功'
+}
+
+function transportLabel(transport: SandboxMcpCallTransport) {
+  return transport === 'http' ? 'HTTP 接口' : 'MCP 客户端'
+}
+
+/**
+ * 列表里的来路只写协议名。
+ *
+ * 时间行的三项加起来正好卡在列表窄栏的宽度上（实测容器 308px，完整文案下三项加间距 305~308px），
+ * 「0 ms」比「1 ms」宽 3px 就足以让那些行折成两行，列表高度随耗时数字忽高忽低。缩成协议名后留出
+ * 约 34px 余量，折行不再取决于耗时。完整文案仍出现在详情面板与筛选项里，语义没有丢。
+ */
+function transportShortLabel(transport: SandboxMcpCallTransport) {
+  return transport === 'http' ? 'HTTP' : 'MCP'
 }
 
 function statusClass(status: SandboxMcpCallRecordListItem['status']) {

@@ -81,4 +81,34 @@ describe('WebQQ MCP 调用工作台', () => {
     expect(styles).toMatch(/\.webqq-mcp-call-list-pane,\s*\n\s*\.webqq-mcp-call-detail-pane\s*\{[^}]*display:\s*grid/s)
     expect(styles).toMatch(/\.webqq-mcp-call-empty,\s*\n\s*\.webqq-mcp-call-error\s*\{[^}]*place-items:\s*center/s)
   })
+
+  /**
+   * 来路标注是两种协议表述共用同一批测试调用记录之后才有的观察面：凭证名与来源 IP 都区分不出
+   * 同一个凭证是被 MCP 客户端还是被 HTTP 脚本使用的，因此列表徽标、详情条目与筛选三处都要有。
+   */
+  it('标注每条记录的协议表述，并可按来路筛选', () => {
+    const workspaceSource = readFileSync(resolve('client/mcp-call-workspace.vue'), 'utf8')
+    const styles = readFileSync(resolve('client/styles/webqq-mcp-calls.css'), 'utf8')
+
+    expect(workspaceSource).toContain("from './components/ui/select'")
+    expect(workspaceSource).toContain('按协议表述筛选')
+    expect(workspaceSource).toContain('<SelectItem value="mcp">MCP 客户端</SelectItem>')
+    expect(workspaceSource).toContain('<SelectItem value="http">HTTP 接口</SelectItem>')
+    // 'all' 只是面板的空值表述，发查询时必须折成 undefined，否则会被当成第三种来路传到服务端。
+    expect(workspaceSource).toContain("transport: transport.value === 'all' ? undefined : transport.value")
+    // 列表只写协议名、详情写完整文案：时间行三项的宽度正好卡在窄栏上，完整文案会让折行取决于耗时数字。
+    expect(workspaceSource).toContain('transportShortLabel(item.transport)')
+    expect(workspaceSource).toContain('transportLabel(detail.transport)')
+    expect(workspaceSource).toMatch(/function transportShortLabel[\s\S]*?'HTTP'\s*:\s*'MCP'/)
+    expect(workspaceSource).toMatch(/function transportLabel[\s\S]*?'HTTP 接口'\s*:\s*'MCP 客户端'/)
+    // 来路落在时间行而不是标题行：标题行再加第四个徽标会让长工具名折行、短工具名不折，列表高度参差。
+    const listRow = workspaceSource.match(/v-for="item in orderedRecords"[\s\S]*?<\/button>/)?.[0] ?? ''
+    expect(listRow.indexOf('transportShortLabel(item.transport)')).toBeGreaterThan(listRow.indexOf('webqq-mcp-call-timing'))
+    expect(listRow.match(/webqq-mcp-call-item-name[\s\S]*?<\/div>/)?.[0] ?? '').not.toContain('item.transport')
+    expect(styles).toMatch(/\.webqq-mcp-call-timing\s*\{[^}]*flex-wrap:\s*wrap/s)
+    expect(workspaceSource).toMatch(/function resetFilters\(\)[\s\S]*transport\.value = 'all'/)
+    expect(workspaceSource).toMatch(/watch\(transport, \(\) => \{\s*applyFilters\(\)/)
+    // 下拉浮层挂到 Popover 内的 portal 目标，否则筛选面板一关就把它连带卸掉。
+    expect(workspaceSource).toContain('filterSelectPortalTarget')
+  })
 })
