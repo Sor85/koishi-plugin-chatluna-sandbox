@@ -103,6 +103,64 @@ describe('WebQQ 顶部导航与会话栏', () => {
   })
 })
 
+describe('会话树的信息密度与展开控件', () => {
+  // 侧栏是 .vue 组件，本仓库不引入组件挂载测试。按 ADR-0073 这里只用允许的三类源码断言：
+  // 用户可见内容（时间、实例数量、无障碍标签）、样式源断言，以及否定式的「已删除实现」守卫。
+  // 时间的数据来源由 tests/webqq-conversation-tree.test.ts 在工作台外壳的 interface 上验证。
+  const sidebarSource = () => readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
+  const sidebarStyles = () => readFileSync(resolve('client/styles/webqq-sidebar.css'), 'utf8')
+
+  it('会话行与实例子项都渲染最后消息时间', () => {
+    const source = sidebarSource()
+
+    expect(source).toContain('<time v-if="conversation.time">{{ conversation.time }}</time>')
+    expect(source).toContain('<time v-if="child.time">{{ child.time }}</time>')
+    // 时间与会话预览共用一套弱化前景色与字号，右上角定位在样式源里只有一处。
+    expect(sidebarStyles()).toMatch(/\.webqq-session-copy small,\s*\.webqq-session time\s*\{[^}]*color:\s*var\(--webqq-muted\)/s)
+    expect(sidebarStyles()).toMatch(/\.webqq-session time\s*\{[^}]*position:\s*absolute[^}]*right:\s*12px/s)
+  })
+
+  it('展开按钮只在存在会话实例时出现，并显示实例数量', () => {
+    const source = sidebarSource()
+    const expandButton = source.slice(source.indexOf('class="webqq-session-expand"') - 200, source.indexOf('webqq-session-expand-count') + 120)
+
+    expect(expandButton).toContain('v-if="instanceCount(conversation)"')
+    // 数量与无障碍标签都是用户可感知的内容：不展开就能知道这个联系人下有几条对话线。
+    expect(expandButton).toContain('{{ instanceCount(conversation) }}')
+    expect(expandButton).toContain('条对话线')
+    expect(sidebarStyles()).toMatch(/\.webqq-session-expand-count\s*\{[^}]*font-size:\s*var\(--webqq-font-2xs\)/s)
+  })
+
+  it('「创建新会话」不再常驻子项列表末尾，只留右键入口', () => {
+    const source = sidebarSource()
+    const menus = [...source.matchAll(/<ContextMenuContent[\s\S]*?<\/ContextMenuContent>/g)].map(([menu]) => menu)
+
+    // 常驻子项按钮及其样式一起删除：它占着每个展开会话的最后一行，而右键菜单已经有同一入口。
+    expect(source).not.toContain('webqq-session-child-create')
+    expect(sidebarStyles()).not.toContain('webqq-session-child-create')
+    expect(menus.filter((menu) => menu.includes('创建新会话'))).toHaveLength(1)
+  })
+
+  it('样式源里没有无对应 class 的死选择器', () => {
+    const source = sidebarSource()
+    const styles = sidebarStyles()
+    // .webqq-session-add 从来没有对应的模板 class，它的悬停规则一直是死代码。
+    expect(styles).not.toContain('webqq-session-add')
+    for (const selector of [...styles.matchAll(/\.(webqq-session[\w-]*)/g)].map(([, name]) => name)) {
+      expect(source, selector).toContain(selector)
+    }
+  })
+
+  it('会话树只出现在「最近」页签，好友与群组页签保持关系目录语义', () => {
+    const source = sidebarSource()
+
+    // 页签收敛只有一处实现：v-for 直接吃 filteredConversations，不在模板里重复判断一次页签。
+    expect(source).toContain("const filteredConversations = computed(() => sidebarTab.value === 'recent' ? props.model.conversations : [])")
+    expect(source).toContain('v-for="conversation in filteredConversations"')
+    expect(source).not.toContain("sidebarTab === 'recent' ? filteredConversations : []")
+  })
+})
+
 describe('会话树的改名与删除入口', () => {
   // 侧栏是 .vue 组件，本仓库不引入组件挂载测试。按 ADR-0073，这里只用两类允许的源码文本
   // 断言：用户可见文案，以及否定式的「已删除实现」守卫。改名与删除的行为本身由

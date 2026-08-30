@@ -140,6 +140,36 @@ describe('侧栏会话树投影', () => {
       .toEqual(['private:10001:20001', 'group:30001'])
   })
 
+  it('会话行与实例子项各自显示自己最后一条消息的时间', async () => {
+    const { shell } = await createShell({
+      ...baseSnapshot,
+      conversationInstances: [
+        { id: 'instance-1', rootConversationId: 'private:10001:20001', title: '换一种问法', messageIds: ['message-2'] },
+        { id: 'instance-2', rootConversationId: 'private:10001:20001', title: '再试一次', messageIds: [] },
+      ],
+      messages: [
+        ...baseSnapshot.messages,
+        {
+          id: 'message-2',
+          authorId: '10001',
+          conversationId: 'instance-1',
+          content: '实例里的提问',
+          createdAt: '2026-08-29T03:00:00.000Z',
+        },
+      ],
+    })
+
+    const [directRoot, groupRoot] = shell.sidebarModel.value.conversations
+    const [withMessages, empty] = directRoot?.children ?? []
+    expect(directRoot?.time).toMatch(/^\d{2}:\d{2}$/)
+    // 子项的时间来自实例自己的最后一条消息，不是根会话的：两条消息相隔一小时，取错来源就相等。
+    expect(withMessages?.time).toMatch(/^\d{2}:\d{2}$/)
+    expect(withMessages?.time).not.toBe(directRoot?.time)
+    // 空实例与没有消息的根会话都没有时间可显示，界面因此不渲染空的时间元素。
+    expect(empty?.time).toBe('')
+    expect(groupRoot?.time).toBe('')
+  })
+
   it('选中会话实例时聊天区标题用实例名，副标题指出它属于哪个根会话', async () => {
     const { controller, shell } = await createShell({
       ...baseSnapshot,

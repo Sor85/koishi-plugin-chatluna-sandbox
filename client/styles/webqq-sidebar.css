@@ -426,19 +426,31 @@
   position: relative;
 }
 
+/*
+ * 展开按钮与会话时间共用会话行右侧那条 58px 预留带：时间贴上沿，展开按钮贴下沿，
+ * 两者纵向错开而不是抢同一条水平位置，避免为了并排再挤掉标题与预览的宽度。
+ */
 .webqq-session-expand {
   position: absolute;
-  top: 50%;
-  right: 10px;
-  display: grid;
-  width: 26px;
+  right: 8px;
+  bottom: 6px;
+  display: inline-flex;
+  min-width: 26px;
   height: 26px;
-  place-items: center;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 5px;
   border: 0;
   border-radius: 7px;
   color: var(--webqq-muted);
   background: transparent;
-  transform: translateY(-50%);
+}
+
+.webqq-session-expand-count {
+  font-size: var(--webqq-font-2xs);
+  line-height: 16px;
+  font-weight: 600;
 }
 
 .webqq-session-expand svg {
@@ -450,9 +462,7 @@
 }
 
 .webqq-session-expand:hover,
-.webqq-session-expand:focus-visible,
-.webqq-session-add:hover,
-.webqq-session-add:focus-visible {
+.webqq-session-expand:focus-visible {
   color: var(--webqq-accent);
   background: var(--webqq-hover);
   outline: none;
@@ -461,24 +471,6 @@
 .webqq-session-children {
   padding: 0 0 4px 26px;
   border-left: 1px solid color-mix(in srgb, var(--webqq-accent) 25%, transparent);
-}
-
-.webqq-session-child-create {
-  grid-template-columns: 10px minmax(0, 1fr);
-  gap: 12px;
-  padding-top: 7px;
-  padding-bottom: 7px;
-  color: var(--webqq-accent);
-}
-
-.webqq-session-child-create-mark {
-  display: inline-flex;
-  width: 16px;
-  height: 16px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--webqq-accent) 12%, transparent);
 }
 
 .webqq-session-child {
@@ -543,13 +535,21 @@
   font-weight: 600;
 }
 
-.webqq-session-copy small {
+.webqq-session-copy small,
+.webqq-session time {
   color: var(--webqq-muted);
   font-size: var(--webqq-font-sm);
 }
 
 .webqq-session-copy small {
   margin-top: 1px;
+  line-height: 16px;
+}
+
+.webqq-session time {
+  position: absolute;
+  top: 8px;
+  right: 12px;
   line-height: 16px;
 }
 

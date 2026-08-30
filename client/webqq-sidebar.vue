@@ -228,7 +228,7 @@
               </ContextMenuContent>
             </ContextMenu>
             <ContextMenu
-              v-for="conversation in sidebarTab === 'recent' ? filteredConversations : []"
+              v-for="conversation in filteredConversations"
               :key="conversation.id"
             >
               <ContextMenuTrigger as-child>
@@ -249,8 +249,17 @@
                       <strong>{{ conversation.title }}</strong>
                       <small>{{ conversation.preview }}</small>
                     </span>
+                    <time v-if="conversation.time">{{ conversation.time }}</time>
                   </button>
-                  <button type="button" class="webqq-session-expand" :aria-expanded="isConversationExpanded(conversation.id)" :aria-label="isConversationExpanded(conversation.id) ? '收起会话' : '展开会话'" @click.stop="toggleConversationExpanded(conversation.id)">
+                  <button
+                    v-if="instanceCount(conversation)"
+                    type="button"
+                    class="webqq-session-expand"
+                    :aria-expanded="isConversationExpanded(conversation.id)"
+                    :aria-label="`${isConversationExpanded(conversation.id) ? '收起' : '展开'}会话（${instanceCount(conversation)} 条对话线）`"
+                    @click.stop="toggleConversationExpanded(conversation.id)"
+                  >
+                    <span class="webqq-session-expand-count">{{ instanceCount(conversation) }}</span>
                     <IconChevronDown :class="{ 'is-expanded': isConversationExpanded(conversation.id) }" :size="15" aria-hidden="true" />
                   </button>
                 </div>
@@ -269,6 +278,7 @@
                         <strong>{{ child.title }}</strong>
                         <small>{{ child.preview }}</small>
                       </span>
+                      <time v-if="child.time">{{ child.time }}</time>
                     </button>
                   </ContextMenuTrigger>
                   <ContextMenuContent style="z-index: 140">
@@ -283,14 +293,6 @@
                     </ContextMenuItem>
                   </ContextMenuContent>
                 </ContextMenu>
-                <button
-                  type="button"
-                  class="webqq-session webqq-session-create webqq-session-child-create"
-                  @click="createConversationInstance(conversation.id)"
-                >
-                  <span class="webqq-session-child-mark webqq-session-child-create-mark" aria-hidden="true"><IconPlus :size="14" /></span>
-                  <span class="webqq-session-copy"><strong>创建新会话</strong></span>
-                </button>
               </div>
               <ContextMenuContent style="z-index: 140">
                 <ContextMenuItem
@@ -340,7 +342,7 @@ import {
   IconBell, IconBrain, IconBug, IconChevronDown, IconClock, IconEdit, IconFileCode, IconHistory, IconId, IconMessageCircle, IconPlus,
   IconSearch, IconSettings, IconTag, IconTrash, IconUser, IconUserMinus, IconUserPlus, IconUsers,
 } from '@tabler/icons-vue'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from './components/ui/context-menu'
 import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover'
 import EnvironmentCreatePopover from './environment-create-popover.vue'
@@ -480,6 +482,11 @@ const sidebarTabs = [
 ]
 const filteredConversations = computed(() => sidebarTab.value === 'recent' ? props.model.conversations : [])
 
+/** 某个根会话下的会话实例数量。展开按钮只在它不为零时出现，并把这个数字显示出来。 */
+function instanceCount(conversation: WebqqSidebarConversation) {
+  return conversation.children?.length ?? 0
+}
+
 function isConversationExpanded(conversationId: string) {
   return !!expandedConversationIds.value[conversationId]
 }
@@ -489,6 +496,14 @@ function toggleConversationExpanded(conversationId: string) {
     ? Object.fromEntries(Object.entries(expandedConversationIds.value).filter(([id]) => id !== conversationId))
     : { ...expandedConversationIds.value, [conversationId]: true }
 }
+
+// 选中一个会话实例时展开它所属的会话行：新建与分叉完成后新实例会被自动选中，而展开态是侧栏
+// 本地状态，折叠的父行会让侧栏一行都不高亮。写进展开态而不是在判定里叠加条件，用户之后仍可收起。
+watch(() => props.model.activeConversationId, (conversationId) => {
+  if (!conversationId) return
+  const parent = props.model.conversations.find(({ children }) => children?.some(({ id }) => id === conversationId))
+  if (parent && !isConversationExpanded(parent.id)) toggleConversationExpanded(parent.id)
+}, { immediate: true })
 const notificationRequests = computed(() => props.model.notificationRequests)
 const pendingNotificationCount = computed(() => notificationRequests.value.friends.length + notificationRequests.value.groups.length)
 const filteredFriendDirectory = computed(() => {
