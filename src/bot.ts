@@ -38,17 +38,26 @@ import {
   type SandboxForwardNodeInput,
   type SandboxGroupMember,
   type SandboxImplementationProfile,
-  type SandboxOneBotConversationDrift,
+  type SandboxOneBotConversationObservation,
 } from './types'
 
 /**
- * 一次 OneBot action 的实际落点，由具体 handler 在写入成功后填上。
+ * 一次 OneBot action 碰到的会话，由具体 handler 在完成后填上。
  *
- * 让「偏离观察」只出现在一处：handler 只报出自己写到了哪个会话，是否偏离由记录调试记录的
- * 那一处统一判定。每次外部调用一个独立实例，避免并发 action 互相覆盖落点。
+ * 让「会话观察」只出现在一处：handler 只报出自己碰了哪个会话、以及按 OneBot 参数寻址到的是
+ * 哪个根会话，两者之间是不是一次值得断言的关系由记录调试记录的那一处统一判定。每次外部调用
+ * 一个独立实例，避免并发 action 互相覆盖。
  */
 interface OneBotActionTarget {
+  /** 实际操作的会话：写入是落点，读取是真正读到的那个会话。 */
   conversationId?: string
+  /**
+   * 仅读取型 action 填写：它按 OneBot 参数寻址到的根会话。
+   *
+   * 与 {@link conversationId} 不同就意味着这次读取跟随了入站事件来源会话；判定因此不必再
+   * 重新推一遍寻址，也不会把「插件主动查另一个联系人的历史」误当成跟随。
+   */
+  addressedRootConversationId?: string
 }
 
 // OneBot 用秒级到期时间戳表示禁言，未禁言固定为 0。
@@ -268,10 +277,18 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           return { status: 'ok', retcode: 0, data: this.toOneBotMessage(message) }
         }
         if (action === 'get_friend_msg_history') {
-          return this.getOneBotMessageHistory(this.resolveDirectConversationId(String(params.user_id ?? '')), params)
+          const conversationId = this.resolveHistoryConversation(
+            target,
+            this.resolveDirectConversationId(String(params.user_id ?? '')),
+          )
+          return this.getOneBotMessageHistory(conversationId, params)
         }
         if (action === 'get_group_msg_history') {
-          return this.getOneBotMessageHistory(this.resolveGroupConversationId(this.normalizeOneBotGroupId(params.group_id)), params)
+          const conversationId = this.resolveHistoryConversation(
+            target,
+            this.resolveGroupConversationId(this.normalizeOneBotGroupId(params.group_id)),
+          )
+          return this.getOneBotMessageHistory(conversationId, params)
         }
         if (action === 'delete_msg') {
           await this.control.recallBotMessage(this.selfId, String(params.message_id ?? ''))
@@ -517,7 +534,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           payload: params,
           result,
           ...(target.conversationId
-            ? { drift: this.observeConversationDrift(target.conversationId) }
+            ? { conversationObservation: this.observeConversation(target) }
             : {}),
         })
         return result
@@ -895,18 +912,49 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
   }
 
   /**
-   * 观察一次原始 OneBot action 的落点是否偏离了触发它的入站事件来源会话。
+   * 一次原始 OneBot 历史查询实际要读的会话，顺带把寻址结果报给会话观察。
    *
-   * 原始 action 只能寻址根会话：真实 QQ 的 action 表面没有「会话」这一级。插件在会话实例的
-   * 入站事件里用原始 action 回复时，回复因此必然落到根会话。沙盒不替它猜测归位，只把这次偏离
-   * 作为可断言的证据挂在机器人动作记录上。
+   * 这一维跟随入站事件来源会话，与写入落点的取舍相反。理由是两者的可见性不同：回复落到根会话
+   * 是测试者在界面上看得见的事实，沙盒只记录不归位；历史查询读到什么没人看得见，它会直接变成
+   * 模型输入，照字面答成根会话会让插件在会话实例里读到另一条对话线的历史，分支测试因此不成立。
    *
-   * 只认「落点正好是来源实例的根会话」这一种：插件主动寻址别的联系人是它自己的选择，
+   * 只在「来源会话是所寻址根会话的实例」时跟随：插件主动查另一个联系人的历史是它自己的选择，
+   * 跟着改会让沙盒答非所问。
+   */
+  private resolveHistoryConversation(target: OneBotActionTarget, rootConversationId: string): string {
+    target.addressedRootConversationId = rootConversationId
+    const eventConversationId = this.control.getInboundEventConversationId(this.selfId)
+    const source = eventConversationId
+      ? resolveConversation(this.control.getSnapshot(), eventConversationId)
+      : undefined
+    target.conversationId = source?.kind === 'instance' && source.rootConversationId === rootConversationId
+      ? source.id
+      : rootConversationId
+    return target.conversationId
+  }
+
+  /**
+   * 观察一次原始 OneBot action 与触发它的入站事件来源会话之间的关系。
+   *
+   * 原始 action 只能按账号或群号寻址：真实 QQ 的 action 表面没有「会话」这一级。插件在会话
+   * 实例的入站事件里用原始 action 回复时，回复因此必然落到根会话——沙盒不替它猜测归位，只把
+   * 这次偏离作为可断言的证据挂在机器人动作记录上。历史查询反过来跟随来源实例，那次跟随同样
+   * 记成证据，见 {@link resolveHistoryConversation}。
+   *
+   * 偏离只认「落点正好是来源实例的根会话」这一种：插件主动寻址别的联系人是它自己的选择，
    * 不是沙盒无法归位造成的偏离，记进来只会变成噪声。
    */
-  private observeConversationDrift(conversationId: string): SandboxOneBotConversationDrift | undefined {
+  private observeConversation(target: OneBotActionTarget): SandboxOneBotConversationObservation | undefined {
+    const { conversationId, addressedRootConversationId } = target
     const eventConversationId = this.control.getInboundEventConversationId(this.selfId)
-    if (!eventConversationId || eventConversationId === conversationId) return undefined
+    if (!conversationId || !eventConversationId) return undefined
+    if (addressedRootConversationId !== undefined) {
+      // 读取路径：寻址结果被改写过就说明跟随发生了，此时读到的会话一定是来源实例本身。
+      return addressedRootConversationId !== conversationId
+        ? { kind: 'history-followed-event-conversation', eventConversationId, conversationId }
+        : undefined
+    }
+    if (eventConversationId === conversationId) return undefined
     const source = resolveConversation(this.control.getSnapshot(), eventConversationId)
     if (source?.kind !== 'instance' || source.rootConversationId !== conversationId) return undefined
     return { kind: 'reply-left-event-conversation', eventConversationId, conversationId }

@@ -365,18 +365,21 @@ export interface SandboxOneBotDebugError {
 }
 
 /**
- * 「回复偏离了事件来源会话」的观察结果。
+ * 一次原始 OneBot action 与触发它的入站事件来源会话之间的关系观察。
  *
- * 真实 QQ 的 OneBot action 表面没有「会话」这一级，原始 action 因此只能寻址根会话。插件在
- * 会话实例的入站事件里用原始 action 回复时，回复必然落到根会话。沙盒不按最近一次事件或
- * 异步上下文替插件猜测归位——那会让沙盒行为与真实环境分叉——而是把这次偏离作为证据留在
- * 机器人动作记录上，供用户复盘并供外部测试控制器断言。它是观察结果，不是警告日志。
+ * 真实 QQ 的 action 表面没有「会话」这一级，插件只能按账号或群号寻址。沙盒对写入和读取作了
+ * 相反的取舍，两者都留成可断言的证据而不是警告日志：
+ *
+ * - 写入落点不归位。回复落到根会话是测试者在界面上看得见的事实，替插件归位会让沙盒行为与真实
+ *   环境分叉，而分叉过的沙盒证明不了任何事情，因此只记 `reply-left-event-conversation`。
+ * - 读取跟随来源会话。历史查询的结果会静默变成模型输入，照字面答成根会话会让插件在会话实例里
+ *   读到另一条对话线的历史，分支测试因此不成立；跟随记 `history-followed-event-conversation`。
  */
-export interface SandboxOneBotConversationDrift {
-  kind: 'reply-left-event-conversation'
+export interface SandboxOneBotConversationObservation {
+  kind: 'reply-left-event-conversation' | 'history-followed-event-conversation'
   /** 触发这次 action 的入站事件来自哪个会话；一定是会话实例。 */
   eventConversationId: string
-  /** action 实际落到哪个会话；一定是上面那个实例的根会话。 */
+  /** action 实际操作了哪个会话：写入是落点（来源实例的根会话），读取是真正读到的那个会话。 */
   conversationId: string
 }
 
@@ -405,8 +408,11 @@ export interface SandboxOneBotDebugRecord {
     messageId?: string
   }
   error?: SandboxOneBotDebugError
-  /** 仅当这次 action 的落点偏离了触发它的入站事件来源会话时存在。 */
-  drift?: SandboxOneBotConversationDrift
+  /**
+   * 仅当这次 action 与触发它的入站事件来源会话之间产生了值得断言的关系时存在：
+   * 回复落到了根会话，或历史读取跟随了来源实例。
+   */
+  conversationObservation?: SandboxOneBotConversationObservation
 }
 
 export type SandboxConsoleOneBotDebugRecord = SandboxOneBotDebugRecord & { source: SandboxEntitySource }

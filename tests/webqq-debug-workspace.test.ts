@@ -85,6 +85,23 @@ describe('WebQQ OneBot 调试工作台', () => {
     expect(styles).toMatch(/\.webqq-debug-empty,\s*\n\s*\.webqq-debug-error\s*\{[^}]*place-items:\s*center/s)
   })
 
+  it('会话观察按两个方向各自成句，不复用一条只讲偏离的文案', () => {
+    const debugSource = readFileSync(resolve('client/onebot-debug-workspace.vue'), 'utf8')
+
+    expect(debugSource).toContain('aria-label="会话观察"')
+    expect(debugSource).toContain("'reply-left-event-conversation'")
+    expect(debugSource).toContain('回复偏离了事件来源会话')
+    expect(debugSource).toContain('沙盒不替插件把回复归位到会话实例')
+    expect(debugSource).toContain("'history-followed-event-conversation'")
+    expect(debugSource).toContain('历史查询跟随了事件来源会话')
+    expect(debugSource).toContain('避免另一条对话线的历史静默变成模型输入')
+    expect(debugSource).toContain('conversationObservationCopy')
+    // 读取方向的实际会话就是来源实例，「实际落点」这种只对写入成立的说法不能留在共用文案里。
+    expect(debugSource).toContain('实际会话')
+    expect(debugSource).not.toContain('实际落点')
+    expect(debugSource).not.toContain('detail.drift')
+  })
+
   it('使用独立网格和统一控件基线，避免筛选器溢出与黑色描边', () => {
     const debugSource = readFileSync(resolve('client/onebot-debug-workspace.vue'), 'utf8')
     const modelRequestSource = readFileSync(resolve('client/model-request-workspace.vue'), 'utf8')

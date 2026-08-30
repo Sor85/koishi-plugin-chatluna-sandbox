@@ -203,15 +203,19 @@
             </p>
           </div>
 
-          <section v-if="detail.drift" class="webqq-debug-observation" aria-label="偏离观察">
+          <section
+            v-if="detail.conversationObservation && conversationObservationCopy"
+            class="webqq-debug-observation"
+            aria-label="会话观察"
+          >
             <header class="webqq-debug-section-heading">
               <span>
                 <IconGitBranch :size="17" aria-hidden="true" />
-                <strong>回复偏离了事件来源会话</strong>
+                <strong>{{ conversationObservationCopy.title }}</strong>
               </span>
             </header>
             <p class="webqq-debug-observation-detail">
-              原始 OneBot action 只能寻址根会话；事件来源 {{ detail.drift.eventConversationId }} · 实际落点 {{ detail.drift.conversationId }}
+              {{ conversationObservationCopy.detail }}；事件来源 {{ detail.conversationObservation.eventConversationId }} · 实际会话 {{ detail.conversationObservation.conversationId }}
             </p>
           </section>
 
@@ -310,6 +314,21 @@ const emit = defineEmits<{
   clear: []
 }>()
 
+/**
+ * 会话观察的两种文案。它们不是错误提示，而是「沙盒对这次 action 做了什么」的事实说明：
+ * 写入落点不归位，读取跟随来源会话。两条各自成句，用户不必自己推断方向。
+ */
+const CONVERSATION_OBSERVATION_COPY = {
+  'reply-left-event-conversation': {
+    title: '回复偏离了事件来源会话',
+    detail: '原始 OneBot action 只能按账号或群号寻址，沙盒不替插件把回复归位到会话实例',
+  },
+  'history-followed-event-conversation': {
+    title: '历史查询跟随了事件来源会话',
+    detail: '沙盒按事件来源的会话实例作答，避免另一条对话线的历史静默变成模型输入',
+  },
+} as const
+
 const botId = ref('all')
 const direction = ref('all')
 const action = ref('')
@@ -320,6 +339,10 @@ const liveRefresh = ref(false)
 const filterOpen = ref(false)
 const filterSelectPortalTarget = ref<HTMLElement>()
 const selectedRecordKey = computed(() => props.detail ? getRecordKey(props.detail) : undefined)
+const conversationObservationCopy = computed(() => {
+  const kind = props.detail?.conversationObservation?.kind
+  return kind ? CONVERSATION_OBSERVATION_COPY[kind] : undefined
+})
 const orderedRecords = computed(() => orderRecordsByTime(props.records, sortOrder.value))
 const liveRefreshController = createModelRequestLiveRefresh({
   isEnabled: () => liveRefresh.value,

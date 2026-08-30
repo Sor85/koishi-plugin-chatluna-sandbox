@@ -263,7 +263,7 @@ describe('会话实例端到端', () => {
   })
 })
 
-describe('原始 OneBot 回复的会话偏离', () => {
+describe('原始 OneBot action 的会话观察', () => {
   /** 收到实例内的用户消息后，用原始 OneBot action 回复——真实插件里最常见的那条路径。 */
   function replyWithRawAction(app: App, reply: (session: Session) => Promise<unknown>) {
     app.middleware(async (session, next) => {
@@ -273,7 +273,7 @@ describe('原始 OneBot 回复的会话偏离', () => {
     })
   }
 
-  async function findDriftRecord(control: SandboxControlService, action: string) {
+  async function findObservedRecord(control: SandboxControlService, action: string) {
     const { records } = await control.getOneBotDebugRecords({ direction: 'action', action })
     expect(records).toHaveLength(1)
     return records[0]!
@@ -300,7 +300,7 @@ describe('原始 OneBot 回复的会话偏离', () => {
     expect(reply?.conversationId).toBe('private:10001:20001')
     expect(readConversationMessageIds(scene, conversationId)).toEqual([asked.messageId])
 
-    expect((await findDriftRecord(control, 'send_private_msg')).drift).toEqual({
+    expect((await findObservedRecord(control, 'send_private_msg')).conversationObservation).toEqual({
       kind: 'reply-left-event-conversation',
       eventConversationId: conversationId,
       conversationId: 'private:10001:20001',
@@ -324,7 +324,7 @@ describe('原始 OneBot 回复的会话偏离', () => {
 
     expect(control.getSnapshot().messages.find(({ content }) => content === '原始群回复')?.conversationId)
       .toBe('group:30001')
-    expect((await findDriftRecord(control, 'send_group_msg')).drift).toEqual({
+    expect((await findObservedRecord(control, 'send_group_msg')).conversationObservation).toEqual({
       kind: 'reply-left-event-conversation',
       eventConversationId: conversationId,
       conversationId: 'group:30001',
@@ -342,7 +342,7 @@ describe('原始 OneBot 回复的会话偏离', () => {
 
     await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content: '在根会话里提问' })
 
-    expect((await findDriftRecord(control, 'send_private_msg'))).not.toHaveProperty('drift')
+    expect((await findObservedRecord(control, 'send_private_msg'))).not.toHaveProperty('conversationObservation')
   })
 
   it('机器人主动发起、不在处理任何入站事件时不产生偏离观察', async () => {
@@ -356,7 +356,7 @@ describe('原始 OneBot 回复的会话偏离', () => {
       message: '机器人主动私聊',
     })
 
-    expect((await findDriftRecord(control, 'send_private_msg'))).not.toHaveProperty('drift')
+    expect((await findObservedRecord(control, 'send_private_msg'))).not.toHaveProperty('conversationObservation')
   })
 
   it('标准 Koishi 回复回到实例本身，因此不算偏离', async () => {
@@ -375,6 +375,127 @@ describe('原始 OneBot 回复的会话偏离', () => {
       .toBe(conversationId)
     // 标准发送路径不经过 OneBot action，因此根本不产生机器人动作记录。
     expect((await control.getOneBotDebugRecords({ direction: 'action' })).records).toEqual([])
+  })
+
+  /** 收到消息后按账号或群号查历史——chatluna-character 冷启动回填走的正是这条路径。 */
+  function readHistoryWithRawAction(app: App, action: string, params: (session: Session) => Record<string, unknown>) {
+    const histories: string[][] = []
+    app.middleware(async (session, next) => {
+      if (session.userId !== '10001') return next()
+      const response = await session.bot.internal._request(action, params(session)) as {
+        data: { messages: Array<{ raw_message: string }> }
+      }
+      histories.push(response.data.messages.map(({ raw_message }) => raw_message))
+      return next()
+    })
+    return histories
+  }
+
+  it('实例里的入站事件按账号查私聊历史时读到该实例，并留下跟随观察', async () => {
+    const { app, control: resolve } = await createControl()
+    const histories = readHistoryWithRawAction(app, 'get_friend_msg_history', (session) => ({
+      user_id: session.userId,
+      count: 20,
+    }))
+    await app.start()
+    const control = resolve()
+
+    await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content: '根会话里的旧问题' })
+    const { conversationId } = control.createConversationInstance({
+      operatorId: '10001',
+      rootConversationId: 'private:10001:20001',
+    })
+    await control.sendMessage({ operatorId: '10001', conversationId, content: '在实例里提问' })
+
+    // 第一次事件来自根会话，读到根会话自己的历史；第二次来自空实例，只读到实例里那一条。
+    expect(histories).toEqual([['根会话里的旧问题'], ['在实例里提问']])
+    const { records } = await control.getOneBotDebugRecords({
+      direction: 'action',
+      action: 'get_friend_msg_history',
+      order: 'asc',
+    })
+    expect(records.map(({ conversationObservation }) => conversationObservation)).toEqual([
+      undefined,
+      { kind: 'history-followed-event-conversation', eventConversationId: conversationId, conversationId },
+    ])
+  })
+
+  it('群实例里的入站事件按群号查历史时读到该实例，并留下跟随观察', async () => {
+    const { app, control: resolve } = await createControl()
+    const histories = readHistoryWithRawAction(app, 'get_group_msg_history', (session) => ({
+      group_id: session.guildId,
+      count: 20,
+    }))
+    await app.start()
+    const control = resolve()
+
+    await control.sendMessage({ operatorId: '10001', conversationId: 'group:30001', content: '群根会话里的旧问题' })
+    const { conversationId } = control.createConversationInstance({
+      operatorId: '10001',
+      rootConversationId: 'group:30001',
+    })
+    await control.sendMessage({ operatorId: '10001', conversationId, content: '在群实例里提问' })
+
+    expect(histories).toEqual([['群根会话里的旧问题'], ['在群实例里提问']])
+    expect((await control.getOneBotDebugRecords({
+      direction: 'action',
+      action: 'get_group_msg_history',
+      order: 'desc',
+    })).records[0]!.conversationObservation).toEqual({
+      kind: 'history-followed-event-conversation',
+      eventConversationId: conversationId,
+      conversationId,
+    })
+  })
+
+  it('分支实例的历史查询读到继承前缀加自有消息', async () => {
+    const { app, control: resolve } = await createControl()
+    const histories = readHistoryWithRawAction(app, 'get_friend_msg_history', (session) => ({
+      user_id: session.userId,
+      count: 20,
+    }))
+    await app.start()
+    const control = resolve()
+
+    const forkPoint = await control.sendMessage({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      content: '分叉点',
+    })
+    await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content: '分叉点之后' })
+    const { conversationId } = control.branchConversationInstance({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      messageId: forkPoint.messageId,
+    })
+    await control.sendMessage({ operatorId: '10001', conversationId, content: '换一种问法' })
+
+    // 分支在插件那里的上下文正是「分叉点及其之前」加自有消息，分叉点之后的原对话不在其中。
+    expect(histories.at(-1)).toEqual(['分叉点', '换一种问法'])
+  })
+
+  it('插件主动查另一个联系人的历史时不跟随，也不产生观察', async () => {
+    const { app, control: resolve } = await createControl()
+    const histories = readHistoryWithRawAction(app, 'get_friend_msg_history', () => ({
+      user_id: '10002',
+      count: 20,
+    }))
+    await app.start()
+    const control = resolve()
+
+    await control.sendMessage({ operatorId: '10002', conversationId: 'private:10002:20001', content: '另一个联系人的历史' })
+    const { conversationId } = control.createConversationInstance({
+      operatorId: '10001',
+      rootConversationId: 'private:10001:20001',
+    })
+    await control.sendMessage({ operatorId: '10001', conversationId, content: '在实例里提问' })
+
+    expect(histories.at(-1)).toEqual(['另一个联系人的历史'])
+    expect((await control.getOneBotDebugRecords({
+      direction: 'action',
+      action: 'get_friend_msg_history',
+      order: 'desc',
+    })).records[0]!).not.toHaveProperty('conversationObservation')
   })
 })
 

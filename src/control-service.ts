@@ -4,6 +4,11 @@ import { resolve } from 'node:path'
 import { SandboxBot } from './bot'
 import { BUILTIN_AVATARS, findBuiltinAvatarByReference, getBuiltinAvatarReference, pickUnusedBuiltinAvatar } from './builtin-avatars'
 import { SandboxChatLunaStateStore, type SandboxChatLunaErrorTarget } from './chatluna-state'
+import {
+  SandboxChatLunaCharacterContext,
+  findChatLunaCharacterChatContext,
+  resolveChatLunaCharacterSessionKey,
+} from './chatluna-character-context'
 import { findLatestFailedModelRequest, readChatLunaRequestError } from './chatluna-error'
 import { SandboxMediaStorage, MAX_MEDIA_SIZE, toMediaMetadata } from './media-storage'
 import { SandboxOneBotDebugStore, createOneBotDebugError, type AppendOneBotDebugRecordInput, type SandboxOneBotDebugPersistence } from './onebot-debug'
@@ -319,12 +324,18 @@ export class SandboxControlService {
   /**
    * 每个虚拟 OneBot 机器人当前正在处理的入站消息事件来自哪个会话，按嵌套顺序入栈。
    *
-   * 只用于观察，不用于替插件寻址：原始 OneBot action 仍然只能寻址根会话。窗口从事件派发开始
-   * 到该事件的中间件链结束，也就是插件真正有机会回复的那段时间；事件派发之后异步发出的 action
-   * 不在窗口内，因此不会被归因，这是有意的下限而不是遗漏。
+   * 写入落点不看它，只观察：原始 OneBot action 的回复仍然落到根会话。读取跟随它：原始历史
+   * 查询按来源会话作答，否则插件在会话实例里会读到另一条对话线的历史并静默拿去请求模型。
+   * 窗口从事件派发开始到该事件的中间件链结束，也就是插件真正有机会回复的那段时间；事件派发
+   * 之后异步发出的 action 不在窗口内，因此不会被归因，这是有意的下限而不是遗漏。
    */
   private inboundEventConversations = new Map<string, string[]>()
   private chatLunaState: SandboxChatLunaStateStore
+  /**
+   * 被测 chatluna-character 的对话上下文只按账号或群号归档，看不见会话实例这一级；
+   * 由它负责在对话线切换时重置那份上下文。
+   */
+  private chatLunaCharacterContext: SandboxChatLunaCharacterContext
   private initialScene: SandboxSnapshot
   private oneBotDebug: SandboxOneBotDebugStore
   private modelRequests: SandboxModelRequestStore
@@ -396,6 +407,7 @@ export class SandboxControlService {
     }, (error, targets) => {
       this.archiveChatLunaModelRequestError(error, targets)
     })
+    this.chatLunaCharacterContext = new SandboxChatLunaCharacterContext(() => findChatLunaCharacterChatContext(ctx))
     this.syncRuntimeBots()
     this.contextDisposers.push(ctx.on('ready', async () => {
       try {
@@ -792,8 +804,8 @@ export class SandboxControlService {
    * 某个虚拟 OneBot 机器人此刻正在处理的入站消息事件来自哪个会话；不在处理入站事件时为
    * undefined。嵌套派发取最内层。
    *
-   * 存在的唯一理由是让机器人动作记录能观察到「回复偏离了事件来源会话」。它不参与寻址：
-   * 原始 OneBot action 仍然只能寻址根会话，沙盒不替插件把回复归位到实例。
+   * 两个用途：让机器人动作记录能给出会话观察，以及让原始历史查询跟随来源会话。写入落点不用它
+   * ——原始 OneBot action 的回复仍然只落到根会话，沙盒不替插件归位。
    */
   getInboundEventConversationId(botId: string): string | undefined {
     return this.inboundEventConversations.get(botId)?.at(-1)
@@ -1996,6 +2008,25 @@ export class SandboxControlService {
     )))
   }
 
+  /**
+   * 让被测 chatluna-character 的对话上下文跟上这次入站事件所属的对话线。
+   *
+   * 失败只写日志：重置不成功最坏是这一轮带上另一条对话线的历史，而中断投递会让被测插件
+   * 根本收不到消息，那比上下文不干净严重得多。
+   */
+  private async followChatLunaCharacterConversation(botId: string, context: SandboxMessageContext): Promise<void> {
+    try {
+      await this.chatLunaCharacterContext.followInboundConversation({
+        botId,
+        conversationId: context.conversation.id,
+        sessionKey: resolveChatLunaCharacterSessionKey(context.conversation, context.operator.id),
+      })
+    } catch (error) {
+      this.ctx.logger('chatluna-sandbox')
+        .warn('重置 chatluna-character 对话上下文失败；这一轮可能带上另一条对话线的历史。', error)
+    }
+  }
+
   private async dispatchMessageToBot(
     recipientBot: SandboxBotProfile,
     context: SandboxMessageContext,
@@ -2006,6 +2037,7 @@ export class SandboxControlService {
   ): Promise<void> {
     const runtimeBot = this.runtimeBots.get(recipientBot.id)
     if (!runtimeBot) throw new SandboxDomainError(`机器人运行时不存在：${recipientBot.id}`)
+    await this.followChatLunaCharacterConversation(recipientBot.id, context)
     // ChatLuna allowQuoteReply / character 只认 session.quote.user.id === bot.userId|selfId，
     // 不依赖 @。quote 必须带齐 user 与 timestamp，character 才能拼出和真 QQ 一样的引用 XML。
     const session = runtimeBot.session({
