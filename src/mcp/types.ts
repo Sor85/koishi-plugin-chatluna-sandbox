@@ -65,10 +65,19 @@ export interface SandboxMcpCallRecordError {
   retryAfterMs?: number
 }
 
+/**
+ * 测试控制端点上承载这次调用的协议表述。
+ *
+ * 两种表述共用同一套测试凭证、配额与测试调用记录，因此只看凭证名与来源 IP 分不出调用来路——
+ * 同一个凭证既可能被 MCP 客户端使用，也可能被 HTTP 脚本使用。复盘时必须能区分，故单独建模。
+ */
+export type SandboxMcpCallTransport = 'mcp' | 'http'
+
 export interface SandboxMcpCallRecordListItem {
   id: string
   createdAt: string
   credentialName: string
+  transport: SandboxMcpCallTransport
   sourceIp?: string
   tool: string
   testRunId?: string

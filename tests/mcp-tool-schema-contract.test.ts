@@ -55,7 +55,7 @@ const TOOL_PARAMETERS: Record<string, string[]> = {
   list_model_request_records: ['scope', 'spaceId', 'botId', 'conversationId', 'interactionId', 'model', 'errorsOnly', 'order', 'limit', 'beforeSequence', 'beforeCreatedAt', 'beforeId', 'testRunId'],
   get_model_request_record: ['scope', 'spaceId', 'recordId', 'testRunId'],
   clear_model_request_records: ['scope', 'spaceId', 'testRunId'],
-  list_mcp_call_records: ['tool', 'credentialName', 'spaceId', 'testRunId', 'errorsOnly', 'order'],
+  list_mcp_call_records: ['tool', 'credentialName', 'transport', 'spaceId', 'testRunId', 'errorsOnly', 'order'],
   get_mcp_call_record: ['recordId', 'testRunId'],
   clear_mcp_call_records: ['testRunId'],
 }

@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SandboxControlService, SandboxRuntimeBotRegistry } from '../src/control-service'
-import { SandboxMcpHttpServer, sourceMatches } from '../src/mcp/server'
+import { SandboxTestEndpointServer, sourceMatches } from '../src/mcp/server'
 import { SandboxMcpService } from '../src/mcp/service'
 import type { SandboxMcpScope } from '../src/mcp/types'
 import { SandboxTestSpaceService } from '../src/test-spaces'
@@ -31,14 +31,14 @@ async function startHttpServer(
   const testSpaces = options.withTestSpaces ? new SandboxTestSpaceService(app, runtimeBots) : undefined
   const service = new SandboxMcpService(app, control, { dataDirectory: directory, testSpaces })
   const credential = service.createCredential(name, scopes)
-  const server = new SandboxMcpHttpServer(app, service, {
-    enabled: true,
+  const server = new SandboxTestEndpointServer(app, service, {
     host: '127.0.0.1',
     port: 0,
-    path: '/mcp',
     allowedSources: ['127.0.0.0/8', '::1/128'],
     allowedOrigins: options.allowedOrigins ?? [],
     allowInsecureRemote: false,
+    mcp: { enabled: true, path: '/mcp' },
+    http: { enabled: false, path: '/api' },
   })
   await server.start()
   cleanups.push(async () => { await server.stop(); await app.stop() })
@@ -180,8 +180,9 @@ describe('MCP Streamable HTTP', () => {
     const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-mcp-tls-'))
     const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media') })
     const service = new SandboxMcpService(app, control, { dataDirectory: directory })
-    const server = new SandboxMcpHttpServer(app, service, {
-      enabled: true, host: '0.0.0.0', port: 0, path: '/mcp', allowedSources: [], allowedOrigins: [], allowInsecureRemote: false,
+    const server = new SandboxTestEndpointServer(app, service, {
+      host: '0.0.0.0', port: 0, allowedSources: [], allowedOrigins: [], allowInsecureRemote: false,
+      mcp: { enabled: true, path: '/mcp' }, http: { enabled: false, path: '/api' },
     })
     cleanups.push(() => app.stop())
     await expect(server.start()).rejects.toThrow('必须配置 TLS')

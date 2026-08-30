@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { LARGE_BASE64_CHAR_THRESHOLD } from '../onebot-debug'
-import type { SandboxMcpCallRecord, SandboxMcpCallRecordListItem, SandboxMcpError } from './types'
+import type { SandboxMcpCallRecord, SandboxMcpCallRecordListItem, SandboxMcpCallTransport, SandboxMcpError } from './types'
 
 const SENSITIVE_KEY_PATTERN = /authorization|access[_-]?token|(?:^|_)token$|secret|password|cookie|private[_-]?key|confirmation[_-]?token|data[_-]?base64/i
 const BASE64_BODY_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
@@ -8,6 +8,8 @@ const BASE64_BODY_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z
 export interface ListSandboxMcpCallRecordsInput {
   tool?: string
   credentialName?: string
+  /** 按承载调用的协议表述筛选；省略时同时返回 MCP 与 HTTP 两种来路的记录。 */
+  transport?: SandboxMcpCallTransport
   spaceId?: string
   testRunId?: string
   errorsOnly?: boolean
@@ -44,6 +46,7 @@ export function toMcpCallRecordListItem(record: SandboxMcpCallRecord): SandboxMc
     id: record.id,
     createdAt: record.createdAt,
     credentialName: record.credentialName,
+    transport: record.transport,
     ...(record.sourceIp ? { sourceIp: record.sourceIp } : {}),
     tool: record.tool,
     ...(record.testRunId ? { testRunId: record.testRunId } : {}),
@@ -67,6 +70,7 @@ export function presentMcpCallRecord(record: SandboxMcpCallRecord): SandboxMcpCa
 export function matchesMcpCallRecordFilter(record: SandboxMcpCallRecord, input: ListSandboxMcpCallRecordsInput = {}): boolean {
   if (input.tool && record.tool !== input.tool) return false
   if (input.credentialName && record.credentialName !== input.credentialName) return false
+  if (input.transport && record.transport !== input.transport) return false
   if (input.spaceId && record.spaceId !== input.spaceId) return false
   if (input.testRunId && record.testRunId !== input.testRunId) return false
   if (input.errorsOnly && record.status !== 'error') return false

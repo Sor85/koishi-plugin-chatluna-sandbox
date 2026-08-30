@@ -41,6 +41,7 @@ import {
 import {
   SandboxMcpError,
   type SandboxMcpCallRecord,
+  type SandboxMcpCallTransport,
   type SandboxMcpCapabilityCatalog,
   type SandboxMcpCreatedCredential,
   type SandboxMcpCredential,
@@ -51,8 +52,16 @@ import {
   type SandboxMcpToolCapability,
 } from './types'
 
+/** 一次工具调用的传输层上下文；只用于标注测试调用记录，不参与权限与配额判定。 */
+export interface SandboxMcpCallContext {
+  sourceIp?: string
+  /** 承载本次调用的协议表述，默认 `mcp`。 */
+  transport?: SandboxMcpCallTransport
+}
+
 // 测试凭证配额：四档调用频率上限与三档并发上限。执行位置在本服务的额度消耗与
-// 并发包装两处，与承载 MCP 的 HTTP 监听器无关；监听器不参与限流判定。
+// 并发包装两处，与承载调用的监听器无关；监听器不参与限流判定。因此同一个凭证在
+// MCP 与 HTTP 两种协议表述下共用同一份额度，换个表述绕不开限流。
 export interface SandboxMcpQuotaConfig {
   readPerMinute: number
   mutationPerMinute: number
@@ -627,6 +636,7 @@ const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
     properties: {
       tool: { type: 'string' },
       credentialName: { type: 'string' },
+      transport: { type: 'string', enum: ['mcp', 'http'], description: '按承载调用的协议表述筛选；省略时同时返回 MCP 与 HTTP 两种来路的记录' },
       spaceId: { type: 'string', description: '按测试调用记录中的空间筛选；省略时返回全部记录' },
       testRunId: { type: 'string' },
       errorsOnly: { type: 'boolean' },
@@ -722,7 +732,11 @@ const ALL_SCOPES: SandboxMcpScope[] = ['read', 'interact', 'manage', 'debug']
 // `chatluna-sandbox://errors` 是 AI 消费者唯一的错误码契约文档，它和抛出点分处两地，靠人工同步必然漂移。
 // `tests/mcp-error-code-contract.test.ts` 从 src/mcp 源码枚举全部 `new SandboxMcpError('<码>'` 字面量，
 // 与本清单双向比较，因此新增未登记的码或删掉在用的码都会让测试变红。
-const STABLE_ERROR_CODES = [
+//
+// `as const` 不只是收窄字面量：HTTP 测试接口把每个码映射成 HTTP 状态码，那张表声明为
+// `Record<SandboxMcpStableErrorCode, number>`，漏掉任何一个码都会在 typecheck 阶段报错，
+// 而不是等到某次真实失败才发现它退回了 500。
+export const STABLE_ERROR_CODES = [
   // 凭证与权限
   'unauthorized',
   'permission_denied',
@@ -757,10 +771,16 @@ const STABLE_ERROR_CODES = [
   'media_not_found',
   'invalid_media_url',
   'digest_mismatch',
+  // HTTP 测试接口的传输层拒绝。MCP 表述不会发出这两个码：JSON-RPC 自己就把方法与请求体
+  // 形状固定住了，只有普通 HTTP 才存在「换个动词打同一条路径」和「请求体过大」两种失败。
+  'method_not_allowed',
+  'payload_too_large',
   // 兜底两类：领域主动拒绝与未预期异常
   'domain_error',
   'internal_error',
-]
+] as const
+
+export type SandboxMcpStableErrorCode = typeof STABLE_ERROR_CODES[number]
 
 function digestToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
@@ -1171,9 +1191,17 @@ export class SandboxMcpService {
     return () => { this.activityListeners.delete(listener) }
   }
 
-  async callTool(token: string, tool: string, argumentsValue: unknown, context: { sourceIp?: string } = {}): Promise<unknown> {
+  /**
+   * 执行一次工具调用。
+   *
+   * 两种协议表述（MCP Streamable HTTP 与 HTTP 测试接口）都只经这里，因此权限、配额、并发、幂等
+   * 与测试调用记录不存在第二份实现。`context.transport` 只用于标注记录与 `get_server_info` 的
+   * 自述，不参与任何权限或配额判定：同一个凭证在两种表述下拥有完全相同的能力与额度。
+   */
+  async callTool(token: string, tool: string, argumentsValue: unknown, context: SandboxMcpCallContext = {}): Promise<unknown> {
     const credential = this.requireCredential(token)
     const args = asRecord(argumentsValue)
+    const transport = context.transport ?? 'mcp'
     const startedAt = Date.now()
     try {
       const definition = TOOL_DEFINITIONS.find(({ name }) => name === tool)
@@ -1184,15 +1212,15 @@ export class SandboxMcpService {
       this.consumeRateLimit(credential.id, rateCategory, rateLimit)
       const concurrencyCategory = tool.startsWith('wait_for_') ? 'wait' : tool === 'upload_media' ? 'upload' : definition.scope === 'read' || definition.scope === 'debug' ? undefined : 'mutation'
       const result = concurrencyCategory
-        ? await this.withConcurrency(credential.id, concurrencyCategory, () => this.executeTool(credential, tool, args))
-        : await this.executeTool(credential, tool, args)
-      this.appendCallRecord(credential, tool, args, context.sourceIp, 'success', result, undefined, Date.now() - startedAt)
+        ? await this.withConcurrency(credential.id, concurrencyCategory, () => this.executeTool(credential, tool, args, transport))
+        : await this.executeTool(credential, tool, args, transport)
+      this.appendCallRecord(credential, tool, args, context.sourceIp, transport, 'success', result, undefined, Date.now() - startedAt)
       return result
     } catch (error) {
       const normalized = this.normalizeToolError(tool, error)
       // 记录 ID 就是对外的 traceId：消费者拿错误信封里的 traceId 调 get_mcp_call_record
       // 即可取回这次失败的记录。此前信封里的 traceId 是当场生成的随机值，与任何记录都对不上。
-      normalized.traceId = this.appendCallRecord(credential, tool, args, context.sourceIp, 'error', undefined, normalized, Date.now() - startedAt)
+      normalized.traceId = this.appendCallRecord(credential, tool, args, context.sourceIp, transport, 'error', undefined, normalized, Date.now() - startedAt)
       // 场景版本走同一条回填路径：传输层此前无条件读主场景，测试空间里的失败会报错的乐观并发基线。
       normalized.revision = this.revisionForScope(args)
       throw normalized
@@ -1249,8 +1277,10 @@ export class SandboxMcpService {
     return { cleared }
   }
 
-  private async executeTool(credential: SandboxMcpCredential, tool: string, args: Record<string, unknown>): Promise<unknown> {
-    if (tool === 'get_server_info') return { name: 'chatluna-sandbox', testApiVersion: 1, transport: 'streamable-http', stateless: true, cursor: this.currentCursor() }
+  private async executeTool(credential: SandboxMcpCredential, tool: string, args: Record<string, unknown>, transport: SandboxMcpCallTransport = 'mcp'): Promise<unknown> {
+    // transport 自述用的是承载本次调用的表述而不是端点上启用的全部表述：客户端问的是「我现在
+    // 走的是什么」，据此决定错误信封要按 JSON-RPC 还是按 HTTP 状态码解析。
+    if (tool === 'get_server_info') return { name: 'chatluna-sandbox', testApiVersion: 1, transport: transport === 'http' ? 'http' : 'streamable-http', stateless: true, cursor: this.currentCursor() }
     if (tool === 'list_test_spaces') return this.requireTestSpaces().listSpaces()
     if (tool === 'get_test_space') return this.getTestSpace(args)
     if (tool === 'create_test_space') return this.withIdempotency(credential, tool, args, async () => {
@@ -1267,6 +1297,7 @@ export class SandboxMcpService {
       return this.listCallRecords({
         tool: typeof args.tool === 'string' ? args.tool : undefined,
         credentialName: typeof args.credentialName === 'string' ? args.credentialName : undefined,
+        transport: args.transport === 'mcp' || args.transport === 'http' ? args.transport : undefined,
         spaceId: typeof args.spaceId === 'string' ? args.spaceId : undefined,
         testRunId: typeof args.testRunId === 'string' ? args.testRunId : undefined,
         errorsOnly: args.errorsOnly === true,
@@ -1990,6 +2021,7 @@ export class SandboxMcpService {
     tool: string,
     args: Record<string, unknown>,
     sourceIp: string | undefined,
+    transport: SandboxMcpCallTransport,
     status: 'success' | 'error',
     result: unknown,
     error: SandboxMcpError | undefined,
@@ -2004,6 +2036,7 @@ export class SandboxMcpService {
       id,
       createdAt: new Date().toISOString(),
       credentialName: credential.name,
+      transport,
       sourceIp,
       tool,
       testRunId: typeof args.testRunId === 'string' ? args.testRunId : undefined,

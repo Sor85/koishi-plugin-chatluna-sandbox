@@ -9,20 +9,53 @@ import { readFileSync } from 'node:fs'
 import type { Context } from 'koishi'
 import { SandboxMcpError } from './types'
 import { SandboxMcpService, TOOL_DEFINITIONS } from './service'
+import { HTTP_API_MAX_BODY_BYTES, handleHttpApiRequest, isHttpApiPath, toHttpApiErrorResponse } from './http-api'
 
-// 只描述传输：监听地址、端口、路径、TLS、来源与 Origin 白名单、启用开关。
-// 测试凭证的频率与并发配额由测试控制服务（SandboxMcpQuotaConfig）执行，不在此声明。
-export interface SandboxMcpServerConfig {
+/** 一种协议表述在端点上的启用开关与路径。两种表述共用同一个监听器与同一套门禁。 */
+export interface SandboxTestEndpointProtocolConfig {
   enabled: boolean
+  path: string
+}
+
+// 只描述传输：监听地址、端口、TLS、来源与 Origin 白名单，以及两种协议表述各自的开关与路径。
+// 测试凭证的频率与并发配额由测试控制服务（SandboxMcpQuotaConfig）执行，不在此声明。
+//
+// 传输字段是共享的而不是每种表述各来一份：非回环必须配 TLS 这道门禁（ADR-0032）一旦分成两份
+// 配置，就有了两次配错的机会，而两种表述面对的风险完全相同。
+export interface SandboxTestEndpointServerConfig {
   host: string
   port: number
-  path: string
   allowedSources: string[]
   allowedOrigins: string[]
   allowInsecureRemote: boolean
   tlsCertPath?: string
   tlsKeyPath?: string
+  mcp: SandboxTestEndpointProtocolConfig
+  http: SandboxTestEndpointProtocolConfig
 }
+
+/**
+ * 传输层门禁的三类拒绝。
+ *
+ * MCP 分支沿用既有的 `{ error: <键> }` 简短形态；HTTP 分支把同一次拒绝转成与工具错误逐字同形的
+ * 信封，让脚本只需要一条解析路径。状态码在 HTTP 分支由错误码推导，不在此重复声明。
+ */
+const TRANSPORT_REJECTIONS = {
+  source_forbidden: {
+    status: 403,
+    toError: () => new SandboxMcpError('permission_denied', '来源 IP 不在允许列表中', false, '请把调用方 IP 加入允许的来源列表，或改从允许的来源发起调用。'),
+  },
+  origin_forbidden: {
+    status: 403,
+    toError: () => new SandboxMcpError('permission_denied', 'Origin 不在允许列表中', false, '请把该 Origin 加入允许列表，或去掉请求中的 Origin 头。'),
+  },
+  unauthorized: {
+    status: 401,
+    toError: () => new SandboxMcpError('unauthorized', '缺少或无效的 Bearer 测试凭证', false, '请在 Authorization 头中携带有效的测试凭证 Token。'),
+  },
+} as const
+
+type TransportRejection = keyof typeof TRANSPORT_REJECTIONS
 
 function isLoopback(host: string): boolean {
   return host === 'localhost' || host === '127.0.0.1' || host === '::1'
@@ -60,18 +93,24 @@ function jsonContent(value: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(value) }], ...(structured ? { structuredContent: structured } : {}) }
 }
 
-export class SandboxMcpHttpServer {
+/**
+ * 测试控制端点的独立 HTTP 监听器。
+ *
+ * 同一个监听器上并列承载两种协议表述：MCP Streamable HTTP 与 HTTP 测试接口，按路径分流。两者
+ * 共用监听地址、TLS、来源与 Origin 白名单、凭证校验，以及背后同一个测试控制服务。
+ */
+export class SandboxTestEndpointServer {
   private server?: HttpServer
 
-  constructor(private ctx: Context, private service: SandboxMcpService, private config: SandboxMcpServerConfig) {}
+  constructor(private ctx: Context, private service: SandboxMcpService, private config: SandboxTestEndpointServerConfig) {}
 
   async start(): Promise<void> {
-    if (!this.config.enabled || this.server) return
+    if ((!this.config.mcp.enabled && !this.config.http.enabled) || this.server) return
     if (!isLoopback(this.config.host) && !this.config.allowInsecureRemote && (!this.config.tlsCertPath || !this.config.tlsKeyPath)) {
-      throw new Error('非回环 MCP 监听必须配置 TLS，或显式启用不安全远程监听')
+      throw new Error('非回环测试控制端点必须配置 TLS，或显式启用不安全远程监听')
     }
     if (!isLoopback(this.config.host) && this.config.allowInsecureRemote) {
-      this.ctx.logger('chatluna-sandbox').warn('MCP 正在非回环地址上使用明文 HTTP；Bearer Token 可能被窃取。')
+      this.ctx.logger('chatluna-sandbox').warn('测试控制端点正在非回环地址上使用明文 HTTP；Bearer Token 可能被窃取。')
     }
     const listener = (request: IncomingMessage, response: ServerResponse) => void this.handleRequest(request, response)
     this.server = this.config.tlsCertPath && this.config.tlsKeyPath
@@ -106,15 +145,25 @@ export class SandboxMcpHttpServer {
     let transport: StreamableHTTPServerTransport | undefined
     let mcp: Server | undefined
     try {
-      if (new URL(request.url ?? '/', 'http://localhost').pathname !== this.config.path) return this.writeJson(response, 404, { error: 'not_found' })
-      if (request.method !== 'POST') return this.writeJson(response, 405, { error: 'method_not_allowed' })
+      const url = new URL(request.url ?? '/', 'http://localhost')
+      const protocol = this.resolveProtocol(url.pathname)
+      // 两个前缀都没命中时无从得知调用方想用哪种表述，因此保留简短形态而不是猜一种信封。
+      if (!protocol) return this.writeJson(response, 404, { error: 'not_found' })
+      if (protocol === 'mcp' && request.method !== 'POST') return this.writeJson(response, 405, { error: 'method_not_allowed' })
+
       const sourceIp = normalizeAddress(request.socket.remoteAddress)
-      if (this.config.allowedSources.length && !this.config.allowedSources.some((rule) => sourceMatches(sourceIp, rule))) return this.writeJson(response, 403, { error: 'source_forbidden' })
-      const origin = request.headers.origin
-      if (origin && !this.config.allowedOrigins.includes(origin)) return this.writeJson(response, 403, { error: 'origin_forbidden' })
-      const authorization = request.headers.authorization ?? ''
-      const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : ''
-      if (!this.service.authenticate(token)) return this.writeJson(response, 401, { error: 'unauthorized' })
+      const screened = this.screen(request, sourceIp)
+      if (typeof screened !== 'string') {
+        const { status, toError } = TRANSPORT_REJECTIONS[screened.rejection]
+        if (protocol === 'http') {
+          const rejected = toHttpApiErrorResponse(this.service, toError())
+          return this.writeJson(response, rejected.status, rejected.body, rejected.headers)
+        }
+        return this.writeJson(response, status, { error: screened.rejection })
+      }
+      const token = screened
+
+      if (protocol === 'http') return await this.handleHttpApi(request, response, url, token, sourceIp)
 
       mcp = this.createMcpServer(token, sourceIp)
       transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true })
@@ -124,7 +173,7 @@ export class SandboxMcpHttpServer {
       // 旧版会提前返回，那时必须额外等待 finish/close，否则客户端只能收到无正文的 200。
       await transport.handleRequest(request, response)
     } catch (error) {
-      this.ctx.logger('chatluna-sandbox').error('MCP 请求处理失败', error)
+      this.ctx.logger('chatluna-sandbox').error('测试控制端点请求处理失败', error)
       if (!response.headersSent) this.writeJson(response, 500, { jsonrpc: '2.0', error: { code: -32603, message: 'Internal server error' }, id: null })
       // 响应头已经发出时无法再改状态码，但必须收尾：不结束响应等于让请求挂到客户端超时。
       else if (!response.writableEnded) response.end()
@@ -132,6 +181,68 @@ export class SandboxMcpHttpServer {
       if (transport) await transport.close().catch(() => undefined)
       if (mcp) await mcp.close().catch(() => undefined)
     }
+  }
+
+  /**
+   * 按路径判断本次请求该交给哪种协议表述。
+   *
+   * MCP 走精确匹配、HTTP 走前缀匹配，因此两者即使配成同一个路径也不会互相吞掉：路径本身是 MCP，
+   * 它下面的 `/v1/...` 子路径是 HTTP 测试接口。未启用的表述一律不参与匹配。
+   */
+  private resolveProtocol(pathname: string): 'mcp' | 'http' | undefined {
+    if (this.config.mcp.enabled && pathname === this.config.mcp.path) return 'mcp'
+    if (this.config.http.enabled && isHttpApiPath(pathname, this.config.http.path)) return 'http'
+  }
+
+  /** 门禁：通过时返回凭证明文 Token，否则返回拒绝类别。两种表述共用这一份判定。 */
+  private screen(request: IncomingMessage, sourceIp: string): string | { rejection: TransportRejection } {
+    if (this.config.allowedSources.length && !this.config.allowedSources.some((rule) => sourceMatches(sourceIp, rule))) {
+      return { rejection: 'source_forbidden' }
+    }
+    const origin = request.headers.origin
+    if (origin && !this.config.allowedOrigins.includes(origin)) return { rejection: 'origin_forbidden' }
+    const authorization = request.headers.authorization ?? ''
+    const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : ''
+    if (!this.service.authenticate(token)) return { rejection: 'unauthorized' }
+    return token
+  }
+
+  private async handleHttpApi(request: IncomingMessage, response: ServerResponse, url: URL, token: string, sourceIp: string) {
+    // handleHttpApiRequest 自身不抛，这个 try 覆盖的是它之前的请求体读取——超限会抛
+    // payload_too_large，必须同样落成信封，否则会被外层 catch 写成 JSON-RPC 形状的 500。
+    try {
+      const body = request.method === 'POST' ? await this.readBody(request) : ''
+      const result = await handleHttpApiRequest(this.service, token, {
+        method: request.method ?? 'GET',
+        pathname: url.pathname,
+        searchParams: url.searchParams,
+        body,
+      }, { basePath: this.config.http.path, sourceIp })
+      return this.writeJson(response, result.status, result.body, result.headers)
+    } catch (error) {
+      const result = toHttpApiErrorResponse(this.service, error)
+      return this.writeJson(response, result.status, result.body, result.headers)
+    }
+  }
+
+  /**
+   * 读取请求体，边读边计字节数。
+   *
+   * 必须在累计过程中判上限而不是读完再看长度：读完再看等于先把超大请求体整份收进内存，上限也就
+   * 没有保护作用了。抛出会让 for-await 销毁请求流，连接随之中断，这正是超限时期望的行为。
+   */
+  private async readBody(request: IncomingMessage): Promise<string> {
+    const chunks: Buffer[] = []
+    let size = 0
+    for await (const chunk of request) {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string)
+      size += buffer.byteLength
+      if (size > HTTP_API_MAX_BODY_BYTES) {
+        throw new SandboxMcpError('payload_too_large', `请求体超过 ${HTTP_API_MAX_BODY_BYTES} 字节上限`, false, '请减小请求体，或改用 upload_media 分次上传媒体。')
+      }
+      chunks.push(buffer)
+    }
+    return Buffer.concat(chunks).toString('utf8')
   }
 
   // 使用低层 Server 而非 McpServer.registerTool：后者要求 zod schema 才能生成
@@ -145,7 +256,7 @@ export class SandboxMcpHttpServer {
     }))
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
       try {
-        return jsonContent(await this.service.callTool(token, request.params.name, request.params.arguments ?? {}, { sourceIp }))
+        return jsonContent(await this.service.callTool(token, request.params.name, request.params.arguments ?? {}, { sourceIp, transport: 'mcp' }))
       } catch (error) {
         // 工具错误的归一化发生在 service.callTool 里：它把领域拒绝与未预期异常都收敛成
         // SandboxMcpError 再抛出，因此这里几乎总是走 instanceof 分支。else 分支留着不是冗余——
@@ -167,8 +278,8 @@ export class SandboxMcpHttpServer {
     return server
   }
 
-  private writeJson(response: import('node:http').ServerResponse, status: number, body: unknown) {
-    response.writeHead(status, { 'content-type': 'application/json; charset=utf-8' })
+  private writeJson(response: import('node:http').ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}) {
+    response.writeHead(status, { 'content-type': 'application/json; charset=utf-8', ...headers })
     response.end(JSON.stringify(body))
   }
 }

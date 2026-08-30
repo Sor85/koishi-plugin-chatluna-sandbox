@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { App, Logger } from '@koishijs/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SandboxControlService } from '../src/control-service'
-import { SandboxMcpHttpServer } from '../src/mcp/server'
+import { SandboxTestEndpointServer } from '../src/mcp/server'
 import { SandboxMcpService } from '../src/mcp/service'
 import type { SandboxMcpCredential } from '../src/mcp/types'
 
@@ -148,8 +148,9 @@ describe('MCP 凭证存储的健壮性', () => {
       { ...goodCredential, id: 'short-digest', name: '坏摘要凭证', tokenDigest: 'deadbeef' },
     ])
     const { app, service } = createService(directory)
-    const server = new SandboxMcpHttpServer(app, service, {
-      enabled: true, host: '127.0.0.1', port: 0, path: '/mcp', allowedSources: ['127.0.0.0/8'], allowedOrigins: [], allowInsecureRemote: false,
+    const server = new SandboxTestEndpointServer(app, service, {
+      host: '127.0.0.1', port: 0, allowedSources: ['127.0.0.0/8'], allowedOrigins: [], allowInsecureRemote: false,
+      mcp: { enabled: true, path: '/mcp' }, http: { enabled: false, path: '/api' },
     })
     await server.start()
     cleanups.push(() => server.stop())

@@ -33,6 +33,7 @@ const record: SandboxMcpCallRecordListItem = {
   id: 'call-1',
   createdAt: '2026-07-25T12:00:00.000Z',
   credentialName: '测试凭证',
+  transport: 'mcp',
   sourceIp: '127.0.0.1',
   tool: 'get_server_info',
   durationMs: 4,
