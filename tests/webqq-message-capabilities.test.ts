@@ -138,9 +138,9 @@ describe('消息能力位投影', () => {
     // 群主自己的普通消息：五项全开。
     expect(capabilitiesOf(messageCapabilities, 'own'))
       .toEqual({ recall: true, react: true, reply: true, branch: true, forward: true })
-    // 戳一戳事件不可贴表情、不可分叉、不可多选，也不可撤回。
+    // 戳一戳事件是系统提示，五项一条都做不到。
     expect(capabilitiesOf(messageCapabilities, 'poke'))
-      .toEqual({ recall: false, react: false, reply: true, branch: false, forward: false })
+      .toEqual({ recall: false, react: false, reply: false, branch: false, forward: false })
     // 已撤回消息不可回复、不可再贴表情、不可多选。
     expect(capabilitiesOf(messageCapabilities, 'recalled'))
       .toEqual({ recall: false, react: false, reply: false, branch: true, forward: false })

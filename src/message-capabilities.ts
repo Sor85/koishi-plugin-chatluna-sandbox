@@ -92,8 +92,9 @@ export function denyMessageCapability(
   const { message } = input
   switch (capability) {
     case 'reply':
-      // 引用一条已撤回的消息等于给原文开一条旁路，撤回因此形同虚设。事件消息不在此列：
-      // 它在界面上根本不提供菜单，而插件仍按普通消息寻址它。
+      // 系统提示不是一条可引用的消息：真实 QQ 里戳一戳这类事件是通知，压根没有消息编号可引用。
+      // 引用一条已撤回的消息则等于给原文开一条旁路，撤回因此形同虚设。
+      if (message.event) return 'event-message'
       return isRecalledMessage(message) ? 'recalled-message' : undefined
     case 'branch':
       // 分支的起点必须是一句真的说过的话；系统提示没有可分叉的对话上下文。

@@ -230,6 +230,19 @@ function describeReactionDenial(denial: MessageCapabilityDenial, messageId: stri
   }
 }
 
+/** 引用回复被判据拒绝时的错误文案，措辞照 `事件消息不能合并转发` 一族。 */
+function describeReplyDenial(denial: MessageCapabilityDenial, messageId: string): string {
+  switch (denial) {
+    case 'event-message':
+      return `事件消息不能引用回复：${messageId}`
+    case 'recalled-message':
+      return `已撤回消息不能引用回复：${messageId}`
+    default:
+      // 回复目标是否在当前会话里可读已在上方判定，走到这里只能是判据新增了依据。
+      return `回复消息不存在：${messageId}`
+  }
+}
+
 export function createDefaultScene(): SandboxSnapshot {
   const createdAt = new Date().toISOString()
   const directConversations: SandboxConversation[] = [
@@ -2595,11 +2608,11 @@ export class SandboxControlService {
       && (!reply || !readConversationMessageIds(this.scene, conversation.id).includes(input.replyToMessageId))) {
       throw new SandboxDomainError(`回复消息不存在：${input.replyToMessageId}`)
     }
-    // 引用一条已撤回的消息会让撤回经引用旁路重新露出原文；机器人表面早已按这条办
-    // （toUniversalMessage 在引用目标已撤回时不给 quote），写入路径与它一致。
-    if (reply && denyMessageCapability('reply', this.toMessageCapabilityInput(reply, conversation, input.operatorId))) {
-      throw new SandboxDomainError(`已撤回消息不能引用回复：${input.replyToMessageId}`)
-    }
+    // 系统提示不是可引用的消息；引用一条已撤回的消息会让撤回经引用旁路重新露出原文。
+    // 机器人表面早已按后一条办（toUniversalMessage 在引用目标已撤回时不给 quote），写入路径与它一致。
+    const replyDenial = reply
+      && denyMessageCapability('reply', this.toMessageCapabilityInput(reply, conversation, input.operatorId))
+    if (replyDenial) throw new SandboxDomainError(describeReplyDenial(replyDenial, input.replyToMessageId!))
     return { operator, peer, conversation, group, reply }
   }
 

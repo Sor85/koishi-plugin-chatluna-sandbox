@@ -2,6 +2,7 @@ import { App } from '@koishijs/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SandboxControlService } from '../src/control-service'
 import { registerConsole, type SandboxConsoleRegistrar } from '../src/console'
+import { getOneBotMessageSequence } from '../src/onebot-profiles'
 import type { ResolvedConversation } from '../src/conversation-resolution'
 import { denyMessageCapability, readMessageCapabilities } from '../src/message-capabilities'
 import type { SandboxAppearance, SandboxGroup, SandboxMessage } from '../src/types'
@@ -128,18 +129,20 @@ describe('消息能力判据', () => {
       .toBe('no-operator')
   })
 
-  it('事件消息不可贴表情、不可分叉、不可合并转发，也不可撤回', () => {
+  it('事件消息不可贴表情、不可分叉、不可合并转发、不可引用，也不可撤回', () => {
     const input = { message: pokeEvent('10001', DIRECT.id), conversation: DIRECT, operatorId: '10001' }
 
-    expect(readMessageCapabilities(input)).toMatchObject({
+    expect(readMessageCapabilities(input)).toEqual({
+      recall: false,
       react: false,
+      reply: false,
       branch: false,
       forward: false,
-      recall: false,
     })
     expect(denyMessageCapability('react', input)).toBe('event-message')
     expect(denyMessageCapability('branch', input)).toBe('event-message')
     expect(denyMessageCapability('forward', input)).toBe('event-message')
+    expect(denyMessageCapability('reply', input)).toBe('event-message')
   })
 
   it('已撤回消息不可回复、不可再贴表情、不可合并转发，但仍可作为分叉点', () => {
@@ -286,6 +289,32 @@ describe('服务端按消息能力拒绝', () => {
       replyToMessageId: target.messageId,
     })).rejects.toThrow(`已撤回消息不能引用回复：${target.messageId}`)
     expect(control.getSnapshot().messages.some(({ content }) => content === '引用它')).toBe(false)
+  })
+
+  it('引用一条戳一戳事件被拒绝：系统提示不是可引用的消息', async () => {
+    const { control } = await createControl()
+    const event = await createPokeEvent(control)
+
+    await expect(control.sendMessage({
+      operatorId: '10001',
+      conversationId: 'group:30001',
+      content: '引用这条系统提示',
+      replyToMessageId: event.id,
+    })).rejects.toThrow(`事件消息不能引用回复：${event.id}`)
+    expect(control.getSnapshot().messages.some(({ content }) => content === '引用这条系统提示')).toBe(false)
+  })
+
+  it('机器人经 OneBot send_msg 引用一条戳一戳事件同样被拒绝', async () => {
+    const { control } = await createControl()
+    const event = await createPokeEvent(control)
+
+    await expect(control.getRuntimeBot('20001').internal._request('send_msg', {
+      group_id: 30001,
+      message: [
+        { type: 'reply', data: { id: String(getOneBotMessageSequence(event.id)) } },
+        { type: 'text', data: { text: '引用这条系统提示' } },
+      ],
+    })).rejects.toThrow(/事件消息不能引用回复/)
   })
 
   it('撤回的群角色阶梯收成一处后行为与文案不变', async () => {
