@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { Config, inject } from '../src'
 import { DEFAULT_SCENE_MESSAGE_LIMIT, DEFAULT_SCENE_MESSAGE_MAX_BYTES } from '../src/control-service'
 
 describe('插件持久化配置', () => {
-  it('默认使用内存模式，并将 Database 与 ChatLuna Usage 声明为可选服务', () => {
+  it('默认使用内存模式，并只把 Database 声明为可选服务', () => {
     expect(inject).toEqual({
       required: ['console'],
-      optional: ['database', 'chatluna_usage'],
+      optional: ['database'],
     })
     if (!Config.dict) throw new Error('配置 Schema 缺少字段定义')
     expect(Config.dict.persistenceMode.meta.default).toBe('memory')
@@ -17,6 +19,21 @@ describe('插件持久化配置', () => {
     expect(Config.dict.modelRequestRecordLimit.meta.default).toBe(500)
     expect(Config.dict.modelRequestRecordLimit.meta.description).toBe('每个空间保留的模型请求记录上限')
     expect(Config.dict.webQQChatStyle).toBeUndefined()
+  })
+
+  /**
+   * chatluna-usage 的用量服务是 Console `DataService`，真实服务名是 `console.services.chatluna_usage`，
+   * 根上下文里不存在 `chatluna_usage`。一旦有人把它写回服务声明，插件配置页就会长期显示
+   * 「可选服务: chatluna_usage (未加载)」，而功能其实一直正常——纯展示性错误，别的测试不会变红。
+   */
+  it('不把 Console DataService 当作根服务声明，且元数据与入口声明一致', () => {
+    const declared = [...inject.required, ...inject.optional]
+    expect(declared).not.toContain('chatluna_usage')
+    const manifest = JSON.parse(readFileSync(resolve('package.json'), 'utf8'))
+    expect(manifest.koishi.service).toEqual({
+      required: inject.required,
+      optional: inject.optional,
+    })
   })
 
   it('场景消息保留上限可配置，且描述说明会丢弃历史消息', () => {

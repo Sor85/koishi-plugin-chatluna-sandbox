@@ -48,9 +48,17 @@ export * from './test-spaces'
 export * from './presets'
 
 export const name = 'chatluna-sandbox'
+/**
+ * `chatluna_usage` 刻意不出现在这里。
+ *
+ * chatluna-usage 的用量服务是 Console `DataService`，Cordis 里的真实服务名是
+ * `console.services.chatluna_usage`，根上下文永远没有 `chatluna_usage`。把它写进 `inject.optional`
+ * 或 `koishi.service.optional`，只会让插件配置页一直显示「可选服务: chatluna_usage (未加载)」——即使
+ * 用量插件已启用、用量也读得到。用量按服务名现取（见 `findChatLunaUsage`），不进 `inject`。
+ */
 export const inject = {
   required: ['console'],
-  optional: ['database', 'chatluna_usage'],
+  optional: ['database'],
 }
 
 /**
@@ -152,7 +160,6 @@ export const Config: Schema<Config> = Schema.object({
 declare module 'koishi' {
   interface Context {
     chatlunaSandbox: SandboxControlService
-    chatluna_usage?: ChatLunaUsageLookup
   }
   interface Events {
     'chatluna/model-usage'(payload: import('./chatluna-usage').ChatLunaModelUsageEvent): void
@@ -170,7 +177,6 @@ export function apply(ctx: Context, config: Config) {
   ctx.inject({
     console: { required: true },
     database: { required: false },
-    chatluna_usage: { required: false },
   }, (inner) => {
     let persistence: KoishiDatabaseScenePersistence | undefined
     let createDebugPersistence: (scopeId: string) => SandboxOneBotDebugPersistence
