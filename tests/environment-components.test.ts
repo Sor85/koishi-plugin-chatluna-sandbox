@@ -226,7 +226,7 @@ describe('环境管理组件传输边界', () => {
   it('环境管理展示服务端权威 MCP 工具、资源和协议能力目录', () => {
     const manager = readFileSync(resolve('client/environment-manager.vue'), 'utf8')
     const catalog = readFileSync(resolve('client/mcp-capability-catalog.vue'), 'utf8')
-    const shim = readFileSync(resolve('client/koishi-client-shim.d.ts'), 'utf8')
+    const contract = readFileSync(resolve('src/console-contract.ts'), 'utf8')
 
     expect(manager).toContain("'mcp-capabilities'")
     expect(manager).toContain('createMcpCapabilityCatalogLoader(props.port)')
@@ -244,12 +244,12 @@ describe('环境管理组件传输边界', () => {
     expect(catalog).toContain('<CollapsibleTrigger class="mcp-capability-trigger">')
     expect(catalog).not.toContain('<details')
     expect(catalog).toContain('MCP 服务不可用')
-    expect(shim).toContain("'chatluna-sandbox/mcp-capabilities'")
+    expect(contract).toContain("'chatluna-sandbox/mcp-capabilities'")
   })
 
   it('已创建的 MCP 凭证可以查看并修改名称和权限', () => {
     const source = readFileSync(resolve('client/mcp-credential-manager.vue'), 'utf8')
-    const shim = readFileSync(resolve('client/koishi-client-shim.d.ts'), 'utf8')
+    const contract = readFileSync(resolve('src/console-contract.ts'), 'utf8')
 
     expect(source).toContain('openEdit(credential)')
     expect(source).toContain('查看 MCP 凭证')
@@ -260,7 +260,7 @@ describe('环境管理组件传输边界', () => {
     expect(source).toContain('{{ editing ? \'保存\' : \'创建\' }}')
     expect(source).not.toContain('createOpen')
     expect(source).not.toContain('明文 Token 无法再次查看')
-    expect(shim).toContain("'chatluna-sandbox/update-mcp-credential'")
-    expect(shim).toContain("'chatluna-sandbox/rotate-mcp-credential-token'")
+    expect(contract).toContain("'chatluna-sandbox/update-mcp-credential'")
+    expect(contract).toContain("'chatluna-sandbox/rotate-mcp-credential-token'")
   })
 })

@@ -1,3 +1,4 @@
+import type { SandboxMcpActivityPayload } from '../../src/console-contract'
 import type {
   SandboxMcpCapabilityCatalog,
   SandboxMcpCreatedCredential,
@@ -5,9 +6,8 @@ import type {
   SandboxMcpScope,
 } from '../../src/mcp/types'
 
-export interface McpActivityPayload {
-  running: boolean
-}
+/** 活动广播的载荷只在 Console 契约里定义一次，这里只是本端口的别名。 */
+export type McpActivityPayload = SandboxMcpActivityPayload
 
 export type McpActivityListener = (payload: McpActivityPayload) => void
 

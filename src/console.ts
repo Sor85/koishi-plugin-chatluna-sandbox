@@ -4,25 +4,15 @@ import type {} from '@koishijs/console'
 import { lookupChatLunaUsage, type ChatLunaUsageLookup } from './chatluna-usage'
 import { listConversationIds } from './conversation-resolution'
 import { buildSandboxModelRequestTrajectoryFromStore } from './model-request-trajectory'
+import type {
+  SandboxConsoleBroadcasts,
+  SandboxConsoleEvents,
+  SpaceScoped,
+} from './console-contract'
 import type { SandboxControlService } from './control-service'
-import type { ListSandboxMcpCallRecordsInput, SandboxMcpCallRecordsPage } from './mcp/call-records'
 import type { SandboxMcpService } from './mcp/service'
-import type { SandboxMcpCallRecord, SandboxMcpCapabilityCatalog, SandboxMcpScope } from './mcp/types'
-import type {
-  LocateSandboxPresetExpressionInput,
-  LocateSandboxPresetExpressionResult,
-  ReadSandboxPresetInput,
-  SandboxPresetDocument,
-  SandboxPresetService,
-} from './presets'
-import type {
-  CreatePresetInput,
-  DeletePresetInput,
-  PresetDocumentKind,
-  RenamePresetInput,
-  SavePresetInput,
-} from './presets'
-import { trimSnapshotMessages, type SandboxTestSpaceService, type SandboxTestSpaceSummary } from './test-spaces'
+import type { SandboxPresetService } from './presets'
+import { trimSnapshotMessages, type SandboxTestSpaceService } from './test-spaces'
 import {
   DEFAULT_MODEL_REQUEST_PAGE_SIZE,
   MAIN_MODEL_REQUEST_SCOPE_ID,
@@ -31,13 +21,9 @@ import {
   type SandboxModelRequestStore,
 } from './model-request'
 import type {
-  DeleteGroupAnnouncementInput,
   ClearSandboxOneBotDebugRecordsResult,
   ClearSandboxModelRequestRecordsResult,
-  GetForwardMessageInput,
-  GetMediaContentInput,
-  GetMessageHistoryInput,
-  GetSandboxBotDeliveriesInput,
+  DeleteGroupAnnouncementInput,
   GetSandboxOneBotDebugRecordInput,
   GetSandboxOneBotDebugRecordsInput,
   GetSandboxModelRequestRecordsInput,
@@ -63,14 +49,11 @@ import type {
   SearchConversationMessagesInput,
   SetMessageReactionInput,
   SandboxAppearance,
-  SandboxBotDelivery,
   SandboxConsoleOneBotDebugRecord,
   SandboxEntitySource,
-  SandboxForward,
-  SandboxMediaContent,
-  SandboxMessageHistory,
-  SandboxMessageSearchResult,
-  SandboxConversationInstanceResult,
+  GetForwardMessageInput,
+  GetMediaContentInput,
+  GetMessageHistoryInput,
   SandboxOneBotDebugRecordsPage,
   SandboxWorkspaceState,
   SendForwardMessageInput,
@@ -84,64 +67,6 @@ type ChatLunaUsageSource = ChatLunaUsageLookup | (() => ChatLunaUsageLookup | un
 
 function resolveChatLunaUsage(source: ChatLunaUsageSource | undefined): ChatLunaUsageLookup | undefined {
   return typeof source === 'function' ? source() : source
-}
-
-type SpaceScoped<Input> = Input & { spaceId?: string }
-
-interface ConsoleEventMap {
-  'chatluna-sandbox/workspace': (input?: SpaceScoped<GetSandboxWorkspaceInput>) => Promise<SandboxWorkspaceState>
-  'chatluna-sandbox/message-history': (input: SpaceScoped<GetMessageHistoryInput>) => Promise<SandboxMessageHistory>
-  'chatluna-sandbox/search-conversation-messages': (input: SpaceScoped<SearchConversationMessagesInput>) => Promise<SandboxMessageSearchResult>
-  'chatluna-sandbox/send-message': (input: SpaceScoped<SendMessageInput>) => Promise<SandboxWorkspaceState>
-  'chatluna-sandbox/create-conversation-instance': (input: SpaceScoped<CreateConversationInstanceInput>) => Promise<SandboxConversationInstanceResult>
-  'chatluna-sandbox/branch-conversation-instance': (input: SpaceScoped<BranchConversationInstanceInput>) => Promise<SandboxConversationInstanceResult>
-  'chatluna-sandbox/rename-conversation-instance': (input: SpaceScoped<RenameConversationInstanceInput>) => Promise<SandboxWorkspaceState>
-  'chatluna-sandbox/delete-conversation-instance': (input: SpaceScoped<DeleteConversationInstanceInput>) => Promise<SandboxWorkspaceState>
-  'chatluna-sandbox/send-media-message': (input: SpaceScoped<SendMediaMessageInput>) => Promise<SandboxWorkspaceState>
-  'chatluna-sandbox/send-forward-message': (input: SpaceScoped<SendForwardMessageInput>) => Promise<SandboxWorkspaceState>
-  'chatluna-sandbox/get-forward-message': (input: SpaceScoped<GetForwardMessageInput>) => Promise<SandboxForward>
-  'chatluna-sandbox/recall-message': (input: SpaceScoped<RecallMessageInput>) => Promise<SandboxWorkspaceState>
-  'chatluna-sandbox/clear-conversation-messages': (input: SpaceScoped<ClearConversationMessagesInput>) => Promise<SandboxWorkspaceState>
-  'chatluna-sandbox/set-message-reaction': (input: SpaceScoped<SetMessageReactionInput>) => Promise<SandboxWorkspaceState>
-  'chatluna-sandbox/media-content': (input: SpaceScoped<GetMediaContentInput>) => Promise<SandboxMediaContent>
-  'chatluna-sandbox/set-group-announcement': (input: SpaceScoped<SetGroupAnnouncementInput>) => Promise<SandboxWorkspaceState>
-  'chatluna-sandbox/delete-group-announcement': (input: SpaceScoped<DeleteGroupAnnouncementInput>) => Promise<SandboxWorkspaceState>
-  'chatluna-sandbox/manage-environment': (input: SpaceScoped<ManageSandboxEnvironmentInput>) => Promise<SandboxWorkspaceState>
-  'chatluna-sandbox/friend-action': (input: SpaceScoped<PerformFriendActionInput>) => Promise<SandboxWorkspaceState>
-  'chatluna-sandbox/group-action': (input: SpaceScoped<PerformGroupActionInput>) => Promise<SandboxWorkspaceState>
-  'chatluna-sandbox/bot-deliveries': (input?: SpaceScoped<GetSandboxBotDeliveriesInput>) => Promise<SandboxBotDelivery[]>
-  'chatluna-sandbox/debug-records': (input?: SpaceScoped<GetSandboxOneBotDebugRecordsInput>) => Promise<SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord>>
-  'chatluna-sandbox/debug-record': (input: SpaceScoped<GetSandboxOneBotDebugRecordInput>) => Promise<SandboxConsoleOneBotDebugRecord>
-  'chatluna-sandbox/clear-debug-records': (input?: { spaceId?: string }) => Promise<ClearSandboxOneBotDebugRecordsResult>
-  'chatluna-sandbox/model-request-records': (input: ListSandboxModelRequestRecordsInput) => Promise<SandboxModelRequestRecordsPage<SandboxConsoleModelRequestListItem>>
-  'chatluna-sandbox/model-request-record': (input: ReadSandboxModelRequestRecordInput) => Promise<SandboxConsoleModelRequestDetail>
-  'chatluna-sandbox/model-request-trajectory': (input: ReadSandboxModelRequestTrajectoryInput) => Promise<SandboxModelRequestTrajectory>
-  'chatluna-sandbox/clear-model-request-records': (input: SandboxModelRequestScope) => Promise<ClearSandboxModelRequestRecordsResult>
-  'chatluna-sandbox/preset-catalog': (input?: { kind?: PresetDocumentKind }) => Promise<SandboxPresetDocument[]>
-  'chatluna-sandbox/preset-read': (input: ReadSandboxPresetInput) => Promise<SandboxPresetDocument>
-  'chatluna-sandbox/preset-create': (input: CreatePresetInput) => Promise<SandboxPresetDocument>
-  'chatluna-sandbox/preset-save': (input: SavePresetInput) => Promise<SandboxPresetDocument>
-  'chatluna-sandbox/preset-rename': (input: RenamePresetInput) => Promise<SandboxPresetDocument>
-  'chatluna-sandbox/preset-delete': (input: DeletePresetInput) => Promise<{ deleted: true }>
-  'chatluna-sandbox/preset-locate-expression': (input: LocateSandboxPresetExpressionInput) => Promise<LocateSandboxPresetExpressionResult>
-  'chatluna-sandbox/mcp-call-records': (input?: ListSandboxMcpCallRecordsInput) => SandboxMcpCallRecordsPage
-  'chatluna-sandbox/mcp-call-record': (input: { recordId: string }) => SandboxMcpCallRecord
-  'chatluna-sandbox/clear-mcp-call-records': () => { cleared: number }
-  'chatluna-sandbox/mcp-activity': () => { running: boolean }
-  'chatluna-sandbox/mcp-capabilities': () => SandboxMcpCapabilityCatalog
-  'chatluna-sandbox/mcp-credentials': () => Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }>
-  'chatluna-sandbox/create-mcp-credential': (input: { name: string; scopes: SandboxMcpScope[] }) => { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
-  'chatluna-sandbox/update-mcp-credential': (input: { id: string; name?: string; scopes?: SandboxMcpScope[] }) => { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }
-  'chatluna-sandbox/rotate-mcp-credential-token': (input: { id: string }) => { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
-  'chatluna-sandbox/set-mcp-credential-enabled': (input: { id: string; enabled: boolean }) => void
-  'chatluna-sandbox/revoke-mcp-credential': (input: { id: string }) => void
-  'chatluna-sandbox/test-spaces': () => SandboxTestSpaceSummary[]
-  'chatluna-sandbox/create-test-space': (input: { name?: string }) => SandboxTestSpaceSummary
-  'chatluna-sandbox/take-over-test-space': (input: { spaceId: string }) => SandboxTestSpaceSummary
-  'chatluna-sandbox/return-test-space': (input: { spaceId: string }) => SandboxTestSpaceSummary
-  'chatluna-sandbox/terminate-test-space': (input: { spaceId: string }) => SandboxTestSpaceSummary
-  'chatluna-sandbox/reactivate-test-space': (input: { spaceId: string }) => SandboxTestSpaceSummary
-  'chatluna-sandbox/delete-test-space': (input: { spaceId: string }) => void
 }
 
 const legacyRpcFields = ['senderId', 'botId', 'actorUserId', 'userId', 'currentUserId'] as const
@@ -181,12 +106,15 @@ export function resolveConsoleEntry(workspace = process.cwd()): { dev: string; p
 
 export interface SandboxConsoleRegistrar {
   addEntry(entry: { dev: string; prod: string }): unknown
-  addListener<Event extends keyof ConsoleEventMap>(
+  addListener<Event extends keyof SandboxConsoleEvents>(
     event: Event,
-    callback: ConsoleEventMap[Event],
+    callback: SandboxConsoleEvents[Event],
     options: { authority: number },
   ): unknown
-  broadcast(type: string, body: unknown): unknown
+  broadcast<Channel extends keyof SandboxConsoleBroadcasts>(
+    type: Channel,
+    body: SandboxConsoleBroadcasts[Channel],
+  ): unknown
 }
 
 export function registerConsole(
@@ -350,7 +278,7 @@ export function registerConsole(
   // Koishi 的 Events 映射规模较大，直接调用泛型 addListener 会让 TypeScript
   // 展开整个事件联合并触发 TS2590；这里保留事件名约束，回调由各领域函数自身类型校验。
   const registerListener = console.addListener.bind(console) as (
-    event: keyof ConsoleEventMap,
+    event: keyof SandboxConsoleEvents,
     callback: (...args: any[]) => any,
     options: { authority: number },
   ) => unknown
@@ -463,7 +391,6 @@ export function registerConsole(
     await (await resolveReadyControl(input, true)).performGroupAction(assertInteractionInput(withoutSpaceId(input)) as PerformGroupActionInput)
     return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
-  registerListener('chatluna-sandbox/bot-deliveries', async (input = {}) => (await resolveReadyControl(input, false)).getBotDeliveries(assertInteractionInput(withoutSpaceId(input)) as GetSandboxBotDeliveriesInput), { authority: 4 })
   const requireUnattributedModelRequests = () => {
     if (!unattributedModelRequests) throw new Error('未归属模型请求库不可用')
     return unattributedModelRequests
@@ -623,60 +550,11 @@ export function registerConsole(
   }
 }
 
+/**
+ * 对 `@koishijs/console` 的模块增强从契约派生：`Events` 直接继承契约映射，
+ * 因此端点名与签名不在这里第二次出现。属性函数类型对方法签名位置可赋值，
+ * Koishi 的 `addListener` 与 `send` 因此照旧拿到逐端点的精确签名。
+ */
 declare module '@koishijs/console' {
-  interface Events {
-    'chatluna-sandbox/workspace'(input?: SpaceScoped<GetSandboxWorkspaceInput>): Promise<SandboxWorkspaceState>
-    'chatluna-sandbox/message-history'(input: SpaceScoped<GetMessageHistoryInput>): Promise<SandboxMessageHistory>
-    'chatluna-sandbox/search-conversation-messages'(input: SpaceScoped<SearchConversationMessagesInput>): Promise<SandboxMessageSearchResult>
-    'chatluna-sandbox/send-message'(input: SpaceScoped<SendMessageInput>): Promise<SandboxWorkspaceState>
-    'chatluna-sandbox/create-conversation-instance'(input: SpaceScoped<CreateConversationInstanceInput>): Promise<SandboxConversationInstanceResult>
-    'chatluna-sandbox/branch-conversation-instance'(input: SpaceScoped<BranchConversationInstanceInput>): Promise<SandboxConversationInstanceResult>
-    'chatluna-sandbox/rename-conversation-instance'(input: SpaceScoped<RenameConversationInstanceInput>): Promise<SandboxWorkspaceState>
-    'chatluna-sandbox/delete-conversation-instance'(input: SpaceScoped<DeleteConversationInstanceInput>): Promise<SandboxWorkspaceState>
-    'chatluna-sandbox/send-media-message'(input: SpaceScoped<SendMediaMessageInput>): Promise<SandboxWorkspaceState>
-    'chatluna-sandbox/send-forward-message'(input: SpaceScoped<SendForwardMessageInput>): Promise<SandboxWorkspaceState>
-    'chatluna-sandbox/get-forward-message'(input: SpaceScoped<GetForwardMessageInput>): Promise<SandboxForward>
-    'chatluna-sandbox/recall-message'(input: SpaceScoped<RecallMessageInput>): Promise<SandboxWorkspaceState>
-    'chatluna-sandbox/clear-conversation-messages'(input: SpaceScoped<ClearConversationMessagesInput>): Promise<SandboxWorkspaceState>
-    'chatluna-sandbox/set-message-reaction'(input: SpaceScoped<SetMessageReactionInput>): Promise<SandboxWorkspaceState>
-    'chatluna-sandbox/media-content'(input: SpaceScoped<GetMediaContentInput>): Promise<SandboxMediaContent>
-    'chatluna-sandbox/set-group-announcement'(input: SpaceScoped<SetGroupAnnouncementInput>): Promise<SandboxWorkspaceState>
-    'chatluna-sandbox/delete-group-announcement'(input: SpaceScoped<DeleteGroupAnnouncementInput>): Promise<SandboxWorkspaceState>
-    'chatluna-sandbox/manage-environment'(input: SpaceScoped<ManageSandboxEnvironmentInput>): Promise<SandboxWorkspaceState>
-    'chatluna-sandbox/friend-action'(input: SpaceScoped<PerformFriendActionInput>): Promise<SandboxWorkspaceState>
-    'chatluna-sandbox/group-action'(input: SpaceScoped<PerformGroupActionInput>): Promise<SandboxWorkspaceState>
-    'chatluna-sandbox/bot-deliveries'(input?: SpaceScoped<GetSandboxBotDeliveriesInput>): Promise<SandboxBotDelivery[]>
-    'chatluna-sandbox/debug-records'(input?: SpaceScoped<GetSandboxOneBotDebugRecordsInput>): Promise<SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord>>
-    'chatluna-sandbox/debug-record'(input: SpaceScoped<GetSandboxOneBotDebugRecordInput>): Promise<SandboxConsoleOneBotDebugRecord>
-    'chatluna-sandbox/clear-debug-records'(input?: { spaceId?: string }): Promise<ClearSandboxOneBotDebugRecordsResult>
-    'chatluna-sandbox/model-request-records'(input: ListSandboxModelRequestRecordsInput): Promise<SandboxModelRequestRecordsPage<SandboxConsoleModelRequestListItem>>
-    'chatluna-sandbox/model-request-record'(input: ReadSandboxModelRequestRecordInput): Promise<SandboxConsoleModelRequestDetail>
-    'chatluna-sandbox/model-request-trajectory'(input: ReadSandboxModelRequestTrajectoryInput): Promise<SandboxModelRequestTrajectory>
-    'chatluna-sandbox/clear-model-request-records'(input: SandboxModelRequestScope): Promise<ClearSandboxModelRequestRecordsResult>
-    'chatluna-sandbox/preset-catalog'(input?: { kind?: PresetDocumentKind }): Promise<SandboxPresetDocument[]>
-    'chatluna-sandbox/preset-read'(input: ReadSandboxPresetInput): Promise<SandboxPresetDocument>
-    'chatluna-sandbox/preset-create'(input: CreatePresetInput): Promise<SandboxPresetDocument>
-    'chatluna-sandbox/preset-save'(input: SavePresetInput): Promise<SandboxPresetDocument>
-    'chatluna-sandbox/preset-rename'(input: RenamePresetInput): Promise<SandboxPresetDocument>
-    'chatluna-sandbox/preset-delete'(input: DeletePresetInput): Promise<{ deleted: true }>
-    'chatluna-sandbox/preset-locate-expression'(input: LocateSandboxPresetExpressionInput): Promise<LocateSandboxPresetExpressionResult>
-    'chatluna-sandbox/mcp-call-records'(input?: ListSandboxMcpCallRecordsInput): SandboxMcpCallRecordsPage
-    'chatluna-sandbox/mcp-call-record'(input: { recordId: string }): SandboxMcpCallRecord
-    'chatluna-sandbox/clear-mcp-call-records'(): { cleared: number }
-    'chatluna-sandbox/mcp-activity'(): { running: boolean }
-    'chatluna-sandbox/mcp-capabilities'(): SandboxMcpCapabilityCatalog
-    'chatluna-sandbox/mcp-credentials'(): Array<{ id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }>
-    'chatluna-sandbox/create-mcp-credential'(input: { name: string; scopes: SandboxMcpScope[] }): { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
-    'chatluna-sandbox/update-mcp-credential'(input: { id: string; name?: string; scopes?: SandboxMcpScope[] }): { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token?: string }
-    'chatluna-sandbox/rotate-mcp-credential-token'(input: { id: string }): { id: string; name: string; scopes: SandboxMcpScope[]; enabled: boolean; createdAt: string; token: string }
-    'chatluna-sandbox/set-mcp-credential-enabled'(input: { id: string; enabled: boolean }): void
-    'chatluna-sandbox/revoke-mcp-credential'(input: { id: string }): void
-    'chatluna-sandbox/test-spaces'(): SandboxTestSpaceSummary[]
-    'chatluna-sandbox/create-test-space'(input: { name?: string }): SandboxTestSpaceSummary
-    'chatluna-sandbox/take-over-test-space'(input: { spaceId: string }): SandboxTestSpaceSummary
-    'chatluna-sandbox/return-test-space'(input: { spaceId: string }): SandboxTestSpaceSummary
-    'chatluna-sandbox/terminate-test-space'(input: { spaceId: string }): SandboxTestSpaceSummary
-    'chatluna-sandbox/reactivate-test-space'(input: { spaceId: string }): SandboxTestSpaceSummary
-    'chatluna-sandbox/delete-test-space'(input: { spaceId: string }): void
-  }
+  interface Events extends SandboxConsoleEvents {}
 }

@@ -104,7 +104,6 @@ describe('Koishi 控制台适配器', () => {
     const manageEnvironmentListener = listeners.get('chatluna-sandbox/manage-environment')
     const friendActionListener = listeners.get('chatluna-sandbox/friend-action')
     const groupActionListener = listeners.get('chatluna-sandbox/group-action')
-    const botDeliveriesListener = listeners.get('chatluna-sandbox/bot-deliveries')
     if (typeof snapshotListener !== 'function'
       || typeof historyListener !== 'function'
       || typeof searchConversationMessagesListener !== 'function'
@@ -117,8 +116,7 @@ describe('Koishi 控制台适配器', () => {
       || typeof deleteGroupAnnouncementListener !== 'function'
       || typeof manageEnvironmentListener !== 'function'
       || typeof friendActionListener !== 'function'
-      || typeof groupActionListener !== 'function'
-      || typeof botDeliveriesListener !== 'function') {
+      || typeof groupActionListener !== 'function') {
       throw new Error('控制台监听器未注册')
     }
 
@@ -204,11 +202,11 @@ describe('Koishi 控制台适配器', () => {
     ])
     expect(snapshot.snapshot.messages.every((message: Record<string, unknown>) => !('botId' in message))).toBe(true)
     expect(snapshot.snapshot.conversations.every((conversation: Record<string, unknown>) => !('userId' in conversation) && !('botId' in conversation))).toBe(true)
-    const messageId = snapshot.snapshot.messages.find(({ content }: { content: string }) => content === '控制台消息')?.id
-    expect(await botDeliveriesListener({ recipientBotId: '20001', messageId })).toEqual([
-      expect.objectContaining({ recipientBotId: '20001', messageId }),
-    ])
-    await expect(botDeliveriesListener({ botId: '20001' })).rejects.toThrow('不支持旧 RPC 字段：botId')
+    await expect(historyListener({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      botId: '20001',
+    })).rejects.toThrow('不支持旧 RPC 字段：botId')
 
     const mediaWorkspace = await sendMediaMessageListener({
       operatorId: '10001',

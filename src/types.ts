@@ -846,7 +846,6 @@ export interface GetSandboxWorkspaceInput {
 }
 
 export interface GetSandboxBotDeliveriesInput {
-  recipientBotId?: string
   messageId?: string
 }
 

@@ -1,6 +1,6 @@
 # 前后端 RPC 契约收敛成一份
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 

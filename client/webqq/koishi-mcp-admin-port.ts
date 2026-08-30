@@ -13,7 +13,7 @@ function installActivityReceiver() {
   receiverInstalled = true
   // Koishi receive 对同名事件只保存一个回调；页面反复挂载时若每次都注册，后卸载的页面会
   // 留下失效回调并覆盖存活页面。这里只注册一次，再由适配器扇出给全部订阅者。
-  receive<McpActivityPayload>('chatluna-sandbox/mcp-activity', notifyActivityListeners)
+  receive('chatluna-sandbox/mcp-activity', notifyActivityListeners)
 }
 
 interface McpActivityContext {

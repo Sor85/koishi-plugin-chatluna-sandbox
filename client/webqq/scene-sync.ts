@@ -1,13 +1,13 @@
 import { receive } from '@koishijs/client'
+import type { SandboxSceneMutationPayload } from '../../src/console-contract'
 import type { createWorkspaceController } from './workspace-controller'
 
-type SceneMutationPayload = { spaceId?: string, revision: number }
-type SceneMutationListener = (payload: SceneMutationPayload) => void
+type SceneMutationListener = (payload: SandboxSceneMutationPayload) => void
 
 const mutationListeners = new Set<SceneMutationListener>()
 let receiverInstalled = false
 
-function notifyMutationListeners(payload: SceneMutationPayload) {
+function notifyMutationListeners(payload: SandboxSceneMutationPayload) {
   for (const listener of mutationListeners) listener(payload)
 }
 
@@ -15,7 +15,7 @@ function installMutationReceiver() {
   if (receiverInstalled) return
   receiverInstalled = true
   // Koishi receive 对同名事件只保存一个回调；页面反复挂载时若直接注册，后卸载的页面会留下失效回调并覆盖存活页面。
-  receive<SceneMutationPayload>('chatluna-sandbox/scene-mutated', notifyMutationListeners)
+  receive('chatluna-sandbox/scene-mutated', notifyMutationListeners)
 }
 
 interface SceneMutationContext {

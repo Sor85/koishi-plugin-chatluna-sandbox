@@ -783,9 +783,8 @@ export class SandboxControlService {
   }
 
   getBotDeliveries(input: GetSandboxBotDeliveriesInput = {}): SandboxBotDelivery[] {
-    return structuredClone(this.botDeliveries.filter(({ recipientBotId, messageId }) => (
-      (!input.recipientBotId || recipientBotId === input.recipientBotId)
-      && (!input.messageId || messageId === input.messageId)
+    return structuredClone(this.botDeliveries.filter(({ messageId }) => (
+      !input.messageId || messageId === input.messageId
     )))
   }
 
