@@ -1,6 +1,6 @@
 # 侧栏会话树投影与展开态下沉成模块
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 

@@ -6,6 +6,8 @@ describe('WebQQ 主页面装配', () => {
   it('只装配工作区区域与组合模块', () => {
     const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
     const shellSource = readFileSync(resolve('client/webqq/workspace-shell.ts'), 'utf8')
+    // 会话树的头像种类判定住在投影 module 里，外壳只把场景喂给它。
+    const conversationTreeSource = readFileSync(resolve('client/webqq/conversation-tree.ts'), 'utf8')
 
     expect(pageSource).toContain('createWebqqWorkspaceShell')
     expect(pageSource).toContain('<WebqqSidebar')
@@ -29,7 +31,7 @@ describe('WebQQ 主页面装配', () => {
     expect(pageSource).toContain('@search-conversation-messages="searchConversationMessages"')
     expect(shellSource).not.toContain('currentUserId')
     expect(shellSource).toContain('currentOperatorName: currentOperator.value?.name')
-    expect(shellSource).toMatch(/avatarKind: group \? 'group'.*bot \? 'bot'.*'user'/)
+    expect(conversationTreeSource).toMatch(/avatarKind: group \? 'group'.*bot \? 'bot'.*'user'/)
     expect(shellSource).not.toContain("from '@koishijs/client'")
   })
 

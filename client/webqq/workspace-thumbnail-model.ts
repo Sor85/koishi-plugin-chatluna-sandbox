@@ -83,6 +83,9 @@ export function buildWorkspaceThumbnailModels(
     return {
       id: conversation.id,
       groupId: group?.id,
+      // 缩略图只画根会话，因此这里的行一律是根会话行且没有实例子项。
+      kind: 'root' as const,
+      children: [],
       title: group?.name ?? peer?.name ?? conversation.id,
       avatar: group?.avatar ?? peer?.avatar,
       avatarKind: group ? 'group' as const : peer?.kind === 'bot' ? 'bot' as const : 'user' as const,

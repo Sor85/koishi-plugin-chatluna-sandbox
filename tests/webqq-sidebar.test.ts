@@ -33,7 +33,6 @@ describe('WebQQ 顶部导航与会话栏', () => {
     expect(source).toContain("const searchQuery = ref('')")
     expect(source).toContain("const sidebarTab = ref<SidebarTab>('recent')")
     expect(source).toContain("const notificationTab = ref<'friends' | 'groups'>('friends')")
-    expect(source).toContain("avatarKind: 'user' | 'bot' | 'group'")
     expect(source).toContain(':kind="conversation.avatarKind"')
     expect(source).not.toContain('class="webqq-avatar webqq-avatar-bot"\n                    :kind="conversation.groupId ? \'group\' : \'bot\'"')
     expect(source).toContain("group.conversationId && group.conversationId === activeConversationId")
@@ -109,13 +108,27 @@ describe('会话树的信息密度与展开控件', () => {
    * 用户可见内容（时间、实例数量、无障碍标签）、样式源断言、否定式的「已删除实现」守卫，以及
    * 一条按规则跑遍样式源的死选择器守卫。
    *
+   * 会话树的投影口径与展开态的三条行为都不在这里断言：它们住在
+   * client/webqq/conversation-tree.ts 与 conversation-tree-expansion.ts 里，
+   * 由 tests/conversation-tree.test.ts 与 tests/conversation-tree-expansion.test.ts
+   * 在各自的 interface 上验证。组件确实驱动了它们这件事由浏览器实测执行验证，
+   * 不用肯定式的源码接线断言冒充。
+   *
    * 「什么时候出现」这类条件本身不在这里断言：模板条件的写法属于实现文本，锁住它只会在等价
    * 重构时变红。展开按钮随实例存在与否出现、页签切换后会话树消失，都由票 08 的浏览器实测逐项
-   * 执行验证（Chrome 与 Firefox 各一轮）；时间的数据来源由 tests/webqq-conversation-tree.test.ts
-   * 在工作台外壳的 interface 上验证。
+   * 执行验证（Chrome 与 Firefox 各一轮）。
    */
   const sidebarSource = () => readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
   const sidebarStyles = () => readFileSync(resolve('client/styles/webqq-sidebar.css'), 'utf8')
+
+  it('展开态与那条自动展开规则不再住在组件里', () => {
+    const source = sidebarSource()
+
+    // 否定式的「已删除实现」守卫：把展开着的会话 ID 集合或找父行那条规则搬回组件时这里变红。
+    expect(source).not.toContain('expandedConversationIds')
+    expect(source).not.toContain('children.some(')
+    expect(source).not.toContain('children?.some(')
+  })
 
   it('会话行与实例子项都渲染最后消息时间', () => {
     const source = sidebarSource()

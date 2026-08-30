@@ -35,6 +35,8 @@ describe('群聊右键提及成员', () => {
     const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
     const composerSource = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
     const shellSource = readFileSync(resolve('client/webqq/workspace-shell.ts'), 'utf8')
+    // 会话列表预览的口径住在会话树投影 module 里；行为本身由 tests/conversation-tree.test.ts 验证。
+    const conversationTreeSource = readFileSync(resolve('client/webqq/conversation-tree.ts'), 'utf8')
 
     expect(menuSource).toContain("actions.includes('mention')")
     expect(menuSource).toContain("emit('mention')")
@@ -45,9 +47,9 @@ describe('群聊右键提及成员', () => {
     expect(composerSource).toContain('serializeComposerDraft(draft.value.tokens)')
     expect(composerSource).toContain('insertComposerMention')
     expect(composerSource).toContain('mentionCandidates')
-    expect(shellSource).toContain('formatMentionContent(latestMessage.content, participantNames.value)')
+    expect(conversationTreeSource).toContain('formatMentionContent(message.content, participantNames)')
     expect(shellSource).toContain('mentionCandidates')
     // 会话列表预览复用领域格式化函数，避免硬编码文案或直接展示撤回原文。
-    expect(shellSource).toContain('formatRecalledMessageEventText(latestMessage, operatorName)')
+    expect(conversationTreeSource).toContain('formatRecalledMessageEventText(message, participantNames[operatorId] ?? operatorId)')
   })
 })

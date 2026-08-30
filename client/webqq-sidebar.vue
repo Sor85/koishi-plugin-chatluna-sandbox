@@ -265,7 +265,7 @@
                 </div>
               </ContextMenuTrigger>
               <div v-if="isConversationExpanded(conversation.id)" class="webqq-session-children">
-                <ContextMenu v-for="child in conversation.children ?? []" :key="child.id">
+                <ContextMenu v-for="child in conversation.children" :key="child.id">
                   <ContextMenuTrigger as-child>
                     <button
                       type="button"
@@ -349,6 +349,8 @@ import EnvironmentCreatePopover from './environment-create-popover.vue'
 import NotificationMenu from './notification-menu.vue'
 import SandboxActivityIcon from './sandbox-activity-icon.vue'
 import SandboxAgentControlIcon from './sandbox-agent-control-icon.vue'
+import type { ConversationTreeNode } from './webqq/conversation-tree'
+import { createConversationTreeExpansion } from './webqq/conversation-tree-expansion'
 import { getGroupRoleLabel } from './webqq/group-display'
 import WebqqAvatar from './webqq-avatar.vue'
 import WebqqMenuExtensionMark from './webqq-menu-extension-mark.vue'
@@ -361,22 +363,6 @@ import type {
 type SidebarTab = 'recent' | 'friends' | 'groups'
 type EnvironmentEntityType = 'user' | 'bot' | 'group'
 type EnvironmentDialogMode = 'edit' | 'delete'
-
-export interface WebqqSidebarConversation {
-  id: string
-  groupId?: string
-  title: string
-  avatar?: string
-  avatarKind: 'user' | 'bot' | 'group'
-  preview: string
-  time: string
-  actorRole?: SandboxGroupMember['role']
-  entityTarget: { type: 'user' | 'bot' | 'group', id: string }
-  entityLabel: '用户' | '机器人' | '群组'
-  /** 根会话还是会话实例；会话实例作为所属根会话的子项展开。 */
-  kind?: 'root' | 'instance'
-  children?: WebqqSidebarConversation[]
-}
 
 export interface WebqqSidebarFriend {
   id: string
@@ -412,7 +398,7 @@ export interface WebqqSidebarModel {
   currentGroupMemberIds: string[]
   currentOperator?: Pick<SandboxParticipant, 'id' | 'name'>
   bots: Pick<SandboxBotProfile, 'id' | 'name'>[]
-  conversations: WebqqSidebarConversation[]
+  conversations: ConversationTreeNode[]
   friends: WebqqSidebarFriend[]
   groups: WebqqSidebarGroup[]
   notificationRequests: { friends: SandboxRelationshipRequest[], groups: SandboxRelationshipRequest[] }
@@ -458,7 +444,7 @@ const sidebarTab = ref<SidebarTab>('recent')
 const notificationTab = ref<'friends' | 'groups'>('friends')
 const handlingRequestId = ref('')
 const notificationErrorMessage = ref('')
-const expandedConversationIds = ref<Record<string, true>>({})
+const { isConversationExpanded, toggleConversationExpanded, revealConversation } = createConversationTreeExpansion()
 const navigationItems = [
   { id: 'messages' as const, label: '消息', icon: IconMessageCircle },
   { id: 'model-requests' as const, label: '模型请求', icon: IconBrain },
@@ -483,26 +469,13 @@ const sidebarTabs = [
 const filteredConversations = computed(() => sidebarTab.value === 'recent' ? props.model.conversations : [])
 
 /** 某个根会话下的会话实例数量。展开按钮只在它不为零时出现，并把这个数字显示出来。 */
-function instanceCount(conversation: WebqqSidebarConversation) {
-  return conversation.children?.length ?? 0
+function instanceCount(conversation: ConversationTreeNode) {
+  return conversation.children.length
 }
 
-function isConversationExpanded(conversationId: string) {
-  return !!expandedConversationIds.value[conversationId]
-}
-
-function toggleConversationExpanded(conversationId: string) {
-  expandedConversationIds.value = isConversationExpanded(conversationId)
-    ? Object.fromEntries(Object.entries(expandedConversationIds.value).filter(([id]) => id !== conversationId))
-    : { ...expandedConversationIds.value, [conversationId]: true }
-}
-
-// 选中一个会话实例时展开它所属的会话行：新建与分叉完成后新实例会被自动选中，而展开态是侧栏
-// 本地状态，折叠的父行会让侧栏一行都不高亮。写进展开态而不是在判定里叠加条件，用户之后仍可收起。
+// 展开、收起与「选中实例就展开所属那一行」都住在展开态 module 里；组件只在选中变化时驱动它一次。
 watch(() => props.model.activeConversationId, (conversationId) => {
-  if (!conversationId) return
-  const parent = props.model.conversations.find(({ children }) => children?.some(({ id }) => id === conversationId))
-  if (parent && !isConversationExpanded(parent.id)) toggleConversationExpanded(parent.id)
+  revealConversation(conversationId, props.model.conversations)
 }, { immediate: true })
 const notificationRequests = computed(() => props.model.notificationRequests)
 const pendingNotificationCount = computed(() => notificationRequests.value.friends.length + notificationRequests.value.groups.length)

@@ -17,12 +17,12 @@ import type {
   SandboxMessageModelRequestReference,
   SearchConversationMessagesInput,
 } from '../../src/types'
-import { formatRecalledMessageEventText, getSandboxBots, getSandboxUsers, isRecalledMessage } from '../../src/types'
+import { getSandboxBots, getSandboxUsers } from '../../src/types'
 import type { SandboxWorkspaceView } from './workspace-state'
 import type { FriendMenuState } from './friend-menu'
+import { buildConversationTree, toRecentForwardTargets } from './conversation-tree'
 import { buildForwardPreviewMap } from './forward-preview'
 import { buildMessageCapabilityMap } from './message-capabilities'
-import { formatMentionContent } from './mention'
 import { getIncomingNotificationRequests } from './notification-requests'
 import { buildGroupProfileCardModel, buildProfileCardModel } from './profile-card'
 import { getConversationPeerId, getFriendDirectory, getGroupDirectory } from './relationship-directory'
@@ -210,13 +210,8 @@ export function createWebqqWorkspaceShell(
     ...snapshot.value.participants.map(({ id, name }) => [id, name]),
   ]))
   const forwardTargets = computed<WebqqForwardTargetModel>(() => {
-    const recent: WebqqForwardTargetOption[] = sidebarConversations.value.map((conversation) => ({
-      conversationId: conversation.id,
-      title: conversation.title,
-      subtitle: conversation.preview,
-      avatar: conversation.avatar,
-      avatarKind: conversation.avatarKind,
-    }))
+    // 「最近」一列由会话树的结果派生，不是另投一次：改会话树的预览口径时这一列跟着变。
+    const recent: WebqqForwardTargetOption[] = toRecentForwardTargets(sidebarConversations.value)
     const friends: WebqqForwardTargetOption[] = getFriendDirectory(snapshot.value, currentOperatorId.value)
       .filter((entry) => entry.isFriend && entry.conversationId)
       .map((entry) => ({
@@ -275,63 +270,13 @@ export function createWebqqWorkspaceShell(
     persistence: workspace.value.persistence,
     participants: participants.value,
   }))
-  const toSidebarConversation = (conversation: ResolvedConversation) => {
-    const group = conversation.type === 'group'
-      ? snapshot.value.groups.find(({ id }) => id === conversation.groupId)
-      : undefined
-    const peerId = getConversationPeerId(conversation, currentOperatorId.value)
-    const bot = getBot(peerId)
-    const peer = bot ?? users.value.find(({ id }) => id === peerId)
-    const messageIds = new Set(readConversationMessageIds(snapshot.value, conversation.id))
-    const latestMessage = snapshot.value.messages.filter(({ id }) => messageIds.has(id)).at(-1)
-    const actorRole = group?.members.find(({ participantId }) => participantId === currentOperatorId.value)?.role
-    const latestPreview = (() => {
-      if (!latestMessage) return '开始一段新对话'
-      if (isRecalledMessage(latestMessage)) {
-        const operatorId = latestMessage.lifecycle.operatorId
-        const operatorName = participantNames.value[operatorId] ?? operatorId
-        return formatRecalledMessageEventText(latestMessage, operatorName)
-      }
-      return formatMentionContent(latestMessage.content, participantNames.value)
-    })()
-    return {
-      id: conversation.id,
-      groupId: group?.id,
-      kind: conversation.kind,
-      // 会话实例有自己的名字；根会话的名字由参与者关系决定。
-      title: conversation.title ?? group?.name ?? peer?.name ?? conversation.id,
-      avatar: resolveAvatar(group?.avatar ?? peer?.avatar),
-      avatarKind: group ? 'group' as const : bot ? 'bot' as const : 'user' as const,
-      preview: latestPreview,
-      time: latestMessage?.createdAt
-        ? new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(new Date(latestMessage.createdAt))
-        : '',
-      actorRole,
-      entityTarget: group
-        ? { type: 'group' as const, id: group.id }
-        : { type: bot ? 'bot' as const : 'user' as const, id: peerId ?? '' },
-      entityLabel: group ? '群组' as const : bot ? '机器人' as const : '用户' as const,
-    }
-  }
-  /**
-   * 侧栏会话树：一层根会话，每个根会话下挂它自己的会话实例。
-   * 数据源是「根会话加其实例列表」，不是「一个扁平集合加父字段」。
-   */
-  const sidebarConversations = computed(() => {
-    const instancesByRoot = new Map<string, ReturnType<typeof toSidebarConversation>[]>()
-    for (const conversation of visibleConversations.value) {
-      if (conversation.kind !== 'instance') continue
-      const siblings = instancesByRoot.get(conversation.rootConversationId) ?? []
-      siblings.push(toSidebarConversation(conversation))
-      instancesByRoot.set(conversation.rootConversationId, siblings)
-    }
-    return visibleConversations.value
-      .filter(({ kind }) => kind === 'root')
-      .map((conversation) => ({
-        ...toSidebarConversation(conversation),
-        children: instancesByRoot.get(conversation.id) ?? [],
-      }))
-  })
+  // 会话树的投影口径住在 conversation-tree module 里；外壳只负责把场景与头像解析喂给它。
+  const sidebarConversations = computed(() => buildConversationTree({
+    scene: snapshot.value,
+    conversations: visibleConversations.value,
+    operatorId: currentOperatorId.value,
+    resolveAvatar,
+  }))
   const sidebarModel = computed<WebqqSidebarModel>(() => ({
     appearance: appearance.value,
     currentView: currentView.value,
