@@ -171,6 +171,21 @@ export interface SandboxGroupConversation {
 export type SandboxConversation = SandboxDirectConversation | SandboxGroupConversation
 
 /**
+ * 分叉点：会话实例记录的来源消息，它界定继承前缀的范围。
+ *
+ * 只记这一对「来源会话 + 来源消息」，不存一份前缀消息 ID 快照：消息只追加不插入，因此
+ * 「来源会话当前列表到分叉点为止」与「分叉时刻的前缀」在正常路径上等价，两者只在来源会话
+ * 被清空或被保留窗口淘汰时不同，而那两种情况下消息正文本身已经不存在，多存一份 ID 列表
+ * 也救不回来。
+ */
+export interface SandboxConversationForkPoint {
+  /** 来源会话 ID，可以是根会话也可以是另一个会话实例。 */
+  conversationId: string
+  /** 分叉点消息 ID；它及其之前的那一段是继承前缀，分叉点本身包含在内。 */
+  messageId: string
+}
+
+/**
  * 会话实例：根会话下的一条独立对话线，拥有自己的消息与标题。
  *
  * 只保存所属根会话 ID；参与者对与群号一律从根会话读，因此关系变更不需要同步两处。
@@ -181,6 +196,12 @@ export interface SandboxConversationInstance {
   id: string
   rootConversationId: string
   title: string
+  /** 分叉点；缺失表示这条对话线只有自有消息。 */
+  forkPoint?: SandboxConversationForkPoint
+  /**
+   * 自有消息，继承前缀不在其中——分支不复制消息，同一条逻辑消息在场景里只有一个身份。
+   * 需要「这个会话由哪些消息组成」时读会话解析模块的 readConversationMessageIds。
+   */
   messageIds: string[]
   hasMoreMessages?: boolean
 }
@@ -857,6 +878,11 @@ export interface SearchConversationMessagesInput {
 
 export interface SandboxMessageSearchHit {
   messageId: string
+  /**
+   * 命中消息真正归属的会话。在分支里搜到继承前缀时它是那条消息所属的来源会话而不是分支——
+   * 一条逻辑消息只有一个会话身份，按分支重复报告会让结果随分支数膨胀。
+   */
+  conversationId: string
   authorId: string
   createdAt: string
   // 命中摘要使用消息 content 原文；撤回消息仍可搜到底层正文。
@@ -899,7 +925,7 @@ export interface BranchConversationInstanceInput {
   operatorId: string
   /** 分叉来源会话，可以是根会话也可以是会话实例。 */
   conversationId: string
-  /** 分叉点消息；它及其之前的历史会被复制进新实例。 */
+  /** 分叉点消息；它及其之前的那一段成为新实例的继承前缀，不复制消息。 */
   messageId: string
   title?: string
 }

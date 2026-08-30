@@ -378,8 +378,8 @@ describe('原始 OneBot 回复的会话偏离', () => {
   })
 })
 
-describe('从消息创建分支', () => {
-  it('新实例带上分叉点及其之前的历史，复制体有新身份且引用指向复制体', async () => {
+describe('从消息分叉出会话实例', () => {
+  it('分支只记分叉点：不新增消息实体，读出来是继承前缀加自有消息', async () => {
     const { app, control: resolve } = await createControl()
     await app.start()
     const control = resolve()
@@ -392,6 +392,7 @@ describe('从消息创建分支', () => {
       replyToMessageId: first.messageId,
     })
     await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content: '分叉点之后' })
+    const messageCountBeforeBranch = control.getSnapshot().messages.length
 
     const { conversationId } = control.branchConversationInstance({
       operatorId: '10001',
@@ -400,43 +401,218 @@ describe('从消息创建分支', () => {
     })
 
     const scene = control.getSnapshot()
-    const copies = readConversationMessageIds(scene, conversationId)
+    // 一条消息都没有新增：分支的历史是同一份记录，不是副本。
+    expect(scene.messages).toHaveLength(messageCountBeforeBranch)
+    const inherited = readConversationMessageIds(scene, conversationId)
       .map((id) => scene.messages.find((message) => message.id === id)!)
-    expect(copies.map(({ content }) => content)).toEqual(['第一条', '第二条引用第一条'])
-    // 复制体拥有新的消息身份，并归属新实例。
-    expect(copies.map(({ id }) => id)).not.toEqual([first.messageId, second.messageId])
-    expect(copies.every(({ conversationId: owner }) => owner === conversationId)).toBe(true)
-    // 复制范围内的引用指向复制体，而不是原会话里的消息。
-    expect(copies[1]?.replyToMessageId).toBe(copies[0]?.id)
-    // 原会话一条不少、一条不改。
+    // 分叉点及其之前的那一段，顺序与来源一致，分叉点本身在内、分叉点之后的不在。
+    expect(inherited.map(({ content }) => content)).toEqual(['第一条', '第二条引用第一条'])
+    // 继承前缀就是来源会话里那两条消息本身，仍然归属来源会话。
+    expect(inherited.map(({ id }) => id)).toEqual([first.messageId, second.messageId])
+    expect(inherited.every(({ conversationId: owner }) => owner === 'private:10001:20001')).toBe(true)
+    // 前缀内的引用指向同一条来源消息，而不是第二份身份。
+    expect(inherited[1]?.replyToMessageId).toBe(first.messageId)
+    // 来源会话一条不少、一条不改。
     expect(readConversationMessageIds(scene, 'private:10001:20001')).toHaveLength(3)
   })
 
-  it('分叉点之后的引用不会跨会话指向原消息', async () => {
+  it('同一段历史开多个分支后，场景消息实体总数不随分支数增长', async () => {
     const { app, control: resolve } = await createControl()
     await app.start()
     const control = resolve()
 
-    const first = await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content: '第一条' })
-    await control.sendMessage({
+    await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content: '第一条' })
+    await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content: '第二条' })
+    const forkPoint = await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content: '第三条' })
+    const messageCount = control.getSnapshot().messages.length
+
+    const branches = [1, 2, 3].map(() => control.branchConversationInstance({
       operatorId: '10001',
       conversationId: 'private:10001:20001',
-      content: '引用第一条',
-      replyToMessageId: first.messageId,
-    })
+      messageId: forkPoint.messageId,
+    }).conversationId)
 
-    // 只复制到第一条：第二条的引用不在复制范围内，因此第二条根本不会出现。
+    const scene = control.getSnapshot()
+    // 单份消息存储：三条分支共享同一段历史，场景消息实体一条都没多。
+    expect(scene.messages).toHaveLength(messageCount)
+    for (const branch of branches) {
+      expect(readConversationMessageIds(scene, branch)).toEqual(readConversationMessageIds(scene, 'private:10001:20001'))
+    }
+  })
+
+  it('从一个分支里再分叉时，新分支看得到该分支的自有消息与它继承的历史', async () => {
+    const { app, control: resolve } = await createControl()
+    await app.start()
+    const control = resolve()
+
+    const root = await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content: '根会话消息' })
+    const first = control.branchConversationInstance({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      messageId: root.messageId,
+    })
+    const asked = await control.sendMessage({ operatorId: '10001', conversationId: first.conversationId, content: '第一条分支里的提问' })
+
+    const second = control.branchConversationInstance({
+      operatorId: '10001',
+      conversationId: first.conversationId,
+      messageId: asked.messageId,
+    })
+    await control.sendMessage({ operatorId: '10001', conversationId: second.conversationId, content: '在实验的基础上继续问' })
+
+    const scene = control.getSnapshot()
+    const contentsOf = (conversationId: string) => readConversationMessageIds(scene, conversationId)
+      .map((id) => scene.messages.find((message) => message.id === id)!.content)
+    // 沿来源链逐段拼接：看到的是上一条分支的那几轮，而不是跳回根会话的历史。
+    expect(contentsOf(second.conversationId)).toEqual(['根会话消息', '第一条分支里的提问', '在实验的基础上继续问'])
+    expect(contentsOf(first.conversationId)).toEqual(['根会话消息', '第一条分支里的提问'])
+    // 存储层级仍严格两层。
+    expect(resolveConversation(scene, second.conversationId)?.rootConversationId).toBe('private:10001:20001')
+  })
+
+  it('消息历史分页连续跨过继承与自有的边界', async () => {
+    const { app, control: resolve } = await createControl()
+    await app.start()
+    const control = resolve()
+
+    for (const content of ['根一', '根二', '根三']) {
+      await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content })
+    }
+    const forkPoint = readConversationMessageIds(control.getSnapshot(), 'private:10001:20001').at(-1)!
     const { conversationId } = control.branchConversationInstance({
       operatorId: '10001',
       conversationId: 'private:10001:20001',
-      messageId: first.messageId,
+      messageId: forkPoint,
     })
+    await control.sendMessage({ operatorId: '10001', conversationId, content: '分支一' })
+    await control.sendMessage({ operatorId: '10001', conversationId, content: '分支二' })
+
+    const readPage = (beforeMessageId?: string) => control.getMessageHistory({
+      operatorId: '10001',
+      conversationId,
+      limit: 2,
+      beforeMessageId,
+    })
+    const pages: string[][] = []
+    let cursor: string | undefined
+    let page = readPage(cursor)
+    while (true) {
+      pages.push(page.messages.map(({ content }) => content))
+      cursor = page.nextBeforeMessageId
+      if (!cursor) break
+      page = readPage(cursor)
+    }
+
+    // 游标仍是消息 ID，跨越继承与自有的边界对调用方透明：分界处不断页、不漏消息。
+    expect(pages).toEqual([['分支一', '分支二'], ['根二', '根三'], ['根一']])
+  })
+
+  it('消息搜索命中继承前缀时报那条消息归属的会话', async () => {
+    const { app, control: resolve } = await createControl()
+    await app.start()
+    const control = resolve()
+
+    const inherited = await control.sendMessage({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      content: '继承前缀里的关键词',
+    })
+    const { conversationId } = control.branchConversationInstance({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      messageId: inherited.messageId,
+    })
+    const own = await control.sendMessage({ operatorId: '10001', conversationId, content: '分支自有的关键词' })
+
+    // 在分支里搜到继承前缀时报根会话：一条逻辑消息只有一个会话身份，
+    // 按分支重复报告会让结果数随分支数膨胀。
+    expect(control.searchConversationMessages({ operatorId: '10001', conversationId, query: '关键词' }).hits
+      .map(({ messageId, conversationId: owner }) => ({ messageId, owner })))
+      .toEqual([
+        { messageId: own.messageId, owner: conversationId },
+        { messageId: inherited.messageId, owner: 'private:10001:20001' },
+      ])
+
+    // 从分支里再分叉时前缀跨两段，报的仍是每条消息各自的归属会话而不是一律报根会话——
+    // 「命中继承前缀时报根会话」在这条链上具体表现为「报那条消息真正所属的那一段」。
+    const nested = control.branchConversationInstance({
+      operatorId: '10001',
+      conversationId,
+      messageId: own.messageId,
+    })
+    expect(control.searchConversationMessages({
+      operatorId: '10001',
+      conversationId: nested.conversationId,
+      query: '关键词',
+    }).hits.map(({ conversationId: owner }) => owner)).toEqual([conversationId, 'private:10001:20001'])
+  })
+
+  it('清空根会话后分支仍存在，继承部分相应变空', async () => {
+    const { app, control: resolve } = await createControl()
+    await app.start()
+    const control = resolve()
+
+    const root = await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content: '原始记录' })
+    const { conversationId } = control.branchConversationInstance({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      messageId: root.messageId,
+    })
+    const own = await control.sendMessage({ operatorId: '10001', conversationId, content: '换一种问法' })
+    expect(readConversationMessageIds(control.getSnapshot(), conversationId)).toEqual([root.messageId, own.messageId])
+
+    control.clearConversationMessages({ operatorId: '10001', conversationId: 'private:10001:20001' })
 
     const scene = control.getSnapshot()
-    const copies = readConversationMessageIds(scene, conversationId)
-      .map((id) => scene.messages.find((message) => message.id === id)!)
-    expect(copies).toHaveLength(1)
-    expect(copies[0]).not.toHaveProperty('replyToMessageId')
+    // 与「更早的消息已不在保留窗口内」是同一种体验：整条实验线不会因为整理原始对话而消失。
+    expect(resolveConversation(scene, conversationId)).toBeDefined()
+    expect(readConversationMessageIds(scene, conversationId)).toEqual([own.messageId])
+  })
+
+  it('保留窗口淘汰掉分叉点之前的消息后，继承部分相应缩短', async () => {
+    const app = new App()
+    let created: SandboxControlService | undefined
+    app.plugin((ctx) => {
+      created = new SandboxControlService(ctx, { sceneMessageLimit: 3 })
+    })
+    runningApps.push(app)
+    await app.start()
+    if (!created) throw new Error('沙盒控制服务未注册')
+    const control = created
+
+    await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content: '最旧的一条' })
+    const forkPoint = await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content: '分叉点' })
+    const { conversationId } = control.branchConversationInstance({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      messageId: forkPoint.messageId,
+    })
+    await control.sendMessage({ operatorId: '10001', conversationId, content: '分支第一条' })
+    // 第四条消息把最旧的那条挤出保留窗口。
+    await control.sendMessage({ operatorId: '10001', conversationId, content: '分支第二条' })
+
+    const scene = control.getSnapshot()
+    expect(readConversationMessageIds(scene, conversationId)
+      .map((id) => scene.messages.find((message) => message.id === id)!.content))
+      .toEqual(['分叉点', '分支第一条', '分支第二条'])
+  })
+
+  it('没有分叉点的实例只显示自有消息，能正常打开', async () => {
+    const { app, control: resolve } = await createControl()
+    await app.start()
+    const control = resolve()
+
+    await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content: '根会话消息' })
+    // 空白实例与场景里已有的复制型旧分支形状相同：没有分叉点，只有自有消息。
+    const { conversationId } = control.createConversationInstance({
+      operatorId: '10001',
+      rootConversationId: 'private:10001:20001',
+    })
+    const own = await control.sendMessage({ operatorId: '10001', conversationId, content: '实例自有消息' })
+
+    expect(readConversationMessageIds(control.getSnapshot(), conversationId)).toEqual([own.messageId])
+    expect(control.getMessageHistory({ operatorId: '10001', conversationId }).messages.map(({ content }) => content))
+      .toEqual(['实例自有消息'])
   })
 
   it('默认标题指出来源会话，从实例再分支时指向实例名并归一化到同一根会话', async () => {
@@ -473,7 +649,7 @@ describe('从消息创建分支', () => {
     expect(nestedConversation?.rootConversationId).toBe('private:10001:20001')
   })
 
-  it('在分支里发消息时插件看到的上下文包含被复制的历史', async () => {
+  it('在分支里发消息时插件看到的上下文包含继承的历史', async () => {
     const { app, control: resolve } = await createControl()
     const observed: Array<{ channelId?: string, history: string[] }> = []
     app.middleware(async (session) => {

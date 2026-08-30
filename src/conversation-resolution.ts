@@ -3,6 +3,7 @@ import {
   createGroupConversationId,
   SandboxDomainError,
   type SandboxConversation,
+  type SandboxConversationForkPoint,
   type SandboxConversationInstance,
   type SandboxSnapshot,
 } from './types'
@@ -97,14 +98,53 @@ function findConversationRow(scene: SandboxSnapshot, conversationId: string): Co
 }
 
 /**
+ * 存储行上的分叉点。只有实例行可能带它，根会话永远没有。
+ *
+ * 形状不对（半成品导入可能带来任意 JSON）时归一成「没有分叉点」，读取路径因此退化为只读
+ * 自有消息，而不是在拼接中途炸掉。
+ */
+function readForkPoint(row: ConversationRow): SandboxConversationForkPoint | undefined {
+  const forkPoint = 'forkPoint' in row ? row.forkPoint : undefined
+  if (!forkPoint || typeof forkPoint !== 'object') return undefined
+  return typeof forkPoint.conversationId === 'string' && typeof forkPoint.messageId === 'string' ? forkPoint : undefined
+}
+
+/**
+ * 一个存储行的逻辑消息列表：继承前缀在前，自有消息在后。
+ *
+ * 继承前缀是来源会话**当前**列表里分叉点及其之前的那一段，因此来源被清空或被保留窗口淘汰后
+ * 它相应变空——那是同一份记录，不是分叉时刻的快照。来源本身可以是另一个实例，此时沿来源链
+ * 递归展开，所以从分支里再分叉能看到上一条分支的自有消息。
+ *
+ * `visited` 让来源链成环时那一段读作「没有可读的前缀」：存储层级严格两层，环只可能来自被改坏
+ * 的导入场景；继续沿环展开会让同一条消息在列表里出现两次，比丢掉前缀更糟。
+ */
+function readRowMessageIds(scene: SandboxSnapshot, row: ConversationRow, visited: Set<string>): readonly string[] {
+  const forkPoint = readForkPoint(row)
+  if (!forkPoint) return row.messageIds
+  if (visited.has(row.id)) return []
+  visited.add(row.id)
+  const source = findConversationRow(scene, forkPoint.conversationId)
+  if (!source) return row.messageIds
+  const sourceMessageIds = readRowMessageIds(scene, source, visited)
+  const forkIndex = sourceMessageIds.indexOf(forkPoint.messageId)
+  // 分叉点消息本身属于继承前缀；它已经不在来源列表里时整段前缀为空——淘汰按最旧优先，
+  // 分叉点消失意味着它之前的消息也都消失了。
+  if (forkIndex < 0) return row.messageIds
+  return [...sourceMessageIds.slice(0, forkIndex + 1), ...row.messageIds]
+}
+
+/**
  * 「某个会话的消息列表」的唯一读取入口，按存储顺序从旧到新。
  *
  * 所有需要会话消息的路径（历史分页、搜索、快照投影、OneBot 表面、外部测试控制端点）都经这里，
- * 因此「一个会话由哪些消息组成」只有一处答案。会话不存在时读出空列表：读取路径不替调用方
- * 判断会话该不该存在，那由各自的可见性与存在性校验负责。
+ * 因此「一个会话由哪些消息组成」只有一处答案，会话实例的继承前缀拼接也只有这一处实现。
+ * 会话不存在时读出空列表：读取路径不替调用方判断会话该不该存在，那由各自的可见性与存在性
+ * 校验负责。
  */
 export function readConversationMessageIds(scene: SandboxSnapshot, conversationId: string): readonly string[] {
-  return findConversationRow(scene, conversationId)?.messageIds ?? []
+  const row = findConversationRow(scene, conversationId)
+  return row ? readRowMessageIds(scene, row, new Set()) : []
 }
 
 /** 场景里的全部根会话，按存储顺序。 */
@@ -285,10 +325,13 @@ export function ensureGroupRootConversation(scene: SandboxSnapshot, groupId: str
  * `rootConversationId` 传入会话实例时归一化到它的根会话：层级严格两层，从实例再分叉不产生第三层。
  * 实例 ID 由调用方给出：本模块被客户端一同引用，不能为了生成 ID 把整个 Koishi 运行时拖进
  * 前端产物；实例 ID 沿用消息那套随机 ID 命名空间，与根会话的规范 ID 天然区分。
+ *
+ * `forkPoint` 是可选的分叉点，来源会话可以是根会话也可以是另一个实例——存储仍是两层，来源链
+ * 只在 {@link readConversationMessageIds} 里展开。新实例永远从零条自有消息开始：分叉不复制消息。
  */
 export function createConversationInstance(
   scene: SandboxSnapshot,
-  input: { id: string, rootConversationId: string, title: string, messageIds?: readonly string[] },
+  input: { id: string, rootConversationId: string, title: string, forkPoint?: SandboxConversationForkPoint },
 ): ResolvedConversation {
   const rootConversationId = resolveRootConversationId(scene, input.rootConversationId)
   if (!findRootRow(scene, rootConversationId)) throw new SandboxDomainError(`会话不存在：${input.rootConversationId}`)
@@ -298,7 +341,8 @@ export function createConversationInstance(
     id: input.id,
     rootConversationId,
     title,
-    messageIds: [...(input.messageIds ?? [])],
+    ...(input.forkPoint ? { forkPoint: { ...input.forkPoint } } : {}),
+    messageIds: [],
   }
   scene.conversationInstances = [...instanceRows(scene), instance]
   return resolveInstance(scene, instance)!
@@ -387,6 +431,10 @@ export interface ConversationProjection {
 /**
  * 投影一个会话行：消息列表经 {@link readConversationMessageIds} 读，因此投影出的那一段与
  * 其他读取路径同源，而不是自己再拼一遍。
+ *
+ * 实例行投影出的 `messageIds` 是拼接后的那一段，因此必须同时去掉分叉点——留着它会让读取口
+ * 拿着已经拼好的列表沿来源链再拼一次，继承前缀因此在客户端重复出现。投影是「这个会话现在
+ * 由哪些消息组成」的物化结果，来源链只在权威场景里展开。
  */
 function truncate<T extends ConversationRow>(
   scene: SandboxSnapshot,
@@ -395,8 +443,9 @@ function truncate<T extends ConversationRow>(
   keepWatermark: boolean,
 ): T {
   const messageIds = readConversationMessageIds(scene, row.id)
+  const { forkPoint: _forkPoint, ...projected } = row as T & { forkPoint?: SandboxConversationForkPoint }
   return {
-    ...row,
+    ...(projected as T),
     messageIds: messageIds.slice(-messageLimit),
     hasMoreMessages: (keepWatermark && !!row.hasMoreMessages) || messageIds.length > messageLimit,
   }
@@ -466,6 +515,11 @@ export function validateSceneConversations(scene: SandboxSnapshot, scope: Conver
       throw new SandboxDomainError(`会话实例引用不存在的根会话：${instance.id}`)
     }
     if (!instance.title?.trim()) throw new SandboxDomainError(`会话实例缺少名称：${instance.id}`)
+    // 只校验形状。分叉点指向的会话与消息都允许已经消失——来源被删除、被清空或被保留窗口
+    // 淘汰之后，继承前缀相应变空而实例仍然可用；要求它们存在会让导出再导入的场景炸掉。
+    if (instance.forkPoint && !readForkPoint(instance)) {
+      throw new SandboxDomainError(`会话实例的分叉点无效：${instance.id}`)
+    }
   }
   for (const row of [...scene.conversations, ...instances]) {
     if (row.messageIds.some((id) => !scope.messageIds.has(id))) {

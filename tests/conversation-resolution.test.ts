@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  appendConversationMessageId,
+  clearConversationMessageIds,
   createConversationInstance,
   ensureDirectRootConversation,
   ensureGroupRootConversation,
@@ -29,8 +31,9 @@ import {
   resolveDirectConversationId,
   resolveGroupConversationId,
   resolveRootConversationId,
+  validateSceneConversations,
 } from '../src/conversation-resolution'
-import { SandboxDomainError, type SandboxSnapshot } from '../src/types'
+import { SandboxDomainError, type SandboxConversationForkPoint, type SandboxSnapshot } from '../src/types'
 
 function createScene(): SandboxSnapshot {
   return {
@@ -64,6 +67,17 @@ function createScene(): SandboxSnapshot {
     }],
     requests: [],
   }
+}
+
+/** 建一个会话实例并给它挂上自有消息。分支不复制消息，自有消息一律靠追加得到。 */
+function createInstance(
+  scene: SandboxSnapshot,
+  input: { id: string, rootConversationId: string, title: string, forkPoint?: SandboxConversationForkPoint },
+  ownMessageIds: readonly string[] = [],
+) {
+  const instance = createConversationInstance(scene, input)
+  for (const messageId of ownMessageIds) appendConversationMessageId(scene, instance.id, messageId)
+  return instance
 }
 
 describe('会话解析', () => {
@@ -202,12 +216,11 @@ describe('会话解析', () => {
 describe('会话消息列表读取', () => {
   it('根会话与会话实例经同一个入口读出消息列表', () => {
     const scene = createScene()
-    const instance = createConversationInstance(scene, {
+    const instance = createInstance(scene, {
       id: 'instance-16',
       rootConversationId: 'private:10001:20001',
       title: '支线',
-      messageIds: ['m7', 'm8'],
-    })
+    }, ['m7', 'm8'])
 
     expect(readConversationMessageIds(scene, 'private:10001:20001')).toEqual(['m1', 'm2'])
     expect(readConversationMessageIds(scene, 'group:30001')).toEqual(['m3'])
@@ -230,6 +243,207 @@ describe('会话消息列表读取', () => {
     // 保留窗口摘除引用会整体替换数组，因此持有解析结果的调用方必须每次重新读。
     pruneConversationMessageIds(scene, new Set(['m1']))
     expect(readConversationMessageIds(scene, conversation.id)).toEqual(['m2'])
+  })
+})
+
+describe('分叉点与继承前缀', () => {
+  it('按分叉点拼接来源前缀与自有消息，分叉点本身包含在前缀内', () => {
+    const scene = createScene()
+    appendConversationMessageId(scene, 'private:10001:20001', 'm3')
+
+    const instance = createInstance(scene, {
+      id: 'fork-1',
+      rootConversationId: 'private:10001:20001',
+      title: '换一种问法',
+      forkPoint: { conversationId: 'private:10001:20001', messageId: 'm2' },
+    }, ['x1', 'x2'])
+
+    // 分叉点 m2 在内、m3 在分叉点之后因此不在；自有消息接在前缀后面，顺序与来源一致。
+    expect(readConversationMessageIds(scene, instance.id)).toEqual(['m1', 'm2', 'x1', 'x2'])
+    // 来源会话一条不少、一条不改。
+    expect(readConversationMessageIds(scene, 'private:10001:20001')).toEqual(['m1', 'm2', 'm3'])
+  })
+
+  it('分叉产生的实例只存分叉点，自有消息为空，场景里没有第二份消息身份', () => {
+    const scene = createScene()
+
+    createInstance(scene, {
+      id: 'fork-2',
+      rootConversationId: 'private:10001:20001',
+      title: '分支',
+      forkPoint: { conversationId: 'private:10001:20001', messageId: 'm2' },
+    })
+
+    expect(scene.conversationInstances).toEqual([{
+      id: 'fork-2',
+      rootConversationId: 'private:10001:20001',
+      title: '分支',
+      forkPoint: { conversationId: 'private:10001:20001', messageId: 'm2' },
+      messageIds: [],
+    }])
+  })
+
+  it('来源是实例时沿来源链逐段拼接，看得到上一条分支的自有消息', () => {
+    const scene = createScene()
+    const first = createInstance(scene, {
+      id: 'fork-3',
+      rootConversationId: 'private:10001:20001',
+      title: '第一条分支',
+      forkPoint: { conversationId: 'private:10001:20001', messageId: 'm1' },
+    }, ['a1', 'a2'])
+
+    const second = createInstance(scene, {
+      id: 'fork-4',
+      rootConversationId: first.id,
+      title: '从分支里再分叉',
+      forkPoint: { conversationId: first.id, messageId: 'a1' },
+    }, ['b1'])
+
+    // 前缀沿链展开：根会话到 m1 为止，加上第一条分支到 a1 为止。
+    expect(readConversationMessageIds(scene, second.id)).toEqual(['m1', 'a1', 'b1'])
+    // 存储仍是两层：从实例分叉出来的实例仍然挂在同一个根会话下。
+    expect(second.rootConversationId).toBe('private:10001:20001')
+  })
+
+  it('分叉点在来源的继承前缀里时仍然拼得出那一段', () => {
+    const scene = createScene()
+    const first = createInstance(scene, {
+      id: 'fork-5',
+      rootConversationId: 'private:10001:20001',
+      title: '第一条分支',
+      forkPoint: { conversationId: 'private:10001:20001', messageId: 'm2' },
+    }, ['a1'])
+
+    const second = createInstance(scene, {
+      id: 'fork-6',
+      rootConversationId: first.id,
+      title: '从继承的那段再分叉',
+      forkPoint: { conversationId: first.id, messageId: 'm1' },
+    }, ['b1'])
+
+    expect(readConversationMessageIds(scene, second.id)).toEqual(['m1', 'b1'])
+  })
+
+  it('没有分叉点的实例只有自有消息', () => {
+    const scene = createScene()
+    const instance = createInstance(scene, {
+      id: 'fork-7',
+      rootConversationId: 'private:10001:20001',
+      title: '旧的复制型分支',
+    }, ['legacy-1'])
+
+    expect(readConversationMessageIds(scene, instance.id)).toEqual(['legacy-1'])
+  })
+
+  it('来源被清空或被保留窗口淘汰后继承前缀相应变空，实例仍然存在', () => {
+    const scene = createScene()
+    const instance = createInstance(scene, {
+      id: 'fork-8',
+      rootConversationId: 'private:10001:20001',
+      title: '分支',
+      forkPoint: { conversationId: 'private:10001:20001', messageId: 'm2' },
+    }, ['x1'])
+
+    // 淘汰按最旧优先：分叉点之前的消息先没，前缀相应缩短。
+    pruneConversationMessageIds(scene, new Set(['m1']))
+    expect(readConversationMessageIds(scene, instance.id)).toEqual(['m2', 'x1'])
+
+    // 分叉点本身也被淘汰后整段前缀为空——它之前的消息此时同样已经不存在。
+    pruneConversationMessageIds(scene, new Set(['m2']))
+    expect(readConversationMessageIds(scene, instance.id)).toEqual(['x1'])
+
+    clearConversationMessageIds(scene, 'private:10001:20001')
+    expect(resolveConversation(scene, instance.id)).toBeDefined()
+    expect(readConversationMessageIds(scene, instance.id)).toEqual(['x1'])
+  })
+
+  it('来源会话不存在或来源链成环时退化为只有自有消息，不炸在读取路径上', () => {
+    const scene = createScene()
+    const dangling = createInstance(scene, {
+      id: 'fork-9',
+      rootConversationId: 'private:10001:20001',
+      title: '来源已经消失',
+      forkPoint: { conversationId: 'instance-does-not-exist', messageId: 'm2' },
+    }, ['x1'])
+
+    expect(readConversationMessageIds(scene, dangling.id)).toEqual(['x1'])
+
+    // 存储层级严格两层，环只可能来自被改坏的导入场景；读取必须停下而不是栈溢出。
+    const left = createInstance(scene, { id: 'fork-10', rootConversationId: 'private:10001:20001', title: '左' }, ['l1'])
+    const right = createInstance(scene, { id: 'fork-11', rootConversationId: 'private:10001:20001', title: '右' }, ['r1'])
+    scene.conversationInstances!.find(({ id }) => id === left.id)!.forkPoint = { conversationId: right.id, messageId: 'r1' }
+    scene.conversationInstances!.find(({ id }) => id === right.id)!.forkPoint = { conversationId: left.id, messageId: 'l1' }
+
+    expect(readConversationMessageIds(scene, left.id)).toEqual(['r1', 'l1'])
+  })
+
+  it('投影把拼接后的那一段物化进实例行并去掉分叉点，消费端不会二次拼接', () => {
+    const scene = createScene()
+    const instance = createInstance(scene, {
+      id: 'fork-12',
+      rootConversationId: 'private:10001:20001',
+      title: '分支',
+      forkPoint: { conversationId: 'private:10001:20001', messageId: 'm2' },
+    }, ['x1'])
+
+    const projection = projectVisibleConversations(scene, '10001', 50)
+
+    expect(projection.conversationInstances).toEqual([{
+      id: instance.id,
+      rootConversationId: 'private:10001:20001',
+      title: '分支',
+      messageIds: ['m1', 'm2', 'x1'],
+      hasMoreMessages: false,
+    }])
+    // 投影出的场景再经同一个读取口读一遍，结果必须与权威场景一致而不是把前缀拼两次。
+    const projected: SandboxSnapshot = {
+      ...scene,
+      conversations: projection.conversations,
+      conversationInstances: projection.conversationInstances,
+    }
+    expect(readConversationMessageIds(projected, instance.id)).toEqual(['m1', 'm2', 'x1'])
+  })
+
+  it('投影的「还有更早消息」按拼接后的长度判定', () => {
+    const scene = createScene()
+    const instance = createInstance(scene, {
+      id: 'fork-13',
+      rootConversationId: 'private:10001:20001',
+      title: '分支',
+      forkPoint: { conversationId: 'private:10001:20001', messageId: 'm2' },
+    }, ['x1'])
+
+    // 自有消息只有一条，但拼接后是三条：水位必须看拼接后的长度，否则分支翻不动继承的历史。
+    const projection = projectVisibleConversations(scene, '10001', 2)
+
+    expect(projection.conversationInstances).toEqual([{
+      id: instance.id,
+      rootConversationId: 'private:10001:20001',
+      title: '分支',
+      messageIds: ['m2', 'x1'],
+      hasMoreMessages: true,
+    }])
+  })
+
+  it('分叉点形状不对时替换场景被拒，指向已消失的会话或消息则允许', () => {
+    const scene = createScene()
+    const scope = {
+      participantIds: new Set(['10001', '10002', '20001']),
+      groupIds: new Set(['30001']),
+      messageIds: new Set(['m1', 'm2', 'm3']),
+    }
+    createInstance(scene, {
+      id: 'fork-14',
+      rootConversationId: 'private:10001:20001',
+      title: '分支',
+      forkPoint: { conversationId: 'instance-does-not-exist', messageId: 'already-evicted' },
+    })
+
+    // 来源与分叉点消息都可以已经消失：继承前缀相应变空，实例本身仍然合法。
+    expect(() => validateSceneConversations(scene, scope)).not.toThrow()
+
+    Reflect.set(scene.conversationInstances!.at(-1)!, 'forkPoint', { conversationId: 'private:10001:20001' })
+    expect(() => validateSceneConversations(scene, scope)).toThrow('会话实例的分叉点无效：fork-14')
   })
 })
 
@@ -338,12 +552,11 @@ describe('会话实例解析', () => {
 
   it('空实例是合法状态：淘汰掉最后一条消息不删除实例本身', () => {
     const scene = createScene()
-    const instance = createConversationInstance(scene, {
+    const instance = createInstance(scene, {
       id: 'instance-12',
       rootConversationId: 'group:30001',
       title: '只有一条消息',
-      messageIds: ['m9'],
-    })
+    }, ['m9'])
 
     pruneConversationMessageIds(scene, new Set(['m9']))
 
@@ -353,12 +566,11 @@ describe('会话实例解析', () => {
 
   it('可见会话投影把根会话的实例一起投影出来', () => {
     const scene = createScene()
-    const instance = createConversationInstance(scene, {
+    const instance = createInstance(scene, {
       id: 'instance-13',
       rootConversationId: 'private:10001:20001',
       title: '支线',
-      messageIds: ['m7', 'm8'],
-    })
+    }, ['m7', 'm8'])
 
     const projection = projectVisibleConversations(scene, '10001', 1)
 
@@ -382,12 +594,11 @@ describe('会话实例解析', () => {
 
   it('删除只对会话实例开放，根会话不可删除', () => {
     const scene = createScene()
-    const removed = createConversationInstance(scene, {
+    const removed = createInstance(scene, {
       id: 'instance-14',
       rootConversationId: 'private:10001:20001',
       title: '要删掉的支线',
-      messageIds: ['m7'],
-    })
+    }, ['m7'])
     const kept = createConversationInstance(scene, { id: 'instance-15', rootConversationId: 'private:10001:20001', title: '留下的支线' })
 
     expect(removeConversationInstance(scene, removed.id)).toEqual(new Set([removed.id]))

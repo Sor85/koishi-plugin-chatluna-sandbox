@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createEmptyScene, SandboxControlService, SandboxRuntimeBotRegistry } from '../src/control-service'
+import { readConversationMessageIds } from '../src/conversation-resolution'
 import { SandboxTestSpaceService, trimSnapshotMessages } from '../src/test-spaces'
 import type { SandboxTestSpacePersistence, SandboxTestSpacePersistenceRecord } from '../src/persistence'
 
@@ -170,5 +171,44 @@ describe('AI 测试空间', () => {
     const untrimmed = trimSnapshotMessages(snapshot, 10)
     expect(untrimmed.conversations[0].messageIds).toHaveLength(5)
     expect(untrimmed.conversations[0].hasMoreMessages).toBe(false)
+  })
+
+  it('trimSnapshotMessages 把分支的继承前缀物化进实例行并去掉分叉点', () => {
+    const messages = ['m1', 'm2', 'm3']
+    const snapshot = {
+      ...createEmptyScene(),
+      conversations: [{
+        id: 'private:11001:11002',
+        type: 'direct' as const,
+        participantIds: ['11001', '11002'] as [string, string],
+        messageIds: [...messages],
+      }],
+      conversationInstances: [{
+        id: 'instance-1',
+        rootConversationId: 'private:11001:11002',
+        title: '换一种问法',
+        forkPoint: { conversationId: 'private:11001:11002', messageId: 'm2' },
+        messageIds: ['x1'],
+      }],
+      messages: [...messages, 'x1'].map((id) => ({
+        id,
+        authorId: '11001',
+        conversationId: id === 'x1' ? 'instance-1' : 'private:11001:11002',
+        content: `内容 ${id}`,
+        createdAt: '2026-01-01T00:00:00.000Z',
+      })),
+    }
+
+    const trimmed = trimSnapshotMessages(snapshot, 10)
+
+    // 消费端拿到的是「这个会话现在由哪些消息组成」，来源链只在权威场景里展开。
+    expect(trimmed.conversationInstances).toEqual([{
+      id: 'instance-1',
+      rootConversationId: 'private:11001:11002',
+      title: '换一种问法',
+      messageIds: ['m1', 'm2', 'x1'],
+      hasMoreMessages: false,
+    }])
+    expect(readConversationMessageIds(trimmed, 'instance-1')).toEqual(['m1', 'm2', 'x1'])
   })
 })

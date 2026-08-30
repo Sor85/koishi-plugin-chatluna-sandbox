@@ -34,6 +34,9 @@ export function trimSnapshotMessages(snapshot: SandboxSnapshot, limit: number): 
   return {
     ...snapshot,
     conversations: trimmed.conversations,
+    // 实例行必须一起换成投影版本：投影把继承前缀物化进它的消息列表并去掉分叉点，留下权威行
+    // 会让消费端拿着「只有自有消息」的列表去拼一份已经被裁过的来源前缀。
+    conversationInstances: trimmed.conversationInstances,
     messages,
     forwards: (snapshot.forwards ?? []).filter(({ id }) => visibleForwardIds.has(id)),
   }

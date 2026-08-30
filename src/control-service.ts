@@ -854,6 +854,9 @@ export class SandboxControlService {
       if (query && !message.content.toLocaleLowerCase().includes(needle)) continue
       hits.push({
         messageId: message.id,
+        // 按消息实体自身的会话归属报告：在分支里命中继承前缀时报的是那条消息真正所属的来源
+        // 会话，而不是被搜索的分支。一条逻辑消息只有一个会话身份。
+        conversationId: message.conversationId,
         authorId: message.authorId,
         createdAt: message.createdAt,
         summary: message.content,
@@ -1525,38 +1528,22 @@ export class SandboxControlService {
   }
 
   /**
-   * 从某条消息分叉出一个会话实例：该消息及其之前的历史被复制进新实例。
+   * 从某条消息分叉出一个会话实例：新实例只记下「来源会话 + 分叉点消息」，一条消息都不复制。
    *
-   * 复制而不是「只记分叉点、读取时拼接根会话前缀」是本轮的明确取舍：后者要改动消息存储与
-   * 历史分页的验证面。代价是场景消息保留窗口的预算按分支数被摊薄。
+   * 因此创建瞬间完成、与历史长短无关，同一段历史开多少个分支都不占额外的场景消息额度。
+   * 分支的历史 = 来源会话里分叉点及其之前的那一段，加上分支自己的消息，由
+   * {@link readConversationMessageIds} 在读取时拼接。来源可以是另一个实例，存储层级仍是两层。
    */
   branchConversationInstance(input: BranchConversationInstanceInput): { conversationId: string, revision: number } {
     const source = this.getVisibleConversation(input.operatorId, input.conversationId)
-    const sourceMessageIds = readConversationMessageIds(this.scene, source.id)
-    const forkIndex = sourceMessageIds.indexOf(input.messageId)
-    if (forkIndex < 0) throw new SandboxDomainError(`消息不存在：${input.messageId}`)
-    const conversationId = Random.id()
-    const sourceMessages = sourceMessageIds.slice(0, forkIndex + 1)
-      .flatMap((messageId) => this.scene.messages.find(({ id }) => id === messageId) ?? [])
-    const copiedIds = new Map(sourceMessages.map(({ id }) => [id, Random.id()]))
-    const copies = sourceMessages.map((message) => {
-      const copy = structuredClone(message)
-      copy.id = copiedIds.get(message.id)!
-      copy.conversationId = conversationId
-      // 复制范围内的引用指向复制体；范围外的引用在新实例里没有对应消息，直接丢掉而不是指向原会话。
-      const replyToMessageId = message.replyToMessageId ? copiedIds.get(message.replyToMessageId) : undefined
-      if (replyToMessageId) copy.replyToMessageId = replyToMessageId
-      else delete copy.replyToMessageId
-      // 广播组表示「同一条逻辑消息的多个副本」；分支复制体是另一条消息，不能被原消息的撤回带走。
-      delete copy.broadcastId
-      return copy
-    })
-    this.scene.messages.push(...copies)
+    if (!readConversationMessageIds(this.scene, source.id).includes(input.messageId)) {
+      throw new SandboxDomainError(`消息不存在：${input.messageId}`)
+    }
     const instance = insertConversationInstance(this.scene, {
-      id: conversationId,
+      id: Random.id(),
       rootConversationId: source.rootConversationId,
       title: input.title?.trim() || `分支：${this.describeConversation(input.operatorId, source)}`,
-      messageIds: copies.map(({ id }) => id),
+      forkPoint: { conversationId: source.id, messageId: input.messageId },
     })
     this.commitSceneMutation()
     return { conversationId: instance.id, revision: this.scene.revision }

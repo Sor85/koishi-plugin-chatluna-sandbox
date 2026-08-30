@@ -499,15 +499,21 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
       const history = await port.getMessageHistory({ ...input, operatorId })
       const knownIds = new Set(snapshot.value.messages.map(({ id }) => id))
       const knownForwardIds = new Set((snapshot.value.forwards ?? []).map(({ id }) => id))
+      // 历史页要合并回被读的那个会话行，而它可能是根会话也可能是会话实例。快照里的实例行
+      // 携带的是拼接后的列表（继承前缀已物化、分叉点已去掉），因此往它前面接一页就是对的；
+      // 只改根会话行会让分支翻不动历史，往上翻到继承前缀时停在分界处。
+      const prepend = <T extends { id: string, messageIds: string[] }>(rows: T[]) => rows
+        .map((row) => row.id === input.conversationId ? {
+          ...row,
+          messageIds: [...history.messages.map(({ id }) => id), ...row.messageIds],
+          hasMoreMessages: !!history.nextBeforeMessageId,
+        } : row)
       replaceWorkspace({
         ...workspaceState.value,
         snapshot: {
           ...snapshot.value,
-          conversations: snapshot.value.conversations.map((conversation) => conversation.id === input.conversationId ? {
-            ...conversation,
-            messageIds: [...history.messages.map(({ id }) => id), ...conversation.messageIds],
-            hasMoreMessages: !!history.nextBeforeMessageId,
-          } : conversation),
+          conversations: prepend(snapshot.value.conversations),
+          conversationInstances: prepend(snapshot.value.conversationInstances ?? []),
           messages: [...history.messages.filter(({ id }) => !knownIds.has(id)), ...snapshot.value.messages],
           forwards: [
             ...(snapshot.value.forwards ?? []),

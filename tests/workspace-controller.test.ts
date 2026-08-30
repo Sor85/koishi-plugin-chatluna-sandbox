@@ -862,6 +862,55 @@ describe('WebQQ 工作区控制模块', () => {
     ])
   })
 
+  it('分支的历史页合并回实例行，往上翻不在继承分界处断掉', async () => {
+    // 快照里的实例行携带的是投影出的拼接结果：继承前缀已物化、分叉点已去掉。
+    const port = createFakeWorkspacePort({
+      ...workspace,
+      snapshot: {
+        ...snapshot,
+        conversationInstances: [{
+          id: 'instance-1',
+          rootConversationId: 'private:10001:20001',
+          title: '换一种问法',
+          messageIds: ['message-1', 'branch-1'],
+          hasMoreMessages: true,
+        }],
+        messages: [...snapshot.messages, {
+          id: 'branch-1',
+          authorId: '10001',
+          conversationId: 'instance-1',
+          content: '分支里的提问',
+          createdAt: '2026-07-23T00:00:01.000Z',
+        }],
+      },
+    })
+    const controller = createWorkspaceController(port, createStorage())
+    await controller.load()
+    controller.selectConversation('instance-1')
+    port.historyResult = {
+      messages: [{
+        id: 'message-0',
+        authorId: '20001',
+        conversationId: 'private:10001:20001',
+        content: '继承前缀里更早的消息',
+        createdAt: '2026-07-22T23:59:59.000Z',
+      }],
+      nextBeforeMessageId: undefined,
+    }
+
+    await controller.loadMessageHistory({
+      conversationId: 'instance-1',
+      beforeMessageId: 'message-1',
+      limit: 50,
+    })
+
+    expect(controller.chat.value.messages.map(({ id }) => id)).toEqual(['message-0', 'message-1', 'branch-1'])
+    expect(readConversationMessageIds(controller.workspace.value.snapshot, 'instance-1'))
+      .toEqual(['message-0', 'message-1', 'branch-1'])
+    // 解析结果只在真的还有更早消息时带水位字段，读完继承前缀后它落回未设置。
+    expect(controller.chat.value.conversation?.hasMoreMessages).toBeUndefined()
+  })
+
   it('搜索会话消息时注入当前操作者并直接返回命中摘要', async () => {
     const port = createFakeWorkspacePort(workspace)
     const controller = createWorkspaceController(port, createStorage())
@@ -869,6 +918,7 @@ describe('WebQQ 工作区控制模块', () => {
     port.searchResult = {
       hits: [{
         messageId: 'message-1',
+        conversationId: 'private:10001:20001',
         authorId: '20001',
         createdAt: '2026-07-23T00:00:00.000Z',
         summary: '基准消息',
