@@ -927,11 +927,20 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     }
   }
 
+  /**
+   * 按原始 message_id 定位一条机器人可读的消息。
+   *
+   * 声明会话时按「在那个会话里可读」筛选，而不是按消息实体的归属：会话实例的继承前缀仍然归属
+   * 来源会话，按归属比对会让插件在分支里按消息 ID 取历史莫名失败。可读集合仍然只包含自身
+   * 会话对机器人可见的消息，因此放宽的只是 `channelId` 这一维，机器人能拿到的消息集合不变。
+   */
   private findAccessibleMessage(rawMessageId: string, channelId?: string) {
-    const visibleConversationIds = listVisibleConversationIds(this.control.getSnapshot(), this.selfId)
-    const visibleMessages = this.control.getSnapshot().messages.filter(({ conversationId }) => (
+    const snapshot = this.control.getSnapshot()
+    const visibleConversationIds = listVisibleConversationIds(snapshot, this.selfId)
+    const readableMessageIds = channelId ? new Set(readConversationMessageIds(snapshot, channelId)) : undefined
+    const visibleMessages = snapshot.messages.filter(({ id, conversationId }) => (
       visibleConversationIds.has(conversationId)
-      && (!channelId || conversationId === channelId)
+      && (!readableMessageIds || readableMessageIds.has(id))
     ))
     const messageId = resolveOneBotMessageId(rawMessageId, visibleMessages.map(({ id }) => id))
     const message = visibleMessages.find(({ id }) => id === messageId)

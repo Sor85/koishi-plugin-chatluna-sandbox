@@ -835,3 +835,152 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
     })
   })
 })
+
+describe('插件视角的继承前缀', () => {
+  /** 一条根会话消息，加上从它分叉出来的分支。 */
+  function branchFrom(control: SandboxControlService, rootConversationId: string, messageId: string) {
+    return control.branchConversationInstance({
+      operatorId: '10001',
+      conversationId: rootConversationId,
+      messageId,
+    }).conversationId
+  }
+
+  /** 往根会话发一条消息，再从它分叉出一个分支。 */
+  async function createBranch(control: SandboxControlService, rootConversationId: string) {
+    const inherited = await control.sendMessage({
+      operatorId: '10001',
+      conversationId: rootConversationId,
+      content: '分叉点那句话',
+    })
+    return { inherited, conversationId: branchFrom(control, rootConversationId, inherited.messageId) }
+  }
+
+  it('插件在群分支里按消息 ID 读到继承前缀，私聊或群聊信息仍是群聊', async () => {
+    const { control } = await createControl()
+    const bot = control.bot
+    const { inherited, conversationId } = await createBranch(control, 'group:30001')
+
+    // 声明了会话的单条读取按「在那个会话里可读」判定：继承前缀仍然归属根会话，
+    // 按归属比对会让插件在分支里按 ID 取历史莫名失败。
+    await expect(bot.getMessage(conversationId, inherited.messageId)).resolves.toMatchObject({
+      id: inherited.messageId,
+      content: '分叉点那句话',
+    })
+    const bySequence = await bot.getMessage(conversationId, String(getOneBotMessageSequence(inherited.messageId)))
+    expect(bySequence.id).toBe(inherited.messageId)
+    // 类型与群号由消息实体的会话解释，实例的两者都继承根会话：群分支里的继承前缀仍是群聊。
+    expect(bySequence.channel?.type).toBe(Universal.Channel.Type.TEXT)
+    expect(bySequence.guild?.id).toBe('30001')
+    await expect(bot.internal._request('get_msg', { message_id: getOneBotMessageSequence(inherited.messageId) }))
+      .resolves.toMatchObject({ data: { message_type: 'group', group_id: 30001 } })
+  })
+
+  it('插件通过原始 OneBot 撤回继承前缀生效，分支里随之显示为已撤回', async () => {
+    const { control } = await createControl()
+    const bot = control.bot
+    const sent = await bot.internal._request('send_private_msg', {
+      user_id: 10001,
+      message: '机器人说的那句话',
+    }) as { data: { message_id: number } }
+    const forkPointId = control.getSnapshot().messages
+      .find(({ id }) => getOneBotMessageSequence(id) === sent.data.message_id)!.id
+    const conversationId = branchFrom(control, 'private:10001:20001', forkPointId)
+    await control.sendMessage({ operatorId: '10001', conversationId, content: '换一种问法' })
+
+    // 只读约束的是用户在分支视图里的入口，不是消息实体的生命周期：插件寻址的是根会话里的
+    // 一条普通消息，拒绝会让沙盒表现出真实环境不存在的错误。
+    await expect(bot.internal._request('delete_msg', { message_id: sent.data.message_id }))
+      .resolves.toMatchObject({ status: 'ok' })
+
+    // 它本来就是同一条消息，因此分支里如实反映已撤回，而不是留着一份旧快照。
+    expect(control.getMessageHistory({ operatorId: '10001', conversationId }).messages
+      .map(({ content, lifecycle }) => ({ content, status: lifecycle?.status })))
+      .toEqual([
+        { content: '机器人说的那句话', status: 'recalled' },
+        { content: '换一种问法', status: undefined },
+      ])
+  })
+
+  it('插件在分支里引用继承前缀回复时，回复落在分支里并指向同一条来源消息', async () => {
+    const { app, control } = await createControl()
+    const { inherited, conversationId } = await createBranch(control, 'private:10001:20001')
+    // 插件拿到的是事件里的 message_seq，用它引用分界线以上那句话继续追问。
+    app.middleware((session, next) => {
+      if (session.content !== '换一种问法') return next()
+      return session.send([
+        h('quote', { id: String(getOneBotMessageSequence(inherited.messageId)) }),
+        h.text('接着这句问'),
+      ])
+    })
+
+    await control.sendMessage({ operatorId: '10001', conversationId, content: '换一种问法' })
+
+    const reply = control.getSnapshot().messages.find(({ content }) => content === '接着这句问')
+    expect(reply).toMatchObject({ conversationId, replyToMessageId: inherited.messageId })
+    // 回复落在分支里，原会话一条都没多。
+    expect(control.getSnapshot().conversations.find(({ id }) => id === 'private:10001:20001')!.messageIds)
+      .toEqual([inherited.messageId])
+  })
+
+  it('声明会话的读取仍然只认在那个会话里可读的消息', async () => {
+    const { control } = await createControl()
+    const bot = control.bot
+    const { conversationId } = await createBranch(control, 'private:10001:20001')
+    const own = await control.sendMessage({ operatorId: '10001', conversationId, content: '分支自有的一条' })
+    const afterFork = await control.sendMessage({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      content: '分叉点之后的一条',
+    })
+
+    // 放宽的只是「按归属比对」这一维，会话仍然是读取范围：分叉点之后的原会话消息不属于这条
+    // 分支的继承前缀，反向的分支自有消息在根会话里同样读不到。两条消息本身都对机器人可见，
+    // 因此这里被拒的原因只能是会话范围。
+    await expect(bot.getMessage(conversationId, afterFork.messageId)).rejects.toThrow(`消息不存在：${afterFork.messageId}`)
+    await expect(bot.getMessage('private:10001:20001', own.messageId)).rejects.toThrow(`消息不存在：${own.messageId}`)
+    // 同一批消息在它们各自可读的会话里照常读得到。
+    await expect(bot.getMessage('private:10001:20001', afterFork.messageId)).resolves.toMatchObject({ id: afterFork.messageId })
+    await expect(bot.getMessage(conversationId, own.messageId)).resolves.toMatchObject({ id: own.messageId })
+
+    // 出站消息的引用目标走同一处判定：机器人不能在分支里引用分叉点之后的原会话消息。
+    await expect(bot.sendMessage(conversationId, [
+      h('quote', { id: String(getOneBotMessageSequence(afterFork.messageId)) }),
+      h.text('引用分叉点之后的消息'),
+    ])).rejects.toThrow(`消息不存在：${getOneBotMessageSequence(afterFork.messageId)}`)
+  })
+
+  it('插件在分支里读历史与根会话共用一套游标语义，能连续读到继承部分', async () => {
+    const { control } = await createControl()
+    const bot = control.bot
+    for (const content of ['根一', '根二', '根三']) {
+      await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content })
+    }
+    const forkPointId = control.getSnapshot().conversations
+      .find(({ id }) => id === 'private:10001:20001')!.messageIds.at(-1)!
+    const conversationId = branchFrom(control, 'private:10001:20001', forkPointId)
+    await control.sendMessage({ operatorId: '10001', conversationId, content: '分支一' })
+
+    // 同一段插件代码读两种会话：分支多出的只是自有消息，分界处不断开也不重复。
+    const readHistory = async (channelId: string) => (await bot.getMessageList(channelId)).data
+      .map(({ content }) => content)
+    await expect(readHistory('private:10001:20001')).resolves.toEqual(['根一', '根二', '根三'])
+    await expect(readHistory(conversationId)).resolves.toEqual(['根一', '根二', '根三', '分支一'])
+
+    // 游标仍是消息 ID 派生的 message_seq：在分支里读到的那条继承前缀，其游标在历史查询里
+    // 照常可用，插件不需要为分支准备第二套取历史的代码。
+    const cursor = getOneBotMessageSequence((await bot.getMessage(conversationId, forkPointId)).id!)
+    await expect(bot.internal._request('get_friend_msg_history', {
+      user_id: 10001,
+      message_seq: cursor,
+      count: 2,
+    })).resolves.toMatchObject({
+      data: {
+        messages: [
+          expect.objectContaining({ message: [{ type: 'text', data: { text: '根一' } }] }),
+          expect.objectContaining({ message: [{ type: 'text', data: { text: '根二' } }] }),
+        ],
+      },
+    })
+  })
+})

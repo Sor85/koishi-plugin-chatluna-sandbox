@@ -10,10 +10,40 @@
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] 插件在分支里按消息 ID 能读到继承前缀
-- [ ] 群分支里继承前缀的私聊或群聊信息仍是群聊，群号正确
-- [ ] 插件通过原始 OneBot 撤回一条继承前缀时操作生效
-- [ ] 该消息在分支里随之显示为已撤回
-- [ ] 插件在分支里读历史使用与根会话相同的游标语义，能连续读到继承部分
+- [x] 插件在分支里按消息 ID 能读到继承前缀
+- [x] 群分支里继承前缀的私聊或群聊信息仍是群聊，群号正确
+- [x] 插件通过原始 OneBot 撤回一条继承前缀时操作生效
+- [x] 该消息在分支里随之显示为已撤回
+- [x] 插件在分支里读历史使用与根会话相同的游标语义，能连续读到继承部分
+
+## Comments
+
+### 实现记录
+
+- 唯一的代码改动是 `SandboxBot.findAccessibleMessage` 的可选会话筛选：从「消息实体的归属等于 `channelId`」改为「消息在 `channelId` 里可读」，即 `readConversationMessageIds(channelId)` 包含它。02 号票留下的那条已知回归（插件按消息 ID 读继承前缀被 `conversationId === channelId` 拒掉）由此闭环。
+- **放宽的只有 `channelId` 这一维。** 消息级筛选仍然要求「消息自身归属的会话对机器人可见」，因此机器人能拿到的消息集合一条不多：一条继承前缀在它的来源会话里本来就对机器人可见，`get_msg`（不带会话）早就能读到。改动只让插件多一条寻址方式，不产生新的可读面。
+- 顺带把重复的 `getSnapshot()` 收成一次。`getSnapshot` 每次克隆整份场景，原来一个函数里克隆两遍。
+- 这一处同时是三条插件路径的判定点：`getMessage(channelId, messageId)`、出站消息的引用目标解析（`deliverOutboundMessage` 里的 `replyToRawId`）、以及合并转发的引用节点。因此插件在分支里用事件里的 `message_seq` 引用分界线以上那句话继续追问也一起通了——服务端侧的回复目标校验已由 03 放宽，机器人表面这一侧才是最后一道。
+- 撤回与群聊信息按规格预期天然满足，两条断言一次就绿：`delete_msg` 不带会话调用 `recallBotMessage`，因此按消息实体的归属执行；`toOneBotMessage` / `toUniversalMessage` 都用消息实体的会话解释类型与群号，而实例的类型与群号继承根会话。两条仍然写成断言，它们是「只读约束的是分支视图的入口，不是消息实体的生命周期」这条区分的守卫。
+- 变异实验：把筛选改回 `conversationId === channelId`，四条用例里有三条同时变红（读继承前缀、引用继承前缀回复、按继承前缀的游标读历史）；撤回那条不变红，它守的是本来就成立的行为。
+
+### 审查后的修正
+
+- **会话这一维原本一条守卫都没有。** 把整个筛选删掉（`readableMessageIds` 恒为 `undefined`）后全量 1102 条测试全绿——改动前的 `conversationId === channelId` 同样没有任何测试区分，因此「放宽」与「删掉」在测试面上不可分辨。补了一条反向断言：分叉点之后的原会话消息在分支里读不到，分支自有的消息在根会话里读不到，而两条消息本身都对机器人可见，所以被拒的原因只能是会话范围。它同时覆盖出站引用目标那个调用点。删掉筛选后这条立刻变红。
+- 测试里重复三遍的「发一条根会话消息再从它分叉」抽成 `createBranch` / `branchFrom`，与 `conversation-instances.test.ts` 里 03 号票的同名夹具同形。
+
+### 验收 5 的口径
+
+原始 OneBot 的历史查询表面只能寻址根会话：`get_friend_msg_history` / `get_group_msg_history` 分别经 `resolveDirectConversationId` / `normalizeOneBotGroupId` 归一到根会话，action 表面没有「会话」这一级（与 `observeConversationDrift` 记录的是同一个事实）。因此「插件在分支里读历史」落在两处：
+
+- `bot.getMessageList(channelId)` 接受实例 ID，读出的是拼接后的完整列表，分界处不断开也不重复——同一段插件代码读根会话与读分支不需要区分种类。
+- 游标本身仍是消息 ID 派生的 `message_seq`：在分支里读到的那条继承前缀，其游标在历史查询里照常可用。
+
+按规格「不新增方向参数，不为前缀单设『加载继承历史』入口」，没有给 `getMessageList` 补 Satori 的 `next` / `direction` 参数——那是另一件事，本票不扩面。跨分界的逐页游标本身由 02 在控制服务那个 seam 上钉住。
+
+### 留给后续票的观察
+
+- `bot.getMessageList` 目前忽略 Satori 声明的 `next` / `direction` / `limit` / `order`，一次返回整段历史。这不是本次改动引入的，也与分支无关（根会话同样如此），但插件若按 Satori 契约翻页会拿到重复的整段。要不要补齐属于「虚拟 OneBot 表面的契约完整度」，与本规格无关。
+- 在分支里读继承前缀时，返回的 `channel.id` 是消息实体所属的来源会话而不是被请求的分支。规格明确只要求「私聊或群聊类型与群号」一致，这一项按「输出由消息实体的会话解释」接受。
