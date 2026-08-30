@@ -46,6 +46,11 @@ import {
   type ResolvedConversation,
 } from './conversation-resolution'
 import { mergeAccountProfile, normalizeAccountProfile, sanitizeSnapshotProfiles } from './account-profile'
+import {
+  denyMessageCapability,
+  type MessageCapabilityDenial,
+  type MessageCapabilityInput,
+} from './message-capabilities'
 import { getOneBotCapabilityMatrix, getOneBotMessageEventFields, getOneBotMessageSequence, normalizeDisabledCapabilities, resolveOneBotMessageId, type SandboxOneBotCapability } from './onebot-profiles'
 import {
   createDirectConversationId,
@@ -182,6 +187,47 @@ export const DEFAULT_SCENE_MESSAGE_MAX_BYTES = 8 * 1024 * 1024
 
 export function createEmptyScene(): SandboxSnapshot {
   return { revision: 0, participants: [], groups: [], conversations: [], conversationInstances: [], messages: [], forwards: [], friendships: [], requests: [] }
+}
+
+/**
+ * 撤回被判据拒绝时的错误文案。
+ *
+ * 判据共享成一处后文案一句不改：它们是外部测试控制器已经在断言的用户可见事实。会话边界那两
+ * 类（继承前缀、没有操作者）在撤回路径上到不了——请求声明的会话必须等于消息自身的归属，
+ * 操作者也已经校验过存在；这里仍然给出归一化的文案，保证判据新增依据时不会静默落到 undefined。
+ */
+function describeRecallDenial(denial: MessageCapabilityDenial, message: SandboxMessage, operatorId: string): string {
+  switch (denial) {
+    case 'event-message':
+    case 'recalled-message':
+      return '该消息不支持撤回'
+    case 'not-own-message':
+      return '只能撤回自己发送的消息'
+    case 'requires-group-authority':
+      return '只有群主或管理员可以撤回成员消息'
+    case 'target-outranks-actor':
+      return '管理员不能管理群主或其他管理员'
+    case 'actor-not-in-group':
+      return `参与者不在群组中：${operatorId}`
+    case 'author-not-in-group':
+      return `参与者不在群组中：${message.authorId}`
+    case 'inherited-prefix':
+    case 'no-operator':
+      return `消息不存在：${message.id}`
+  }
+}
+
+/** 表情回应被判据拒绝时的错误文案。已撤回那句沿用收敛前的措辞。 */
+function describeReactionDenial(denial: MessageCapabilityDenial, messageId: string): string {
+  switch (denial) {
+    case 'event-message':
+      return '事件消息不支持表情回应'
+    case 'recalled-message':
+      return '已撤回消息不支持修改表情回应'
+    default:
+      // 会话归属与操作者存在性都在写入路径之前判定，走到这里只能是判据新增了依据。
+      return `消息不存在：${messageId}`
+  }
 }
 
 export function createDefaultScene(): SandboxSnapshot {
@@ -1539,6 +1585,12 @@ export class SandboxControlService {
     if (!readConversationMessageIds(this.scene, source.id).includes(input.messageId)) {
       throw new SandboxDomainError(`消息不存在：${input.messageId}`)
     }
+    const message = this.scene.messages.find(({ id }) => id === input.messageId)
+    if (!message) throw new SandboxDomainError(`消息不存在：${input.messageId}`)
+    // 事件消息不是可操作的消息，因此不能当分叉点；判据与右键菜单同一份。
+    if (denyMessageCapability('branch', this.toMessageCapabilityInput(message, source, input.operatorId))) {
+      throw new SandboxDomainError(`事件消息不能作为分叉点：${input.messageId}`)
+    }
     const instance = insertConversationInstance(this.scene, {
       id: Random.id(),
       rootConversationId: source.rootConversationId,
@@ -1742,11 +1794,14 @@ export class SandboxControlService {
     const messages = uniqueIds.map((messageId) => {
       const message = this.scene.messages.find(({ id }) => id === messageId)
       if (!message) throw new SandboxDomainError(`消息不存在：${messageId}`)
-      if (!findVisibleConversation(this.scene, operatorId, message.conversationId)) {
+      const conversation = findVisibleConversation(this.scene, operatorId, message.conversationId)
+      if (!conversation) {
         throw new SandboxDomainError(`消息不存在：${messageId}`)
       }
-      if (message.event) throw new SandboxDomainError(`事件消息不能合并转发：${messageId}`)
-      if (isRecalledMessage(message)) throw new SandboxDomainError(`已撤回消息不能合并转发：${messageId}`)
+      // 与右键多选读同一份能力位：事件消息与已撤回消息都进不了合并转发。
+      const denial = denyMessageCapability('forward', this.toMessageCapabilityInput(message, conversation, operatorId))
+      if (denial === 'event-message') throw new SandboxDomainError(`事件消息不能合并转发：${messageId}`)
+      if (denial) throw new SandboxDomainError(`已撤回消息不能合并转发：${messageId}`)
       return message
     })
     // 多选发送按时间稳定排序，不使用点击顺序。
@@ -2094,12 +2149,15 @@ export class SandboxControlService {
     this.getParticipant(input.operatorId)
     const message = this.scene.messages.find(({ id }) => id === input.messageId)
     if (!message) throw new SandboxDomainError(`消息不存在：${input.messageId}`)
-    if (!findVisibleConversation(this.scene, input.operatorId, message.conversationId)) {
+    const conversation = findVisibleConversation(this.scene, input.operatorId, message.conversationId)
+    if (!conversation) {
       throw new SandboxDomainError(`消息不存在：${input.messageId}`)
     }
     // 私聊和群聊共用回应事实；会话可见性已在上方统一校验。
+    // 事件消息不接受回应，真实 QQ 里系统提示不是一条可操作的消息；
     // 撤回后保留历史回应，但禁止继续新增或取消，避免把历史事实改写成当前操作。
-    if (isRecalledMessage(message)) throw new SandboxDomainError('已撤回消息不支持修改表情回应')
+    const denial = denyMessageCapability('react', this.toMessageCapabilityInput(message, conversation, input.operatorId))
+    if (denial) throw new SandboxDomainError(describeReactionDenial(denial, input.messageId))
     // 与撤回一致地覆盖同一广播组，避免同一条逻辑消息的副本之间回应不一致。
     for (const target of this.scene.messages.filter(({ id, broadcastId }) => id === message.id
       || (!!message.broadcastId && broadcastId === message.broadcastId))) {
@@ -2158,16 +2216,13 @@ export class SandboxControlService {
     if (!message || (conversationId && message.conversationId !== conversationId)) throw new SandboxDomainError(`消息不存在：${messageId}`)
     const conversation = findVisibleConversation(this.scene, operatorId, message.conversationId)
     if (!conversation) throw new SandboxDomainError(`消息不存在：${messageId}`)
-    if (message.event || isRecalledMessage(message)) throw new SandboxDomainError('该消息不支持撤回')
     const group = conversation.type === 'group'
       ? this.scene.groups.find(({ id }) => id === conversation.groupId)
       : undefined
-    if (message.authorId !== operatorId) {
-      if (!group) throw new SandboxDomainError('只能撤回自己发送的消息')
-      const actor = this.requireGroupMember(group, operatorId)
-      const target = this.requireGroupMember(group, message.authorId)
-      this.assertCanManageMember(actor, target, '撤回成员消息')
-    }
+    // 事件消息、已撤回消息与群角色阶梯都由共享判据回答，右键菜单读的是同一份答案；
+    // 文案由 describeRecallDenial 还原成收敛前的那几句。
+    const denial = denyMessageCapability('recall', { message, conversation, operatorId, group })
+    if (denial) throw new SandboxDomainError(describeRecallDenial(denial, message, operatorId))
     const recalledAt = new Date().toISOString()
     const recalled = this.scene.messages.filter(({ id, broadcastId }) => id === message.id
       || (!!message.broadcastId && broadcastId === message.broadcastId))
@@ -2540,7 +2595,33 @@ export class SandboxControlService {
       && (!reply || !readConversationMessageIds(this.scene, conversation.id).includes(input.replyToMessageId))) {
       throw new SandboxDomainError(`回复消息不存在：${input.replyToMessageId}`)
     }
+    // 引用一条已撤回的消息会让撤回经引用旁路重新露出原文；机器人表面早已按这条办
+    // （toUniversalMessage 在引用目标已撤回时不给 quote），写入路径与它一致。
+    if (reply && denyMessageCapability('reply', this.toMessageCapabilityInput(reply, conversation, input.operatorId))) {
+      throw new SandboxDomainError(`已撤回消息不能引用回复：${input.replyToMessageId}`)
+    }
     return { operator, peer, conversation, group, reply }
+  }
+
+  /**
+   * 消息能力判据的入参：群组按会话归属解析，因此调用方不必各自记得群聊要多带一个实体。
+   *
+   * 判据不做可见性校验——各入口自己已经用 {@link findVisibleConversation} 或
+   * {@link getVisibleConversation} 判过，这里只把已经解析出的会话交给判据。
+   */
+  private toMessageCapabilityInput(
+    message: SandboxMessage,
+    conversation: ResolvedConversation,
+    operatorId?: string,
+  ): MessageCapabilityInput {
+    return {
+      message,
+      conversation,
+      operatorId,
+      group: conversation.type === 'group'
+        ? this.scene.groups.find(({ id }) => id === conversation.groupId)
+        : undefined,
+    }
   }
 
   private getMessageRecipientBots(context: SandboxMessageContext): SandboxBotProfile[] {

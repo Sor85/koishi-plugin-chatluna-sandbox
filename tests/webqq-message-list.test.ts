@@ -261,7 +261,6 @@ describe('WebQQ 消息列表', () => {
     expect(source).toContain("{ 'is-recalled': isRecalledMessage(message) }")
     expect(source).toContain('shouldShowThinking(message)')
     expect(source).toContain('class="chatluna-sandbox-message-recalled-label">已撤回</span>')
-    expect(source).toContain('v-if="!isRecalledMessage(message)" @select="emit(\'reply\', message.id)"')
     expect(source).toContain('as-child :disabled="isRecalledMessage(message) || model.selectionMode"')
     expect(source).toContain('formatRecalledMessageEventText')
     expect(source).toContain('isRecalledMessage(message)')
@@ -291,12 +290,6 @@ describe('WebQQ 消息列表', () => {
 
     expect(source).toContain('<WebqqMessageReactions')
     expect(source).toContain('贴表情')
-    expect(source).toContain('canReactToMessage(message)')
-    // 私聊与群聊都允许主动贴表情，不再依赖当前群组。
-    const reactionPermissionSource = source.slice(source.indexOf('function canReactToMessage'), source.indexOf('function toggleReaction'))
-    expect(reactionPermissionSource).not.toContain('props.model.currentGroup')
-    expect(reactionPermissionSource).toContain('!message.event')
-    expect(reactionPermissionSource).toContain('!isRecalledMessage(message)')
     expect(source).toContain("emit('openReactionPicker', message.id)")
     expect(source).toContain("emit('setMessageReaction', message.id, emojiId, enabled)")
     expect(source).toContain("getMessageGroupMemberActions(message.authorId).includes('mention')")
@@ -304,7 +297,6 @@ describe('WebQQ 消息列表', () => {
     expect(source).toMatch(/<ContextMenuItem v-if="!model\.currentGroup && getChatFriendActions\(message\.authorId\)\.includes\('poke'\)" @select="emit\('pokeFriend', message\.authorId\)">/)
     expect(source).not.toContain('好友互动')
     // 「创建分支」只对普通消息开放；戳一戳这类消息事件没有可分叉的对话上下文。
-    expect(source).toMatch(/<ContextMenuItem v-if="!message\.event" @select="emit\('branchConversationInstance', message\.id\)">/)
     expect(source).toContain('创建分支')
     expect(source).toContain('hasMessageGroupMemberManagementActions(message.authorId)')
     expect(source).toContain('management-only')
@@ -342,15 +334,17 @@ describe('WebQQ 消息列表', () => {
     expect(pageSource).toContain('@set-message-reaction="setMessageReaction"')
   })
 
-  it('继承前缀上的右键不提供撤回与贴表情', () => {
+  it('继承前缀与其余四类判定都改读投影给出的能力位', () => {
     const source = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
 
-    // 判定本身住在 fork-boundary 模块并由它的测试逐条执行；这里剩下的是三个写入入口都接了它，
-    // 那处接线在组件外观察不到。ADR-0073 的三类例外不含这种肯定式接线断言，它与 03 号票点名的
-    // 「把权限判定下沉成 messageList 投影的能力位」是同一笔债，由那条后续工作一并消化。
-    expect(source).toContain('if (isInheritedMessage(message)) return false')
-    expect(source).toContain('&& !isInheritedMessage(message)')
-    expect(source).toContain('|| isInheritedMessage(message)')
+    // 判定本身住在 src/message-capabilities 并由它的测试逐条执行；能力位接线由 messageList
+    // 投影的行为断言守（webqq-message-capabilities.test.ts），三个写入入口各自读到自己那一位
+    // 由架构守卫「消息动作入口必须由能力位守门」逐个钉住（webqq-architecture.test.ts）。
+    // 这里只剩一条否定式守卫：已删掉的四个组件内推导不得被加回来，否则客户端又会长出第二份口径。
+    expect(source).not.toMatch(/function\s+canRecallMessage/)
+    expect(source).not.toMatch(/function\s+canReactToMessage/)
+    expect(source).not.toMatch(/function\s+isReactionReadonly/)
+    expect(source).not.toMatch(/function\s+isMessageSelectable/)
   })
 
   it('分支在继承前缀与自有消息之间显示分界，继承部分整段弱化', () => {
@@ -358,9 +352,8 @@ describe('WebQQ 消息列表', () => {
     const styles = readFileSync(resolve('client/styles/webqq-messages.css'), 'utf8')
 
     // 分界位置与整段弱化的判定由 fork-boundary 模块的测试逐条执行；这里守的是用户可见文案与
-    // 样式两类 ADR-0073 例外，加上一条同上的接线断言：规则算对了但没渲染出来，从外观察不到。
+    // 样式两类 ADR-0073 例外。
     expect(source).toContain('以上是与原会话共享的记录，在这条分支里只读')
-    expect(source).toContain("{ 'is-inherited': isInheritedMessage(message) }")
     expect(styles).toContain('.chatluna-sandbox-fork-boundary')
     // 弱化而不是隐藏：继承部分不折叠、不默认收起，看全上下文正是复盘时要做的事。
     expect(styles).toMatch(/\.chatluna-sandbox-message-row\.is-inherited \{[^}]*opacity:/)

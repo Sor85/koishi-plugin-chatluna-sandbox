@@ -24,6 +24,62 @@ const fullSnapshotPredicates: readonly ArchitecturePredicate[] = [
   { evidence: '以 props.snapshot / model.snapshot 形式读取完整快照', pattern: /\b(?:props|model)\.snapshot\b/ },
 ]
 
+/**
+ * 消息能力判据的持有者：`webqq` 模块目录下读取投影的那一个文件。
+ *
+ * 与端口适配器那条不同，能力判据的合法持有者只有一个，因此这里连目录一起钉住：放宽成
+ * 「任何目录下任何叫 message-capabilities.ts 的文件」会让规则靠文件名而不是位置成立，
+ * 在别处新建一个同名文件就能绕过它。
+ */
+const MESSAGE_CAPABILITY_MODULE_PATTERN = /(?:^|\/)webqq\/message-capabilities\.ts$/
+
+/**
+ * 「客户端不自己判定消息能力」的谓词。两条分别对应能力谓词的两种命名形状：判定词打头
+ * （`canRecallMessage`、`allowReactionFor`）和可行性后缀收尾（`isMessageSelectable`、
+ * `isReactionReadonly`、`forkAllowed`）。动作词表就是领域词汇里「消息能力」的那五项。
+ *
+ * 第二条的 `(?<![-\w])` 是按真实源码校准出来的边界：动作词大小写不敏感才能抓住
+ * `forkAllowed` 这类小写打头的拼法，但那样会把 `'is-selectable'` 这个 CSS 类名一起抓进来。
+ * 类名是「哪几行看起来可勾选」的呈现绑定而不是能力判定，kebab-case 里动作词前面一定有连字符，
+ * 因此排除它；误报会让豁免清单混进假债务。
+ */
+const messageCapabilityPredicates: readonly ArchitecturePredicate[] = [
+  {
+    evidence: '出现「判定词 + 消息动作」形式的能力谓词',
+    pattern: /\b(?:can|may|allow|permit|forbid|deny|disallow)[A-Za-z]*(?:recall|react|reply|branch|fork|select|forward)/i,
+  },
+  {
+    evidence: '出现「消息动作 + 可行性后缀」形式的能力谓词',
+    pattern: /(?<![-\w])[A-Za-z]*(?:recall|reaction|react|reply|branch|fork|select|forward)[A-Za-z]*(?:able|allowed|permitted|readonly|disabled)\b/i,
+  },
+]
+
+/**
+ * 消息动作的发起点：`emit('<动作>', message.id ...)`。
+ *
+ * 锚点选「动作名 + `message.id`」而不是动作名本身，因此只命中「拿着一条消息向用户提供这个
+ * 动作」的位置。聊天区域把表情选择结果转交出去、页面装配转发处理器、外壳发起 RPC，这三处
+ * 传的都是 `messageId` 字符串——它们是管道而不是入口，不会被误抓成未守门。
+ */
+const MESSAGE_ACTION_EMIT_PATTERN = /emit\('([A-Za-z]+)', message\.id/g
+
+/** 读能力位的两种形状：经组件里的读取包装，或直接索引投影。 */
+const CAPABILITY_READ_PATTERN = /capabilitiesOf\s*\(|messageCapabilities\s*\[/
+
+/**
+ * 发起点所在的最小作用域：模板里是它所属的那个元素（上一个 `<`），脚本里是它所在的那个函数
+ * （上一个 `function ` 或箭头函数体）。取三者中最靠近发起点的那个，因此相邻元素上的守门不会
+ * 顺带把本处也算成已守门——少接一个入口仍然是一条绕路，这条规则要逐个入口成立。
+ */
+function readEnclosingScope(source: string, index: number): string {
+  const start = Math.max(
+    source.lastIndexOf('<', index),
+    source.lastIndexOf('function ', index),
+    source.lastIndexOf('=> {', index),
+  )
+  return source.slice(Math.max(start, 0), index)
+}
+
 interface ArchitectureRule {
   readonly name: string
   readonly extensions: readonly string[]
@@ -52,6 +108,23 @@ const rules: readonly ArchitectureRule[] = [
       return calls.length ? [`${calls.length} 处 ${[...new Set(calls)].sort().join(' / ')}() 调用绕过端口`] : []
     },
   },
+  {
+    name: '客户端不自己判定消息能力',
+    extensions: ['.ts', '.vue'],
+    findViolations: (file, source) => {
+      if (MESSAGE_CAPABILITY_MODULE_PATTERN.test(file)) return []
+      return messageCapabilityPredicates
+        .filter(({ pattern }) => pattern.test(source))
+        .map(({ evidence }) => evidence)
+    },
+  },
+  {
+    name: '消息动作入口必须由能力位守门',
+    extensions: ['.ts', '.vue'],
+    findViolations: (_file, source) => [...source.matchAll(MESSAGE_ACTION_EMIT_PATTERN)]
+      .filter((match) => !CAPABILITY_READ_PATTERN.test(readEnclosingScope(source, match.index)))
+      .map((match) => `${match[1]!} 入口所在的元素或函数没有读能力位`),
+  },
 ]
 
 interface ArchitectureExemption {
@@ -67,8 +140,9 @@ interface ArchitectureExemption {
  * 已知违规的显式豁免清单，与守卫断言放在同一处，改客户端代码的人立刻看到。
  * 理由与负责人均为必填；豁免不是放行，是有主的债务。
  *
- * 当前为空：九条历史违规已由区域投影下沉与扩展端口两批工作消化完，两条规则因此是
- * 无例外的不变量。清单与它的三条守卫断言保留，下一次真有取舍时按同一形状登记。
+ * 当前为空：九条历史违规已由区域投影下沉与扩展端口两批工作消化完，消息能力判定则在收成
+ * 共享判据时一并清掉，三条规则因此都是无例外的不变量。清单与它的三条守卫断言保留，
+ * 下一次真有取舍时按同一形状登记。
  */
 const exemptions: readonly ArchitectureExemption[] = []
 
@@ -96,17 +170,17 @@ function isExempted(violation: string, allowed: readonly ArchitectureExemption[]
 }
 
 describe('WebQQ 模块化架构', () => {
-  it('两条架构规则对客户端源码全量生效，未登记的违规按文件与规则报出', () => {
+  it('四条架构规则对客户端源码全量生效，未登记的违规按文件与规则报出', () => {
     expect(findAllViolations().filter((violation) => !isExempted(violation, exemptions))).toEqual([])
   })
 
   /**
-   * 两条规则的谓词自测。这条不依赖豁免清单里有没有条目：清单清空后，
+   * 四条规则的谓词自测。这条不依赖豁免清单里有没有条目：清单清空后，
    * 「移除任一豁免必须报错」变成空循环，只有喂合成源码才能证明规则还活着。
    */
-  it('两条规则各自认得出违规写法，也不误报同名局部变量', () => {
-    const [snapshotRule, rpcRule] = rules
-    if (!snapshotRule || !rpcRule) throw new Error('架构规则缺失')
+  it('四条规则各自认得出违规写法，也不误报同名局部变量、呈现绑定与管道', () => {
+    const [snapshotRule, rpcRule, capabilityRule, entryRule] = rules
+    if (!snapshotRule || !rpcRule || !capabilityRule || !entryRule) throw new Error('架构规则缺失')
 
     expect(snapshotRule.findViolations('client/x.vue', 'const props = defineProps<{ snapshot: SandboxSnapshot }>()')).not.toEqual([])
     expect(snapshotRule.findViolations('client/x.vue', 'const bots = getSandboxBots(input)')).not.toEqual([])
@@ -121,6 +195,52 @@ describe('WebQQ 模块化架构', () => {
     expect(rpcRule.findViolations('client/webqq/x.ts', "receive('chatluna-sandbox/mcp-activity', handler)")).not.toEqual([])
     expect(rpcRule.findViolations('client/webqq/koishi-x-port.ts', "await send('chatluna-sandbox/workspace')")).toEqual([])
     expect(rpcRule.findViolations('client/webqq/x-port.ts', "await send('chatluna-sandbox/workspace')")).not.toEqual([])
+
+    // 判定词打头与可行性后缀收尾两种形状都要认得，换一种拼法不能让规则静默失效。
+    expect(capabilityRule.findViolations('client/x.vue', 'function canRecallMessage(message) {}')).not.toEqual([])
+    expect(capabilityRule.findViolations('client/x.vue', 'const allowReactionFor = (message) => !message.event')).not.toEqual([])
+    expect(capabilityRule.findViolations('client/x.vue', 'function isMessageSelectable(message) {}')).not.toEqual([])
+    expect(capabilityRule.findViolations('client/x.vue', 'const isReactionReadonly = computed(() => true)')).not.toEqual([])
+    expect(capabilityRule.findViolations('client/webqq/x.ts', 'const forkAllowed = !message.event')).not.toEqual([])
+    // 读取投影的模块是合法持有者；同一段源码换到别处——包括别的目录下的同名文件——仍然违规。
+    expect(capabilityRule.findViolations('client/webqq/message-capabilities.ts', 'function canRecallMessage(message) {}')).toEqual([])
+    expect(capabilityRule.findViolations('client/webqq/x.ts', 'function canRecallMessage(message) {}')).not.toEqual([])
+    expect(capabilityRule.findViolations('client/message-capabilities.ts', 'function canRecallMessage(message) {}')).not.toEqual([])
+    // 读能力位、发起动作与呈现绑定都不是判定，不得误报。
+    expect(capabilityRule.findViolations('client/x.vue', 'v-if="capabilitiesOf(message).recall"')).toEqual([])
+    expect(capabilityRule.findViolations('client/x.vue', "emit('recallMessage', message.id)")).toEqual([])
+    expect(capabilityRule.findViolations('client/x.vue', "emit('branchConversationInstance', message.id)")).toEqual([])
+    expect(capabilityRule.findViolations('client/x.vue', "{ 'is-selectable': model.selectionMode }")).toEqual([])
+    expect(capabilityRule.findViolations('client/x.vue', ':readonly="!capabilitiesOf(message).react"')).toEqual([])
+
+    // 三个写入入口逐个成立：右键项与处理器各自要在自己的元素/函数里读过能力位。
+    expect(entryRule.findViolations(
+      'client/x.vue',
+      '<Item v-if="capabilitiesOf(message).recall" @select="emit(\'recallMessage\', message.id)">',
+    )).toEqual([])
+    expect(entryRule.findViolations(
+      'client/x.vue',
+      '<Item @select="emit(\'recallMessage\', message.id)">',
+    )).not.toEqual([])
+    expect(entryRule.findViolations(
+      'client/x.vue',
+      'function toggleReaction(message) {\n  if (!capabilitiesOf(message).react) return\n  emit(\'setMessageReaction\', message.id, emojiId, enabled)\n}',
+    )).toEqual([])
+    expect(entryRule.findViolations(
+      'client/x.vue',
+      'function toggleReaction(message) {\n  emit(\'setMessageReaction\', message.id, emojiId, enabled)\n}',
+    )).not.toEqual([])
+    // 相邻元素上的守门不得顺带放行本处：少接一个入口仍然是一条绕路。
+    expect(entryRule.findViolations(
+      'client/x.vue',
+      '<Item v-if="capabilitiesOf(message).react" @select="emit(\'openReactionPicker\', message.id)" />\n<Item @select="emit(\'recallMessage\', message.id)" />',
+    )).toEqual(['recallMessage 入口所在的元素或函数没有读能力位'])
+    // 聊天区域与外壳传的是 messageId 字符串，那是管道不是入口，不得误报。
+    expect(entryRule.findViolations('client/x.vue', "emit('setMessageReaction', messageId, emojiId, true)")).toEqual([])
+    expect(entryRule.findViolations('client/webqq/x.ts', 'await port.setMessageReaction({ messageId: input.messageId })')).toEqual([])
+    // 打开合并转发与查看资料不是消息能力，不进这条规则。
+    expect(entryRule.findViolations('client/x.vue', "emit('openForward', { messageId: message.id, forwardId })")).toEqual([])
+    expect(entryRule.findViolations('client/x.vue', "emit('openProfile', message.authorId)")).toEqual([])
   })
 
   /**

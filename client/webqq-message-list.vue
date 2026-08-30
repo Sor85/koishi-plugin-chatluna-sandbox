@@ -43,7 +43,7 @@
                 { 'is-recalled': isRecalledMessage(message) },
                 { 'is-inherited': isInheritedMessage(message) },
                 { 'is-selecting': model.selectionMode },
-                { 'is-selectable': model.selectionMode && isMessageSelectable(message) },
+                { 'is-selectable': model.selectionMode && capabilitiesOf(message).forward },
                 { 'is-selected': model.selectionMode && isMessageSelected(message.id) },
               ]"
               :data-message-id="message.id"
@@ -51,7 +51,7 @@
               @click="handleMessageClick(message, $event)"
             >
               <span
-                v-if="model.selectionMode && isMessageSelectable(message)"
+                v-if="model.selectionMode && capabilitiesOf(message).forward"
                 class="chatluna-sandbox-message-select-marker"
                 :class="{ 'is-checked': isMessageSelected(message.id) }"
                 aria-hidden="true"
@@ -168,7 +168,7 @@
                         :reactions="message.reactions"
                         :current-operator-id="model.currentOperatorId"
                         :participants="model.participants"
-                        :readonly="isReactionReadonly(message)"
+                        :readonly="!capabilitiesOf(message).react"
                         @toggle="toggleReaction(message, $event)"
                       />
                       </div>
@@ -186,20 +186,20 @@
             >
               <IconExternalLink :size="16" aria-hidden="true" /> 跳转到对应请求
             </ContextMenuItem>
-            <ContextMenuItem v-if="!isRecalledMessage(message)" @select="emit('reply', message.id)"><IconMessageReply :size="16" aria-hidden="true" /> 回复</ContextMenuItem>
-            <ContextMenuItem v-if="!message.event" @select="emit('branchConversationInstance', message.id)">
+            <ContextMenuItem v-if="capabilitiesOf(message).reply" @select="emit('reply', message.id)"><IconMessageReply :size="16" aria-hidden="true" /> 回复</ContextMenuItem>
+            <ContextMenuItem v-if="capabilitiesOf(message).branch" @select="emit('branchConversationInstance', message.id)">
               <IconGitBranch :size="16" aria-hidden="true" /> 创建分支
             </ContextMenuItem>
-            <ContextMenuItem v-if="canReactToMessage(message)" @select="emit('openReactionPicker', message.id)">
+            <ContextMenuItem v-if="capabilitiesOf(message).react" @select="emit('openReactionPicker', message.id)">
               <IconMoodSmile :size="16" aria-hidden="true" /> 贴表情
             </ContextMenuItem>
             <ContextMenuItem
-              v-if="!isRecalledMessage(message) && !message.event"
+              v-if="capabilitiesOf(message).forward"
               @select="emit('enterSelection', message.id)"
             >
               <IconChecks :size="16" aria-hidden="true" /> 多选
             </ContextMenuItem>
-            <ContextMenuItem v-if="canRecallMessage(message)" class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="emit('recallMessage', message.id)">
+            <ContextMenuItem v-if="capabilitiesOf(message).recall" class="text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40" @select="emit('recallMessage', message.id)">
               <IconArrowBackUp :size="16" aria-hidden="true" /> 撤回
             </ContextMenuItem>
           </ContextMenuContent>
@@ -332,7 +332,7 @@ import { getFriendMenuActions, type FriendMenuState } from './webqq/friend-menu'
 import { getGroupAuthorityBadge, getGroupMemberDisplayName } from './webqq/group-display'
 import { getGroupMemberMenuActions, type GroupMemberMenuAction } from './webqq/group-menu'
 import GroupMemberMenu from './group-member-menu.vue'
-import { isForkBoundaryMessage, isInheritedMessage as isInheritedPrefixMessage } from './webqq/fork-boundary'
+import { isForkBoundaryMessage } from './webqq/fork-boundary'
 import { getMessageClusterClass, isMergedMessage } from './webqq/message-cluster'
 import { createMessageListFollowController } from './webqq/message-list-follow'
 import {
@@ -354,6 +354,8 @@ import WebqqMessageReactions from './webqq-message-reactions.vue'
 import WebqqMenuExtensionMark from './webqq-menu-extension-mark.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type { ResolvedConversation } from '../src/conversation-resolution'
+import { isInheritedMessage as isInheritedPrefixMessage } from '../src/conversation-resolution'
+import { NO_MESSAGE_CAPABILITIES, type MessageCapabilities } from '../src/message-capabilities'
 import {
   formatRecalledMessageEventText,
   isRecalledMessage,
@@ -377,6 +379,8 @@ export interface WebqqMessageListModel {
   replyMessages: Record<string, SandboxMessage>
   // 外层合并转发卡片的轻量投影：标题、总数、最多 4 行。
   forwardPreviews: Record<string, SandboxForwardPreview>
+  // 每条消息的能力位，由共享判据在外壳投影里算好；列表只渲染，不自己推导。
+  messageCapabilities: Record<string, MessageCapabilities>
   participants: Record<string, MessageParticipant>
   friendMenuStates: Record<string, FriendMenuState>
   currentConversation?: ResolvedConversation
@@ -719,9 +723,15 @@ function shouldRenderAsEvent(message: SandboxMessage) {
   return !!message.event || (isRecalledMessage(message) && !props.model.markRecalledMessages)
 }
 
-// 与服务端 sendForwardMessage 约束一致：事件与撤回消息不可进入合并转发。
-function isMessageSelectable(message: SandboxMessage) {
-  return !message.event && !isRecalledMessage(message)
+/**
+ * 这条消息现在能做什么。
+ *
+ * 判定住在 `src/message-capabilities`，服务端在写入路径上问的是同一份判据；列表只读答案，
+ * 因此右键里出现的动作都真的做得到，也不会在这里长出第二份口径。投影还没给出这条消息时
+ * 一律读作「一条都做不到」，不猜。
+ */
+function capabilitiesOf(message: SandboxMessage): MessageCapabilities {
+  return props.model.messageCapabilities[message.id] ?? NO_MESSAGE_CAPABILITIES
 }
 
 function isMessageSelected(messageId: string) {
@@ -737,7 +747,7 @@ function handleMessageAvatarClick(message: SandboxMessage, event: MouseEvent) {
 }
 
 function handleMessageBubbleClick(message: SandboxMessage, event: MouseEvent) {
-  if (!props.model.selectionMode || !isMessageSelectable(message)) return
+  if (!props.model.selectionMode || !capabilitiesOf(message).forward) return
   // 捕获阶段先于卡片、媒体和回应控件执行；多选时整颗气泡只负责切换勾选，不能误打开详情或文件。
   event.preventDefault()
   event.stopPropagation()
@@ -745,7 +755,7 @@ function handleMessageBubbleClick(message: SandboxMessage, event: MouseEvent) {
 }
 
 function handleMessageClick(message: SandboxMessage, event: MouseEvent) {
-  if (!props.model.selectionMode || !isMessageSelectable(message)) return
+  if (!props.model.selectionMode || !capabilitiesOf(message).forward) return
   // 气泡由捕获处理器统一接管；这里只覆盖头像、发送者信息和行内空白区域。
   if ((event.target as HTMLElement | null)?.closest('.chatluna-sandbox-message-bubble')) return
   emit('toggleSelection', message.id)
@@ -771,8 +781,8 @@ function shouldShowUsage(message: SandboxMessage) {
 /**
  * 消息是不是这条分支继承来的那一段。
  *
- * 判定住在 {@link isInheritedPrefixMessage}：继承前缀在分支视图里只读，因此右键里做不到的动作
- * 干脆不显示，用户不必靠试错才知道哪些被禁；同一份判定也决定这一行要不要弱化。
+ * 判定住在共享的 {@link isInheritedPrefixMessage}：同一份判定既决定这一行要不要弱化，也是
+ * 消息能力里「继承前缀在实例视图里只读」那一条的依据，因此右键里做不到的动作干脆不显示。
  */
 function isInheritedMessage(message: SandboxMessage) {
   return isInheritedPrefixMessage(message, props.model.currentConversation?.id)
@@ -783,36 +793,10 @@ function isForkBoundary(index: number) {
   return isForkBoundaryMessage(props.model.messages, index, props.model.currentConversation?.id)
 }
 
-// 与服务端撤回权限一致：自己的消息随时可撤；群内群主/管理员可撤成员消息，但不能动群主或同级管理员。
-function canRecallMessage(message: SandboxMessage) {
-  const operatorId = props.model.currentOperatorId
-  if (!operatorId || message.event || isRecalledMessage(message)) return false
-  if (isInheritedMessage(message)) return false
-  if (message.authorId === operatorId) return true
-  if (!props.model.currentGroup) return false
-  const actor = getCurrentGroupMember(operatorId)
-  const target = getCurrentGroupMember(message.authorId)
-  if (!actor || !target || actor.role === 'member') return false
-  return target.role !== 'owner' && !(actor.role === 'admin' && target.role === 'admin')
-}
-
-// 私聊与群聊共用回应入口；事件消息不可回应，撤回消息与继承前缀只读展示已有回应。
-function canReactToMessage(message: SandboxMessage) {
-  return !message.event
-    && !isRecalledMessage(message)
-    && !isInheritedMessage(message)
-    && !!props.model.currentOperatorId
-}
-
-function isReactionReadonly(message: SandboxMessage) {
-  return !!message.event
-    || isRecalledMessage(message)
-    || isInheritedMessage(message)
-    || !props.model.currentOperatorId
-}
-
+// 气泡下方的已有回应条是第三个写入入口，与右键撤回、右键贴表情读同一份能力位：
+// 少接一个就会让用户点一下已有 emoji 绕过只读。
 function toggleReaction(message: SandboxMessage, emojiId: string) {
-  if (isReactionReadonly(message) || !props.model.currentOperatorId) return
+  if (!capabilitiesOf(message).react || !props.model.currentOperatorId) return
   const reaction = message.reactions?.find((item) => item.emojiId === emojiId)
   const enabled = !reaction?.participantIds.includes(props.model.currentOperatorId)
   emit('setMessageReaction', message.id, emojiId, enabled)

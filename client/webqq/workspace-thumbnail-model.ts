@@ -13,6 +13,7 @@ import {
 } from '../../src/types'
 import { includesConversationParticipant, listRootConversations, readConversationMessageIds } from '../../src/conversation-resolution'
 import { buildForwardPreviewMap } from './forward-preview'
+import { buildMessageCapabilityMap } from './message-capabilities'
 import { formatMentionContent } from './mention'
 import { getIncomingNotificationRequests } from './notification-requests'
 import { getConversationPeerId, getFriendDirectory, getGroupDirectory } from './relationship-directory'
@@ -152,6 +153,12 @@ export function buildWorkspaceThumbnailModels(
         chatLunaStates: [],
         replyMessages,
         forwardPreviews: buildForwardPreviewMap(messages, (snapshot.forwards ?? []) as SandboxForward[]),
+        messageCapabilities: buildMessageCapabilityMap({
+          messages,
+          conversation: currentConversation,
+          operatorId: currentOperatorId,
+          group: currentGroup,
+        }),
         participants,
         friendMenuStates,
         currentConversation,

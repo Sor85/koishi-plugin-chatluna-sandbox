@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { SandboxMessage } from '../src/types'
-import { isForkBoundaryMessage, isInheritedMessage } from '../client/webqq/fork-boundary'
+import { isInheritedMessage } from '../src/conversation-resolution'
+import { isForkBoundaryMessage } from '../client/webqq/fork-boundary'
 
 const ROOT = 'private:10001:20001'
 const BRANCH = 'branch-1'

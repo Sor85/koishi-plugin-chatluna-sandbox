@@ -21,6 +21,7 @@ import { formatRecalledMessageEventText, getSandboxBots, getSandboxUsers, isReca
 import type { SandboxWorkspaceView } from './workspace-state'
 import type { FriendMenuState } from './friend-menu'
 import { buildForwardPreviewMap } from './forward-preview'
+import { buildMessageCapabilityMap } from './message-capabilities'
 import { formatMentionContent } from './mention'
 import { getIncomingNotificationRequests } from './notification-requests'
 import { buildGroupProfileCardModel, buildProfileCardModel } from './profile-card'
@@ -150,11 +151,19 @@ export function createWebqqWorkspaceShell(
     // chat.forwards 是 DeepReadonly，预览投影只读节点内容，可安全降级为可变输入类型。
     workspaceController.chat.value.forwards as unknown as SandboxForward[],
   ))
+  // 「这条消息能做什么」由共享判据回答一次，菜单只渲染它；客户端不再自己推导。
+  const messageCapabilities = computed(() => buildMessageCapabilityMap({
+    messages: messages.value,
+    conversation: currentConversation.value,
+    operatorId: currentOperatorId.value,
+    group: currentGroup.value,
+  }))
   const messageListModel = computed<WebqqMessageListModel>(() => ({
     messages: messages.value,
     chatLunaStates: workspaceController.chat.value.chatLunaStates.map((state) => ({ ...state })),
     replyMessages: replyMessages.value,
     forwardPreviews: forwardPreviews.value,
+    messageCapabilities: messageCapabilities.value,
     participants: participants.value,
     friendMenuStates: friendMenuStates.value,
     currentConversation: currentConversation.value,

@@ -20,10 +20,7 @@ describe('WebQQ 消息多选与目标选择', () => {
     expect(source).toContain('event.stopPropagation()')
     expect(source).toContain("closest('.chatluna-sandbox-message-bubble')")
     expect(source).toContain("{ 'is-selected': model.selectionMode && isMessageSelected(message.id) }")
-    expect(source).toContain('isMessageSelectable(message)')
-    expect(source).toContain('v-if="model.selectionMode && isMessageSelectable(message)"')
     expect(source).not.toContain('v-if="model.selectionMode"\n                class="chatluna-sandbox-message-select-marker"')
-    expect(source).toContain('return !message.event && !isRecalledMessage(message)')
     expect(source).toContain('class="chatluna-sandbox-message-select-marker"')
     // 多选态禁用普通右键操作，避免和勾选冲突。
     expect(source).toContain(':disabled="isRecalledMessage(message) || model.selectionMode"')

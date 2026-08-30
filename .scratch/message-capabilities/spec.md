@@ -1,6 +1,6 @@
 # 消息能力判定收成一处
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 

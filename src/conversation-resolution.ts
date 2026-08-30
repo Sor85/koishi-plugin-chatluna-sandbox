@@ -5,6 +5,7 @@ import {
   type SandboxConversation,
   type SandboxConversationForkPoint,
   type SandboxConversationInstance,
+  type SandboxMessage,
   type SandboxSnapshot,
 } from './types'
 
@@ -145,6 +146,20 @@ function readRowMessageIds(scene: SandboxSnapshot, row: ConversationRow, visited
 export function readConversationMessageIds(scene: SandboxSnapshot, conversationId: string): readonly string[] {
   const row = findConversationRow(scene, conversationId)
   return row ? readRowMessageIds(scene, row, new Set()) : []
+}
+
+/**
+ * 消息是不是某个会话继承来的那一段，也就是它的继承前缀。
+ *
+ * 判定依据只有「消息自己的归属会话」：读出来的列表里每条消息都带着它真正所属的那个会话，
+ * 与被读到的会话不同的就是继承前缀——它是与来源会话共享的同一份记录，不需要额外字段，
+ * 也不需要调用方沿来源链再拼一次。会话未知时一律算自有消息，不凭空给任何一条加约束。
+ */
+export function isInheritedMessage(
+  message: Pick<SandboxMessage, 'conversationId'>,
+  conversationId: string | undefined,
+): boolean {
+  return !!conversationId && message.conversationId !== conversationId
 }
 
 /** 场景里的全部根会话，按存储顺序。 */

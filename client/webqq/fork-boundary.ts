@@ -1,16 +1,13 @@
+import { isInheritedMessage } from '../../src/conversation-resolution'
 import type { SandboxMessage } from '../../src/types'
 
 /**
  * 分支视图里继承前缀与自有消息的边界。
  *
- * 判定依据只有「消息自己的归属会话」：投影出的消息带着它真正所属的那个会话，与当前会话不同的
- * 就是继承前缀——它是与原会话共享的同一份记录，不需要额外字段，也不需要客户端再沿来源链拼一次。
+ * 判定依据只有「消息自己的归属会话」，由 {@link isInheritedMessage} 在共享模块里给出：投影出的
+ * 消息带着它真正所属的那个会话，与当前会话不同的就是继承前缀——它是与原会话共享的同一份记录，
+ * 不需要额外字段，也不需要客户端再沿来源链拼一次。
  */
-
-/** 消息是不是当前会话继承来的那一段。当前会话未知时一律算自有消息，不凭空弱化任何一条。 */
-export function isInheritedMessage(message: SandboxMessage, currentConversationId: string | undefined) {
-  return !!currentConversationId && message.conversationId !== currentConversationId
-}
 
 /**
  * 这一条是不是继承前缀之后的第一条自有消息，也就是该显示分界标记的位置。
