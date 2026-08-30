@@ -2048,6 +2048,9 @@ export class SandboxControlService {
   // 表情回应写入消息状态，使 get_msg、场景快照和消息历史都能读回同一份回应事实。
   // 机器人操作者必须走 set_msg_emoji_like，以便能力禁用与调试记录和真实 OneBot 通道一致。
   async setMessageReaction(input: SetMessageReactionInput): Promise<{ revision: number }> {
+    // 会话归属只在这里判定，且必须在分流之前：机器人操作者要绕一圈自身 OneBot action，
+    // 而 action 表面没有「会话」这一级，走到那里就再也看不见请求声明的会话了。
+    this.assertReactionConversationMatches(input)
     if (this.isBot(input.operatorId)) {
       const bot = this.getBots().find(({ id }) => id === input.operatorId)!
       if (!bot.enabled) throw new SandboxDomainError(`机器人已停用：${bot.id}`)
@@ -2062,8 +2065,30 @@ export class SandboxControlService {
     return { revision: this.scene.revision }
   }
 
-  // bot action 与用户交互最终都落到这里，保证场景回应事实唯一。
-  applyMessageReaction(input: SetMessageReactionInput): void {
+  /**
+   * 请求声明了会话时，要求它就是目标消息自身的归属会话。
+   *
+   * 在分支里对继承前缀贴表情因此被拒——那段历史是与原会话共享的同一份记录，在分支视图里只读。
+   * 不声明会话表示按消息自身的归属执行：插件通过原始 OneBot 寻址的是根会话的一条普通消息，
+   * 拒绝它会让沙盒表现出真实环境不存在的错误。
+   *
+   * 消息本身不存在时这里放行，由写入路径给出统一的「消息不存在」。
+   */
+  private assertReactionConversationMatches(input: SetMessageReactionInput): void {
+    if (!input.conversationId) return
+    const message = this.scene.messages.find(({ id }) => id === input.messageId)
+    if (message && message.conversationId !== input.conversationId) {
+      throw new SandboxDomainError(`消息不存在：${input.messageId}`)
+    }
+  }
+
+  /**
+   * bot action 与用户交互最终都落到这里，保证场景回应事实唯一。
+   *
+   * 不接受会话：会话归属是请求层的边界，由 {@link setMessageReaction} 在分流前判定；
+   * 这条写入路径只认消息实体，因此插件通过原始 OneBot 作用到继承前缀仍然生效。
+   */
+  applyMessageReaction(input: Omit<SetMessageReactionInput, 'conversationId'>): void {
     const emojiId = input.emojiId.trim()
     if (!emojiId) throw new SandboxDomainError('表情 ID 不能为空')
     this.getParticipant(input.operatorId)
@@ -2507,9 +2532,14 @@ export class SandboxControlService {
     const peerId = resolveConversationPeerId(conversation, input.operatorId)
     const peer = peerId ? this.getParticipant(peerId) : undefined
     const reply = input.replyToMessageId
-      ? this.scene.messages.find(({ id, conversationId }) => id === input.replyToMessageId && conversationId === conversation.id)
+      ? this.scene.messages.find(({ id }) => id === input.replyToMessageId)
       : undefined
-    if (input.replyToMessageId && !reply) throw new SandboxDomainError(`回复消息不存在：${input.replyToMessageId}`)
+    // 回复目标只要在当前会话里可读即可：自有消息或它的继承前缀。分支里「在分叉点那句话上
+    // 换一种问法」是最自然的用法，要求归属等于当前会话会让分界线以上完全惰性。
+    if (input.replyToMessageId
+      && (!reply || !readConversationMessageIds(this.scene, conversation.id).includes(input.replyToMessageId))) {
+      throw new SandboxDomainError(`回复消息不存在：${input.replyToMessageId}`)
+    }
     return { operator, peer, conversation, group, reply }
   }
 

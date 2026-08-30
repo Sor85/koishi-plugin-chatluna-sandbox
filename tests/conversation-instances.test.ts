@@ -690,6 +690,211 @@ describe('从消息分叉出会话实例', () => {
   })
 })
 
+describe('分支里的继承前缀只读', () => {
+  /** 一条根会话消息，加上从它分叉出来的分支，以及分支自己的一条消息。 */
+  async function createBranch(control: SandboxControlService) {
+    const inherited = await control.sendMessage({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      content: '分叉点那句话',
+    })
+    const { conversationId } = control.branchConversationInstance({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      messageId: inherited.messageId,
+    })
+    const own = await control.sendMessage({ operatorId: '10001', conversationId, content: '换一种问法' })
+    return { inherited, own, conversationId }
+  }
+
+  it('在分支里撤回继承前缀被拒绝，在根会话里撤回同一条消息仍然正常', async () => {
+    const { app, control: resolve } = await createControl()
+    await app.start()
+    const control = resolve()
+    const { inherited, own, conversationId } = await createBranch(control)
+
+    await expect(control.recallMessage({ operatorId: '10001', conversationId, messageId: inherited.messageId }))
+      .rejects.toThrow(`消息不存在：${inherited.messageId}`)
+    // 分支自有的消息不受影响：只读约束的是继承来的那一段。
+    await control.recallMessage({ operatorId: '10001', conversationId, messageId: own.messageId })
+
+    // 原始记录仍然可以在它自己的会话里撤回，撤回后分支里如实反映。
+    await control.recallMessage({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      messageId: inherited.messageId,
+    })
+    expect(control.getMessageHistory({ operatorId: '10001', conversationId }).messages
+      .map(({ content, lifecycle }) => ({ content, status: lifecycle?.status })))
+      .toEqual([
+        { content: '分叉点那句话', status: 'recalled' },
+        { content: '换一种问法', status: 'recalled' },
+      ])
+  })
+
+  it('在分支里给继承前缀贴表情被拒绝，在根会话里给同一条消息贴表情仍然正常', async () => {
+    const { app, control: resolve } = await createControl()
+    await app.start()
+    const control = resolve()
+    const { inherited, own, conversationId } = await createBranch(control)
+
+    await expect(control.setMessageReaction({
+      operatorId: '10001',
+      conversationId,
+      messageId: inherited.messageId,
+      emojiId: '76',
+      enabled: true,
+    })).rejects.toThrow(`消息不存在：${inherited.messageId}`)
+    expect(control.getSnapshot().messages.find(({ id }) => id === inherited.messageId)?.reactions).toBeUndefined()
+
+    // 分支自有的消息照常可贴。
+    await control.setMessageReaction({
+      operatorId: '10001',
+      conversationId,
+      messageId: own.messageId,
+      emojiId: '76',
+      enabled: true,
+    })
+    // 原会话里同一条消息照常可贴，贴上的回应在分支里如实呈现——同一条消息只有一套附属事实。
+    await control.setMessageReaction({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      messageId: inherited.messageId,
+      emojiId: '4',
+      enabled: true,
+    })
+    expect(control.getMessageHistory({ operatorId: '10001', conversationId }).messages
+      .map(({ content, reactions }) => ({ content, reactions })))
+      .toEqual([
+        { content: '分叉点那句话', reactions: [{ emojiId: '4', participantIds: ['10001'] }] },
+        { content: '换一种问法', reactions: [{ emojiId: '76', participantIds: ['10001'] }] },
+      ])
+  })
+
+  it('机器人操作者在分支里给继承前缀贴表情同样被拒，贴到分支自有消息上照常生效', async () => {
+    const { app, control: resolve } = await createControl()
+    await app.start()
+    const control = resolve()
+    const { inherited, own, conversationId } = await createBranch(control)
+
+    // 机器人操作者要绕一圈自身 OneBot action，而 action 表面没有「会话」这一级：
+    // 判定必须发生在分流之前，否则只读约束会因操作者种类而失效。
+    await expect(control.setMessageReaction({
+      operatorId: '20001',
+      conversationId,
+      messageId: inherited.messageId,
+      emojiId: '76',
+      enabled: true,
+    })).rejects.toThrow(`消息不存在：${inherited.messageId}`)
+    expect(control.getSnapshot().messages.find(({ id }) => id === inherited.messageId)?.reactions).toBeUndefined()
+
+    await control.setMessageReaction({
+      operatorId: '20001',
+      conversationId,
+      messageId: own.messageId,
+      emojiId: '76',
+      enabled: true,
+    })
+    expect(control.getSnapshot().messages.find(({ id }) => id === own.messageId)?.reactions)
+      .toEqual([{ emojiId: '76', participantIds: ['20001'] }])
+  })
+
+  it('不指定会话的表情回应按消息自身归属执行，插件通道因此不受分支视图的只读约束', async () => {
+    const { app, control: resolve } = await createControl()
+    await app.start()
+    const control = resolve()
+    const { inherited } = await createBranch(control)
+
+    // 只读约束的是用户在分支视图里的入口；插件寻址的是根会话的一条普通消息。
+    await control.setMessageReaction({
+      operatorId: '10001',
+      messageId: inherited.messageId,
+      emojiId: '76',
+      enabled: true,
+    })
+    expect(control.getSnapshot().messages.find(({ id }) => id === inherited.messageId)?.reactions)
+      .toEqual([{ emojiId: '76', participantIds: ['10001'] }])
+  })
+
+  it('清空分支只清掉它自有的消息，继承前缀不受影响', async () => {
+    const { app, control: resolve } = await createControl()
+    await app.start()
+    const control = resolve()
+    const { inherited, own, conversationId } = await createBranch(control)
+
+    control.clearConversationMessages({ operatorId: '10001', conversationId })
+
+    const scene = control.getSnapshot()
+    expect(scene.messages.map(({ id }) => id)).toEqual([inherited.messageId])
+    // 清空之后分支里仍然读得到继承前缀：它是原会话的记录，不属于这条分支。
+    expect(readConversationMessageIds(scene, conversationId)).toEqual([inherited.messageId])
+    expect(readConversationMessageIds(scene, 'private:10001:20001')).toEqual([inherited.messageId])
+    expect(scene.messages.some(({ id }) => id === own.messageId)).toBe(false)
+  })
+
+  it('在分支里引用继承前缀回复成功，回复归属该分支', async () => {
+    const { app, control: resolve } = await createControl()
+    await app.start()
+    const control = resolve()
+    const { inherited, conversationId } = await createBranch(control)
+
+    const reply = await control.sendMessage({
+      operatorId: '10001',
+      conversationId,
+      content: '在分叉点那句话上换一种问法',
+      replyToMessageId: inherited.messageId,
+    })
+
+    const scene = control.getSnapshot()
+    const message = scene.messages.find(({ id }) => id === reply.messageId)
+    expect(message).toMatchObject({ conversationId, replyToMessageId: inherited.messageId })
+    // 回复落在分支里，原会话一条都没多。
+    expect(readConversationMessageIds(scene, 'private:10001:20001')).toEqual([inherited.messageId])
+
+    // 从分支里再分叉时，继承前缀跨两段，被引用的消息在链上任一段里都算可读。
+    const nested = control.branchConversationInstance({
+      operatorId: '10001',
+      conversationId,
+      messageId: reply.messageId,
+    })
+    const nestedReply = await control.sendMessage({
+      operatorId: '10001',
+      conversationId: nested.conversationId,
+      content: '再引用一次根会话那句话',
+      replyToMessageId: inherited.messageId,
+    })
+    expect(control.getSnapshot().messages.find(({ id }) => id === nestedReply.messageId))
+      .toMatchObject({ conversationId: nested.conversationId, replyToMessageId: inherited.messageId })
+  })
+
+  it('引用不在当前会话里可读的消息仍然被拒绝', async () => {
+    const { app, control: resolve } = await createControl()
+    await app.start()
+    const control = resolve()
+    const { own, conversationId } = await createBranch(control)
+    const afterFork = await control.sendMessage({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      content: '分叉点之后的消息',
+    })
+
+    // 分叉点之后的原会话消息不属于这条分支的继承前缀。
+    await expect(control.sendMessage({
+      operatorId: '10001',
+      conversationId,
+      content: '引用分叉点之后的消息',
+      replyToMessageId: afterFork.messageId,
+    })).rejects.toThrow(`回复消息不存在：${afterFork.messageId}`)
+    // 反向同理：分支自有的消息在根会话里不可读。
+    await expect(control.sendMessage({
+      operatorId: '10001',
+      conversationId: 'private:10001:20001',
+      content: '引用分支里的消息',
+      replyToMessageId: own.messageId,
+    })).rejects.toThrow(`回复消息不存在：${own.messageId}`)
+  })
+})
+
 describe('实例重命名与删除', () => {
   it('改名后场景与可见投影里的标题同步，根会话不能改名', async () => {
     const { app, control: resolve } = await createControl()

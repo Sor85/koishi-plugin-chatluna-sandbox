@@ -765,10 +765,22 @@ function shouldShowUsage(message: SandboxMessage) {
   return !!getMessageUsage(message) && !(isRecalledMessage(message) && !props.model.markRecalledMessages)
 }
 
+/**
+ * 消息是不是这条分支继承来的那一段。
+ *
+ * 投影出的消息带着自己的归属会话，与当前会话不同的就是继承前缀——它是与原会话共享的同一份
+ * 记录，在分支视图里只读，因此右键里做不到的动作干脆不显示，用户不必靠试错才知道哪些被禁。
+ */
+function isInheritedMessage(message: SandboxMessage) {
+  const conversationId = props.model.currentConversation?.id
+  return !!conversationId && message.conversationId !== conversationId
+}
+
 // 与服务端撤回权限一致：自己的消息随时可撤；群内群主/管理员可撤成员消息，但不能动群主或同级管理员。
 function canRecallMessage(message: SandboxMessage) {
   const operatorId = props.model.currentOperatorId
   if (!operatorId || message.event || isRecalledMessage(message)) return false
+  if (isInheritedMessage(message)) return false
   if (message.authorId === operatorId) return true
   if (!props.model.currentGroup) return false
   const actor = getCurrentGroupMember(operatorId)
@@ -777,16 +789,18 @@ function canRecallMessage(message: SandboxMessage) {
   return target.role !== 'owner' && !(actor.role === 'admin' && target.role === 'admin')
 }
 
-// 私聊与群聊共用回应入口；事件消息不可回应，撤回消息只读展示已有回应。
+// 私聊与群聊共用回应入口；事件消息不可回应，撤回消息与继承前缀只读展示已有回应。
 function canReactToMessage(message: SandboxMessage) {
   return !message.event
     && !isRecalledMessage(message)
+    && !isInheritedMessage(message)
     && !!props.model.currentOperatorId
 }
 
 function isReactionReadonly(message: SandboxMessage) {
   return !!message.event
     || isRecalledMessage(message)
+    || isInheritedMessage(message)
     || !props.model.currentOperatorId
 }
 

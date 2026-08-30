@@ -341,4 +341,17 @@ describe('WebQQ 消息列表', () => {
     expect(chatPaneSource).toContain("@set-message-reaction=\"forwardSetMessageReaction\"")
     expect(pageSource).toContain('@set-message-reaction="setMessageReaction"')
   })
+
+  it('继承前缀上的右键不提供撤回与贴表情', () => {
+    const source = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
+
+    // 判定依据是消息自己的归属会话：投影出的继承前缀带着来源会话 ID，与当前会话不同。
+    expect(source).toContain('function isInheritedMessage(message: SandboxMessage) {')
+    expect(source).toContain('return !!conversationId && message.conversationId !== conversationId')
+    // 撤回、主动贴表情与已有回应的切换是三个独立的写入入口，逐个挡住。少挡一个就有一条绕路：
+    // 只挡右键菜单时，点一下气泡下方已有的 emoji 仍会改写原会话的回应事实。
+    expect(source).toContain('if (isInheritedMessage(message)) return false')
+    expect(source).toContain('&& !isInheritedMessage(message)')
+    expect(source).toContain('|| isInheritedMessage(message)')
+  })
 })

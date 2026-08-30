@@ -979,6 +979,14 @@ export interface ClearConversationMessagesInput {
 
 export interface SetMessageReactionInput {
   operatorId: string
+  /**
+   * 请求发起时所在的会话。给出时要求它就是消息自身的归属会话，因此在分支里对继承前缀贴表情
+   * 会被拒——继承前缀是与原会话共享的同一份记录，在分支视图里只读。
+   *
+   * 省略表示按消息自身的归属执行：插件通过原始 OneBot 寻址的是根会话的一条普通消息，
+   * 只读约束的是用户在分支视图里的入口，不是消息实体的生命周期。
+   */
+  conversationId?: string
   messageId: string
   emojiId: string
   enabled: boolean

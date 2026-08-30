@@ -587,9 +587,12 @@ export function createWebqqWorkspaceShell(
   }
 
   async function setMessageReaction(messageId: string, emojiId: string, enabled: boolean) {
+    const conversationId = currentConversation.value?.id
+    if (!conversationId) return
     errorMessage.value = ''
     try {
-      await workspaceController.setMessageReaction({ messageId, emojiId, enabled })
+      // 带上当前会话，服务端才能判定目标是不是继承前缀：分支里那一段与原会话共享同一份记录，只读。
+      await workspaceController.setMessageReaction({ conversationId, messageId, emojiId, enabled })
     } catch (error) {
       errorMessage.value = error instanceof Error ? error.message : '贴表情失败'
     }

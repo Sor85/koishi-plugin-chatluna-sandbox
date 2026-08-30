@@ -263,3 +263,58 @@ describe('会话实例的重命名与删除', () => {
     expect(shell.chatPaneModel.value.composer.externalError).toBe('会话实例不存在：instance-1')
   })
 })
+
+describe('分支里的继承前缀只读', () => {
+  // 投影把拼接结果物化进实例行并删掉分叉点，因此客户端拿到的实例行是「继承前缀 + 自有消息」
+  // 的完整列表，而不是分叉点。夹具照这个形状写，否则测的是客户端二次展开来源链那条死路。
+  const withBranch: SandboxSnapshot = {
+    ...baseSnapshot,
+    conversationInstances: [{
+      id: 'instance-1',
+      rootConversationId: 'private:10001:20001',
+      title: '换一种问法',
+      messageIds: ['message-1', 'message-2'],
+    }],
+    messages: [
+      ...baseSnapshot.messages,
+      {
+        id: 'message-2',
+        authorId: '10001',
+        conversationId: 'instance-1',
+        content: '分支里的提问',
+        createdAt: '2026-08-29T03:00:00.000Z',
+      },
+    ],
+  }
+
+  it('贴表情带上当前会话，服务端因此能判定目标是不是继承前缀', async () => {
+    const { controller, port, shell } = await createShell(withBranch)
+    controller.selectConversation('instance-1')
+
+    await shell.setMessageReaction('message-2', '76', true)
+
+    // 少了会话这一项，服务端只能按消息归属判定，分支视图的只读约束就无从成立。
+    expect(port.calls.at(-1)).toEqual({
+      operation: 'setMessageReaction',
+      input: { operatorId: '10001', conversationId: 'instance-1', messageId: 'message-2', emojiId: '76', enabled: true },
+    })
+
+    port.rejectNext('setMessageReaction', new Error('消息不存在：message-1'))
+    await shell.setMessageReaction('message-1', '76', true)
+
+    expect(shell.chatPaneModel.value.composer.externalError).toBe('消息不存在：message-1')
+  })
+
+  it('分支里的消息列表把继承前缀与自有消息一起给出，各自带着归属会话', async () => {
+    const { controller, shell } = await createShell(withBranch)
+    controller.selectConversation('instance-1')
+
+    const { messageList } = shell.chatPaneModel.value
+    // 只读判定的依据就是这里的归属会话：与当前会话不同的那一段是继承前缀。
+    expect(messageList.messages.map(({ id, conversationId }) => ({ id, conversationId }))).toEqual([
+      { id: 'message-1', conversationId: 'private:10001:20001' },
+      { id: 'message-2', conversationId: 'instance-1' },
+    ])
+    expect(messageList.currentConversation?.id).toBe('instance-1')
+  })
+})
