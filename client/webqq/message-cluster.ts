@@ -24,6 +24,9 @@ function isSameClusterSender(
     && !right.event
     // 撤回只改变呈现状态，不改变发送者连续性；继续合并可避免同一发送者重复头像。
     && left.authorId === right.authorId
+    // 跨会话的两条消息不是一簇：分支里继承前缀与自有消息之间有一条分界，合并会让分叉点之后的
+    // 第一条自有消息看起来是上面那条的续写，连发送者一行都被省掉。
+    && left.conversationId === right.conversationId
     && getDirection(left, currentOperatorId) === getDirection(right, currentOperatorId)
 }
 

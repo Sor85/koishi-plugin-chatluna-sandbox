@@ -345,13 +345,24 @@ describe('WebQQ 消息列表', () => {
   it('继承前缀上的右键不提供撤回与贴表情', () => {
     const source = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
 
-    // 判定依据是消息自己的归属会话：投影出的继承前缀带着来源会话 ID，与当前会话不同。
-    expect(source).toContain('function isInheritedMessage(message: SandboxMessage) {')
-    expect(source).toContain('return !!conversationId && message.conversationId !== conversationId')
-    // 撤回、主动贴表情与已有回应的切换是三个独立的写入入口，逐个挡住。少挡一个就有一条绕路：
-    // 只挡右键菜单时，点一下气泡下方已有的 emoji 仍会改写原会话的回应事实。
+    // 判定本身住在 fork-boundary 模块并由它的测试逐条执行；这里剩下的是三个写入入口都接了它，
+    // 那处接线在组件外观察不到。ADR-0073 的三类例外不含这种肯定式接线断言，它与 03 号票点名的
+    // 「把权限判定下沉成 messageList 投影的能力位」是同一笔债，由那条后续工作一并消化。
     expect(source).toContain('if (isInheritedMessage(message)) return false')
     expect(source).toContain('&& !isInheritedMessage(message)')
     expect(source).toContain('|| isInheritedMessage(message)')
+  })
+
+  it('分支在继承前缀与自有消息之间显示分界，继承部分整段弱化', () => {
+    const source = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
+    const styles = readFileSync(resolve('client/styles/webqq-messages.css'), 'utf8')
+
+    // 分界位置与整段弱化的判定由 fork-boundary 模块的测试逐条执行；这里守的是用户可见文案与
+    // 样式两类 ADR-0073 例外，加上一条同上的接线断言：规则算对了但没渲染出来，从外观察不到。
+    expect(source).toContain('以上是与原会话共享的记录，在这条分支里只读')
+    expect(source).toContain("{ 'is-inherited': isInheritedMessage(message) }")
+    expect(styles).toContain('.chatluna-sandbox-fork-boundary')
+    // 弱化而不是隐藏：继承部分不折叠、不默认收起，看全上下文正是复盘时要做的事。
+    expect(styles).toMatch(/\.chatluna-sandbox-message-row\.is-inherited \{[^}]*opacity:/)
   })
 })

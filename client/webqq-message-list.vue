@@ -30,6 +30,7 @@
         </button>
       </li>
       <template v-for="(message, messageIndex) in model.messages" :key="message.id">
+        <li v-if="isForkBoundary(messageIndex)" :key="`${message.id}:fork-boundary`" class="chatluna-sandbox-fork-boundary">以上是与原会话共享的记录，在这条分支里只读</li>
         <li v-if="shouldRenderAsEvent(message)" class="chatluna-sandbox-message-event">{{ getEventMessageText(message) }}</li>
         <ContextMenu v-else>
           <li
@@ -40,6 +41,7 @@
                 { 'is-merged': isMergedMessage(model.messages, messageIndex, model.currentOperatorId) },
                 { 'is-quote-target': highlightedMessageId === message.id },
                 { 'is-recalled': isRecalledMessage(message) },
+                { 'is-inherited': isInheritedMessage(message) },
                 { 'is-selecting': model.selectionMode },
                 { 'is-selectable': model.selectionMode && isMessageSelectable(message) },
                 { 'is-selected': model.selectionMode && isMessageSelected(message.id) },
@@ -330,6 +332,7 @@ import { getFriendMenuActions, type FriendMenuState } from './webqq/friend-menu'
 import { getGroupAuthorityBadge, getGroupMemberDisplayName } from './webqq/group-display'
 import { getGroupMemberMenuActions, type GroupMemberMenuAction } from './webqq/group-menu'
 import GroupMemberMenu from './group-member-menu.vue'
+import { isForkBoundaryMessage, isInheritedMessage as isInheritedPrefixMessage } from './webqq/fork-boundary'
 import { getMessageClusterClass, isMergedMessage } from './webqq/message-cluster'
 import { createMessageListFollowController } from './webqq/message-list-follow'
 import {
@@ -768,12 +771,16 @@ function shouldShowUsage(message: SandboxMessage) {
 /**
  * 消息是不是这条分支继承来的那一段。
  *
- * 投影出的消息带着自己的归属会话，与当前会话不同的就是继承前缀——它是与原会话共享的同一份
- * 记录，在分支视图里只读，因此右键里做不到的动作干脆不显示，用户不必靠试错才知道哪些被禁。
+ * 判定住在 {@link isInheritedPrefixMessage}：继承前缀在分支视图里只读，因此右键里做不到的动作
+ * 干脆不显示，用户不必靠试错才知道哪些被禁；同一份判定也决定这一行要不要弱化。
  */
 function isInheritedMessage(message: SandboxMessage) {
-  const conversationId = props.model.currentConversation?.id
-  return !!conversationId && message.conversationId !== conversationId
+  return isInheritedPrefixMessage(message, props.model.currentConversation?.id)
+}
+
+/** 这一行之前要不要画分界：它解释了上面那段为什么右键项更少。 */
+function isForkBoundary(index: number) {
+  return isForkBoundaryMessage(props.model.messages, index, props.model.currentConversation?.id)
 }
 
 // 与服务端撤回权限一致：自己的消息随时可撤；群内群主/管理员可撤成员消息，但不能动群主或同级管理员。

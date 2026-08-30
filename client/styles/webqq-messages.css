@@ -35,6 +35,36 @@
   margin-bottom: 0;
 }
 
+/* 分支的继承前缀整段弱化，与自有消息拉开层级；不折叠也不收起——看全上下文正是复盘时要做的事。 */
+.chatluna-sandbox-message-row.is-inherited {
+  opacity: 0.68;
+}
+
+/*
+ * 分叉点分界：继承前缀与自有消息之间的一条说明线。
+ *
+ * 它同时承担解释职责——上面那段是与原会话共享的同一份记录，因此右键项变少不再像缺陷。
+ * 分界画在自有消息一侧，前缀被清空或被保留窗口淘汰后整段变空时它随之消失，而分支仍在。
+ */
+.chatluna-sandbox-fork-boundary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  color: color-mix(in srgb, var(--webqq-text) 46%, transparent);
+  font-size: var(--webqq-font-xs);
+  line-height: 16px;
+  text-align: center;
+}
+
+.chatluna-sandbox-fork-boundary::before,
+.chatluna-sandbox-fork-boundary::after {
+  height: 1px;
+  flex: 1;
+  background: color-mix(in srgb, var(--webqq-border) 70%, transparent);
+  content: "";
+}
+
 /* 撤回只弱化气泡内容；文字和媒体分别覆盖撤回线，避免媒体仍被误认成可操作内容。 */
 .chatluna-sandbox-message-row.is-recalled .chatluna-sandbox-message-bubble,
 .chatluna-sandbox-thinking-row.is-recalled {

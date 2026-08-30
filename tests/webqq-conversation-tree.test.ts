@@ -317,4 +317,27 @@ describe('分支里的继承前缀只读', () => {
     ])
     expect(messageList.currentConversation?.id).toBe('instance-1')
   })
+
+  it('刚创建的分支侧栏预览是分叉点那条消息，有了自有消息后跟随最新一条', async () => {
+    // 刚创建的分支一条自有消息都没有，投影给出的就是物化后的继承前缀。
+    const justCreated = await createShell({
+      ...withBranch,
+      conversationInstances: [{
+        id: 'instance-1',
+        rootConversationId: 'private:10001:20001',
+        title: '换一种问法',
+        messageIds: ['message-1'],
+      }],
+    })
+
+    // 预览取拼接后的最后一条，因此它显示分叉点那条而不是「开始一段新对话」——分支不是空会话。
+    expect(justCreated.shell.sidebarModel.value.conversations[0]?.children
+      ?.map(({ id, preview }) => ({ id, preview })))
+      .toEqual([{ id: 'instance-1', preview: '根会话消息' }])
+
+    const withOwnMessage = await createShell(withBranch)
+    expect(withOwnMessage.shell.sidebarModel.value.conversations[0]?.children
+      ?.map(({ id, preview }) => ({ id, preview })))
+      .toEqual([{ id: 'instance-1', preview: '分支里的提问' }])
+  })
 })

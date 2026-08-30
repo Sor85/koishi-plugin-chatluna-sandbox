@@ -76,4 +76,15 @@ describe('TIM 消息簇', () => {
     expect(messages.map((_, index) => isMergedMessage(messages, index, '10001')))
       .toEqual([false, true, true])
   })
+
+  it('同一发送者跨会话的两条消息不合并，分界两侧各自成簇', () => {
+    // 分支里继承前缀与自有消息可能是同一个人连着发的两条；合并会让分叉点之后的第一条看起来
+    // 是上面那条的续写，连发送者一行都被省掉，分界因此形同不存在。
+    const inherited = message('继承', '10001')
+    const own = { ...message('自有', '10001'), conversationId: 'branch-1' }
+    const messages = [inherited, own]
+
+    expect(isMergedMessage(messages, 1, '10001')).toBe(false)
+    expect(messages.map((_, index) => getMessageClusterClass(messages, index, '10001'))).toEqual(['', ''])
+  })
 })
