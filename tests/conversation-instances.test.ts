@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SandboxControlService, createDefaultScene } from '../src/control-service'
-import { listRootConversationInstances, resolveConversation } from '../src/conversation-resolution'
+import { listRootConversationInstances, readConversationMessageIds, resolveConversation } from '../src/conversation-resolution'
 import type { SandboxSnapshot } from '../src/types'
 import { createDirectSession, emitChatLunaEvent } from './helpers/chatluna-state-broadcast'
 
@@ -56,15 +56,15 @@ describe('会话实例端到端', () => {
 
     // 插件看到的会话标识是实例本身，不是它的根会话。
     expect(observed.map(({ channelId }) => channelId)).toEqual([conversationId, 'private:10001:20001'])
-    const instance = resolveConversation(control.getSnapshot(), conversationId)
-    const reply = control.getSnapshot().messages.find(({ content }) => content === '实例里的回复')
+    const scene = control.getSnapshot()
+    const reply = scene.messages.find(({ content }) => content === '实例里的回复')
     expect(reply?.conversationId).toBe(conversationId)
-    expect(instance?.messageIds).toEqual([
+    expect(readConversationMessageIds(scene, conversationId)).toEqual([
       expect.any(String),
       reply?.id,
     ])
     // 根会话只有它自己那一条：两条对话线互不污染。
-    expect(resolveConversation(control.getSnapshot(), 'private:10001:20001')?.messageIds).toHaveLength(1)
+    expect(readConversationMessageIds(scene, 'private:10001:20001')).toHaveLength(1)
   })
 
   it('ChatLuna 对话状态按实例分叉，状态键与根会话不同', async () => {
@@ -252,14 +252,14 @@ describe('会话实例端到端', () => {
 
     const scene = control.getSnapshot()
     expect(scene.messages.map(({ content }) => content)).toEqual(['实例第二条', '根会话消息'])
-    expect(resolveConversation(scene, conversationId)?.messageIds).toHaveLength(1)
+    expect(readConversationMessageIds(scene, conversationId)).toHaveLength(1)
 
     await control.sendMessage({ operatorId: '10001', conversationId: 'private:10001:20001', content: '再一条根会话消息' })
 
     const trimmed = control.getSnapshot()
     // 实例最后一条消息被淘汰后实例本身仍然存在：空实例是合法状态。
-    expect(listRootConversationInstances(trimmed, 'private:10001:20001').map(({ id, messageIds }) => ({ id, messageIds })))
-      .toEqual([{ id: conversationId, messageIds: [] }])
+    expect(listRootConversationInstances(trimmed, 'private:10001:20001').map(({ id }) => id)).toEqual([conversationId])
+    expect(readConversationMessageIds(trimmed, conversationId)).toEqual([])
   })
 })
 
@@ -298,7 +298,7 @@ describe('原始 OneBot 回复的会话偏离', () => {
     const scene = control.getSnapshot()
     const reply = scene.messages.find(({ content }) => content === '原始 action 回复')
     expect(reply?.conversationId).toBe('private:10001:20001')
-    expect(resolveConversation(scene, conversationId)?.messageIds).toEqual([asked.messageId])
+    expect(readConversationMessageIds(scene, conversationId)).toEqual([asked.messageId])
 
     expect((await findDriftRecord(control, 'send_private_msg')).drift).toEqual({
       kind: 'reply-left-event-conversation',
@@ -400,8 +400,8 @@ describe('从消息创建分支', () => {
     })
 
     const scene = control.getSnapshot()
-    const branch = resolveConversation(scene, conversationId)!
-    const copies = branch.messageIds.map((id) => scene.messages.find((message) => message.id === id)!)
+    const copies = readConversationMessageIds(scene, conversationId)
+      .map((id) => scene.messages.find((message) => message.id === id)!)
     expect(copies.map(({ content }) => content)).toEqual(['第一条', '第二条引用第一条'])
     // 复制体拥有新的消息身份，并归属新实例。
     expect(copies.map(({ id }) => id)).not.toEqual([first.messageId, second.messageId])
@@ -409,7 +409,7 @@ describe('从消息创建分支', () => {
     // 复制范围内的引用指向复制体，而不是原会话里的消息。
     expect(copies[1]?.replyToMessageId).toBe(copies[0]?.id)
     // 原会话一条不少、一条不改。
-    expect(resolveConversation(scene, 'private:10001:20001')?.messageIds).toHaveLength(3)
+    expect(readConversationMessageIds(scene, 'private:10001:20001')).toHaveLength(3)
   })
 
   it('分叉点之后的引用不会跨会话指向原消息', async () => {
@@ -433,7 +433,7 @@ describe('从消息创建分支', () => {
     })
 
     const scene = control.getSnapshot()
-    const copies = resolveConversation(scene, conversationId)!.messageIds
+    const copies = readConversationMessageIds(scene, conversationId)
       .map((id) => scene.messages.find((message) => message.id === id)!)
     expect(copies).toHaveLength(1)
     expect(copies[0]).not.toHaveProperty('replyToMessageId')
@@ -465,7 +465,7 @@ describe('从消息创建分支', () => {
     const nested = control.branchConversationInstance({
       operatorId: '10001',
       conversationId: fromDirect.conversationId,
-      messageId: resolveConversation(scene, fromDirect.conversationId)!.messageIds[0]!,
+      messageId: readConversationMessageIds(scene, fromDirect.conversationId)[0]!,
     })
     const nestedConversation = resolveConversation(control.getSnapshot(), nested.conversationId)
     expect(nestedConversation?.title).toBe('分支：分支：Koishi')
@@ -568,7 +568,7 @@ describe('实例重命名与删除', () => {
     expect(resolveConversation(scene, removed.conversationId)).toBeUndefined()
     expect(scene.messages.map(({ id }) => id)).toEqual([root.messageId, keptMessage.messageId])
     expect(scene.messages.some(({ id }) => id === dropped.messageId)).toBe(false)
-    expect(resolveConversation(scene, 'private:10001:20001')?.messageIds).toEqual([root.messageId])
+    expect(readConversationMessageIds(scene, 'private:10001:20001')).toEqual([root.messageId])
     expect(listRootConversationInstances(scene, 'private:10001:20001').map(({ id }) => id)).toEqual([kept.conversationId])
     // 消息搜索不再命中被删实例里的内容。
     expect(control.searchConversationMessages({

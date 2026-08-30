@@ -56,6 +56,7 @@ import type {
 import {
   includesConversationParticipant,
   listConversations,
+  readConversationMessageIds,
   type ResolvedConversation,
 } from '../../src/conversation-resolution'
 import type { ListSandboxMcpCallRecordsInput } from '../../src/mcp/call-records'
@@ -189,7 +190,8 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   })
   const activeConversation = computed(() => conversations.value.find(({ id }) => id === activeConversationIdState.value))
   const activeMessages = computed(() => {
-    const ids = new Set(activeConversation.value?.messageIds ?? [])
+    const conversation = activeConversation.value
+    const ids = new Set(conversation ? readConversationMessageIds(snapshot.value, conversation.id) : [])
     return snapshot.value.messages.filter(({ id }) => ids.has(id))
   })
   // 仅暴露当前会话消息直接引用的转发资源；嵌套详情通过 getForwardMessage 按需加载。

@@ -18,6 +18,7 @@ import {
   normalizeSceneConversationInstances,
   projectVisibleConversations,
   pruneConversationMessageIds,
+  readConversationMessageIds,
   removeConversationInstance,
   removeConversations,
   requireConversation,
@@ -75,7 +76,6 @@ describe('会话解析', () => {
       rootConversationId: 'private:10001:20001',
       type: 'direct',
       participantIds: ['10001', '20001'],
-      messageIds: ['m1', 'm2'],
     })
     expect(resolveConversation(scene, 'group:30001')).toEqual({
       id: 'group:30001',
@@ -83,7 +83,6 @@ describe('会话解析', () => {
       rootConversationId: 'group:30001',
       type: 'group',
       groupId: '30001',
-      messageIds: ['m3'],
     })
     expect(resolveConversation(scene, 'private:10001:10002')).toBeUndefined()
   })
@@ -164,7 +163,6 @@ describe('会话解析', () => {
       rootConversationId: 'private:10001:10002',
       type: 'direct',
       participantIds: ['10001', '10002'],
-      messageIds: [],
     })
     expect(ensureGroupRootConversation(scene, '39999').id).toBe('group:39999')
     expect(ensureGroupRootConversation(scene, '39999').id).toBe('group:39999')
@@ -185,8 +183,8 @@ describe('会话解析', () => {
 
     pruneConversationMessageIds(scene, new Set(['m1', 'm3']))
 
-    expect(resolveConversation(scene, 'private:10001:20001')?.messageIds).toEqual(['m2'])
-    expect(resolveConversation(scene, 'group:30001')?.messageIds).toEqual([])
+    expect(readConversationMessageIds(scene, 'private:10001:20001')).toEqual(['m2'])
+    expect(readConversationMessageIds(scene, 'group:30001')).toEqual([])
   })
 
   it('可见会话投影按上限截断消息并标注还有更多', () => {
@@ -198,6 +196,40 @@ describe('会话解析', () => {
     expect(projection.conversations[0]).toMatchObject({ messageIds: ['m2'], hasMoreMessages: true })
     expect(projection.conversations[1]).toMatchObject({ messageIds: ['m3'], hasMoreMessages: false })
     expect(projection.messageIds).toEqual(new Set(['m2', 'm3']))
+  })
+})
+
+describe('会话消息列表读取', () => {
+  it('根会话与会话实例经同一个入口读出消息列表', () => {
+    const scene = createScene()
+    const instance = createConversationInstance(scene, {
+      id: 'instance-16',
+      rootConversationId: 'private:10001:20001',
+      title: '支线',
+      messageIds: ['m7', 'm8'],
+    })
+
+    expect(readConversationMessageIds(scene, 'private:10001:20001')).toEqual(['m1', 'm2'])
+    expect(readConversationMessageIds(scene, 'group:30001')).toEqual(['m3'])
+    expect(readConversationMessageIds(scene, instance.id)).toEqual(['m7', 'm8'])
+  })
+
+  it('会话不存在时读出空列表，读取路径不抛错', () => {
+    const scene = createScene()
+
+    expect(readConversationMessageIds(scene, 'group:39999')).toEqual([])
+    expect(readConversationMessageIds(scene, 'instance-does-not-exist')).toEqual([])
+  })
+
+  it('解析结果不带消息列表，长期持有它的调用方读不到过期的那一份', () => {
+    const scene = createScene()
+    const conversation = requireConversation(scene, 'private:10001:20001')
+
+    expect('messageIds' in conversation).toBe(false)
+
+    // 保留窗口摘除引用会整体替换数组，因此持有解析结果的调用方必须每次重新读。
+    pruneConversationMessageIds(scene, new Set(['m1']))
+    expect(readConversationMessageIds(scene, conversation.id)).toEqual(['m2'])
   })
 })
 
@@ -214,7 +246,6 @@ describe('会话实例解析', () => {
       type: 'direct',
       participantIds: ['10001', '20001'],
       title: '换一种问法',
-      messageIds: [],
     })
     // 参与者对不复制到实例上，只从根会话读。
     expect(scene.conversationInstances).toEqual([
@@ -316,7 +347,8 @@ describe('会话实例解析', () => {
 
     pruneConversationMessageIds(scene, new Set(['m9']))
 
-    expect(resolveConversation(scene, instance.id)).toMatchObject({ messageIds: [] })
+    expect(resolveConversation(scene, instance.id)).toBeDefined()
+    expect(readConversationMessageIds(scene, instance.id)).toEqual([])
   })
 
   it('可见会话投影把根会话的实例一起投影出来', () => {

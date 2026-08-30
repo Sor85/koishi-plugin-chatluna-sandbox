@@ -23,6 +23,7 @@ import {
   ensureGroupRootConversation,
   listRootConversationInstances,
   listRootConversations,
+  readConversationMessageIds,
   resolveConversation,
   type ResolvedConversation,
 } from '../conversation-resolution'
@@ -840,6 +841,16 @@ function requireCapabilityList(value: unknown): string[] | undefined {
   return value.map(String)
 }
 
+/**
+ * 会话在 MCP 表面的形状：解析结果加上它的消息列表。
+ *
+ * 消息列表是外部测试控制器读会话内容的入口，因此这里显式带上它；列表本身经会话解析模块的唯一
+ * 读取口取，不在 MCP 层自己拼。
+ */
+function toMcpConversation(snapshot: SandboxSnapshot, conversation: ResolvedConversation) {
+  return { ...conversation, messageIds: readConversationMessageIds(snapshot, conversation.id) }
+}
+
 export class SandboxMcpService {
   private credentials: SandboxMcpCredential[] = []
   private events: SandboxMcpEvent[] = []
@@ -1348,7 +1359,7 @@ export class SandboxMcpService {
     const snapshot = control.getVisibleSnapshot(operatorId, 100)
     const limit = Math.min(Math.max(Number(args.limit ?? 50), 1), 200)
     const offset = Math.max(Number(args.offset ?? 0), 0)
-    const items = this.listConversationItems(snapshot, args)
+    const items = this.listConversationItems(snapshot, args).map((conversation) => toMcpConversation(snapshot, conversation))
     return { items: items.slice(offset, offset + limit), nextOffset: offset + limit < items.length ? offset + limit : undefined }
   }
 
@@ -1376,8 +1387,9 @@ export class SandboxMcpService {
     const operatorId = requireString(args.operatorId, 'operatorId')
     const conversationId = requireString(args.conversationId, 'conversationId')
     const snapshot = control.getVisibleSnapshot(operatorId, Math.min(Math.max(Number(args.messageLimit ?? 50), 1), 100))
-    const conversation = resolveConversation(snapshot, conversationId)
-    if (!conversation) throw new SandboxMcpError('conversation_not_found', `会话不存在或不可见：${conversationId}`)
+    const resolved = resolveConversation(snapshot, conversationId)
+    if (!resolved) throw new SandboxMcpError('conversation_not_found', `会话不存在或不可见：${conversationId}`)
+    const conversation = toMcpConversation(snapshot, resolved)
     const messageIds = new Set(conversation.messageIds)
     return { conversation, messages: snapshot.messages.filter(({ id }) => messageIds.has(id)) }
   }

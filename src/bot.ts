@@ -25,6 +25,7 @@ import { MAX_MEDIA_SIZE } from './media-storage'
 import {
   listVisibleConversationIds,
   listVisibleRootConversations,
+  readConversationMessageIds,
   requireVisibleConversation,
   resolveConversation,
   resolveConversationPeerId,
@@ -187,7 +188,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           const messages = new Map(snapshot.messages.map((message) => [message.id, message]))
           const recentContacts = listVisibleRootConversations(snapshot, this.selfId).flatMap((conversation) => {
             // 最近联系人摘要不得泄露撤回原文，回退到最近一条仍可读的消息。
-            const latestMessage = [...conversation.messageIds].reverse()
+            const latestMessage = [...readConversationMessageIds(snapshot, conversation.id)].reverse()
               .map((messageId) => messages.get(messageId))
               .find((message) => message && !isRecalledMessage(message))
             if (!latestMessage) return []
@@ -645,10 +646,12 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
   }
 
   async getMessageList(channelId: string): Promise<Universal.BidiList<Universal.Message>> {
-    const conversation = this.getVisibleConversation(channelId)
+    const snapshot = this.control.getSnapshot()
+    const conversation = this.getVisibleConversation(channelId, snapshot)
+    const conversationMessageIds = new Set(readConversationMessageIds(snapshot, conversation.id))
     // 与 get_msg / 历史查询一致：已撤回消息不得以原文形式暴露给机器人。
-    const messages = this.control.getSnapshot().messages
-      .filter(({ id }) => conversation.messageIds.includes(id))
+    const messages = snapshot.messages
+      .filter(({ id }) => conversationMessageIds.has(id))
       .filter((message) => !isRecalledMessage(message))
     return { data: await Promise.all(messages.map((message) => this.toUniversalMessage(message))) }
   }
@@ -909,10 +912,16 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     return { kind: 'reply-left-event-conversation', eventConversationId, conversationId }
   }
 
-  private getVisibleConversation(channelId: string) {
+  /**
+   * 会话可见性按完整逻辑会话判断。
+   *
+   * 快照可选：`getSnapshot` 每次克隆整份场景，需要顺带读消息列表的调用方传入自己那一份，
+   * 一次 action 因此只克隆一遍。
+   */
+  private getVisibleConversation(channelId: string, snapshot = this.control.getSnapshot()) {
     // WebQQ 可见快照会截断最近消息；机器人 action 必须按完整逻辑会话判断可见性。
     try {
-      return requireVisibleConversation(this.control.getSnapshot(), this.selfId, channelId)
+      return requireVisibleConversation(snapshot, this.selfId, channelId)
     } catch {
       throw new Error(`会话不存在：${channelId}`)
     }
@@ -943,8 +952,10 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
     const messageSequence = Number(params.message_seq)
     let beforeMessageId: string | undefined
     if (Number.isFinite(messageSequence) && messageSequence > 0) {
-      const conversation = this.getVisibleConversation(conversationId)
-      beforeMessageId = conversation.messageIds.find((messageId) => getOneBotMessageSequence(messageId) === messageSequence)
+      const snapshot = this.control.getSnapshot()
+      const conversation = this.getVisibleConversation(conversationId, snapshot)
+      beforeMessageId = readConversationMessageIds(snapshot, conversation.id)
+        .find((messageId) => getOneBotMessageSequence(messageId) === messageSequence)
       if (!beforeMessageId) throw new Error(`消息不存在：${params.message_seq}`)
     }
     // 历史查询同样不得泄露撤回原文，直接隐藏已撤回消息。

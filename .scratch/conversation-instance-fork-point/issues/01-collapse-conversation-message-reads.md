@@ -10,10 +10,24 @@
 
 **Blocked by:** None — can start immediately
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] 会话解析模块提供唯一的「读某个会话的消息列表」函数
-- [ ] 解析结果不再对外暴露对场景消息 ID 数组的实时引用
-- [ ] 消息历史分页、消息搜索、可见快照投影、OneBot 消息读取与历史、清空会话、测试控制端点的会话读取全部经该函数
-- [ ] 没有任何调用方依赖消息 ID 数组对象的身份不变
-- [ ] 既有测试全部通过，外部行为零变化
+- [x] 会话解析模块提供唯一的「读某个会话的消息列表」函数
+- [x] 解析结果不再对外暴露对场景消息 ID 数组的实时引用
+- [x] 消息历史分页、消息搜索、可见快照投影、OneBot 消息读取与历史、清空会话、测试控制端点的会话读取全部经该函数
+- [x] 没有任何调用方依赖消息 ID 数组对象的身份不变
+- [x] 既有测试全部通过，外部行为零变化
+
+## Comments
+
+### 实现记录
+
+- `readConversationMessageIds(scene, conversationId)` 成为唯一读取口，`ResolvedConversation.messageIds` 删除。会话不存在时读出空列表，存在性与可见性仍由各自的校验负责。
+- 模块内新增 `findConversationRow`，读取口与追加、清空共用同一处行查找。
+- 可见快照投影与带宽裁剪的 `truncate` 改为经读取口取列表，因此投影出的那一段与其他读取路径同源。
+- MCP `list_conversations` 与 `get_conversation` 的输出契约里 `messageIds` 是外部测试控制器读会话内容的入口，因此在 MCP 层显式经读取口投影上去（`toMcpConversation`），对外形状不变。
+- `SandboxBot.getVisibleConversation` 增加可选快照参数：`getSnapshot` 每次克隆整份场景，需要顺带读消息列表的 action 传入自己那一份，一次 action 因此仍只克隆一遍。
+
+### 留给后续票的观察
+
+客户端 `loadMessageHistory` 把历史合并回快照时只改写根会话行（`workspace-controller.ts`），会话实例的历史分页从来没有被合并过。它写的是存储行而不是读逻辑列表，因此不在本票范围内；分叉点落地后由 03/04 处理。

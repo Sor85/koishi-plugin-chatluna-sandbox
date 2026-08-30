@@ -21,8 +21,8 @@ import {
  * 解析出的会话。根会话解析到自己（`kind: 'root'`、`rootConversationId === id`）；会话实例的
  * 私聊参与者对与群号来自它的根会话，因此调用方不需要知道谁在哪一层存着什么。
  *
- * `messageIds` 直接引用场景里的数组而不是副本：解析在消息历史与搜索这类热路径上按会话调用，
- * 复制会把每次读取变成 O(消息数)。写入必须走本模块的变更函数，类型上因此声明为只读。
+ * 解析结果不带消息列表：那份列表只能经 {@link readConversationMessageIds} 读。长期持有解析
+ * 结果的调用方因此不可能读到过期的一份——保留窗口摘除引用时会整体替换场景里的数组。
  */
 export interface ResolvedConversation {
   readonly id: string
@@ -34,7 +34,6 @@ export interface ResolvedConversation {
   readonly participantIds?: readonly [string, string]
   /** 群聊的群号；私聊为 undefined。 */
   readonly groupId?: string
-  readonly messageIds: readonly string[]
   /** 仅会话实例拥有标题。 */
   readonly title?: string
   /** 消息分页水位：解析自被截断过的快照时为真，权威场景里始终为假。 */
@@ -46,7 +45,6 @@ function resolveRoot(conversation: SandboxConversation): ResolvedConversation {
     id: conversation.id,
     kind: 'root' as const,
     rootConversationId: conversation.id,
-    messageIds: conversation.messageIds,
     ...(conversation.hasMoreMessages ? { hasMoreMessages: true } : {}),
   }
   return conversation.type === 'direct'
@@ -65,7 +63,6 @@ function resolveInstance(
     id: instance.id,
     kind: 'instance' as const,
     rootConversationId: root.id,
-    messageIds: instance.messageIds,
     title: instance.title,
     ...(instance.hasMoreMessages ? { hasMoreMessages: true } : {}),
   }
@@ -90,6 +87,24 @@ function instanceRows(scene: SandboxSnapshot): SandboxConversationInstance[] {
 
 function findInstanceRow(scene: SandboxSnapshot, conversationId: string): SandboxConversationInstance | undefined {
   return instanceRows(scene).find(({ id }) => id === conversationId)
+}
+
+/** 会话在场景里的存储行，无论它存在会话集合还是实例集合。 */
+type ConversationRow = SandboxConversation | SandboxConversationInstance
+
+function findConversationRow(scene: SandboxSnapshot, conversationId: string): ConversationRow | undefined {
+  return findRootRow(scene, conversationId) ?? findInstanceRow(scene, conversationId)
+}
+
+/**
+ * 「某个会话的消息列表」的唯一读取入口，按存储顺序从旧到新。
+ *
+ * 所有需要会话消息的路径（历史分页、搜索、快照投影、OneBot 表面、外部测试控制端点）都经这里，
+ * 因此「一个会话由哪些消息组成」只有一处答案。会话不存在时读出空列表：读取路径不替调用方
+ * 判断会话该不该存在，那由各自的可见性与存在性校验负责。
+ */
+export function readConversationMessageIds(scene: SandboxSnapshot, conversationId: string): readonly string[] {
+  return findConversationRow(scene, conversationId)?.messageIds ?? []
 }
 
 /** 场景里的全部根会话，按存储顺序。 */
@@ -314,14 +329,14 @@ export function removeConversationInstance(scene: SandboxSnapshot, conversationI
 
 /** 把一条消息挂到会话末尾。会话不存在时抛领域错误。 */
 export function appendConversationMessageId(scene: SandboxSnapshot, conversationId: string, messageId: string): void {
-  const row = findRootRow(scene, conversationId) ?? findInstanceRow(scene, conversationId)
+  const row = findConversationRow(scene, conversationId)
   if (!row) throw new SandboxDomainError(`会话不存在：${conversationId}`)
   row.messageIds.push(messageId)
 }
 
 /** 清空某个会话的消息引用，保留会话实体本身。 */
 export function clearConversationMessageIds(scene: SandboxSnapshot, conversationId: string): void {
-  const row = findRootRow(scene, conversationId) ?? findInstanceRow(scene, conversationId)
+  const row = findConversationRow(scene, conversationId)
   if (!row) throw new SandboxDomainError(`会话不存在：${conversationId}`)
   row.messageIds = []
   row.hasMoreMessages = false
@@ -369,15 +384,21 @@ export interface ConversationProjection {
   messageIds: Set<string>
 }
 
-function truncate<T extends { messageIds: string[], hasMoreMessages?: boolean }>(
+/**
+ * 投影一个会话行：消息列表经 {@link readConversationMessageIds} 读，因此投影出的那一段与
+ * 其他读取路径同源，而不是自己再拼一遍。
+ */
+function truncate<T extends ConversationRow>(
+  scene: SandboxSnapshot,
   row: T,
   messageLimit: number,
   keepWatermark: boolean,
 ): T {
+  const messageIds = readConversationMessageIds(scene, row.id)
   return {
     ...row,
-    messageIds: row.messageIds.slice(-messageLimit),
-    hasMoreMessages: (keepWatermark && !!row.hasMoreMessages) || row.messageIds.length > messageLimit,
+    messageIds: messageIds.slice(-messageLimit),
+    hasMoreMessages: (keepWatermark && !!row.hasMoreMessages) || messageIds.length > messageLimit,
   }
 }
 
@@ -405,18 +426,18 @@ export function projectVisibleConversations(
   return toProjection(
     scene.conversations
       .filter(({ id }) => visibleRootIds.has(id))
-      .map((conversation) => truncate(conversation, messageLimit, false)),
+      .map((conversation) => truncate(scene, conversation, messageLimit, false)),
     instanceRows(scene)
       .filter(({ rootConversationId }) => visibleRootIds.has(rootConversationId))
-      .map((instance) => truncate(instance, messageLimit, false)),
+      .map((instance) => truncate(scene, instance, messageLimit, false)),
   )
 }
 
 /** 把整份场景的会话消息引用截断到上限，用于按带宽裁剪快照。 */
 export function trimConversationMessages(scene: SandboxSnapshot, messageLimit: number): ConversationProjection {
   return toProjection(
-    scene.conversations.map((conversation) => truncate(conversation, messageLimit, true)),
-    instanceRows(scene).map((instance) => truncate(instance, messageLimit, true)),
+    scene.conversations.map((conversation) => truncate(scene, conversation, messageLimit, true)),
+    instanceRows(scene).map((instance) => truncate(scene, instance, messageLimit, true)),
   )
 }
 

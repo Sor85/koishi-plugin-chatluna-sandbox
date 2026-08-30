@@ -11,7 +11,7 @@ import {
   type SandboxForward,
   type SandboxSnapshot,
 } from '../../src/types'
-import { includesConversationParticipant, listRootConversations } from '../../src/conversation-resolution'
+import { includesConversationParticipant, listRootConversations, readConversationMessageIds } from '../../src/conversation-resolution'
 import { buildForwardPreviewMap } from './forward-preview'
 import { formatMentionContent } from './mention'
 import { getIncomingNotificationRequests } from './notification-requests'
@@ -57,9 +57,10 @@ export function buildWorkspaceThumbnailModels(
     avatar,
     isBot: kind === 'bot',
   }]))
-  const messages = currentConversation
-    ? snapshot.messages.filter(({ id }) => currentConversation.messageIds.includes(id))
-    : []
+  const currentConversationMessageIds = new Set(currentConversation
+    ? readConversationMessageIds(snapshot, currentConversation.id)
+    : [])
+  const messages = snapshot.messages.filter(({ id }) => currentConversationMessageIds.has(id))
   const replyMessages = Object.fromEntries(messages.flatMap(({ replyToMessageId }) => {
     if (!replyToMessageId) return []
     const reply = snapshot.messages.find(({ id }) => id === replyToMessageId)
@@ -76,7 +77,8 @@ export function buildWorkspaceThumbnailModels(
     const group = conversation.type === 'group' ? snapshot.groups.find(({ id }) => id === conversation.groupId) : undefined
     const peerId = getConversationPeerId(conversation, currentOperatorId)
     const peer = snapshot.participants.find(({ id }) => id === peerId)
-    const latestMessage = snapshot.messages.find(({ id }) => id === conversation.messageIds.at(-1))
+    const latestMessageId = readConversationMessageIds(snapshot, conversation.id).at(-1)
+    const latestMessage = snapshot.messages.find(({ id }) => id === latestMessageId)
     return {
       id: conversation.id,
       groupId: group?.id,

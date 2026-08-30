@@ -6,7 +6,7 @@ import type { WebqqForwardTargetModel, WebqqForwardTargetOption } from '../webqq
 import type { WebqqMessageListModel } from '../webqq-message-list.vue'
 import type { WebqqSidebarModel } from '../webqq-sidebar.vue'
 import type { ListSandboxMcpCallRecordsInput } from '../../src/mcp/call-records'
-import type { ResolvedConversation } from '../../src/conversation-resolution'
+import { readConversationMessageIds, type ResolvedConversation } from '../../src/conversation-resolution'
 import type {
   GetSandboxOneBotDebugRecordInput,
   GetSandboxOneBotDebugRecordsInput,
@@ -101,8 +101,7 @@ export function createWebqqWorkspaceShell(
   const currentOperator = computed(() => snapshot.value.participants.find(({ id }) => id === currentOperatorId.value))
   const composerSenders = computed<WebqqComposerSender[]>(() => workspaceController.composer.value.participants
     .map((participant) => ({ ...participant, avatar: resolveAvatar(participant.avatar) })))
-  const visibleConversations = computed<ResolvedConversation[]>(() => workspaceController.sidebar.value.conversations
-    .map((conversation) => ({ ...conversation, messageIds: [...conversation.messageIds] })))
+  const visibleConversations = computed<readonly ResolvedConversation[]>(() => workspaceController.sidebar.value.conversations)
   const currentConversation = computed(() => visibleConversations.value.find(({ id }) => id === activeConversationId.value))
   const currentPeerId = computed(() => currentConversation.value
     ? getConversationPeerId(currentConversation.value, currentOperatorId.value)
@@ -126,7 +125,8 @@ export function createWebqqWorkspaceShell(
     return currentPeer.value ? `${instanceOf}在线 · 好友` : '暂无会话'
   })
   const messages = computed(() => {
-    const ids = new Set(currentConversation.value?.messageIds ?? [])
+    const conversation = currentConversation.value
+    const ids = new Set(conversation ? readConversationMessageIds(snapshot.value, conversation.id) : [])
     return snapshot.value.messages.filter(({ id }) => ids.has(id))
   })
   const participants = computed(() => Object.fromEntries(snapshot.value.participants
@@ -273,7 +273,7 @@ export function createWebqqWorkspaceShell(
     const peerId = getConversationPeerId(conversation, currentOperatorId.value)
     const bot = getBot(peerId)
     const peer = bot ?? users.value.find(({ id }) => id === peerId)
-    const messageIds = new Set(conversation.messageIds)
+    const messageIds = new Set(readConversationMessageIds(snapshot.value, conversation.id))
     const latestMessage = snapshot.value.messages.filter(({ id }) => messageIds.has(id)).at(-1)
     const actorRole = group?.members.find(({ participantId }) => participantId === currentOperatorId.value)?.role
     const latestPreview = (() => {
@@ -930,7 +930,7 @@ export function createWebqqWorkspaceShell(
 
   async function loadEarlierMessages(resolve: Resolve, reject: Reject) {
     const conversation = currentConversation.value
-    const beforeMessageId = conversation?.messageIds[0]
+    const beforeMessageId = conversation ? readConversationMessageIds(snapshot.value, conversation.id)[0] : undefined
     if (!conversation || !currentOperator.value || !beforeMessageId) return resolve()
     errorMessage.value = ''
     try {

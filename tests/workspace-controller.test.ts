@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { SandboxSnapshot, SandboxWorkspaceState } from '../src/types'
 import { createFakeWorkspacePort } from '../client/webqq/fake-workspace-port'
+import { readConversationMessageIds } from '../src/conversation-resolution'
 import { createWorkspaceController } from '../client/webqq/workspace-controller'
 
 const snapshot: SandboxSnapshot = {
@@ -853,7 +854,8 @@ describe('WebQQ 工作区控制模块', () => {
       },
     })
     expect(controller.chat.value.messages.map(({ id }) => id)).toEqual(['message-0', 'message-1'])
-    expect(controller.chat.value.conversation?.messageIds).toEqual(['message-0', 'message-1'])
+    expect(readConversationMessageIds(controller.workspace.value.snapshot, 'private:10001:20001'))
+      .toEqual(['message-0', 'message-1'])
     expect(controller.chat.value.conversation?.hasMoreMessages).toBe(true)
     expect(controller.chat.value.forwards).toEqual([
       expect.objectContaining({ id: 'forward-history-1' }),

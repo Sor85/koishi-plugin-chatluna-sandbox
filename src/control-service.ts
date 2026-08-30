@@ -32,6 +32,7 @@ import {
   projectVisibleConversations,
   pruneConversationMessageIds,
   normalizeSceneConversationInstances,
+  readConversationMessageIds,
   removeConversationInstance,
   removeConversations,
   renameConversationInstance as renameInstanceTitle,
@@ -793,13 +794,14 @@ export class SandboxControlService {
   getMessageHistory(input: GetMessageHistoryInput): SandboxMessageHistory {
     const conversation = this.getVisibleConversation(input.operatorId, input.conversationId)
     const limit = this.validateMessageLimit(input.limit ?? 50)
-    let end = conversation.messageIds.length
+    const conversationMessageIds = readConversationMessageIds(this.scene, conversation.id)
+    let end = conversationMessageIds.length
     if (input.beforeMessageId) {
-      end = conversation.messageIds.indexOf(input.beforeMessageId)
+      end = conversationMessageIds.indexOf(input.beforeMessageId)
       if (end < 0) throw new SandboxDomainError(`消息不存在：${input.beforeMessageId}`)
     }
     const start = Math.max(0, end - limit)
-    const messageIds = conversation.messageIds.slice(start, end)
+    const messageIds = conversationMessageIds.slice(start, end)
     const messagesById = new Map(this.scene.messages.map((message) => [message.id, message]))
     const messages = messageIds.flatMap((id) => messagesById.get(id) ?? [])
     // 与 getVisibleSnapshot 一致：历史页只附带直接引用的转发资源，嵌套资源按需读取。
@@ -832,9 +834,10 @@ export class SandboxControlService {
     if (!query && createdAtStart === undefined) return { hits: [] }
 
     const limit = this.validateMessageLimit(input.limit ?? 50)
-    let end = conversation.messageIds.length
+    const conversationMessageIds = readConversationMessageIds(this.scene, conversation.id)
+    let end = conversationMessageIds.length
     if (input.beforeMessageId) {
-      end = conversation.messageIds.indexOf(input.beforeMessageId)
+      end = conversationMessageIds.indexOf(input.beforeMessageId)
       if (end < 0) throw new SandboxDomainError(`消息不存在：${input.beforeMessageId}`)
     }
     const needle = query.toLocaleLowerCase()
@@ -842,7 +845,7 @@ export class SandboxControlService {
     const hits: SandboxMessageSearchResult['hits'] = []
     // 从新到旧扫描命中；日期必须在游标扫描内过滤，否则分页会漏掉同日的后续消息。
     for (let index = end - 1; index >= 0; index -= 1) {
-      const message = messagesById.get(conversation.messageIds[index])
+      const message = messagesById.get(conversationMessageIds[index])
       if (!message) continue
       if (createdAtStart !== undefined) {
         const createdAt = Date.parse(message.createdAt)
@@ -1529,10 +1532,11 @@ export class SandboxControlService {
    */
   branchConversationInstance(input: BranchConversationInstanceInput): { conversationId: string, revision: number } {
     const source = this.getVisibleConversation(input.operatorId, input.conversationId)
-    const forkIndex = source.messageIds.indexOf(input.messageId)
+    const sourceMessageIds = readConversationMessageIds(this.scene, source.id)
+    const forkIndex = sourceMessageIds.indexOf(input.messageId)
     if (forkIndex < 0) throw new SandboxDomainError(`消息不存在：${input.messageId}`)
     const conversationId = Random.id()
-    const sourceMessages = source.messageIds.slice(0, forkIndex + 1)
+    const sourceMessages = sourceMessageIds.slice(0, forkIndex + 1)
       .flatMap((messageId) => this.scene.messages.find(({ id }) => id === messageId) ?? [])
     const copiedIds = new Map(sourceMessages.map(({ id }) => [id, Random.id()]))
     const copies = sourceMessages.map((message) => {
