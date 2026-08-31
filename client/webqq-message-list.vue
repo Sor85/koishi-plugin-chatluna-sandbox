@@ -329,6 +329,7 @@ import { IconArrowBackUp, IconAt, IconBell, IconCheck, IconChecks, IconClock, Ic
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from './components/ui/context-menu'
 import { type FriendMenuState } from './webqq/friend-menu'
+import { formatSandboxTimeOfDay } from './webqq/format-time'
 import GroupMemberMenu from './group-member-menu.vue'
 import { getMessageClusterClass, isMergedMessage } from './webqq/message-cluster'
 import { createMessageListFollowController } from './webqq/message-list-follow'
@@ -698,10 +699,8 @@ function getMessageRoleBadge(participantId: string) {
 }
 
 function formatMessageTime(createdAt: string) {
-  return new Date(createdAt).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  // 时区与语言都由格式化模块显式取，缺省指向浏览器环境；不在这里隐式读一次。
+  return formatSandboxTimeOfDay(createdAt)
 }
 
 function getFriendMenuState(targetId: string): FriendMenuState {

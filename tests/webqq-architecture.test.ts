@@ -331,16 +331,26 @@ interface ArchitectureExemption {
  * 端口时消化。两条毛玻璃规则从一开始就是干净的——它们是从消息列表测试里那四条肯定式断言
  * 转过来的，转的时候实现已经合规。
  *
- * 「组件测试文件不得出现裸的肯定式源码断言」这条则一次登记了全部未治理文件。理由统一：
- * 该文件断言的组件行为尚未下沉，这些断言是它当前行为的唯一记录，在对应 interface 抽出来
- * 之前删掉是净损失。负责人分三种——本轮票号、已有架构候选、以及尚无候选的「待开候选」。
+ * 「组件测试文件不得出现裸的肯定式源码断言」这条分两类登记。第一类是**已消化**的文件：
+ * 它们的组件行为已经下沉成模块，剩下的肯定式断言是接线与 DOM 结构契约——按 ADR 0073 的五类
+ * 判据本来就该保留，但规则无从按形状把它们和被禁止的实现细节断言区分开，因此仍需登记。
+ * 第二类是**尚未治理**的文件，理由统一：该文件断言的组件行为尚未下沉，这些断言是它当前行为
+ * 的唯一记录，在对应 interface 抽出来之前删掉是净损失；负责人分已有架构候选与待开候选两种。
  */
 const exemptions: readonly ArchitectureExemption[] = [
   ...([
-    // 本轮 message-chain-behaviour-modules 逐票消化。
-    ['tests/webqq-message-list.test.ts', 'message-chain-behaviour-modules 02/03/04/05'],
-    ['tests/webqq-message-selection.test.ts', 'message-chain-behaviour-modules 04'],
-    ['tests/webqq-chat-pane.test.ts', 'message-chain-behaviour-modules 06/07'],
+    ['tests/webqq-message-list.test.ts', '消息呈现、思考面板、指针分流、滚动恢复、会话切换、加载更早与时刻格式化七块已下沉'],
+    ['tests/webqq-chat-pane.test.ts', '多选、合并转发栈与聊天记录搜索三块已下沉'],
+  ] as const).map(([file, owner]) => ({
+    file,
+    rule: '组件测试文件不得出现裸的肯定式源码断言',
+    reason: '该文件的组件行为已下沉成模块并由模块的行为断言执行；剩余的肯定式断言是接线与 DOM 结构契约（ADR 0073 第三类例外），规则无从按形状与被禁止的实现细节断言区分。',
+    owner: 'message-chain-behaviour-modules（已完成）：若日后把接线本身也变成可执行 interface，再收掉这条豁免',
+  })),
+  ...([
+    // 多选的六项判定已由 message-chain-behaviour-modules 04 消化；这个文件剩下的是转发目标
+    // 对话框，它的页签、搜索与单选行为从未下沉，因此仍是未治理文件。
+    ['tests/webqq-message-selection.test.ts', '待开候选：转发目标对话框行为下沉'],
     // 已有架构候选，本轮明确排除在外（见该 feature 的 Out of Scope）。
     ['tests/webqq-composer.test.ts', '发送控件候选：草稿与编辑器之间的桥接'],
     ['tests/model-request-analysis.test.ts', '分析视图候选：展开态与原文态'],
@@ -377,6 +387,9 @@ const exemptions: readonly ArchitectureExemption[] = [
  *
  * 按仓库判据，这些文件里三分之二的断言（样式文本、DOM 结构与元素顺序、用户可见文案）本来
  * 就是合法的，钉总条数会让人误以为目标是把它清零，而清零会逼人删掉有架构决策依据的守卫。
+ *
+ * 下界不是零：已消化的那几个文件仍留着接线与 DOM 结构契约这两类合法断言，规则无从按形状
+ * 区分它们，因此它们的豁免会长期在册。棘轮对余下的未治理文件照常生效。
  */
 const TREATED_FILE_BUDGET = 24
 

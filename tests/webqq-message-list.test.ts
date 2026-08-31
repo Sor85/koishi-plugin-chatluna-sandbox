@@ -296,10 +296,16 @@ describe('WebQQ 消息列表', () => {
 
     /**
      * 类别：实现细节契约（肯定式）。
-     * 依据：时间格式化的时区尚未提成显式参数，负责人 message-chain-behaviour-modules 08。
+     * 依据：时刻格式化住在 format-time，时区与语言都是显式参数，跨日、跨年、午夜与非法输入
+     * 四个边界各有行为断言。这里保留的是「气泡上真的接了那个格式化器」这条接线——
+     * 接错回隐式取环境的写法不会报错，只会在别的时区静默显示错的钟点。
      * 作者名回退与群身份徽标的判定已下沉到 participant-presentation。
      */
     expect(source).toContain('formatMessageTime(message.createdAt)')
+    expect(source).toContain('formatSandboxTimeOfDay(createdAt)')
+
+    // 类别：实现细节契约（否定式）。隐式取运行机器时区与语言的旧写法不得被加回来。
+    expect(source).not.toContain('toLocaleTimeString')
 
     // 类别：DOM 结构与元素顺序。
     expect(source).toContain('class="chatluna-sandbox-message-time"')
