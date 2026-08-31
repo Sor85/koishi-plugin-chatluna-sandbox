@@ -1,6 +1,6 @@
 # 发送控件的草稿宿主与发送编排下沉成模块
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 

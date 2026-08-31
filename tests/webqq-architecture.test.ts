@@ -328,13 +328,14 @@ interface ArchitectureExemption {
  * 区分开，因此仍要登记。**棘轮不数这一组**，否则治理进度永远收敛不到零（ADR 0073）。
  */
 const treatedAssertionExemptions: readonly ArchitectureExemption[] = ([
-  ['tests/webqq-message-list.test.ts', '消息呈现、思考面板、指针分流、滚动恢复、会话切换、加载更早与时刻格式化七块已下沉'],
-  ['tests/webqq-chat-pane.test.ts', '多选、合并转发栈与聊天记录搜索三块已下沉'],
-] as const).map(([file, owner]) => ({
+  ['tests/webqq-message-list.test.ts', 'message-chain-behaviour-modules', '消息呈现、思考面板、指针分流、滚动恢复、会话切换、加载更早与时刻格式化七块已下沉'],
+  ['tests/webqq-chat-pane.test.ts', 'message-chain-behaviour-modules', '多选、合并转发栈与聊天记录搜索三块已下沉'],
+  ['tests/webqq-composer.test.ts', 'composer-draft-host', '草稿宿主、候选菜单与按键路由、附件采集与发送编排四块已下沉'],
+] as const).map(([file, feature, owner]) => ({
   file,
   rule: '组件测试文件不得出现裸的肯定式源码断言',
   reason: '该文件的组件行为已下沉成模块并由模块的行为断言执行；剩余的肯定式断言是接线与 DOM 结构契约（五类判据第 3、4 类），规则无从按形状与被禁止的实现细节断言区分。',
-  owner: `message-chain-behaviour-modules（已完成）：${owner}；若日后把接线本身也变成可执行 interface，再收掉这条豁免`,
+  owner: `${feature}（已完成）：${owner}；若日后把接线本身也变成可执行 interface，再收掉这条豁免`,
 }))
 
 /**
@@ -346,7 +347,6 @@ const untreatedAssertionExemptions: readonly ArchitectureExemption[] = ([
   // 对话框，它的页签、搜索与单选行为从未下沉，因此仍是未治理文件。
   ['tests/webqq-message-selection.test.ts', '待开候选：转发目标对话框行为下沉'],
   // 已有架构候选，本轮明确排除在外（见该 feature 的 Out of Scope）。
-  ['tests/webqq-composer.test.ts', '发送控件候选：草稿与编辑器之间的桥接'],
   ['tests/model-request-analysis.test.ts', '分析视图候选：展开态与原文态'],
   ['tests/webqq-model-request-workspace.test.ts', '分析视图候选：展开态与原文态'],
   ['tests/webqq-preset-workspace.test.ts', '预设工作台候选：源文档与运行时证据关联'],
@@ -397,7 +397,7 @@ const exemptions: readonly ArchitectureExemption[] = [
  * 删掉有架构决策依据的守卫。第二，已消化的文件不会从豁免清单里消失——它剩下的接线与结构契约
  * 该留，规则却无从按形状区分——把两类混在一个计数里，治理进度永远收敛不到零。
  */
-const UNTREATED_FILE_BUDGET = 22
+const UNTREATED_FILE_BUDGET = 21
 
 /**
  * 类型声明文件不含运行时代码，`send` 在里面只是被声明的重载签名。

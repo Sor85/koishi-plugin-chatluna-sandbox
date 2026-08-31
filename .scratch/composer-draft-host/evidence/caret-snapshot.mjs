@@ -10,6 +10,11 @@ import { open } from './lib.mjs'
 
 const out = process.argv[2] ?? 'snapshot.json'
 const ZWSP = '​'
+/** 1×1 透明 PNG。附件采集只看 MIME 与大小，内容够小且固定即可。 */
+const PNG_BYTES = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=',
+  'base64',
+)
 
 function normalize(html) {
   return html
@@ -162,6 +167,31 @@ await composeText(page, '中文', samples)
 
 await page.keyboard.press('Escape')
 await sample(page, 'Escape', samples)
+
+// 附件：选择文件入口。图片有缩略图，文本文件走文件名胶囊。
+await page.setInputFiles('#chatluna-sandbox-input ~ input[type="file"], .webqq-composer input[type="file"]', [
+  { name: 'shot.png', mimeType: 'image/png', buffer: PNG_BYTES },
+  { name: '2026.07.23-回归.tar.gz', mimeType: 'application/gzip', buffer: Buffer.from('gz') },
+])
+await sample(page, '选择两个附件', samples)
+
+const removeButtons = await page.$$('.webqq-composer-context button[aria-label^="移除"]')
+await removeButtons.at(-1).evaluate((node) => node.click())
+await sample(page, '移除一个附件', samples)
+
+// 附件：粘贴入口。剪贴板里有文件时吞掉这次粘贴，把它当附件。
+await page.evaluate(() => {
+  const editor = document.querySelector('#chatluna-sandbox-input')
+  const transfer = new DataTransfer()
+  transfer.items.add(new File([new Uint8Array([1, 2, 3])], 'pasted.png', { type: 'image/png' }))
+  editor.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: transfer }))
+})
+await sample(page, '粘贴一张图', samples)
+
+// 发送：成功后草稿、附件与回复上下文一起清空，焦点回到输入框。
+await (await page.$('.webqq-composer-action.is-primary')).evaluate((node) => node.click())
+await page.waitForTimeout(1600)
+await sample(page, '发送后', samples)
 
 // 切回私聊：草稿随会话切换清空，页面回到可反复运行的状态。
 await selectSessionByName(page, 'Koishi')

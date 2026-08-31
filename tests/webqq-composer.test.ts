@@ -29,8 +29,6 @@ describe('WebQQ 发送控件', () => {
     expect(composerSource).toContain('send: [input: WebqqComposerSendIntent')
     expect(composerSource).toContain('selectOperator: [participantId: string')
     expect(composerSource).toContain('manageEnvironment: [input: ManageSandboxEnvironmentInput')
-    expect(composerSource).toContain('const sendFiles = ref<ComposerSendFile[]>([])')
-    expect(composerSource).toContain('const sending = ref(false)')
     expect(composerSource).toContain('contenteditable')
     expect(composerSource).toContain('WebqqMentionMenu')
     expect(chatPaneSource).toContain('<WebqqComposer')
@@ -144,23 +142,28 @@ describe('WebQQ 发送控件', () => {
     })).toBe(false)
   })
 
-  it('发送控件通过稳定输入控件 ref 与 nextTick 恢复焦点，并保持单请求锁', () => {
+  /**
+   * 接线断言，不是判定断言（ADR 0073 第 4 类）。单请求锁、错误文案与动作顺序住在
+   * `composer-send`，附件采集住在 `composer-attachments`，两者的判定各由自己的行为断言执行；
+   * 这里只保证组件把它们接上，并且焦点判定仍然走 `composer-focus` 而不是被重新实现一遍。
+   *
+   * 少接这几根线的表现各不相同且都不报错：漏掉 `captureFocus` 里捕获原节点，发送完焦点会被
+   * 还给切换之后的输入框；漏掉实例令牌失效，卸载后的旧请求会去 focus 一个已经脱离文档的节点。
+   */
+  it('附件采集与发送编排接在各自模块上，焦点判定仍走既有模块', () => {
     const source = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
 
     expect(source).toContain('ref="inputRef"')
-    expect(source).toContain('const inputRef = ref<HTMLElement>()')
+    expect(source).toContain('createComposerAttachments<File>')
+    expect(source).toContain('createComposerSendController')
     expect(source).toContain('shouldRestoreComposerFocus')
     expect(source).toContain('from \'./webqq/composer-focus\'')
-    // 成功与失败共用 finally：先解锁，再 nextTick 后条件恢复焦点。
-    expect(source).toMatch(/finally\s*\{[\s\S]*sending\.value = false[\s\S]*await nextTick\(\)[\s\S]*shouldRestoreComposerFocus[\s\S]*requestInput\?\.focus\(\)/)
-    // 单请求锁：sending 为真时直接返回，不引入队列。
-    expect(source).toContain('|| sending.value) return')
-    expect(source).not.toMatch(/sendQueue|messageQueue|pendingSends/)
-    // 发起发送时捕获原会话、原操作者和原输入控件，避免闭包读到切换后的状态。
-    expect(source).toMatch(/requestConversationId|const \{[^}]*conversationId/)
     expect(source).toContain('const composerInstanceId = Symbol(\'webqq-composer\')')
     expect(source).toContain('activeComposerInstanceId = undefined')
     expect(source).toContain('inputElement: requestInput')
+    // 否定式守卫：不引入发送队列，也不把锁与顺序搬回组件。
+    expect(source).not.toMatch(/sendQueue|messageQueue|pendingSends/)
+    expect(source).not.toContain('sending.value = true')
   })
 
   /**

@@ -1,6 +1,6 @@
 <template>
   <div ref="composerLayoutRef" class="webqq-composer-layout-root">
-    <form ref="composerFormRef" class="webqq-composer" :style="composerStyle" @submit.prevent="sendMessage">
+    <form ref="composerFormRef" class="webqq-composer" :style="composerStyle" @submit.prevent="sendController.submit()">
       <span v-if="displayError" class="webqq-composer-error" role="alert">{{ displayError }}</span>
       <div
         v-if="model.replyingTo || sendFiles.length"
@@ -19,7 +19,7 @@
             <span class="webqq-composer-attachment-name">
               <span class="webqq-composer-attachment-base">{{ file.baseName }}</span><span>{{ file.extension }}</span>
             </span>
-            <button type="button" :aria-label="`移除 ${file.file.name}`" @click="removeSendFile(file.id)">
+            <button type="button" :aria-label="`移除 ${file.file.name}`" @click="attachments.remove(file.id)">
               <IconX :size="14" aria-hidden="true" />
             </button>
           </span>
@@ -27,7 +27,7 @@
             <button type="button" class="webqq-composer-attachment-preview" :aria-label="`预览 ${file.file.name}`" @click="previewImageUrl = file.previewUrl">
               <img :src="file.previewUrl" :alt="file.file.name">
             </button>
-            <button type="button" class="webqq-composer-attachment-remove" :aria-label="`移除 ${file.file.name}`" @click="removeSendFile(file.id)">
+            <button type="button" class="webqq-composer-attachment-remove" :aria-label="`移除 ${file.file.name}`" @click="attachments.remove(file.id)">
               <IconX :size="12" aria-hidden="true" />
             </button>
           </span>
@@ -205,6 +205,7 @@ import WebqqMentionMenu from './webqq-mention-menu.vue'
 import WebqqMenuExtensionMark from './webqq-menu-extension-mark.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type { MentionCandidate } from './webqq/composer-draft'
+import { createComposerAttachments } from './webqq/composer-attachments'
 import {
   createComposerDraftHost,
   type ComposerHostCaretReading,
@@ -213,6 +214,7 @@ import {
   type ComposerHostNodeReading,
 } from './webqq/composer-draft-host'
 import { shouldRestoreComposerFocus } from './webqq/composer-focus'
+import { createComposerSendController } from './webqq/composer-send'
 import {
   getUserStackLayoutMetrics,
   getUserStackMetrics,
@@ -263,21 +265,9 @@ const emit = defineEmits<{
 
 type UserStackOverflowMotion = 'idle' | 'expanding' | 'collapsing'
 
-// 与 onebot-webqq 一致的附件结构：图片带 objectURL 缩略图，文件名拆 baseName/extension 便于截断。
-interface ComposerSendFile {
-  id: string
-  file: File
-  previewUrl?: string
-  baseName: string
-  extension: string
-}
-
 const inputRef = ref<HTMLElement>()
 const mediaInputRef = ref<HTMLInputElement>()
-const sendFiles = ref<ComposerSendFile[]>([])
 const previewImageUrl = ref('')
-const sending = ref(false)
-const localError = ref('')
 const composerLayoutRef = ref<HTMLElement>()
 const composerFormRef = ref<HTMLFormElement>()
 const composerContextRef = ref<HTMLElement>()
@@ -399,6 +389,68 @@ const isDraftEmpty = draftHost.isEmpty
 const mentionMenuOpen = draftHost.mentionMenuOpen
 const filteredMentionCandidates = draftHost.mentionCandidates
 const mentionMenuIndex = draftHost.mentionMenuIndex
+
+/**
+ * 附件采集的注入点。只做宿主动作：临时预览地址与 `FileReader`。
+ *
+ * 读到的 data URL 交给模块去取逗号之后的内容——读不出前缀时报错的口径在那里有断言。
+ */
+const attachments = createComposerAttachments<File>({
+  createObjectUrl: (file) => URL.createObjectURL(file),
+  revokeObjectUrl: (url) => URL.revokeObjectURL(url),
+  readDataUrl: (file) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.addEventListener('load', () => resolve(typeof reader.result === 'string' ? reader.result : ''))
+    reader.addEventListener('error', () => reject(reader.error ?? new Error('无法读取媒体内容')))
+    reader.readAsDataURL(file)
+  }),
+})
+const sendFiles = attachments.attachments
+
+/**
+ * 发送编排的注入点。锁、错误文案与动作顺序都在 `composer-send` 里；
+ * 焦点该不该还回去仍由 `composer-focus` 判定，这里只把发起那一刻的读数交给它。
+ */
+const sendController = createComposerSendController({
+  readRequest: () => ({
+    content: draftHost.serialize(),
+    attachmentCount: sendFiles.value.length,
+    conversationId: props.model.conversationId,
+    operatorId: props.model.currentOperatorId,
+    replyToMessageId: props.model.replyingTo?.id,
+    composing: draftHost.composing.value,
+  }),
+  closeMentionMenu: () => draftHost.closeMentionMenu(),
+  captureFocus: ({ conversationId, operatorId }) => {
+    // 始终使用发送开始时捕获的原节点；当前 ref 即使指向新节点，也不能代替旧 composer 恢复焦点。
+    const requestInput = inputRef.value
+    return {
+      shouldRestore: () => shouldRestoreComposerFocus({
+        requestConversationId: conversationId,
+        requestOperatorId: operatorId,
+        requestComposerId: composerInstanceId,
+        activeConversationId: props.model.conversationId,
+        activeOperatorId: props.model.currentOperatorId,
+        activeComposerId: activeComposerInstanceId,
+        inputElement: requestInput,
+      }),
+      restore: () => requestInput?.focus(),
+    }
+  },
+  readMedia: () => attachments.readMedia(),
+  deliver: (intent) => new Promise<void>((resolve, reject) => emit('send', {
+    conversationId: intent.conversationId,
+    content: intent.content,
+    replyToMessageId: intent.replyToMessageId,
+    media: intent.media,
+  }, resolve, reject)),
+  clearDraft: () => draftHost.reset(),
+  clearAttachments: () => attachments.clear(),
+  clearReply: () => emit('clearReply'),
+  nextTick: () => nextTick(),
+})
+const sending = sendController.sending
+const localError = sendController.error
 
 const displayError = computed(() => localError.value || props.model.externalError || '')
 const compactUserStack = ref(false)
@@ -563,7 +615,7 @@ function handleEditorKeydown(event: KeyboardEvent) {
     disabled: sending.value || !props.model.conversationId,
   })
   if (action.kind !== 'none') event.preventDefault()
-  if (action.kind === 'submit') void sendMessage()
+  if (action.kind === 'submit') void sendController.submit()
 }
 
 async function selectComposerUser(sender: WebqqComposerSender) {
@@ -593,117 +645,21 @@ function forwardManageEnvironment(input: ManageSandboxEnvironmentInput, resolve:
   emit('manageEnvironment', input, resolve, reject)
 }
 
-function getSendFileNameParts(name: string) {
-  const dotIndex = name.lastIndexOf('.')
-  if (dotIndex <= 0) return { baseName: name, extension: '' }
-  return { baseName: name.slice(0, dotIndex), extension: name.slice(dotIndex) }
-}
-
-function addSendFiles(files: Iterable<File>) {
-  for (const file of files) {
-    // 服务端 MAX_MEDIA_SIZE 硬校验 10 MB，前端预检避免白传大文件后才报错。
-    if (file.size > 10 * 1024 * 1024) {
-      localError.value = '媒体大小不能超过 10 MB'
-      continue
-    }
-    sendFiles.value.push({
-      id: `${file.name}:${file.size}:${file.lastModified}:${sendFiles.value.length}`,
-      file,
-      previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
-      ...getSendFileNameParts(file.name),
-    })
-  }
-}
-
-function removeSendFile(id: string) {
-  const file = sendFiles.value.find((file) => file.id === id)
-  if (file?.previewUrl) URL.revokeObjectURL(file.previewUrl)
-  sendFiles.value = sendFiles.value.filter((file) => file.id !== id)
-}
-
-function clearSendFiles() {
-  for (const file of sendFiles.value) {
-    if (file.previewUrl) URL.revokeObjectURL(file.previewUrl)
-  }
-  sendFiles.value = []
-}
-
 function handleSendFileSelect(event: Event) {
   const input = event.currentTarget as HTMLInputElement
-  if (input.files) addSendFiles(input.files)
+  if (input.files) reportAttachmentError(attachments.add(input.files))
   input.value = ''
 }
 
 function handleSendPaste(event: ClipboardEvent) {
-  const files = Array.from(event.clipboardData?.files ?? [])
-  if (!files.length) return
+  const result = attachments.addFromPaste(event.clipboardData?.files ?? [])
+  if (!result.consumed) return
   event.preventDefault()
-  addSendFiles(files)
+  reportAttachmentError(result)
 }
 
-function readFileBase64(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.addEventListener('load', () => {
-      const result = typeof reader.result === 'string' ? reader.result : ''
-      const separator = result.indexOf(',')
-      if (separator < 0) return reject(new Error('无法读取媒体内容'))
-      resolve(result.slice(separator + 1))
-    })
-    reader.addEventListener('error', () => reject(reader.error ?? new Error('无法读取媒体内容')))
-    reader.readAsDataURL(file)
-  })
-}
-
-async function sendMessage() {
-  draftHost.closeMentionMenu()
-  const content = draftHost.serialize()
-  const { currentOperatorId, conversationId } = props.model
-  if ((!content && !sendFiles.value.length) || !currentOperatorId || !conversationId || sending.value) return
-
-  // 捕获发起时的会话、操作者和输入控件，避免异步完成后读到切换后的状态。
-  const requestConversationId = conversationId
-  const requestOperatorId = currentOperatorId
-  const requestInput = inputRef.value
-
-  sending.value = true
-  localError.value = ''
-  try {
-    const media = sendFiles.value.length
-      ? await Promise.all(sendFiles.value.map(async ({ file }) => ({
-          fileName: file.name,
-          mimeType: file.type,
-          dataBase64: await readFileBase64(file),
-        })))
-      : undefined
-    await new Promise<void>((resolve, reject) => emit('send', {
-      conversationId,
-      content,
-      replyToMessageId: props.model.replyingTo?.id,
-      media,
-    }, resolve, reject))
-    draftHost.reset()
-    clearSendFiles()
-    emit('clearReply')
-  } catch (error) {
-    localError.value = error instanceof Error ? error.message : '发送失败'
-  } finally {
-    sending.value = false
-    // 等 disabled 解除后再 focus，否则浏览器会忽略对 disabled 控件的焦点请求。
-    await nextTick()
-    // 始终使用发送开始时捕获的原节点；当前 ref 即使指向新节点，也不能代替旧 composer 恢复焦点。
-    if (shouldRestoreComposerFocus({
-      requestConversationId,
-      requestOperatorId,
-      requestComposerId: composerInstanceId,
-      activeConversationId: props.model.conversationId,
-      activeOperatorId: props.model.currentOperatorId,
-      activeComposerId: activeComposerInstanceId,
-      inputElement: requestInput,
-    })) {
-      requestInput?.focus()
-    }
-  }
+function reportAttachmentError(result: { error: string }) {
+  if (result.error) localError.value = result.error
 }
 
 // 胶囊内 padding(8) + 三个 gap(12) + 附件按钮(32) + 发送按钮(36)。
@@ -762,7 +718,7 @@ watch(() => orderedSenders.value.length, () => {
 onBeforeUnmount(() => {
   // 请求可能晚于组件卸载完成；先使实例令牌失效，finally 就不会触碰旧输入控件。
   activeComposerInstanceId = undefined
-  clearSendFiles()
+  attachments.clear()
   composerSpaceObserver?.disconnect()
   userStackLayout?.revert()
   if (suppressUserStackCollapseTimer) clearTimeout(suppressUserStackCollapseTimer)
