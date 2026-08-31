@@ -33,6 +33,48 @@ const conversationCollectionPredicates: readonly ArchitecturePredicate[] = [
   { evidence: '解构出实例集合绕过解析模块', pattern: /(?:const|let|var)\s*\{[^}]*\bconversationInstances\b[^}]*\}\s*=/ },
 ]
 
+/**
+ * 记录域目录模块自身是「谁是全部记录域」这条规则的唯一持有者，同样按形状而不是按文件清单判定。
+ */
+const SCOPE_DIRECTORY_MODULE_PATTERN = /(?:^|\/)scope-directory\.ts$/
+
+/** 按标识取控制服务的全部写法，外加测试控制端点自己那层包装。 */
+const CONTROL_LOOKUP_PATTERN = /\b(?:getControl|resolveControl|requireReadable|requireAiControl|requireUserControl)\s*\(/
+
+/** 从开括号处取出与之配对的那一段文本，用于把「清单交给了谁」这段范围切出来。 */
+function readBalanced(source: string, openIndex: number): string {
+  const open = source[openIndex]!
+  const close = open === '(' ? ')' : open === '[' ? ']' : '}'
+  let depth = 0
+  for (let index = openIndex; index < source.length; index += 1) {
+    if (source[index] === open) depth += 1
+    else if (source[index] === close && --depth === 0) return source.slice(openIndex + 1, index)
+  }
+  return source.slice(openIndex + 1)
+}
+
+/**
+ * 每处空间清单枚举「把清单交给谁」的那一段文本。
+ *
+ * 只跟着清单仍在流动的那条路走，因此判定的是写法形状而不是文件里出现过什么：
+ * - 清单直接交给某个数组方法的回调时，范围是那对括号；
+ * - 清单是 `for…of` 头部的可迭代对象时，范围是紧随其后的循环体。
+ *
+ * 只匹配成员调用（`X.listSpaces()`），因此清单方法自己的声明不会被当成枚举。清单没有继续
+ * 流向任何遍历时（`return this.requireTestSpaces().listSpaces()`）返回空，那只是把清单交给调用方。
+ */
+function enumerationBodies(source: string): string[] {
+  return [...source.matchAll(/\.\s*listSpaces\s*\(\s*\)/g)].flatMap((match) => {
+    const after = match.index + match[0].length
+    // `?? []`、把清单包起来的右括号与空白都只是转手，清单仍在向后流动。
+    const forwarded = /^(?:\s|\)|\?\?|\[|\])*/.exec(source.slice(after))![0]
+    const rest = source.slice(after + forwarded.length)
+    const chained = /^\.\s*[A-Za-z]+\s*\(/.exec(rest)
+    if (chained) return [readBalanced(rest, chained[0].length - 1)]
+    return rest.startsWith('{') ? [readBalanced(rest, 0)] : []
+  })
+}
+
 interface ArchitectureRule {
   readonly name: string
   readonly extensions: readonly string[]
@@ -54,6 +96,16 @@ const rules: readonly ArchitectureRule[] = [
         .map(({ evidence }) => evidence)
     },
   },
+  {
+    name: '只有记录域目录能枚举记录域',
+    extensions: ['.ts'],
+    findViolations: (file, source) => {
+      if (SCOPE_DIRECTORY_MODULE_PATTERN.test(file)) return []
+      return enumerationBodies(source)
+        .filter((body) => CONTROL_LOOKUP_PATTERN.test(body))
+        .map(() => '枚举 AI 测试空间后逐个取控制服务')
+    },
+  },
 ]
 
 interface ArchitectureExemption {
@@ -69,8 +121,8 @@ interface ArchitectureExemption {
  * 已知违规的显式豁免清单，与守卫断言放在同一处，改服务端代码的人立刻看到。
  * 理由与负责人均为必填；豁免不是放行，是有主的债务。
  *
- * 当前为空：全部会话查找都已经收进解析模块，规则因此是无例外的不变量。清单与它的三条
- * 守卫断言保留，下一次真有取舍时按同一形状登记。
+ * 当前为空：全部会话查找都已经收进解析模块，全部记录域枚举都已经收进记录域目录，两条规则因此
+ * 都是无例外的不变量。清单与它的三条守卫断言保留，下一次真有取舍时按同一形状登记。
  */
 const exemptions: readonly ArchitectureExemption[] = []
 
@@ -94,8 +146,8 @@ function isExempted(violation: string, allowed: readonly ArchitectureExemption[]
   return allowed.some(({ file, rule }) => violation.startsWith(`${file} 违反「${rule}」：`))
 }
 
-describe('服务端会话解析架构', () => {
-  it('会话集合规则对服务端源码全量生效，未登记的违规按文件与规则报出', () => {
+describe('服务端架构守卫', () => {
+  it('两条规则对服务端源码全量生效，未登记的违规按文件与规则报出', () => {
     expect(findAllViolations().filter((violation) => !isExempted(violation, exemptions))).toEqual([])
   })
 
@@ -123,6 +175,26 @@ describe('服务端会话解析架构', () => {
     // 解析模块自身是规则的持有者。
     expect(collectionRule.findViolations('src/conversation-resolution.ts', 'scene.conversations.find(({ id }) => id === target)')).toEqual([])
     expect(collectionRule.findViolations('src/conversation-resolution.ts', 'scene.conversationInstances = rows')).toEqual([])
+  })
+
+  it('记录域规则认得出「枚举后逐个取控制服务」，也不误报纯列清单与单空间解析', () => {
+    const scopeRule = rules.find(({ name }) => name === '只有记录域目录能枚举记录域')
+    if (!scopeRule) throw new Error('记录域架构规则缺失')
+
+    // 链式遍历与 for…of 两种写法，以及测试控制端点自己那层包装，都是同一件事。
+    expect(scopeRule.findViolations('src/x.ts', 'testSpaces.listSpaces().map((space) => testSpaces.getControl(space.id))')).not.toEqual([])
+    expect(scopeRule.findViolations('src/x.ts', '...(testSpaces?.listSpaces() ?? []).map((space) => testSpaces!.getControl(space.id)\n  .getModelRequestRecords(query))')).not.toEqual([])
+    expect(scopeRule.findViolations('src/x.ts', 'for (const space of testSpaces?.listSpaces() ?? []) {\n  cleared += await testSpaces!.getControl(space.id).clearOneBotDebugRecords()\n}')).not.toEqual([])
+    expect(scopeRule.findViolations('src/x.ts', '...(this.testSpaces?.listSpaces() ?? []).map((space) => this.resolveControl({ spaceId: space.id }, false).getModelRequestRecords(query))')).not.toEqual([])
+    // 纯粹把清单列给用户或外部测试控制器看：只取清单，不取控制服务。
+    expect(scopeRule.findViolations('src/x.ts', "registerListener('test-spaces', () => testSpaces.listSpaces()\n  .map((space) => ({ ...space, snapshot: trimSnapshotMessages(space.snapshot, 10) })), { authority: 4 })\nconst spaceControl = testSpaces.getControl(input.spaceId)")).toEqual([])
+    expect(scopeRule.findViolations('src/x.ts', "if (tool === 'list_test_spaces') return this.requireTestSpaces().listSpaces()\nreturn this.requireTestSpaces().getControl(args.spaceId)")).toEqual([])
+    // 带显式空间标识的单空间解析不枚举，不该命中。
+    expect(scopeRule.findViolations('src/x.ts', 'const space = testSpaces.getSpace(input.spaceId)\nconst spaceControl = testSpaces.getControl(space.id)')).toEqual([])
+    // 清单方法自身的声明不是枚举，不得把方法体当成使用点。
+    expect(scopeRule.findViolations('src/x.ts', 'listSpaces(): SandboxTestSpaceSummary[] {\n  return [...this.spaces.values()].map((space) => this.getControl(space.id))\n}')).toEqual([])
+    // 记录域目录自身是规则的持有者。
+    expect(scopeRule.findViolations('src/scope-directory.ts', 'testSpaces.listSpaces().map(({ id }) => testSpaces.getControl(id))')).toEqual([])
   })
 
   /**

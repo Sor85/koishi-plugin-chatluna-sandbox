@@ -447,38 +447,6 @@ export class SandboxModelRequestStore {
   }
 }
 
-export function mergeModelRequestRecordPages<T extends SandboxModelRequestListItem>(
-  pages: readonly SandboxModelRequestRecordsPage<T>[],
-  limit: number,
-  order: 'asc' | 'desc' = 'desc',
-): SandboxModelRequestRecordsPage<T> {
-  const pageSize = Math.min(Math.max(Number(limit) || DEFAULT_MODEL_REQUEST_PAGE_SIZE, 1), MAX_MODEL_REQUEST_PAGE_SIZE)
-  const sign = order === 'asc' ? 1 : -1
-  const merged = pages
-    .flatMap(({ records }) => records)
-    .sort((left, right) => sign * (left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id)))
-  const records = merged.slice(0, pageSize)
-  const last = records[records.length - 1]
-  const leftover = merged.length > records.length
-  const hasMore = leftover || pages.some(({ hasMore: pageHasMore }) => pageHasMore)
-  return {
-    records,
-    hasMore,
-    nextCreatedAt: hasMore ? last?.createdAt : undefined,
-    nextId: hasMore ? last?.id : undefined,
-    earliestCursor: pages
-      .map(({ earliestCursor }) => earliestCursor)
-      .filter((value): value is number => typeof value === 'number')
-      .sort((left, right) => left - right)[0],
-    capacity: pages.reduce((summary, page) => ({
-      recordCount: summary.recordCount + page.capacity.recordCount,
-      totalBytes: summary.totalBytes + page.capacity.totalBytes,
-      maxRecords: summary.maxRecords + page.capacity.maxRecords,
-      maxBytes: summary.maxBytes + page.capacity.maxBytes,
-    }), { recordCount: 0, totalBytes: 0, maxRecords: 0, maxBytes: 0 } satisfies SandboxModelRequestCapacity),
-  }
-}
-
 export function resolveModelRequestOrder(input: Pick<GetSandboxModelRequestRecordsInput, 'order'>): 'asc' | 'desc' {
   return input.order === 'asc' ? 'asc' : 'desc'
 }

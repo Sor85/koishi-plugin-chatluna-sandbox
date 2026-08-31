@@ -14,6 +14,26 @@ afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.stop()))
 })
 
+/** 一套「控制服务 + 测试空间 + 未归属库 + 测试控制服务 + 凭证」，含一个已创建的 AI 测试空间。 */
+function createHarness(spaceName = '模型请求空间') {
+  const app = new App()
+  apps.push(app)
+  const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-mcp-model-'))
+  const runtimeBots = new SandboxRuntimeBotRegistry()
+  const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media'), runtimeBots })
+  const testSpaces = new SandboxTestSpaceService(app, runtimeBots)
+  const unattributed = new SandboxModelRequestStore()
+  const service = new SandboxMcpService(app, control, { dataDirectory: directory, testSpaces, unattributedModelRequests: unattributed })
+  const credential = service.createCredential('调试凭证', ['read', 'manage', 'debug'])
+  return { control, testSpaces, unattributed, service, credential, space: testSpaces.createSpace({ name: spaceName }) }
+}
+
+const call = (
+  { service, credential }: ReturnType<typeof createHarness>,
+  tool: string,
+  args: Record<string, unknown>,
+) => service.callTool(credential.token, tool, args)
+
 describe('模型请求 MCP 工具', () => {
   it('按 scope 读取主环境、测试空间和未归属记录，且不能清理未归属库', async () => {
     const app = new App()
@@ -81,5 +101,90 @@ describe('模型请求 MCP 工具', () => {
     expect(await service.callTool(credential.token, 'clear_model_request_records', { spaceId: created.spaceId })).toEqual({ cleared: 1 })
     expect((await spaceControl.getModelRequestRecords()).records).toEqual([])
     expect((await unattributed.getRecords()).records).toHaveLength(1)
+  })
+
+  it('scope=all 按记录 ID 跨全部已归属记录域读详情，并标注来源', async () => {
+    const harness = createHarness()
+    const mainRecord = harness.control.recordModelRequest({
+      status: 'success', durationMs: 1, model: 'main-model',
+      attribution: 'attributed', entities: { scopeId: 'main' }, requestBodyAvailable: false,
+    })
+    const spaceRecord = harness.space.control.recordModelRequest({
+      status: 'success', durationMs: 2, model: 'space-model',
+      attribution: 'attributed', entities: { scopeId: harness.space.id },
+      requestBodyAvailable: true, requestBody: { model: 'space-model', messages: [{ role: 'user', content: 'hi' }] },
+      responseBodyStatus: 'complete', responseBodyFormat: 'json', responseStatus: 200,
+      responseBodyRaw: JSON.stringify({ content: 'hello' }),
+    })
+
+    expect(await call(harness, 'get_model_request_record', { scope: 'all', recordId: mainRecord.id })).toMatchObject({
+      id: mainRecord.id,
+      source: { scope: 'main', spaceId: 'main', name: '主环境' },
+    })
+    // 正文与显式指定该空间读到的完全一致，联邦查找只是替调用方省掉「先判断它属于哪个空间」这一步。
+    const viaExplicitSpace = await call(harness, 'get_model_request_record', {
+      scope: 'space', spaceId: harness.space.id, recordId: spaceRecord.id,
+    }) as Record<string, unknown>
+    expect(await call(harness, 'get_model_request_record', { scope: 'all', recordId: spaceRecord.id })).toEqual({
+      ...viaExplicitSpace,
+      source: { scope: 'space', spaceId: harness.space.id, name: '模型请求空间' },
+    })
+    expect(viaExplicitSpace).toMatchObject({
+      requestBody: { model: 'space-model', messages: [{ role: 'user', content: 'hi' }] },
+      responseBodyRaw: JSON.stringify({ content: 'hello' }),
+    })
+  })
+
+  it('scope=all 的未归属记录与全部未命中都返回结构化的记录不存在', async () => {
+    const harness = createHarness()
+    const lost = harness.unattributed.append({
+      status: 'error', durationMs: 3, model: 'lost-model',
+      attribution: 'unattributed', entities: {}, requestBodyAvailable: false,
+    })
+
+    // 未归属不参与联邦查找；要读它仍必须显式指定范围。
+    await expect(call(harness, 'get_model_request_record', { scope: 'all', recordId: lost.id })).rejects.toMatchObject({
+      code: 'record_not_found',
+    })
+    expect(await call(harness, 'get_model_request_record', { scope: 'unattributed', recordId: lost.id })).toMatchObject({ id: lost.id })
+    await expect(call(harness, 'get_model_request_record', { scope: 'all', recordId: '不存在的记录' })).rejects.toMatchObject({
+      code: 'record_not_found',
+    })
+  })
+
+  /**
+   * 收拢前 scope=all 的详情用 try/catch 遍历，任何异常都被记成 record_not_found，
+   * 一个记录域的持久化故障因此伪装成「记录不存在」，用户看到的是一条错误结论。
+   */
+  it('scope=all 遇到某个记录域的读取故障时不伪装成未命中', async () => {
+    const harness = createHarness()
+    const store = harness.space.control.getModelRequestStore()
+    store.getRecord = () => Promise.reject(new Error('模型请求持久化不可用'))
+
+    await expect(call(harness, 'get_model_request_record', { scope: 'all', recordId: '任意记录' })).rejects.toMatchObject({
+      code: 'internal_error',
+    })
+  })
+
+  it('清理类工具与调试记录列表未随详情一并放开', async () => {
+    const harness = createHarness()
+    harness.control.recordOneBotDebug({
+      botId: '20001', implementation: 'napcat', direction: 'action',
+      requestedAction: 'main-action', action: 'main-action', status: 'success', durationMs: 1,
+    })
+    harness.space.control.recordOneBotDebug({
+      botId: '21001', implementation: 'llbot', direction: 'event',
+      requestedAction: 'space-event', action: 'space-event', status: 'success', durationMs: 2,
+    })
+
+    // 联邦清理意味着一个测试凭证一次抹掉主环境与全部空间的证据，这个能力不给外部测试控制器。
+    for (const args of [{ scope: 'all' }, {}]) {
+      await expect(call(harness, 'clear_model_request_records', args)).rejects.toMatchObject({ code: 'space_id_required' })
+      await expect(call(harness, 'clear_onebot_debug_records', args)).rejects.toMatchObject({ code: 'space_id_required' })
+    }
+    // 调试记录的联邦列表同样不补：省略 spaceId 仍然只读主环境。
+    expect(await call(harness, 'list_onebot_debug_records', {})).toMatchObject({
+      records: [expect.objectContaining({ requestedAction: 'main-action' })],
+    })
   })
 })

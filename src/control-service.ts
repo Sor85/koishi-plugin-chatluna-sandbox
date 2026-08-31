@@ -671,8 +671,18 @@ export class SandboxControlService {
     return this.oneBotDebug.getRecords(input)
   }
 
+  /**
+   * 未命中返回 undefined，读取故障照原样抛出。
+   *
+   * 跨记录域查找需要把两者分开：`getOneBotDebugRecord` 用异常表达未命中，遍历时只能用 try/catch
+   * 跳过，一次真实的持久化故障就会被当成「这里没有」静默继续，最终报给用户「记录不存在」。
+   */
+  findOneBotDebugRecord(input: GetSandboxOneBotDebugRecordInput): Promise<SandboxOneBotDebugRecord | undefined> {
+    return this.oneBotDebug.getRecord(input.recordId, input.includeLargeValues === true)
+  }
+
   async getOneBotDebugRecord(input: GetSandboxOneBotDebugRecordInput): Promise<SandboxOneBotDebugRecord> {
-    const record = await this.oneBotDebug.getRecord(input.recordId, input.includeLargeValues === true)
+    const record = await this.findOneBotDebugRecord(input)
     if (!record) throw new SandboxDomainError(`调试记录不存在：${input.recordId}`)
     return record
   }

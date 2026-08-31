@@ -12,9 +12,9 @@ import {
   DEFAULT_MODEL_REQUEST_PAGE_SIZE,
   MAIN_MODEL_REQUEST_SCOPE_ID,
   MAX_MODEL_REQUEST_PAGE_SIZE,
-  mergeModelRequestRecordPages,
   type SandboxModelRequestStore,
 } from '../model-request'
+import { createScopeDirectory, type ScopeDirectory, type SceneScope } from '../scope-directory'
 import type { SandboxTestSpaceService } from '../test-spaces'
 import type { GetSandboxModelRequestRecordsInput, SandboxForwardNodeInput, SandboxMedia, SandboxImplementationProfile, SandboxSnapshot } from '../types'
 import { isRecalledMessage, SandboxDomainError, SandboxModelRequestCursorExpiredError, SandboxOneBotDebugCursorExpiredError } from '../types'
@@ -617,7 +617,7 @@ const TOOL_SCHEMAS: Record<string, Record<string, unknown>> = {
     type: 'object',
     description: '按记录 ID 读取完整模型请求与原始响应体；流式响应以 SSE 原文返回。',
     properties: {
-      scope: { type: 'string', enum: ['main', 'space', 'unattributed'] },
+      scope: { type: 'string', enum: ['all', 'main', 'space', 'unattributed'], description: 'all 按记录 ID 跨全部已归属空间查找并在结果里标注来源，main 读取主环境，space 读取指定 AI 测试空间，unattributed 读取无法安全归属的记录' },
       spaceId: { type: 'string', description: 'AI 测试空间 ID；scope=space 且省略时读取主环境' },
       recordId: { type: 'string' },
     },
@@ -688,7 +688,7 @@ const TOOL_DEFINITIONS: SandboxMcpToolCapability[] = [
   ['get_onebot_debug_record', 'debug', '读取单条 OneBot 调试记录，可显式展开大型值'],
   ['clear_onebot_debug_records', 'debug', '清理 OneBot 调试记录'],
   ['list_model_request_records', 'debug', '读取模型请求记录'],
-  ['get_model_request_record', 'debug', '读取单条模型请求记录，含完整请求体和原始响应体'],
+  ['get_model_request_record', 'debug', '读取单条模型请求记录，含完整请求体和原始响应体；scope=all 时按记录 ID 跨全部已归属空间查找'],
   ['clear_model_request_records', 'debug', '清理指定 AI 测试空间的模型请求记录'],
   ['list_mcp_call_records', 'debug', '读取 MCP 调用记录摘要'],
   ['get_mcp_call_record', 'debug', '读取单条 MCP 调用记录详情'],
@@ -903,10 +903,21 @@ export class SandboxMcpService {
   private concurrentLimits: Record<'mutation' | 'wait' | 'upload', number>
   private testSpaces?: SandboxTestSpaceService
   private unattributedModelRequests?: SandboxModelRequestStore
+  /**
+   * 「谁是全部记录域」的唯一答案，与 Console 注册处各自从同样三个输入包一份。
+   *
+   * 判空在此吸收一次：`testSpaces` 与 `unattributedModelRequests` 缺席就是目录里少一个成员。
+   */
+  private scopes: ScopeDirectory
 
   constructor(private ctx: Context, private control: SandboxControlService, options: SandboxMcpServiceOptions) {
     this.testSpaces = options.testSpaces
     this.unattributedModelRequests = options.unattributedModelRequests
+    this.scopes = createScopeDirectory({
+      control,
+      testSpaces: options.testSpaces,
+      unattributedModelRequests: options.unattributedModelRequests,
+    })
     mkdirSync(options.dataDirectory, { recursive: true })
     this.credentialFile = join(options.dataDirectory, 'mcp-credentials.json')
     this.eventLimit = options.eventLimit ?? 1000
@@ -1907,12 +1918,17 @@ export class SandboxMcpService {
       const scope = this.resolveModelRequestScope(args)
       if (scope.kind === 'unattributed') return await this.requireUnattributedModelRequests().getRecords(query)
       if (scope.kind === 'all') {
-        const limit = Math.min(Math.max(Number(query.limit ?? DEFAULT_MODEL_REQUEST_PAGE_SIZE) || DEFAULT_MODEL_REQUEST_PAGE_SIZE, 1), MAX_MODEL_REQUEST_PAGE_SIZE)
         const federatedQuery = { ...query, beforeSequence: undefined }
-        return mergeModelRequestRecordPages(await Promise.all([
-          this.control.getModelRequestRecords(federatedQuery),
-          ...(this.testSpaces?.listSpaces() ?? []).map((space) => this.resolveControl({ spaceId: space.id }, false).getModelRequestRecords(federatedQuery)),
-        ]), limit, query.order === 'asc' ? 'asc' : 'desc')
+        const { next, ...page } = await this.scopes.federate(
+          (recordScope) => recordScope.control.getModelRequestRecords(federatedQuery),
+          {
+            limit: Math.min(Math.max(Number(query.limit ?? DEFAULT_MODEL_REQUEST_PAGE_SIZE) || DEFAULT_MODEL_REQUEST_PAGE_SIZE, 1), MAX_MODEL_REQUEST_PAGE_SIZE),
+            order: query.order === 'asc' ? 'asc' : 'desc',
+            tieBreak: ({ id }) => id,
+            nextCursor: ({ createdAt, id }) => ({ nextCreatedAt: createdAt, nextId: id }),
+          },
+        )
+        return { ...page, ...next }
       }
       if (scope.kind === 'main') return await this.control.getModelRequestRecords(query)
       return await this.resolveControl({ spaceId: scope.spaceId }, false).getModelRequestRecords(query)
@@ -1928,8 +1944,21 @@ export class SandboxMcpService {
 
   private async getModelRequestRecord(args: Record<string, unknown>) {
     const recordId = requireString(args.recordId, 'recordId')
+    const scope = this.resolveModelRequestScope(args)
+    /*
+     * 「全部」范围刻意留在下面那个 catch 之外：它把任何异常都记成 record_not_found，一个记录域的
+     * 持久化故障会因此伪装成「记录不存在」。这里未命中显式表达成结构化错误，故障照原样抛出，
+     * 由 normalizeToolError 按 ADR-0027 归类。
+     *
+     * 记录标识本身唯一且读取无副作用，要求调用方先知道记录属于哪个空间说不通；清理类工具刻意
+     * 不跟着放开，这处能力不对等见 ADR-0083。
+     */
+    if (scope.kind === 'all') {
+      const hit = await this.scopes.findFirst((recordScope) => recordScope.control.getModelRequestStore().getRecord(recordId))
+      if (!hit) throw new SandboxMcpError('record_not_found', `模型请求记录不存在：${recordId}`)
+      return { ...hit.value, source: this.describeRecordScope(hit.scope) }
+    }
     try {
-      const scope = this.resolveModelRequestScope(args)
       if (scope.kind === 'unattributed') {
         const record = await this.requireUnattributedModelRequests().getRecord(recordId)
         if (!record) throw new Error(`模型请求记录不存在：${recordId}`)
@@ -1941,6 +1970,16 @@ export class SandboxMcpService {
       if (error instanceof SandboxMcpError) throw error
       throw new SandboxMcpError('record_not_found', error instanceof Error ? error.message : '模型请求记录不存在')
     }
+  }
+
+  /**
+   * 来源标注按本端点自己的入参词汇给出，而不是照抄 Console 的 `type: 'main' | 'test-space'`：
+   * 调用方拿到 `scope` 与 `spaceId` 就能原样传回任何单记录域工具（`spaceId='main'` 也解析成主环境）。
+   */
+  private describeRecordScope(scope: SceneScope) {
+    return scope.kind === 'main'
+      ? { scope: 'main' as const, spaceId: MAIN_MODEL_REQUEST_SCOPE_ID, name: scope.name }
+      : { scope: 'space' as const, spaceId: scope.id, name: scope.name }
   }
 
   private resolveControl(args: Record<string, unknown>, mutation: boolean): SandboxControlService {

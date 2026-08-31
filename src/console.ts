@@ -17,9 +17,9 @@ import {
   DEFAULT_MODEL_REQUEST_PAGE_SIZE,
   MAIN_MODEL_REQUEST_SCOPE_ID,
   MAX_MODEL_REQUEST_PAGE_SIZE,
-  mergeModelRequestRecordPages,
   type SandboxModelRequestStore,
 } from './model-request'
+import { createScopeDirectory, type SceneScope } from './scope-directory'
 import type {
   ClearSandboxOneBotDebugRecordsResult,
   ClearSandboxModelRequestRecordsResult,
@@ -61,7 +61,7 @@ import type {
   SendMessageInput,
   SetGroupAnnouncementInput,
 } from './types'
-import { getSandboxUsers } from './types'
+import { getSandboxUsers, SandboxDomainError } from './types'
 
 type ChatLunaUsageSource = ChatLunaUsageLookup | (() => ChatLunaUsageLookup | undefined)
 
@@ -144,6 +144,13 @@ export function registerConsole(
     if (!testSpaces) throw new Error('AI 测试空间服务不可用')
     return mutation ? testSpaces.requireUserControl(input.spaceId) : testSpaces.getControl(input.spaceId)
   }
+  /**
+   * 「谁是全部记录域」的唯一答案。三个可选服务的判空在此被吸收一次，之后不再出现。
+   *
+   * 由本函数入口包装而不是由插件入口传入：两处消费方（这里与测试控制服务）从同样三个输入
+   * 派生，内容不可能漂移，而改成入口统一创建要动两个函数的签名与二十多处测试调用点。
+   */
+  const scopes = createScopeDirectory({ control, testSpaces, unattributedModelRequests })
   const resolveReadyControl = async (input: { spaceId?: string } | undefined, mutation: boolean) => {
     const activeControl = resolveControl(input, mutation)
     await activeControl.waitForSceneReady()
@@ -154,6 +161,15 @@ export function registerConsole(
     return rest
   }
   const mainSource: SandboxEntitySource = { type: 'main', name: '主环境' }
+  /**
+   * 记录域目录只提供标识、名字与是不是主环境；投影成哪种来源形状留在这里。
+   *
+   * 来源形状属于 Console 契约的出参，让枚举模块去产出它等于把出参声明搬出契约。
+   * `SandboxModelRequestSource` 是本类型的超集（多一个未归属），因此两种记录共用这一处投影。
+   */
+  const sceneSource = (scope: SceneScope): SandboxEntitySource => (scope.kind === 'main'
+    ? mainSource
+    : { type: 'test-space', spaceId: scope.id, name: scope.name })
   const getDebugPage = async (
     activeControl: SandboxControlService,
     source: SandboxEntitySource,
@@ -180,42 +196,15 @@ export function registerConsole(
         name: space.name,
       }, query)
     }
-    // 联邦视图必须等各空间恢复完成，避免把“仍在加载”误报成空历史。
-    const spaceControls = (testSpaces?.listSpaces() ?? []).map((space) => ({
-      space,
-      control: testSpaces!.getControl(space.id),
-    }))
-    await Promise.all([control.waitForPersistence(), ...spaceControls.map(({ control: activeControl }) => activeControl.waitForPersistence())])
-    // 联邦视图跨多个独立 sequence，仅聚合首页；精确游标分页必须带 spaceId。
-    const pages = await Promise.all([
-      getDebugPage(control, mainSource, { ...query, beforeSequence: undefined }),
-      ...spaceControls.map(({ space, control: activeControl }) => getDebugPage(activeControl, {
-        type: 'test-space',
-        spaceId: space.id,
-        name: space.name,
-      }, { ...query, beforeSequence: undefined })),
-    ])
-    const limit = Math.min(Math.max(Number(query.limit ?? 50) || 50, 1), 200)
-    const sign = query.order === 'asc' ? 1 : -1
-    const records = pages
-      .flatMap(({ records: items }) => items)
-      .sort((left, right) => sign * (left.createdAt.localeCompare(right.createdAt) || left.sequence - right.sequence))
-      .slice(0, limit)
-    const capacity = pages.reduce((summary, page) => ({
-      recordCount: summary.recordCount + page.capacity.recordCount,
-      totalBytes: summary.totalBytes + page.capacity.totalBytes,
-      maxRecords: summary.maxRecords + page.capacity.maxRecords,
-      maxBytes: summary.maxBytes + page.capacity.maxBytes,
-    }), { recordCount: 0, totalBytes: 0, maxRecords: 0, maxBytes: 0 })
-    return {
-      records,
-      hasMore: pages.some(({ hasMore }) => hasMore) || pages.flatMap(({ records: items }) => items).length > limit,
-      earliestCursor: pages
-        .map(({ earliestCursor }) => earliestCursor)
-        .filter((value): value is number => typeof value === 'number')
-        .sort((left, right) => left - right)[0],
-      capacity,
-    }
+    // 联邦视图跨多个独立 sequence，仅聚合首页；精确游标分页必须带 spaceId，因此不声明续页游标。
+    return scopes.federate(
+      (scope) => getDebugPage(scope.control, sceneSource(scope), { ...query, beforeSequence: undefined }),
+      {
+        limit: Math.min(Math.max(Number(query.limit ?? 50) || 50, 1), 200),
+        order: query.order === 'asc' ? 'asc' : 'desc',
+        tieBreak: ({ sequence }) => sequence,
+      },
+    )
   }
   const getDebugRecord = async (input: SpaceScoped<GetSandboxOneBotDebugRecordInput>): Promise<SandboxConsoleOneBotDebugRecord> => {
     const query = withoutSpaceId(input)
@@ -229,33 +218,15 @@ export function registerConsole(
         source: { type: 'test-space', spaceId: space.id, name: space.name },
       }
     }
-    await control.waitForPersistence()
-    try {
-      return { ...await control.getOneBotDebugRecord(query), source: mainSource }
-    } catch (error) {
-      for (const space of testSpaces?.listSpaces() ?? []) {
-        try {
-          const spaceControl = testSpaces!.getControl(space.id)
-          await spaceControl.waitForPersistence()
-          return {
-            ...await spaceControl.getOneBotDebugRecord(query),
-            source: { type: 'test-space', spaceId: space.id, name: space.name },
-          }
-        } catch {
-          // 继续在其他空间查找。
-        }
-      }
-      throw error
-    }
+    const hit = await scopes.findFirst((scope) => scope.control.findOneBotDebugRecord(query))
+    if (!hit) throw new SandboxDomainError(`调试记录不存在：${query.recordId}`)
+    return { ...hit.value, source: sceneSource(hit.scope) }
   }
   const clearDebugRecords = async (input: { spaceId?: string } = {}): Promise<ClearSandboxOneBotDebugRecordsResult> => {
     if (input.spaceId) return { cleared: await resolveControl(input, true).clearOneBotDebugRecords() }
-    let cleared = await control.clearOneBotDebugRecords()
-    for (const space of testSpaces?.listSpaces() ?? []) {
-      // 主调试页展示的是联邦视图，清理必须覆盖运行中的 AI 空间，不能要求用户先接管。
-      cleared += await testSpaces!.getControl(space.id).clearOneBotDebugRecords()
-    }
-    return { cleared }
+    // 主调试页展示的是联邦视图，清理必须覆盖运行中的 AI 空间，不能要求用户先接管。
+    const cleared = await scopes.forEachScene(({ control: scopeControl }) => scopeControl.clearOneBotDebugRecords())
+    return { cleared: cleared.reduce((total, count) => total + count, 0) }
   }
   const getWorkspace = async (input: SpaceScoped<GetSandboxWorkspaceInput> = {}): Promise<SandboxWorkspaceState> => {
     assertNoLegacyRpcFields(input)
@@ -412,36 +383,37 @@ export function registerConsole(
     if (!testSpaces) throw new Error('AI 测试空间服务不可用')
     return testSpaces.getControl(input.spaceId)
   }
-  const listAttributedModelRequestPages = (input: GetSandboxModelRequestRecordsInput) => {
-    const query: GetSandboxModelRequestRecordsInput = {
-      botId: input.botId,
-      conversationId: input.conversationId,
-      interactionId: input.interactionId,
-      model: input.model,
-      errorsOnly: input.errorsOnly,
-      order: input.order,
-      limit: input.limit,
-      beforeCreatedAt: input.beforeCreatedAt,
-      beforeId: input.beforeId,
-    }
-    const withSource = (
-      page: SandboxModelRequestRecordsPage,
-      source: SandboxModelRequestSource,
-    ): SandboxModelRequestRecordsPage<SandboxConsoleModelRequestListItem> => ({
-      ...page,
-      records: page.records.map((record) => ({ ...record, source })),
-    })
-    return Promise.all([
-      control.getModelRequestRecords(query).then((page) => withSource(page, { type: 'main', name: '主环境' })),
-      ...(testSpaces?.listSpaces() ?? []).map((space) => testSpaces!.getControl(space.id)
-        .getModelRequestRecords(query)
-        .then((page) => withSource(page, { type: 'test-space', spaceId: space.id, name: space.name }))),
-    ])
-  }
+  /**
+   * 联邦读取用的查询：`beforeSequence` 与 `spaceId` 刻意不透传。
+   *
+   * 序号是每个记录域各自独立的计数，跨记录域的精确游标没有意义；联邦续页只用时间与记录标识。
+   */
+  const federatedModelRequestQuery = (input: GetSandboxModelRequestRecordsInput): GetSandboxModelRequestRecordsInput => ({
+    botId: input.botId,
+    conversationId: input.conversationId,
+    interactionId: input.interactionId,
+    model: input.model,
+    errorsOnly: input.errorsOnly,
+    order: input.order,
+    limit: input.limit,
+    beforeCreatedAt: input.beforeCreatedAt,
+    beforeId: input.beforeId,
+  })
   const listModelRequestRecords = async (input: ListSandboxModelRequestRecordsInput): Promise<SandboxModelRequestRecordsPage<SandboxConsoleModelRequestListItem>> => {
     if (input.scope === 'all') {
-      const limit = Math.min(Math.max(Number(input.limit ?? DEFAULT_MODEL_REQUEST_PAGE_SIZE) || DEFAULT_MODEL_REQUEST_PAGE_SIZE, 1), MAX_MODEL_REQUEST_PAGE_SIZE)
-      return mergeModelRequestRecordPages(await listAttributedModelRequestPages(input), limit, input.order === 'asc' ? 'asc' : 'desc')
+      const query = federatedModelRequestQuery(input)
+      // 「全部」排除未归属不写在这里：联邦读取本来就只遍历拥有场景的记录域。
+      const { next, ...page } = await scopes.federate(async (scope) => {
+        const scopePage = await scope.control.getModelRequestRecords(query)
+        return { ...scopePage, records: scopePage.records.map((record) => ({ ...record, source: sceneSource(scope) })) }
+      }, {
+        limit: Math.min(Math.max(Number(input.limit ?? DEFAULT_MODEL_REQUEST_PAGE_SIZE) || DEFAULT_MODEL_REQUEST_PAGE_SIZE, 1), MAX_MODEL_REQUEST_PAGE_SIZE),
+        order: input.order === 'asc' ? 'asc' : 'desc',
+        tieBreak: ({ id }) => id,
+        // 时间与记录标识的组合跨记录域全局可比，WebQQ 的「加载更多」正在用它续页。
+        nextCursor: ({ createdAt, id }) => ({ nextCreatedAt: createdAt, nextId: id }),
+      })
+      return { ...page, ...next }
     }
     const source = resolveModelRequestSource(input)
     const page = input.scope === 'unattributed'
@@ -454,21 +426,9 @@ export function registerConsole(
   }
   const readModelRequestRecord = async (input: ReadSandboxModelRequestRecordInput): Promise<SandboxConsoleModelRequestDetail> => {
     if (input.scope === 'all') {
-      try {
-        return { ...await control.getModelRequestRecord(input), source: { type: 'main', name: '主环境' } }
-      } catch (error) {
-        for (const space of testSpaces?.listSpaces() ?? []) {
-          try {
-            return {
-              ...await testSpaces!.getControl(space.id).getModelRequestRecord(input),
-              source: { type: 'test-space', spaceId: space.id, name: space.name },
-            }
-          } catch {
-            // 继续在其他已归属空间查找。
-          }
-        }
-        throw error
-      }
+      const hit = await scopes.findFirst((scope) => scope.control.getModelRequestStore().getRecord(input.recordId))
+      if (!hit) throw new SandboxDomainError(`模型请求记录不存在：${input.recordId}`)
+      return { ...hit.value, source: sceneSource(hit.scope) }
     }
     const source = resolveModelRequestSource(input)
     if (input.scope === 'unattributed') {

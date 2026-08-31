@@ -27,6 +27,7 @@ import { MAIN_MODEL_REQUEST_SCOPE_ID, SandboxModelRequestStore, UNATTRIBUTED_MOD
 import { SandboxTestEndpointServer, type SandboxTestEndpointProtocolConfig, type SandboxTestEndpointServerConfig } from './mcp/server'
 import { SandboxMcpService, type SandboxMcpQuotaConfig } from './mcp/service'
 import { SandboxTestSpaceService } from './test-spaces'
+import { createScopeDirectory } from './scope-directory'
 import { resolve } from 'node:path'
 import { PresetRuntimeSnapshotTracker, SandboxPresetService, type PresetRuntimeResolvedTarget } from './presets'
 import type { SandboxAppearance, SandboxModelRequestEntities, SandboxPersistenceMode } from './types'
@@ -235,6 +236,8 @@ export function apply(ctx: Context, config: Config) {
         sceneMessageMaxBytes: config.sceneMessageMaxBytes,
       },
     )
+    // 「谁是全部记录域」的唯一答案；装配里三处扇出与两个端点的联邦读取共享同一份口径。
+    const scopes = createScopeDirectory({ control, testSpaces, unattributedModelRequests })
     const resolvePresetRuntimeTarget = ({ botId, conversationId }: Pick<PresetRuntimeResolvedTarget, 'botId' | 'conversationId'>): PresetRuntimeResolvedTarget | undefined => {
       const belongsToTarget = (snapshot: ReturnType<SandboxControlService['getSnapshot']>) => {
         const botExists = snapshot.participants.some(({ id, kind }) => id === botId && kind === 'bot')
@@ -243,15 +246,10 @@ export function apply(ctx: Context, config: Config) {
         // 解除好友只撤销可见性，运行时预设快照仍要能归属到这一对参与者，因此按归属而不是可见性判定。
         return includesConversationParticipant(snapshot, conversation, botId)
       }
-      const matches: PresetRuntimeResolvedTarget[] = []
-      if (belongsToTarget(control.getSnapshot())) {
-        matches.push({ scopeId: MAIN_MODEL_REQUEST_SCOPE_ID, botId, conversationId })
-      }
-      for (const space of testSpaces.listSpaces()) {
-        if (belongsToTarget(testSpaces.getControl(space.id).getSnapshot())) {
-          matches.push({ scopeId: space.id, botId, conversationId })
-        }
-      }
+      const matches = scopes.listScenes()
+        .filter(({ control: scopeControl }) => belongsToTarget(scopeControl.getSnapshot()))
+        .map(({ id }): PresetRuntimeResolvedTarget => ({ scopeId: id, botId, conversationId }))
+      // 只有恰好一个记录域能证明归属时才认，否则同名参与者会把快照归到错误的记录域。
       return matches.length === 1 ? matches[0] : undefined
     }
     const presetSnapshots = new PresetRuntimeSnapshotTracker(inner, resolvePresetRuntimeTarget)
@@ -282,30 +280,19 @@ export function apply(ctx: Context, config: Config) {
           // 请求归属后空间可能被并发删除；此时不把引用错误写入其他空间。
         }
       },
-      getCandidates: () => [
-        {
-          scopeId: MAIN_MODEL_REQUEST_SCOPE_ID,
-          store: control.getModelRequestStore(),
-          thinking: control.getThinkingModelRequestTargets(),
-        },
-        ...testSpaces.listSpaces().map((space) => {
-          const spaceControl = testSpaces.getControl(space.id)
-          return {
-            scopeId: space.id,
-            store: spaceControl.getModelRequestStore(),
-            thinking: spaceControl.getThinkingModelRequestTargets(),
-          }
-        }),
-      ],
+      getCandidates: () => scopes.listScenes().map(({ id, control: scopeControl }) => ({
+        scopeId: id,
+        store: scopeControl.getModelRequestStore(),
+        thinking: scopeControl.getThinkingModelRequestTargets(),
+      })),
     })
     inner.logger('chatluna-sandbox').info(chatLunaPlugin
       ? 'ChatLuna 模型请求采集器已安装。'
       : '未找到 ChatLuna 运行时，模型请求采集器未安装。')
-    const modelRequestStores = () => [
-      control.getModelRequestStore(),
-      unattributedModelRequests,
-      ...testSpaces.listSpaces().map((space) => testSpaces.getControl(space.id).getModelRequestStore()),
-    ]
+    // 用量关联要覆盖未归属记录库，因此用完整清单而不是只看拥有场景的那些。
+    const modelRequestStores = () => scopes.listScopes().map((scope) => (scope.kind === 'unattributed'
+      ? scope.records
+      : scope.control.getModelRequestStore()))
     inner.on('chatluna/model-usage', (payload) => {
       // 记录库读取是异步的，事件回调不可等待；失败只写日志，不影响 ChatLuna 主流程。
       void linkChatLunaUsageRequest(modelRequestStores(), payload).catch((error) => {
