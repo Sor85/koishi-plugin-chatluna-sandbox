@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { ref } from 'vue'
 import {
   COMPOSER_CARET_ANCHOR,
   createComposerDraftHost,
@@ -6,13 +7,15 @@ import {
   readComposerDraftTokens,
   resolveComposerCaretFromReading,
   resolveComposerCaretTarget,
+  resolveComposerMentionMenu,
+  routeComposerKey,
   type ComposerDraftHostAdapter,
   type ComposerHostCaretReading,
   type ComposerHostCaretTarget,
   type ComposerHostNodePlan,
   type ComposerHostNodeReading,
 } from '../client/webqq/composer-draft-host'
-import type { ComposerDraftToken } from '../client/webqq/composer-draft'
+import type { ComposerDraftToken, MentionCandidate } from '../client/webqq/composer-draft'
 
 function text(value: string): ComposerHostNodeReading {
   return { kind: 'text', text: value }
@@ -33,10 +36,18 @@ function createFakeHost(initial: readonly ComposerHostNodePlan[] = [{ kind: 'tex
   const calls: string[] = []
   const renders: ComposerHostNodePlan[][] = []
   const carets: ComposerHostCaretTarget[] = []
+  // 候选表来自上层模型，在真实组件里是响应式的 props；造假宿主用 ref 提供同样的响应性。
+  const candidates = ref<MentionCandidate[]>([])
   const state = {
     nodes: [...initial] as ComposerHostNodePlan[],
     caret: undefined as ComposerHostCaretReading | undefined,
     detached: false,
+    get candidates() {
+      return candidates.value
+    },
+    set candidates(next: MentionCandidate[]) {
+      candidates.value = next
+    },
   }
 
   const adapter: ComposerDraftHostAdapter = {
@@ -65,6 +76,7 @@ function createFakeHost(initial: readonly ComposerHostNodePlan[] = [{ kind: 'tex
       return new Promise<void>((resolve) => pending.push(resolve))
     },
     focus: () => calls.push('focus'),
+    readMentionCandidates: () => state.candidates,
   }
 
   async function flush() {
@@ -454,6 +466,299 @@ describe('WebQQ 发送控件草稿宿主', () => {
 
       expect(draftHost.draft.value.tokenIndex).toBe(2)
       expect(draftHost.draft.value.offset).toBe(1)
+    })
+  })
+
+  describe('候选菜单该不该开', () => {
+    function menu(text: string, offset: number, overrides: { composing?: boolean, hasCandidates?: boolean } = {}) {
+      return resolveComposerMentionMenu({
+        tokens: [{ type: 'text', text }],
+        tokenIndex: 0,
+        offset,
+        composing: false,
+        hasCandidates: true,
+        ...overrides,
+      })
+    }
+
+    it('输入 @ 之后开，片段就是 @ 后面已经打进去的那几个字', () => {
+      expect(menu('@', 1)).toEqual({ tokenIndex: 0, start: 0, query: '' })
+      expect(menu('你好 @测', 5)).toEqual({ tokenIndex: 0, start: 3, query: '测' })
+    })
+
+    /** 片段里一出现空白就说明用户已经在写正文而不是在挑人，此时菜单必须关掉。 */
+    it('片段中出现空白后关', () => {
+      expect(menu('你好 @测试 用户', 8)).toBeUndefined()
+    })
+
+    /** 私聊没有可提及的人。候选为空时开一个空菜单只是挡住输入区。 */
+    it('一个候选都没有时不开', () => {
+      expect(menu('@', 1, { hasCandidates: false })).toBeUndefined()
+    })
+
+    /** 组字期间宿主里是未上屏的拼音，据它过滤候选等于用拼音去搜人。 */
+    it('组字期间不开', () => {
+      expect(menu('@', 1, { composing: true })).toBeUndefined()
+    })
+
+    /** 光标落在提及 token 上时没有可供检测的文本，菜单不开。 */
+    it('光标不在文本 token 上时不开', () => {
+      expect(resolveComposerMentionMenu({
+        tokens: TOKENS_WITH_MENTION,
+        tokenIndex: 1,
+        offset: 0,
+        composing: false,
+        hasCandidates: true,
+      })).toBeUndefined()
+    })
+  })
+
+  describe('按键分流', () => {
+    function route(key: string, overrides: Partial<Parameters<typeof routeComposerKey>[0]> = {}) {
+      return routeComposerKey({
+        key,
+        shiftKey: false,
+        disabled: false,
+        composing: false,
+        menuOpen: false,
+        ...overrides,
+      })
+    }
+
+    it('菜单开着时方向键在候选之间移动', () => {
+      expect(route('ArrowDown', { menuOpen: true })).toEqual({ kind: 'move-candidate', delta: 1 })
+      expect(route('ArrowUp', { menuOpen: true })).toEqual({ kind: 'move-candidate', delta: -1 })
+    })
+
+    it('菜单开着时 Enter 与 Tab 都是选中候选', () => {
+      expect(route('Enter', { menuOpen: true })).toEqual({ kind: 'select-candidate' })
+      expect(route('Tab', { menuOpen: true })).toEqual({ kind: 'select-candidate' })
+    })
+
+    /** Esc 只关菜单：正文一个字都不该丢。 */
+    it('菜单开着时 Esc 只关菜单', () => {
+      expect(route('Escape', { menuOpen: true })).toEqual({ kind: 'close-menu' })
+    })
+
+    it('菜单关着时 Enter 才是发送', () => {
+      expect(route('Enter')).toEqual({ kind: 'submit' })
+    })
+
+    /** shift+Enter 是换行，不是发送。 */
+    it('shift+Enter 不发送，交给宿主换行', () => {
+      expect(route('Enter', { shiftKey: true })).toEqual({ kind: 'none' })
+    })
+
+    /** 组字期间的 Enter 是上屏确认，不是发送——否则把拼音发出去。 */
+    it('组字期间 Enter 不发送', () => {
+      expect(route('Enter', { composing: true })).toEqual({ kind: 'none' })
+    })
+
+    /** 菜单关着时方向键与 Esc 都交给宿主：移动光标、退出输入。 */
+    it('菜单关着时方向键与 Esc 都不被消费', () => {
+      expect(route('ArrowDown')).toEqual({ kind: 'none' })
+      expect(route('ArrowUp')).toEqual({ kind: 'none' })
+      expect(route('Escape')).toEqual({ kind: 'none' })
+    })
+
+    /**
+     * 退格交给宿主。提及芯片是 `contentEditable = 'false'` 的原子节点，一次退格删掉整块，
+     * 两个引擎实测一致；把它改成自己删会改变 Firefox 里 Selection 的落点表示形式。
+     * 删除后的口径由下面「退格跨提及整块删除」两条驱动。
+     */
+    it('退格不被消费', () => {
+      expect(route('Backspace')).toEqual({ kind: 'none' })
+      expect(route('Backspace', { menuOpen: true })).toEqual({ kind: 'none' })
+    })
+
+    /** 发送中或没有会话时整个输入区都不接受按键，包括换行与退格。 */
+    it('发送中或没有会话时吞掉所有按键', () => {
+      expect(route('Enter', { disabled: true })).toEqual({ kind: 'blocked' })
+      expect(route('a', { disabled: true })).toEqual({ kind: 'blocked' })
+      expect(route('Backspace', { disabled: true })).toEqual({ kind: 'blocked' })
+      expect(route('ArrowDown', { disabled: true, menuOpen: true })).toEqual({ kind: 'blocked' })
+    })
+
+    it('普通字符不被消费', () => {
+      expect(route('a')).toEqual({ kind: 'none' })
+    })
+  })
+
+  describe('候选菜单与按键在宿主里合流', () => {
+    const CANDIDATES: MentionCandidate[] = [
+      { id: '10002', name: '测试用户2', kind: 'user' },
+      { id: '10003', name: '管理员', kind: 'user', keywords: ['真实昵称'] },
+      { id: '20001', name: 'Koishi', kind: 'bot' },
+    ]
+
+    async function typed(text: string, caretOffset = text.length) {
+      const host = createFakeHost()
+      host.state.candidates = CANDIDATES
+      const draftHost = createComposerDraftHost(host.adapter)
+      host.state.nodes = [{ kind: 'text', text }]
+      host.state.caret = { kind: 'child', childIndex: 0, offset: caretOffset }
+      const settled = draftHost.handleInput()
+      await host.flush()
+      await settled
+      return { host, draftHost }
+    }
+
+    it('输入 @ 之后菜单开着，候选按片段过滤', async () => {
+      const { draftHost } = await typed('你好 @')
+      expect(draftHost.mentionMenuOpen.value).toBe(true)
+      // 片段为空时不过滤，三个候选都在（排序口径由 composer-draft.test.ts 执行）。
+      expect([...draftHost.mentionCandidates.value].map(({ id }) => id).sort()).toEqual(['10002', '10003', '20001'])
+
+      const filtered = await typed('你好 @测')
+      expect(filtered.draftHost.mentionCandidates.value.map(({ id }) => id)).toEqual(['10002'])
+
+      // 关键字命中：候选自己的名字里没有「真实」，靠 keywords 命中。
+      const byKeyword = await typed('你好 @真实')
+      expect(byKeyword.draftHost.mentionCandidates.value.map(({ id }) => id)).toEqual(['10003'])
+    })
+
+    it('片段里出现空白后菜单关掉', async () => {
+      const { draftHost } = await typed('你好 @测 试')
+      expect(draftHost.mentionMenuOpen.value).toBe(false)
+    })
+
+    /** 组字期间收到 input：菜单必须关掉，否则未上屏的拼音会被当成提及片段去过滤。 */
+    it('组字期间收到输入时菜单关掉，且草稿不读回', async () => {
+      const { host, draftHost } = await typed('你好 @')
+      expect(draftHost.mentionMenuOpen.value).toBe(true)
+
+      draftHost.startComposition()
+      host.state.nodes = [{ kind: 'text', text: '你好 @ceshi' }]
+      const settled = draftHost.handleInput()
+      await host.flush()
+      await settled
+
+      expect(draftHost.mentionMenuOpen.value).toBe(false)
+      expect(draftHost.draft.value.tokens).toEqual([{ type: 'text', text: '你好 @' }])
+    })
+
+    it('方向键在候选里循环移动，Esc 只关菜单不动正文', async () => {
+      const { draftHost } = await typed('你好 @')
+      expect(draftHost.mentionMenuIndex.value).toBe(0)
+
+      expect(draftHost.routeKey({ key: 'ArrowDown', shiftKey: false, disabled: false }).kind).toBe('move-candidate')
+      expect(draftHost.mentionMenuIndex.value).toBe(1)
+      draftHost.routeKey({ key: 'ArrowUp', shiftKey: false, disabled: false })
+      expect(draftHost.mentionMenuIndex.value).toBe(0)
+      // 到头回绕，用户不必反向按回去。
+      draftHost.routeKey({ key: 'ArrowUp', shiftKey: false, disabled: false })
+      expect(draftHost.mentionMenuIndex.value).toBe(2)
+
+      draftHost.routeKey({ key: 'Escape', shiftKey: false, disabled: false })
+      expect(draftHost.mentionMenuOpen.value).toBe(false)
+      expect(draftHost.draft.value.tokens).toEqual([{ type: 'text', text: '你好 @' }])
+    })
+
+    /** 选中候选：`@片段` 整段换成提及，光标越过自动补入的分隔空格停在提及之后。 */
+    it('Enter 选中候选后提及替换掉 @片段，光标落在提及之后', async () => {
+      const { host, draftHost } = await typed('你好 @测')
+
+      expect(draftHost.routeKey({ key: 'Enter', shiftKey: false, disabled: false }).kind).toBe('select-candidate')
+      await host.flush()
+
+      expect(draftHost.draft.value.tokens).toEqual([
+        { type: 'text', text: '你好 ' },
+        { type: 'mention', id: '10002', name: '测试用户2' },
+        { type: 'text', text: ' ' },
+      ])
+      expect(draftHost.draft.value).toMatchObject({ tokenIndex: 2, offset: 1 })
+      expect(host.carets.at(-1)).toEqual({ kind: 'child', childIndex: 2, offset: 1 })
+      expect(draftHost.mentionMenuOpen.value).toBe(false)
+    })
+
+    it('菜单开着但一个候选都过滤不出来时，Enter 不插入也不发送', async () => {
+      const { draftHost } = await typed('你好 @查无此人')
+
+      // 片段过滤不出候选，但菜单仍开着（候选列表本身非空），Enter 因此被菜单吞掉。
+      expect(draftHost.mentionMenuOpen.value).toBe(true)
+      expect(draftHost.mentionCandidates.value).toEqual([])
+      expect(draftHost.routeKey({ key: 'Enter', shiftKey: false, disabled: false }).kind).toBe('select-candidate')
+      expect(draftHost.draft.value.tokens).toEqual([{ type: 'text', text: '你好 @查无此人' }])
+    })
+
+    it('菜单关着时 Enter 交回调用方去发送', async () => {
+      const { draftHost } = await typed('你好')
+      expect(draftHost.mentionMenuOpen.value).toBe(false)
+      expect(draftHost.routeKey({ key: 'Enter', shiftKey: false, disabled: false })).toEqual({ kind: 'submit' })
+    })
+
+    it('候选表变短后高亮项跟着收回来，不会指向不存在的候选', async () => {
+      const { host, draftHost } = await typed('你好 @')
+      draftHost.routeKey({ key: 'ArrowUp', shiftKey: false, disabled: false })
+      expect(draftHost.mentionMenuIndex.value).toBe(2)
+
+      host.state.candidates = [CANDIDATES[0]!]
+      expect(draftHost.mentionMenuIndex.value).toBe(0)
+    })
+
+    it('鼠标悬停可以直接指定高亮项', async () => {
+      const { draftHost } = await typed('你好 @')
+      draftHost.setMentionSelection(2)
+      expect(draftHost.mentionMenuIndex.value).toBe(2)
+    })
+
+    it('清空草稿时菜单一起关掉', async () => {
+      const { draftHost } = await typed('你好 @')
+      draftHost.reset()
+      expect(draftHost.mentionMenuOpen.value).toBe(false)
+    })
+  })
+
+  describe('退格跨提及整块删除', () => {
+    /**
+     * 提及是原子节点：宿主里的芯片 `contentEditable = 'false'`，一次退格删掉整块，
+     * 从不留下半截 `@测试` 文本。这里驱动的是删除之后的回读口径——草稿里的提及整块消失，
+     * 光标落在提及原来的位置，而不是被夹到别处。
+     *
+     * 两个引擎（Chromium、Firefox）都实测过一次退格删掉整块；本轮不改这条接线，
+     * 见 `.scratch/composer-draft-host/issues/02-*.md` 的处置说明。
+     */
+    async function backspaceOver(nodes: readonly ComposerHostNodePlan[], caret: ComposerHostCaretReading) {
+      const host = createFakeHost()
+      const draftHost = createComposerDraftHost(host.adapter)
+      host.state.nodes = [...nodes]
+      host.state.caret = caret
+      const settled = draftHost.handleInput()
+      await host.flush()
+      await settled
+      return draftHost
+    }
+
+    it('提及位于两段文本之间时整块消失，光标停在它原来的位置', async () => {
+      const draftHost = await backspaceOver(
+        [{ kind: 'text', text: '你好 ' }, { kind: 'text', text: '在吗' }],
+        { kind: 'child', childIndex: 0, offset: 3 },
+      )
+
+      expect(draftHost.draft.value.tokens).toEqual([{ type: 'text', text: '你好 在吗' }])
+      expect(draftHost.draft.value.offset).toBe(3)
+      expect(draftHost.serialize()).toBe('你好 在吗')
+    })
+
+    it('提及位于开头时整块消失，草稿回到纯文本', async () => {
+      const draftHost = await backspaceOver(
+        [{ kind: 'text', text: COMPOSER_CARET_ANCHOR }, { kind: 'text', text: '在吗' }],
+        { kind: 'child', childIndex: 1, offset: 0 },
+      )
+
+      expect(draftHost.draft.value.tokens).toEqual([{ type: 'text', text: '在吗' }])
+      expect(draftHost.serialize()).toBe('在吗')
+    })
+
+    /** 删到只剩零宽锚点时草稿算空：占位文案回来，发送按钮回到禁用。 */
+    it('删干净后草稿算空', async () => {
+      const draftHost = await backspaceOver(
+        [{ kind: 'text', text: COMPOSER_CARET_ANCHOR }],
+        { kind: 'child', childIndex: 0, offset: 1 },
+      )
+
+      expect(draftHost.isEmpty.value).toBe(true)
+      expect(draftHost.serialize()).toBe('')
     })
   })
 })

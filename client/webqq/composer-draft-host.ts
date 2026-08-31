@@ -1,22 +1,29 @@
 import { computed, ref } from 'vue'
 import {
   createEmptyComposerDraft,
+  detectMentionTrigger,
+  filterMentionCandidates,
   insertComposerMention,
   isComposerDraftEmpty,
   normalizeComposerTokens,
+  replaceComposerTextRange,
   serializeComposerDraft,
   type ComposerDraft,
   type ComposerDraftToken,
+  type MentionCandidate,
 } from './composer-draft'
 
 /**
- * 草稿与 contenteditable 之间的双向转换、光标读写与输入法状态。
+ * 草稿与 contenteditable 之间的双向转换、光标读写、输入法状态与提及候选菜单。
  *
  * 纯 token 计算早就下沉了（`composer-draft.ts`）；真正会出问题的是「怎么把它和 contenteditable
  * 对上」：从子节点遍历回读出草稿、把草稿渲染成节点、把光标放到第几个 token 的第几个偏移、
  * 输入法未上屏时不许读回、input 事件早于 Selection 更新时要等一拍。这几块此前全留在发送控件里，
  * 一条行为断言都没有，而它们的失效形态都是静默的——光标跳到开头、中文输入法上屏后前一个字符
  * 消失、退格删掉半个提及——不报错，只能靠人在界面上敲出来。
+ *
+ * 候选菜单与草稿同处一个模块：每次输入都要重算菜单、方向键要被路由给菜单、选中候选项又要写回
+ * 草稿并移动光标，拆开会让两者之间的 interface 宽到没有意义。
  *
  * 判定进这个模块，带副作用与有时序的宿主操作按最小结构接口注入（ADR 0075）：不注入 DOM 类型，
  * 视图负责把 Text 节点、提及芯片与 Selection 映射成下面这几个朴素结构。
@@ -163,6 +170,77 @@ export function resolveComposerCaretTarget(
   return { kind: 'child', childIndex: tokenIndex + 1, offset: 0 }
 }
 
+/** 候选菜单开着时它盯住的那个 `@片段`：在第几个 token、从第几位开始、已经打进去了什么。 */
+export interface ComposerMentionMenuState {
+  readonly tokenIndex: number
+  readonly start: number
+  readonly query: string
+}
+
+/**
+ * 菜单该不该开。
+ *
+ * 四条关闭条件各有各的理由：一个候选都没有时（私聊）开个空菜单只是挡住输入区；组字期间宿主里
+ * 是未上屏的拼音，据它过滤等于用拼音去搜人；光标不在文本 token 上时没有可检测的片段；
+ * 片段里一出现空白就说明用户已经在写正文而不是在挑人。
+ */
+export function resolveComposerMentionMenu(input: {
+  readonly tokens: readonly ComposerDraftToken[]
+  readonly tokenIndex: number
+  readonly offset: number
+  readonly composing: boolean
+  readonly hasCandidates: boolean
+}): ComposerMentionMenuState | undefined {
+  if (!input.hasCandidates || input.composing) return
+  const token = input.tokens[input.tokenIndex]
+  if (token?.type !== 'text') return
+  const trigger = detectMentionTrigger(token.text, input.offset)
+  if (!trigger) return
+  return { tokenIndex: input.tokenIndex, start: trigger.start, query: trigger.query }
+}
+
+export type ComposerKeyAction =
+  /** 不消费，交给宿主的默认行为：普通字符、换行、移动光标、退格。 */
+  | { readonly kind: 'none' }
+  /** 发送中或没有会话：吞掉这次按键，输入区整体不接受编辑。 */
+  | { readonly kind: 'blocked' }
+  | { readonly kind: 'move-candidate', readonly delta: 1 | -1 }
+  | { readonly kind: 'select-candidate' }
+  | { readonly kind: 'close-menu' }
+  /** 交回调用方去发送。发送编排不反过来问菜单开没开。 */
+  | { readonly kind: 'submit' }
+
+/**
+ * 这一次按键是什么意思。
+ *
+ * 「Enter 到底是发送还是选中候选」此前是组件里的一个内联条件，散在模板事件绑定与两个处理函数
+ * 之间；现在由这一个函数回答，调用方只按返回值决定要不要 `preventDefault`。
+ *
+ * 退格不在这里消费：提及芯片是 `contentEditable = 'false'` 的原子节点，一次退格删掉整块，
+ * Chromium 与 Firefox 都实测一致；改成自己删会改变 Firefox 里 Selection 落点的表示形式。
+ * 删除之后的回读口径由宿主的「退格跨提及整块删除」断言执行。
+ */
+export function routeComposerKey(input: {
+  readonly key: string
+  readonly shiftKey: boolean
+  readonly disabled: boolean
+  readonly composing: boolean
+  readonly menuOpen: boolean
+}): ComposerKeyAction {
+  if (input.disabled) return { kind: 'blocked' }
+
+  if (input.menuOpen) {
+    if (input.key === 'ArrowDown') return { kind: 'move-candidate', delta: 1 }
+    if (input.key === 'ArrowUp') return { kind: 'move-candidate', delta: -1 }
+    if (input.key === 'Enter' || input.key === 'Tab') return { kind: 'select-candidate' }
+    if (input.key === 'Escape') return { kind: 'close-menu' }
+  }
+
+  // 组字期间的 Enter 是上屏确认；shift+Enter 是换行。两者都不是发送。
+  if (input.key === 'Enter' && !input.shiftKey && !input.composing) return { kind: 'submit' }
+  return { kind: 'none' }
+}
+
 /** 宿主操作。带副作用、有时序，全部按最小结构接口注入。 */
 export interface ComposerDraftHostAdapter {
   /** 回读编辑器子节点；宿主还没挂上时返回 undefined。 */
@@ -177,6 +255,12 @@ export interface ComposerDraftHostAdapter {
   nextTick(): Promise<void>
   /** 聚焦输入控件。 */
   focus(): void
+  /**
+   * 当前可提及的候选。
+   *
+   * 候选的来源与「谁能被提及」由上层模型决定；宿主只管菜单什么时候开、按已输入的片段怎么过滤。
+   */
+  readMentionCandidates(): readonly MentionCandidate[]
 }
 
 export function createComposerDraftHost(adapter: ComposerDraftHostAdapter) {
@@ -190,8 +274,47 @@ export function createComposerDraftHost(adapter: ComposerDraftHostAdapter) {
    * 文案，它会和拼音叠在一起。因此组字中一律不算空。
    */
   const isEmpty = computed(() => !composing.value && isComposerDraftEmpty(draft.value.tokens))
+  const mentionMenu = ref<ComposerMentionMenuState>()
+  /**
+   * 高亮项的原始序号与夹紧后的序号分开。
+   *
+   * 候选表会随上层模型变短（有人退群、切换会话），夹紧写成 computed 而不是一个 watch：
+   * 高亮项因此永远指向一个真实存在的候选，不需要靠某次副作用去修正它。
+   */
+  const rawMentionIndex = ref(0)
+  /** 菜单开着的条件里带上「候选列表非空」：私聊没有可提及的人，菜单一次都不该出现。 */
+  const mentionMenuOpen = computed(() => !!mentionMenu.value && adapter.readMentionCandidates().length > 0)
+  const mentionCandidates = computed(() => mentionMenu.value
+    ? filterMentionCandidates(adapter.readMentionCandidates(), mentionMenu.value.query)
+    : [])
+  const mentionMenuIndex = computed(() => Math.min(
+    Math.max(rawMentionIndex.value, 0),
+    Math.max(0, mentionCandidates.value.length - 1),
+  ))
   /** 程序化替换节点期间不读回：宿主若把这次替换报成 input，读回会拿到半份内容。 */
   let suppressRead = false
+
+  function closeMentionMenu() {
+    mentionMenu.value = undefined
+    rawMentionIndex.value = 0
+  }
+
+  function updateMentionMenu() {
+    const current = draft.value
+    const next = resolveComposerMentionMenu({
+      tokens: current.tokens,
+      tokenIndex: current.tokenIndex,
+      offset: current.offset,
+      composing: composing.value,
+      hasCandidates: adapter.readMentionCandidates().length > 0,
+    })
+    if (!next) {
+      closeMentionMenu()
+      return
+    }
+    mentionMenu.value = next
+    rawMentionIndex.value = 0
+  }
 
   function render() {
     suppressRead = true
@@ -215,9 +338,10 @@ export function createComposerDraftHost(adapter: ComposerDraftHostAdapter) {
     })
   }
 
-  /** 清空草稿。切换会话时用，不抢焦点——用户可能正在别处操作。 */
+  /** 清空草稿与候选菜单。切换会话与切换发送者时用，不抢焦点——用户可能正在别处操作。 */
   function reset() {
     apply(createEmptyComposerDraft(), { focus: false })
+    closeMentionMenu()
   }
 
   function readCaret(tokens: readonly ComposerDraftToken[]): ComposerDraftCaret | undefined {
@@ -240,7 +364,12 @@ export function createComposerDraftHost(adapter: ComposerDraftHostAdapter) {
    * 表现为「单独输入 @ 之后候选菜单不弹」。
    */
   async function handleInput() {
-    if (suppressRead || composing.value) return
+    if (suppressRead) return
+    // 组字期间菜单仍要关掉：留着它会拿未上屏的拼音去过滤候选。
+    if (composing.value) {
+      closeMentionMenu()
+      return
+    }
     await adapter.nextTick()
     const readings = adapter.readNodes()
     if (!readings) return
@@ -251,6 +380,7 @@ export function createComposerDraftHost(adapter: ComposerDraftHostAdapter) {
       tokenIndex: caret?.tokenIndex ?? draft.value.tokenIndex,
       offset: caret?.offset ?? draft.value.offset,
     }
+    updateMentionMenu()
   }
 
   function startComposition() {
@@ -270,6 +400,52 @@ export function createComposerDraftHost(adapter: ComposerDraftHostAdapter) {
     const token = current.tokens[current.tokenIndex]
     const offset = token?.type === 'text' ? current.offset : 0
     apply(insertComposerMention(current.tokens, current.tokenIndex, offset, mention))
+    closeMentionMenu()
+  }
+
+  /** 选中一个候选：`@片段` 整段换成提及，光标越过自动补入的分隔空格停在提及之后。 */
+  function selectMentionCandidate(candidate: MentionCandidate) {
+    const menu = mentionMenu.value
+    if (!menu) return
+    const token = draft.value.tokens[menu.tokenIndex]
+    const end = token?.type === 'text' ? draft.value.offset : menu.start
+    apply(replaceComposerTextRange(
+      draft.value.tokens,
+      menu.tokenIndex,
+      menu.start,
+      Math.max(menu.start, end),
+      { id: candidate.id, name: candidate.name },
+    ))
+    closeMentionMenu()
+  }
+
+  function moveMentionSelection(delta: number) {
+    const total = mentionCandidates.value.length
+    if (!total) return
+    rawMentionIndex.value = (mentionMenuIndex.value + delta + total) % total
+  }
+
+  /**
+   * 路由一次按键，并把菜单相关的动作就地执行掉。
+   *
+   * 返回的动作同时回答了「这次按键有没有被候选菜单消费」：调用方只在 `none` 时放任宿主默认行为，
+   * 只在 `submit` 时走发送。发送编排因此不必反过来问菜单开没开。
+   */
+  function routeKey(input: { key: string, shiftKey: boolean, disabled: boolean }): ComposerKeyAction {
+    const action = routeComposerKey({
+      key: input.key,
+      shiftKey: input.shiftKey,
+      disabled: input.disabled,
+      composing: composing.value,
+      menuOpen: mentionMenuOpen.value,
+    })
+    if (action.kind === 'move-candidate') moveMentionSelection(action.delta)
+    if (action.kind === 'close-menu') closeMentionMenu()
+    if (action.kind === 'select-candidate') {
+      const candidate = mentionCandidates.value[mentionMenuIndex.value]
+      if (candidate) selectMentionCandidate(candidate)
+    }
+    return action
   }
 
   function serialize() {
@@ -280,6 +456,9 @@ export function createComposerDraftHost(adapter: ComposerDraftHostAdapter) {
     draft,
     composing,
     isEmpty,
+    mentionMenuOpen,
+    mentionCandidates,
+    mentionMenuIndex,
     render,
     apply,
     reset,
@@ -288,6 +467,12 @@ export function createComposerDraftHost(adapter: ComposerDraftHostAdapter) {
     startComposition,
     endComposition,
     insertMention,
+    selectMentionCandidate,
+    closeMentionMenu,
+    setMentionSelection: (index: number) => {
+      rawMentionIndex.value = index
+    },
+    routeKey,
     serialize,
     focus: () => adapter.focus(),
   }

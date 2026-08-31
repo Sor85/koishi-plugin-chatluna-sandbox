@@ -156,9 +156,9 @@
           data-placeholder="发送消息"
           :data-empty="isDraftEmpty ? 'true' : undefined"
           @keydown="handleEditorKeydown"
-          @input="handleEditorInput"
+          @input="draftHost.handleInput()"
           @compositionstart="draftHost.startComposition()"
-          @compositionend="handleCompositionEnd"
+          @compositionend="draftHost.endComposition()"
           @paste="handleSendPaste"
           @mouseup="draftHost.syncCaretFromHost()"
           @keyup="draftHost.syncCaretFromHost()"
@@ -169,8 +169,8 @@
           :candidates="filteredMentionCandidates"
           :active-index="mentionMenuIndex"
           aria-label="提及成员"
-          @select="selectMentionCandidate"
-          @hover="mentionMenuIndex = $event"
+          @select="draftHost.selectMentionCandidate"
+          @hover="draftHost.setMentionSelection"
         />
       </div>
       <input
@@ -204,13 +204,7 @@ import WebqqImagePreview from './webqq-image-preview.vue'
 import WebqqMentionMenu from './webqq-mention-menu.vue'
 import WebqqMenuExtensionMark from './webqq-menu-extension-mark.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
-import {
-  detectMentionTrigger,
-  filterMentionCandidates,
-  replaceComposerTextRange,
-  type ComposerDraft,
-  type MentionCandidate,
-} from './webqq/composer-draft'
+import type { MentionCandidate } from './webqq/composer-draft'
 import {
   createComposerDraftHost,
   type ComposerHostCaretReading,
@@ -278,20 +272,12 @@ interface ComposerSendFile {
   extension: string
 }
 
-interface MentionMenuState {
-  tokenIndex: number
-  start: number
-  query: string
-}
-
 const inputRef = ref<HTMLElement>()
 const mediaInputRef = ref<HTMLInputElement>()
 const sendFiles = ref<ComposerSendFile[]>([])
 const previewImageUrl = ref('')
 const sending = ref(false)
 const localError = ref('')
-const mentionMenu = ref<MentionMenuState>()
-const mentionMenuIndex = ref(0)
 const composerLayoutRef = ref<HTMLElement>()
 const composerFormRef = ref<HTMLFormElement>()
 const composerContextRef = ref<HTMLElement>()
@@ -407,17 +393,14 @@ const draftHost = createComposerDraftHost({
   writeCaret: writeEditorCaret,
   nextTick: () => nextTick(),
   focus: () => inputRef.value?.focus(),
+  readMentionCandidates: () => props.model.mentionCandidates ?? [],
 })
-const draft = draftHost.draft
 const isDraftEmpty = draftHost.isEmpty
-const isComposing = draftHost.composing
+const mentionMenuOpen = draftHost.mentionMenuOpen
+const filteredMentionCandidates = draftHost.mentionCandidates
+const mentionMenuIndex = draftHost.mentionMenuIndex
 
 const displayError = computed(() => localError.value || props.model.externalError || '')
-const mentionMenuOpen = computed(() => !!mentionMenu.value && !!props.model.mentionCandidates?.length)
-const filteredMentionCandidates = computed(() => {
-  if (!mentionMenu.value) return []
-  return filterMentionCandidates(props.model.mentionCandidates ?? [], mentionMenu.value.query)
-})
 const compactUserStack = ref(false)
 const orderedSenders = computed(() => orderUsersByActive(props.model.senders, props.model.currentOperatorId))
 const userStackMetrics = computed(() => getUserStackMetrics(orderedSenders.value.length, compactUserStack.value))
@@ -460,25 +443,14 @@ watch(() => props.model.mentionRequest?.requestId, () => {
   const mention = props.model.mentionRequest
   if (!mention) return
   draftHost.insertMention({ id: mention.id, name: mention.name })
-  closeMentionMenu()
 })
 
 watch(() => props.model.conversationId, () => {
   draftHost.reset()
-  closeMentionMenu()
 })
 
 watch(hasUserStackOverflow, (hasOverflow) => {
   if (!hasOverflow) userStackExpanded.value = false
-})
-
-watch(filteredMentionCandidates, (candidates) => {
-  if (!mentionMenu.value) return
-  if (!candidates.length) {
-    mentionMenuIndex.value = 0
-    return
-  }
-  mentionMenuIndex.value = Math.min(mentionMenuIndex.value, candidates.length - 1)
 })
 
 onMounted(() => {
@@ -580,95 +552,18 @@ function clearComposerContext() {
   emit('clearReply')
 }
 
-function closeMentionMenu() {
-  mentionMenu.value = undefined
-  mentionMenuIndex.value = 0
-}
-
-function updateMentionMenuFromDraft(current: ComposerDraft) {
-  if (!(props.model.mentionCandidates?.length) || isComposing.value) {
-    closeMentionMenu()
-    return
-  }
-  const token = current.tokens[current.tokenIndex]
-  if (token?.type !== 'text') {
-    closeMentionMenu()
-    return
-  }
-  const trigger = detectMentionTrigger(token.text, current.offset)
-  if (!trigger) {
-    closeMentionMenu()
-    return
-  }
-  mentionMenu.value = {
-    tokenIndex: current.tokenIndex,
-    start: trigger.start,
-    query: trigger.query,
-  }
-  mentionMenuIndex.value = 0
-}
-
-async function handleEditorInput() {
-  await draftHost.handleInput()
-  updateMentionMenuFromDraft(draft.value)
-}
-
-async function handleCompositionEnd() {
-  await draftHost.endComposition()
-  updateMentionMenuFromDraft(draft.value)
-}
-
-function selectMentionCandidate(candidate: MentionCandidate) {
-  const menu = mentionMenu.value
-  if (!menu) return
-  const token = draft.value.tokens[menu.tokenIndex]
-  const end = token?.type === 'text' ? draft.value.offset : menu.start
-  draftHost.apply(replaceComposerTextRange(
-    draft.value.tokens,
-    menu.tokenIndex,
-    menu.start,
-    Math.max(menu.start, end),
-    { id: candidate.id, name: candidate.name },
-  ))
-  closeMentionMenu()
-}
-
+/**
+ * 按键分流全部交给草稿宿主：菜单相关的动作由它就地执行，返回值同时回答「这次按键有没有被
+ * 候选菜单消费」。组件只按返回值决定要不要阻止宿主的默认行为，以及要不要走发送。
+ */
 function handleEditorKeydown(event: KeyboardEvent) {
-  if (sending.value || !props.model.conversationId) {
-    event.preventDefault()
-    return
-  }
-
-  if (mentionMenuOpen.value) {
-    if (event.key === 'ArrowDown') {
-      event.preventDefault()
-      if (!filteredMentionCandidates.value.length) return
-      mentionMenuIndex.value = (mentionMenuIndex.value + 1) % filteredMentionCandidates.value.length
-      return
-    }
-    if (event.key === 'ArrowUp') {
-      event.preventDefault()
-      if (!filteredMentionCandidates.value.length) return
-      mentionMenuIndex.value = (mentionMenuIndex.value - 1 + filteredMentionCandidates.value.length) % filteredMentionCandidates.value.length
-      return
-    }
-    if (event.key === 'Enter' || event.key === 'Tab') {
-      event.preventDefault()
-      const candidate = filteredMentionCandidates.value[mentionMenuIndex.value]
-      if (candidate) selectMentionCandidate(candidate)
-      return
-    }
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      closeMentionMenu()
-      return
-    }
-  }
-
-  if (event.key === 'Enter' && !event.shiftKey && !isComposing.value) {
-    event.preventDefault()
-    void sendMessage()
-  }
+  const action = draftHost.routeKey({
+    key: event.key,
+    shiftKey: event.shiftKey,
+    disabled: sending.value || !props.model.conversationId,
+  })
+  if (action.kind !== 'none') event.preventDefault()
+  if (action.kind === 'submit') void sendMessage()
 }
 
 async function selectComposerUser(sender: WebqqComposerSender) {
@@ -680,7 +575,6 @@ async function selectComposerUser(sender: WebqqComposerSender) {
   try {
     await new Promise<void>((resolve, reject) => emit('selectOperator', sender.id, resolve, reject))
     draftHost.reset()
-    closeMentionMenu()
     localError.value = ''
     await animateUserStackLayout(layout)
   } catch (error) {
@@ -762,7 +656,7 @@ function readFileBase64(file: File) {
 }
 
 async function sendMessage() {
-  if (mentionMenuOpen.value) closeMentionMenu()
+  draftHost.closeMentionMenu()
   const content = draftHost.serialize()
   const { currentOperatorId, conversationId } = props.model
   if ((!content && !sendFiles.value.length) || !currentOperatorId || !conversationId || sending.value) return
