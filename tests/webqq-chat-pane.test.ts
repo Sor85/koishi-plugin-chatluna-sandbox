@@ -36,15 +36,16 @@ describe('WebQQ 聊天区域', () => {
     expect(source).toContain('getForwardMessage:')
     expect(source).toContain('<WebqqForwardModal')
     expect(source).toContain('@open-forward="openForwardDialog"')
+    /**
+     * 类别：实现细节契约（肯定式）。
+     * 依据：推入／弹出／栈顶取值／按入参读取已下沉到 forward-dialog-stack 并由它的 15 条
+     * 行为断言逐条执行。这里保留的是「哪个入口用 replace、哪个用 push」这条接线——
+     * 它决定「返回」会退到哪条转发链，而模块只看得到两种模式各自的结果。
+     */
     expect(source).toContain('const forwardStack = ref<ForwardDialogFrame[]>([])')
-    expect(source).toContain('const forwardDialog = computed(() => forwardStack.value.at(-1))')
-    expect(source).toContain(':can-navigate-back="forwardStack.length > 1"')
     expect(source).toContain('@back="popForwardDialog"')
-    expect(source).toContain("mode === 'push' ? [...forwardStack.value, frame] : [frame]")
     expect(source).toContain("openForwardByInput(input, 'replace')")
     expect(source).toContain("openForwardByInput({ forwardId }, 'push')")
-    expect(source).toContain('forwardStack.value = forwardStack.value.slice(0, -1)')
-    expect(source).toContain('forwardStack.value = []')
     expect(source).not.toContain('koishiWorkspacePort')
     expect(pageSource).toContain('<WebqqChatPane')
     expect(pageSource).toContain(':scroll-scope="activeSpaceId ?? \'main\'"')

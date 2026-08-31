@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { expectUserFacingCopy } from './helpers/user-facing-copy'
 
 describe('WebQQ 消息多选与目标选择', () => {
   it('消息列表提供多选入口、默认选中与行内 toggle', () => {
@@ -26,25 +27,31 @@ describe('WebQQ 消息多选与目标选择', () => {
     expect(source).toContain(':disabled="isRecalledMessage(message) || model.selectionMode"')
   })
 
-  it('chat-pane 管理多选态、Esc/切会话清空，并在多选时替换 composer', () => {
+  it('chat-pane 在多选时用操作栏替换 composer，并在切会话时清空', () => {
     const source = readFileSync(resolve('client/webqq-chat-pane.vue'), 'utf8')
 
+    /**
+     * 类别：实现细节契约（肯定式）。
+     * 依据：进入／切换／退出／可选性／确认转发／Escape 优先级六项判定已下沉到
+     * message-selection 并由它的 21 条行为断言逐条执行。这里保留的是「多选态由聊天区域
+     * 拥有、切会话时清空」这条接线与操作栏的替换关系——模块看不到这两件事。
+     */
     expect(source).toContain('const selectionMode = ref(false)')
     expect(source).toContain('const selectedMessageIds = ref<string[]>([])')
-    expect(source).toContain('function enterSelection(messageId: string)')
-    expect(source).toContain('selectedMessageIds.value = [messageId]')
-    expect(source).toContain('function toggleSelection(messageId: string)')
-    expect(source).toContain('function exitSelection()')
-    expect(source).toContain("event.key !== 'Escape'")
     expect(source).toContain('watch(() => props.model.conversationId')
     expect(source).toContain('exitSelection()')
-    expect(source).toContain('已选 {{ selectedMessageIds.length }} 条')
-    expect(source).not.toContain('点击消息切换勾选，Esc 退出多选')
+
+    // 类别：DOM 结构与元素顺序。操作栏与 composer 是同一槽位的二选一，顺序反了会同时出现。
     expect(source).toContain('class="chatluna-sandbox-selection-bar-button"')
-    expect(source).toContain('合并转发')
     expect(source).toContain('<WebqqComposer\n      v-else')
-    expect(source).toContain('sendForwardMessage: [input: { conversationId: string, messageIds: string[] }')
     expect(source).toContain('<WebqqForwardTargetDialog')
+
+    // 类别：用户可见文案。
+    expectUserFacingCopy(source, '已选 {{ selectedMessageIds.length }} 条')
+    expectUserFacingCopy(source, '合并转发')
+
+    // 类别：实现细节契约（否定式）。那句提示文案已删除，加回来会挤掉操作栏的按钮。
+    expect(source).not.toContain('点击消息切换勾选，Esc 退出多选')
   })
 
   it('目标会话对话框支持最近/好友/群/搜索/单选', () => {

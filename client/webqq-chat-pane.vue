@@ -142,7 +142,7 @@
       :title="forwardDialog.title"
       :items="forwardDialog.items"
       :nested-forwards="forwardDialog.nestedForwards"
-      :can-navigate-back="forwardStack.length > 1"
+      :can-navigate-back="hasParentForwardFrame(forwardStack)"
       :participants="model.messageList.participants"
       :media-sources="model.messageList.mediaSources"
       :media-load-failures="model.messageList.mediaLoadFailures"
@@ -168,15 +168,30 @@ import WebqqForwardTargetDialog, { type WebqqForwardTargetModel } from './webqq-
 import WebqqImagePreview from './webqq-image-preview.vue'
 import WebqqMessageList, { type WebqqMessageListModel } from './webqq-message-list.vue'
 import WebqqMessageSearch, { type WebqqMessageSearchCriteria } from './webqq-message-search.vue'
-import { buildForwardPreview } from './webqq/forward-preview'
+import {
+  hasParentForwardFrame,
+  closeForwardStack,
+  loadForwardDialogFrame,
+  popForwardFrame,
+  pushForwardFrame,
+  readForwardStackTop,
+  type ForwardDialogFrame,
+} from './webqq/forward-dialog-stack'
+import {
+  hasSelectedMessages,
+  enterMessageSelection,
+  exitMessageSelection,
+  resolveForwardConfirmation,
+  routeEscapeKey,
+  toggleMessageSelection,
+  type MessageSelectionState,
+} from './webqq/message-selection'
 import { localDateToMessageSearchRange } from './webqq/message-search-date'
 import { formatMentionContent } from './webqq/mention'
 import { ensureMessageLoaded } from './webqq/message-reveal'
 import {
-  isRecalledMessage,
   type ManageSandboxEnvironmentInput,
   type SandboxForward,
-  type SandboxForwardNode,
   type SandboxMessageSearchHit,
   type SandboxMessageSearchResult,
   type SandboxMessageModelRequestReference,
@@ -272,13 +287,8 @@ const searchNextBeforeMessageId = ref<string>()
 const activeSearchMessageId = ref('')
 const revealingMessageId = ref('')
 let searchRequestSerial = 0
-interface ForwardDialogFrame {
-  title: string
-  items: SandboxForwardNode[]
-  nestedForwards: Record<string, SandboxForward>
-}
 const forwardStack = ref<ForwardDialogFrame[]>([])
-const forwardDialog = computed(() => forwardStack.value.at(-1))
+const forwardDialog = computed(() => readForwardStackTop(forwardStack.value))
 const replyingToMessage = computed(() => props.model.messageList.messages.find(({ id }) => id === replyingToMessageId.value))
 const composerModel = computed<WebqqComposerModel>(() => ({
   ...props.model.composer,
@@ -326,44 +336,48 @@ function openTitleProfile() {
   if (props.model.profileParticipantId) emit('openProfile', props.model.profileParticipantId)
 }
 
-function isSelectableMessageId(messageId: string) {
-  const message = props.model.messageList.messages.find(({ id }) => id === messageId)
-  return !!message && !message.event && !isRecalledMessage(message)
+// 多选的六项判定住在 message-selection 并由它的行为断言逐条执行；这里只把结果写回状态。
+const selectionContext = computed(() => ({ messageCapabilities: props.model.messageList.messageCapabilities }))
+
+function applySelection(next: MessageSelectionState) {
+  selectionMode.value = next.active
+  selectedMessageIds.value = [...next.messageIds]
 }
 
 function enterSelection(messageId: string) {
-  if (!isSelectableMessageId(messageId)) return
-  selectionMode.value = true
-  selectedMessageIds.value = [messageId]
+  const next = enterMessageSelection(messageId, selectionContext.value)
+  if (next) applySelection(next)
 }
 
 function toggleSelection(messageId: string) {
-  if (!selectionMode.value || !isSelectableMessageId(messageId)) return
-  if (selectedMessageIds.value.includes(messageId)) {
-    selectedMessageIds.value = selectedMessageIds.value.filter((id) => id !== messageId)
-    return
-  }
-  selectedMessageIds.value = [...selectedMessageIds.value, messageId]
+  applySelection(toggleMessageSelection(
+    { active: selectionMode.value, messageIds: selectedMessageIds.value },
+    messageId,
+    selectionContext.value,
+  ))
 }
 
 function exitSelection() {
-  selectionMode.value = false
-  selectedMessageIds.value = []
+  applySelection(exitMessageSelection())
   forwardTargetOpen.value = false
 }
 
 function openForwardTargetDialog() {
-  if (!selectedMessageIds.value.length) return
+  if (!hasSelectedMessages({ active: selectionMode.value, messageIds: selectedMessageIds.value })) return
   forwardTargetOpen.value = true
 }
 
 function confirmForward(conversationId: string, resolve: () => void, reject: (error: unknown) => void) {
-  const messageIds = selectedMessageIds.value.filter(isSelectableMessageId)
-  if (!messageIds.length) {
-    reject(new Error('请先选择可转发的消息'))
+  const confirmation = resolveForwardConfirmation(
+    { active: selectionMode.value, messageIds: selectedMessageIds.value },
+    conversationId,
+    selectionContext.value,
+  )
+  if (confirmation.kind === 'reject') {
+    reject(new Error(confirmation.message))
     return
   }
-  emit('sendForwardMessage', { conversationId, messageIds }, () => {
+  emit('sendForwardMessage', { conversationId, messageIds: [...confirmation.messageIds] }, () => {
     exitSelection()
     resolve()
   }, reject)
@@ -371,17 +385,22 @@ function confirmForward(conversationId: string, resolve: () => void, reject: (er
 
 function handleSelectionKeydown(event: KeyboardEvent) {
   if (event.key !== 'Escape') return
-  if (selectionMode.value) {
-    if (forwardTargetOpen.value) {
-      forwardTargetOpen.value = false
-      return
-    }
+  const action = routeEscapeKey({
+    selectionActive: selectionMode.value,
+    forwardTargetOpen: forwardTargetOpen.value,
+    searchOpen: searchOpen.value,
+    searchDatePopoverOpen: searchDatePopoverOpen.value,
+  })
+  if (action.kind === 'close-forward-target') {
+    forwardTargetOpen.value = false
+    return
+  }
+  if (action.kind === 'exit-selection') {
     event.preventDefault()
     exitSelection()
     return
   }
-  if (searchOpen.value) {
-    if (searchDatePopoverOpen.value) return
+  if (action.kind === 'close-search') {
     event.preventDefault()
     void closeSearch(true)
   }
@@ -597,34 +616,13 @@ function loadForwardMessage(input: { forwardId?: string; messageId?: string }) {
   })
 }
 
+// 栈的推入、弹出、栈顶取值与按入参读取住在 forward-dialog-stack；这里只管加载闸门。
 async function openForwardByInput(input: { forwardId?: string; messageId?: string }, mode: 'replace' | 'push') {
   if (forwardLoading.value) return
   forwardLoading.value = true
   try {
-    const forward = await loadForwardMessage(input)
-    const nestedEntries = await Promise.all(
-      forward.nodes
-        .map((node) => node.forwardId)
-        .filter((forwardId): forwardId is string => !!forwardId)
-        .map(async (forwardId) => {
-          try {
-            return [forwardId, await loadForwardMessage({ forwardId })] as const
-          } catch {
-            // 嵌套资源失败时保留外层弹窗；卡片回退为“合并转发”占位文案。
-            return undefined
-          }
-        }),
-    )
-    const nestedForwards = Object.fromEntries(nestedEntries.filter((entry): entry is readonly [string, SandboxForward] => !!entry))
-    const frame: ForwardDialogFrame = {
-      title: buildForwardPreview(forward).title || '合并转发',
-      items: forward.nodes.map((node) => ({ ...node })),
-      nestedForwards,
-    }
-    // 根消息重置历史；嵌套详情压栈，返回时直接恢复上一帧而不重复 RPC。
-    forwardStack.value = mode === 'push' ? [...forwardStack.value, frame] : [frame]
-  } catch {
-    // 页面控制层负责展示错误；弹窗只在成功后打开。
+    const frame = await loadForwardDialogFrame({ input, load: loadForwardMessage })
+    if (frame) forwardStack.value = pushForwardFrame(forwardStack.value, frame, mode)
   } finally {
     forwardLoading.value = false
   }
@@ -640,13 +638,13 @@ function openNestedForward(forwardId: string) {
 }
 
 function popForwardDialog() {
-  if (forwardStack.value.length <= 1) return
-  forwardStack.value = forwardStack.value.slice(0, -1)
+  if (!hasParentForwardFrame(forwardStack.value)) return
+  forwardStack.value = popForwardFrame(forwardStack.value)
   previewImageUrl.value = ''
 }
 
 function closeForwardDialog() {
-  forwardStack.value = []
+  forwardStack.value = closeForwardStack()
   previewImageUrl.value = ''
 }
 </script>
