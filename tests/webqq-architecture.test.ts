@@ -82,9 +82,150 @@ function readEnclosingScope(source: string, index: number): string {
 
 interface ArchitectureRule {
   readonly name: string
+  /**
+   * 扫描根目录。提成规则上的字段而不是写死在引擎里：客户端源码规则扫 `client`，
+   * 测试断言规则扫 `tests`，两者共用同一份遍历、汇总与豁免机制，不长出第三份引擎。
+   */
+  readonly root: string
   readonly extensions: readonly string[]
   /** 返回命中的证据描述；空数组表示该文件不违反本规则。 */
   findViolations(file: string, source: string): string[]
+}
+
+/**
+ * 一级布局区域与工作区本体。ADR 0060：带 `backdrop-filter` 的元素形成 Backdrop Root 边界，
+ * 写在这几个选择器上会让工作区内所有控件与覆盖其上的浮层的毛玻璃静默退化成纯半透明。
+ */
+const FIRST_LEVEL_REGION_PATTERN =
+  /\.(?:webqq-workspace|webqq-rail|webqq-conversations|webqq-profile|chatluna-sandbox-chat)(?![\w-])/
+
+/** 吸顶／覆盖式表头。ADR 0071：它们的模糊层必须放在无后代的 `::before` 上。 */
+const HEADER_SELECTOR_PATTERN = /header(?![\w-])/i
+
+/**
+ * 选择器的主语：最后一个复合选择器。前面的部分只是祖先限定，模糊落在它们身上与否
+ * 与本规则无关——`.webqq-workspace.is-frosted .webqq-composer` 的模糊在发送控件上，合法。
+ */
+function readSelectorSubject(selector: string): string {
+  return selector.split(/[\s>~+]+/).filter(Boolean).at(-1) ?? ''
+}
+
+/** `::before` / `::after` 是无后代的伪元素层，正是两条决策要求把模糊放进去的地方。 */
+function isPseudoElement(compound: string): boolean {
+  return compound.includes('::')
+}
+
+interface CssRule {
+  readonly selectors: string[]
+  readonly body: string
+}
+
+/**
+ * 把 CSS 源码切成「选择器列表 + 声明块」。够用即可：本仓库的样式表没有嵌套规则，
+ * `@media` 之类的 at-rule 块会被切成一条选择器为 `@media ...` 的记录，不会命中下面两条谓词。
+ *
+ * 逗号必须按括号深度切：`:is(.webqq-workspace, .sandbox-popover-content) [data-slot="input"]`
+ * 的主语是那个控件而不是工作区，按裸逗号切会把 `:is(.webqq-workspace` 切出来当成一级区域误报。
+ */
+function splitSelectorList(selectorList: string): string[] {
+  const selectors: string[] = []
+  let depth = 0
+  let current = ''
+  for (const character of selectorList) {
+    if (character === '(' || character === '[') depth += 1
+    else if (character === ')' || character === ']') depth -= 1
+    if (character === ',' && depth === 0) {
+      selectors.push(current)
+      current = ''
+      continue
+    }
+    current += character
+  }
+  selectors.push(current)
+  return selectors.map((selector) => selector.trim()).filter(Boolean)
+}
+
+function readCssRules(source: string): CssRule[] {
+  const withoutComments = source.replace(/\/\*[\s\S]*?\*\//g, '')
+  const rules: CssRule[] = []
+  for (const match of withoutComments.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    rules.push({ selectors: splitSelectorList(match[1]!), body: match[2]! })
+  }
+  return rules
+}
+
+/**
+ * 只认真正开启模糊的声明。`backdrop-filter: none` 恰恰是这两条决策要求的写法——雾化态下
+ * 关掉遮罩与实体面的模糊——把它判成违规会让规则和它守的决策打架。
+ */
+function declaresBackdropFilter(body: string): boolean {
+  return [...body.matchAll(/(?:^|[\s;])backdrop-filter\s*:([^;}]*)/g)]
+    .some((match) => match[1]!.trim() !== 'none')
+}
+
+/**
+ * 架构守卫自身读取源码是 ADR 0073 明确的第三类例外：「客户端源码是否遵守某条规则」没有别的
+ * 观察面。按文件名形状认出来而不是列举文件名，新增守卫文件只要叫 `*-architecture.test.ts`
+ * 就自动被认作合法持有者。
+ */
+const ARCHITECTURE_GUARD_PATTERN = /(?:^|\/)[a-z0-9-]*architecture\.test\.ts$/
+
+/** `const x = readFileSync(resolve('<路径>'), 'utf8')`：把变量名绑到它读进来的那个文件。 */
+const FILE_READ_PATTERN = /\b(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*readFileSync\(\s*resolve\(\s*'([^']+)'/g
+
+/** `const x = <表达式>`：用于把 `styles.slice(...)`、`(s) => styles.slice(...)` 这类派生变量接上来源。 */
+const BINDING_PATTERN = /\b(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=([^\n]*(?:\n\s{4,}[^\n]*)*)/g
+
+/**
+ * 断言的落点：`expect(<表达式>).toContain(...)` / `.toMatch(...)`。
+ *
+ * `not\.` 单独成组而不是排除掉——否定式的已删实现守卫是 ADR 0073 的第二类例外，成本结构与
+ * 肯定式细节断言相反：它只在有人把删掉的实现加回来时才变红，那正是需要的行为。
+ */
+const TEXT_ASSERTION_PATTERN = /\bexpect\(([^;]*?)\)\s*\.\s*(not\s*\.\s*)?(toContain|toMatch)\(/g
+
+type TextSource = 'style' | 'source'
+
+/**
+ * 判定测试文件里每个字符串变量读的是样式表还是组件源码。
+ *
+ * 样式文本断言的断言对象本身就是样式源码，它不锁死实现写法，是 ADR 0073 的第一类例外，
+ * 因此必须能和组件源码区分开——两者的读取写法一模一样，只有路径后缀不同。
+ */
+function classifyTextBindings(source: string): Map<string, TextSource> {
+  const kinds = new Map<string, TextSource>()
+  for (const match of source.matchAll(FILE_READ_PATTERN)) {
+    kinds.set(match[1]!, match[2]!.endsWith('.css') ? 'style' : 'source')
+  }
+
+  // 派生变量按来源传递：`const chatRule = styles.slice(...)` 仍然是样式文本。
+  // 迭代到不动点，因为派生可以套派生。
+  const bindings = [...source.matchAll(BINDING_PATTERN)]
+  for (let pass = 0; pass < 4; pass += 1) {
+    let changed = false
+    for (const match of bindings) {
+      const name = match[1]!
+      if (kinds.has(name)) continue
+      const referenced = [...match[2]!.matchAll(/[A-Za-z_$][\w$]*/g)]
+        .map((identifier) => kinds.get(identifier[0]))
+        .filter((kind): kind is TextSource => !!kind)
+      if (!referenced.length) continue
+      kinds.set(name, referenced.includes('source') ? 'source' : 'style')
+      changed = true
+    }
+    if (!changed) break
+  }
+  return kinds
+}
+
+function findBareSourceAssertions(file: string, source: string): string[] {
+  if (ARCHITECTURE_GUARD_PATTERN.test(file)) return []
+  const kinds = classifyTextBindings(source)
+  const bare = [...source.matchAll(TEXT_ASSERTION_PATTERN)]
+    .filter((match) => !match[2])
+    .map((match) => match[1]!.match(/[A-Za-z_$][\w$]*/)?.[0])
+    .filter((root): root is string => !!root && kinds.get(root) === 'source')
+  return bare.length ? [`${bare.length} 条裸的肯定式源码断言（${[...new Set(bare)].sort().join(' / ')}）`] : []
 }
 
 /**
@@ -94,6 +235,7 @@ interface ArchitectureRule {
 const rules: readonly ArchitectureRule[] = [
   {
     name: 'UI 模块不读取完整工作区快照',
+    root: 'client',
     extensions: ['.vue'],
     findViolations: (_file, source) => fullSnapshotPredicates
       .filter(({ pattern }) => pattern.test(source))
@@ -101,6 +243,7 @@ const rules: readonly ArchitectureRule[] = [
   },
   {
     name: '收发 Koishi RPC 的函数只允许出现在客户端端口适配器里',
+    root: 'client',
     extensions: ['.ts', '.vue'],
     findViolations: (file, source) => {
       if (PORT_ADAPTER_PATTERN.test(file)) return []
@@ -110,6 +253,7 @@ const rules: readonly ArchitectureRule[] = [
   },
   {
     name: '客户端不自己判定消息能力',
+    root: 'client',
     extensions: ['.ts', '.vue'],
     findViolations: (file, source) => {
       if (MESSAGE_CAPABILITY_MODULE_PATTERN.test(file)) return []
@@ -120,10 +264,47 @@ const rules: readonly ArchitectureRule[] = [
   },
   {
     name: '消息动作入口必须由能力位守门',
+    root: 'client',
     extensions: ['.ts', '.vue'],
     findViolations: (_file, source) => [...source.matchAll(MESSAGE_ACTION_EMIT_PATTERN)]
       .filter((match) => !CAPABILITY_READ_PATTERN.test(readEnclosingScope(source, match.index)))
       .map((match) => `${match[1]!} 入口所在的元素或函数没有读能力位`),
+  },
+  /**
+   * ADR 0060 与 ADR 0071 此前只由消息列表测试里的四条肯定式源码断言守着——它们钉的是
+   * `client/webqq-scrollbar.ts` 的源码文本，既不属于消息列表，也管不到别的样式表。
+   * 这两条决策的失效形态都是「不会报错、只会静默错」，因此先转成对全仓样式表生效的规则，
+   * 再从组件测试里删掉那四条断言。
+   */
+  {
+    name: '工作区本体与一级区域不得声明 backdrop-filter',
+    root: 'client/styles',
+    extensions: ['.css'],
+    findViolations: (_file, source) => readCssRules(source)
+      .filter(({ body }) => declaresBackdropFilter(body))
+      .flatMap(({ selectors }) => selectors.filter((selector) => {
+        const subject = readSelectorSubject(selector)
+        return !isPseudoElement(subject) && FIRST_LEVEL_REGION_PATTERN.test(subject)
+      }))
+      .map((selector) => `${selector} 声明了 backdrop-filter，会成为 Backdrop Root 边界`),
+  },
+  {
+    name: '毛玻璃表头的模糊层必须放在 ::before 上',
+    root: 'client/styles',
+    extensions: ['.css'],
+    findViolations: (_file, source) => readCssRules(source)
+      .filter(({ body }) => declaresBackdropFilter(body))
+      .flatMap(({ selectors }) => selectors.filter((selector) => {
+        const subject = readSelectorSubject(selector)
+        return !isPseudoElement(subject) && HEADER_SELECTOR_PATTERN.test(subject)
+      }))
+      .map((selector) => `${selector} 把模糊写在表头自身上，表头会成为 Backdrop Root 边界`),
+  },
+  {
+    name: '组件测试文件不得出现裸的肯定式源码断言',
+    root: 'tests',
+    extensions: ['.test.ts'],
+    findViolations: findBareSourceAssertions,
   },
 ]
 
@@ -140,26 +321,73 @@ interface ArchitectureExemption {
  * 已知违规的显式豁免清单，与守卫断言放在同一处，改客户端代码的人立刻看到。
  * 理由与负责人均为必填；豁免不是放行，是有主的债务。
  *
- * 当前为空：九条历史违规已由区域投影下沉与扩展端口两批工作消化完，消息能力判定则在收成
- * 共享判据时一并清掉，场景变更广播的模块级 `receive` 在收进工作区端口时消化。清单与它的
- * 三条守卫断言保留，下一次真有取舍时按同一形状登记。
+ * 客户端源码那四条规则当前一条豁免都没有：九条历史违规已由区域投影下沉与扩展端口两批工作
+ * 消化完，消息能力判定在收成共享判据时一并清掉，场景变更广播的模块级 `receive` 在收进工作区
+ * 端口时消化。两条毛玻璃规则从一开始就是干净的——它们是从消息列表测试里那四条肯定式断言
+ * 转过来的，转的时候实现已经合规。
+ *
+ * 「组件测试文件不得出现裸的肯定式源码断言」这条则一次登记了全部未治理文件。理由统一：
+ * 该文件断言的组件行为尚未下沉，这些断言是它当前行为的唯一记录，在对应 interface 抽出来
+ * 之前删掉是净损失。负责人分三种——本轮票号、已有架构候选、以及尚无候选的「待开候选」。
  */
-const exemptions: readonly ArchitectureExemption[] = []
+const exemptions: readonly ArchitectureExemption[] = [
+  ...([
+    // 本轮 message-chain-behaviour-modules 逐票消化。
+    ['tests/webqq-message-list.test.ts', 'message-chain-behaviour-modules 02/03/04/05'],
+    ['tests/webqq-message-selection.test.ts', 'message-chain-behaviour-modules 04'],
+    ['tests/webqq-chat-pane.test.ts', 'message-chain-behaviour-modules 06/07'],
+    // 已有架构候选，本轮明确排除在外（见该 feature 的 Out of Scope）。
+    ['tests/webqq-composer.test.ts', '发送控件候选：草稿与编辑器之间的桥接'],
+    ['tests/model-request-analysis.test.ts', '分析视图候选：展开态与原文态'],
+    ['tests/webqq-model-request-workspace.test.ts', '分析视图候选：展开态与原文态'],
+    ['tests/webqq-preset-workspace.test.ts', '预设工作台候选：源文档与运行时证据关联'],
+    // 尚无对应候选，登记为待开候选，等有人认领时按同一形状先抽 interface 再删断言。
+    ['tests/ai-test-spaces-ui.test.ts', '待开候选：AI 测试空间视图行为下沉'],
+    ['tests/environment-components.test.ts', '待开候选：环境管理弹层行为下沉'],
+    ['tests/evidence-navigation.test.ts', '待开候选：证据导航视图行为下沉'],
+    ['tests/friend-menu.test.ts', '待开候选：关系菜单视图行为下沉'],
+    ['tests/group-mention.test.ts', '待开候选：关系菜单视图行为下沉'],
+    ['tests/group-menu.test.ts', '待开候选：关系菜单视图行为下沉'],
+    ['tests/user-stack.test.ts', '待开候选：用户切换栈视图行为下沉'],
+    ['tests/webqq-avatar.test.ts', '待开候选：头像呈现投影下沉'],
+    ['tests/webqq-debug-workspace.test.ts', '待开候选：OneBot 调试工作台行为下沉'],
+    ['tests/webqq-details-panel.test.ts', '待开候选：详情栏行为下沉'],
+    ['tests/webqq-mcp-call-workspace.test.ts', '待开候选：MCP 调用工作台行为下沉'],
+    ['tests/webqq-page-shell.test.ts', '待开候选：页面外壳装配行为下沉'],
+    ['tests/webqq-profile-card.test.ts', '待开候选：资料卡行为下沉'],
+    ['tests/webqq-region-css.test.ts', '待开候选：区域类名结构契约转规则制守卫'],
+    ['tests/webqq-sidebar.test.ts', '待开候选：侧边栏其余行为下沉'],
+  ] as const).map(([file, owner]) => ({
+    file,
+    rule: '组件测试文件不得出现裸的肯定式源码断言',
+    reason: '该文件断言的组件行为尚未下沉，这些断言是它当前行为的唯一记录；在对应 interface 抽出来之前删除是净损失。',
+    owner,
+  })),
+]
+
+/**
+ * 棘轮钉的是「已治理文件为零」而不是断言总条数。
+ *
+ * 按仓库判据，这些文件里三分之二的断言（样式文本、DOM 结构与元素顺序、用户可见文案）本来
+ * 就是合法的，钉总条数会让人误以为目标是把它清零，而清零会逼人删掉有架构决策依据的守卫。
+ */
+const TREATED_FILE_BUDGET = 22
 
 /**
  * 类型声明文件不含运行时代码，`send` 在里面只是被声明的重载签名。
+ * 构建产物（`*.generated.css`）不是源码，改它没有意义，规则不扫它。
  */
 function listSourceFiles(directory: string, extensions: readonly string[]): string[] {
   return readdirSync(resolve(directory), { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name)
     if (entry.isDirectory()) return listSourceFiles(path, extensions)
-    if (entry.name.endsWith('.d.ts')) return []
+    if (entry.name.endsWith('.d.ts') || entry.name.endsWith('.generated.css')) return []
     return extensions.some((extension) => entry.name.endsWith(extension)) ? [path] : []
   })
 }
 
 function findAllViolations(): string[] {
-  return rules.flatMap((rule) => listSourceFiles('client', rule.extensions).flatMap((file) => {
+  return rules.flatMap((rule) => listSourceFiles(rule.root, rule.extensions).flatMap((file) => {
     const source = readFileSync(resolve(file), 'utf8')
     return rule.findViolations(file, source).map((evidence) => `${file} 违反「${rule.name}」：${evidence}`)
   }))
@@ -170,17 +398,18 @@ function isExempted(violation: string, allowed: readonly ArchitectureExemption[]
 }
 
 describe('WebQQ 模块化架构', () => {
-  it('四条架构规则对客户端源码全量生效，未登记的违规按文件与规则报出', () => {
+  it('七条架构规则对各自扫描根目录全量生效，未登记的违规按文件与规则报出', () => {
     expect(findAllViolations().filter((violation) => !isExempted(violation, exemptions))).toEqual([])
   })
 
   /**
-   * 四条规则的谓词自测。这条不依赖豁免清单里有没有条目：清单清空后，
-   * 「移除任一豁免必须报错」变成空循环，只有喂合成源码才能证明规则还活着。
+   * 七条规则的谓词自测。这条不依赖豁免清单里有没有条目：客户端那四条规则的清单是空的，
+   * 「移除任一豁免必须报错」对它们是空循环，只有喂合成源码才能证明规则还活着。
    */
-  it('四条规则各自认得出违规写法，也不误报同名局部变量、呈现绑定与管道', () => {
-    const [snapshotRule, rpcRule, capabilityRule, entryRule] = rules
+  it('七条规则各自认得出违规写法，也不误报同名局部变量、呈现绑定与管道', () => {
+    const [snapshotRule, rpcRule, capabilityRule, entryRule, regionFrostRule, headerFrostRule, assertionRule] = rules
     if (!snapshotRule || !rpcRule || !capabilityRule || !entryRule) throw new Error('架构规则缺失')
+    if (!regionFrostRule || !headerFrostRule || !assertionRule) throw new Error('架构规则缺失')
 
     expect(snapshotRule.findViolations('client/x.vue', 'const props = defineProps<{ snapshot: SandboxSnapshot }>()')).not.toEqual([])
     expect(snapshotRule.findViolations('client/x.vue', 'const bots = getSandboxBots(input)')).not.toEqual([])
@@ -241,6 +470,60 @@ describe('WebQQ 模块化架构', () => {
     // 打开合并转发与查看资料不是消息能力，不进这条规则。
     expect(entryRule.findViolations('client/x.vue', "emit('openForward', { messageId: message.id, forwardId })")).toEqual([])
     expect(entryRule.findViolations('client/x.vue', "emit('openProfile', message.authorId)")).toEqual([])
+
+    // ADR 0060：一级区域自己带模糊就成了 Backdrop Root 边界；模糊挪到 ::before 上则合法。
+    expect(regionFrostRule.findViolations('client/styles/x.css', '.webqq-workspace.is-frosted {\n  backdrop-filter: blur(20px);\n}')).not.toEqual([])
+    expect(regionFrostRule.findViolations('client/styles/x.css', '.webqq-workspace.is-frosted .webqq-rail {\n  backdrop-filter: blur(20px);\n}')).not.toEqual([])
+    expect(regionFrostRule.findViolations('client/styles/x.css', '.webqq-workspace.is-frosted .chatluna-sandbox-chat {\n  backdrop-filter: blur(20px);\n}')).not.toEqual([])
+    expect(regionFrostRule.findViolations('client/styles/x.css', '.webqq-workspace.is-frosted .webqq-rail::before {\n  backdrop-filter: blur(20px);\n}')).toEqual([])
+    expect(regionFrostRule.findViolations('client/styles/x.css', '.webqq-workspace.is-frosted .webqq-rail {\n  background: rgb(0 0 0 / 20%);\n}')).toEqual([])
+    // 显式关掉模糊正是这条决策要的写法，不得反过来被判成违规。
+    expect(regionFrostRule.findViolations('client/styles/x.css', '.webqq-workspace {\n  backdrop-filter: none;\n}')).toEqual([])
+    // `:is()` 里的逗号不是选择器列表分隔符：这条规则的主语是那个控件，不是工作区。
+    expect(regionFrostRule.findViolations(
+      'client/styles/x.css',
+      ':is(.webqq-workspace, .sandbox-popover-content) [data-slot="input"] {\n  backdrop-filter: blur(20px);\n}',
+    )).toEqual([])
+
+    // ADR 0071：表头自身带模糊会挡住它内部 Popover/Select 的毛玻璃，模糊层必须在 ::before 上。
+    expect(headerFrostRule.findViolations('client/styles/x.css', '.chatluna-sandbox-chat-header {\n  backdrop-filter: blur(32px);\n}')).not.toEqual([])
+    expect(headerFrostRule.findViolations('client/styles/x.css', '.webqq-overlay-header {\n  backdrop-filter: blur(20px);\n}')).not.toEqual([])
+    expect(headerFrostRule.findViolations('client/styles/x.css', '.chatluna-sandbox-chat-header::before {\n  backdrop-filter: blur(32px);\n}')).toEqual([])
+    // 表头下面的子元素不是表头本身，不得误报。
+    expect(headerFrostRule.findViolations('client/styles/x.css', '.chatluna-sandbox-chat-header .webqq-avatar {\n  backdrop-filter: blur(4px);\n}')).toEqual([])
+
+    // 裸的肯定式源码断言按形状认：读的是组件源码、没有 not、用的是文本匹配器。
+    const bare = "const source = readFileSync(resolve('client/x.vue'), 'utf8')\nexpect(source).toContain('selectionMode?: boolean')\n"
+    expect(assertionRule.findViolations('tests/x.test.ts', bare)).not.toEqual([])
+    expect(assertionRule.findViolations('tests/x.test.ts', bare.replace('.toContain', '.toMatch'))).not.toEqual([])
+    // 否定式的已删实现守卫是 ADR 0073 的例外，成本结构与肯定式相反，必须放行。
+    expect(assertionRule.findViolations('tests/x.test.ts', bare.replace(').toContain', ').not.toContain'))).toEqual([])
+    // 用户可见文案经显式辅助函数表达，是规则认得的合法出口。
+    expect(assertionRule.findViolations(
+      'tests/x.test.ts',
+      "const source = readFileSync(resolve('client/x.vue'), 'utf8')\nexpectUserFacingCopy(source, '发送一条消息开始测试')\n",
+    )).toEqual([])
+    // 读 CSS 文件的样式断言同样是例外，包括从样式变量切出来的规则片段。
+    expect(assertionRule.findViolations(
+      'tests/x.test.ts',
+      "const styles = readFileSync(resolve('client/styles/x.css'), 'utf8')\nexpect(styles).toContain('overflow-anchor: none')\n",
+    )).toEqual([])
+    expect(assertionRule.findViolations(
+      'tests/x.test.ts',
+      "const styles = readFileSync(resolve('client/styles/x.css'), 'utf8')\n"
+      + "const chatRule = styles.slice(styles.indexOf('.chatluna-sandbox-chat {')).split('}')[0]\n"
+      + "expect(chatRule).toContain('grid-template-rows: auto minmax(0, 1fr)')\n",
+    )).toEqual([])
+    // 从组件源码切出来的片段仍然是源码，换个中间变量不能让规则失效。
+    expect(assertionRule.findViolations(
+      'tests/x.test.ts',
+      "const source = readFileSync(resolve('client/x.vue'), 'utf8')\n"
+      + "const menu = source.slice(source.indexOf('<ContextMenu>'))\n"
+      + "expect(menu).toContain('<ContextMenuTrigger')\n",
+    )).not.toEqual([])
+    // 架构守卫读源码是 ADR 0073 的第三类例外：它的断言对象本来就是源码结构。
+    expect(assertionRule.findViolations('tests/webqq-architecture.test.ts', bare)).toEqual([])
+    expect(assertionRule.findViolations('tests/server-architecture.test.ts', bare)).toEqual([])
   })
 
   /**
@@ -263,6 +546,16 @@ describe('WebQQ 模块化架构', () => {
     // 同一条规则在另一个文件上也不得被放行。
     expect(isExempted(snapshotViolation.replace('client/x.vue', 'client/y.vue'), [exemption])).toBe(false)
     expect(isExempted(snapshotViolation, [])).toBe(false)
+  })
+
+  /**
+   * 棘轮：未治理文件只减不增。数的是文件而不是断言条数——按仓库的五类判据，这些文件里
+   * 三分之二的断言本来就是合法的，钉总条数会把「治理完成」误导成「断言归零」。
+   */
+  it('未治理文件数只减不增', () => {
+    const treated = exemptions.filter(({ rule }) => rule === '组件测试文件不得出现裸的肯定式源码断言')
+    expect(treated.length).toBeLessThanOrEqual(TREATED_FILE_BUDGET)
+    expect([...new Set(treated.map(({ file }) => file))].length).toBe(treated.length)
   })
 
   it('每条豁免都写明理由与负责消化它的后续工作', () => {
