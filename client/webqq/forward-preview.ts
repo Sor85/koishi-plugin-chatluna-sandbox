@@ -2,13 +2,9 @@ import type {
   SandboxForward,
   SandboxForwardNode,
   SandboxForwardPreview,
-  SandboxMedia,
   SandboxMessage,
 } from '../../src/types'
-
-function getMediaLabel(media: SandboxMedia): string {
-  return media.type === 'image' ? '图片' : media.type === 'audio' ? '语音' : media.type === 'video' ? '视频' : '文件'
-}
+import { getMediaLabel } from './message-presentation'
 
 function summarizeNode(node: SandboxForwardNode): string {
   if (node.forwardId) return '[合并转发]'

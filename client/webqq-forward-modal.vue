@@ -105,9 +105,10 @@ import { IconChevronLeft, IconPaperclip, IconX } from '@tabler/icons-vue'
 import { onMounted, ref } from 'vue'
 import WebqqAvatar from './webqq-avatar.vue'
 import { buildForwardPreview } from './webqq/forward-preview'
+import { formatMediaSize, getMediaLabel } from './webqq/message-presentation'
 import { getForwardNodeClusterClass, isMergedForwardNode } from './webqq/forward-cluster'
 import { vWebqqScrollbar } from './webqq-scrollbar'
-import type { SandboxForward, SandboxForwardNode, SandboxMedia } from '../src/types'
+import type { SandboxForward, SandboxForwardNode } from '../src/types'
 
 const props = defineProps<{
   title: string
@@ -142,16 +143,6 @@ function isBotParticipant(userId: string) {
 
 function getMediaSource(mediaId: string) {
   return props.mediaSources[mediaId] ?? ''
-}
-
-function formatMediaSize(size: number) {
-  if (size < 1024) return `${size} B`
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
-  return `${(size / 1024 / 1024).toFixed(1)} MB`
-}
-
-function getMediaLabel(media: SandboxMedia) {
-  return media.type === 'image' ? '图片' : media.type === 'audio' ? '语音' : media.type === 'video' ? '视频' : '文件'
 }
 
 function getNodeText(item: SandboxForwardNode) {

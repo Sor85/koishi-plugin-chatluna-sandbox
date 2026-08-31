@@ -170,8 +170,13 @@ function declaresBackdropFilter(body: string): boolean {
  */
 const ARCHITECTURE_GUARD_PATTERN = /(?:^|\/)[a-z0-9-]*architecture\.test\.ts$/
 
-/** `const x = readFileSync(resolve('<路径>'), 'utf8')`：把变量名绑到它读进来的那个文件。 */
-const FILE_READ_PATTERN = /\b(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*readFileSync\(\s*resolve\(\s*'([^']+)'/g
+/**
+ * `const x = <任何含源码路径字面量的表达式>`：把变量名绑到它读进来的那个文件。
+ *
+ * 按路径字面量而不是按 `readFileSync(` 判定：测试文件普遍会包一层 `readSource(path)` 之类的
+ * 小工具，钉住读取函数名会让规则被一个两行的包装函数整体旁路——而那正是规则最需要拦住的写法。
+ */
+const FILE_READ_PATTERN = /\b(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=[^\n]*?'([^']+\.(?:css|vue|ts|mjs|js))'/g
 
 /** `const x = <表达式>`：用于把 `styles.slice(...)`、`(s) => styles.slice(...)` 这类派生变量接上来源。 */
 const BINDING_PATTERN = /\b(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=([^\n]*(?:\n\s{4,}[^\n]*)*)/g
@@ -341,6 +346,7 @@ const exemptions: readonly ArchitectureExemption[] = [
     ['tests/model-request-analysis.test.ts', '分析视图候选：展开态与原文态'],
     ['tests/webqq-model-request-workspace.test.ts', '分析视图候选：展开态与原文态'],
     ['tests/webqq-preset-workspace.test.ts', '预设工作台候选：源文档与运行时证据关联'],
+    ['tests/model-request-read-cost.test.ts', '分析视图候选：展开态与原文态'],
     // 尚无对应候选，登记为待开候选，等有人认领时按同一形状先抽 interface 再删断言。
     ['tests/ai-test-spaces-ui.test.ts', '待开候选：AI 测试空间视图行为下沉'],
     ['tests/environment-components.test.ts', '待开候选：环境管理弹层行为下沉'],
@@ -357,6 +363,7 @@ const exemptions: readonly ArchitectureExemption[] = [
     ['tests/webqq-profile-card.test.ts', '待开候选：资料卡行为下沉'],
     ['tests/webqq-region-css.test.ts', '待开候选：区域类名结构契约转规则制守卫'],
     ['tests/webqq-sidebar.test.ts', '待开候选：侧边栏其余行为下沉'],
+    ['tests/sandbox-extension-menu.test.ts', '待开候选：扩展动作登记表的菜单接线下沉'],
   ] as const).map(([file, owner]) => ({
     file,
     rule: '组件测试文件不得出现裸的肯定式源码断言',
@@ -371,7 +378,7 @@ const exemptions: readonly ArchitectureExemption[] = [
  * 按仓库判据，这些文件里三分之二的断言（样式文本、DOM 结构与元素顺序、用户可见文案）本来
  * 就是合法的，钉总条数会让人误以为目标是把它清零，而清零会逼人删掉有架构决策依据的守卫。
  */
-const TREATED_FILE_BUDGET = 22
+const TREATED_FILE_BUDGET = 24
 
 /**
  * 类型声明文件不含运行时代码，`send` 在里面只是被声明的重载签名。
@@ -507,6 +514,15 @@ describe('WebQQ 模块化架构', () => {
     expect(assertionRule.findViolations(
       'tests/x.test.ts',
       "const styles = readFileSync(resolve('client/styles/x.css'), 'utf8')\nexpect(styles).toContain('overflow-anchor: none')\n",
+    )).toEqual([])
+    // 包一层读取小工具不能让规则失效：变量按它读进来的路径分类，不按读取函数名。
+    expect(assertionRule.findViolations(
+      'tests/x.test.ts',
+      "const source = readSource('client/x.vue')\nexpect(source).toContain('selectionMode?: boolean')\n",
+    )).not.toEqual([])
+    expect(assertionRule.findViolations(
+      'tests/x.test.ts',
+      "const styles = readSource('client/styles/x.css')\nexpect(styles).toContain('overflow-anchor: none')\n",
     )).toEqual([])
     expect(assertionRule.findViolations(
       'tests/x.test.ts',

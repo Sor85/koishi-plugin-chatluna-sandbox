@@ -328,13 +328,42 @@
 import { IconArrowBackUp, IconAt, IconBell, IconCheck, IconChecks, IconClock, IconExternalLink, IconGitBranch, IconHandClick, IconId, IconMessageReply, IconMoodSmile, IconPaperclip, IconTag, IconTrash, IconUserMinus, IconUserPlus, IconUsers } from '@tabler/icons-vue'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from './components/ui/context-menu'
-import { getFriendMenuActions, type FriendMenuState } from './webqq/friend-menu'
-import { getGroupAuthorityBadge, getGroupMemberDisplayName } from './webqq/group-display'
-import { getGroupMemberMenuActions, type GroupMemberMenuAction } from './webqq/group-menu'
+import { type FriendMenuState } from './webqq/friend-menu'
 import GroupMemberMenu from './group-member-menu.vue'
-import { isForkBoundaryMessage } from './webqq/fork-boundary'
 import { getMessageClusterClass, isMergedMessage } from './webqq/message-cluster'
 import { createMessageListFollowController } from './webqq/message-list-follow'
+import {
+  formatMediaSize,
+  getEventMessageText as readEventMessageText,
+  getForwardPreview as readForwardPreview,
+  getMessageText as readMessageText,
+  getMessageThinking,
+  getMessageUsage,
+  getReplyMessage as readReplyMessage,
+  isForkBoundary as isForkBoundaryRow,
+  isInheritedMessage as isInheritedPrefixMessage,
+  readMessageCapabilities,
+  resolveForwardOpenInput,
+  resolveReactionToggle,
+  shouldRenderAsEvent as shouldRenderMessageAsEvent,
+  shouldShowThinking as shouldShowMessageThinking,
+  shouldShowUsage as shouldShowMessageUsage,
+  type MessagePresentationContext,
+} from './webqq/message-presentation'
+import {
+  getChatFriendActions as readChatFriendActions,
+  getCurrentGroupMember as readCurrentGroupMember,
+  getFriendMenuStateOf as readFriendMenuState,
+  getMessageAuthorName as readMessageAuthorName,
+  getMessageGroupMemberActions as readGroupMemberActions,
+  getMessageRoleBadge as readMessageRoleBadge,
+  getParticipantAvatar as readParticipantAvatar,
+  getParticipantName as readParticipantName,
+  hasGroupMemberManagementActions,
+  isBotParticipant as readIsBotParticipant,
+  type MessageParticipant,
+  type ParticipantPresentationContext,
+} from './webqq/participant-presentation'
 import {
   buildMessageListTail,
   scrollMessageListToBottom,
@@ -348,30 +377,20 @@ import {
   type MessageListScrollState,
 } from './webqq/message-list-scroll-state'
 import { highlightMessageElement } from './webqq/message-reveal'
-import { formatMentionContent } from './webqq/mention'
 import WebqqAvatar from './webqq-avatar.vue'
 import WebqqMessageReactions from './webqq-message-reactions.vue'
 import WebqqMenuExtensionMark from './webqq-menu-extension-mark.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type { ResolvedConversation } from '../src/conversation-resolution'
-import { isInheritedMessage as isInheritedPrefixMessage } from '../src/conversation-resolution'
-import { NO_MESSAGE_CAPABILITIES, type MessageCapabilities } from '../src/message-capabilities'
+import { type MessageCapabilities } from '../src/message-capabilities'
 import {
-  formatRecalledMessageEventText,
   isRecalledMessage,
   type SandboxChatLunaState,
   type SandboxForwardPreview,
   type SandboxGroup,
-  type SandboxMedia,
   type SandboxMessage,
   type SandboxMessageModelRequestReference,
 } from '../src/types'
-
-interface MessageParticipant {
-  name: string
-  avatar?: string
-  isBot: boolean
-}
 
 export interface WebqqMessageListModel {
   messages: SandboxMessage[]
@@ -446,6 +465,24 @@ const follow = createMessageListFollowController({
 const participantNames = computed(() => Object.fromEntries(
   Object.entries(props.model.participants).map(([id, participant]) => [id, participant.name]),
 ))
+/**
+ * 两个呈现模块共用的取数上下文。
+ *
+ * 合成一个 computed 而不是在每个包装函数里现拼：模板里每一行都会问好几次，逐次重建对象会让
+ * 参与者名字映射按渲染次数重算，正是读取放大守卫要钉住的那类写法。
+ */
+const presentation = computed<MessagePresentationContext & ParticipantPresentationContext>(() => ({
+  replyMessages: props.model.replyMessages,
+  forwardPreviews: props.model.forwardPreviews,
+  messageCapabilities: props.model.messageCapabilities,
+  participantNames: participantNames.value,
+  markRecalledMessages: props.model.markRecalledMessages,
+  currentConversationId: props.model.currentConversation?.id,
+  currentOperatorId: props.model.currentOperatorId,
+  participants: props.model.participants,
+  friendMenuStates: props.model.friendMenuStates,
+  currentGroup: props.model.currentGroup,
+}))
 let quoteHighlightTimer: ReturnType<typeof setTimeout> | undefined
 
 const messageListTail = computed(() => buildMessageListTail({
@@ -598,16 +635,6 @@ watch([messagesElement, messagesContentElement], ([element, content]) => {
 }, { flush: 'post' })
 
 // 思考与用量归档在消息上，因此多轮对话后每条机器人消息都保留自己的指标。
-function getMessageThinking(message: SandboxMessage) {
-  return message.chatLuna?.thought ? message.chatLuna : undefined
-}
-
-// 没有思考内容但拿到了 Token 用量时单独常显指标，与 onebot-webqq 的 is-usage-only 行为一致。
-function getMessageUsage(message: SandboxMessage) {
-  const chatLuna = message.chatLuna
-  return chatLuna && !chatLuna.thought && chatLuna.usage ? chatLuna : undefined
-}
-
 function isThinkingExpanded(message: SandboxMessage) {
   return !!expandedThinking.value[message.id]
 }
@@ -647,46 +674,35 @@ function prepareThinkingPanelLeave(element: Element) {
 }
 
 function getParticipantName(id: string) {
-  return props.model.participants[id]?.name ?? id
+  return readParticipantName(id, presentation.value)
 }
 
 function getParticipantAvatar(id: string) {
-  return props.model.participants[id]?.avatar
+  return readParticipantAvatar(id, presentation.value)
 }
 
 function isBotParticipant(id: string) {
-  return props.model.participants[id]?.isBot ?? false
+  return readIsBotParticipant(id, presentation.value)
 }
 
 function getCurrentGroupMember(participantId: string) {
-  return props.model.currentGroup?.members.find((member) => member.participantId === participantId)
+  return readCurrentGroupMember(participantId, presentation.value)
 }
 
 function getMessageGroupMemberActions(participantId: string) {
-  const target = getCurrentGroupMember(participantId)
-  if (!target) return []
-  return getGroupMemberMenuActions(getCurrentGroupMember(props.model.currentOperatorId ?? ''), target)
+  return readGroupMemberActions(participantId, presentation.value)
 }
 
-const messageGroupManagementActions: GroupMemberMenuAction[] = [
-  'set-card',
-  'set-title',
-  'set-admin',
-  'unset-admin',
-  'transfer-owner',
-  'kick',
-]
-
 function hasMessageGroupMemberManagementActions(participantId: string) {
-  return getMessageGroupMemberActions(participantId).some((action) => messageGroupManagementActions.includes(action))
+  return hasGroupMemberManagementActions(participantId, presentation.value)
 }
 
 function getMessageAuthorName(participantId: string) {
-  return getGroupMemberDisplayName(getCurrentGroupMember(participantId), getParticipantName(participantId))
+  return readMessageAuthorName(participantId, presentation.value)
 }
 
 function getMessageRoleBadge(participantId: string) {
-  return getGroupAuthorityBadge(getCurrentGroupMember(participantId))
+  return readMessageRoleBadge(participantId, presentation.value)
 }
 
 function formatMessageTime(createdAt: string) {
@@ -697,41 +713,32 @@ function formatMessageTime(createdAt: string) {
 }
 
 function getFriendMenuState(targetId: string): FriendMenuState {
-  return props.model.friendMenuStates[targetId]
-    ?? { isFriend: false, pendingOutgoing: false, pendingIncoming: false }
+  return readFriendMenuState(targetId, presentation.value)
 }
 
 function getChatFriendActions(targetId: string) {
-  return getFriendMenuActions(getFriendMenuState(targetId), true)
+  return readChatFriendActions(targetId, presentation.value)
 }
 
 function getReplyMessage(message: SandboxMessage) {
-  return message.replyToMessageId ? props.model.replyMessages[message.replyToMessageId] : undefined
+  return readReplyMessage(message, presentation.value)
 }
 
 function getForwardPreview(message: SandboxMessage) {
-  return message.forwardId ? props.model.forwardPreviews[message.id] : undefined
+  return readForwardPreview(message, presentation.value)
 }
 
 function openForwardMessage(message: SandboxMessage) {
-  if (!message.forwardId || !getForwardPreview(message)) return
-  emit('openForward', { messageId: message.id, forwardId: message.forwardId })
+  const input = resolveForwardOpenInput(message, presentation.value)
+  if (input) emit('openForward', input)
 }
 
-// 戳一戳始终是事件；撤回在关闭 mark 时也呈现为结构化事件，开启时仍渲染原气泡。
 function shouldRenderAsEvent(message: SandboxMessage) {
-  return !!message.event || (isRecalledMessage(message) && !props.model.markRecalledMessages)
+  return shouldRenderMessageAsEvent(message, presentation.value)
 }
 
-/**
- * 这条消息现在能做什么。
- *
- * 判定住在 `src/message-capabilities`，服务端在写入路径上问的是同一份判据；列表只读答案，
- * 因此右键里出现的动作都真的做得到，也不会在这里长出第二份口径。投影还没给出这条消息时
- * 一律读作「一条都做不到」，不猜。
- */
 function capabilitiesOf(message: SandboxMessage): MessageCapabilities {
-  return props.model.messageCapabilities[message.id] ?? NO_MESSAGE_CAPABILITIES
+  return readMessageCapabilities(message, presentation.value)
 }
 
 function isMessageSelected(messageId: string) {
@@ -762,65 +769,36 @@ function handleMessageClick(message: SandboxMessage, event: MouseEvent) {
 }
 
 function getEventMessageText(message: SandboxMessage) {
-  if (isRecalledMessage(message)) {
-    const operatorId = message.lifecycle?.operatorId ?? message.authorId
-    return formatRecalledMessageEventText(message, getMessageAuthorName(operatorId))
-  }
-  return message.content
+  return readEventMessageText(message, getMessageAuthorName)
 }
 
 function shouldShowThinking(message: SandboxMessage) {
-  // 关闭 mark 时连同思考一起隐藏；开启时思考仍可读，仅随消息弱化。
-  return !!getMessageThinking(message) && !(isRecalledMessage(message) && !props.model.markRecalledMessages)
+  return shouldShowMessageThinking(message, presentation.value)
 }
 
 function shouldShowUsage(message: SandboxMessage) {
-  return !!getMessageUsage(message) && !(isRecalledMessage(message) && !props.model.markRecalledMessages)
+  return shouldShowMessageUsage(message, presentation.value)
 }
 
-/**
- * 消息是不是这条分支继承来的那一段。
- *
- * 判定住在共享的 {@link isInheritedPrefixMessage}：同一份判定既决定这一行要不要弱化，也是
- * 消息能力里「继承前缀在实例视图里只读」那一条的依据，因此右键里做不到的动作干脆不显示。
- */
 function isInheritedMessage(message: SandboxMessage) {
-  return isInheritedPrefixMessage(message, props.model.currentConversation?.id)
+  return isInheritedPrefixMessage(message, presentation.value)
 }
 
-/** 这一行之前要不要画分界：它解释了上面那段为什么右键项更少。 */
 function isForkBoundary(index: number) {
-  return isForkBoundaryMessage(props.model.messages, index, props.model.currentConversation?.id)
+  return isForkBoundaryRow(props.model.messages, index, presentation.value)
 }
 
-// 气泡下方的已有回应条是第三个写入入口，与右键撤回、右键贴表情读同一份能力位：
-// 少接一个就会让用户点一下已有 emoji 绕过只读。
 function toggleReaction(message: SandboxMessage, emojiId: string) {
-  if (!capabilitiesOf(message).react || !props.model.currentOperatorId) return
-  const reaction = message.reactions?.find((item) => item.emojiId === emojiId)
-  const enabled = !reaction?.participantIds.includes(props.model.currentOperatorId)
-  emit('setMessageReaction', message.id, emojiId, enabled)
-}
-
-function getMediaLabel(media: SandboxMedia) {
-  return media.type === 'image' ? '图片' : media.type === 'audio' ? '语音' : media.type === 'video' ? '视频' : '文件'
+  const toggle = resolveReactionToggle(message, emojiId, presentation.value)
+  if (toggle) emit('setMessageReaction', toggle.messageId, toggle.emojiId, toggle.enabled)
 }
 
 function getMessageText(message: SandboxMessage) {
-  // 外层合并转发卡片自己渲染预览行，避免与 content 摘要重复。
-  if (message.forwardId) return ''
-  if (message.media?.length === 1 && message.content === `[${getMediaLabel(message.media[0])}] ${message.media[0].name}`) return ''
-  return formatMentionContent(message.content, participantNames.value)
+  return readMessageText(message, presentation.value)
 }
 
 function getMediaSource(mediaId: string) {
   return props.model.mediaSources[mediaId] ?? ''
-}
-
-function formatMediaSize(size: number) {
-  if (size < 1024) return `${size} B`
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
-  return `${(size / 1024 / 1024).toFixed(1)} MB`
 }
 
 function revealMessage(messageId: string) {

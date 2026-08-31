@@ -1,34 +1,51 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { expectUserFacingCopies, expectUserFacingCopy } from './helpers/user-facing-copy'
+
+const readSource = (path: string) => readFileSync(resolve(path), 'utf8')
 
 describe('WebQQ 消息列表', () => {
-  it('从页面提取消息渲染与消息交互', () => {
-    const source = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-messages.css'), 'utf8')
-    const chatPaneSource = readFileSync(resolve('client/webqq-chat-pane.vue'), 'utf8')
-    const scrollbarSource = readFileSync(resolve('client/webqq-scrollbar.ts'), 'utf8')
-    const emojiPickerSource = readFileSync(resolve('client/webqq-emoji-picker.vue'), 'utf8')
-    const forwardModalSource = readFileSync(resolve('client/webqq-forward-modal.vue'), 'utf8')
-    const forwardTargetSource = readFileSync(resolve('client/webqq-forward-target-dialog.vue'), 'utf8')
+  it('消息行按方向、分簇与呈现状态挂类名', () => {
+    const source = readSource('client/webqq-message-list.vue')
 
-    expect(source).toContain('model: WebqqMessageListModel')
-    expect(source).toContain('getMessageClusterClass')
-    expect(source).toContain('replyMessages: Record<string, SandboxMessage>')
-    expect(source).toContain('forwardPreviews: Record<string, SandboxForwardPreview>')
-    expect(source).toContain('selectionMode?: boolean')
-    expect(source).toContain('enterSelection: [messageId: string]')
-    expect(source).toContain('props.model.replyMessages[message.replyToMessageId]')
-    expect(source).toContain('isMergedMessage')
+    /**
+     * 类别：DOM 结构与元素顺序（ADR 0073 第三类例外）。
+     * 依据：这些类名与 `webqq-messages.css` 的选择器构成结构契约，改名会让样式静默失效。
+     * 判定本身住在 message-cluster、message-presentation 两个模块，由它们的行为断言逐条执行。
+     */
+    expect(source).toContain("message.authorId === model.currentOperatorId ? 'is-outgoing' : 'is-incoming'")
     expect(source).toContain('class="chatluna-sandbox-message-quote is-clickable"')
     expect(source).toContain('class="chatluna-sandbox-message-quote chatluna-sandbox-message-forward"')
-    expect(source).toContain('openForward: [input: { messageId: string; forwardId: string }]')
     expect(source).toContain('class="chatluna-sandbox-message-forward-entry"')
     expect(source).toContain('class="chatluna-sandbox-message-event"')
-    expect(source).toContain("message.authorId === model.currentOperatorId ? 'is-outgoing' : 'is-incoming'")
+    expect(source).toContain('<ol v-else ref="messagesContentElement">')
+  })
+
+  it('多选态的入口、勾选标记与右键禁用', () => {
+    const source = readSource('client/webqq-message-list.vue')
+
+    /**
+     * 类别：实现细节契约（肯定式）。
+     * 依据：多选流程尚未下沉，这些断言是它当前行为的唯一记录；
+     * 负责人 message-chain-behaviour-modules 04。
+     */
+    expect(source).toContain('selectionMode?: boolean')
+    expect(source).toContain('enterSelection: [messageId: string]')
+    expect(source).toContain('<ContextMenuTrigger as-child :disabled="preview || model.selectionMode || !model.currentConversation">')
+  })
+
+  it('滚动追踪、位置恢复与加载更早历史的接线', () => {
+    const source = readSource('client/webqq-message-list.vue')
+    const styles = readSource('client/styles/webqq-messages.css')
+    const scrollbarSource = readSource('client/webqq-scrollbar.ts')
+
+    /**
+     * 类别：实现细节契约（肯定式）。
+     * 依据：滚动编排尚未下沉，这些断言是它当前行为的唯一记录；
+     * 负责人 message-chain-behaviour-modules 05/06。
+     */
     expect(source).toContain('loadHistory: [resolve: () => void')
-    expect(source).toContain("!model.currentGroup && getChatFriendActions(message.authorId).includes('remark')")
-    expect(source).toContain("!model.currentGroup && getChatFriendActions(message.authorId).includes('delete')")
     expect(source).toContain('ref="messagesElement"')
     expect(source).toContain('@scroll="handleMessagesScroll"')
     expect(source).toContain("from './webqq/message-list-scroll'")
@@ -54,39 +71,85 @@ describe('WebQQ 消息列表', () => {
     expect(source).toContain('cancelAnimationFrame(restoreSettleFrame)')
     expect(source).toContain('follow.setStickingToBottom(false)')
     expect(source).toContain("from './webqq/message-list-follow'")
+
+    // 类别：样式文本（ADR 0073 第一类例外）。浏览器的滚动锚定会和自定义恢复算术打架。
     expect(styles).toContain('overflow-anchor: none')
+
+    /**
+     * 类别：实现细节契约（否定式）。
+     * 依据：贴底追踪曾经住在滚动条指令里；加回去会让两处各判一次。
+     */
     expect(scrollbarSource).not.toContain('stickingToBottom')
     expect(scrollbarSource).not.toContain('shouldFollowMessageListTail')
-    // 轨道的可见区域计算（含「轨道从毛玻璃表头底缘开始」这条 ADR 0071 判定）已下沉到
-    // scrollbar-track-bounds 并由它的行为断言逐条执行；ADR 0060 与 ADR 0071 的样式面
-    // 则转成了对全仓样式表生效的规则制守卫（webqq-architecture.test.ts）。
-    expect(emojiPickerSource).toContain("v-webqq-scrollbar=\"{ showOverlay: false, tone: 'accent', zIndex: 140 }\"")
-    expect(forwardModalSource).toContain('v-webqq-scrollbar="{ showOverlay: false }"')
-    expect(forwardTargetSource).toContain("v-webqq-scrollbar=\"{ showOverlay: false, tone: 'accent' }\"")
-    expect(source).toContain('clearConversation: []')
-    expect(source).toContain('清空会话记录')
-    expect(source).toContain('<ContextMenuTrigger as-child :disabled="preview || model.selectionMode || !model.currentConversation">')
-    expect(chatPaneSource).toContain('@clear-conversation="emit(\'clearConversation\')"')
-    expect(source).toContain('跳转到对应请求')
-    expect(source).toContain("isBotParticipant(message.authorId) && message.chatLuna?.modelRequests?.length")
-    expect(source).toContain("emit('openModelRequest', message.chatLuna.modelRequests.at(-1)!)")
-    expect(chatPaneSource).toContain('@open-model-request="emit(\'openModelRequest\', $event)"')
-    expect(chatPaneSource).toContain('openModelRequest: [reference: SandboxMessageModelRequestReference]')
-    expect(source).toContain('message.chatLuna?.modelRequests?.length')
-    expect(chatPaneSource).toContain('clearConversation: []')
+  })
+
+  it('二级面与浮层里的滚动条隐藏 body 轨道', () => {
+    /**
+     * 类别：实现细节契约（肯定式）。
+     * 依据：这三处的行为由各自组件的候选负责，不在本轮范围内。
+     */
+    expect(readSource('client/webqq-emoji-picker.vue')).toContain("v-webqq-scrollbar=\"{ showOverlay: false, tone: 'accent', zIndex: 140 }\"")
+    expect(readSource('client/webqq-forward-modal.vue')).toContain('v-webqq-scrollbar="{ showOverlay: false }"')
+    expect(readSource('client/webqq-forward-target-dialog.vue')).toContain("v-webqq-scrollbar=\"{ showOverlay: false, tone: 'accent' }\"")
+  })
+
+  it('空会话显示欢迎页，机器人会话多一段状态说明', () => {
+    const source = readSource('client/webqq-message-list.vue')
+
+    // 类别：DOM 结构与元素顺序。这些类名与 webqq-messages.css 的欢迎页规则构成结构契约。
     expect(source).toContain('class="webqq-welcome"')
     expect(source).toContain("'is-bot': model.avatarKind === 'bot'")
     expect(source).toContain('class="webqq-welcome-status"')
-    expect(source).toContain('在线 · OneBot 机器人')
     expect(source).toContain('class="webqq-welcome-divider"')
-    expect(source).toContain('发送一条消息开始测试')
-    expect(source).toContain('在模拟 QQ 环境中体验 OneBot 的消息交互')
-    expect(source).toContain('发送消息，验证插件在模拟 QQ 环境中的响应')
-    expect(source).toContain('<ol v-else ref="messagesContentElement">')
-    // 消息操作菜单只能由气泡本身触发，消息行的头像、时间和外部留白不能成为触发区域。
-    const messageActionMenuSource = source.slice(source.indexOf('<ContextMenu v-else>'), source.indexOf('<li\n          v-if="shouldShowThinking(message)"'))
+
+    // 类别：用户可见文案。在不引入组件挂载测试的前提下，这是守住界面文案不被误删的唯一手段。
+    expectUserFacingCopies(source, [
+      '在线 · OneBot 机器人',
+      '发送一条消息开始测试',
+      '在模拟 QQ 环境中体验 OneBot 的消息交互',
+      '发送消息，验证插件在模拟 QQ 环境中的响应',
+    ])
+  })
+
+  it('消息操作菜单只能由气泡本身触发', () => {
+    const source = readSource('client/webqq-message-list.vue')
+
+    /**
+     * 类别：DOM 结构与元素顺序。
+     * 依据：触发区域是结构事实——挂到整条 `<li>` 上会让头像、时间与行内空白都能唤出菜单。
+     */
+    const messageActionMenuSource = source.slice(
+      source.indexOf('<ContextMenu v-else>'),
+      source.indexOf('<li\n          v-if="shouldShowThinking(message)"'),
+    )
     expect(messageActionMenuSource).toContain('<ContextMenuTrigger as-child :disabled="isRecalledMessage(message) || model.selectionMode">\n                      <div class="chatluna-sandbox-message-bubble"')
     expect(messageActionMenuSource).not.toContain('<ContextMenuTrigger as-child :disabled="isRecalledMessage(message) || model.selectionMode">\n            <li')
+  })
+
+  it('清空会话与跳转到对应请求的入口', () => {
+    const source = readSource('client/webqq-message-list.vue')
+    const chatPaneSource = readSource('client/webqq-chat-pane.vue')
+
+    // 类别：用户可见文案。
+    expectUserFacingCopy(source, '清空会话记录')
+    expectUserFacingCopy(source, '跳转到对应请求')
+
+    /**
+     * 类别：实现细节契约（肯定式）。
+     * 依据：两个入口都从列表冒泡到聊天区域再到页面；这段接线尚未下沉，
+     * 负责人 message-chain-behaviour-modules 06。
+     */
+    expect(source).toContain("emit('openModelRequest', message.chatLuna.modelRequests.at(-1)!)")
+    expect(chatPaneSource).toContain('@clear-conversation="emit(\'clearConversation\')"')
+    expect(chatPaneSource).toContain('@open-model-request="emit(\'openModelRequest\', $event)"')
+    expect(chatPaneSource).toContain('openModelRequest: [reference: SandboxMessageModelRequestReference]')
+    expect(chatPaneSource).toContain('clearConversation: []')
+  })
+
+  it('聊天区域装配消息列表与合并转发弹窗，自己不画消息容器', () => {
+    const chatPaneSource = readSource('client/webqq-chat-pane.vue')
+
+    // 类别：DOM 结构与元素顺序。消息容器只能有一处，否则会出现两层滚动区。
     expect(chatPaneSource).toContain('<WebqqMessageList')
     expect(chatPaneSource).toContain('<WebqqForwardModal')
     expect(chatPaneSource).toContain('@open-forward="openForwardDialog"')
@@ -94,13 +157,19 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('合并转发卡片 1:1 复刻 quote/forward 尺寸与入口文案', () => {
-    const source = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-messages.css'), 'utf8')
-    const modalSource = readFileSync(resolve('client/webqq-forward-modal.vue'), 'utf8')
-    const overlays = readFileSync(resolve('client/styles/webqq-overlays.css'), 'utf8')
+    const source = readSource('client/webqq-message-list.vue')
+    const styles = readSource('client/styles/webqq-messages.css')
+    const modalSource = readSource('client/webqq-forward-modal.vue')
+    const overlays = readSource('client/styles/webqq-overlays.css')
 
-    expect(source).toContain('查看{{ getForwardPreview(message)!.total }}条转发消息')
-    expect(source).toContain('getForwardPreview(message)?.title || \'合并转发\'')
+    /**
+     * 类别：用户可见文案。转发预览的查表判定（含「没有转发标识就不算转发」这条边界）
+     * 已下沉到 message-presentation 并由它的行为断言逐条执行，这里只守文案。
+     */
+    expectUserFacingCopy(source, '条转发消息')
+    expectUserFacingCopy(source, '合并转发')
+
+    // 类别：样式文本。
     expect(styles).toContain('.chatluna-sandbox-message-quote.chatluna-sandbox-message-forward')
     expect(styles).toContain('width: 260px')
     expect(styles).toContain('.chatluna-sandbox-message-forward-entry')
@@ -131,7 +200,7 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('显式深色主题下区分其他用户与当前操作者气泡', () => {
-    const styles = readFileSync(resolve('client/styles/webqq-messages.css'), 'utf8')
+    const styles = readSource('client/styles/webqq-messages.css')
     const darkIncomingRule = styles.indexOf(
       '.webqq-workspace[data-color-mode="dark"] .chatluna-sandbox-message-bubble {\n  --webqq-bubble-bg:',
     )
@@ -152,8 +221,8 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('按机器人参与者和逻辑会话渲染 ChatLuna 等待态', () => {
-    const source = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-messages.css'), 'utf8')
+    const source = readSource('client/webqq-message-list.vue')
+    const styles = readSource('client/styles/webqq-messages.css')
 
     expect(source).toContain('chatLunaStates: SandboxChatLunaState[]')
     expect(source).toContain("state.botParticipantId === model.currentOperatorId ? 'is-outgoing' : 'is-incoming'")
@@ -162,15 +231,16 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('思考指标 1:1 复用 onebot-webqq 的结构与交互', () => {
-    const source = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-messages.css'), 'utf8')
+    const source = readSource('client/webqq-message-list.vue')
+    const styles = readSource('client/styles/webqq-messages.css')
 
+    /**
+     * 类别：DOM 结构与元素顺序。
+     * 依据：「有思考内容」与「只有用量」的取值判定已下沉到 message-presentation
+     * 并由它的行为断言逐条执行；这里守的是两种形态各自的类名与结构。
+     */
     expect(source).toContain('class="chatluna-sandbox-thinking-row"')
-    expect(source).toContain('getMessageThinking(message)')
     expect(source).toContain('class="chatluna-sandbox-thinking-row is-usage-only"')
-    expect(source).toContain('getMessageUsage(message)')
-    // 思考归档在消息上，多轮对话后每条机器人消息各自保留指标。
-    expect(source).toContain('message.chatLuna?.thought')
     expect(source).toContain('<Transition name="chatluna-sandbox-thinking" @before-leave="prepareThinkingPanelLeave">')
     expect(source).toContain('class="chatluna-sandbox-thinking-content"')
     expect(source).toContain('chatluna-sandbox-thinking-usage-icon is-input')
@@ -189,8 +259,8 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('机器人在左侧时 Token 镜像到右侧但箭头仍紧跟思考时长', () => {
-    const source = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-messages.css'), 'utf8')
+    const source = readSource('client/webqq-message-list.vue')
+    const styles = readSource('client/styles/webqq-messages.css')
     const readRule = (selector: string) => styles.slice(styles.indexOf(`\n${selector} {`) + 1).split('}')[0]
 
     expect(source).toContain('class="chatluna-sandbox-thinking-duration"')
@@ -209,13 +279,20 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('固定 TIM 并显示消息时间与群身份', () => {
-    const source = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-messages.css'), 'utf8')
+    const source = readSource('client/webqq-message-list.vue')
+    const styles = readSource('client/styles/webqq-messages.css')
 
+    /**
+     * 类别：实现细节契约（肯定式）。
+     * 依据：时间格式化的时区尚未提成显式参数，负责人 message-chain-behaviour-modules 08。
+     * 作者名回退与群身份徽标的判定已下沉到 participant-presentation。
+     */
     expect(source).toContain('formatMessageTime(message.createdAt)')
+
+    // 类别：DOM 结构与元素顺序。
     expect(source).toContain('class="chatluna-sandbox-message-time"')
-    expect(source).toContain('getMessageAuthorName(message.authorId)')
-    expect(source).toContain('getMessageRoleBadge(message.authorId)')
+
+    // 类别：实现细节契约（否定式）。旧的整体聊天皮肤开关已删除，不得被加回来。
     expect(source).not.toContain('chatStyle')
     expect(styles).toContain('.chatluna-sandbox-message-time')
     expect(styles).toContain('opacity: 0')
@@ -229,16 +306,19 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('专属头衔复用群身份徽标位置并提供设置入口', () => {
-    const source = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-messages.css'), 'utf8')
-    const menuSource = readFileSync(resolve('client/group-member-menu.vue'), 'utf8')
-    const detailsSource = readFileSync(resolve('client/webqq-details-panel.vue'), 'utf8')
-    const overlaySource = readFileSync(resolve('client/workspace-overlay-host.vue'), 'utf8')
-    const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
+    const source = readSource('client/webqq-message-list.vue')
+    const styles = readSource('client/styles/webqq-messages.css')
+    const menuSource = readSource('client/group-member-menu.vue')
+    const detailsSource = readSource('client/webqq-details-panel.vue')
+    const overlaySource = readSource('client/workspace-overlay-host.vue')
+    const pageSource = readSource('client/page.vue')
 
-    expect(source).toContain('getGroupAuthorityBadge')
+    /**
+     * 类别：DOM 结构与元素顺序。头衔沿用同一个徽标槽位，不新增第二个徽标元素。
+     * 依据：「群主／管理员／头衔各显示什么」的判定已下沉到 participant-presentation
+     * 并由它的行为断言逐条执行。
+     */
     expect(source).toContain("emit('setGroupTitle', message.authorId)")
-    // 头衔沿用同一个徽标槽位，不新增第二个徽标元素。
     expect(source).toContain('class="webqq-role-badge"')
     expect(styles).toContain('.webqq-role-badge.is-title')
     expect(menuSource).toContain("actions.includes('set-title')")
@@ -250,20 +330,25 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('撤回消息按 markRecalledMessages 在原气泡与事件之间切换', () => {
-    const source = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-messages.css'), 'utf8')
-    const shellSource = readFileSync(resolve('client/webqq/workspace-shell.ts'), 'utf8')
+    const source = readSource('client/webqq-message-list.vue')
+    const styles = readSource('client/styles/webqq-messages.css')
+    const shellSource = readSource('client/webqq/workspace-shell.ts')
 
-    expect(source).toContain('markRecalledMessages: boolean')
-    expect(source).toContain('shouldRenderAsEvent(message)')
+    /**
+     * 类别：DOM 结构与元素顺序。
+     * 依据：「事件化」「思考与用量随撤回标记一同隐藏」两条判定已下沉到 message-presentation，
+     * 两个方向（开启／关闭撤回标记）各有行为断言；这里守的是撤回态的类名与标签结构。
+     */
     expect(source).toContain("{ 'is-recalled': isRecalledMessage(message) }")
-    expect(source).toContain('shouldShowThinking(message)')
     expect(source).toContain('class="chatluna-sandbox-message-recalled-label">已撤回</span>')
+
+    /**
+     * 类别：实现细节契约（肯定式）。
+     * 依据：多选态下右键禁用属于多选流程，负责人 message-chain-behaviour-modules 04。
+     */
     expect(source).toContain('as-child :disabled="isRecalledMessage(message) || model.selectionMode"')
-    expect(source).toContain('formatRecalledMessageEventText')
-    expect(source).toContain('isRecalledMessage(message)')
-    // 关闭配置时隐藏原文与思考；开启时保留气泡并弱化。
-    expect(source).toContain("isRecalledMessage(message) && !props.model.markRecalledMessages")
+
+    // 类别：样式文本。
     expect(styles).toContain('.chatluna-sandbox-message-row.is-recalled')
     expect(styles).toContain('.chatluna-sandbox-message-row.is-recalled .chatluna-sandbox-message-text')
     expect(styles).toContain('text-decoration-line: line-through')
@@ -279,25 +364,27 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('私聊与群聊展示表情回应，并在聊天区打开二级选择页', () => {
-    const source = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
-    const reactionsSource = readFileSync(resolve('client/webqq-message-reactions.vue'), 'utf8')
-    const pickerSource = readFileSync(resolve('client/webqq-emoji-picker.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-messages.css'), 'utf8')
-    const chatPaneSource = readFileSync(resolve('client/webqq-chat-pane.vue'), 'utf8')
-    const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
+    const source = readSource('client/webqq-message-list.vue')
+    const reactionsSource = readSource('client/webqq-message-reactions.vue')
+    const pickerSource = readSource('client/webqq-emoji-picker.vue')
+    const styles = readSource('client/styles/webqq-messages.css')
+    const chatPaneSource = readSource('client/webqq-chat-pane.vue')
+    const pageSource = readSource('client/page.vue')
 
+    // 类别：DOM 结构与元素顺序。
     expect(source).toContain('<WebqqMessageReactions')
-    expect(source).toContain('贴表情')
-    expect(source).toContain("emit('openReactionPicker', message.id)")
-    expect(source).toContain("emit('setMessageReaction', message.id, emojiId, enabled)")
-    expect(source).toContain("getMessageGroupMemberActions(message.authorId).includes('mention')")
-    expect(source).toContain("getMessageGroupMemberActions(message.authorId).includes('poke')")
-    expect(source).toMatch(/<ContextMenuItem v-if="!model\.currentGroup && getChatFriendActions\(message\.authorId\)\.includes\('poke'\)" @select="emit\('pokeFriend', message\.authorId\)">/)
-    expect(source).not.toContain('好友互动')
-    // 「创建分支」只对普通消息开放；戳一戳这类消息事件没有可分叉的对话上下文。
-    expect(source).toContain('创建分支')
-    expect(source).toContain('hasMessageGroupMemberManagementActions(message.authorId)')
     expect(source).toContain('management-only')
+
+    /**
+     * 类别：用户可见文案。
+     * 依据：「哪几个动作出现在菜单里」的取数（群成员动作、好友动作、以及决定子菜单出不出现的
+     * 那张六项管理动作表）已下沉到 participant-presentation；贴表情双闸门下沉到
+     * message-presentation。两者各有行为断言，这里只守用户读得到的那几个词。
+     */
+    expectUserFacingCopies(source, ['贴表情', '创建分支'])
+
+    // 类别：实现细节契约（否定式）。曾经的「好友互动」子菜单层级已删除，不得被加回来。
+    expect(source).not.toContain('好友互动')
     expect(reactionsSource).toContain('class="chatluna-sandbox-message-reaction"')
     expect(reactionsSource).toContain('chatluna-sandbox-message-reaction-users')
     expect(reactionsSource).not.toContain('chatluna-sandbox-message-reaction-total')
@@ -333,7 +420,7 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('继承前缀与其余四类判定都改读投影给出的能力位', () => {
-    const source = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
+    const source = readSource('client/webqq-message-list.vue')
 
     // 判定本身住在 src/message-capabilities 并由它的测试逐条执行；能力位接线由 messageList
     // 投影的行为断言守（webqq-message-capabilities.test.ts），三个写入入口各自读到自己那一位
@@ -346,12 +433,12 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('分支在继承前缀与自有消息之间显示分界，继承部分整段弱化', () => {
-    const source = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-messages.css'), 'utf8')
+    const source = readSource('client/webqq-message-list.vue')
+    const styles = readSource('client/styles/webqq-messages.css')
 
     // 分界位置与整段弱化的判定由 fork-boundary 模块的测试逐条执行；这里守的是用户可见文案与
     // 样式两类 ADR-0073 例外。
-    expect(source).toContain('以上是与原会话共享的记录，在这条分支里只读')
+    expectUserFacingCopy(source, '以上是与原会话共享的记录，在这条分支里只读')
     expect(styles).toContain('.chatluna-sandbox-fork-boundary')
     // 弱化而不是隐藏：继承部分不折叠、不默认收起，看全上下文正是复盘时要做的事。
     expect(styles).toMatch(/\.chatluna-sandbox-message-row\.is-inherited \{[^}]*opacity:/)
