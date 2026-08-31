@@ -74,6 +74,25 @@
 以及一条否定式守卫 `not.toContain('toLocaleTimeString')`——隐式取环境的旧写法不得被加回来，
 它的失效形态是「不报错，只在别的时区静默显示错的钟点」）。文件总数 190 → 192。
 
+### 评审提出的两点，在此答复
+
+**一、「调用方传入而不是由格式化器隐式取」是否真的做到了？** 生产接线是零参数调用
+（`client/webqq-message-list.vue` 的 `formatSandboxTimeOfDay(message.createdAt)`），面板上仍按
+浏览器时区渲染。这不是半成品，而是本仓库既定形状：ADR 0075 原文写着「改成 `Intl.DateTimeFormat`
+加显式 `timeZone` 参数后，**不传参仍按浏览器本地时区渲染**，用户看到的结果不变，而测试可以
+指名时区去断言边界」，并把规矩总结成「凡是判定依赖环境隐式提供的东西…都把它提成参数，
+**默认值指向真实环境**」。同仓既有的 `formatSandboxDateTime` 也是这个用法——它唯一的生产调用点
+`client/model-request-workspace.vue` 同样不传 `timeZone`。
+
+「隐式取」被消掉的是**格式化器内部**那次环境读取：此前 `toLocaleTimeString` 把时区与语言
+一起吃进去，调用方无从改变也无从断言；现在两者都是入参，谁要指名谁就传。要求生产代码显式传
+`Intl.DateTimeFormat().resolvedOptions().timeZone` 只会让调用点多读一次环境、结果一字不变，
+而且会与既有形状分叉——那正是验收项「不新造第二种写法」要避免的。
+
+**二、本轮是否只有本票一处行为变化？** 措辞需要更正：**呈现口径的唯一变化在本票；票 06 另有
+一处缺陷修复带来的位置变化**（加载更早后当前这一行不再跳走，该缺陷在票 05 Comments 里已记录
+在案）。详见票 06 的 DOM 快照一节。
+
 ### 验证
 
 `yarn test`（172 文件 / 1477 用例全通过）、`yarn typecheck`、`yarn build` 均通过。

@@ -323,6 +323,59 @@ interface ArchitectureExemption {
 }
 
 /**
+ * 已消化的文件：组件行为已经下沉成模块，剩下的肯定式断言按五类判据本来就该留——第 3 类
+ * （DOM 结构与元素顺序）与第 4 类里的接线——但规则无从按形状把它们和被禁止的实现细节断言
+ * 区分开，因此仍要登记。**棘轮不数这一组**，否则治理进度永远收敛不到零（ADR 0073）。
+ */
+const treatedAssertionExemptions: readonly ArchitectureExemption[] = ([
+  ['tests/webqq-message-list.test.ts', '消息呈现、思考面板、指针分流、滚动恢复、会话切换、加载更早与时刻格式化七块已下沉'],
+  ['tests/webqq-chat-pane.test.ts', '多选、合并转发栈与聊天记录搜索三块已下沉'],
+] as const).map(([file, owner]) => ({
+  file,
+  rule: '组件测试文件不得出现裸的肯定式源码断言',
+  reason: '该文件的组件行为已下沉成模块并由模块的行为断言执行；剩余的肯定式断言是接线与 DOM 结构契约（五类判据第 3、4 类），规则无从按形状与被禁止的实现细节断言区分。',
+  owner: `message-chain-behaviour-modules（已完成）：${owner}；若日后把接线本身也变成可执行 interface，再收掉这条豁免`,
+}))
+
+/**
+ * 尚未治理的文件。理由统一：该文件断言的组件行为尚未下沉，这些断言是它当前行为的唯一记录，
+ * 在对应 interface 抽出来之前删掉是净损失。负责人分已有架构候选与待开候选两种。
+ */
+const untreatedAssertionExemptions: readonly ArchitectureExemption[] = ([
+  // 多选的六项判定已由 message-chain-behaviour-modules 04 消化；这个文件剩下的是转发目标
+  // 对话框，它的页签、搜索与单选行为从未下沉，因此仍是未治理文件。
+  ['tests/webqq-message-selection.test.ts', '待开候选：转发目标对话框行为下沉'],
+  // 已有架构候选，本轮明确排除在外（见该 feature 的 Out of Scope）。
+  ['tests/webqq-composer.test.ts', '发送控件候选：草稿与编辑器之间的桥接'],
+  ['tests/model-request-analysis.test.ts', '分析视图候选：展开态与原文态'],
+  ['tests/webqq-model-request-workspace.test.ts', '分析视图候选：展开态与原文态'],
+  ['tests/webqq-preset-workspace.test.ts', '预设工作台候选：源文档与运行时证据关联'],
+  ['tests/model-request-read-cost.test.ts', '分析视图候选：展开态与原文态'],
+  // 尚无对应候选，登记为待开候选，等有人认领时按同一形状先抽 interface 再删断言。
+  ['tests/ai-test-spaces-ui.test.ts', '待开候选：AI 测试空间视图行为下沉'],
+  ['tests/environment-components.test.ts', '待开候选：环境管理弹层行为下沉'],
+  ['tests/evidence-navigation.test.ts', '待开候选：证据导航视图行为下沉'],
+  ['tests/friend-menu.test.ts', '待开候选：关系菜单视图行为下沉'],
+  ['tests/group-mention.test.ts', '待开候选：关系菜单视图行为下沉'],
+  ['tests/group-menu.test.ts', '待开候选：关系菜单视图行为下沉'],
+  ['tests/user-stack.test.ts', '待开候选：用户切换栈视图行为下沉'],
+  ['tests/webqq-avatar.test.ts', '待开候选：头像呈现投影下沉'],
+  ['tests/webqq-debug-workspace.test.ts', '待开候选：OneBot 调试工作台行为下沉'],
+  ['tests/webqq-details-panel.test.ts', '待开候选：详情栏行为下沉'],
+  ['tests/webqq-mcp-call-workspace.test.ts', '待开候选：MCP 调用工作台行为下沉'],
+  ['tests/webqq-page-shell.test.ts', '待开候选：页面外壳装配行为下沉'],
+  ['tests/webqq-profile-card.test.ts', '待开候选：资料卡行为下沉'],
+  ['tests/webqq-region-css.test.ts', '待开候选：区域类名结构契约转规则制守卫'],
+  ['tests/webqq-sidebar.test.ts', '待开候选：侧边栏其余行为下沉'],
+  ['tests/sandbox-extension-menu.test.ts', '待开候选：扩展动作登记表的菜单接线下沉'],
+] as const).map(([file, owner]) => ({
+  file,
+  rule: '组件测试文件不得出现裸的肯定式源码断言',
+  reason: '该文件断言的组件行为尚未下沉，这些断言是它当前行为的唯一记录；在对应 interface 抽出来之前删除是净损失。',
+  owner,
+}))
+
+/**
  * 已知违规的显式豁免清单，与守卫断言放在同一处，改客户端代码的人立刻看到。
  * 理由与负责人均为必填；豁免不是放行，是有主的债务。
  *
@@ -330,68 +383,21 @@ interface ArchitectureExemption {
  * 消化完，消息能力判定在收成共享判据时一并清掉，场景变更广播的模块级 `receive` 在收进工作区
  * 端口时消化。两条毛玻璃规则从一开始就是干净的——它们是从消息列表测试里那四条肯定式断言
  * 转过来的，转的时候实现已经合规。
- *
- * 「组件测试文件不得出现裸的肯定式源码断言」这条分两类登记。第一类是**已消化**的文件：
- * 它们的组件行为已经下沉成模块，剩下的肯定式断言是接线与 DOM 结构契约——按 ADR 0073 的五类
- * 判据本来就该保留，但规则无从按形状把它们和被禁止的实现细节断言区分开，因此仍需登记。
- * 第二类是**尚未治理**的文件，理由统一：该文件断言的组件行为尚未下沉，这些断言是它当前行为
- * 的唯一记录，在对应 interface 抽出来之前删掉是净损失；负责人分已有架构候选与待开候选两种。
  */
 const exemptions: readonly ArchitectureExemption[] = [
-  ...([
-    ['tests/webqq-message-list.test.ts', '消息呈现、思考面板、指针分流、滚动恢复、会话切换、加载更早与时刻格式化七块已下沉'],
-    ['tests/webqq-chat-pane.test.ts', '多选、合并转发栈与聊天记录搜索三块已下沉'],
-  ] as const).map(([file, owner]) => ({
-    file,
-    rule: '组件测试文件不得出现裸的肯定式源码断言',
-    reason: '该文件的组件行为已下沉成模块并由模块的行为断言执行；剩余的肯定式断言是接线与 DOM 结构契约（ADR 0073 第三类例外），规则无从按形状与被禁止的实现细节断言区分。',
-    owner: 'message-chain-behaviour-modules（已完成）：若日后把接线本身也变成可执行 interface，再收掉这条豁免',
-  })),
-  ...([
-    // 多选的六项判定已由 message-chain-behaviour-modules 04 消化；这个文件剩下的是转发目标
-    // 对话框，它的页签、搜索与单选行为从未下沉，因此仍是未治理文件。
-    ['tests/webqq-message-selection.test.ts', '待开候选：转发目标对话框行为下沉'],
-    // 已有架构候选，本轮明确排除在外（见该 feature 的 Out of Scope）。
-    ['tests/webqq-composer.test.ts', '发送控件候选：草稿与编辑器之间的桥接'],
-    ['tests/model-request-analysis.test.ts', '分析视图候选：展开态与原文态'],
-    ['tests/webqq-model-request-workspace.test.ts', '分析视图候选：展开态与原文态'],
-    ['tests/webqq-preset-workspace.test.ts', '预设工作台候选：源文档与运行时证据关联'],
-    ['tests/model-request-read-cost.test.ts', '分析视图候选：展开态与原文态'],
-    // 尚无对应候选，登记为待开候选，等有人认领时按同一形状先抽 interface 再删断言。
-    ['tests/ai-test-spaces-ui.test.ts', '待开候选：AI 测试空间视图行为下沉'],
-    ['tests/environment-components.test.ts', '待开候选：环境管理弹层行为下沉'],
-    ['tests/evidence-navigation.test.ts', '待开候选：证据导航视图行为下沉'],
-    ['tests/friend-menu.test.ts', '待开候选：关系菜单视图行为下沉'],
-    ['tests/group-mention.test.ts', '待开候选：关系菜单视图行为下沉'],
-    ['tests/group-menu.test.ts', '待开候选：关系菜单视图行为下沉'],
-    ['tests/user-stack.test.ts', '待开候选：用户切换栈视图行为下沉'],
-    ['tests/webqq-avatar.test.ts', '待开候选：头像呈现投影下沉'],
-    ['tests/webqq-debug-workspace.test.ts', '待开候选：OneBot 调试工作台行为下沉'],
-    ['tests/webqq-details-panel.test.ts', '待开候选：详情栏行为下沉'],
-    ['tests/webqq-mcp-call-workspace.test.ts', '待开候选：MCP 调用工作台行为下沉'],
-    ['tests/webqq-page-shell.test.ts', '待开候选：页面外壳装配行为下沉'],
-    ['tests/webqq-profile-card.test.ts', '待开候选：资料卡行为下沉'],
-    ['tests/webqq-region-css.test.ts', '待开候选：区域类名结构契约转规则制守卫'],
-    ['tests/webqq-sidebar.test.ts', '待开候选：侧边栏其余行为下沉'],
-    ['tests/sandbox-extension-menu.test.ts', '待开候选：扩展动作登记表的菜单接线下沉'],
-  ] as const).map(([file, owner]) => ({
-    file,
-    rule: '组件测试文件不得出现裸的肯定式源码断言',
-    reason: '该文件断言的组件行为尚未下沉，这些断言是它当前行为的唯一记录；在对应 interface 抽出来之前删除是净损失。',
-    owner,
-  })),
+  ...treatedAssertionExemptions,
+  ...untreatedAssertionExemptions,
 ]
 
 /**
- * 棘轮钉的是「已治理文件为零」而不是断言总条数。
+ * 棘轮只数**未治理**文件，且只减不增。
  *
- * 按仓库判据，这些文件里三分之二的断言（样式文本、DOM 结构与元素顺序、用户可见文案）本来
- * 就是合法的，钉总条数会让人误以为目标是把它清零，而清零会逼人删掉有架构决策依据的守卫。
- *
- * 下界不是零：已消化的那几个文件仍留着接线与 DOM 结构契约这两类合法断言，规则无从按形状
- * 区分它们，因此它们的豁免会长期在册。棘轮对余下的未治理文件照常生效。
+ * 两条理由。第一，按五类判据，这些文件里三分之二的断言（样式文本、DOM 结构与元素顺序、
+ * 用户可见文案）本来就是合法的，钉断言总条数会把「治理完成」误导成「断言归零」，而归零会逼人
+ * 删掉有架构决策依据的守卫。第二，已消化的文件不会从豁免清单里消失——它剩下的接线与结构契约
+ * 该留，规则却无从按形状区分——把两类混在一个计数里，治理进度永远收敛不到零。
  */
-const TREATED_FILE_BUDGET = 24
+const UNTREATED_FILE_BUDGET = 22
 
 /**
  * 类型声明文件不含运行时代码，`send` 在里面只是被声明的重载签名。
@@ -578,13 +584,15 @@ describe('WebQQ 模块化架构', () => {
   })
 
   /**
-   * 棘轮：未治理文件只减不增。数的是文件而不是断言条数——按仓库的五类判据，这些文件里
-   * 三分之二的断言本来就是合法的，钉总条数会把「治理完成」误导成「断言归零」。
+   * 棘轮：未治理文件只减不增。数的是文件而不是断言条数——按五类判据，这些文件里三分之二的
+   * 断言本来就是合法的，钉总条数会把「治理完成」误导成「断言归零」。已消化的文件单列一组，
+   * 不进这个计数，否则进度永远收敛不到零。
    */
   it('未治理文件数只减不增', () => {
-    const treated = exemptions.filter(({ rule }) => rule === '组件测试文件不得出现裸的肯定式源码断言')
-    expect(treated.length).toBeLessThanOrEqual(TREATED_FILE_BUDGET)
-    expect([...new Set(treated.map(({ file }) => file))].length).toBe(treated.length)
+    expect(untreatedAssertionExemptions.length).toBeLessThanOrEqual(UNTREATED_FILE_BUDGET)
+    // 同一个文件不得在两组里各登记一次，也不得在同一组里重复登记。
+    const assertionExemptions = exemptions.filter(({ rule }) => rule === '组件测试文件不得出现裸的肯定式源码断言')
+    expect([...new Set(assertionExemptions.map(({ file }) => file))].length).toBe(assertionExemptions.length)
   })
 
   it('每条豁免都写明理由与负责消化它的后续工作', () => {

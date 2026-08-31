@@ -174,7 +174,7 @@
                       </div>
                     </ContextMenuTrigger>
                   </div>
-                  <time class="chatluna-sandbox-message-time">{{ formatMessageTime(message.createdAt) }}</time>
+                  <time class="chatluna-sandbox-message-time">{{ formatSandboxTimeOfDay(message.createdAt) }}</time>
                 </div>
               </div>
               </div>
@@ -329,6 +329,7 @@ import { IconArrowBackUp, IconAt, IconBell, IconCheck, IconChecks, IconClock, Ic
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from './components/ui/context-menu'
 import { type FriendMenuState } from './webqq/friend-menu'
+// 时刻的时区与语言都是格式化模块的显式参数，缺省指向浏览器环境；这里不再包一层。
 import { formatSandboxTimeOfDay } from './webqq/format-time'
 import GroupMemberMenu from './group-member-menu.vue'
 import { getMessageClusterClass, isMergedMessage } from './webqq/message-cluster'
@@ -697,11 +698,6 @@ function getMessageAuthorName(participantId: string) {
 
 function getMessageRoleBadge(participantId: string) {
   return readMessageRoleBadge(participantId, presentation.value)
-}
-
-function formatMessageTime(createdAt: string) {
-  // 时区与语言都由格式化模块显式取，缺省指向浏览器环境；不在这里隐式读一次。
-  return formatSandboxTimeOfDay(createdAt)
 }
 
 function getFriendMenuState(targetId: string): FriendMenuState {

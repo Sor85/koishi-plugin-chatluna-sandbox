@@ -10,7 +10,7 @@ describe('WebQQ 消息列表', () => {
     const source = readSource('client/webqq-message-list.vue')
 
     /**
-     * 类别：DOM 结构与元素顺序（ADR 0073 第三类例外）。
+     * 类别：DOM 结构与元素顺序（ADR 0073 五类判据第 3 类，全留）。
      * 依据：这些类名与 `webqq-messages.css` 的选择器构成结构契约，改名会让样式静默失效。
      * 判定本身住在 message-cluster、message-presentation 两个模块，由它们的行为断言逐条执行。
      */
@@ -295,14 +295,13 @@ describe('WebQQ 消息列表', () => {
     const styles = readSource('client/styles/webqq-messages.css')
 
     /**
-     * 类别：实现细节契约（肯定式）。
+     * 类别：实现细节契约（肯定式，五类判据第 4 类里的接线）。
      * 依据：时刻格式化住在 format-time，时区与语言都是显式参数，跨日、跨年、午夜与非法输入
      * 四个边界各有行为断言。这里保留的是「气泡上真的接了那个格式化器」这条接线——
      * 接错回隐式取环境的写法不会报错，只会在别的时区静默显示错的钟点。
      * 作者名回退与群身份徽标的判定已下沉到 participant-presentation。
      */
-    expect(source).toContain('formatMessageTime(message.createdAt)')
-    expect(source).toContain('formatSandboxTimeOfDay(createdAt)')
+    expect(source).toContain('formatSandboxTimeOfDay(message.createdAt)')
 
     // 类别：实现细节契约（否定式）。隐式取运行机器时区与语言的旧写法不得被加回来。
     expect(source).not.toContain('toLocaleTimeString')
