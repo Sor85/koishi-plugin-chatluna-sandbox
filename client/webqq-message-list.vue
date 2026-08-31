@@ -520,7 +520,7 @@ function readScrollAnchorRows(element: HTMLElement): ScrollAnchorRow[] {
   })
 }
 
-/** 一次读齐容器顶缘、滚动位置与全部消息行，供加载更早历史的锚点补偿使用。 */
+/** 一次读齐容器顶缘、滚动位置与全部消息行：恢复与加载更早的锚点补偿都按这三样算。 */
 function readMessageListGeometry(): MessageListGeometry | undefined {
   const element = messagesElement.value
   if (!element) return
@@ -533,12 +533,13 @@ function readMessageListGeometry(): MessageListGeometry | undefined {
 
 function applyMessageListScrollState(state: MessageListScrollState) {
   const element = messagesElement.value
-  if (!element) return
+  const geometry = readMessageListGeometry()
+  if (!element || !geometry) return
   const outcome = resolveMessageListScrollRestore({
     state,
-    containerTop: element.getBoundingClientRect().top,
-    currentScrollTop: element.scrollTop,
-    rows: readScrollAnchorRows(element),
+    containerTop: geometry.containerTop,
+    currentScrollTop: geometry.scrollTop,
+    rows: geometry.rows,
   })
   if (outcome.kind === 'bottom') scrollMessageListToBottom(element)
   else element.scrollTop = outcome.scrollTop
