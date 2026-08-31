@@ -6,6 +6,11 @@
 
 WebQQ 的毛玻璃、气泡尾部、颜色模式和强调色由 Koishi 插件全局配置统一控制。
 
+## 灵感来源
+
+- 轨迹功能的设计灵感来源于 [DeepSeek Harness（dsh）](https://github.com/deepseek-ai/deepseek-harness)。
+- 请求体与响应体的样式来源于 [Axonhub](https://github.com/looplj/axonhub)。
+
 ## AI 测试空间
 
 测试控制端点默认开启，外部测试控制器可以创建空白且隔离的 AI 测试空间，自主准备用户、机器人、群组和关系，再通过真实 OneBot 交互验证插件行为。端点只监听回环地址且要求 Bearer 测试凭证，需先在环境管理页创建凭证才能调用。修改操作必须显式携带 `spaceId`，不会写入主模拟 QQ 环境。
