@@ -333,6 +333,13 @@ import GroupMemberMenu from './group-member-menu.vue'
 import { getMessageClusterClass, isMergedMessage } from './webqq/message-cluster'
 import { createMessageListFollowController } from './webqq/message-list-follow'
 import {
+  readPointerContext,
+  routeAvatarClick,
+  routeBubbleClick,
+  routeRowClick,
+} from './webqq/message-pointer-routing'
+import { formatThinkingDuration, freezeThinkingPanel, toggleThinkingExpansion } from './webqq/thinking-panel'
+import {
   formatMediaSize,
   getEventMessageText as readEventMessageText,
   getForwardPreview as readForwardPreview,
@@ -640,37 +647,11 @@ function isThinkingExpanded(message: SandboxMessage) {
 }
 
 function toggleThinking(message: SandboxMessage) {
-  const next = { ...expandedThinking.value }
-  if (next[message.id]) delete next[message.id]
-  else next[message.id] = true
-  expandedThinking.value = next
+  expandedThinking.value = toggleThinkingExpansion(expandedThinking.value, message.id)
 }
 
-function formatThinkingDuration(durationMs?: number) {
-  if (durationMs === undefined) return '思考过程'
-  return `已思考 ${Math.max(0, Math.round(durationMs / 1000))}s`
-}
-
-// Vue 离场节点默认会继续占住文档流，导致后续消息只能等思考面板淡出结束后才上移；
-// 这里把离场面板冻结在原视觉位置，让消息位移和面板离场同步开始。
 function prepareThinkingPanelLeave(element: Element) {
-  if (!(element instanceof HTMLElement) || !element.parentElement) return
-  const row = element.parentElement
-  const parentRect = row.getBoundingClientRect()
-  const panelRect = element.getBoundingClientRect()
-  element.style.position = 'absolute'
-  element.style.top = `${panelRect.top - parentRect.top}px`
-  // 面板脱流后思考行宽度立刻收缩成指标行宽度，水平锚点必须选收缩后位置不变的一侧
-  // （入向行左缘固定、出向行右缘固定），否则面板会在离场瞬间水平跳位。
-  if (row.classList.contains('is-incoming')) {
-    element.style.left = `${panelRect.left - parentRect.left}px`
-  } else {
-    element.style.right = `${parentRect.right - panelRect.right}px`
-  }
-  element.style.width = `${panelRect.width}px`
-  // max-width 里的 100% 同样按收缩后的行宽重算，会把冻结宽度压小、迫使单行思考内容先换行再淡出。
-  element.style.maxWidth = 'none'
-  element.style.marginTop = '0'
+  if (element instanceof HTMLElement) freezeThinkingPanel(element)
 }
 
 function getParticipantName(id: string) {
@@ -745,26 +726,31 @@ function isMessageSelected(messageId: string) {
   return !!props.model.selectedMessageIds?.includes(messageId)
 }
 
+/**
+ * 三条分流规则住在 message-pointer-routing 并由它的行为断言逐条执行；这三个处理器只把判定
+ * 结果翻译成 DOM 机械动作。能力位在每个处理器自己的函数体里读，不抽到公共辅助函数里——
+ * 架构守卫「消息动作入口必须由能力位守门」按发起点所在的最小作用域逐个判定，抽走会让它看不见。
+ */
 function handleMessageAvatarClick(message: SandboxMessage, event: MouseEvent) {
-  // 多选时头像仍属于整条消息的可选区域；不能阻断冒泡，否则点击头像无法切换勾选。
-  if (props.model.selectionMode) return
+  const action = routeAvatarClick(readPointerContext(props.model.selectionMode, capabilitiesOf(message)))
+  if (action.kind === 'none') return
   event.preventDefault()
   event.stopPropagation()
   emit('openProfile', message.authorId)
 }
 
 function handleMessageBubbleClick(message: SandboxMessage, event: MouseEvent) {
-  if (!props.model.selectionMode || !capabilitiesOf(message).forward) return
-  // 捕获阶段先于卡片、媒体和回应控件执行；多选时整颗气泡只负责切换勾选，不能误打开详情或文件。
+  const action = routeBubbleClick(readPointerContext(props.model.selectionMode, capabilitiesOf(message)))
+  if (action.kind === 'none') return
   event.preventDefault()
   event.stopPropagation()
   emit('toggleSelection', message.id)
 }
 
 function handleMessageClick(message: SandboxMessage, event: MouseEvent) {
-  if (!props.model.selectionMode || !capabilitiesOf(message).forward) return
-  // 气泡由捕获处理器统一接管；这里只覆盖头像、发送者信息和行内空白区域。
-  if ((event.target as HTMLElement | null)?.closest('.chatluna-sandbox-message-bubble')) return
+  const context = readPointerContext(props.model.selectionMode, capabilitiesOf(message))
+  const action = routeRowClick(context, event.target as HTMLElement | null)
+  if (action.kind === 'none') return
   emit('toggleSelection', message.id)
 }
 

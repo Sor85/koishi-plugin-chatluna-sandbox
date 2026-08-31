@@ -10,15 +10,15 @@ describe('WebQQ 消息多选与目标选择', () => {
     expect(source).toContain('多选')
     expect(source).toContain('selectionMode?: boolean')
     expect(source).toContain('selectedMessageIds?: string[]')
-    expect(source).toContain('function handleMessageAvatarClick(message: SandboxMessage, event: MouseEvent)')
-    expect(source).toContain('if (props.model.selectionMode) return')
+    /**
+     * 三条指针分流规则（多选下头像不阻断冒泡、气泡在捕获阶段按可转发能力位接管、
+     * 整条点击排除气泡区）已下沉到 message-pointer-routing 并由它的行为断言逐条执行。
+     * 这里只剩接线与一条否定式守卫：头像上不得出现 `.stop`，加上它多选下点头像就无法勾选。
+     */
     expect(source).toContain('@click="handleMessageAvatarClick(message, $event)"')
     expect(source).not.toContain('@click.stop="handleMessageAvatarClick')
     expect(source).toContain("emit('toggleSelection', message.id)")
     expect(source).toContain('@click.capture="handleMessageBubbleClick(message, $event)"')
-    expect(source).toContain('event.preventDefault()')
-    expect(source).toContain('event.stopPropagation()')
-    expect(source).toContain("closest('.chatluna-sandbox-message-bubble')")
     expect(source).toContain("{ 'is-selected': model.selectionMode && isMessageSelected(message.id) }")
     expect(source).not.toContain('v-if="model.selectionMode"\n                class="chatluna-sandbox-message-select-marker"')
     expect(source).toContain('class="chatluna-sandbox-message-select-marker"')

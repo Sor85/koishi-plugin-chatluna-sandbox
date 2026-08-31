@@ -241,6 +241,12 @@ describe('WebQQ 消息列表', () => {
      */
     expect(source).toContain('class="chatluna-sandbox-thinking-row"')
     expect(source).toContain('class="chatluna-sandbox-thinking-row is-usage-only"')
+    /**
+     * 类别：实现细节契约（肯定式）。
+     * 依据：离场冻结的判定（钉左缘还是钉右缘、解除宽度百分比约束）已下沉到 thinking-panel
+     * 并由它的行为断言逐条执行；这里保留的是「Transition 真的接上了那个钩子」这条接线——
+     * 钩子没接上时面板会继续占住文档流，模块的行为断言看不到这件事。
+     */
     expect(source).toContain('<Transition name="chatluna-sandbox-thinking" @before-leave="prepareThinkingPanelLeave">')
     expect(source).toContain('class="chatluna-sandbox-thinking-content"')
     expect(source).toContain('chatluna-sandbox-thinking-usage-icon is-input')
@@ -263,6 +269,7 @@ describe('WebQQ 消息列表', () => {
     const styles = readSource('client/styles/webqq-messages.css')
     const readRule = (selector: string) => styles.slice(styles.indexOf(`\n${selector} {`) + 1).split('}')[0]
 
+    // 类别：DOM 结构与元素顺序。时长文案本身由 thinking-panel 的行为断言覆盖三种输入。
     expect(source).toContain('class="chatluna-sandbox-thinking-duration"')
     expect(readRule('.chatluna-sandbox-thinking-row.is-incoming .chatluna-sandbox-thinking-duration')).toContain('order: 1')
     expect(readRule('.chatluna-sandbox-thinking-row.is-incoming .chatluna-sandbox-thinking-chevron')).toContain('order: 2')
