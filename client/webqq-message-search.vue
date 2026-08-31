@@ -130,13 +130,12 @@ import {
   calendarValueToLocalDate,
   localDateToCalendarValue,
 } from './webqq/message-search-date'
+import type { MessageSearchCriteria } from './webqq/message-search'
 import { formatMentionContent } from './webqq/mention'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 
-export interface WebqqMessageSearchCriteria {
-  query: string
-  localDate?: string
-}
+/** 面板交出的条件形状由搜索编排模块定义，两处不各写一份，免得字段悄悄分叉。 */
+export type WebqqMessageSearchCriteria = MessageSearchCriteria
 
 const props = defineProps<{
   open: boolean

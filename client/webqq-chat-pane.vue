@@ -167,7 +167,7 @@ import WebqqForwardModal from './webqq-forward-modal.vue'
 import WebqqForwardTargetDialog, { type WebqqForwardTargetModel } from './webqq-forward-target-dialog.vue'
 import WebqqImagePreview from './webqq-image-preview.vue'
 import WebqqMessageList, { type WebqqMessageListModel } from './webqq-message-list.vue'
-import WebqqMessageSearch, { type WebqqMessageSearchCriteria } from './webqq-message-search.vue'
+import WebqqMessageSearch from './webqq-message-search.vue'
 import {
   hasParentForwardFrame,
   closeForwardStack,
@@ -186,13 +186,14 @@ import {
   toggleMessageSelection,
   type MessageSelectionState,
 } from './webqq/message-selection'
-import { localDateToMessageSearchRange } from './webqq/message-search-date'
+import {
+  createMessageSearchController,
+  shouldCloseMessageSearchOnOutsidePointer,
+} from './webqq/message-search'
 import { formatMentionContent } from './webqq/mention'
-import { ensureMessageLoaded } from './webqq/message-reveal'
 import {
   type ManageSandboxEnvironmentInput,
   type SandboxForward,
-  type SandboxMessageSearchHit,
   type SandboxMessageSearchResult,
   type SandboxMessageModelRequestReference,
   type SearchConversationMessagesInput,
@@ -273,20 +274,40 @@ const previewImageUrl = ref('')
 const messageListRef = ref<{ revealMessage: (messageId: string) => boolean }>()
 const searchShellRef = ref<HTMLElement>()
 const searchTriggerRef = ref<HTMLButtonElement>()
-const searchOpen = ref(false)
-const searchDatePopoverOpen = ref(false)
-const searchLoading = ref(false)
-const searchError = ref('')
-type SearchCriteriaSnapshot = Pick<
-  SearchConversationMessagesInput,
-  'query' | 'createdAtStart' | 'createdAtEnd'
->
-const searchCriteria = ref<SearchCriteriaSnapshot>({ query: '' })
-const searchHits = ref<SandboxMessageSearchHit[]>([])
-const searchNextBeforeMessageId = ref<string>()
-const activeSearchMessageId = ref('')
-const revealingMessageId = ref('')
-let searchRequestSerial = 0
+/**
+ * 搜索的整条编排住在 message-search 并由它的行为断言逐条执行；这里只负责注入
+ * Console RPC、DOM 聚焦、下一拍与消息列表的跳转方法，并把状态解构给模板绑定。
+ */
+const messageSearch = createMessageSearchController({
+  getConversationId: () => props.model.conversationId,
+  search: (input) => new Promise<SandboxMessageSearchResult>((resolve, reject) => {
+    emit('searchConversationMessages', input, resolve, reject)
+  }),
+  isMessageLoaded: (messageId) => props.model.messageList.messages.some(({ id }) => id === messageId),
+  canLoadMore: () => !!props.model.messageList.hasMoreMessages,
+  getOldestLoadedMessageId: () => props.model.messageList.messages[0]?.id,
+  loadMore: () => new Promise<void>((resolve, reject) => emit('loadHistory', resolve, reject)),
+  revealMessage: (messageId) => messageListRef.value?.revealMessage(messageId) ?? false,
+  settle: () => nextTick(),
+  focusTrigger: () => searchTriggerRef.value?.focus(),
+  isSelectionActive: () => selectionMode.value,
+  exitSelection: () => exitSelection(),
+})
+const {
+  open: searchOpen,
+  loading: searchLoading,
+  error: searchError,
+  hits: searchHits,
+  nextBeforeMessageId: searchNextBeforeMessageId,
+  activeMessageId: activeSearchMessageId,
+  revealingMessageId,
+  datePopoverOpen: searchDatePopoverOpen,
+  close: closeSearch,
+  toggle: toggleSearch,
+  run: runSearch,
+  loadMore: loadMoreSearchHits,
+  revealHit: revealSearchHit,
+} = messageSearch
 const forwardStack = ref<ForwardDialogFrame[]>([])
 const forwardDialog = computed(() => readForwardStackTop(forwardStack.value))
 const replyingToMessage = computed(() => props.model.messageList.messages.find(({ id }) => id === replyingToMessageId.value))
@@ -313,8 +334,7 @@ watch(() => props.model.conversationId, () => {
   // 切换会话必须清空多选，避免把旧会话 messageId 误转发。
   exitSelection()
   // 搜索结果绑定当前会话；换会话后旧 hits 的 messageId 无意义。
-  resetSearchState()
-  searchOpen.value = false
+  messageSearch.leaveConversation()
 })
 
 watch(selectionMode, (active) => {
@@ -322,7 +342,7 @@ watch(selectionMode, (active) => {
     replyingToMessageId.value = ''
     reactionPickerMessageId.value = ''
     // 搜索面板与多选操作栏叠在同一区域会抢焦点；进入多选时收起搜索。
-    closeSearch()
+    void closeSearch()
     // 短胶囊仍需为消息列表保留底部安全区，避免最后一条消息被悬浮操作栏遮住。
     composerSpace.value = 64
   }
@@ -407,15 +427,17 @@ function handleSelectionKeydown(event: KeyboardEvent) {
 }
 
 function handleSearchOutsidePointerDown(event: PointerEvent) {
-  if (!searchOpen.value) return
   const target = event.target
-  if (target instanceof Node && searchShellRef.value?.contains(target)) return
-  if (target instanceof Element && target.closest('[data-chatluna-sandbox-message-search-date]')) return
-  // 日期弹层里的月/年下拉（shadcn Select）portal 到 body，不在弹层 DOM 子树内；
-  // 点击下拉选项不是"搜索外部点击"，否则会把搜索栏连同日期弹层一起关掉。
-  if (target instanceof Element && target.closest('.sandbox-select-content')) return
+  const element = target instanceof Element ? target : undefined
+  const shouldClose = shouldCloseMessageSearchOnOutsidePointer({
+    open: searchOpen.value,
+    insideShell: target instanceof Node && !!searchShellRef.value?.contains(target),
+    insideDatePopover: !!element?.closest('[data-chatluna-sandbox-message-search-date]'),
+    // 日期弹层里的月/年下拉（shadcn Select）portal 到 body，不在弹层 DOM 子树内。
+    insideSelectContent: !!element?.closest('.sandbox-select-content'),
+  })
   // 外部点击应让目标元素自然接管焦点，不能像 Escape 一样强制回焦搜索按钮。
-  void closeSearch()
+  if (shouldClose) void closeSearch()
 }
 
 onMounted(() => {
@@ -428,151 +450,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleSelectionKeydown)
   document.removeEventListener('pointerdown', handleSearchOutsidePointerDown)
 })
-
-function resetSearchState() {
-  searchRequestSerial += 1
-  searchDatePopoverOpen.value = false
-  searchLoading.value = false
-  searchError.value = ''
-  searchCriteria.value = { query: '' }
-  searchHits.value = []
-  searchNextBeforeMessageId.value = undefined
-  activeSearchMessageId.value = ''
-  revealingMessageId.value = ''
-}
-
-async function closeSearch(restoreFocus = false) {
-  searchOpen.value = false
-  resetSearchState()
-  if (!restoreFocus) return
-  await nextTick()
-  searchTriggerRef.value?.focus()
-}
-
-function toggleSearch() {
-  if (!props.model.conversationId) return
-  if (searchOpen.value) {
-    closeSearch()
-    return
-  }
-  // 搜索与多选互斥：避免同时出现悬浮操作栏与结果面板。
-  if (selectionMode.value) exitSelection()
-  searchOpen.value = true
-}
-
-function requestSearch(input: Omit<SearchConversationMessagesInput, 'operatorId'>) {
-  return new Promise<SandboxMessageSearchResult>((resolve, reject) => {
-    emit('searchConversationMessages', input, resolve, reject)
-  })
-}
-
-async function runSearch(criteria: WebqqMessageSearchCriteria) {
-  const conversationId = props.model.conversationId
-  const query = criteria.query.trim()
-  const dateRange = criteria.localDate
-    ? localDateToMessageSearchRange(criteria.localDate)
-    : undefined
-  const snapshot: SearchCriteriaSnapshot = {
-    query,
-    ...(dateRange ?? {}),
-  }
-  const serial = ++searchRequestSerial
-  searchCriteria.value = snapshot
-  activeSearchMessageId.value = ''
-  searchHits.value = []
-  searchNextBeforeMessageId.value = undefined
-  searchError.value = ''
-  if (!conversationId || (!query && !dateRange)) {
-    searchLoading.value = false
-    return
-  }
-  if (criteria.localDate && !dateRange) {
-    searchLoading.value = false
-    searchError.value = '筛选日期无效'
-    return
-  }
-
-  searchLoading.value = true
-  try {
-    const result = await requestSearch({ conversationId, ...snapshot, limit: 30 })
-    if (serial !== searchRequestSerial) return
-    searchHits.value = result.hits
-    searchNextBeforeMessageId.value = result.nextBeforeMessageId
-  } catch (error) {
-    if (serial !== searchRequestSerial) return
-    searchHits.value = []
-    searchNextBeforeMessageId.value = undefined
-    searchError.value = error instanceof Error ? error.message : '搜索会话消息失败'
-  } finally {
-    if (serial === searchRequestSerial) searchLoading.value = false
-  }
-}
-
-async function loadMoreSearchHits() {
-  const conversationId = props.model.conversationId
-  const beforeMessageId = searchNextBeforeMessageId.value
-  const criteria = searchCriteria.value
-  if (
-    !conversationId
-    || !beforeMessageId
-    || (!criteria.query && !criteria.createdAtStart)
-    || searchLoading.value
-  ) return
-
-  const serial = ++searchRequestSerial
-  searchLoading.value = true
-  searchError.value = ''
-  try {
-    const result = await requestSearch({
-      conversationId,
-      ...criteria,
-      beforeMessageId,
-      limit: 30,
-    })
-    if (serial !== searchRequestSerial) return
-    const known = new Set(searchHits.value.map(({ messageId }) => messageId))
-    searchHits.value = [
-      ...searchHits.value,
-      ...result.hits.filter(({ messageId }) => !known.has(messageId)),
-    ]
-    searchNextBeforeMessageId.value = result.nextBeforeMessageId
-  } catch (error) {
-    if (serial !== searchRequestSerial) return
-    searchError.value = error instanceof Error ? error.message : '搜索会话消息失败'
-  } finally {
-    if (serial === searchRequestSerial) searchLoading.value = false
-  }
-}
-
-async function revealSearchHit(hit: SandboxMessageSearchHit) {
-  if (revealingMessageId.value) return
-  revealingMessageId.value = hit.messageId
-  searchError.value = ''
-  try {
-    const loaded = await ensureMessageLoaded({
-      messageId: hit.messageId,
-      isLoaded: () => props.model.messageList.messages.some(({ id }) => id === hit.messageId),
-      canLoadMore: () => !!props.model.messageList.hasMoreMessages,
-      getOldestLoadedMessageId: () => props.model.messageList.messages[0]?.id,
-      loadMore: () => new Promise<void>((resolve, reject) => emit('loadHistory', resolve, reject)),
-    })
-    if (!loaded) {
-      searchError.value = '消息尚未加载，且没有更多历史消息'
-      return
-    }
-    await nextTick()
-    const revealed = messageListRef.value?.revealMessage(hit.messageId) ?? false
-    if (!revealed) {
-      searchError.value = '无法定位到该消息'
-      return
-    }
-    activeSearchMessageId.value = hit.messageId
-  } catch (error) {
-    searchError.value = error instanceof Error ? error.message : '定位消息失败'
-  } finally {
-    revealingMessageId.value = ''
-  }
-}
 
 function forwardSend(input: WebqqComposerSendIntent, resolve: () => void, reject: (error: unknown) => void) {
   emit('send', input, resolve, reject)
