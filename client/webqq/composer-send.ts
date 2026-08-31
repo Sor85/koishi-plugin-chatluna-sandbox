@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import type { SendMediaFileInput } from '../../src/types'
 
 /**
  * 发送编排：单请求锁、错误文案与动作顺序。
@@ -10,12 +11,6 @@ import { ref } from 'vue'
  * 「该不该把焦点还回输入框」留在既有的 `composer-focus`：那是一份已经有断言的判定，
  * 编排调用它而不吸收它。
  */
-
-export interface ComposerSendMedia {
-  readonly fileName: string
-  readonly mimeType: string
-  readonly dataBase64: string
-}
 
 /** 发起这一刻的读数。 */
 export interface ComposerSendRequest {
@@ -33,7 +28,7 @@ export interface ComposerSendIntent {
   readonly conversationId: string
   readonly content: string
   readonly replyToMessageId?: string
-  readonly media?: ComposerSendMedia[]
+  readonly media?: SendMediaFileInput[]
 }
 
 /** 发起发送这一刻捕获的焦点还原动作。判定由 `composer-focus` 给出，这里只是它的调用面。 */
@@ -55,7 +50,7 @@ export interface ComposerSendAdapter {
    */
   captureFocus(request: { conversationId: string, operatorId: string }): ComposerSendFocusHandle
   /** 把附件读成媒体载荷；没有附件时给 undefined。 */
-  readMedia(): Promise<ComposerSendMedia[] | undefined>
+  readMedia(): Promise<SendMediaFileInput[] | undefined>
   /** 外发一条消息。失败时抛出。 */
   deliver(intent: ComposerSendIntent): Promise<void>
   clearDraft(): void

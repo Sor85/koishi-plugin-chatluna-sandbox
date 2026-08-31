@@ -1,4 +1,5 @@
 import { ref, type Ref } from 'vue'
+import type { SendMediaFileInput } from '../../src/types'
 
 /**
  * 附件采集：选择文件与粘贴两条入口、文件名与扩展名的拆分、附件列表的增删清空、
@@ -24,12 +25,6 @@ export interface ComposerAttachment<TFile extends ComposerFileLike = ComposerFil
   readonly previewUrl?: string
   readonly baseName: string
   readonly extension: string
-}
-
-export interface ComposerAttachmentMedia {
-  readonly fileName: string
-  readonly mimeType: string
-  readonly dataBase64: string
 }
 
 /** 服务端 `MAX_MEDIA_SIZE` 硬校验 10 MB，前端预检避免白传一遍大文件后才报错。 */
@@ -122,7 +117,7 @@ export function createComposerAttachments<TFile extends ComposerFileLike = Compo
   }
 
   /** 发送时取媒体载荷。没有附件时不给载荷，而不是给一个空数组。 */
-  async function readMedia(): Promise<ComposerAttachmentMedia[] | undefined> {
+  async function readMedia(): Promise<SendMediaFileInput[] | undefined> {
     if (!attachments.value.length) return
     return Promise.all(attachments.value.map(async ({ file }) => ({
       fileName: file.name,

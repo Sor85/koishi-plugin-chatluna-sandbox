@@ -3,11 +3,11 @@ import {
   createComposerSendController,
   type ComposerSendAdapter,
   type ComposerSendIntent,
-  type ComposerSendMedia,
   type ComposerSendRequest,
 } from '../client/webqq/composer-send'
+import type { SendMediaFileInput } from '../src/types'
 
-const MEDIA: ComposerSendMedia[] = [{ fileName: 'shot.png', mimeType: 'image/png', dataBase64: 'SHOT' }]
+const MEDIA: SendMediaFileInput[] = [{ fileName: 'shot.png', mimeType: 'image/png', dataBase64: 'SHOT' }]
 
 /**
  * 造假宿主：记录动作顺序，因此「先解锁、再等一拍、再问焦点模块」这条顺序可以被断言。
@@ -16,7 +16,7 @@ const MEDIA: ComposerSendMedia[] = [{ fileName: 'shot.png', mimeType: 'image/png
  */
 function createFakeHost(overrides: {
   request?: Partial<ComposerSendRequest>
-  media?: ComposerSendMedia[] | undefined
+  media?: SendMediaFileInput[] | undefined
   mediaError?: Error
   deliverError?: Error
   shouldRestore?: boolean
