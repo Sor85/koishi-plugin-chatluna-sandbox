@@ -42,14 +42,18 @@ describe('WebQQ 消息列表', () => {
 
     /**
      * 类别：实现细节契约（肯定式）。
-     * 依据：滚动编排尚未下沉，这些断言是它当前行为的唯一记录；
-     * 负责人 message-chain-behaviour-modules 05/06。
+     * 依据：锚点选取、恢复的三分支、保存的两条边界与分趟排程已下沉到
+     * message-list-scroll-restore 并由它的 23 条行为断言逐条执行。这里保留的是**接线**：
+     * 哪几个 DOM 事件通向哪个处理器、哪个 watcher 触发保存与恢复。模块看不到接线，
+     * 少接一根线的表现是「某种滚动方式不再被识别」，而不是判定出错。
+     * 会话切换编排与容器尺寸变化的二选一仍未下沉，负责人 06。
      */
     expect(source).toContain('loadHistory: [resolve: () => void')
     expect(source).toContain('ref="messagesElement"')
     expect(source).toContain('@scroll="handleMessagesScroll"')
     expect(source).toContain("from './webqq/message-list-scroll'")
     expect(source).toContain("from './webqq/message-reveal'")
+    expect(source).toContain("from './webqq/message-list-scroll-restore'")
     expect(source).toContain('function revealMessage(messageId: string)')
     expect(source).toContain('defineExpose({')
     expect(source).toContain('createMessageListFollowController')
@@ -66,10 +70,6 @@ describe('WebQQ 消息列表', () => {
     expect(source).toContain('@wheel.passive="handleMessageListUserScroll"')
     expect(source).toContain('@touchstart.passive="handleMessageListUserScroll"')
     expect(source).toContain('@pointerdown="finishMessageListScrollRestore"')
-    expect(source).toContain('if (!messagesElement.value || restoringScrollState) return')
-    expect(source).toContain('if (restoringScrollState) scheduleMessageListScrollRestore(activeScrollStateKey)')
-    expect(source).toContain('cancelAnimationFrame(restoreSettleFrame)')
-    expect(source).toContain('follow.setStickingToBottom(false)')
     expect(source).toContain("from './webqq/message-list-follow'")
 
     // 类别：样式文本（ADR 0073 第一类例外）。浏览器的滚动锚定会和自定义恢复算术打架。

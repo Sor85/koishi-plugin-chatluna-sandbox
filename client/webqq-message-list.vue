@@ -378,11 +378,17 @@ import {
 } from './webqq/message-list-scroll'
 import {
   buildMessageListScrollStateKey,
-  calculateAnchoredMessageListScrollTop,
   readMessageListScrollState,
   writeMessageListScrollState,
   type MessageListScrollState,
 } from './webqq/message-list-scroll-state'
+import {
+  createMessageListScrollRestoreScheduler,
+  resolveMessageListScrollRestore,
+  resolveMessageListScrollSave,
+  revealMessageListMessage,
+  type ScrollAnchorRow,
+} from './webqq/message-list-scroll-restore'
 import { highlightMessageElement } from './webqq/message-reveal'
 import WebqqAvatar from './webqq-avatar.vue'
 import WebqqMessageReactions from './webqq-message-reactions.vue'
@@ -459,9 +465,6 @@ const expandedThinking = ref<Record<string, true>>({})
 const messagesElement = ref<HTMLElement>()
 const messagesContentElement = ref<HTMLOListElement>()
 let previousMessageListTail: ReturnType<typeof buildMessageListTail> | undefined
-let restoreFrame = 0
-let restoreSettleFrame = 0
-let restoringScrollState: MessageListScrollState | undefined
 let contentResizeObserver: ResizeObserver | undefined
 const follow = createMessageListFollowController({
   getBox: () => messagesElement.value,
@@ -503,94 +506,67 @@ const scrollStateKey = computed(() => buildMessageListScrollStateKey(
 ))
 let activeScrollStateKey: string | undefined
 
-function getMessageListScrollAnchor(element: HTMLElement) {
-  const containerTop = element.getBoundingClientRect().top
-  const rows = element.querySelectorAll<HTMLElement>('[data-message-id]')
-  for (const row of rows) {
+/** 从 DOM 行映射出锚点判定要的几何。映射是机械动作，判定住在模块里。 */
+function readScrollAnchorRows(element: HTMLElement): ScrollAnchorRow[] {
+  return [...element.querySelectorAll<HTMLElement>('[data-message-id]')].map((row) => {
     const rect = row.getBoundingClientRect()
-    if (rect.bottom <= containerTop) continue
-    return {
-      messageId: row.dataset.messageId!,
-      offsetTop: rect.top - containerTop,
-    }
-  }
+    return { messageId: row.dataset.messageId!, top: rect.top, bottom: rect.bottom }
+  })
 }
 
 function applyMessageListScrollState(state: MessageListScrollState) {
   const element = messagesElement.value
   if (!element) return
-  if (state.stickingToBottom) {
-    scrollMessageListToBottom(element)
-    return
-  }
-  const anchor = state.anchor
-  const anchorElement = anchor
-    ? [...element.querySelectorAll<HTMLElement>('[data-message-id]')]
-        .find((row) => row.dataset.messageId === anchor.messageId)
-    : undefined
-  if (!anchor || !anchorElement) {
-    element.scrollTop = state.scrollTop
-    return
-  }
-  element.scrollTop = calculateAnchoredMessageListScrollTop({
-    currentScrollTop: element.scrollTop,
-    currentAnchorTop: anchorElement.getBoundingClientRect().top,
+  const outcome = resolveMessageListScrollRestore({
+    state,
     containerTop: element.getBoundingClientRect().top,
-    savedAnchorOffsetTop: anchor.offsetTop,
+    currentScrollTop: element.scrollTop,
+    rows: readScrollAnchorRows(element),
   })
+  if (outcome.kind === 'bottom') scrollMessageListToBottom(element)
+  else element.scrollTop = outcome.scrollTop
 }
 
+const restore = createMessageListScrollRestoreScheduler({
+  requestAnimationFrame: (callback) => requestAnimationFrame(callback),
+  cancelAnimationFrame: (id) => cancelAnimationFrame(id),
+  apply: applyMessageListScrollState,
+  getActiveKey: () => activeScrollStateKey,
+})
+
 function saveMessageListScrollState(key = activeScrollStateKey) {
-  if (preview.value) return
-  if (restoringScrollState) {
-    writeMessageListScrollState(key, restoringScrollState)
-    return
-  }
   const element = messagesElement.value
-  if (!element) return
-  writeMessageListScrollState(key, {
-    scrollTop: element.scrollTop,
+  const next = resolveMessageListScrollSave({
+    preview: preview.value,
+    restoring: restore.restoring,
+    box: element,
     stickingToBottom: follow.stickingToBottom,
-    anchor: follow.stickingToBottom ? undefined : getMessageListScrollAnchor(element),
+    containerTop: element?.getBoundingClientRect().top ?? 0,
+    rows: element ? readScrollAnchorRows(element) : [],
   })
+  if (next) writeMessageListScrollState(key, next)
 }
 
 function scheduleMessageListScrollRestore(key: string | undefined) {
-  if (!restoringScrollState) return
-  if (restoreFrame) cancelAnimationFrame(restoreFrame)
-  if (restoreSettleFrame) cancelAnimationFrame(restoreSettleFrame)
-  restoreFrame = requestAnimationFrame(() => {
-    restoreFrame = 0
-    if (!restoringScrollState || activeScrollStateKey !== key) return
-    applyMessageListScrollState(restoringScrollState)
-    restoreSettleFrame = requestAnimationFrame(() => {
-      restoreSettleFrame = 0
-      if (!restoringScrollState || activeScrollStateKey !== key) return
-      applyMessageListScrollState(restoringScrollState)
-    })
-  })
+  restore.schedule(key)
 }
 
 function finishMessageListScrollRestore() {
-  restoringScrollState = undefined
-  if (restoreFrame) cancelAnimationFrame(restoreFrame)
-  if (restoreSettleFrame) cancelAnimationFrame(restoreSettleFrame)
-  restoreFrame = 0
-  restoreSettleFrame = 0
+  restore.finish()
 }
 
 function restoreMessageListScrollState(key: string | undefined) {
   const state = readMessageListScrollState(key)
   if (!state) return false
   follow.cancel()
-  restoringScrollState = state
+  restore.begin(state)
   follow.setStickingToBottom(state.stickingToBottom)
   void nextTick(() => scheduleMessageListScrollRestore(key))
   return true
 }
 
 function handleMessagesScroll() {
-  if (!messagesElement.value || restoringScrollState) return
+  if (!messagesElement.value || restore.restoring) return
   follow.handleScroll()
 }
 
@@ -634,7 +610,7 @@ watch([messagesElement, messagesContentElement], ([element, content]) => {
   if (!element || typeof ResizeObserver === 'undefined') return
   // 新消息中的媒体与 thinking 内容可能在 Vue 更新后继续增高；仅在 sticky 状态下补齐末尾位置。
   contentResizeObserver = new ResizeObserver(() => {
-    if (restoringScrollState) scheduleMessageListScrollRestore(activeScrollStateKey)
+    if (restore.restoring) scheduleMessageListScrollRestore(activeScrollStateKey)
     else if (follow.stickingToBottom) void follow.scheduleBottom()
   })
   contentResizeObserver.observe(element)
@@ -788,22 +764,28 @@ function getMediaSource(mediaId: string) {
 }
 
 function revealMessage(messageId: string) {
-  follow.setStickingToBottom(false)
-  follow.cancel()
-  const result = highlightMessageElement({
-    messageId,
-    root: messagesElement.value ?? document,
-    onHighlight: (id) => {
-      highlightedMessageId.value = id
+  return revealMessageListMessage({
+    stopFollowing: () => {
+      follow.setStickingToBottom(false)
+      follow.cancel()
     },
-    onClear: () => {
-      highlightedMessageId.value = ''
-      quoteHighlightTimer = undefined
+    highlight: () => {
+      const result = highlightMessageElement({
+        messageId,
+        root: messagesElement.value ?? document,
+        onHighlight: (id) => {
+          highlightedMessageId.value = id
+        },
+        onClear: () => {
+          highlightedMessageId.value = ''
+          quoteHighlightTimer = undefined
+        },
+        clearTimer: quoteHighlightTimer,
+      })
+      quoteHighlightTimer = result.clearTimer
+      return result.highlighted
     },
-    clearTimer: quoteHighlightTimer,
   })
-  quoteHighlightTimer = result.clearTimer
-  return result.highlighted
 }
 
 function scrollToQuotedMessage(messageId: string) {
