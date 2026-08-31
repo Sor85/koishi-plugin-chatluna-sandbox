@@ -129,3 +129,30 @@
 - 用例 13 个 → 19 个，第一个巨型用例（80 条断言）拆成 8 个按主题命名的用例
 - 新增行为断言 52 条：`message-presentation.test.ts` 30 条、`participant-presentation.test.ts` 22 条
 - 新增读取成本断言 9 条：`message-list-read-cost.test.ts`
+
+## 本表之后的变动记录（票 03–08）
+
+**本表的行号自票 02 落地后即失效**，失效条件写在开头：断言总数一旦变动，全表需按新提交重新分类。
+后续各票因此不再重排本表，而是逐票记录增删量与「删掉的每一条由谁接住」——后者写在各票的
+Comments 里。读本表时以下面这份账为准。
+
+`tests/webqq-message-list.test.ts` 的 `expect(...)` 条数（不含 `expectUserFacingCopy`）：
+
+| 票 | 变动 | 条数 | 用例数 |
+| --- | --- | --- | --- |
+| 02（本表基线之后） | 删 30、加 1 | 193 | 19 |
+| 03 思考面板与指针分流 | 见票 03 Comments | — | 19 |
+| 04 多选与转发栈 | 见票 04 Comments | — | 19 |
+| 05 滚动锚点与单次恢复 | 删 4、加 1 | 190 | 19 |
+| 06 会话切换与加载更早 | 删 4、加 4 | 190 | 19 |
+| 08 消息时刻时区 | 删 0、加 2（1 条接线 ＋ 1 条否定式守卫） | 192 | 19 |
+
+`tests/webqq-chat-pane.test.ts`（票 07 治理，本表不覆盖该文件）：
+
+| 票 | 变动 | 条数 | 用例数 |
+| --- | --- | --- | --- |
+| 07 前 | — | 153 | 3 |
+| 07 聊天记录搜索 | 删 8、加 5 | 150 | 11 |
+
+净新增的行为断言（票 06–08）：`message-list-conversation-switch.test.ts` 17 条、
+`message-list-history-load.test.ts` 9 条、`message-search.test.ts` 40 条、`format-time.test.ts` ＋7 条。
