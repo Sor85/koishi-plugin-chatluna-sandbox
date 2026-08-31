@@ -1,0 +1,1178 @@
+{
+  "chromiumBaseline": {
+    "consoleErrors": [],
+    "samples": [
+      {
+        "label": "群会话空态",
+        "editorHtml": "<zwsp>",
+        "caret": {
+          "kind": "none"
+        },
+        "mentionMenu": null,
+        "dataEmpty": "true",
+        "placeholderVisible": true,
+        "sendDisabled": true,
+        "rootWidth": 795,
+        "rootHtmlLength": 5981
+      },
+      {
+        "label": "点入输入框",
+        "editorHtml": "<zwsp>",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "<zwsp>",
+          "offset": 1,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": "true",
+        "placeholderVisible": true,
+        "sendDisabled": true,
+        "rootWidth": 795,
+        "rootHtmlLength": 5981
+      },
+      {
+        "label": "输入两个字符",
+        "editorHtml": "<zwsp>你好",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "<zwsp>你好",
+          "offset": 3,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5893
+      },
+      {
+        "label": "输入 @ 打开候选",
+        "editorHtml": "<zwsp>你好 @",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "<zwsp>你好 @",
+          "offset": 5,
+          "collapsed": true
+        },
+        "mentionMenu": [
+          "测试用户110001",
+          "测试用户210002",
+          "测试用户310003",
+          "Koishi20001"
+        ],
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 7286
+      },
+      {
+        "label": "方向键移动候选",
+        "editorHtml": "<zwsp>你好 @",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "<zwsp>你好 @",
+          "offset": 5,
+          "collapsed": true
+        },
+        "mentionMenu": [
+          "测试用户110001",
+          "测试用户210002",
+          "测试用户310003",
+          "Koishi20001"
+        ],
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 7286
+      },
+      {
+        "label": "Enter 选中候选",
+        "editorHtml": "你好 <span class=\"chatluna-sandbox-composer-mention\" contenteditable=\"false\" data-mention-id=\"10002\" data-mention-name=\"测试用户2\">@测试用户2</span>&nbsp;",
+        "caret": {
+          "kind": "child",
+          "childIndex": 2,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": " ",
+          "offset": 1,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 6029
+      },
+      {
+        "label": "退格一次",
+        "editorHtml": "你好 <span class=\"chatluna-sandbox-composer-mention\" contenteditable=\"false\" data-mention-id=\"10002\" data-mention-name=\"测试用户2\">@测试用户2</span>",
+        "caret": {
+          "kind": "editor",
+          "childIndex": -1,
+          "insideChild": false,
+          "nodeName": "DIV",
+          "nodeText": "你好 @测试用户2",
+          "offset": 2,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 6023
+      },
+      {
+        "label": "退格两次",
+        "editorHtml": "你好 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好 ",
+          "offset": 3,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5888
+      },
+      {
+        "label": "左移一次",
+        "editorHtml": "你好 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好 ",
+          "offset": 2,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5888
+      },
+      {
+        "label": "左移两次",
+        "editorHtml": "你好 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好 ",
+          "offset": 1,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5888
+      },
+      {
+        "label": "右移一次",
+        "editorHtml": "你好 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好 ",
+          "offset": 2,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5888
+      },
+      {
+        "label": "组字中「中文」",
+        "editorHtml": "你好中文 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好中文 ",
+          "offset": 4,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5890
+      },
+      {
+        "label": "上屏后「中文」",
+        "editorHtml": "你好中文 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好中文 ",
+          "offset": 4,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5890
+      },
+      {
+        "label": "Escape",
+        "editorHtml": "你好中文 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好中文 ",
+          "offset": 4,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5890
+      },
+      {
+        "label": "切换会话后清空",
+        "editorHtml": "<zwsp>",
+        "caret": {
+          "kind": "editor",
+          "childIndex": -1,
+          "insideChild": false,
+          "nodeName": "DIV",
+          "nodeText": "<zwsp>",
+          "offset": 0,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": "true",
+        "placeholderVisible": true,
+        "sendDisabled": true,
+        "rootWidth": 795,
+        "rootHtmlLength": 5981
+      }
+    ]
+  },
+  "chromiumAfter": {
+    "consoleErrors": [],
+    "samples": [
+      {
+        "label": "群会话空态",
+        "editorHtml": "<zwsp>",
+        "caret": {
+          "kind": "none"
+        },
+        "mentionMenu": null,
+        "dataEmpty": "true",
+        "placeholderVisible": true,
+        "sendDisabled": true,
+        "rootWidth": 795,
+        "rootHtmlLength": 5981
+      },
+      {
+        "label": "点入输入框",
+        "editorHtml": "<zwsp>",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "<zwsp>",
+          "offset": 1,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": "true",
+        "placeholderVisible": true,
+        "sendDisabled": true,
+        "rootWidth": 795,
+        "rootHtmlLength": 5981
+      },
+      {
+        "label": "输入两个字符",
+        "editorHtml": "<zwsp>你好",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "<zwsp>你好",
+          "offset": 3,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5893
+      },
+      {
+        "label": "输入 @ 打开候选",
+        "editorHtml": "<zwsp>你好 @",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "<zwsp>你好 @",
+          "offset": 5,
+          "collapsed": true
+        },
+        "mentionMenu": [
+          "测试用户110001",
+          "测试用户210002",
+          "测试用户310003",
+          "Koishi20001"
+        ],
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 7286
+      },
+      {
+        "label": "方向键移动候选",
+        "editorHtml": "<zwsp>你好 @",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "<zwsp>你好 @",
+          "offset": 5,
+          "collapsed": true
+        },
+        "mentionMenu": [
+          "测试用户110001",
+          "测试用户210002",
+          "测试用户310003",
+          "Koishi20001"
+        ],
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 7286
+      },
+      {
+        "label": "Enter 选中候选",
+        "editorHtml": "你好 <span class=\"chatluna-sandbox-composer-mention\" contenteditable=\"false\" data-mention-id=\"10002\" data-mention-name=\"测试用户2\">@测试用户2</span>&nbsp;",
+        "caret": {
+          "kind": "child",
+          "childIndex": 2,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": " ",
+          "offset": 1,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 6029
+      },
+      {
+        "label": "退格一次",
+        "editorHtml": "你好 <span class=\"chatluna-sandbox-composer-mention\" contenteditable=\"false\" data-mention-id=\"10002\" data-mention-name=\"测试用户2\">@测试用户2</span>",
+        "caret": {
+          "kind": "editor",
+          "childIndex": -1,
+          "insideChild": false,
+          "nodeName": "DIV",
+          "nodeText": "你好 @测试用户2",
+          "offset": 2,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 6023
+      },
+      {
+        "label": "退格两次",
+        "editorHtml": "你好 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好 ",
+          "offset": 3,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5888
+      },
+      {
+        "label": "左移一次",
+        "editorHtml": "你好 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好 ",
+          "offset": 2,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5888
+      },
+      {
+        "label": "左移两次",
+        "editorHtml": "你好 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好 ",
+          "offset": 1,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5888
+      },
+      {
+        "label": "右移一次",
+        "editorHtml": "你好 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好 ",
+          "offset": 2,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5888
+      },
+      {
+        "label": "组字中「中文」",
+        "editorHtml": "你好中文 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好中文 ",
+          "offset": 4,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5890
+      },
+      {
+        "label": "上屏后「中文」",
+        "editorHtml": "你好中文 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好中文 ",
+          "offset": 4,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5890
+      },
+      {
+        "label": "Escape",
+        "editorHtml": "你好中文 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好中文 ",
+          "offset": 4,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5890
+      },
+      {
+        "label": "切换会话后清空",
+        "editorHtml": "<zwsp>",
+        "caret": {
+          "kind": "editor",
+          "childIndex": -1,
+          "insideChild": false,
+          "nodeName": "DIV",
+          "nodeText": "<zwsp>",
+          "offset": 0,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": "true",
+        "placeholderVisible": true,
+        "sendDisabled": true,
+        "rootWidth": 795,
+        "rootHtmlLength": 5981
+      }
+    ]
+  },
+  "firefoxBaseline": {
+    "consoleErrors": [],
+    "samples": [
+      {
+        "label": "群会话空态",
+        "editorHtml": "<zwsp>",
+        "caret": {
+          "kind": "none"
+        },
+        "mentionMenu": null,
+        "dataEmpty": "true",
+        "placeholderVisible": true,
+        "sendDisabled": true,
+        "rootWidth": 795,
+        "rootHtmlLength": 5981
+      },
+      {
+        "label": "点入输入框",
+        "editorHtml": "<zwsp>",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "<zwsp>",
+          "offset": 1,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": "true",
+        "placeholderVisible": true,
+        "sendDisabled": true,
+        "rootWidth": 795,
+        "rootHtmlLength": 5981
+      },
+      {
+        "label": "输入两个字符",
+        "editorHtml": "<zwsp>你好",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "<zwsp>你好",
+          "offset": 3,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5893
+      },
+      {
+        "label": "输入 @ 打开候选",
+        "editorHtml": "<zwsp>你好 @",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "<zwsp>你好 @",
+          "offset": 5,
+          "collapsed": true
+        },
+        "mentionMenu": [
+          "测试用户110001",
+          "测试用户210002",
+          "测试用户310003",
+          "Koishi20001"
+        ],
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 7286
+      },
+      {
+        "label": "方向键移动候选",
+        "editorHtml": "<zwsp>你好 @",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "<zwsp>你好 @",
+          "offset": 5,
+          "collapsed": true
+        },
+        "mentionMenu": [
+          "测试用户110001",
+          "测试用户210002",
+          "测试用户310003",
+          "Koishi20001"
+        ],
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 7286
+      },
+      {
+        "label": "Enter 选中候选",
+        "editorHtml": "你好 <span class=\"chatluna-sandbox-composer-mention\" contenteditable=\"false\" data-mention-id=\"10002\" data-mention-name=\"测试用户2\">@测试用户2</span>&nbsp;",
+        "caret": {
+          "kind": "child",
+          "childIndex": 2,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": " ",
+          "offset": 1,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 6029
+      },
+      {
+        "label": "退格一次",
+        "editorHtml": "你好 <span class=\"chatluna-sandbox-composer-mention\" contenteditable=\"false\" data-mention-id=\"10002\" data-mention-name=\"测试用户2\">@测试用户2</span>",
+        "caret": {
+          "kind": "editor",
+          "childIndex": -1,
+          "insideChild": false,
+          "nodeName": "DIV",
+          "nodeText": "你好 @测试用户2",
+          "offset": 2,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 6023
+      },
+      {
+        "label": "退格两次",
+        "editorHtml": "你好 ",
+        "caret": {
+          "kind": "editor",
+          "childIndex": -1,
+          "insideChild": false,
+          "nodeName": "DIV",
+          "nodeText": "你好 ",
+          "offset": 1,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5888
+      },
+      {
+        "label": "左移一次",
+        "editorHtml": "你好 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好 ",
+          "offset": 2,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5888
+      },
+      {
+        "label": "左移两次",
+        "editorHtml": "你好 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好 ",
+          "offset": 1,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5888
+      },
+      {
+        "label": "右移一次",
+        "editorHtml": "你好 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好 ",
+          "offset": 2,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5888
+      },
+      {
+        "label": "组字中「中文」",
+        "editorHtml": "你好中文 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好中文 ",
+          "offset": 4,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5890
+      },
+      {
+        "label": "上屏后「中文」",
+        "editorHtml": "你好中文 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好中文 ",
+          "offset": 4,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5890
+      },
+      {
+        "label": "Escape",
+        "editorHtml": "你好中文 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好中文 ",
+          "offset": 4,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5890
+      },
+      {
+        "label": "切换会话后清空",
+        "editorHtml": "<zwsp>",
+        "caret": {
+          "kind": "editor",
+          "childIndex": -1,
+          "insideChild": false,
+          "nodeName": "DIV",
+          "nodeText": "<zwsp>",
+          "offset": 0,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": "true",
+        "placeholderVisible": true,
+        "sendDisabled": true,
+        "rootWidth": 795,
+        "rootHtmlLength": 5981
+      }
+    ]
+  },
+  "firefoxAfter": {
+    "consoleErrors": [],
+    "samples": [
+      {
+        "label": "群会话空态",
+        "editorHtml": "<zwsp>",
+        "caret": {
+          "kind": "none"
+        },
+        "mentionMenu": null,
+        "dataEmpty": "true",
+        "placeholderVisible": true,
+        "sendDisabled": true,
+        "rootWidth": 795,
+        "rootHtmlLength": 5981
+      },
+      {
+        "label": "点入输入框",
+        "editorHtml": "<zwsp>",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "<zwsp>",
+          "offset": 1,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": "true",
+        "placeholderVisible": true,
+        "sendDisabled": true,
+        "rootWidth": 795,
+        "rootHtmlLength": 5981
+      },
+      {
+        "label": "输入两个字符",
+        "editorHtml": "<zwsp>你好",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "<zwsp>你好",
+          "offset": 3,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5893
+      },
+      {
+        "label": "输入 @ 打开候选",
+        "editorHtml": "<zwsp>你好 @",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "<zwsp>你好 @",
+          "offset": 5,
+          "collapsed": true
+        },
+        "mentionMenu": [
+          "测试用户110001",
+          "测试用户210002",
+          "测试用户310003",
+          "Koishi20001"
+        ],
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 7286
+      },
+      {
+        "label": "方向键移动候选",
+        "editorHtml": "<zwsp>你好 @",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "<zwsp>你好 @",
+          "offset": 5,
+          "collapsed": true
+        },
+        "mentionMenu": [
+          "测试用户110001",
+          "测试用户210002",
+          "测试用户310003",
+          "Koishi20001"
+        ],
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 7286
+      },
+      {
+        "label": "Enter 选中候选",
+        "editorHtml": "你好 <span class=\"chatluna-sandbox-composer-mention\" contenteditable=\"false\" data-mention-id=\"10002\" data-mention-name=\"测试用户2\">@测试用户2</span>&nbsp;",
+        "caret": {
+          "kind": "child",
+          "childIndex": 2,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": " ",
+          "offset": 1,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 6029
+      },
+      {
+        "label": "退格一次",
+        "editorHtml": "你好 <span class=\"chatluna-sandbox-composer-mention\" contenteditable=\"false\" data-mention-id=\"10002\" data-mention-name=\"测试用户2\">@测试用户2</span>",
+        "caret": {
+          "kind": "editor",
+          "childIndex": -1,
+          "insideChild": false,
+          "nodeName": "DIV",
+          "nodeText": "你好 @测试用户2",
+          "offset": 2,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 6023
+      },
+      {
+        "label": "退格两次",
+        "editorHtml": "你好 ",
+        "caret": {
+          "kind": "editor",
+          "childIndex": -1,
+          "insideChild": false,
+          "nodeName": "DIV",
+          "nodeText": "你好 ",
+          "offset": 1,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5888
+      },
+      {
+        "label": "左移一次",
+        "editorHtml": "你好 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好 ",
+          "offset": 2,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5888
+      },
+      {
+        "label": "左移两次",
+        "editorHtml": "你好 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好 ",
+          "offset": 1,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5888
+      },
+      {
+        "label": "右移一次",
+        "editorHtml": "你好 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好 ",
+          "offset": 2,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5888
+      },
+      {
+        "label": "组字中「中文」",
+        "editorHtml": "你好中文 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好中文 ",
+          "offset": 4,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5890
+      },
+      {
+        "label": "上屏后「中文」",
+        "editorHtml": "你好中文 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好中文 ",
+          "offset": 4,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5890
+      },
+      {
+        "label": "Escape",
+        "editorHtml": "你好中文 ",
+        "caret": {
+          "kind": "child",
+          "childIndex": 0,
+          "insideChild": false,
+          "nodeName": "#text",
+          "nodeText": "你好中文 ",
+          "offset": 4,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": null,
+        "placeholderVisible": false,
+        "sendDisabled": false,
+        "rootWidth": 795,
+        "rootHtmlLength": 5890
+      },
+      {
+        "label": "切换会话后清空",
+        "editorHtml": "<zwsp>",
+        "caret": {
+          "kind": "editor",
+          "childIndex": -1,
+          "insideChild": false,
+          "nodeName": "DIV",
+          "nodeText": "<zwsp>",
+          "offset": 0,
+          "collapsed": true
+        },
+        "mentionMenu": null,
+        "dataEmpty": "true",
+        "placeholderVisible": true,
+        "sendDisabled": true,
+        "rootWidth": 795,
+        "rootHtmlLength": 5981
+      }
+    ]
+  }
+}

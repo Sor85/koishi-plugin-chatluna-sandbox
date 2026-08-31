@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { shouldRestoreComposerFocus } from '../client/webqq/composer-focus'
+import { expectUserFacingCopy } from './helpers/user-facing-copy'
 
 function createConnectedInput() {
   return {
@@ -28,25 +29,24 @@ describe('WebQQ 发送控件', () => {
     expect(composerSource).toContain('send: [input: WebqqComposerSendIntent')
     expect(composerSource).toContain('selectOperator: [participantId: string')
     expect(composerSource).toContain('manageEnvironment: [input: ManageSandboxEnvironmentInput')
-    expect(composerSource).toContain('const draft = ref<ComposerDraft>(createEmptyComposerDraft())')
     expect(composerSource).toContain('const sendFiles = ref<ComposerSendFile[]>([])')
     expect(composerSource).toContain('const sending = ref(false)')
     expect(composerSource).toContain('contenteditable')
     expect(composerSource).toContain('WebqqMentionMenu')
-    expect(composerSource).toContain('contenteditable 的 input 事件有时早于 Selection 更新')
-    expect(composerSource).toContain('void nextTick(() =>')
     expect(chatPaneSource).toContain('<WebqqComposer')
     expect(chatPaneSource).not.toContain('class="webqq-composer"')
   })
 
-  it('保留 Tooltip 与 ContextMenu 的原始嵌套边界', () => {
+  /**
+   * 接线断言，不是判定断言（ADR 0073 第 4 类）。草稿与 contenteditable 之间的双向转换、光标
+   * 读写与输入法状态住在 `composer-draft-host`，判定由它自己的行为断言执行；这里只保证组件
+   * 真的把 DOM 映射接到了那个宿主上。少接这一根线的表现是输入框完全不响应输入。
+   */
+  it('草稿与编辑器之间的桥接接在草稿宿主上', () => {
     const source = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
 
-    expect(source).toContain('<TooltipTrigger as-child>')
-    expect(source).toContain('<ContextMenu>')
-    expect(source).toContain('class="webqq-composer-user-menu" style="z-index: 160"')
-    expect(source).toContain('recordUserStackLayout')
-    expect(source).toContain("await layout.animate({ duration: 260, ease: 'out(3)' })")
+    expect(source).toContain('createComposerDraftHost')
+    expect(source).toContain('from \'./webqq/composer-draft-host\'')
   })
 
   it('发送成功或失败后仅在原会话、原操作者和原输入控件仍有效时恢复焦点', () => {
@@ -172,7 +172,6 @@ describe('WebQQ 发送控件', () => {
     expect(source).toContain('model.replyingTo || sendFiles.length')
     expect(source).not.toContain('mentions.length')
     expect(source).toContain('chatluna-sandbox-composer-mention')
-    expect(source).toContain('serializeComposerDraft')
     expect(contextIndex).toBeGreaterThan(-1)
     expect(replyIndex).toBeGreaterThan(contextIndex)
     expect(attachmentIndex).toBeGreaterThan(replyIndex)
@@ -199,7 +198,7 @@ describe('WebQQ 发送控件', () => {
     expect(source).toContain('const context = composerContextRef.value')
     expect(source).toContain('composerSpaceObserver.observe(context)')
     expect(source).not.toContain("querySelectorAll('.webqq-composer-reply, .webqq-composer-attachments')")
-    expect(source).toContain('aria-label="清除回复"')
+    expectUserFacingCopy(source, '清除回复')
   })
 
   it('深色发送者添加按钮保留中性灰底，并用主题色显示虚线与加号', () => {

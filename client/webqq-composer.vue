@@ -157,11 +157,11 @@
           :data-empty="isDraftEmpty ? 'true' : undefined"
           @keydown="handleEditorKeydown"
           @input="handleEditorInput"
-          @compositionstart="isComposing = true"
+          @compositionstart="draftHost.startComposition()"
           @compositionend="handleCompositionEnd"
           @paste="handleSendPaste"
-          @mouseup="syncDraftCaretFromDom"
-          @keyup="syncDraftCaretFromDom"
+          @mouseup="draftHost.syncCaretFromHost()"
+          @keyup="draftHost.syncCaretFromHost()"
         />
         <WebqqMentionMenu
           v-if="mentionMenuOpen"
@@ -205,18 +205,19 @@ import WebqqMentionMenu from './webqq-mention-menu.vue'
 import WebqqMenuExtensionMark from './webqq-menu-extension-mark.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import {
-  createEmptyComposerDraft,
   detectMentionTrigger,
   filterMentionCandidates,
-  insertComposerMention,
-  isComposerDraftEmpty,
-  normalizeComposerTokens,
   replaceComposerTextRange,
-  serializeComposerDraft,
   type ComposerDraft,
-  type ComposerDraftToken,
   type MentionCandidate,
 } from './webqq/composer-draft'
+import {
+  createComposerDraftHost,
+  type ComposerHostCaretReading,
+  type ComposerHostCaretTarget,
+  type ComposerHostNodePlan,
+  type ComposerHostNodeReading,
+} from './webqq/composer-draft-host'
 import { shouldRestoreComposerFocus } from './webqq/composer-focus'
 import {
   getUserStackLayoutMetrics,
@@ -283,14 +284,12 @@ interface MentionMenuState {
   query: string
 }
 
-const draft = ref<ComposerDraft>(createEmptyComposerDraft())
 const inputRef = ref<HTMLElement>()
 const mediaInputRef = ref<HTMLInputElement>()
 const sendFiles = ref<ComposerSendFile[]>([])
 const previewImageUrl = ref('')
 const sending = ref(false)
 const localError = ref('')
-const isComposing = ref(false)
 const mentionMenu = ref<MentionMenuState>()
 const mentionMenuIndex = ref(0)
 const composerLayoutRef = ref<HTMLElement>()
@@ -307,12 +306,113 @@ let suppressUserStackCollapseTimer: ReturnType<typeof setTimeout> | undefined
 let userStackOverflowMotionTimer: ReturnType<typeof setTimeout> | undefined
 let userStackLayout: AutoLayout | undefined
 let userStackTransitionUntil = 0
-let suppressEditorInput = false
 const composerInstanceId = Symbol('webqq-composer')
 let activeComposerInstanceId: symbol | undefined = composerInstanceId
 
+/**
+ * 草稿宿主的注入点。这里只做 DOM 映射：把编辑器子节点与 Selection 换成朴素结构读数，
+ * 再把节点计划与光标落点写回去。所有判定与时序都在 `composer-draft-host` 里（ADR 0075）。
+ */
+function readEditorNodes(): ComposerHostNodeReading[] | undefined {
+  const editor = inputRef.value
+  if (!editor) return undefined
+  const map = (node: Node): ComposerHostNodeReading => {
+    if (node.nodeType === Node.TEXT_NODE) return { kind: 'text', text: node.textContent ?? '' }
+    if (!(node instanceof HTMLElement)) return { kind: 'container', children: [] }
+    if (node.dataset.mentionId) {
+      return {
+        kind: 'mention',
+        id: node.dataset.mentionId,
+        name: node.dataset.mentionName || node.textContent?.replace(/^@/, '') || node.dataset.mentionId,
+      }
+    }
+    if (node.tagName === 'BR') return { kind: 'line-break' }
+    return { kind: 'container', children: Array.from(node.childNodes).map(map) }
+  }
+  return Array.from(editor.childNodes).map(map)
+}
+
+function renderEditorNodes(plan: readonly ComposerHostNodePlan[]) {
+  const editor = inputRef.value
+  if (!editor) return
+  editor.replaceChildren()
+  for (const node of plan) {
+    if (node.kind === 'text') {
+      editor.appendChild(document.createTextNode(node.text))
+      continue
+    }
+    const chip = document.createElement('span')
+    chip.className = 'chatluna-sandbox-composer-mention'
+    chip.contentEditable = 'false'
+    chip.dataset.mentionId = node.id
+    chip.dataset.mentionName = node.name
+    chip.textContent = `@${node.name}`
+    editor.appendChild(chip)
+  }
+}
+
+/** 子节点序号只数 token 节点（文本与提及芯片），与草稿 token 一一对应。 */
+function isTokenNode(node: Node) {
+  return node.nodeType === Node.TEXT_NODE || (node instanceof HTMLElement && !!node.dataset.mentionId)
+}
+
+function readEditorCaret(): ComposerHostCaretReading | undefined {
+  const editor = inputRef.value
+  const selection = window.getSelection()
+  if (!editor || !selection || selection.rangeCount === 0) return undefined
+  const range = selection.getRangeAt(0)
+  if (!editor.contains(range.startContainer)) return undefined
+  if (range.startContainer === editor) return { kind: 'editor', childOffset: range.startOffset }
+
+  let childIndex = 0
+  for (const child of Array.from(editor.childNodes)) {
+    if (child === range.startContainer || child.contains(range.startContainer)) {
+      return { kind: 'child', childIndex, offset: range.startOffset }
+    }
+    if (isTokenNode(child)) childIndex += 1
+  }
+  return { kind: 'editor', childOffset: editor.childNodes.length }
+}
+
+function writeEditorCaret(target: ComposerHostCaretTarget) {
+  const editor = inputRef.value
+  const selection = window.getSelection()
+  if (!editor || !selection) return
+  let node: Node = editor
+  let offset = editor.childNodes.length
+  if (target.kind === 'child') {
+    const child = editor.childNodes[target.childIndex]
+    if (child) {
+      node = child
+      // 空文本 token 在宿主里是一个零宽字符节点，长度是 1 而不是 0；上限只有这里知道。
+      offset = Math.min(target.offset, child.textContent?.length ?? 0)
+    }
+  }
+
+  const range = document.createRange()
+  try {
+    range.setStart(node, offset)
+    range.collapse(true)
+    selection.removeAllRanges()
+    selection.addRange(range)
+  } catch {
+    // 某些浏览器在节点刚替换时可能拒绝 setStart；忽略即可，下次输入会重新同步。
+  }
+}
+
+const draftHost = createComposerDraftHost({
+  readNodes: readEditorNodes,
+  renderNodes: renderEditorNodes,
+  readCaret: readEditorCaret,
+  writeCaret: writeEditorCaret,
+  nextTick: () => nextTick(),
+  focus: () => inputRef.value?.focus(),
+})
+const draft = draftHost.draft
+const isDraftEmpty = draftHost.isEmpty
+const isComposing = draftHost.composing
+
 const displayError = computed(() => localError.value || props.model.externalError || '')
-const isDraftEmpty = computed(() => isComposerDraftEmpty(draft.value.tokens))
 const mentionMenuOpen = computed(() => !!mentionMenu.value && !!props.model.mentionCandidates?.length)
 const filteredMentionCandidates = computed(() => {
   if (!mentionMenu.value) return []
@@ -356,15 +456,15 @@ const userOverflowStyle = computed(() => {
   }
 })
 
-watch(() => props.model.mentionRequest?.requestId, async () => {
+watch(() => props.model.mentionRequest?.requestId, () => {
   const mention = props.model.mentionRequest
   if (!mention) return
-  syncDraftCaretFromDom()
-  insertExternalMention({ id: mention.id, name: mention.name })
+  draftHost.insertMention({ id: mention.id, name: mention.name })
+  closeMentionMenu()
 })
 
 watch(() => props.model.conversationId, () => {
-  resetDraft()
+  draftHost.reset()
   closeMentionMenu()
 })
 
@@ -383,7 +483,7 @@ watch(filteredMentionCandidates, (candidates) => {
 
 onMounted(() => {
   if (preview.value) return
-  renderDraftToEditor(draft.value)
+  draftHost.render()
 })
 
 function getUserSwitchStyle(index: number) {
@@ -480,217 +580,9 @@ function clearComposerContext() {
   emit('clearReply')
 }
 
-function resetDraft() {
-  applyDraft(createEmptyComposerDraft(), { focus: false })
-}
-
 function closeMentionMenu() {
   mentionMenu.value = undefined
   mentionMenuIndex.value = 0
-}
-
-function insertExternalMention(mention: { id: string, name: string }) {
-  const current = draft.value
-  const token = current.tokens[current.tokenIndex]
-  const offset = token?.type === 'text' ? current.offset : 0
-  const next = insertComposerMention(current.tokens, current.tokenIndex, offset, mention)
-  applyDraft(next, { focus: true })
-  closeMentionMenu()
-}
-
-function applyDraft(next: ComposerDraft, options: { focus?: boolean } = {}) {
-  draft.value = {
-    tokens: normalizeComposerTokens(next.tokens),
-    tokenIndex: next.tokenIndex,
-    offset: next.offset,
-  }
-  renderDraftToEditor(draft.value)
-  if (options.focus !== false) {
-    void nextTick(() => {
-      inputRef.value?.focus()
-      setEditorCaret(draft.value.tokenIndex, draft.value.offset)
-    })
-  }
-}
-
-function renderDraftToEditor(current: ComposerDraft) {
-  const editor = inputRef.value
-  if (!editor) return
-  suppressEditorInput = true
-  editor.replaceChildren()
-  for (const token of current.tokens) {
-    if (token.type === 'text') {
-      // 空文本 token 用零宽字符提供可点击的光标锚点；读回草稿时 normalizeComposerTokens 会移除它。
-      editor.appendChild(document.createTextNode(token.text || '​'))
-      continue
-    }
-    const chip = document.createElement('span')
-    chip.className = 'chatluna-sandbox-composer-mention'
-    chip.contentEditable = 'false'
-    chip.dataset.mentionId = token.id
-    chip.dataset.mentionName = token.name
-    chip.textContent = `@${token.name}`
-    editor.appendChild(chip)
-  }
-  // 浏览器在空 contenteditable 里常插入 <br>；这里保证至少有一个文本节点，方便光标与 :empty 判定。
-  if (!editor.childNodes.length) editor.appendChild(document.createTextNode(''))
-  suppressEditorInput = false
-}
-
-function readDraftFromEditor(): ComposerDraft {
-  const editor = inputRef.value
-  if (!editor) return createEmptyComposerDraft()
-  const tokens: ComposerDraftToken[] = []
-  const walk = (node: Node) => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      tokens.push({ type: 'text', text: node.textContent ?? '' })
-      return
-    }
-    if (!(node instanceof HTMLElement)) return
-    if (node.dataset.mentionId) {
-      tokens.push({
-        type: 'mention',
-        id: node.dataset.mentionId,
-        name: node.dataset.mentionName || node.textContent?.replace(/^@/, '') || node.dataset.mentionId,
-      })
-      return
-    }
-    if (node.tagName === 'BR') {
-      tokens.push({ type: 'text', text: '\n' })
-      return
-    }
-    node.childNodes.forEach(walk)
-  }
-  editor.childNodes.forEach(walk)
-  return {
-    tokens: normalizeComposerTokens(tokens),
-    tokenIndex: draft.value.tokenIndex,
-    offset: draft.value.offset,
-  }
-}
-
-function getEditorCaret(): { tokenIndex: number, offset: number } | undefined {
-  const editor = inputRef.value
-  const selection = window.getSelection()
-  if (!editor || !selection || selection.rangeCount === 0) return undefined
-  const range = selection.getRangeAt(0)
-  if (!editor.contains(range.startContainer)) return undefined
-
-  let tokenIndex = 0
-  let offset = 0
-  let remaining = range.startOffset
-  let container: Node | null = range.startContainer
-
-  // 若光标在元素节点上，换算到子节点偏移。
-  if (container === editor) {
-    let index = 0
-    let walked = 0
-    for (const child of Array.from(editor.childNodes)) {
-      if (walked === range.startOffset) {
-        if (child.nodeType === Node.TEXT_NODE) {
-          return { tokenIndex: index, offset: 0 }
-        }
-        // 落在 mention 芯片前，优先停在前一个文本 token 末尾。
-        return { tokenIndex: Math.max(0, index - 1), offset: Number.MAX_SAFE_INTEGER }
-      }
-      if (child.nodeType === Node.TEXT_NODE) {
-        index += 1
-      } else if (child instanceof HTMLElement && child.dataset.mentionId) {
-        index += 1
-      }
-      walked += 1
-    }
-    const lastIndex = Math.max(0, draft.value.tokens.length - 1)
-    return { tokenIndex: lastIndex, offset: Number.MAX_SAFE_INTEGER }
-  }
-
-  // 将 DOM 节点映射回 token 序号。
-  const mapNodeToToken = (node: Node): number => {
-    let index = 0
-    for (const child of Array.from(editor.childNodes)) {
-      if (child === node || child.contains(node)) return index
-      if (child.nodeType === Node.TEXT_NODE || (child instanceof HTMLElement && child.dataset.mentionId)) {
-        index += 1
-      }
-    }
-    return Math.max(0, draft.value.tokens.length - 1)
-  }
-
-  if (container.nodeType === Node.TEXT_NODE) {
-    tokenIndex = mapNodeToToken(container)
-    offset = remaining
-  } else if (container instanceof HTMLElement && container.dataset.mentionId) {
-    tokenIndex = mapNodeToToken(container)
-    offset = 0
-  } else {
-    tokenIndex = mapNodeToToken(container)
-    offset = 0
-  }
-
-  const token = draft.value.tokens[tokenIndex]
-  if (token?.type === 'text') {
-    offset = Math.min(Math.max(offset, 0), token.text.length)
-  } else {
-    // mention 上的光标统一挪到后一个文本 token 起点。
-    tokenIndex = Math.min(tokenIndex + 1, draft.value.tokens.length - 1)
-    offset = 0
-  }
-  return { tokenIndex, offset }
-}
-
-function setEditorCaret(tokenIndex: number, offset: number) {
-  const editor = inputRef.value
-  if (!editor) return
-  const selection = window.getSelection()
-  if (!selection) return
-
-  let index = 0
-  let targetNode: Node | undefined
-  let targetOffset = 0
-  for (const child of Array.from(editor.childNodes)) {
-    const isToken = child.nodeType === Node.TEXT_NODE || (child instanceof HTMLElement && !!child.dataset.mentionId)
-    if (!isToken) continue
-    if (index === tokenIndex) {
-      if (child.nodeType === Node.TEXT_NODE) {
-        targetNode = child
-        targetOffset = Math.min(Math.max(offset, 0), child.textContent?.length ?? 0)
-      } else {
-        // mention 不可编辑：把光标放到其后的文本节点。
-        const next = child.nextSibling
-        targetNode = next && next.nodeType === Node.TEXT_NODE ? next : child
-        targetOffset = 0
-      }
-      break
-    }
-    index += 1
-  }
-
-  if (!targetNode) {
-    targetNode = editor
-    targetOffset = editor.childNodes.length
-  }
-
-  const range = document.createRange()
-  try {
-    range.setStart(targetNode, targetOffset)
-    range.collapse(true)
-    selection.removeAllRanges()
-    selection.addRange(range)
-  } catch {
-    // 某些浏览器在节点刚替换时可能拒绝 setStart；忽略即可，下次输入会重新同步。
-  }
-}
-
-function syncDraftCaretFromDom() {
-  const caret = getEditorCaret()
-  if (!caret) return
-  const token = draft.value.tokens[caret.tokenIndex]
-  const maxOffset = token?.type === 'text' ? token.text.length : 0
-  draft.value = {
-    ...draft.value,
-    tokenIndex: caret.tokenIndex,
-    offset: Math.min(caret.offset, maxOffset),
-  }
 }
 
 function updateMentionMenuFromDraft(current: ComposerDraft) {
@@ -716,35 +608,14 @@ function updateMentionMenuFromDraft(current: ComposerDraft) {
   mentionMenuIndex.value = 0
 }
 
-function handleEditorInput() {
-  if (suppressEditorInput) return
-  const next = readDraftFromEditor()
-  const caret = getEditorCaret()
-  draft.value = {
-    tokens: next.tokens,
-    tokenIndex: caret?.tokenIndex ?? next.tokenIndex,
-    offset: caret?.offset ?? next.offset,
-  }
+async function handleEditorInput() {
+  await draftHost.handleInput()
   updateMentionMenuFromDraft(draft.value)
-  // contenteditable 的 input 事件有时早于 Selection 更新；下一微任务重新读取，确保单独输入 @ 也立即打开菜单。
-  void nextTick(() => {
-    const currentCaret = getEditorCaret()
-    if (!currentCaret) return
-    const currentToken = draft.value.tokens[currentCaret.tokenIndex]
-    draft.value = {
-      ...draft.value,
-      tokenIndex: currentCaret.tokenIndex,
-      offset: currentToken?.type === 'text'
-        ? Math.min(currentCaret.offset, currentToken.text.length)
-        : 0,
-    }
-    updateMentionMenuFromDraft(draft.value)
-  })
 }
 
-function handleCompositionEnd() {
-  isComposing.value = false
-  handleEditorInput()
+async function handleCompositionEnd() {
+  await draftHost.endComposition()
+  updateMentionMenuFromDraft(draft.value)
 }
 
 function selectMentionCandidate(candidate: MentionCandidate) {
@@ -752,13 +623,13 @@ function selectMentionCandidate(candidate: MentionCandidate) {
   if (!menu) return
   const token = draft.value.tokens[menu.tokenIndex]
   const end = token?.type === 'text' ? draft.value.offset : menu.start
-  applyDraft(replaceComposerTextRange(
+  draftHost.apply(replaceComposerTextRange(
     draft.value.tokens,
     menu.tokenIndex,
     menu.start,
     Math.max(menu.start, end),
     { id: candidate.id, name: candidate.name },
-  ), { focus: true })
+  ))
   closeMentionMenu()
 }
 
@@ -808,7 +679,7 @@ async function selectComposerUser(sender: WebqqComposerSender) {
   const layout = recordUserStackLayout()
   try {
     await new Promise<void>((resolve, reject) => emit('selectOperator', sender.id, resolve, reject))
-    resetDraft()
+    draftHost.reset()
     closeMentionMenu()
     localError.value = ''
     await animateUserStackLayout(layout)
@@ -892,7 +763,7 @@ function readFileBase64(file: File) {
 
 async function sendMessage() {
   if (mentionMenuOpen.value) closeMentionMenu()
-  const content = serializeComposerDraft(draft.value.tokens)
+  const content = draftHost.serialize()
   const { currentOperatorId, conversationId } = props.model
   if ((!content && !sendFiles.value.length) || !currentOperatorId || !conversationId || sending.value) return
 
@@ -917,7 +788,7 @@ async function sendMessage() {
       replyToMessageId: props.model.replyingTo?.id,
       media,
     }, resolve, reject))
-    resetDraft()
+    draftHost.reset()
     clearSendFiles()
     emit('clearReply')
   } catch (error) {

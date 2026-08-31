@@ -88,4 +88,16 @@ describe('发送框用户头像组', () => {
     expect(composerSource).not.toContain('<ContextMenu v-for="(sender, index) in orderedSenders"')
     expect(composerSource).toContain('class="webqq-composer-user-menu" style="z-index: 160"')
   })
+
+  /**
+   * 接线断言，不是判定断言（ADR 0073 第 4 类）。这两条原先落在 `webqq-composer.test.ts` 里，
+   * 但它们保护的是用户切换栈的 FLIP 布局动画，与草稿、光标、发送无关，归到本文件。
+   * 少接这根线的表现是切换发送者时头像瞬移而不是滑动，不会报错。
+   */
+  it('切换发送者时对头像区做 FLIP 布局动画', () => {
+    const composerSource = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
+
+    expect(composerSource).toContain('recordUserStackLayout')
+    expect(composerSource).toContain("await layout.animate({ duration: 260, ease: 'out(3)' })")
+  })
 })
