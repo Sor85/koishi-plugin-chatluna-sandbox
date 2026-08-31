@@ -95,7 +95,7 @@ DOM 映射接到草稿宿主上，少接一根线的表现是输入框完全不�
 - 票 01 后：`tests/webqq-composer.test.ts` 79 条 → 71 条 `expect(...)` ＋ 1 条 `expectUserFacingCopy(...)`（原第 202 行的 `aria-label="清除回复"` 改走文案出口），用例 7 个 → 7 个（删掉一个用户切换栈用例，新增一个草稿宿主接线用例）
 - `tests/user-stack.test.ts` ＋2 条（挪入），用例 6 个 → 7 个
 - `tests/group-mention.test.ts` 条数不变（删 1 加 1）
-- 新增行为断言（三票合计）：`composer-draft-host.test.ts` 115 条 / 63 个用例、`composer-attachments.test.ts` 31 条 / 20 个用例、`composer-send.test.ts` 29 条 / 17 个用例
+- 新增行为断言（三票 ＋ 退格接管合计）：`composer-draft-host.test.ts` 130 条 / 72 个用例、`composer-attachments.test.ts` 31 条 / 20 个用例、`composer-send.test.ts` 29 条 / 17 个用例
 
 ## 票 02 与票 03 的变动账
 
@@ -107,3 +107,4 @@ DOM 映射接到草稿宿主上，少接一根线的表现是输入框完全不�
 | 01 草稿宿主 | 删 7、挪出 2、加 2、1 条改走文案出口 | 71 | 7 |
 | 02 提及菜单与按键路由 | 删 1（重复的元素顺序断言）、加 3（接线与否定式守卫） | 73 | 9 |
 | 03 附件与发送编排 | 删 6、加 3 | 70 | 9 |
+| 退格接管提及边界（票 02 收口） | 组件测试不动 | 70 | 9 |

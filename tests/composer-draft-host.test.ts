@@ -7,6 +7,7 @@ import {
   readComposerDraftTokens,
   resolveComposerCaretFromReading,
   resolveComposerCaretTarget,
+  isComposerMentionBoundary,
   resolveComposerMentionMenu,
   routeComposerKey,
   type ComposerDraftHostAdapter,
@@ -521,6 +522,7 @@ describe('WebQQ 发送控件草稿宿主', () => {
         disabled: false,
         composing: false,
         menuOpen: false,
+        mentionBoundary: false,
         ...overrides,
       })
     }
@@ -562,20 +564,28 @@ describe('WebQQ 发送控件草稿宿主', () => {
     })
 
     /**
-     * 退格交给宿主。提及芯片是 `contentEditable = 'false'` 的原子节点，一次退格删掉整块，
-     * 两个引擎实测一致；把它改成自己删会改变 Firefox 里 Selection 的落点表示形式。
-     * 删除后的口径由下面「退格跨提及整块删除」两条驱动。
+     * 光标贴在提及右边时退格删掉整块提及。这条改由本模块说了算，两个引擎口径因此一致，
+     * 不再依赖各家 contenteditable 对不可编辑节点的处理。
      */
-    it('退格不被消费', () => {
+    it('光标贴在提及右边时退格删掉整块提及', () => {
+      expect(route('Backspace', { mentionBoundary: true })).toEqual({ kind: 'delete-mention' })
+    })
+
+    /** 其余位置的退格照旧交给宿主：删一个字符就是删一个字符。 */
+    it('不在提及边界上的退格不被消费', () => {
       expect(route('Backspace')).toEqual({ kind: 'none' })
-      expect(route('Backspace', { menuOpen: true })).toEqual({ kind: 'none' })
+    })
+
+    /** 组字期间的退格由输入法处理未上屏的拼音，不该动草稿。 */
+    it('组字期间的退格不被消费', () => {
+      expect(route('Backspace', { mentionBoundary: true, composing: true })).toEqual({ kind: 'none' })
     })
 
     /** 发送中或没有会话时整个输入区都不接受按键，包括换行与退格。 */
     it('发送中或没有会话时吞掉所有按键', () => {
       expect(route('Enter', { disabled: true })).toEqual({ kind: 'blocked' })
       expect(route('a', { disabled: true })).toEqual({ kind: 'blocked' })
-      expect(route('Backspace', { disabled: true })).toEqual({ kind: 'blocked' })
+      expect(route('Backspace', { disabled: true, mentionBoundary: true })).toEqual({ kind: 'blocked' })
       expect(route('ArrowDown', { disabled: true, menuOpen: true })).toEqual({ kind: 'blocked' })
     })
 
@@ -710,55 +720,124 @@ describe('WebQQ 发送控件草稿宿主', () => {
   })
 
   describe('退格跨提及整块删除', () => {
+    const MENTION: ComposerDraftToken = { type: 'mention', id: '10002', name: '测试用户2' }
+
     /**
-     * 提及是原子节点：宿主里的芯片 `contentEditable = 'false'`，一次退格删掉整块，
-     * 从不留下半截 `@测试` 文本。这里驱动的是删除之后的回读口径——草稿里的提及整块消失，
-     * 光标落在提及原来的位置，而不是被夹到别处。
-     *
-     * 两个引擎（Chromium、Firefox）都实测过一次退格删掉整块；本轮不改这条接线，
-     * 见 `.scratch/composer-draft-host/issues/02-*.md` 的处置说明。
+     * 提及是原子的：一次退格删掉整块，从不留下半截 `@测试` 文本。这条规则本轮改由宿主执行
+     * 而不是各家 contenteditable，因此两个引擎口径一致，并且光标停在提及原来的位置。
      */
-    async function backspaceOver(nodes: readonly ComposerHostNodePlan[], caret: ComposerHostCaretReading) {
+    function backspaceAt(tokens: readonly ComposerDraftToken[], tokenIndex: number, offset = 0) {
       const host = createFakeHost()
       const draftHost = createComposerDraftHost(host.adapter)
-      host.state.nodes = [...nodes]
-      host.state.caret = caret
-      const settled = draftHost.handleInput()
-      await host.flush()
-      await settled
-      return draftHost
+      draftHost.apply({ tokens: [...tokens], tokenIndex, offset }, { focus: false })
+      const action = draftHost.routeKey({ key: 'Backspace', shiftKey: false, disabled: false })
+      return { host, draftHost, action }
     }
 
     it('提及位于两段文本之间时整块消失，光标停在它原来的位置', async () => {
-      const draftHost = await backspaceOver(
-        [{ kind: 'text', text: '你好 ' }, { kind: 'text', text: '在吗' }],
-        { kind: 'child', childIndex: 0, offset: 3 },
+      const { host, draftHost, action } = backspaceAt(
+        [{ type: 'text', text: '你好 ' }, MENTION, { type: 'text', text: ' 在吗' }],
+        2,
       )
+      await host.flush()
 
-      expect(draftHost.draft.value.tokens).toEqual([{ type: 'text', text: '你好 在吗' }])
-      expect(draftHost.draft.value.offset).toBe(3)
-      expect(draftHost.serialize()).toBe('你好 在吗')
+      expect(action).toEqual({ kind: 'delete-mention' })
+      expect(draftHost.draft.value.tokens).toEqual([{ type: 'text', text: '你好  在吗' }])
+      // 提及原来就在「你好 」之后，光标停在那里而不是被推到行尾。
+      expect(draftHost.draft.value).toMatchObject({ tokenIndex: 0, offset: 3 })
+      expect(host.carets.at(-1)).toEqual({ kind: 'child', childIndex: 0, offset: 3 })
     })
 
-    it('提及位于开头时整块消失，草稿回到纯文本', async () => {
-      const draftHost = await backspaceOver(
-        [{ kind: 'text', text: COMPOSER_CARET_ANCHOR }, { kind: 'text', text: '在吗' }],
-        { kind: 'child', childIndex: 1, offset: 0 },
+    it('提及位于开头时整块消失，光标落在正文起点', async () => {
+      const { host, draftHost, action } = backspaceAt(
+        [{ type: 'text', text: '' }, MENTION, { type: 'text', text: '在吗' }],
+        2,
+      )
+      await host.flush()
+
+      expect(action).toEqual({ kind: 'delete-mention' })
+      expect(draftHost.draft.value.tokens).toEqual([{ type: 'text', text: '在吗' }])
+      expect(draftHost.draft.value).toMatchObject({ tokenIndex: 0, offset: 0 })
+    })
+
+    it('提及位于末尾时整块消失，光标停在前一段文本末尾', async () => {
+      const { draftHost } = backspaceAt([{ type: 'text', text: '你好 ' }, MENTION, { type: 'text', text: '' }], 2)
+
+      expect(draftHost.draft.value.tokens).toEqual([{ type: 'text', text: '你好 ' }])
+      expect(draftHost.draft.value).toMatchObject({ tokenIndex: 0, offset: 3 })
+      expect(draftHost.serialize()).toBe('你好')
+    })
+
+    /**
+     * 选中候选后提及右边会自动补一个不换行空格，光标停在空格之后。那个位置上的退格只删掉
+     * 那个空格，提及留着——这是治理前的行为，本轮保留，因此这次按键不被消费。
+     */
+    it('光标在提及后的分隔空格之后时，退格交给宿主只删那个空格', () => {
+      const { draftHost, action } = backspaceAt(
+        [{ type: 'text', text: '你好 ' }, MENTION, { type: 'text', text: ' 在吗' }],
+        2,
+        1,
       )
 
-      expect(draftHost.draft.value.tokens).toEqual([{ type: 'text', text: '在吗' }])
-      expect(draftHost.serialize()).toBe('在吗')
+      expect(action).toEqual({ kind: 'none' })
+      // 草稿一个字都没动：这次删除由宿主执行，随后的 input 事件才把结果读回来。
+      expect(draftHost.draft.value.tokens).toEqual([
+        { type: 'text', text: '你好 ' },
+        MENTION,
+        { type: 'text', text: ' 在吗' },
+      ])
+    })
+
+    it('正文中间的退格不动提及', () => {
+      const { draftHost, action } = backspaceAt(
+        [{ type: 'text', text: '你好 ' }, MENTION, { type: 'text', text: ' 在吗' }],
+        0,
+        2,
+      )
+
+      expect(action).toEqual({ kind: 'none' })
+      expect(draftHost.draft.value.tokens).toHaveLength(3)
     })
 
     /** 删到只剩零宽锚点时草稿算空：占位文案回来，发送按钮回到禁用。 */
     it('删干净后草稿算空', async () => {
-      const draftHost = await backspaceOver(
-        [{ kind: 'text', text: COMPOSER_CARET_ANCHOR }],
-        { kind: 'child', childIndex: 0, offset: 1 },
-      )
+      const host = createFakeHost()
+      const draftHost = createComposerDraftHost(host.adapter)
+      host.state.nodes = [{ kind: 'text', text: COMPOSER_CARET_ANCHOR }]
+      host.state.caret = { kind: 'child', childIndex: 0, offset: 1 }
+      const settled = draftHost.handleInput()
+      await host.flush()
+      await settled
 
       expect(draftHost.isEmpty.value).toBe(true)
       expect(draftHost.serialize()).toBe('')
+    })
+  })
+
+  describe('提及边界的判定', () => {
+    const TOKENS: ComposerDraftToken[] = [
+      { type: 'text', text: '你好 ' },
+      { type: 'mention', id: '10002', name: '测试用户2' },
+      { type: 'text', text: ' 在吗' },
+    ]
+
+    it('光标贴在提及右边算边界', () => {
+      expect(isComposerMentionBoundary(TOKENS, 2, 0)).toBe(true)
+    })
+
+    /** 偏移 1 是自动补入的分隔空格之后，那里的退格只删空格。 */
+    it('越过分隔空格之后不算边界', () => {
+      expect(isComposerMentionBoundary(TOKENS, 2, 1)).toBe(false)
+    })
+
+    it('前面不是提及时不算边界', () => {
+      expect(isComposerMentionBoundary(TOKENS, 0, 0)).toBe(false)
+      expect(isComposerMentionBoundary([{ type: 'text', text: '你好' }], 0, 0)).toBe(false)
+    })
+
+    /** 读回光标永远不会停在提及 token 上，这一条只是把不变量钉住。 */
+    it('光标落在提及 token 上不算边界', () => {
+      expect(isComposerMentionBoundary(TOKENS, 1, 0)).toBe(false)
     })
   })
 })

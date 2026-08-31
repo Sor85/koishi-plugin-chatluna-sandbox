@@ -163,6 +163,20 @@ await sample(page, '左移两次', samples)
 await page.keyboard.press('ArrowRight')
 await sample(page, '右移一次', samples)
 
+// 提及位于两段文本之间：光标移回芯片右边再退格，整块删掉，光标应停在提及原来的位置。
+await page.keyboard.press('End')
+await page.keyboard.type(' @')
+await page.keyboard.press('Enter')
+await sample(page, '第二次选中候选', samples)
+await page.keyboard.type('在吗')
+await sample(page, '提及后再输入正文', samples)
+await page.keyboard.press('ArrowLeft')
+await page.keyboard.press('ArrowLeft')
+await page.keyboard.press('ArrowLeft')
+await sample(page, '光标移回提及右边', samples)
+await page.keyboard.press('Backspace')
+await sample(page, '两段文本之间的提及退格', samples)
+
 await composeText(page, '中文', samples)
 
 await page.keyboard.press('Escape')

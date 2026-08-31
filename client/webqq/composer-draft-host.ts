@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import {
   createEmptyComposerDraft,
+  deleteComposerBackward,
   detectMentionTrigger,
   filterMentionCandidates,
   insertComposerMention,
@@ -200,15 +201,58 @@ export function resolveComposerMentionMenu(input: {
 }
 
 export type ComposerKeyAction =
-  /** 不消费，交给宿主的默认行为：普通字符、换行、移动光标、退格。 */
+  /** 不消费，交给宿主的默认行为：普通字符、换行、移动光标、删一个字符。 */
   | { readonly kind: 'none' }
   /** 发送中或没有会话：吞掉这次按键，输入区整体不接受编辑。 */
   | { readonly kind: 'blocked' }
   | { readonly kind: 'move-candidate', readonly delta: 1 | -1 }
   | { readonly kind: 'select-candidate' }
   | { readonly kind: 'close-menu' }
+  /** 光标正贴在提及右边，这次退格删掉整块提及。 */
+  | { readonly kind: 'delete-mention' }
   /** 交回调用方去发送。发送编排不反过来问菜单开没开。 */
   | { readonly kind: 'submit' }
+
+/**
+ * 光标是不是正贴在一个提及的右边。
+ *
+ * 只认「当前是文本 token 且偏移为 0，前一个 token 是提及」这一种形状——那正是用户看到光标
+ * 紧贴芯片右侧的位置。`normalizeComposerTokens` 保证提及永远不在第 0 位，因此前一个 token 一定
+ * 存在；读回光标也永远不会停在提及 token 上（会被挪到它后面那个文本 token 的起点），
+ * 所以「光标在提及内部」这种情形已经被归一成这同一种形状。
+ *
+ * **偏移 1 不算边界。** 选中候选后提及右边会自动补一个不换行空格，光标停在空格之后（偏移 1）。
+ * 那个位置上的退格只删掉那个空格，提及留着——这是治理前的行为，本轮保留。
+ */
+export function isComposerMentionBoundary(
+  tokens: readonly ComposerDraftToken[],
+  tokenIndex: number,
+  offset: number,
+): boolean {
+  if (offset !== 0) return false
+  if (tokens[tokenIndex]?.type !== 'text') return false
+  return tokens[tokenIndex - 1]?.type === 'mention'
+}
+
+/**
+ * 退格落在提及边界上：整块删掉那个提及，光标停在它原来的位置。
+ *
+ * token 算术复用 `deleteComposerBackward`，光标不复用它给的落点：它把光标放到合并后那个文本
+ * token 的**末尾**，提及后面还有正文时那是行尾而不是提及原来的位置，表现为「删掉一个提及，
+ * 光标却跳到了行尾」。删掉提及之后前后两段文本会合并成一个 token，提及原来的位置就是
+ * 前一段文本的长度。
+ */
+export function deleteComposerMentionAtBoundary(
+  tokens: readonly ComposerDraftToken[],
+  tokenIndex: number,
+): ComposerDraft {
+  const before = tokens[tokenIndex - 2]
+  return {
+    tokens: deleteComposerBackward(tokens, tokenIndex, 0).tokens,
+    tokenIndex: Math.max(0, tokenIndex - 2),
+    offset: before?.type === 'text' ? before.text.length : 0,
+  }
+}
 
 /**
  * 这一次按键是什么意思。
@@ -216,9 +260,9 @@ export type ComposerKeyAction =
  * 「Enter 到底是发送还是选中候选」此前是组件里的一个内联条件，散在模板事件绑定与两个处理函数
  * 之间；现在由这一个函数回答，调用方只按返回值决定要不要 `preventDefault`。
  *
- * 退格不在这里消费：提及芯片是 `contentEditable = 'false'` 的原子节点，一次退格删掉整块，
- * Chromium 与 Firefox 都实测一致；改成自己删会改变 Firefox 里 Selection 落点的表示形式。
- * 删除之后的回读口径由宿主的「退格跨提及整块删除」断言执行。
+ * 退格只在提及边界上被消费，让「整块删掉提及」这条规则由本模块说了算，两个引擎口径一致；
+ * 其余位置的退格照旧交给宿主，删一个字符就是删一个字符。菜单开着时不可能同时落在提及边界上
+ * （菜单要求光标前面有 `@片段`，边界要求偏移为 0），两个分支互不相交。
  */
 export function routeComposerKey(input: {
   readonly key: string
@@ -226,6 +270,7 @@ export function routeComposerKey(input: {
   readonly disabled: boolean
   readonly composing: boolean
   readonly menuOpen: boolean
+  readonly mentionBoundary: boolean
 }): ComposerKeyAction {
   if (input.disabled) return { kind: 'blocked' }
 
@@ -238,6 +283,8 @@ export function routeComposerKey(input: {
 
   // 组字期间的 Enter 是上屏确认；shift+Enter 是换行。两者都不是发送。
   if (input.key === 'Enter' && !input.shiftKey && !input.composing) return { kind: 'submit' }
+  // 组字期间的退格由输入法处理未上屏的拼音，不该动草稿。
+  if (input.key === 'Backspace' && input.mentionBoundary && !input.composing) return { kind: 'delete-mention' }
   return { kind: 'none' }
 }
 
@@ -432,18 +479,23 @@ export function createComposerDraftHost(adapter: ComposerDraftHostAdapter) {
    * 只在 `submit` 时走发送。发送编排因此不必反过来问菜单开没开。
    */
   function routeKey(input: { key: string, shiftKey: boolean, disabled: boolean }): ComposerKeyAction {
+    const current = draft.value
     const action = routeComposerKey({
       key: input.key,
       shiftKey: input.shiftKey,
       disabled: input.disabled,
       composing: composing.value,
       menuOpen: mentionMenuOpen.value,
+      mentionBoundary: isComposerMentionBoundary(current.tokens, current.tokenIndex, current.offset),
     })
     if (action.kind === 'move-candidate') moveMentionSelection(action.delta)
     if (action.kind === 'close-menu') closeMentionMenu()
     if (action.kind === 'select-candidate') {
       const candidate = mentionCandidates.value[mentionMenuIndex.value]
       if (candidate) selectMentionCandidate(candidate)
+    }
+    if (action.kind === 'delete-mention') {
+      apply(deleteComposerMentionAtBoundary(current.tokens, current.tokenIndex))
     }
     return action
   }
