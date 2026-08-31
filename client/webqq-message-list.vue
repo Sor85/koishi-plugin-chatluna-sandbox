@@ -333,6 +333,12 @@ import GroupMemberMenu from './group-member-menu.vue'
 import { getMessageClusterClass, isMergedMessage } from './webqq/message-cluster'
 import { createMessageListFollowController } from './webqq/message-list-follow'
 import {
+  createMessageListContentResizeBinding,
+  routeMessageListContentResize,
+  switchMessageListConversation,
+} from './webqq/message-list-conversation-switch'
+import { loadEarlierMessageListHistory, type MessageListGeometry } from './webqq/message-list-history-load'
+import {
   readPointerContext,
   routeAvatarClick,
   routeBubbleClick,
@@ -465,7 +471,6 @@ const expandedThinking = ref<Record<string, true>>({})
 const messagesElement = ref<HTMLElement>()
 const messagesContentElement = ref<HTMLOListElement>()
 let previousMessageListTail: ReturnType<typeof buildMessageListTail> | undefined
-let contentResizeObserver: ResizeObserver | undefined
 const follow = createMessageListFollowController({
   getBox: () => messagesElement.value,
   nextTick,
@@ -514,6 +519,17 @@ function readScrollAnchorRows(element: HTMLElement): ScrollAnchorRow[] {
   })
 }
 
+/** 一次读齐容器顶缘、滚动位置与全部消息行，供加载更早历史的锚点补偿使用。 */
+function readMessageListGeometry(): MessageListGeometry | undefined {
+  const element = messagesElement.value
+  if (!element) return
+  return {
+    containerTop: element.getBoundingClientRect().top,
+    scrollTop: element.scrollTop,
+    rows: readScrollAnchorRows(element),
+  }
+}
+
 function applyMessageListScrollState(state: MessageListScrollState) {
   const element = messagesElement.value
   if (!element) return
@@ -555,13 +571,23 @@ function finishMessageListScrollRestore() {
   restore.finish()
 }
 
-function restoreMessageListScrollState(key: string | undefined) {
-  const state = readMessageListScrollState(key)
-  if (!state) return false
+/**
+ * 开始一次恢复：停掉贴底追踪、记下待恢复状态、下一拍起排程。
+ *
+ * 会话切换与加载更早历史共用这一段——两者的差别只在待恢复状态是从哪里来的（存下来的，
+ * 还是按加载前的锚点现算的），后续的分趟施加与防覆盖完全一样。
+ */
+function beginMessageListScrollRestore(state: MessageListScrollState, key = activeScrollStateKey) {
   follow.cancel()
   restore.begin(state)
   follow.setStickingToBottom(state.stickingToBottom)
   void nextTick(() => scheduleMessageListScrollRestore(key))
+}
+
+function restoreMessageListScrollState(key: string | undefined) {
+  const state = readMessageListScrollState(key)
+  if (!state) return false
+  beginMessageListScrollRestore(state, key)
   return true
 }
 
@@ -576,16 +602,22 @@ function handleMessageListUserScroll() {
 }
 
 watch(scrollStateKey, (nextKey, previousKey) => {
-  if (preview.value) return
-  if (previousKey) saveMessageListScrollState(previousKey)
-  finishMessageListScrollRestore()
-  follow.cancel()
-  activeScrollStateKey = nextKey
-  previousMessageListTail = messageListTail.value
-  if (restoreMessageListScrollState(nextKey)) return
-  if (!nextKey) return
-  follow.setStickingToBottom(true)
-  void follow.scheduleBottom(true)
+  switchMessageListConversation({ preview: preview.value, previousKey, nextKey }, {
+    saveScrollState: saveMessageListScrollState,
+    finishRestore: finishMessageListScrollRestore,
+    cancelFollow: () => follow.cancel(),
+    adoptKey: (key) => {
+      activeScrollStateKey = key
+      // 与状态键同拍换掉末尾签名：换会话本身不是「来了新消息」，让末尾 watcher 据此判定
+      // 会把整段历史当成新消息，进而无条件置底。
+      previousMessageListTail = messageListTail.value
+    },
+    restoreScrollState: restoreMessageListScrollState,
+    stickToBottom: () => {
+      follow.setStickingToBottom(true)
+      void follow.scheduleBottom(true)
+    },
+  })
 }, { immediate: true })
 
 watch(messageListTail, (nextTail) => {
@@ -603,18 +635,21 @@ watch(messageListTail, (nextTail) => {
   void follow.scheduleBottom()
 }, { immediate: true, flush: 'post' })
 
+// 新消息中的媒体与 thinking 内容可能在 Vue 更新后继续增高；补哪一种位置是模块里的二选一。
+const contentResize = createMessageListContentResizeBinding({
+  createObserver: (callback) => typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(callback),
+  onResize: () => {
+    const action = routeMessageListContentResize({
+      restoring: !!restore.restoring,
+      stickingToBottom: follow.stickingToBottom,
+    })
+    if (action.kind === 'reschedule-restore') scheduleMessageListScrollRestore(activeScrollStateKey)
+    else if (action.kind === 'stick-to-bottom') void follow.scheduleBottom()
+  },
+})
+
 watch([messagesElement, messagesContentElement], ([element, content]) => {
-  contentResizeObserver?.disconnect()
-  if (preview.value) return
-  contentResizeObserver = undefined
-  if (!element || typeof ResizeObserver === 'undefined') return
-  // 新消息中的媒体与 thinking 内容可能在 Vue 更新后继续增高；仅在 sticky 状态下补齐末尾位置。
-  contentResizeObserver = new ResizeObserver(() => {
-    if (restore.restoring) scheduleMessageListScrollRestore(activeScrollStateKey)
-    else if (follow.stickingToBottom) void follow.scheduleBottom()
-  })
-  contentResizeObserver.observe(element)
-  if (content) contentResizeObserver.observe(content)
+  contentResize.bind({ preview: preview.value, box: element, content })
 }, { flush: 'post' })
 
 // 思考与用量归档在消息上，因此多轮对话后每条机器人消息都保留自己的指标。
@@ -796,16 +831,17 @@ defineExpose({
   revealMessage,
 })
 
-async function loadEarlierMessages() {
-  if (historyLoading.value) return
-  historyLoading.value = true
-  try {
-    await new Promise<void>((resolve, reject) => emit('loadHistory', resolve, reject))
-  } catch {
-    // 页面控制层负责展示具体错误；列表只需要结束 loading，避免事件 Promise 泄漏为未处理拒绝。
-  } finally {
-    historyLoading.value = false
-  }
+function loadEarlierMessages() {
+  return loadEarlierMessageListHistory({
+    isLoading: () => historyLoading.value,
+    setLoading: (loading) => {
+      historyLoading.value = loading
+    },
+    isStickingToBottom: () => follow.stickingToBottom,
+    readGeometry: readMessageListGeometry,
+    requestHistory: () => new Promise<void>((resolve, reject) => emit('loadHistory', resolve, reject)),
+    restoreAnchored: beginMessageListScrollRestore,
+  })
 }
 
 onBeforeUnmount(() => {
@@ -813,6 +849,6 @@ onBeforeUnmount(() => {
   if (quoteHighlightTimer) clearTimeout(quoteHighlightTimer)
   follow.cancel()
   finishMessageListScrollRestore()
-  contentResizeObserver?.disconnect()
+  contentResize.disconnect()
 })
 </script>

@@ -42,18 +42,22 @@ describe('WebQQ 消息列表', () => {
 
     /**
      * 类别：实现细节契约（肯定式）。
-     * 依据：锚点选取、恢复的三分支、保存的两条边界与分趟排程已下沉到
-     * message-list-scroll-restore 并由它的 23 条行为断言逐条执行。这里保留的是**接线**：
-     * 哪几个 DOM 事件通向哪个处理器、哪个 watcher 触发保存与恢复。模块看不到接线，
-     * 少接一根线的表现是「某种滚动方式不再被识别」，而不是判定出错。
-     * 会话切换编排与容器尺寸变化的二选一仍未下沉，负责人 06。
+     * 依据：锚点选取、恢复的三分支、保存的两条边界与分趟排程住在 message-list-scroll-restore；
+     * 会话切换的五步顺序、容器尺寸变化的二选一与观察器的建立断开住在
+     * message-list-conversation-switch；加载更早历史的闸门、拒绝吞掉与锚点补偿住在
+     * message-list-history-load。三者各有行为断言逐条执行。
+     *
+     * 这里保留的是**接线**：哪几个 DOM 事件通向哪个处理器、哪个 watcher 触发切换编排与观察器
+     * 绑定、卸载时断开哪些东西。模块看不到接线，少接一根线的表现是「某种滚动方式不再被识别」，
+     * 而不是判定出错。
      */
-    expect(source).toContain('loadHistory: [resolve: () => void')
     expect(source).toContain('ref="messagesElement"')
     expect(source).toContain('@scroll="handleMessagesScroll"')
     expect(source).toContain("from './webqq/message-list-scroll'")
     expect(source).toContain("from './webqq/message-reveal'")
     expect(source).toContain("from './webqq/message-list-scroll-restore'")
+    expect(source).toContain("from './webqq/message-list-conversation-switch'")
+    expect(source).toContain("from './webqq/message-list-history-load'")
     expect(source).toContain('function revealMessage(messageId: string)')
     expect(source).toContain('defineExpose({')
     expect(source).toContain('createMessageListFollowController')
@@ -61,11 +65,10 @@ describe('WebQQ 消息列表', () => {
     expect(source).toContain('follow.handleScroll()')
     expect(source).toContain('follow.handleUserScrollIntent()')
     expect(source).toContain('follow.scheduleBottom')
-    expect(source).toContain('new ResizeObserver')
-    expect(source).toContain('contentResizeObserver?.disconnect()')
+    expect(source).toContain('contentResize.bind(')
+    expect(source).toContain('contentResize.disconnect()')
     expect(source).toContain('watch(scrollStateKey')
     expect(source).toContain('saveMessageListScrollState()')
-    expect(source).toContain('restoreMessageListScrollState(nextKey)')
     expect(source).toContain("from './webqq/message-list-scroll-state'")
     expect(source).toContain('@wheel.passive="handleMessageListUserScroll"')
     expect(source).toContain('@touchstart.passive="handleMessageListUserScroll"')
@@ -136,8 +139,10 @@ describe('WebQQ 消息列表', () => {
 
     /**
      * 类别：实现细节契约（肯定式）。
-     * 依据：两个入口都从列表冒泡到聊天区域再到页面；这段接线尚未下沉，
-     * 负责人 message-chain-behaviour-modules 06。
+     * 依据：两个入口都从列表冒泡到聊天区域再到页面。这段接线是纯转发管道，按本轮规格
+     * 「不下沉的三块」明确留在组件里——把它下沉不会集中复杂度，只会搬家；因此这里的断言
+     * 是这条管道唯一的观察面。客户端守卫「消息动作入口必须由能力位守门」已经把它判为管道
+     * 而不是动作入口，两者口径一致。
      */
     expect(source).toContain("emit('openModelRequest', message.chatLuna.modelRequests.at(-1)!)")
     expect(chatPaneSource).toContain('@clear-conversation="emit(\'clearConversation\')"')
