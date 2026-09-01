@@ -110,7 +110,7 @@ describe('模型请求记录持久化与生命周期', () => {
     await control.waitForPersistence()
 
     expect((await control.getModelRequestRecords()).records.map(({ model }) => model)).toEqual(['current-model'])
-    expect(await control.getModelRequestRecord({ recordId: 'legacy' }).catch(() => 'missing')).toBe('missing')
+    expect(await control.getModelRequestStore().requireRecord('legacy').catch(() => 'missing')).toBe('missing')
   })
 
   it('共享内存 Adapter 后跨控制服务实例恢复记录，且 sequence 不回退', async () => {

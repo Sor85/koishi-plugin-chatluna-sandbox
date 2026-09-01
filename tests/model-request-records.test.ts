@@ -3,7 +3,7 @@ import {
   SandboxModelRequestStore,
   createModelRequestError,
 } from '../src/model-request'
-import { SandboxModelRequestCursorExpiredError, type SandboxPresetRuntimeSnapshot } from '../src/types'
+import { SandboxDomainError, SandboxModelRequestCursorExpiredError, type SandboxPresetRuntimeSnapshot } from '../src/types'
 import {
   aiSdkRequest,
   anthropicMessagesRequest,
@@ -206,6 +206,19 @@ describe('模型请求记录库', () => {
     appendRecord(store, { model: 'two' })
     expect((await store.getRecords({ order: 'asc' })).records.map(({ model }) => model)).toEqual(['one', 'two'])
     expect((await store.getRecords({ order: 'desc' })).records.map(({ model }) => model)).toEqual(['two', 'one'])
+  })
+
+  /**
+   * 「这条记录在不在」由记录库判定。两种读取并存而不是互相替代：跨记录域遍历要靠返回空值
+   * 区分「这个域里没有」与「这个域坏了」，因此不能只留抛出的那一个。
+   */
+  it('取不到返回空值与取不到就抛并存，抛的是领域错误且消息含记录标识', async () => {
+    const store = new SandboxModelRequestStore()
+    appendRecord(store, { model: 'one' })
+
+    expect(await store.getRecord('不存在的记录')).toBeUndefined()
+    await expect(store.requireRecord('不存在的记录')).rejects.toThrow(SandboxDomainError)
+    await expect(store.requireRecord('不存在的记录')).rejects.toThrow('模型请求记录不存在：不存在的记录')
   })
 })
 

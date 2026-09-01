@@ -1383,10 +1383,10 @@ export class SandboxMcpService {
     if (tool === 'get_onebot_debug_record') {
       try {
         await activeControl.waitForPersistence()
-        return await activeControl.getOneBotDebugRecord({
-          recordId: requireString(args.recordId, 'recordId'),
-          includeLargeValues: args.includeLargeValues === true,
-        })
+        return await activeControl.getOneBotDebugStore().requireRecord(
+          requireString(args.recordId, 'recordId'),
+          args.includeLargeValues === true,
+        )
       } catch (error) {
         throw new SandboxMcpError('record_not_found', error instanceof Error ? error.message : '调试记录不存在')
       }
@@ -1959,13 +1959,9 @@ export class SandboxMcpService {
       return { ...hit.value, source: this.describeRecordScope(hit.scope) }
     }
     try {
-      if (scope.kind === 'unattributed') {
-        const record = await this.requireUnattributedModelRequests().getRecord(recordId)
-        if (!record) throw new Error(`模型请求记录不存在：${recordId}`)
-        return record
-      }
-      if (scope.kind === 'main') return await this.control.getModelRequestRecord({ recordId })
-      return await this.resolveControl({ spaceId: scope.spaceId }, false).getModelRequestRecord({ recordId })
+      if (scope.kind === 'unattributed') return await this.requireUnattributedModelRequests().requireRecord(recordId)
+      if (scope.kind === 'main') return await this.control.getModelRequestStore().requireRecord(recordId)
+      return await this.resolveControl({ spaceId: scope.spaceId }, false).getModelRequestStore().requireRecord(recordId)
     } catch (error) {
       if (error instanceof SandboxMcpError) throw error
       throw new SandboxMcpError('record_not_found', error instanceof Error ? error.message : '模型请求记录不存在')

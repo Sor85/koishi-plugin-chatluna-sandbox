@@ -403,6 +403,19 @@ export class SandboxModelRequestStore {
     return record ? presentModelRequestDetail(record) : undefined
   }
 
+  /**
+   * 「这条模型请求记录在不在」由本记录库判定，取不到就抛。
+   *
+   * 与 `getRecord` 并存而不是替代它：本成员服务于「调用方就是要这条记录」，`getRecord` 服务于
+   * 跨记录域遍历——遍历必须能区分「这个记录域里没有」与「这个记录域的持久化坏了」，用异常表达
+   * 未命中会让一次真实故障被当成「这里没有」静默跳过。
+   */
+  async requireRecord(recordId: string): Promise<SandboxModelRequestDetail> {
+    const record = await this.getRecord(recordId)
+    if (!record) throw new SandboxDomainError(`模型请求记录不存在：${recordId}`)
+    return record
+  }
+
   async getRawRecords(input: GetSandboxModelRequestRecordsInput = {}): Promise<SandboxModelRequestRecord[]> {
     const limit = Math.min(Math.max(Number(input.limit ?? MAX_MODEL_REQUEST_PAGE_SIZE) || MAX_MODEL_REQUEST_PAGE_SIZE, 1), MAX_MODEL_REQUEST_PAGE_SIZE)
     await this.settle()

@@ -191,7 +191,7 @@ describe('ChatLuna 多机器人对话状态', () => {
     await emitChatLunaEvent(app, 'chatluna/after-chat-error', { errorCode: 103, message: 'API 请求失败 (103)' }, 'chatluna:shared-error')
 
     await control.waitForPersistence()
-    expect((await control.getModelRequestRecord({ recordId: request.id })).chatlunaError).toBeUndefined()
+    expect((await control.getModelRequestStore().requireRecord(request.id)).chatlunaError).toBeUndefined()
   })
 
   it('兼容 chatluna-character 的思考开始与结束事件', async () => {

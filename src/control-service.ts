@@ -667,6 +667,16 @@ export class SandboxControlService {
     }
   }
 
+  /**
+   * 取得调试记录库。
+   *
+   * 「这条记录在不在」归记录库自己，本类不再替它转述；这个入口只负责把记录库交出去，
+   * 与模型请求库那个入口同形。
+   */
+  getOneBotDebugStore(): SandboxOneBotDebugStore {
+    return this.oneBotDebug
+  }
+
   getOneBotDebugRecords(input: GetSandboxOneBotDebugRecordsInput = {}): Promise<SandboxOneBotDebugRecordsPage> {
     return this.oneBotDebug.getRecords(input)
   }
@@ -674,17 +684,11 @@ export class SandboxControlService {
   /**
    * 未命中返回 undefined，读取故障照原样抛出。
    *
-   * 跨记录域查找需要把两者分开：`getOneBotDebugRecord` 用异常表达未命中，遍历时只能用 try/catch
-   * 跳过，一次真实的持久化故障就会被当成「这里没有」静默继续，最终报给用户「记录不存在」。
+   * 跨记录域查找需要把两者分开：用异常表达未命中时遍历只能靠 try/catch 跳过，一次真实的
+   * 持久化故障就会被当成「这里没有」静默继续，最终报给用户「记录不存在」。
    */
   findOneBotDebugRecord(input: GetSandboxOneBotDebugRecordInput): Promise<SandboxOneBotDebugRecord | undefined> {
     return this.oneBotDebug.getRecord(input.recordId, input.includeLargeValues === true)
-  }
-
-  async getOneBotDebugRecord(input: GetSandboxOneBotDebugRecordInput): Promise<SandboxOneBotDebugRecord> {
-    const record = await this.findOneBotDebugRecord(input)
-    if (!record) throw new SandboxDomainError(`调试记录不存在：${input.recordId}`)
-    return record
   }
 
   clearOneBotDebugRecords(): Promise<number> {
@@ -720,12 +724,6 @@ export class SandboxControlService {
 
   getModelRequestRecords(input: GetSandboxModelRequestRecordsInput = {}): Promise<SandboxModelRequestRecordsPage> {
     return this.modelRequests.getRecords(input)
-  }
-
-  async getModelRequestRecord(input: GetSandboxModelRequestRecordInput): Promise<SandboxModelRequestDetail> {
-    const record = await this.modelRequests.getRecord(input.recordId)
-    if (!record) throw new SandboxDomainError(`模型请求记录不存在：${input.recordId}`)
-    return record
   }
 
   clearModelRequestRecords(): Promise<number> {

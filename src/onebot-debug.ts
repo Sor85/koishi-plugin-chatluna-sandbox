@@ -390,6 +390,19 @@ export class SandboxOneBotDebugStore {
     return record ? presentOneBotDebugRecord(record, includeLargeValues) : undefined
   }
 
+  /**
+   * 「这条调试记录在不在」由本记录库判定，取不到就抛。
+   *
+   * 与 `getRecord` 并存而不是替代它：本成员服务于「调用方就是要这条记录」，`getRecord` 服务于
+   * 跨记录域遍历——遍历必须能区分「这个记录域里没有」与「这个记录域的持久化坏了」，用异常表达
+   * 未命中会让一次真实故障被当成「这里没有」静默跳过。
+   */
+  async requireRecord(recordId: string, includeLargeValues = false): Promise<SandboxOneBotDebugRecord> {
+    const record = await this.getRecord(recordId, includeLargeValues)
+    if (!record) throw new SandboxDomainError(`调试记录不存在：${recordId}`)
+    return record
+  }
+
   clear(): Promise<number> {
     // sequence 不因清理而回退，避免跨清理复用。
     return this.writes.run(async () => {

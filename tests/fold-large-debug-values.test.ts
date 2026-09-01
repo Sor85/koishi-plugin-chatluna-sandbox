@@ -228,7 +228,7 @@ describe('MCP 折叠大型调试值', () => {
 })
 
 describe('控制服务与 Console 单条详情', () => {
-  it('getOneBotDebugRecord 支持 includeLargeValues，Console 异步暴露 debug-record', async () => {
+  it('调试记录库的 requireRecord 支持 includeLargeValues，Console 异步暴露 debug-record', async () => {
     const app = new App()
     runningApps.push(app)
     const control = new SandboxControlService(app)
@@ -244,13 +244,10 @@ describe('控制服务与 Console 单条详情', () => {
       payload: { file: body },
     })
 
-    expect((await control.getOneBotDebugRecord({ recordId: projected.id })).payload).toEqual({
+    expect((await control.getOneBotDebugStore().requireRecord(projected.id)).payload).toEqual({
       file: expect.objectContaining({ kind: 'large-value', mimeType: 'image/png' }),
     })
-    expect((await control.getOneBotDebugRecord({
-      recordId: projected.id,
-      includeLargeValues: true,
-    })).payload).toEqual({ file: body })
+    expect((await control.getOneBotDebugStore().requireRecord(projected.id, true)).payload).toEqual({ file: body })
 
     const { registerConsole } = await import('../src/console')
     const listeners = new Map<string, (...args: any[]) => any>()

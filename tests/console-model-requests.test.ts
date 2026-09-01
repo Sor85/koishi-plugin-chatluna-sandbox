@@ -5,6 +5,7 @@ import { SandboxControlService, SandboxRuntimeBotRegistry } from '../src/control
 import { SandboxModelRequestStore } from '../src/model-request'
 import { SandboxTestSpaceService } from '../src/test-spaces'
 import type { SandboxAppearance } from '../src/types'
+import { SandboxDomainError } from '../src/types'
 import type { ChatLunaUsageLookup } from '../src/chatluna-usage'
 
 const appearance: SandboxAppearance = {
@@ -98,6 +99,39 @@ describe('模型请求 Console 协议', () => {
     expect((await control.getModelRequestRecords()).records).toHaveLength(1)
     expect(await Reflect.apply(clearRecords, undefined, [{ scope: 'unattributed' }])).toEqual({ cleared: 1 })
     expect((await unattributed.getRecords()).records).toEqual([])
+  })
+
+  /**
+   * 「记录不存在」这句判定归记录库，因此三种范围下的提示必须逐字相同——用户不必先分辨
+   * 自己当时在哪个视图。跨记录域那一处的判定留在调用方，但文案与单记录域同源。
+   */
+  it('单空间、未归属与全部空间读不到记录时的提示逐字相同，且都是领域错误', async () => {
+    const app = new App()
+    runningApps.push(app)
+    const runtimeBots = new SandboxRuntimeBotRegistry()
+    const control = new SandboxControlService(app, { runtimeBots })
+    const spaces = new SandboxTestSpaceService(app, runtimeBots)
+    const space = spaces.createSpace({ name: '请求空间' })
+    const listeners = new Map<string, (...args: any[]) => any>()
+    registerConsole({
+      addEntry() {},
+      addListener(event, callback) { listeners.set(event, callback as never) },
+      broadcast() {},
+    }, control, appearance, undefined, spaces, new SandboxModelRequestStore())
+
+    const getRecord = listeners.get('chatluna-sandbox/model-request-record')
+    if (!getRecord) throw new Error('模型请求详情监听器未注册')
+    for (const scope of [
+      { scope: 'main' },
+      { scope: 'space', spaceId: space.id },
+      { scope: 'unattributed' },
+      { scope: 'all' },
+    ]) {
+      await expect(getRecord({ ...scope, recordId: '不存在的记录' }), JSON.stringify(scope))
+        .rejects.toThrow(SandboxDomainError)
+      await expect(getRecord({ ...scope, recordId: '不存在的记录' }), JSON.stringify(scope))
+        .rejects.toThrow('模型请求记录不存在：不存在的记录')
+    }
   })
 
   it('在详情读取时解析后加载的 ChatLuna Usage 服务', async () => {

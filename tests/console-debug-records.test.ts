@@ -4,6 +4,7 @@ import { registerConsole, type SandboxConsoleRegistrar } from '../src/console'
 import { SandboxControlService, SandboxRuntimeBotRegistry } from '../src/control-service'
 import { SandboxTestSpaceService } from '../src/test-spaces'
 import type { SandboxAppearance } from '../src/types'
+import { SandboxDomainError } from '../src/types'
 
 const appearance: SandboxAppearance = {
   enableSandboxFrostedGlass: true,
@@ -120,5 +121,32 @@ describe('OneBot 调试 Console 协议', () => {
     expect(await listeners.get('chatluna-sandbox/clear-debug-records')?.({})).toEqual({ cleared: 2 })
     expect(await control.getOneBotDebugRecords()).toMatchObject({ records: [], hasMore: false })
     expect(await first.control.getOneBotDebugRecords()).toMatchObject({ records: [], hasMore: false })
+  })
+
+  /**
+   * 「记录不存在」这句判定归记录库，两种证据的提示因此同形；显式空间与联邦视图逐字相同。
+   */
+  it('显式空间与联邦视图读不到调试记录时的提示逐字相同，且都是领域错误', async () => {
+    const app = new App()
+    runningApps.push(app)
+    const runtimeBots = new SandboxRuntimeBotRegistry()
+    const control = new SandboxControlService(app, { runtimeBots })
+    const spaces = new SandboxTestSpaceService(app, runtimeBots)
+    const space = spaces.createSpace({ name: '空间 A' })
+    const listeners = new Map<string, (...args: any[]) => any>()
+    registerConsole({
+      addEntry() {},
+      addListener(event, callback) { listeners.set(event, callback as never) },
+      broadcast() {},
+    }, control, appearance, undefined, spaces)
+
+    const getRecord = listeners.get('chatluna-sandbox/debug-record')
+    if (!getRecord) throw new Error('调试记录详情监听器未注册')
+    for (const scope of [{}, { spaceId: space.id }]) {
+      await expect(getRecord({ ...scope, recordId: '不存在的记录' }), JSON.stringify(scope))
+        .rejects.toThrow(SandboxDomainError)
+      await expect(getRecord({ ...scope, recordId: '不存在的记录' }), JSON.stringify(scope))
+        .rejects.toThrow('调试记录不存在：不存在的记录')
+    }
   })
 })

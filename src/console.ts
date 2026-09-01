@@ -214,7 +214,7 @@ export function registerConsole(
       const spaceControl = testSpaces.getControl(space.id)
       await spaceControl.waitForPersistence()
       return {
-        ...await spaceControl.getOneBotDebugRecord(query),
+        ...await spaceControl.getOneBotDebugStore().requireRecord(query.recordId, query.includeLargeValues === true),
         source: { type: 'test-space', spaceId: space.id, name: space.name },
       }
     }
@@ -432,11 +432,9 @@ export function registerConsole(
     }
     const source = resolveModelRequestSource(input)
     if (input.scope === 'unattributed') {
-      const record = await requireUnattributedModelRequests().getRecord(input.recordId)
-      if (!record) throw new Error(`模型请求记录不存在：${input.recordId}`)
-      return { ...record, source }
+      return { ...await requireUnattributedModelRequests().requireRecord(input.recordId), source }
     }
-    return { ...await resolveModelRequestControl(input)!.getModelRequestRecord(input), source }
+    return { ...await resolveModelRequestControl(input)!.getModelRequestStore().requireRecord(input.recordId), source }
   }
   const getModelRequestRecord = async (input: ReadSandboxModelRequestRecordInput): Promise<SandboxConsoleModelRequestDetail> => {
     const detail = await readModelRequestRecord(input)

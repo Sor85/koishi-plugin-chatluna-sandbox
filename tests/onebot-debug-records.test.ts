@@ -1,6 +1,7 @@
 import { App } from '@koishijs/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SandboxControlService, type SandboxControlServiceOptions } from '../src/control-service'
+import { SandboxDomainError } from '../src/types'
 
 const runningApps: App[] = []
 
@@ -206,5 +207,18 @@ describe('OneBot 调试记录', () => {
       { requestedAction: 'get_friend_list', sequence: 4 },
     ])
     expect(secondPage.hasMore).toBe(true)
+  })
+
+  /**
+   * 「这条记录在不在」由记录库判定。两种读取并存而不是互相替代：跨记录域遍历要靠返回空值
+   * 区分「这个域里没有」与「这个域坏了」，因此不能只留抛出的那一个。
+   */
+  it('取不到返回空值与取不到就抛并存，抛的是领域错误且消息含记录标识', async () => {
+    const { control } = await createControl()
+    const store = control.getOneBotDebugStore()
+
+    expect(await store.getRecord('不存在的记录')).toBeUndefined()
+    await expect(store.requireRecord('不存在的记录')).rejects.toThrow(SandboxDomainError)
+    await expect(store.requireRecord('不存在的记录')).rejects.toThrow('调试记录不存在：不存在的记录')
   })
 })
