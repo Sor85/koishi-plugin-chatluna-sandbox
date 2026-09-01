@@ -391,17 +391,19 @@ interface ArchitectureExemption {
 
 /**
  * 已消化的文件：组件行为已经下沉成模块，剩下的肯定式断言按五类判据本来就该留——第 3 类
- * （DOM 结构与元素顺序）与第 4 类里的接线——但规则无从按形状把它们和被禁止的实现细节断言
- * 区分开，因此仍要登记。**棘轮不数这一组**，否则治理进度永远收敛不到零（ADR 0073）。
+ * （DOM 结构与元素顺序）与第 4 类里的接线与成本结构——但规则无从按形状把它们和被禁止的
+ * 实现细节断言区分开，因此仍要登记。**棘轮不数这一组**，否则治理进度永远收敛不到零（ADR 0073）。
  */
 const treatedAssertionExemptions: readonly ArchitectureExemption[] = ([
   ['tests/webqq-message-list.test.ts', 'message-chain-behaviour-modules', '消息呈现、思考面板、指针分流、滚动恢复、会话切换、加载更早与时刻格式化七块已下沉'],
   ['tests/webqq-chat-pane.test.ts', 'message-chain-behaviour-modules', '多选、合并转发栈与聊天记录搜索三块已下沉'],
   ['tests/webqq-composer.test.ts', 'composer-draft-host', '草稿宿主、候选菜单与按键路由、附件采集与发送编排四块已下沉'],
+  ['tests/model-request-analysis.test.ts', 'analysis-expansion-state', '展开态与原文态十项已下沉，折叠、展开、看原文、搜索命中后的展开与切换记录的复位改由模块的行为断言执行'],
+  ['tests/model-request-read-cost.test.ts', 'analysis-expansion-state', '「原文一旦挂载就留着」与「从未切开的消息不进已挂载集合」已下沉成模块断言，这个文件保留它那一半成本断言'],
 ] as const).map(([file, feature, owner]) => ({
   file,
   rule: '组件测试文件不得出现裸的肯定式源码断言',
-  reason: '该文件的组件行为已下沉成模块并由模块的行为断言执行；剩余的肯定式断言是接线与 DOM 结构契约（五类判据第 3、4 类），规则无从按形状与被禁止的实现细节断言区分。',
+  reason: '该文件的组件行为已下沉成模块并由模块的行为断言执行；剩余的肯定式断言是接线、DOM 结构契约与成本结构（五类判据第 3、4 类），规则无从按形状与被禁止的实现细节断言区分。',
   owner: `${feature}（已完成）：${owner}；若日后把接线本身也变成可执行 interface，再收掉这条豁免`,
 }))
 
@@ -414,10 +416,11 @@ const untreatedAssertionExemptions: readonly ArchitectureExemption[] = ([
   // 对话框，它的页签、搜索与单选行为从未下沉，因此仍是未治理文件。
   ['tests/webqq-message-selection.test.ts', '待开候选：转发目标对话框行为下沉'],
   // 已有架构候选，本轮明确排除在外（见该 feature 的 Out of Scope）。
-  ['tests/model-request-analysis.test.ts', '分析视图候选：展开态与原文态'],
-  ['tests/webqq-model-request-workspace.test.ts', '分析视图候选：展开态与原文态'],
   ['tests/webqq-preset-workspace.test.ts', '预设工作台候选：源文档与运行时证据关联'],
-  ['tests/model-request-read-cost.test.ts', '分析视图候选：展开态与原文态'],
+  // 展开态与原文态下沉（analysis-expansion-state）消化不了这个文件：它断言的是外层模型请求
+  // 工作台组件，源码断言里零处涉及那十项状态。因此换成一个真能消化它的候选——留着旧负责人
+  // 会让下一轮有人照着做一遍才发现，白花一次。
+  ['tests/webqq-model-request-workspace.test.ts', '待开候选：模型请求工作台外壳行为下沉'],
   // 尚无对应候选，登记为待开候选，等有人认领时按同一形状先抽 interface 再删断言。
   ['tests/ai-test-spaces-ui.test.ts', '待开候选：AI 测试空间视图行为下沉'],
   ['tests/environment-components.test.ts', '待开候选：环境管理弹层行为下沉'],
@@ -489,7 +492,7 @@ const exemptions: readonly ArchitectureExemption[] = [
  * 删掉有架构决策依据的守卫。第二，已消化的文件不会从豁免清单里消失——它剩下的接线与结构契约
  * 该留，规则却无从按形状区分——把两类混在一个计数里，治理进度永远收敛不到零。
  */
-const UNTREATED_FILE_BUDGET = 21
+const UNTREATED_FILE_BUDGET = 19
 
 /**
  * 类型声明文件不含运行时代码，`send` 在里面只是被声明的重载签名。

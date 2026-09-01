@@ -568,9 +568,12 @@ const responseVisible = computed(() => (
 ))
 // 展开态与原文态住在 analysis-expansion 里；这里只是它的渲染面。
 const {
+  activeNavigationTarget,
+  collapsedNavigationGroups,
   expandCard,
   expandSearchMatches,
   expandTool,
+  focusNavigationTarget,
   getExpandedText,
   isCardCollapsed,
   isHistoryVariableRaw,
@@ -587,6 +590,7 @@ const {
   toggleCard,
   toggleHistoryVariableRaw,
   toggleMessageRaw,
+  toggleNavigationGroup: toggleNavigationGroupCollapsed,
   toggleResponseRaw,
   toggleTool,
 } = createAnalysisExpansion()
@@ -596,8 +600,6 @@ const historyPreviewCache = new Map<string, readonly ModelRequestHistoryMessage[
 let jsonTrees = new Map<string, ModelRequestJsonNode>()
 const contentElement = ref<HTMLElement>()
 const navigationElement = ref<HTMLElement>()
-const collapsedNavigationGroups = ref(new Set<ModelRequestAnalysisGroupKey>())
-const activeNavigationTarget = ref('')
 const highlightedTarget = ref('')
 const activeOccurrence = ref<ModelRequestOccurrence>()
 // 搜索文本按会话投影预先折叠成小写一次。逐次渲染或逐个按键都重新 toLocaleLowerCase 整段会话，
@@ -720,8 +722,6 @@ watch(() => props.detail.id, (next, previous) => {
   resetExpansion()
   historyPreviewCache.clear()
   jsonTrees = new Map()
-  collapsedNavigationGroups.value = new Set()
-  activeNavigationTarget.value = ''
   navigationTargetsDirty = true
   locator.reset()
   const scroller = findScroller()
@@ -780,10 +780,7 @@ function updateActiveNavigationTarget() {
     .map(({ target, element }) => ({ target, top: element.getBoundingClientRect().top }))
     .sort((left, right) => left.top - right.top)
   const nextTarget = resolveActiveAnalysisTarget(targetPositions, scrollerTop, scroller.clientHeight)
-  if (nextTarget && nextTarget !== activeNavigationTarget.value) {
-    activeNavigationTarget.value = nextTarget
-    nextTick(() => scrollNavigationTargetIntoView(nextTarget))
-  }
+  if (focusNavigationTarget(nextTarget)) nextTick(() => scrollNavigationTargetIntoView(nextTarget!))
 }
 
 function resolveNavigationTargetElements(content: HTMLElement) {
@@ -818,10 +815,9 @@ function scrollNavigationTargetIntoView(target: string) {
   }
 }
 
+// 折叠一个分组改变左侧条目的布局，跟随因此要重新量一次；跟随本身是 DOM 的事，留在视图。
 function toggleNavigationGroup(group: ModelRequestAnalysisGroupKey) {
-  const next = new Set(collapsedNavigationGroups.value)
-  next.has(group) ? next.delete(group) : next.add(group)
-  collapsedNavigationGroups.value = next
+  toggleNavigationGroupCollapsed(group)
   nextTick(scheduleNavigationTracking)
 }
 

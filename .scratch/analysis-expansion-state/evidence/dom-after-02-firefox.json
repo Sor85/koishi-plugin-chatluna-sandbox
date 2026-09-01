@@ -1,0 +1,344 @@
+{
+  "engine": "firefox",
+  "samples": [
+    {
+      "label": "01 初始渲染",
+      "length": 147026,
+      "sha256": "ed034b144091ad72ef5bac822b09be7f",
+      "scrollTop": 0,
+      "collapsedMessageCards": 0,
+      "collapsedVariableCards": 0,
+      "expandedTools": 0,
+      "collapsedNavGroups": 0,
+      "mountedRawBlocks": 0,
+      "hiddenRawBlocks": 0,
+      "historyPreviews": 2,
+      "currentNavTarget": [],
+      "cardHeaderLabels": [
+        "查看第 0 条消息原始 JSON",
+        "收起第 0 条消息卡片",
+        "查看第 1 条消息原始 JSON",
+        "收起第 1 条消息卡片",
+        "查看第 2 条消息原始 JSON",
+        "收起第 2 条消息卡片",
+        "查看第 3 条消息原始 JSON",
+        "收起第 3 条消息卡片",
+        "查看响应原始 JSON",
+        "收起响应卡片"
+      ],
+      "navExpanded": [
+        "true",
+        "true",
+        "true",
+        "true",
+        "true"
+      ]
+    },
+    {
+      "label": "02 折叠一张卡",
+      "length": 146685,
+      "sha256": "7ad5b006c00e03458670a3cb17146f6c",
+      "scrollTop": 0,
+      "collapsedMessageCards": 1,
+      "collapsedVariableCards": 0,
+      "expandedTools": 0,
+      "collapsedNavGroups": 0,
+      "mountedRawBlocks": 0,
+      "hiddenRawBlocks": 0,
+      "historyPreviews": 2,
+      "currentNavTarget": [],
+      "cardHeaderLabels": [
+        "查看第 0 条消息原始 JSON",
+        "收起第 0 条消息卡片",
+        "查看第 1 条消息原始 JSON",
+        "收起第 1 条消息卡片",
+        "查看第 2 条消息原始 JSON",
+        "收起第 2 条消息卡片",
+        "查看第 3 条消息原始 JSON",
+        "展开第 3 条消息卡片",
+        "查看响应原始 JSON",
+        "收起响应卡片"
+      ],
+      "navExpanded": [
+        "true",
+        "true",
+        "true",
+        "true",
+        "true"
+      ]
+    },
+    {
+      "label": "03 展开一个工具",
+      "length": 168162,
+      "sha256": "b265b3ce3e6ee17ae336aca1f73f2752",
+      "scrollTop": 0,
+      "collapsedMessageCards": 1,
+      "collapsedVariableCards": 0,
+      "expandedTools": 1,
+      "collapsedNavGroups": 0,
+      "mountedRawBlocks": 0,
+      "hiddenRawBlocks": 0,
+      "historyPreviews": 2,
+      "currentNavTarget": [],
+      "cardHeaderLabels": [
+        "查看第 0 条消息原始 JSON",
+        "收起第 0 条消息卡片",
+        "查看第 1 条消息原始 JSON",
+        "收起第 1 条消息卡片",
+        "查看第 2 条消息原始 JSON",
+        "收起第 2 条消息卡片",
+        "查看第 3 条消息原始 JSON",
+        "展开第 3 条消息卡片",
+        "查看响应原始 JSON",
+        "收起响应卡片"
+      ],
+      "navExpanded": [
+        "true",
+        "true",
+        "true",
+        "true",
+        "true"
+      ]
+    },
+    {
+      "label": "04 切某条消息看原文",
+      "length": 170230,
+      "sha256": "b98e907f767e97d894728770527eac4f",
+      "scrollTop": 0,
+      "collapsedMessageCards": 1,
+      "collapsedVariableCards": 0,
+      "expandedTools": 1,
+      "collapsedNavGroups": 0,
+      "mountedRawBlocks": 1,
+      "hiddenRawBlocks": 0,
+      "historyPreviews": 2,
+      "currentNavTarget": [],
+      "cardHeaderLabels": [
+        "查看第 0 条消息原始 JSON",
+        "收起第 0 条消息卡片",
+        "查看第 1 条消息格式化内容",
+        "收起第 1 条消息卡片",
+        "查看第 2 条消息原始 JSON",
+        "收起第 2 条消息卡片",
+        "查看第 3 条消息原始 JSON",
+        "展开第 3 条消息卡片",
+        "查看响应原始 JSON",
+        "收起响应卡片"
+      ],
+      "navExpanded": [
+        "true",
+        "true",
+        "true",
+        "true",
+        "true"
+      ]
+    },
+    {
+      "label": "05 再切回格式化",
+      "length": 170241,
+      "sha256": "8850f258085e70fb6a3c11d7e86d29a9",
+      "scrollTop": 0,
+      "collapsedMessageCards": 1,
+      "collapsedVariableCards": 0,
+      "expandedTools": 1,
+      "collapsedNavGroups": 0,
+      "mountedRawBlocks": 1,
+      "hiddenRawBlocks": 1,
+      "historyPreviews": 2,
+      "currentNavTarget": [],
+      "cardHeaderLabels": [
+        "查看第 0 条消息原始 JSON",
+        "收起第 0 条消息卡片",
+        "查看第 1 条消息原始 JSON",
+        "收起第 1 条消息卡片",
+        "查看第 2 条消息原始 JSON",
+        "收起第 2 条消息卡片",
+        "查看第 3 条消息原始 JSON",
+        "展开第 3 条消息卡片",
+        "查看响应原始 JSON",
+        "收起响应卡片"
+      ],
+      "navExpanded": [
+        "true",
+        "true",
+        "true",
+        "true",
+        "true"
+      ]
+    },
+    {
+      "label": "06 切响应原文",
+      "length": 197678,
+      "sha256": "1f64b0367815a59e0a86104647cf1ccf",
+      "scrollTop": 0,
+      "collapsedMessageCards": 1,
+      "collapsedVariableCards": 0,
+      "expandedTools": 1,
+      "collapsedNavGroups": 0,
+      "mountedRawBlocks": 2,
+      "hiddenRawBlocks": 1,
+      "historyPreviews": 2,
+      "currentNavTarget": [
+        "model-analysis-res:tool-call:candidates.0.parts.0"
+      ],
+      "cardHeaderLabels": [
+        "查看第 0 条消息原始 JSON",
+        "收起第 0 条消息卡片",
+        "查看第 1 条消息原始 JSON",
+        "收起第 1 条消息卡片",
+        "查看第 2 条消息原始 JSON",
+        "收起第 2 条消息卡片",
+        "查看第 3 条消息原始 JSON",
+        "展开第 3 条消息卡片",
+        "查看响应格式化内容",
+        "收起响应卡片"
+      ],
+      "navExpanded": [
+        "true",
+        "true",
+        "true",
+        "true",
+        "true"
+      ]
+    },
+    {
+      "label": "07 展开历史变量原文",
+      "length": 179079,
+      "sha256": "0bef5f80c31556b0b892f3f5e3f3a93e",
+      "scrollTop": 0,
+      "collapsedMessageCards": 1,
+      "collapsedVariableCards": 0,
+      "expandedTools": 1,
+      "collapsedNavGroups": 0,
+      "mountedRawBlocks": 2,
+      "hiddenRawBlocks": 1,
+      "historyPreviews": 1,
+      "currentNavTarget": [
+        "model-analysis-res:tool-call:candidates.0.parts.0"
+      ],
+      "cardHeaderLabels": [
+        "查看第 0 条消息原始 JSON",
+        "收起第 0 条消息卡片",
+        "查看第 1 条消息原始 JSON",
+        "收起第 1 条消息卡片",
+        "查看第 2 条消息原始 JSON",
+        "收起第 2 条消息卡片",
+        "查看第 3 条消息原始 JSON",
+        "展开第 3 条消息卡片",
+        "查看响应格式化内容",
+        "收起响应卡片"
+      ],
+      "navExpanded": [
+        "true",
+        "true",
+        "true",
+        "true",
+        "true"
+      ]
+    },
+    {
+      "label": "08 搜索命中后的展开态",
+      "length": 326974,
+      "sha256": "85c728fb396609c0353851e98da362bd",
+      "scrollTop": 1731,
+      "collapsedMessageCards": 0,
+      "collapsedVariableCards": 0,
+      "expandedTools": 9,
+      "collapsedNavGroups": 0,
+      "mountedRawBlocks": 2,
+      "hiddenRawBlocks": 1,
+      "historyPreviews": 1,
+      "currentNavTarget": [
+        "model-analysis-req:message:contents.0"
+      ],
+      "cardHeaderLabels": [
+        "查看第 0 条消息原始 JSON",
+        "收起第 0 条消息卡片",
+        "查看第 1 条消息原始 JSON",
+        "收起第 1 条消息卡片",
+        "查看第 2 条消息原始 JSON",
+        "收起第 2 条消息卡片",
+        "查看第 3 条消息原始 JSON",
+        "收起第 3 条消息卡片",
+        "查看响应格式化内容",
+        "收起响应卡片"
+      ],
+      "navExpanded": [
+        "true",
+        "true",
+        "true",
+        "true",
+        "true"
+      ]
+    },
+    {
+      "label": "09 折叠一个导航分组",
+      "length": 327001,
+      "sha256": "f0d7431ebc01d1860fbf0fbcde8418f9",
+      "scrollTop": 1731,
+      "collapsedMessageCards": 0,
+      "collapsedVariableCards": 0,
+      "expandedTools": 9,
+      "collapsedNavGroups": 1,
+      "mountedRawBlocks": 2,
+      "hiddenRawBlocks": 1,
+      "historyPreviews": 1,
+      "currentNavTarget": [
+        "model-analysis-req:message:contents.0"
+      ],
+      "cardHeaderLabels": [
+        "查看第 0 条消息原始 JSON",
+        "收起第 0 条消息卡片",
+        "查看第 1 条消息原始 JSON",
+        "收起第 1 条消息卡片",
+        "查看第 2 条消息原始 JSON",
+        "收起第 2 条消息卡片",
+        "查看第 3 条消息原始 JSON",
+        "收起第 3 条消息卡片",
+        "查看响应格式化内容",
+        "收起响应卡片"
+      ],
+      "navExpanded": [
+        "true",
+        "true",
+        "true",
+        "true",
+        "false"
+      ]
+    },
+    {
+      "label": "10 切换到另一条记录",
+      "length": 131577,
+      "sha256": "b42450dbcb1e2a8e0de1e8f74c58a891",
+      "scrollTop": 0,
+      "collapsedMessageCards": 0,
+      "collapsedVariableCards": 0,
+      "expandedTools": 0,
+      "collapsedNavGroups": 0,
+      "mountedRawBlocks": 0,
+      "hiddenRawBlocks": 0,
+      "historyPreviews": 2,
+      "currentNavTarget": [],
+      "cardHeaderLabels": [
+        "查看第 0 条消息原始 JSON",
+        "收起第 0 条消息卡片",
+        "查看第 1 条消息原始 JSON",
+        "收起第 1 条消息卡片",
+        "查看第 2 条消息原始 JSON",
+        "收起第 2 条消息卡片",
+        "查看第 3 条消息原始 JSON",
+        "收起第 3 条消息卡片",
+        "查看响应原始 JSON",
+        "收起响应卡片"
+      ],
+      "navExpanded": [
+        "true",
+        "true",
+        "true",
+        "true",
+        "true"
+      ]
+    }
+  ],
+  "consoleErrors": []
+}

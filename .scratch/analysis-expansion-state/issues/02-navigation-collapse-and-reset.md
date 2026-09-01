@@ -12,24 +12,91 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] 折叠导航分组与当前导航目标两项住在 module 里
-- [ ] 折叠导航分组的界面行为一字不变，有断言
-- [ ] 滚动时当前分组的高亮行为一字不变
-- [ ] 「切换记录时十项全部复位」是 module 上的一次调用，且有断言逐项验证
-- [ ] 组件仍负责调用定位器的复位与把滚动容器归零，这两件事未被吸收进 module
-- [ ] 导航跟踪与滚动留在组件
-- [ ] 两条断言豁免从「未治理」挪到「已消化」，理由与负责人均非占位文字
-- [ ] 棘轮相应减二，且只减不增
-- [ ] 第三条豁免的负责人改指向「模型请求工作台外壳行为下沉」，理由写明它的源码断言零处涉及这十个状态
-- [ ] 「移除任一豁免后对应文件重新报错」那条元守卫断言仍然成立
-- [ ] 未写新的架构决定记录，未给领域词汇加新词
-- [ ] 未借机合并证据定位与证据导航
-- [ ] 未新增肯定式实现细节断言
-- [ ] DOM 快照与基线一致：折叠一个导航分组、切换到另一条记录（验复位）
-- [ ] Chromium 与 Firefox 各跑一次，控制台无错误
-- [ ] `git diff --stat` 里不出现服务端源码路径
-- [ ] 验收后清理浏览器会话与工具生成的临时目录
-- [ ] 别处变红的断言逐条区分真红与假红，处置记入 Comments，不重判前几轮判定保留的断言
-- [ ] 完整测试、类型检查与构建通过
+- [x] 折叠导航分组与当前导航目标两项住在 module 里
+- [x] 折叠导航分组的界面行为一字不变，有断言
+- [x] 滚动时当前分组的高亮行为一字不变
+- [x] 「切换记录时十项全部复位」是 module 上的一次调用，且有断言逐项验证
+- [x] 组件仍负责调用定位器的复位与把滚动容器归零，这两件事未被吸收进 module
+- [x] 导航跟踪与滚动留在组件
+- [x] 两条断言豁免从「未治理」挪到「已消化」，理由与负责人均非占位文字
+- [x] 棘轮相应减二，且只减不增
+- [x] 第三条豁免的负责人改指向「模型请求工作台外壳行为下沉」，理由写明它的源码断言零处涉及这十个状态
+- [x] 「移除任一豁免后对应文件重新报错」那条元守卫断言仍然成立
+- [x] 未写新的架构决定记录，未给领域词汇加新词
+- [x] 未借机合并证据定位与证据导航
+- [x] 未新增肯定式实现细节断言
+- [x] DOM 快照与基线一致：折叠一个导航分组、切换到另一条记录（验复位）
+- [x] Chromium 与 Firefox 各跑一次，控制台无错误
+- [x] `git diff --stat` 里不出现服务端源码路径
+- [x] 验收后清理浏览器会话与工具生成的临时目录
+- [x] 别处变红的断言逐条区分真红与假红，处置记入 Comments，不重判前几轮判定保留的断言
+- [x] 完整测试、类型检查与构建通过
+
+## Comments
+
+### 落地形状
+
+- `collapsedNavigationGroups` 与 `activeNavigationTarget` 进 module，十项到齐。两项仍以 `ref`
+  形式暴露给模板读取（`aria-expanded`、`v-show`、`is-current` 三处绑定一字未动），转换则是
+  module 上的两个函数。
+- `focusNavigationTarget(target)` 收下「当前导航目标只在真的变了时才改变，空目标不清掉它」这条
+  规则并返回是否变了；视图据此决定要不要把左侧条目滚进视野。空目标不清掉当前目标原先只是
+  `if (nextTarget && …)` 里的一个条件，现在是一条断言——它的失效形态是滚到页尾时左侧高亮闪掉一下。
+- 视图侧的 `toggleNavigationGroup` 退成两行：转调 module，再排一次跟随重量。折叠分组会改变
+  左侧条目布局，重量是 DOM 的事，留在视图。
+- 复位从十四行手写赋值变成 `resetExpansion()` 一次调用。视图那一侧仍然负责 JSON 树缓存、
+  历史预览缓存、导航锚点脏标记、`locator.reset()` 与把滚动容器归零——那些都不属于展开态。
+
+### 断言豁免与棘轮
+
+- `tests/model-request-analysis.test.ts` 与 `tests/model-request-read-cost.test.ts` 从「未治理」
+  移入「已消化」，棘轮 21 → 19（只减不增）。已消化那一组的共用理由补上「成本结构」一项：
+  读取代价那份文件剩下的肯定式断言守的是成本而不是判定。
+- `tests/model-request-read-cost.test.ts` 里那个 `it` 加了块注释，按 ADR-0073 对保留肯定式
+  第 4 类断言的要求写明它保护什么、少哪一条会怎样失效（不报错，只是打开大请求变慢、输入掉帧），
+  以及行为那一半已经由 `tests/analysis-expansion.test.ts` 断言。
+- `tests/webqq-model-request-workspace.test.ts` 的负责人改成「待开候选：模型请求工作台外壳行为
+  下沉」。核过：它读的是 `page.vue`、`webqq-sidebar.vue`、`model-request-workspace.vue`、
+  `model-response-content-preview.vue`、`model-request-trajectory.vue` 与
+  `model-request-json-tree.vue`，**一条都不读 `analysis-view.vue`**，因此零处涉及这十项状态。
+
+### 与 ADR-0062 的冲突（未处置，需要决定）
+
+`docs/adr/0062-put-evidence-locating-behind-a-testable-adapter.md` 第二段写着「展开状态（折叠卡片、
+原始消息、展开工具、强制展开长文本、当前高亮）继续由视图以 Vue `ref` 持有，module 只拥有
+『定位时该展开哪些』的决策」，理由是「只有时序需要进入可测 module，渲染状态留在框架里更简单」。
+
+本轮把前四项搬进了 `analysis-expansion`（当前高亮仍在定位器），因此那句描述与那条理由都已过时。
+本票明确要求「不写新的架构决定记录」，改既有记录属于决定层面的变更，按 `docs/agents/domain.md`
+的「处理 ADR 冲突」不得静默覆盖，因此**本轮没有动它**，在此登记冲突等决定：要么在 ADR-0062 里
+把那句改成「展开态由 `analysis-expansion` 拥有，定位器只拥有展开决策」，要么为展开态单开一条记录。
+
+### 别处变红的处置
+
+| 位置 | 变红原因 | 真红／假红 | 处置 |
+| --- | --- | --- | --- |
+| `tests/model-request-analysis.test.ts:450` | `collapsedNavigationGroups = ref(new Set<…>())` 已不在视图里 | 假红 | 删除。「默认全部展开」改由 module 的行为断言执行（五类判据第 1 类：已有行为测试覆盖同一事实，全删） |
+| `tests/model-request-analysis.test.ts:454` | `collapsedNavigationGroups.value = new Set()` 已不在视图里 | 假红 | 删除。复位已是 module 上的一条断言 |
+| `tests/model-request-analysis.test.ts:455` | `next.has(group) ? next.delete(group) : next.add(group)` 已不在视图里 | 假红 | 删除。切换已是 module 上的一条断言 |
+
+真红：无。同一个 `it` 里的 `@click="toggleNavigationGroup(group.key)"`、
+`:aria-expanded="!collapsedNavigationGroups.has(group.key)"`、
+`v-show="!collapsedNavigationGroups.has(group.key)"` 与那条吸顶样式断言全部保留（第 3 类结构契约
+与第 2 类样式文本），用例名与块注释同步说明保留的是什么。
+`'is-current': activeNavigationTarget === item.target` 未变红——那两项仍以 `ref` 暴露。
+`expect(view).not.toContain('collapsedNavigationGroups.value = new Set(resolveCollapsedAnalysisGroups(')`
+是前几轮判定保留的否定式守卫，未重判、未删。
+
+### 验证
+
+- `yarn test`：185 个文件、1679 条用例全通过（本轮新增 4 条：导航分组折叠、折叠不改变当前目标、
+  当前目标只在变了时才改变、十项复位）。
+- `yarn typecheck`：通过。
+- `yarn build`：通过。
+- DOM 快照：`evidence/dom-after-02-{chromium,firefox}.json` 与基线的十个采样点全部一致，
+  归一化全文逐字节相同，控制台 0 错误。采样点 09（折叠一个导航分组）与 10（切换到另一条记录，
+  验复位）是本票的观察面：09 的折叠分组数 0 → 1、`aria-expanded` 第五项 true → false；
+  10 的折叠卡片、展开工具、折叠分组、已挂载原文块与当前导航目标全部回到初始。
+- `git diff --stat` 不含 `src/` 路径。

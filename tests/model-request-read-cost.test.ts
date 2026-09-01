@@ -57,6 +57,15 @@ describe('模型请求视图的重复计算', () => {
     expect(source).toContain('normalizeEvidencePreviewText')
   })
 
+  /**
+   * 这一组守的是**成本结构**而不是判定：原文树按需挂载、JSON 树按证据身份缓存、搜索文本按会话
+   * 折叠一次、一个 Tooltip Provider、滚动跟随只量导航锚点。少哪一条都不会报错，只表现为打开一条
+   * 大请求的分析变慢、搜索时输入掉帧——没有任何红灯，因此这些肯定式断言按 ADR 0073 第 4 类保留。
+   *
+   * 「原文一旦挂载就留着」与「从未切开的消息不进已挂载集合」这两条**行为**已经下沉到
+   * `client/webqq/analysis-expansion.ts`，由 `tests/analysis-expansion.test.ts` 断言；
+   * 这里只剩「已挂载才挂载」这一处渲染面的接线。
+   */
   it('分析页的原始 JSON 树按需挂载并缓存', () => {
     const view = read('client/webqq/analysis-view.vue')
 

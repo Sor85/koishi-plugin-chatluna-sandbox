@@ -443,16 +443,15 @@ describe('模型请求分析展示模型', () => {
     expect(styles).toMatch(/\.webqq-model-request-analysis \.webqq-model-analysis-content \{[^}]*max-height: none[^}]*overflow: visible/s)
   })
 
-  it('单一左侧导航保持吸顶，分类默认展开且支持独立折叠', () => {
+  // 「默认展开、各自独立折叠、切换记录后回到默认」三条已由 analysis-expansion 的行为断言执行；
+  // 这里只保留无从进入 module 的结构契约：折叠按钮的 aria 与正文的显隐都绑在同一个分组键上。
+  it('单一左侧导航保持吸顶，折叠按钮的 aria 与条目显隐绑在同一个分组键上', () => {
     const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
 
-    expect(view).toContain('collapsedNavigationGroups = ref(new Set<ModelRequestAnalysisGroupKey>())')
     expect(view).toContain('@click="toggleNavigationGroup(group.key)"')
     expect(view).toContain(':aria-expanded="!collapsedNavigationGroups.has(group.key)"')
     expect(view).toContain('v-show="!collapsedNavigationGroups.has(group.key)"')
-    expect(view).toContain('collapsedNavigationGroups.value = new Set()')
-    expect(view).toContain('next.has(group) ? next.delete(group) : next.add(group)')
     expect(styles).toMatch(/\.webqq-model-request-analysis \.webqq-model-analysis-nav \{[^}]*position: sticky;[^}]*top: var\(--webqq-model-trajectory-sticky-height[^}]*max-height: calc\(var\(--webqq-model-analysis-nav-height[^}]*- var\(--webqq-model-trajectory-sticky-height[^}]*overflow: auto;/s)
   })
 

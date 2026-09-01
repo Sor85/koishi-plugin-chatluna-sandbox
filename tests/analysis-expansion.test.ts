@@ -198,4 +198,65 @@ describe('模型请求分析的展开态与原文态', () => {
     expansion.toggleHistoryVariableRaw('variable-history-new')
     expect(expansion.isHistoryVariableRaw('variable-history-new')).toBe(false)
   })
+
+  it('导航分组默认全部展开，折叠一个再展开只影响被切换的那一个', () => {
+    const expansion = createAnalysisExpansion()
+
+    expect(expansion.isNavigationGroupCollapsed('tool')).toBe(false)
+    expect(expansion.isNavigationGroupCollapsed('system')).toBe(false)
+
+    expansion.toggleNavigationGroup('tool')
+    expect(expansion.isNavigationGroupCollapsed('tool')).toBe(true)
+    expect(expansion.isNavigationGroupCollapsed('system')).toBe(false)
+
+    expansion.toggleNavigationGroup('tool')
+    expect(expansion.isNavigationGroupCollapsed('tool')).toBe(false)
+  })
+
+  it('折叠导航分组不改变当前导航目标', () => {
+    const expansion = createAnalysisExpansion()
+    expansion.focusNavigationTarget(USER_TARGET)
+
+    expansion.toggleNavigationGroup('user')
+
+    expect(expansion.activeNavigationTarget.value).toBe(USER_TARGET)
+  })
+
+  it('当前导航目标只在真的变了时才改变，空目标不清掉它', () => {
+    const expansion = createAnalysisExpansion()
+
+    expect(expansion.focusNavigationTarget(USER_TARGET)).toBe(true)
+    expect(expansion.activeNavigationTarget.value).toBe(USER_TARGET)
+    // 没变就不必把左侧条目再滚一次。
+    expect(expansion.focusNavigationTarget(USER_TARGET)).toBe(false)
+    // 滚过最后一个锚点后探针算不出目标；清掉它会让左侧高亮在页尾闪掉一下。
+    expect(expansion.focusNavigationTarget(undefined)).toBe(false)
+    expect(expansion.activeNavigationTarget.value).toBe(USER_TARGET)
+  })
+
+  it('切换到另一条记录时十项状态全部回到初始', () => {
+    // 这一条此前是十四行手写赋值，漏掉其中一项不报错，只表现为上一条记录的展开态残留到下一条。
+    const expansion = createAnalysisExpansion()
+    expansion.toggleCard(SYSTEM_TARGET)
+    expansion.toggleTool('req:tool-definition:tools.0.function')
+    expansion.setExpandedText([USER_TARGET])
+    expansion.toggleMessageRaw('req:message:messages.1')
+    expansion.toggleHistoryVariableRaw('variable-history-new')
+    expansion.toggleResponseRaw()
+    expansion.toggleNavigationGroup('tool')
+    expansion.focusNavigationTarget(USER_TARGET)
+
+    expansion.reset()
+
+    expect(expansion.collapsedCards.value.size).toBe(0)
+    expect(expansion.expandedTools.value.size).toBe(0)
+    expect(expansion.expandedTextTargets.value.size).toBe(0)
+    expect(expansion.rawMessages.value.size).toBe(0)
+    expect(expansion.rawMountedMessages.value.size).toBe(0)
+    expect(expansion.rawHistoryVariables.value.size).toBe(0)
+    expect(expansion.responseRaw.value).toBe(false)
+    expect(expansion.responseRawMounted.value).toBe(false)
+    expect(expansion.collapsedNavigationGroups.value.size).toBe(0)
+    expect(expansion.activeNavigationTarget.value).toBe('')
+  })
 })
