@@ -67,6 +67,67 @@ const MESSAGE_ACTION_EMIT_PATTERN = /emit\('([A-Za-z]+)', message\.id/g
 const CAPABILITY_READ_PATTERN = /capabilitiesOf\s*\(|messageCapabilities\s*\[/
 
 /**
+ * 裸的错误兜底：「取错误消息，取不到就用一句中文」这个形状。
+ *
+ * 收拢前它在工作台外壳里出现二十九次，保护的两条不变量（无论成败都复位进行中、每次操作前先清掉
+ * 上一次的错误）却一条断言都没有。两者改坏了都不报错——一个表现为界面一直转圈，一个表现为用户
+ * 对着一条早已过期的报错发愁——因此这个形状收进闸门与错误位模块，并由本规则拦住下一次照抄。
+ *
+ * 判定分两步。第一步认「取错误消息」这个头，主语允许是带点的属性路径（`state.error`），两侧必须是
+ * 同一个主语（反向引用），因此 `a instanceof Error ? b.message : ...` 这种不同主语的写法不算。
+ * 第二步看兜底分支里有没有中文字面量：规则禁止的是把一句中文**写死在条件表达式里**，而把兜底当
+ * 参数传进来（`: fallback`）或指向一个具名常量（`: SEARCH_FAILED_TEXT`）恰恰是收拢后的合法形态。
+ *
+ * 因此本规则不需要按文件名钉持有者：闸门与错误位模块的兜底是参数，在形状上就不违规。这比列举
+ * 持有者文件更严——把模块整段抄到别处，抄过去的那份仍然是合法形状，而真正被禁止的照抄一定带着
+ * 那句写死的中文。
+ */
+const ERROR_FALLBACK_HEAD_PATTERN =
+  /\b([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s+instanceof\s+Error\s*\?\s*\1\??\.message\s*:/g
+
+/** 中文字面量：单引号、双引号或反引号里含至少一个 CJK 字符。 */
+const CJK_LITERAL_PATTERN = /(['"`])[^'"`\n]*[一-鿿][^'"`\n]*\1/
+
+/**
+ * 兜底分支的表达式文本：从冒号读到本语句结束。
+ *
+ * 语句边界按三条判定收：括号配平后遇到 `;`、或遇到换行且下一行不以 `?` / `:` 打头。字符串内部的
+ * 分号、括号与换行不算边界，因此含分号的中文文案不会被截断。
+ *
+ * 三条都是按真实源码校准出来的：续行判定让「把三元链换行摊开」失效——那是最容易想到的绕法；
+ * 括号配平让「兜底套在跨行括号里」失效；`;` 截断则防止把同一行后面那条语句里的中文误读成兜底，
+ * 误报会让豁免清单混进假债务。
+ */
+function readFallbackExpression(source: string, index: number): string {
+  let depth = 0
+  let quote = ''
+  let at = index
+  for (; at < source.length; at += 1) {
+    const character = source[at]!
+    if (quote) {
+      if (character === '\\') at += 1
+      else if (character === quote) quote = ''
+      continue
+    }
+    if (character === '\'' || character === '"' || character === '`') quote = character
+    else if ('([{'.includes(character)) depth += 1
+    else if (')]}'.includes(character)) depth -= 1
+    else if (depth <= 0 && character === ';') break
+    else if (depth <= 0 && character === '\n' && !/^\s*[?:]/.test(source.slice(at + 1, source.indexOf('\n', at + 1) + 1 || undefined))) break
+  }
+  return source.slice(index, at)
+}
+
+function findBareErrorFallbacks(_file: string, source: string): string[] {
+  const literals = [...source.matchAll(ERROR_FALLBACK_HEAD_PATTERN)]
+    .map((match) => readFallbackExpression(source, match.index + match[0].length).match(CJK_LITERAL_PATTERN)?.[0])
+    .filter((literal): literal is string => !!literal)
+  return literals.length
+    ? [`${literals.length} 处裸的错误兜底（${[...new Set(literals)].sort().join(' / ')}）`]
+    : []
+}
+
+/**
  * 发起点所在的最小作用域：模板里是它所属的那个元素（上一个 `<`），脚本里是它所在的那个函数
  * （上一个 `function ` 或箭头函数体）。取三者中最靠近发起点的那个，因此相邻元素上的守门不会
  * 顺带把本处也算成已守门——少接一个入口仍然是一条绕路，这条规则要逐个入口成立。
@@ -275,6 +336,12 @@ const rules: readonly ArchitectureRule[] = [
       .filter((match) => !CAPABILITY_READ_PATTERN.test(readEnclosingScope(source, match.index)))
       .map((match) => `${match[1]!} 入口所在的元素或函数没有读能力位`),
   },
+  {
+    name: '错误兜底文案不得写死在裸的条件表达式里',
+    root: 'client',
+    extensions: ['.ts', '.vue'],
+    findViolations: findBareErrorFallbacks,
+  },
   /**
    * ADR 0060 与 ADR 0071 此前只由消息列表测试里的四条肯定式源码断言守着——它们钉的是
    * `client/webqq-scrollbar.ts` 的源码文本，既不属于消息列表，也管不到别的样式表。
@@ -376,17 +443,42 @@ const untreatedAssertionExemptions: readonly ArchitectureExemption[] = ([
 }))
 
 /**
+ * 裸错误兜底那条规则的豁免，键是**源码文件**，与上面两组以测试文件为键的条目不是同一批。
+ *
+ * 工作台外壳那二十九处已经收进闸门与错误位模块；外壳之外还有十处，本轮不迁移。理由不是懒：这些
+ * 组件与模块的错误位语义各不相同——有的写进本地状态、有的外发给父级、有的带自己的过期请求判定，
+ * 不是一次机械迁移，而且每个都要各自的基线比对。
+ */
+const errorFallbackExemptions: readonly ArchitectureExemption[] = ([
+  ['client/webqq-details-panel.vue', '两处群公告操作的错误写进详情栏本地状态', '待开候选：详情栏行为下沉'],
+  ['client/webqq-sidebar.vue', '关系申请处理的错误写进侧栏本地的通知错误位', '待开候选：侧边栏其余行为下沉'],
+  ['client/webqq-forward-target-dialog.vue', '多选期间发送控件不可见，错误必须留在本对话框', '待开候选：转发目标对话框行为下沉'],
+  ['client/webqq-composer.vue', '切换发送者的错误写进发送控件自己的本地错误位', '待开候选：发送控件其余行为下沉'],
+  ['client/preset-workspace.vue', '预设操作的错误经一个本地取消息函数，兜底里还套了一层 String()', '预设工作台候选：源文档与运行时证据关联'],
+  ['client/environment-entity-dialog.vue', '环境管理的错误写进弹层本地状态并阻塞关闭', '待开候选：环境管理弹层行为下沉'],
+  ['client/environment-create-popover.vue', '新建实体的错误写进浮层本地状态并阻塞关闭', '待开候选：环境管理弹层行为下沉'],
+  ['client/webqq/message-search.ts', '同一文件另外两处已改用具名常量，这一处的定位失败仍是字面量；写入前还要过一道过期请求判定', '待开候选：搜索编排的错误位统一'],
+  ['client/webqq/composer-send.ts', '发送编排持有自己的进行中与错误位，是发送控件模型的一部分', '待开候选：发送编排改用区域读取闸门'],
+] as const).map(([file, reason, owner]) => ({
+  file,
+  rule: '错误兜底文案不得写死在裸的条件表达式里',
+  reason: `${reason}；本轮不迁移，登记为有主的债务。`,
+  owner,
+}))
+
+/**
  * 已知违规的显式豁免清单，与守卫断言放在同一处，改客户端代码的人立刻看到。
  * 理由与负责人均为必填；豁免不是放行，是有主的债务。
  *
- * 客户端源码那四条规则当前一条豁免都没有：九条历史违规已由区域投影下沉与扩展端口两批工作
- * 消化完，消息能力判定在收成共享判据时一并清掉，场景变更广播的模块级 `receive` 在收进工作区
+ * 客户端源码那四条规则里，前四条当前一条豁免都没有：九条历史违规已由区域投影下沉与扩展端口两批
+ * 工作消化完，消息能力判定在收成共享判据时一并清掉，场景变更广播的模块级 `receive` 在收进工作区
  * 端口时消化。两条毛玻璃规则从一开始就是干净的——它们是从消息列表测试里那四条肯定式断言
- * 转过来的，转的时候实现已经合规。
+ * 转过来的，转的时候实现已经合规。裸错误兜底那条带着九个源码文件的豁免上线，见上一组。
  */
 const exemptions: readonly ArchitectureExemption[] = [
   ...treatedAssertionExemptions,
   ...untreatedAssertionExemptions,
+  ...errorFallbackExemptions,
 ]
 
 /**
@@ -424,17 +516,18 @@ function isExempted(violation: string, allowed: readonly ArchitectureExemption[]
 }
 
 describe('WebQQ 模块化架构', () => {
-  it('七条架构规则对各自扫描根目录全量生效，未登记的违规按文件与规则报出', () => {
+  it('八条架构规则对各自扫描根目录全量生效，未登记的违规按文件与规则报出', () => {
     expect(findAllViolations().filter((violation) => !isExempted(violation, exemptions))).toEqual([])
   })
 
   /**
-   * 七条规则的谓词自测。这条不依赖豁免清单里有没有条目：客户端那四条规则的清单是空的，
+   * 八条规则的谓词自测。这条不依赖豁免清单里有没有条目：客户端那四条规则的清单是空的，
    * 「移除任一豁免必须报错」对它们是空循环，只有喂合成源码才能证明规则还活着。
    */
-  it('七条规则各自认得出违规写法，也不误报同名局部变量、呈现绑定与管道', () => {
-    const [snapshotRule, rpcRule, capabilityRule, entryRule, regionFrostRule, headerFrostRule, assertionRule] = rules
-    if (!snapshotRule || !rpcRule || !capabilityRule || !entryRule) throw new Error('架构规则缺失')
+  it('八条规则各自认得出违规写法，也不误报同名局部变量、呈现绑定与管道', () => {
+    const [snapshotRule, rpcRule, capabilityRule, entryRule, fallbackRule] = rules
+    const [, , , , , regionFrostRule, headerFrostRule, assertionRule] = rules
+    if (!snapshotRule || !rpcRule || !capabilityRule || !entryRule || !fallbackRule) throw new Error('架构规则缺失')
     if (!regionFrostRule || !headerFrostRule || !assertionRule) throw new Error('架构规则缺失')
 
     expect(snapshotRule.findViolations('client/x.vue', 'const props = defineProps<{ snapshot: SandboxSnapshot }>()')).not.toEqual([])
@@ -496,6 +589,70 @@ describe('WebQQ 模块化架构', () => {
     // 打开合并转发与查看资料不是消息能力，不进这条规则。
     expect(entryRule.findViolations('client/x.vue', "emit('openForward', { messageId: message.id, forwardId })")).toEqual([])
     expect(entryRule.findViolations('client/x.vue', "emit('openProfile', message.authorId)")).toEqual([])
+
+    // 裸的错误兜底按形状认：取错误消息，取不到就用一句写死的中文。
+    expect(fallbackRule.findViolations('client/webqq/x.ts', "error.value = cause instanceof Error ? cause.message : '发送失败'"))
+      .toEqual(["1 处裸的错误兜底（'发送失败'）"])
+    expect(fallbackRule.findViolations('client/x.vue', 'errorMessage.value = error instanceof Error ? error.message : "创建失败"'))
+      .not.toEqual([])
+    // 兜底里套一层 String() 仍然是写死的中文。
+    expect(fallbackRule.findViolations('client/x.vue', "return error instanceof Error ? error.message : String(error || '操作失败')"))
+      .not.toEqual([])
+    // 把同一个三元链换行摊开是最容易想到的绕法，规则要跟着续行读下去。
+    expect(fallbackRule.findViolations(
+      'client/x.vue',
+      'errorMessage.value = error instanceof Error\n  ? error.message\n  : \'创建失败\'',
+    )).not.toEqual([])
+    // 同一个文件里的多处合并成一条证据，文案去重后列出。
+    expect(fallbackRule.findViolations(
+      'client/x.vue',
+      "a.value = error instanceof Error ? error.message : '发布群公告失败'\nb.value = error instanceof Error ? error.message : '删除群公告失败'",
+    )).toEqual(["2 处裸的错误兜底（'删除群公告失败' / '发布群公告失败'）"])
+    // 主语是属性路径时同样要认：换成 `state.error` 不能让规则失效。
+    expect(fallbackRule.findViolations('client/x.vue', "state.error = cause instanceof Error ? cause.message : '失败了'"))
+      .not.toEqual([])
+    expect(fallbackRule.findViolations('client/x.vue', "x = state.error instanceof Error ? state.error.message : '失败了'"))
+      .not.toEqual([])
+    expect(fallbackRule.findViolations('client/x.vue', "x = state.error instanceof Error ? state.error?.message : '失败了'"))
+      .not.toEqual([])
+    // 兜底套在跨行的括号里也要认。
+    expect(fallbackRule.findViolations(
+      'client/x.vue',
+      'x = cause instanceof Error ? cause.message : (\n  fallback || \'创建失败\'\n)\n',
+    )).not.toEqual([])
+    // 兜底当参数传进来、或指向具名常量，都是收拢后的合法形态。
+    expect(fallbackRule.findViolations('client/webqq/error-slot.ts', 'return cause instanceof Error ? cause.message : fallback')).toEqual([])
+    expect(fallbackRule.findViolations('client/webqq/x.ts', 'error.value = failure instanceof Error ? failure.message : SEARCH_FAILED_TEXT')).toEqual([])
+    // 规范化非 Error 值的那条三元链里带着 `'string'`、`'message'` 这些非中文字面量，不得误报。
+    expect(fallbackRule.findViolations(
+      'client/webqq/x.ts',
+      "const message = error instanceof Error\n"
+      + "  ? error.message\n"
+      + "  : typeof error === 'string'\n"
+      + "    ? error\n"
+      + "    : ''\n"
+      + "return message || fallback\n",
+    )).toEqual([])
+    // 语句结束之后的中文不属于这条兜底，不得越界读进来——换行与同一行的 `;` 两种写法都要收住。
+    expect(fallbackRule.findViolations(
+      'client/webqq/x.ts',
+      'const message = cause instanceof Error ? cause.message : fallback\nconst title = \'读取失败\'\n',
+    )).toEqual([])
+    expect(fallbackRule.findViolations(
+      'client/webqq/x.ts',
+      "const message = cause instanceof Error ? cause.message : fallback; const title = '读取失败'\n",
+    )).toEqual([])
+    // 但文案自己带的分号在字符串内部，不得被当成语句边界而漏报。
+    expect(fallbackRule.findViolations(
+      'client/webqq/x.ts',
+      "const message = cause instanceof Error ? cause.message : '读取失败; 请重试'\n",
+    )).not.toEqual([])
+    // 经模块表达的写法只有一次调用，没有条件表达式可认。
+    expect(fallbackRule.findViolations('client/webqq/x.ts', "await gate.read('list', '读取 MCP 调用记录失败', () => controller.loadMcpCallRecords())")).toEqual([])
+    expect(fallbackRule.findViolations('client/webqq/x.ts', "await slot.run('撤回失败', () => controller.recallMessage(input))")).toEqual([])
+    // 两侧主语不同不是这个形状；取的不是消息也不是。
+    expect(fallbackRule.findViolations('client/webqq/x.ts', "const m = cause instanceof Error ? other.message : '失败了'")).toEqual([])
+    expect(fallbackRule.findViolations('client/webqq/x.ts', "const m = cause instanceof Error ? cause.stack : '失败了'")).toEqual([])
 
     // ADR 0060：一级区域自己带模糊就成了 Backdrop Root 边界；模糊挪到 ::before 上则合法。
     expect(regionFrostRule.findViolations('client/styles/x.css', '.webqq-workspace.is-frosted {\n  backdrop-filter: blur(20px);\n}')).not.toEqual([])
@@ -593,6 +750,18 @@ describe('WebQQ 模块化架构', () => {
     // 同一个文件不得在两组里各登记一次，也不得在同一组里重复登记。
     const assertionExemptions = exemptions.filter(({ rule }) => rule === '组件测试文件不得出现裸的肯定式源码断言')
     expect([...new Set(assertionExemptions.map(({ file }) => file))].length).toBe(assertionExemptions.length)
+  })
+
+  /**
+   * 两批豁免的键不是同一类东西：断言规则那批以**测试文件**为键，裸错误兜底那批以**源码文件**为键。
+   * 混进同一组会让「未治理文件只减不增」这个棘轮把源码债务也算进测试治理进度里，两者从此互相掩盖。
+   */
+  it('以源码文件为键的豁免与以测试文件为键的豁免分开登记', () => {
+    expect(errorFallbackExemptions.map(({ file }) => file).filter((file) => !file.startsWith('client/'))).toEqual([])
+    expect([...treatedAssertionExemptions, ...untreatedAssertionExemptions]
+      .map(({ file }) => file)
+      .filter((file) => !file.startsWith('tests/'))).toEqual([])
+    expect([...new Set(errorFallbackExemptions.map(({ file }) => file))].length).toBe(errorFallbackExemptions.length)
   })
 
   it('每条豁免都写明理由与负责消化它的后续工作', () => {
