@@ -1,33 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { createFakeWorkspacePort } from '../client/webqq/fake-workspace-port'
-import { createWorkspaceController } from '../client/webqq/workspace-controller'
+import { createFakeMcpCallRecordPort } from '../client/webqq/fake-mcp-call-record-port'
+import { createTestWorkspaceController } from './helpers/workspace-controller'
 import type { SandboxMcpCallRecord, SandboxMcpCallRecordListItem } from '../src/mcp/types'
-import type { SandboxWorkspaceState } from '../src/types'
-
-const workspace: SandboxWorkspaceState = {
-  snapshot: {
-    revision: 0,
-    participants: [
-      { kind: 'user', id: '10001', name: '测试用户1' },
-      { kind: 'bot', id: '20001', name: 'Koishi', implementation: 'napcat', enabled: true },
-    ],
-    groups: [],
-    conversations: [{ id: 'private:10001:20001', type: 'direct', participantIds: ['10001', '20001'], messageIds: [] }],
-    messages: [],
-    forwards: [],
-    friendships: [],
-    requests: [],
-  },
-  chatLunaStates: [],
-  appearance: {
-    enableSandboxFrostedGlass: true,
-    sandboxTimBubbleTail: true,
-    sandboxColorMode: 'auto',
-    sandboxAccentColor: '#2563eb',
-    sandboxMarkRecalledMessages: true,
-  },
-  persistence: { mode: 'memory', available: true, persisted: false },
-}
 
 const record: SandboxMcpCallRecordListItem = {
   id: 'call-1',
@@ -49,13 +23,10 @@ const detail: SandboxMcpCallRecord = {
 
 describe('WebQQ MCP 调用记录控制器', () => {
   it('通过端口加载筛选记录、详情并清理当前缓冲区', async () => {
-    const port = createFakeWorkspacePort(workspace)
+    const port = createFakeMcpCallRecordPort()
     port.mcpCallRecordsResult = { records: [record] }
     port.mcpCallRecordResult = detail
-    const controller = createWorkspaceController(port, {
-      getItem: () => null,
-      setItem: () => undefined,
-    })
+    const controller = createTestWorkspaceController({ mcpCallRecord: port })
 
     await controller.loadMcpCallRecords({ tool: 'get_server_info' })
     expect(controller.mcpCallRecords.value).toEqual([record])

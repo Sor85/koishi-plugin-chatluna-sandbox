@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { describe, expect, it } from 'vitest'
 import { createFakeWorkspacePort } from '../client/webqq/fake-workspace-port'
-import { createWorkspaceController } from '../client/webqq/workspace-controller'
+import { createTestWorkspaceController } from './helpers/workspace-controller'
 import { createWorkspaceLayout } from '../client/webqq/workspace-layout'
 import { createWebqqWorkspaceShell } from '../client/webqq/workspace-shell'
 import type { SandboxSnapshot, SandboxWorkspaceState } from '../src/types'
@@ -65,7 +65,7 @@ function createStorage() {
 
 async function createShell(withConversation = true) {
   const port = createFakeWorkspacePort(createWorkspace(createSnapshot(withConversation)))
-  const controller = createWorkspaceController(port, createStorage())
+  const controller = createTestWorkspaceController({ workspace: port }, createStorage())
   await controller.load()
   const warn = console.warn
   console.warn = (...args: unknown[]) => {

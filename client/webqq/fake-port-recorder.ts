@@ -5,8 +5,8 @@ export interface FakePortCall<Operation extends string> {
 }
 
 /**
- * 三个假端口共用的调用记录与失败注入。集中一份的理由不是省行数，而是失败消费必须
- * 只有一套语义：注入的失败按操作排队、每次调用消费一条，任何一处手抄都可能与其余两处分叉。
+ * 六个假端口共用的调用记录与失败注入。集中一份的理由不是省行数，而是失败消费必须
+ * 只有一套语义：注入的失败按操作排队、每次调用消费一条，任何一处手抄都可能与其余几处分叉。
  */
 export class FakePortRecorder<Operation extends string> {
   readonly calls: FakePortCall<Operation>[] = []

@@ -1,30 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { createFakeWorkspacePort } from '../client/webqq/fake-workspace-port'
-import { createWorkspaceController } from '../client/webqq/workspace-controller'
+import { createFakePresetPort } from '../client/webqq/fake-preset-port'
+import { createTestWorkspaceController } from './helpers/workspace-controller'
 import type { SandboxPresetDocument } from '../src/presets'
-import type { SandboxWorkspaceState } from '../src/types'
-
-const workspace: SandboxWorkspaceState = {
-  snapshot: {
-    revision: 0,
-    participants: [],
-    groups: [],
-    conversations: [],
-    messages: [],
-    forwards: [],
-    friendships: [],
-    requests: [],
-  },
-  chatLunaStates: [],
-  appearance: {
-    enableSandboxFrostedGlass: true,
-    sandboxTimBubbleTail: true,
-    sandboxColorMode: 'auto',
-    sandboxAccentColor: '#2563eb',
-    sandboxMarkRecalledMessages: true,
-  },
-  persistence: { mode: 'memory', available: true, persisted: false },
-}
 
 const document: SandboxPresetDocument = {
   kind: 'core',
@@ -41,7 +18,7 @@ const document: SandboxPresetDocument = {
 
 describe('预设工作区控制器和端口', () => {
   it('公开目录、读取、CRUD 与定位调用，并同步公开状态', async () => {
-    const port = createFakeWorkspacePort(workspace)
+    const port = createFakePresetPort()
     port.presetCatalogResult = [document]
     port.presetDocumentResult = document
     port.locatePresetExpressionResult = {
@@ -51,7 +28,7 @@ describe('预设工作区控制器和端口', () => {
       range: { start: 0, end: 4 },
       scope: { scope: 'main' },
     }
-    const controller = createWorkspaceController(port, { getItem: () => null, setItem: () => undefined })
+    const controller = createTestWorkspaceController({ preset: port })
 
     await controller.loadPresetCatalog()
     expect(controller.presetCatalog.value).toEqual([document])

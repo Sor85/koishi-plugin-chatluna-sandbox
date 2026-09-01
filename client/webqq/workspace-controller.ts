@@ -41,6 +41,9 @@ import {
   type SandboxWorkspaceView,
 } from './workspace-state'
 import type { WorkspacePort } from './workspace-port'
+import type { ModelRequestPort } from './model-request-port'
+import type { PresetPort } from './preset-port'
+import type { McpCallRecordPort } from './mcp-call-record-port'
 import type {
   LocateSandboxPresetExpressionInput,
   LocateSandboxPresetExpressionResult,
@@ -151,7 +154,19 @@ const emptySnapshot: SandboxSnapshot = {
   requests: [],
 }
 
-export function createWorkspaceController(port: WorkspacePort, storage: WorkspaceStorage) {
+/**
+ * 控制器按能力收若干道端口。它仍然是一个 module——工作台状态与选择解析住在这里——但
+ * 每道能力的通信各走自己那道窄端口，加一道能力不会让别的消费方的 interface 跟着变宽。
+ */
+export interface WorkspaceControllerPorts {
+  workspace: WorkspacePort
+  modelRequest: ModelRequestPort
+  preset: PresetPort
+  mcpCallRecord: McpCallRecordPort
+}
+
+export function createWorkspaceController(ports: WorkspaceControllerPorts, storage: WorkspaceStorage) {
+  const { workspace: workspacePort, modelRequest: modelRequestPort, preset: presetPort, mcpCallRecord: mcpCallRecordPort } = ports
   const workspaceState = ref<SandboxWorkspaceState>({
     snapshot: emptySnapshot,
     chatLunaStates: [],
@@ -273,10 +288,10 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     let nextWorkspace: SandboxWorkspaceState
     try {
       nextWorkspace = preferences.currentOperatorId
-        ? await port.getWorkspace({ operatorId: preferences.currentOperatorId })
-        : await port.getWorkspace()
+        ? await workspacePort.getWorkspace({ operatorId: preferences.currentOperatorId })
+        : await workspacePort.getWorkspace()
     } catch {
-      nextWorkspace = await port.getWorkspace()
+      nextWorkspace = await workspacePort.getWorkspace()
     }
     workspaceState.value = nextWorkspace
     applySelection(resolveWorkspaceSelection(snapshot.value, preferences))
@@ -298,7 +313,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     if (!snapshot.value.participants.some(({ id }) => id === participantId)) return
     let nextWorkspace: SandboxWorkspaceState
     try {
-      nextWorkspace = await port.getWorkspace({ operatorId: participantId })
+      nextWorkspace = await workspacePort.getWorkspace({ operatorId: participantId })
     } catch (error) {
       throw normalizeWorkspaceError(error, '切换当前操作者失败')
     }
@@ -322,7 +337,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     const operatorId = currentOperatorIdState.value
     if (!operatorId) throw new WorkspaceControllerError('当前操作者不可用')
     try {
-      replaceWorkspace(await port.performFriendAction({ ...input, operatorId }))
+      replaceWorkspace(await workspacePort.performFriendAction({ ...input, operatorId }))
     } catch (error) {
       throw normalizeWorkspaceError(error, '好友操作失败')
     }
@@ -335,7 +350,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   async function createConversationInstance(input: Omit<CreateConversationInstanceInput, 'operatorId'>) {
     const operatorId = getCurrentOperatorId()
     try {
-      const { conversationId, ...workspace } = await port.createConversationInstance({ ...input, operatorId })
+      const { conversationId, ...workspace } = await workspacePort.createConversationInstance({ ...input, operatorId })
       replaceWorkspace(workspace)
       selectConversation(conversationId)
       return conversationId
@@ -348,7 +363,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   async function branchConversationInstance(input: Omit<BranchConversationInstanceInput, 'operatorId'>) {
     const operatorId = getCurrentOperatorId()
     try {
-      const { conversationId, ...workspace } = await port.branchConversationInstance({ ...input, operatorId })
+      const { conversationId, ...workspace } = await workspacePort.branchConversationInstance({ ...input, operatorId })
       replaceWorkspace(workspace)
       selectConversation(conversationId)
       return conversationId
@@ -361,7 +376,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   async function renameConversationInstance(input: Omit<RenameConversationInstanceInput, 'operatorId'>) {
     const operatorId = getCurrentOperatorId()
     try {
-      replaceWorkspace(await port.renameConversationInstance({ ...input, operatorId }))
+      replaceWorkspace(await workspacePort.renameConversationInstance({ ...input, operatorId }))
     } catch (error) {
       throw normalizeWorkspaceError(error, '重命名会话失败')
     }
@@ -374,7 +389,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   async function deleteConversationInstance(input: Omit<DeleteConversationInstanceInput, 'operatorId'>) {
     const operatorId = getCurrentOperatorId()
     try {
-      replaceWorkspace(await port.deleteConversationInstance({ ...input, operatorId }))
+      replaceWorkspace(await workspacePort.deleteConversationInstance({ ...input, operatorId }))
     } catch (error) {
       throw normalizeWorkspaceError(error, '删除会话失败')
     }
@@ -383,7 +398,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   async function sendMessage(input: Omit<SendMessageInput, 'operatorId'>) {
     const operatorId = getCurrentOperatorId()
     try {
-      replaceWorkspace(await port.sendMessage({ ...input, operatorId }))
+      replaceWorkspace(await workspacePort.sendMessage({ ...input, operatorId }))
     } catch (error) {
       throw normalizeWorkspaceError(error, '发送失败')
     }
@@ -392,7 +407,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   async function sendMediaMessage(input: Omit<SendMediaMessageInput, 'operatorId'>) {
     const operatorId = getCurrentOperatorId()
     try {
-      replaceWorkspace(await port.sendMediaMessage({ ...input, operatorId }))
+      replaceWorkspace(await workspacePort.sendMediaMessage({ ...input, operatorId }))
     } catch (error) {
       throw normalizeWorkspaceError(error, '发送失败')
     }
@@ -401,7 +416,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   async function sendForwardMessage(input: Omit<SendForwardMessageInput, 'operatorId'>) {
     const operatorId = getCurrentOperatorId()
     try {
-      replaceWorkspace(await port.sendForwardMessage({ ...input, operatorId }))
+      replaceWorkspace(await workspacePort.sendForwardMessage({ ...input, operatorId }))
     } catch (error) {
       throw normalizeWorkspaceError(error, '合并转发失败')
     }
@@ -410,7 +425,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   async function getForwardMessage(input: Omit<GetForwardMessageInput, 'operatorId'>) {
     const operatorId = getCurrentOperatorId()
     try {
-      const forward = await port.getForwardMessage({ ...input, operatorId })
+      const forward = await workspacePort.getForwardMessage({ ...input, operatorId })
       // 按需详情也并入本地快照，避免重复 RPC 与列表预览丢失嵌套资源。
       if (!(snapshot.value.forwards ?? []).some(({ id }) => id === forward.id)) {
         replaceWorkspace({
@@ -430,7 +445,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   async function recallMessage(input: Omit<RecallMessageInput, 'operatorId'>) {
     const operatorId = getCurrentOperatorId()
     try {
-      replaceWorkspace(await port.recallMessage({ ...input, operatorId }))
+      replaceWorkspace(await workspacePort.recallMessage({ ...input, operatorId }))
     } catch (error) {
       throw normalizeWorkspaceError(error, '撤回失败')
     }
@@ -439,7 +454,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   async function clearConversationMessages(input: Omit<ClearConversationMessagesInput, 'operatorId'>) {
     const operatorId = getCurrentOperatorId()
     try {
-      replaceWorkspace(await port.clearConversationMessages({ ...input, operatorId }))
+      replaceWorkspace(await workspacePort.clearConversationMessages({ ...input, operatorId }))
     } catch (error) {
       throw normalizeWorkspaceError(error, '清空会话记录失败')
     }
@@ -448,7 +463,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   async function setMessageReaction(input: Omit<SetMessageReactionInput, 'operatorId'>) {
     const operatorId = getCurrentOperatorId()
     try {
-      replaceWorkspace(await port.setMessageReaction({ ...input, operatorId }))
+      replaceWorkspace(await workspacePort.setMessageReaction({ ...input, operatorId }))
     } catch (error) {
       throw normalizeWorkspaceError(error, '贴表情失败')
     }
@@ -470,8 +485,8 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
           const operatorId = currentOperatorIdState.value
           try {
             const nextWorkspace = operatorId
-              ? await port.getWorkspace({ operatorId })
-              : await port.getWorkspace()
+              ? await workspacePort.getWorkspace({ operatorId })
+              : await workspacePort.getWorkspace()
             // 并发的用户操作 RPC 可能已带回更新的工作区，旧响应不能回退状态。
             if (nextWorkspace.snapshot.revision >= snapshot.value.revision) replaceWorkspace(nextWorkspace)
           } catch {
@@ -487,7 +502,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   async function getMediaContent(mediaId: string) {
     const operatorId = getCurrentOperatorId()
     try {
-      return await port.getMediaContent({ operatorId, mediaId })
+      return await workspacePort.getMediaContent({ operatorId, mediaId })
     } catch (error) {
       throw normalizeWorkspaceError(error, '加载媒体失败')
     }
@@ -496,7 +511,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   async function loadMessageHistory(input: Omit<GetMessageHistoryInput, 'operatorId'>) {
     const operatorId = getCurrentOperatorId()
     try {
-      const history = await port.getMessageHistory({ ...input, operatorId })
+      const history = await workspacePort.getMessageHistory({ ...input, operatorId })
       const knownIds = new Set(snapshot.value.messages.map(({ id }) => id))
       const knownForwardIds = new Set((snapshot.value.forwards ?? []).map(({ id }) => id))
       // 历史页要合并回被读的那个会话行，而它可能是根会话也可能是会话实例。快照里的实例行
@@ -530,7 +545,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   async function searchConversationMessages(input: Omit<SearchConversationMessagesInput, 'operatorId'>) {
     const operatorId = getCurrentOperatorId()
     try {
-      return await port.searchConversationMessages({ ...input, operatorId })
+      return await workspacePort.searchConversationMessages({ ...input, operatorId })
     } catch (error) {
       throw normalizeWorkspaceError(error, '搜索会话消息失败')
     }
@@ -539,7 +554,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   async function setGroupAnnouncement(input: Omit<SetGroupAnnouncementInput, 'operatorId'>) {
     const operatorId = getCurrentOperatorId()
     try {
-      replaceWorkspace(await port.setGroupAnnouncement({ ...input, operatorId }))
+      replaceWorkspace(await workspacePort.setGroupAnnouncement({ ...input, operatorId }))
     } catch (error) {
       throw normalizeWorkspaceError(error, '发布群公告失败')
     }
@@ -548,7 +563,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   async function deleteGroupAnnouncement(input: Omit<DeleteGroupAnnouncementInput, 'operatorId'>) {
     const operatorId = getCurrentOperatorId()
     try {
-      replaceWorkspace(await port.deleteGroupAnnouncement({ ...input, operatorId }))
+      replaceWorkspace(await workspacePort.deleteGroupAnnouncement({ ...input, operatorId }))
     } catch (error) {
       throw normalizeWorkspaceError(error, '删除群公告失败')
     }
@@ -557,12 +572,12 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
   async function manageEnvironment(input: ManageSandboxEnvironmentInput) {
     try {
       const operatorId = currentOperatorIdState.value
-      const managedWorkspace = await port.manageEnvironment(input)
+      const managedWorkspace = await workspacePort.manageEnvironment(input)
       const deletesCurrentOperator = (input.action === 'delete-user' || input.action === 'delete-bot')
         && input.data.id === operatorId
       // Koishi send 会把缺省 RPC 入参传成 null；空环境创建首个参与者或删除当前操作者时，直接使用管理接口返回的 fallback 工作区。
       replaceWorkspace(operatorId && !deletesCurrentOperator
-        ? await port.getWorkspace({ operatorId })
+        ? await workspacePort.getWorkspace({ operatorId })
         : managedWorkspace)
     } catch (error) {
       throw normalizeWorkspaceError(error, '环境管理失败')
@@ -573,7 +588,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     const operatorId = currentOperatorIdState.value
     if (!operatorId) throw new WorkspaceControllerError('当前操作者不可用')
     try {
-      replaceWorkspace(await port.performGroupAction({ ...input, operatorId }))
+      replaceWorkspace(await workspacePort.performGroupAction({ ...input, operatorId }))
     } catch (error) {
       throw normalizeWorkspaceError(error, '群组操作失败')
     }
@@ -581,7 +596,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
 
   async function loadOneBotDebugRecords(input: GetSandboxOneBotDebugRecordsInput = {}) {
     try {
-      const page = await port.getOneBotDebugRecords(input)
+      const page = await workspacePort.getOneBotDebugRecords(input)
       oneBotDebugRecordsState.value = page.records
     } catch (error) {
       throw normalizeWorkspaceError(error, '读取 OneBot 调试记录失败')
@@ -590,7 +605,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
 
   async function loadOneBotDebugRecord(input: GetSandboxOneBotDebugRecordInput & { spaceId?: string }) {
     try {
-      oneBotDebugRecordState.value = await port.getOneBotDebugRecord(input)
+      oneBotDebugRecordState.value = await workspacePort.getOneBotDebugRecord(input)
       return oneBotDebugRecordState.value
     } catch (error) {
       throw normalizeWorkspaceError(error, '读取 OneBot 调试详情失败')
@@ -599,7 +614,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
 
   async function clearOneBotDebugRecords() {
     try {
-      await port.clearOneBotDebugRecords()
+      await workspacePort.clearOneBotDebugRecords()
       oneBotDebugRecordsState.value = []
       oneBotDebugRecordState.value = undefined
     } catch (error) {
@@ -609,7 +624,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
 
   async function loadModelRequestRecords(input: ModelRequestRecordsQuery, mode: 'replace' | 'append' = 'replace') {
     try {
-      const page = await port.getModelRequestRecords(input)
+      const page = await modelRequestPort.getModelRequestRecords(input)
       modelRequestRecordsState.value = mode === 'append'
         ? [...modelRequestRecordsState.value, ...page.records]
         : page.records
@@ -628,7 +643,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
 
   async function loadModelRequestRecord(input: ModelRequestRecordQuery) {
     try {
-      modelRequestRecordState.value = await port.getModelRequestRecord(input)
+      modelRequestRecordState.value = await modelRequestPort.getModelRequestRecord(input)
       return modelRequestRecordState.value
     } catch (error) {
       throw normalizeWorkspaceError(error, '读取模型请求详情失败')
@@ -637,7 +652,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
 
   async function loadModelRequestTrajectory(input: ModelRequestTrajectoryQuery) {
     try {
-      modelRequestTrajectoryState.value = await port.getModelRequestTrajectory(input)
+      modelRequestTrajectoryState.value = await modelRequestPort.getModelRequestTrajectory(input)
     } catch (error) {
       throw normalizeWorkspaceError(error, '读取模型请求轨迹失败')
     }
@@ -645,7 +660,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
 
   async function clearModelRequestRecords(input: ClearModelRequestRecordsQuery) {
     try {
-      await port.clearModelRequestRecords(input)
+      await modelRequestPort.clearModelRequestRecords(input)
       modelRequestRecordsState.value = []
       modelRequestRecordState.value = undefined
       modelRequestTrajectoryState.value = undefined
@@ -660,7 +675,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
 
   async function loadPresetCatalog() {
     try {
-      presetCatalogState.value = await port.getPresetCatalog()
+      presetCatalogState.value = await presetPort.getPresetCatalog()
     } catch (error) {
       throw normalizeWorkspaceError(error, '读取预设目录失败')
     }
@@ -668,7 +683,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
 
   async function readPreset(input: ReadSandboxPresetInput) {
     try {
-      presetDocumentState.value = await port.readPreset(input)
+      presetDocumentState.value = await presetPort.readPreset(input)
       return presetDocumentState.value
     } catch (error) {
       throw normalizeWorkspaceError(error, '读取预设失败')
@@ -677,7 +692,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
 
   async function createPreset(input: CreatePresetInput) {
     try {
-      const document = await port.createPreset(input)
+      const document = await presetPort.createPreset(input)
       upsertPreset(document)
       presetDocumentState.value = document
       return document
@@ -688,7 +703,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
 
   async function savePreset(input: SavePresetInput) {
     try {
-      const document = await port.savePreset(input)
+      const document = await presetPort.savePreset(input)
       upsertPreset(document)
       presetDocumentState.value = document
       return document
@@ -699,7 +714,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
 
   async function renamePreset(input: RenamePresetInput) {
     try {
-      const document = await port.renamePreset(input)
+      const document = await presetPort.renamePreset(input)
       presetCatalogState.value = presetCatalogState.value.filter(({ kind, fileName }) => (
         kind !== input.kind || fileName !== input.fileName
       ))
@@ -713,7 +728,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
 
   async function deletePreset(input: DeletePresetInput) {
     try {
-      const result = await port.deletePreset(input)
+      const result = await presetPort.deletePreset(input)
       presetCatalogState.value = presetCatalogState.value.filter(({ kind, fileName }) => (
         kind !== input.kind || fileName !== input.fileName
       ))
@@ -728,7 +743,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
 
   async function loadMcpCallRecords(input: ListSandboxMcpCallRecordsInput = {}) {
     try {
-      const page = await port.getMcpCallRecords(input)
+      const page = await mcpCallRecordPort.getMcpCallRecords(input)
       mcpCallRecordsState.value = page.records
     } catch (error) {
       throw normalizeWorkspaceError(error, '读取 MCP 调用记录失败')
@@ -737,7 +752,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
 
   async function loadMcpCallRecord(input: { recordId: string }) {
     try {
-      mcpCallRecordState.value = await port.getMcpCallRecord(input)
+      mcpCallRecordState.value = await mcpCallRecordPort.getMcpCallRecord(input)
       return mcpCallRecordState.value
     } catch (error) {
       throw normalizeWorkspaceError(error, '读取 MCP 调用详情失败')
@@ -746,7 +761,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
 
   async function clearMcpCallRecords() {
     try {
-      await port.clearMcpCallRecords()
+      await mcpCallRecordPort.clearMcpCallRecords()
       mcpCallRecordsState.value = []
       mcpCallRecordState.value = undefined
     } catch (error) {
@@ -756,7 +771,7 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
 
   async function locatePresetExpression(input: LocateSandboxPresetExpressionInput) {
     try {
-      const result = await port.locatePresetExpression(input)
+      const result = await presetPort.locatePresetExpression(input)
       presetLocateResultState.value = result
       return result
     } catch (error) {
@@ -779,8 +794,8 @@ export function createWorkspaceController(port: WorkspacePort, storage: Workspac
     if (!request) throw new WorkspaceControllerError('关系申请不存在')
     try {
       const nextWorkspace = request.type === 'group'
-        ? await port.performGroupAction({ action: 'handle-request', requestId, approve, operatorId })
-        : await port.performFriendAction({ action: 'handle-request', requestId, approve, operatorId })
+        ? await workspacePort.performGroupAction({ action: 'handle-request', requestId, approve, operatorId })
+        : await workspacePort.performFriendAction({ action: 'handle-request', requestId, approve, operatorId })
       replaceWorkspace(nextWorkspace)
     } catch (error) {
       throw normalizeWorkspaceError(error, '处理关系申请失败')

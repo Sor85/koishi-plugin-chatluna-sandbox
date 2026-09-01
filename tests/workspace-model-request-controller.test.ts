@@ -1,32 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { createFakeWorkspacePort } from '../client/webqq/fake-workspace-port'
-import { createWorkspaceController } from '../client/webqq/workspace-controller'
-import type { SandboxModelRequestDetail, SandboxModelRequestListItem, SandboxWorkspaceState } from '../src/types'
-
-const workspace: SandboxWorkspaceState = {
-  snapshot: {
-    revision: 0,
-    participants: [
-      { kind: 'user', id: '10001', name: '测试用户1' },
-      { kind: 'bot', id: '20001', name: 'Koishi', implementation: 'napcat', enabled: true },
-    ],
-    groups: [],
-    conversations: [{ id: 'private:10001:20001', type: 'direct', participantIds: ['10001', '20001'], messageIds: [] }],
-    messages: [],
-    forwards: [],
-    friendships: [],
-    requests: [],
-  },
-  chatLunaStates: [],
-  appearance: {
-    enableSandboxFrostedGlass: true,
-    sandboxTimBubbleTail: true,
-    sandboxColorMode: 'auto',
-    sandboxAccentColor: '#2563eb',
-    sandboxMarkRecalledMessages: true,
-  },
-  persistence: { mode: 'memory', available: true, persisted: false },
-}
+import { createFakeModelRequestPort } from '../client/webqq/fake-model-request-port'
+import { createTestWorkspaceController } from './helpers/workspace-controller'
+import type { SandboxModelRequestDetail, SandboxModelRequestListItem } from '../src/types'
 
 const listItem: SandboxModelRequestListItem = {
   id: 'record-1',
@@ -58,7 +33,7 @@ const detail: SandboxModelRequestDetail = {
 
 describe('WebQQ 模型请求控制器', () => {
   it('按空间或未归属分类分页加载摘要，并读取单条详情', async () => {
-    const port = createFakeWorkspacePort(workspace)
+    const port = createFakeModelRequestPort()
     port.modelRequestRecordsResult = {
       records: [listItem],
       hasMore: true,
@@ -74,10 +49,7 @@ describe('WebQQ 模型请求控制器', () => {
       promptComposition: [],
       complete: true,
     }
-    const controller = createWorkspaceController(port, {
-      getItem: () => null,
-      setItem: () => undefined,
-    })
+    const controller = createTestWorkspaceController({ modelRequest: port })
 
     await controller.loadModelRequestRecords({ scope: 'space', spaceId: 'main', limit: 50 })
     expect(controller.modelRequestRecords.value).toEqual([listItem])
@@ -112,16 +84,13 @@ describe('WebQQ 模型请求控制器', () => {
   })
 
   it('只通过未归属分类清理当前缓冲区', async () => {
-    const port = createFakeWorkspacePort(workspace)
+    const port = createFakeModelRequestPort()
     port.modelRequestRecordsResult = {
       records: [listItem],
       hasMore: false,
       capacity: { recordCount: 1, totalBytes: 64, maxRecords: 5000, maxBytes: 50 * 1024 * 1024 },
     }
-    const controller = createWorkspaceController(port, {
-      getItem: () => null,
-      setItem: () => undefined,
-    })
+    const controller = createTestWorkspaceController({ modelRequest: port })
 
     await controller.loadModelRequestRecords({ scope: 'unattributed' })
     await controller.clearModelRequestRecords({ scope: 'unattributed' })

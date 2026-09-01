@@ -1,6 +1,12 @@
 import { ref } from 'vue'
 import { describe, expect, it } from 'vitest'
-import { createFakeWorkspacePort } from '../client/webqq/fake-workspace-port'
+import { createFakeMcpCallRecordPort } from '../client/webqq/fake-mcp-call-record-port'
+import { createFakeModelRequestPort } from '../client/webqq/fake-model-request-port'
+import { createFakePresetPort } from '../client/webqq/fake-preset-port'
+import { createFakeWorkspacePort, type WorkspacePortOperation } from '../client/webqq/fake-workspace-port'
+import type { McpCallRecordPortOperation } from '../client/webqq/mcp-call-record-port'
+import type { ModelRequestPortOperation } from '../client/webqq/model-request-port'
+import type { PresetPortOperation } from '../client/webqq/preset-port'
 import { createWorkspaceController } from '../client/webqq/workspace-controller'
 import { createWorkspaceLayout } from '../client/webqq/workspace-layout'
 import { createWebqqWorkspaceShell } from '../client/webqq/workspace-shell'
@@ -53,9 +59,38 @@ function createStorage() {
   }
 }
 
+type RegionOperation =
+  | WorkspacePortOperation
+  | ModelRequestPortOperation
+  | PresetPortOperation
+  | McpCallRecordPortOperation
+
+/**
+ * 四个区域各驱动自己那道端口。用例问的是「失败写进哪个区域的错误位」，因此这里按操作名
+ * 路由注入——操作名在四道端口之间不重名，用例里那一串操作名一字不改。
+ */
+function createRegionPorts() {
+  const workspace = createFakeWorkspacePort(createWorkspace())
+  const modelRequest = createFakeModelRequestPort()
+  const preset = createFakePresetPort()
+  const mcpCallRecord = createFakeMcpCallRecordPort()
+  const owners = [workspace, modelRequest, preset, mcpCallRecord]
+  return {
+    workspace,
+    modelRequest,
+    preset,
+    mcpCallRecord,
+    rejectNext(operation: RegionOperation, error: unknown) {
+      const owner = owners.find((candidate) => operation in candidate)
+      if (!owner) throw new Error(`没有端口提供操作：${operation}`)
+      ;(owner.rejectNext as (operation: string, error: unknown) => void)(operation, error)
+    },
+  }
+}
+
 async function createShell() {
-  const port = createFakeWorkspacePort(createWorkspace())
-  const controller = createWorkspaceController(port, createStorage())
+  const ports = createRegionPorts()
+  const controller = createWorkspaceController(ports, createStorage())
   await controller.load()
   // 外壳在 setup 里注册 onMounted；测试直接调用工厂时该钩子是空操作，只吞掉这一条预期告警。
   const warn = console.warn
@@ -65,7 +100,7 @@ async function createShell() {
   }
   try {
     const shell = createWebqqWorkspaceShell(controller, createWorkspaceLayout(ref(true)), () => undefined)
-    return { port, shell }
+    return { ports, shell }
   } finally {
     console.warn = warn
   }
@@ -167,8 +202,8 @@ describe('四个区域的读取闸门', () => {
   })
 
   it('定位预设表达式不展示进行中，只写区域错误位', async () => {
-    const { port, shell } = await createShell()
-    port.rejectNext('locatePresetExpression', new Error('没有匹配的模型请求'))
+    const { ports, shell } = await createShell()
+    ports.rejectNext('locatePresetExpression', new Error('没有匹配的模型请求'))
 
     await acrossCall(
       () => shell.locatePresetExpression(presetLocateInput),
@@ -180,11 +215,11 @@ describe('四个区域的读取闸门', () => {
 
   /** 漏掉复位不报错，界面只会一直转圈。四个区域的失败路径逐个断言。 */
   it('读取失败后进行中一定复位，界面不会一直转圈', async () => {
-    const { port, shell } = await createShell()
-    port.rejectNext('getOneBotDebugRecords', new Error('上游失败'))
-    port.rejectNext('getMcpCallRecords', new Error('上游失败'))
-    port.rejectNext('getModelRequestRecords', new Error('上游失败'))
-    port.rejectNext('getPresetCatalog', new Error('上游失败'))
+    const { ports, shell } = await createShell()
+    ports.rejectNext('getOneBotDebugRecords', new Error('上游失败'))
+    ports.rejectNext('getMcpCallRecords', new Error('上游失败'))
+    ports.rejectNext('getModelRequestRecords', new Error('上游失败'))
+    ports.rejectNext('getPresetCatalog', new Error('上游失败'))
 
     await shell.loadOneBotDebugRecords()
     await shell.loadMcpCallRecords()
@@ -199,17 +234,17 @@ describe('四个区域的读取闸门', () => {
   })
 
   it('四个区域各自独立：一个区域的错误不出现在另一个区域的模型上，也不写进发送控件', async () => {
-    const { port, shell } = await createShell()
+    const { ports, shell } = await createShell()
 
-    port.rejectNext('getOneBotDebugRecords', new Error('调试记录读取失败'))
+    ports.rejectNext('getOneBotDebugRecords', new Error('调试记录读取失败'))
     await shell.loadOneBotDebugRecords()
     expect(errorsOf(shell)).toEqual({ ...noError, debug: '调试记录读取失败' })
 
-    port.rejectNext('getMcpCallRecords', new Error('MCP 调用读取失败'))
+    ports.rejectNext('getMcpCallRecords', new Error('MCP 调用读取失败'))
     await shell.loadMcpCallRecords()
-    port.rejectNext('getModelRequestRecords', new Error('模型请求读取失败'))
+    ports.rejectNext('getModelRequestRecords', new Error('模型请求读取失败'))
     await shell.loadModelRequestRecords({ scope: 'main' })
-    port.rejectNext('getPresetCatalog', new Error('预设目录读取失败'))
+    ports.rejectNext('getPresetCatalog', new Error('预设目录读取失败'))
     await shell.loadPresetCatalog()
 
     // 四条错误同时在场且各归各位；发送控件上的外部错误始终为空。
@@ -231,9 +266,9 @@ describe('四个区域的读取闸门', () => {
    * 控制器背后不可达。兜底优先级那条规则由错误位模块自己的测试执行。
    */
   it('每个读取动作把上游失败写进自己那个区域的错误位', async () => {
-    const { port, shell } = await createShell()
-    const wrote = async (operation: Parameters<typeof port.rejectNext>[0], message: string, call: () => Promise<unknown>) => {
-      port.rejectNext(operation, new Error(message))
+    const { ports, shell } = await createShell()
+    const wrote = async (operation: Parameters<typeof ports.rejectNext>[0], message: string, call: () => Promise<unknown>) => {
+      ports.rejectNext(operation, new Error(message))
       await call().catch(() => undefined)
       return errorsOf(shell)
     }
@@ -282,8 +317,8 @@ describe('四个区域的读取闸门', () => {
   })
 
   it('读取失败后再点一次能重试，错误位在新的一次读取开始时就被清掉', async () => {
-    const { port, shell } = await createShell()
-    port.rejectNext('getModelRequestRecords', new Error('第一次就失败'))
+    const { ports, shell } = await createShell()
+    ports.rejectNext('getModelRequestRecords', new Error('第一次就失败'))
 
     await shell.loadModelRequestRecords({ scope: 'main' })
     expect(errorsOf(shell).modelRequest).toBe('第一次就失败')

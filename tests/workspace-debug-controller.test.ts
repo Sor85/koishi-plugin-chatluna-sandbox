@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createFakeWorkspacePort } from '../client/webqq/fake-workspace-port'
-import { createWorkspaceController } from '../client/webqq/workspace-controller'
+import { createTestWorkspaceController } from './helpers/workspace-controller'
 import type { SandboxConsoleOneBotDebugRecord, SandboxWorkspaceState } from '../src/types'
 
 const workspace: SandboxWorkspaceState = {
@@ -54,10 +54,7 @@ describe('WebQQ OneBot 调试控制器', () => {
       earliestCursor: 1,
       capacity: { recordCount: 1, totalBytes: 128, maxRecords: 5000, maxBytes: 50 * 1024 * 1024 },
     }
-    const controller = createWorkspaceController(port, {
-      getItem: () => null,
-      setItem: () => undefined,
-    })
+    const controller = createTestWorkspaceController({ workspace: port })
 
     await controller.loadOneBotDebugRecords({ botId: '20001', direction: 'action' })
     expect(controller.oneBotDebugRecords.value).toEqual([record])

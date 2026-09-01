@@ -7,7 +7,7 @@ import {
   toRecentForwardTargets,
 } from '../client/webqq/conversation-tree'
 import { createFakeWorkspacePort } from '../client/webqq/fake-workspace-port'
-import { createWorkspaceController } from '../client/webqq/workspace-controller'
+import { createTestWorkspaceController } from './helpers/workspace-controller'
 import { createWorkspaceLayout } from '../client/webqq/workspace-layout'
 import { createWebqqWorkspaceShell } from '../client/webqq/workspace-shell'
 import { listVisibleConversations } from '../src/conversation-resolution'
@@ -68,7 +68,7 @@ function createWorkspace(source: SandboxSnapshot): SandboxWorkspaceState {
 
 async function createShell(source: SandboxSnapshot) {
   const values = new Map<string, string>()
-  const controller = createWorkspaceController(createFakeWorkspacePort(createWorkspace(source)), {
+  const controller = createTestWorkspaceController({ workspace: createFakeWorkspacePort(createWorkspace(source)) }, {
     getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, value: string) => values.set(key, value),
   })

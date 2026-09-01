@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { SandboxSnapshot, SandboxWorkspaceState } from '../src/types'
 import { createFakeWorkspacePort } from '../client/webqq/fake-workspace-port'
 import { readConversationMessageIds } from '../src/conversation-resolution'
-import { createWorkspaceController } from '../client/webqq/workspace-controller'
+import { createTestWorkspaceController } from './helpers/workspace-controller'
 
 const snapshot: SandboxSnapshot = {
   revision: 7,
@@ -96,7 +96,7 @@ describe('WebQQ 工作区控制模块', () => {
       activeConversationId: 'private:10001:20001',
       currentView: 'messages',
     }))
-    const controller = createWorkspaceController(port, storage)
+    const controller = createTestWorkspaceController({ workspace: port }, storage)
 
     await controller.load()
 
@@ -130,7 +130,7 @@ describe('WebQQ 工作区控制模块', () => {
       },
     })
     port.createdConversationInstanceId = instanceId
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
 
     await controller.createConversationInstance({ rootConversationId: 'private:10001:20001' })
@@ -164,7 +164,7 @@ describe('WebQQ 工作区控制模块', () => {
       },
     })
     port.createdConversationInstanceId = instanceId
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
 
     await controller.branchConversationInstance({ conversationId: 'private:10001:20001', messageId: 'message-1' })
@@ -181,7 +181,7 @@ describe('WebQQ 工作区控制模块', () => {
   it('新建会话实例失败时抛出归一化后的错误消息', async () => {
     const port = createFakeWorkspacePort(workspace)
     port.rejectNext('createConversationInstance', new Error('会话不存在：private:10002:20001'))
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
 
     await expect(controller.createConversationInstance({ rootConversationId: 'private:10002:20001' }))
@@ -192,7 +192,7 @@ describe('WebQQ 工作区控制模块', () => {
   it('切换会话时同步聊天区域并保存浏览器选择', async () => {
     const port = createFakeWorkspacePort(workspace)
     const storage = createStorage()
-    const controller = createWorkspaceController(port, storage)
+    const controller = createTestWorkspaceController({ workspace: port }, storage)
     await controller.load()
 
     controller.selectConversation('group:30001')
@@ -221,7 +221,7 @@ describe('WebQQ 工作区控制模块', () => {
       },
     })
     const port = createFakeWorkspacePort(withInstanceTitle('新会话'))
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
     controller.selectConversation(instanceId)
 
@@ -254,7 +254,7 @@ describe('WebQQ 工作区控制模块', () => {
         }],
       },
     })
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
     controller.selectConversation(instanceId)
 
@@ -269,7 +269,7 @@ describe('WebQQ 工作区控制模块', () => {
 
   it('重命名与删除会话实例失败时抛出归一化后的错误消息', async () => {
     const port = createFakeWorkspacePort(workspace)
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
 
     port.rejectNext('renameConversationInstance', new Error('会话实例不存在：private:10001:20001'))
@@ -283,7 +283,7 @@ describe('WebQQ 工作区控制模块', () => {
   })
 
   it('快速切换会话时只显示当前逻辑会话的 ChatLuna 状态', async () => {
-    const controller = createWorkspaceController(createFakeWorkspacePort(workspace), createStorage())
+    const controller = createTestWorkspaceController({ workspace: createFakeWorkspacePort(workspace) }, createStorage())
     await controller.load()
 
     controller.selectConversation('group:30001')
@@ -307,7 +307,7 @@ describe('WebQQ 工作区控制模块', () => {
   })
 
   it('进入普通用户私聊时发送控件仍保留机器人参与者', async () => {
-    const controller = createWorkspaceController(createFakeWorkspacePort(workspace), createStorage())
+    const controller = createTestWorkspaceController({ workspace: createFakeWorkspacePort(workspace) }, createStorage())
     await controller.load()
 
     controller.selectConversation('private:10001:10002')
@@ -317,7 +317,7 @@ describe('WebQQ 工作区控制模块', () => {
 
   it('切换当前操作者时加载对应参与者的可见会话', async () => {
     const port = createFakeWorkspacePort(workspace)
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
 
     await controller.selectOperator('10002')
@@ -356,7 +356,7 @@ describe('WebQQ 工作区控制模块', () => {
 
   it('机器人作为当前操作者时所有工作区命令都使用机器人参与者 ID', async () => {
     const port = createFakeWorkspacePort(workspace)
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
     await controller.selectOperator('20001')
 
@@ -376,7 +376,7 @@ describe('WebQQ 工作区控制模块', () => {
 
   it('端口拒绝操作者切换时保留全部区域模型并返回规范化错误', async () => {
     const port = createFakeWorkspacePort(workspace)
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
     const regionsBeforeFailure = [
       controller.sidebar.value,
@@ -406,7 +406,7 @@ describe('WebQQ 工作区控制模块', () => {
       activeConversationId: 'deleted-conversation',
       currentView: 'contacts',
     }))
-    const controller = createWorkspaceController(createFakeWorkspacePort(workspace), storage)
+    const controller = createTestWorkspaceController({ workspace: createFakeWorkspacePort(workspace) }, storage)
 
     await controller.load()
 
@@ -423,7 +423,7 @@ describe('WebQQ 工作区控制模块', () => {
   it('保存的参与者加载失败时保留无参数工作区 fallback', async () => {
     const port = createFakeWorkspacePort(workspace)
     port.rejectNext('getWorkspace', new Error('参与者不存在'))
-    const controller = createWorkspaceController(port, createStorage(JSON.stringify({
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage(JSON.stringify({
       currentOperatorId: '10001',
       currentView: 'messages',
     })))
@@ -439,7 +439,7 @@ describe('WebQQ 工作区控制模块', () => {
 
   it('收到机器人异步回复修订后主动刷新当前会话', async () => {
     const port = createFakeWorkspacePort(workspace)
-    const controller = createWorkspaceController(port, createStorage(JSON.stringify({
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage(JSON.stringify({
       currentOperatorId: '10001',
       activeConversationId: 'private:10001:20001',
       currentView: 'messages',
@@ -483,7 +483,7 @@ describe('WebQQ 工作区控制模块', () => {
 
   it('等待态广播不改变场景修订时仍刷新聊天区域', async () => {
     const port = createFakeWorkspacePort(workspace)
-    const controller = createWorkspaceController(port, createStorage(JSON.stringify({
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage(JSON.stringify({
       currentOperatorId: '10001',
       activeConversationId: 'private:10001:20001',
       currentView: 'messages',
@@ -515,7 +515,7 @@ describe('WebQQ 工作区控制模块', () => {
 
   it('刷新期间到达的等待态广播合并成一次后续刷新', async () => {
     const port = createFakeWorkspacePort(workspace)
-    const controller = createWorkspaceController(port, createStorage(JSON.stringify({
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage(JSON.stringify({
       currentOperatorId: '10001',
       activeConversationId: 'private:10001:20001',
       currentView: 'messages',
@@ -552,7 +552,7 @@ describe('WebQQ 工作区控制模块', () => {
   })
 
   it('替换工作区时四个区域模型原子观察同一修订', async () => {
-    const controller = createWorkspaceController(createFakeWorkspacePort(workspace), createStorage())
+    const controller = createTestWorkspaceController({ workspace: createFakeWorkspacePort(workspace) }, createStorage())
     await controller.load()
     const nextWorkspace: SandboxWorkspaceState = {
       ...workspace,
@@ -585,7 +585,7 @@ describe('WebQQ 工作区控制模块', () => {
 
   it('好友命令失败时保留区域模型并返回规范化错误', async () => {
     const port = createFakeWorkspacePort(workspace)
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
     const regionsBeforeFailure = [
       controller.sidebar.value,
@@ -621,7 +621,7 @@ describe('WebQQ 工作区控制模块', () => {
 
   it('群组命令失败时保留区域模型并返回规范化错误', async () => {
     const port = createFakeWorkspacePort(workspace)
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
     const regionsBeforeFailure = [
       controller.sidebar.value,
@@ -659,7 +659,7 @@ describe('WebQQ 工作区控制模块', () => {
 
   it('处理关系申请时按申请类型调用对应端口', async () => {
     const port = createFakeWorkspacePort(workspace)
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
 
     await controller.handleRelationshipRequest('friend-request-1', true)
@@ -686,7 +686,7 @@ describe('WebQQ 工作区控制模块', () => {
 
   it('好友与群组命令成功后原子同步四个区域模型', async () => {
     const port = createFakeWorkspacePort(workspace)
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
     port.workspaceResult = {
       ...workspace,
@@ -736,7 +736,7 @@ describe('WebQQ 工作区控制模块', () => {
 
   it('发送文本消息时注入当前用户并同步四个区域模型', async () => {
     const port = createFakeWorkspacePort(workspace)
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
     port.workspaceResult = {
       ...workspace,
@@ -769,7 +769,7 @@ describe('WebQQ 工作区控制模块', () => {
 
   it('媒体消息失败时保留工作区并返回规范化错误', async () => {
     const port = createFakeWorkspacePort(workspace)
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
     const revisionBeforeFailure = controller.chat.value.revision
     port.rejectNext('sendMediaMessage', new Error('媒体发送被拒绝'))
@@ -795,7 +795,7 @@ describe('WebQQ 工作区控制模块', () => {
 
   it('媒体内容通过端口加载并注入当前用户', async () => {
     const port = createFakeWorkspacePort(workspace)
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
 
     const content = await controller.getMediaContent('media-1')
@@ -812,7 +812,7 @@ describe('WebQQ 工作区控制模块', () => {
 
   it('加载历史消息时保持旧消息前置和分页状态', async () => {
     const port = createFakeWorkspacePort(workspace)
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
     port.historyResult = {
       messages: [{
@@ -884,7 +884,7 @@ describe('WebQQ 工作区控制模块', () => {
         }],
       },
     })
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
     controller.selectConversation('instance-1')
     port.historyResult = {
@@ -913,7 +913,7 @@ describe('WebQQ 工作区控制模块', () => {
 
   it('搜索会话消息时注入当前操作者并直接返回命中摘要', async () => {
     const port = createFakeWorkspacePort(workspace)
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
     port.searchResult = {
       hits: [{
@@ -953,7 +953,7 @@ describe('WebQQ 工作区控制模块', () => {
 
   it('发送合并转发与按需读取详情都注入当前操作者', async () => {
     const port = createFakeWorkspacePort(workspace)
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
     port.workspaceResult = {
       ...workspace,
@@ -1031,7 +1031,7 @@ describe('WebQQ 工作区控制模块', () => {
 
   it('群公告新增和删除通过端口更新工作区', async () => {
     const port = createFakeWorkspacePort(workspace)
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
     port.workspaceResult = {
       ...workspace,
@@ -1075,7 +1075,7 @@ describe('WebQQ 工作区控制模块', () => {
 
   it('环境管理删除当前用户后应用现有选择 fallback', async () => {
     const port = createFakeWorkspacePort(workspace)
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
     port.workspaceResult = {
       ...workspace,
@@ -1122,7 +1122,7 @@ describe('WebQQ 工作区控制模块', () => {
       chatLunaStates: [],
     }
     const port = createFakeWorkspacePort(emptyWorkspace)
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
     port.workspaceResult = {
       ...emptyWorkspace,
@@ -1144,7 +1144,7 @@ describe('WebQQ 工作区控制模块', () => {
 
   it('环境管理失败时保留 Console RPC 返回的具体原因', async () => {
     const port = createFakeWorkspacePort(workspace)
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
     port.rejectNext('manageEnvironment', 'Error: 群组必须有一个群主\n    at SandboxControlService.validateGroupMembers')
 
@@ -1167,7 +1167,7 @@ describe('WebQQ 工作区控制模块', () => {
 
   it('环境管理失败时保留工作区和当前选择', async () => {
     const port = createFakeWorkspacePort(workspace)
-    const controller = createWorkspaceController(port, createStorage())
+    const controller = createTestWorkspaceController({ workspace: port }, createStorage())
     await controller.load()
     port.rejectNext('manageEnvironment', new Error('环境操作被拒绝'))
 

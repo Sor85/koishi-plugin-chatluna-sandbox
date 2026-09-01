@@ -82,54 +82,6 @@ describe('Koishi 工作区端口', () => {
     })
   })
 
-  it('预设文件调用保持全局，表达式定位使用调用方提供的显式 scope', async () => {
-    send.mockClear()
-    send.mockResolvedValue({})
-    const port = createKoishiWorkspacePort(() => 'space-current')
-
-    await port.getPresetCatalog()
-    await port.readPreset({ kind: 'core', fileName: 'assistant.yml' })
-    await port.locatePresetExpression({
-      document: { kind: 'core', fileName: 'assistant.yml', revision: 'rev-1' },
-      expression: { stableId: 'expression-1' },
-      scope: { scope: 'space', spaceId: 'space-target' },
-    })
-
-    expect(send).toHaveBeenNthCalledWith(1, 'chatluna-sandbox/preset-catalog', {})
-    expect(send).toHaveBeenNthCalledWith(2, 'chatluna-sandbox/preset-read', { kind: 'core', fileName: 'assistant.yml' })
-    expect(send).toHaveBeenNthCalledWith(3, 'chatluna-sandbox/preset-locate-expression', expect.objectContaining({
-      scope: { scope: 'space', spaceId: 'space-target' },
-    }))
-  })
-
-  it('模型请求记录按显式 scope 发送，不注入当前工作区 spaceId', async () => {
-    send.mockClear()
-    send.mockResolvedValue({ records: [], hasMore: false, capacity: { recordCount: 0, totalBytes: 0, maxRecords: 5000, maxBytes: 1 } })
-    const port = createKoishiWorkspacePort(() => 'space-1')
-
-    await port.getModelRequestRecords({ scope: 'unattributed', limit: 50 })
-    await port.getModelRequestRecord({ scope: 'space', spaceId: 'main', recordId: 'record-1' })
-    await port.clearModelRequestRecords({ scope: 'unattributed' })
-
-    expect(send).toHaveBeenNthCalledWith(1, 'chatluna-sandbox/model-request-records', { scope: 'unattributed', limit: 50 })
-    expect(send).toHaveBeenNthCalledWith(2, 'chatluna-sandbox/model-request-record', { scope: 'space', spaceId: 'main', recordId: 'record-1' })
-    expect(send).toHaveBeenNthCalledWith(3, 'chatluna-sandbox/clear-model-request-records', { scope: 'unattributed' })
-  })
-
-  it('MCP 调用记录按筛选参数发送，不注入当前工作区 spaceId', async () => {
-    send.mockClear()
-    send.mockResolvedValue({ records: [] })
-    const port = createKoishiWorkspacePort(() => 'space-1')
-
-    await port.getMcpCallRecords({ tool: 'send_message', spaceId: 'space-target' })
-    await port.getMcpCallRecord({ recordId: 'call-1' })
-    await port.clearMcpCallRecords()
-
-    expect(send).toHaveBeenNthCalledWith(1, 'chatluna-sandbox/mcp-call-records', { tool: 'send_message', spaceId: 'space-target' })
-    expect(send).toHaveBeenNthCalledWith(2, 'chatluna-sandbox/mcp-call-record', { recordId: 'call-1' })
-    expect(send).toHaveBeenNthCalledWith(3, 'chatluna-sandbox/clear-mcp-call-records')
-  })
-
   it('无论订阅多少次都只向 Koishi 注册一次场景变更回调，并扇出给全部订阅者', () => {
     const port = createKoishiWorkspacePort(() => 'space-1')
     const seen: string[] = []

@@ -1,7 +1,6 @@
 import type { SandboxSceneMutationPayload } from '../../src/console-contract'
 import type {
   DeleteGroupAnnouncementInput,
-  ClearSandboxModelRequestRecordsResult,
   ClearSandboxOneBotDebugRecordsResult,
   GetForwardMessageInput,
   GetMediaContentInput,
@@ -26,9 +25,6 @@ import type {
   SandboxMediaContent,
   SandboxMessageHistory,
   SandboxMessageSearchResult,
-  SandboxModelRequestDetail,
-  SandboxModelRequestRecordsPage,
-  SandboxModelRequestTrajectory,
   SandboxOneBotDebugRecordsPage,
   SandboxWorkspaceState,
   SendForwardMessageInput,
@@ -36,27 +32,6 @@ import type {
   SendMessageInput,
   SetGroupAnnouncementInput,
 } from '../../src/types'
-import type {
-  ClearModelRequestRecordsQuery,
-  ModelRequestRecordQuery,
-  ModelRequestRecordsQuery,
-  ModelRequestTrajectoryQuery,
-} from './model-request-query'
-import type { ListSandboxMcpCallRecordsInput, SandboxMcpCallRecordsPage } from '../../src/mcp/call-records'
-import type { SandboxMcpCallRecord } from '../../src/mcp/types'
-import type {
-  LocateSandboxPresetExpressionInput,
-  LocateSandboxPresetExpressionResult,
-  ReadSandboxPresetInput,
-  SandboxPresetDocument,
-} from '../../src/presets'
-import type {
-  CreatePresetInput,
-  DeletePresetInput,
-  PresetDocumentKind,
-  RenamePresetInput,
-  SavePresetInput,
-} from '../../src/presets'
 
 export type SceneMutationListener = (payload: SandboxSceneMutationPayload) => void
 
@@ -88,20 +63,6 @@ export interface WorkspacePort {
   getOneBotDebugRecords(input?: GetSandboxOneBotDebugRecordsInput): Promise<SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord>>
   getOneBotDebugRecord(input: GetSandboxOneBotDebugRecordInput & { spaceId?: string }): Promise<SandboxConsoleOneBotDebugRecord>
   clearOneBotDebugRecords(): Promise<ClearSandboxOneBotDebugRecordsResult>
-  getModelRequestRecords(input: ModelRequestRecordsQuery): Promise<SandboxModelRequestRecordsPage>
-  getModelRequestRecord(input: ModelRequestRecordQuery): Promise<SandboxModelRequestDetail>
-  getModelRequestTrajectory(input: ModelRequestTrajectoryQuery): Promise<SandboxModelRequestTrajectory>
-  clearModelRequestRecords(input: ClearModelRequestRecordsQuery): Promise<ClearSandboxModelRequestRecordsResult>
-  getPresetCatalog(input?: { kind?: PresetDocumentKind }): Promise<SandboxPresetDocument[]>
-  readPreset(input: ReadSandboxPresetInput): Promise<SandboxPresetDocument>
-  createPreset(input: CreatePresetInput): Promise<SandboxPresetDocument>
-  savePreset(input: SavePresetInput): Promise<SandboxPresetDocument>
-  renamePreset(input: RenamePresetInput): Promise<SandboxPresetDocument>
-  deletePreset(input: DeletePresetInput): Promise<{ deleted: true }>
-  locatePresetExpression(input: LocateSandboxPresetExpressionInput): Promise<LocateSandboxPresetExpressionResult>
-  getMcpCallRecords(input?: ListSandboxMcpCallRecordsInput): Promise<SandboxMcpCallRecordsPage>
-  getMcpCallRecord(input: { recordId: string }): Promise<SandboxMcpCallRecord>
-  clearMcpCallRecords(): Promise<{ cleared: number }>
   /**
    * 订阅服务端的场景变更广播，返回退订函数。适配器负责把一份底层广播扇出给全部订阅者，
    * 因此一个页面退订不会让仍存活的页面失聪。

@@ -1,6 +1,5 @@
 import type {
   DeleteGroupAnnouncementInput,
-  ClearSandboxModelRequestRecordsResult,
   ClearSandboxOneBotDebugRecordsResult,
   GetForwardMessageInput,
   GetMediaContentInput,
@@ -24,9 +23,6 @@ import type {
   SandboxMediaContent,
   SandboxMessageHistory,
   SandboxMessageSearchResult,
-  SandboxModelRequestDetail,
-  SandboxModelRequestRecordsPage,
-  SandboxModelRequestTrajectory,
   SandboxOneBotDebugRecordsPage,
   SandboxWorkspaceState,
   SendForwardMessageInput,
@@ -37,28 +33,6 @@ import type {
 import { FakePortRecorder } from './fake-port-recorder'
 import type { SceneMutationListener, WorkspacePort } from './workspace-port'
 import type { SandboxSceneMutationPayload } from '../../src/console-contract'
-import type {
-  ClearModelRequestRecordsQuery,
-  ModelRequestRecordQuery,
-  ModelRequestRecordsQuery,
-  ModelRequestTrajectoryQuery,
-} from './model-request-query'
-import { emptyModelRequestRecordsPage } from './model-request-query'
-import type { ListSandboxMcpCallRecordsInput, SandboxMcpCallRecordsPage } from '../../src/mcp/call-records'
-import type { SandboxMcpCallRecord } from '../../src/mcp/types'
-import type {
-  LocateSandboxPresetExpressionInput,
-  LocateSandboxPresetExpressionResult,
-  ReadSandboxPresetInput,
-  SandboxPresetDocument,
-} from '../../src/presets'
-import type {
-  CreatePresetInput,
-  DeletePresetInput,
-  PresetDocumentKind,
-  RenamePresetInput,
-  SavePresetInput,
-} from '../../src/presets'
 
 export type WorkspacePortOperation = keyof WorkspacePort
 
@@ -94,22 +68,8 @@ export class FakeWorkspacePort implements WorkspacePort {
   }
   debugRecordResult?: SandboxConsoleOneBotDebugRecord
   clearDebugRecordsResult: ClearSandboxOneBotDebugRecordsResult = { cleared: 0 }
-  modelRequestRecordsResult: SandboxModelRequestRecordsPage = emptyModelRequestRecordsPage
-  modelRequestRecordResult?: SandboxModelRequestDetail
-  modelRequestTrajectoryResult?: SandboxModelRequestTrajectory
-  clearModelRequestRecordsResult: ClearSandboxModelRequestRecordsResult = { cleared: 0 }
-  presetCatalogResult: SandboxPresetDocument[] = []
-  presetDocumentResult?: SandboxPresetDocument
-  locatePresetExpressionResult: LocateSandboxPresetExpressionResult = {
-    status: 'failed',
-    code: 'request-not-observed',
-    message: '没有匹配的模型请求',
-  }
   /** 新建或分叉会话实例后返回的会话 ID；用例可改写它来断言选中行为。 */
   createdConversationInstanceId = 'conversation-instance-1'
-  mcpCallRecordsResult: SandboxMcpCallRecordsPage = { records: [] }
-  mcpCallRecordResult?: SandboxMcpCallRecord
-  clearMcpCallRecordsResult = { cleared: 0 }
   private readonly recorder = new FakePortRecorder<WorkspacePortOperation>()
   private readonly sceneMutationListeners = new Set<SceneMutationListener>()
 
@@ -235,113 +195,10 @@ export class FakeWorkspacePort implements WorkspacePort {
     return this.invoke('clearOneBotDebugRecords', undefined, this.clearDebugRecordsResult)
   }
 
-  getModelRequestRecords(input: ModelRequestRecordsQuery) {
-    return this.invoke('getModelRequestRecords', input, this.modelRequestRecordsResult)
-  }
-
-  getModelRequestRecord(input: ModelRequestRecordQuery) {
-    const record = this.modelRequestRecordResult
-      ?? this.modelRequestRecordsResult.records.find(({ id }) => id === input.recordId)
-    if (!record) this.rejectNext('getModelRequestRecord', new Error('模型请求记录不存在'))
-    return this.invoke('getModelRequestRecord', input, {
-      ...record,
-      requestBody: record && 'requestBody' in record ? record.requestBody : undefined,
-    } as SandboxModelRequestDetail)
-  }
-
-  getModelRequestTrajectory(input: ModelRequestTrajectoryQuery) {
-    const trajectory = this.modelRequestTrajectoryResult ?? {
-      mode: input.mode,
-      records: [],
-      rows: [],
-      promptComposition: [],
-      complete: true,
-    }
-    return this.invoke('getModelRequestTrajectory', input, trajectory)
-  }
-
-  clearModelRequestRecords(input: ClearModelRequestRecordsQuery) {
-    return this.invoke('clearModelRequestRecords', input, this.clearModelRequestRecordsResult)
-  }
-
-  getPresetCatalog(input: { kind?: PresetDocumentKind } = {}) {
-    const result = input.kind
-      ? this.presetCatalogResult.filter(({ kind }) => kind === input.kind)
-      : this.presetCatalogResult
-    return this.invoke('getPresetCatalog', input, result)
-  }
-
-  readPreset(input: ReadSandboxPresetInput) {
-    const document = this.presetCatalogResult.find(({ kind, fileName }) => kind === input.kind && fileName === input.fileName)
-      ?? this.presetDocumentResult
-    if (!document) this.rejectNext('readPreset', new Error('预设不存在'))
-    return this.invoke('readPreset', input, document as SandboxPresetDocument)
-  }
-
-  createPreset(input: CreatePresetInput) {
-    const result = this.presetDocumentResult ?? fakePresetDocument(input)
-    return this.invoke('createPreset', input, result)
-  }
-
-  savePreset(input: SavePresetInput) {
-    const result = this.presetDocumentResult ?? fakePresetDocument(input)
-    return this.invoke('savePreset', input, result)
-  }
-
-  renamePreset(input: RenamePresetInput) {
-    const current = this.presetDocumentResult
-      ?? this.presetCatalogResult.find(({ kind, fileName }) => kind === input.kind && fileName === input.fileName)
-    const result = current ? { ...current, fileName: input.newFileName } : fakePresetDocument({
-      kind: input.kind,
-      fileName: input.newFileName,
-      source: '',
-    })
-    return this.invoke('renamePreset', input, result)
-  }
-
-  deletePreset(input: DeletePresetInput) {
-    return this.invoke('deletePreset', input, { deleted: true } as const)
-  }
-
-  locatePresetExpression(input: LocateSandboxPresetExpressionInput) {
-    return this.invoke('locatePresetExpression', input, this.locatePresetExpressionResult)
-  }
-
-  getMcpCallRecords(input?: ListSandboxMcpCallRecordsInput) {
-    return this.invoke('getMcpCallRecords', input, this.mcpCallRecordsResult)
-  }
-
-  getMcpCallRecord(input: { recordId: string }) {
-    const record = this.mcpCallRecordResult
-      ?? this.mcpCallRecordsResult.records.find(({ id }) => id === input.recordId)
-    if (!record) this.rejectNext('getMcpCallRecord', new Error('MCP 调用记录不存在'))
-    return this.invoke('getMcpCallRecord', input, {
-      ...record,
-      arguments: record && 'arguments' in record ? record.arguments : {},
-      result: record && 'result' in record ? record.result : undefined,
-    } as SandboxMcpCallRecord)
-  }
-
-  clearMcpCallRecords() {
-    return this.invoke('clearMcpCallRecords', undefined, this.clearMcpCallRecordsResult)
-  }
-
   subscribeSceneMutation(listener: SceneMutationListener) {
     void this.invoke('subscribeSceneMutation', undefined, undefined)
     this.sceneMutationListeners.add(listener)
     return () => { this.sceneMutationListeners.delete(listener) }
-  }
-}
-
-function fakePresetDocument(input: CreatePresetInput): SandboxPresetDocument {
-  return {
-    ...input,
-    revision: `revision:${input.source}`,
-    size: input.source.length,
-    modifiedAt: '2026-08-22T00:00:00.000Z',
-    templateFields: [],
-    expressions: [],
-    diagnostics: [],
   }
 }
 

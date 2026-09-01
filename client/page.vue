@@ -212,6 +212,9 @@ import WorkspaceOverlayHost from './workspace-overlay-host.vue'
 import { useResolvedColorMode, useFrostedSurfaceFlag } from './webqq/color-scheme'
 import { rememberFloatingPanelAnchor } from './webqq/floating-panel'
 import { createKoishiMcpAdminPort } from './webqq/koishi-mcp-admin-port'
+import { createKoishiMcpCallRecordPort } from './webqq/koishi-mcp-call-record-port'
+import { createKoishiModelRequestPort } from './webqq/koishi-model-request-port'
+import { createKoishiPresetPort } from './webqq/koishi-preset-port'
 import { createKoishiTestSpacePort } from './webqq/koishi-test-space-port'
 import { createKoishiWorkspacePort } from './webqq/koishi-workspace-port'
 import { createMcpActivitySync } from './webqq/mcp-activity-sync'
@@ -223,7 +226,13 @@ import { createAiTestSpaceShell } from './webqq/test-space-shell'
 
 const activeSpaceId = ref<string>()
 const workspacePort = createKoishiWorkspacePort(() => activeSpaceId.value)
-const workspaceController = createWorkspaceController(workspacePort, window.localStorage)
+// 记录域那三道端口的适配器不注入当前观察空间，因此不需要第二份实例，构造一次就够。
+const workspaceController = createWorkspaceController({
+  workspace: workspacePort,
+  modelRequest: createKoishiModelRequestPort(),
+  preset: createKoishiPresetPort(),
+  mcpCallRecord: createKoishiMcpCallRecordPort(),
+}, window.localStorage)
 // 总览要读主场景与任意测试空间的头像媒体，因此另配一个不跟随当前活动空间的工作区端口。
 const mainWorkspacePort = createKoishiWorkspacePort()
 const testSpacePort = createKoishiTestSpacePort()

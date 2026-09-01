@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { describe, expect, it } from 'vitest'
 import { createFakeWorkspacePort } from '../client/webqq/fake-workspace-port'
-import { createWorkspaceController } from '../client/webqq/workspace-controller'
+import { createTestWorkspaceController } from './helpers/workspace-controller'
 import { createWorkspaceLayout } from '../client/webqq/workspace-layout'
 import { createWebqqWorkspaceShell } from '../client/webqq/workspace-shell'
 import type { SandboxSnapshot, SandboxWorkspaceState } from '../src/types'
@@ -63,7 +63,7 @@ function createStorage() {
 
 async function createShell(snapshot: SandboxSnapshot) {
   const port = createFakeWorkspacePort(createWorkspace(snapshot))
-  const controller = createWorkspaceController(port, createStorage())
+  const controller = createTestWorkspaceController({ workspace: port }, createStorage())
   await controller.load()
   // 外壳在 setup 里注册 onMounted 做首屏加载；测试直接调用工厂时该钩子是空操作，
   // Vue 会为此打一条 warn。这里只吞掉这一条预期噪声，其余告警照常输出。
