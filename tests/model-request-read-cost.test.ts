@@ -60,7 +60,7 @@ describe('模型请求视图的重复计算', () => {
   it('分析页的原始 JSON 树按需挂载并缓存', () => {
     const view = read('client/webqq/analysis-view.vue')
 
-    expect(view).toContain('v-if="rawMountedMessages.has(message.evidenceId)"')
+    expect(view).toContain('v-if="isMessageRawMounted(message.evidenceId)"')
     expect(view).toContain('v-if="responseRawMounted"')
     expect(view).toContain(':node="messageJsonTree(message)"')
     expect(view).toContain(':node="responseJsonTree()"')

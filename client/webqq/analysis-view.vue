@@ -106,13 +106,13 @@
                   <Button
                     size="icon-sm"
                     variant="ghost"
-                    :aria-label="rawMessages.has(message.evidenceId) ? `查看第 ${message.index} 条消息格式化内容` : `查看第 ${message.index} 条消息原始 JSON`"
-                    @click="toggleRaw(message.evidenceId)"
+                    :aria-label="isMessageRaw(message.evidenceId) ? `查看第 ${message.index} 条消息格式化内容` : `查看第 ${message.index} 条消息原始 JSON`"
+                    @click="toggleMessageRaw(message.evidenceId)"
                   >
                     <IconCode :size="16" aria-hidden="true" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>{{ rawMessages.has(message.evidenceId) ? '查看格式化内容' : '查看原始 JSON' }}</TooltipContent>
+                <TooltipContent>{{ isMessageRaw(message.evidenceId) ? '查看格式化内容' : '查看原始 JSON' }}</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger as-child>
@@ -133,8 +133,8 @@
 
             <!-- 原始 JSON 只在第一次真的被切开后才挂载：v-show 会让每条消息的整棵原始树在打开分析页时就进入 DOM。 -->
             <div
-              v-if="rawMountedMessages.has(message.evidenceId)"
-              v-show="!isCardCollapsed(modelAnalysisTargetId(message.evidenceId)) && rawMessages.has(message.evidenceId)"
+              v-if="isMessageRawMounted(message.evidenceId)"
+              v-show="!isCardCollapsed(modelAnalysisTargetId(message.evidenceId)) && isMessageRaw(message.evidenceId)"
               class="webqq-model-analysis-json"
             >
               <div class="webqq-model-analysis-source-path">{{ formatEvidencePath(message.path) }}</div>
@@ -146,32 +146,32 @@
                 :images-preview="true"
               />
             </div>
-            <div v-show="!isCardCollapsed(modelAnalysisTargetId(message.evidenceId)) && !rawMessages.has(message.evidenceId)" class="webqq-model-analysis-formatted">
+            <div v-show="!isCardCollapsed(modelAnalysisTargetId(message.evidenceId)) && !isMessageRaw(message.evidenceId)" class="webqq-model-analysis-formatted">
               <AnalysisTextBlock
                 v-if="occurrenceForMessage(message.evidenceId)"
                 :value="message.content"
                 :search-query="normalizedSearch"
                 :occurrence="occurrenceForMessage(message.evidenceId)"
-                :force-expanded="expandedTextTargets.has(modelAnalysisTargetId(message.evidenceId))"
+                :force-expanded="isTextForceExpanded(modelAnalysisTargetId(message.evidenceId))"
               />
               <AnalysisContentParts
                 v-else-if="message.contentParts.length"
                 :parts="message.contentParts"
                 :search-query="normalizedSearch"
-                :force-expanded="expandedTextTargets.has(modelAnalysisTargetId(message.evidenceId))"
+                :force-expanded="isTextForceExpanded(modelAnalysisTargetId(message.evidenceId))"
               />
               <AnalysisTextBlock
                 v-else-if="message.content"
                 :value="message.content"
                 :search-query="normalizedSearch"
-                :force-expanded="expandedTextTargets.has(modelAnalysisTargetId(message.evidenceId))"
+                :force-expanded="isTextForceExpanded(modelAnalysisTargetId(message.evidenceId))"
               />
               <AnalysisTextBlock
                 v-if="message.reasoning"
                 label="思考"
                 :value="message.reasoning"
                 :search-query="normalizedSearch"
-                :force-expanded="expandedTextTargets.has(modelAnalysisTargetId(message.evidenceId))"
+                :force-expanded="isTextForceExpanded(modelAnalysisTargetId(message.evidenceId))"
               />
               <section v-if="message.toolCalls.length && requestToolCallsVisible" class="webqq-model-analysis-section">
                 <strong>工具调用</strong>
@@ -186,7 +186,7 @@
                   <AnalysisTextBlock
                     :value="call.arguments || '{}'"
                     :search-query="normalizedSearch"
-                    :force-expanded="expandedTextTargets.has(modelAnalysisTargetId(call.evidenceId))"
+                    :force-expanded="isTextForceExpanded(modelAnalysisTargetId(call.evidenceId))"
                     compact
                   />
                   <button
@@ -228,13 +228,13 @@
                       <Button
                         size="icon-sm"
                         variant="ghost"
-                        :aria-label="rawHistoryVariables.has(variable.id) ? `查看变量 ${variable.name} 的消息预览` : `查看变量 ${variable.name} 的原始 XML`"
-                        @click="toggleHistoryRaw(variable.id)"
+                        :aria-label="isHistoryVariableRaw(variable.id) ? `查看变量 ${variable.name} 的消息预览` : `查看变量 ${variable.name} 的原始 XML`"
+                        @click="toggleHistoryVariableRaw(variable.id)"
                       >
                         <IconCode :size="16" aria-hidden="true" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>{{ rawHistoryVariables.has(variable.id) ? '查看消息预览' : '查看原始 XML' }}</TooltipContent>
+                    <TooltipContent>{{ isHistoryVariableRaw(variable.id) ? '查看消息预览' : '查看原始 XML' }}</TooltipContent>
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger as-child>
@@ -257,7 +257,7 @@
                     <span>空值</span>该表达式在本次模型请求中展开为空字符串
                   </p>
                   <ModelRequestHistoryPreview
-                    v-else-if="historyPreview(variable) && !rawHistoryVariables.has(variable.id)"
+                    v-else-if="historyPreview(variable) && !isHistoryVariableRaw(variable.id)"
                     :messages="historyPreview(variable)!"
                     :bot-id="detail.entities.botId"
                     :characters="variable.value?.length"
@@ -349,13 +349,13 @@
                 label="思考"
                 :value="response.reasoning.join('\n')"
                 :search-query="normalizedSearch"
-                :force-expanded="expandedTextTargets.has(MODEL_ANALYSIS_RESPONSE_TARGET)"
+                :force-expanded="isTextForceExpanded(MODEL_ANALYSIS_RESPONSE_TARGET)"
               />
               <AnalysisTextBlock
                 v-if="response.content.length && responseContentVisible"
                 :value="response.content.join('\n')"
                 :search-query="normalizedSearch"
-                :force-expanded="expandedTextTargets.has(MODEL_ANALYSIS_RESPONSE_TARGET)"
+                :force-expanded="isTextForceExpanded(MODEL_ANALYSIS_RESPONSE_TARGET)"
               />
               <section v-if="response.toolCalls.length && responseToolCallsVisible" class="webqq-model-analysis-section">
                 <strong>工具调用</strong>
@@ -393,7 +393,7 @@
                   <AnalysisTextBlock
                     :value="result.content"
                     :search-query="normalizedSearch"
-                    :force-expanded="expandedTextTargets.has(modelAnalysisTargetId(result.evidenceId))"
+                    :force-expanded="isTextForceExpanded(modelAnalysisTargetId(result.evidenceId))"
                     compact
                   />
                 </article>
@@ -418,7 +418,7 @@
               :key="tool.evidenceId"
               class="webqq-model-analysis-tool-card"
               :class="{
-                'is-expanded': expandedTools.has(tool.evidenceId),
+                'is-expanded': isToolExpanded(tool.evidenceId),
                 'is-muted': normalizedSearch && !toolMatches(tool),
                 'is-located': highlightedTarget === modelAnalysisTargetId(tool.evidenceId),
               }"
@@ -426,7 +426,7 @@
               <button
                 type="button"
                 class="webqq-model-analysis-tool-summary"
-                :aria-expanded="expandedTools.has(tool.evidenceId)"
+                :aria-expanded="isToolExpanded(tool.evidenceId)"
                 @pointerdown="startToolPointer"
                 @pointerup="finishToolPointer"
                 @click="toggleToolFromSummary(tool.evidenceId)"
@@ -444,7 +444,7 @@
                 </span>
                 <IconChevronDown class="webqq-model-analysis-tool-chevron" :size="18" aria-hidden="true" />
               </button>
-              <div v-if="expandedTools.has(tool.evidenceId)" class="webqq-model-analysis-tool-detail">
+              <div v-if="isToolExpanded(tool.evidenceId)" class="webqq-model-analysis-tool-detail">
                 <p><AnalysisHighlightedText :value="tool.description || '无描述'" :query="normalizedSearch" /></p>
                 <h4>Parameters (JSON Schema) <small>{{ formatEvidencePath(tool.path) }}</small></h4>
                 <div class="webqq-model-analysis-tool-schema webqq-model-request-json-viewer">
@@ -499,6 +499,7 @@ import {
   type ModelRequestAnalysisGroupKey,
   type ModelRequestAnalysisNavigationItem,
 } from './model-request-analysis'
+import { createAnalysisExpansion } from './analysis-expansion'
 import { createEvidenceLocator, type LocateRequest } from './evidence-locator'
 import {
   isHistoryVariableName,
@@ -565,20 +566,34 @@ const responseToolResultsVisible = computed(() => isEvidenceVisible(evidenceFilt
 const responseVisible = computed(() => (
   responseContentVisible.value || responseToolCallsVisible.value || responseToolResultsVisible.value
 ))
-const responseRaw = ref(false)
-const rawMessages = ref(new Set<string>())
-// 原始 JSON 一旦挂载就留在 DOM 里，切回格式化内容不会丢掉树内的展开状态；
-// 但从未被切开的消息不会为它构造整棵树。
-const rawMountedMessages = ref(new Set<string>())
-const responseRawMounted = ref(false)
-const rawHistoryVariables = ref(new Set<string>())
+// 展开态与原文态住在 analysis-expansion 里；这里只是它的渲染面。
+const {
+  expandCard,
+  expandSearchMatches,
+  expandTool,
+  getExpandedText,
+  isCardCollapsed,
+  isHistoryVariableRaw,
+  isMessageRaw,
+  isMessageRawMounted,
+  isTextForceExpanded,
+  isToolExpanded,
+  reset: resetExpansion,
+  responseRaw,
+  responseRawMounted,
+  setExpandedText,
+  setMessageRaw,
+  setResponseRaw,
+  toggleCard,
+  toggleHistoryVariableRaw,
+  toggleMessageRaw,
+  toggleResponseRaw,
+  toggleTool,
+} = createAnalysisExpansion()
 const historyPreviewCache = new Map<string, readonly ModelRequestHistoryMessage[] | undefined>()
 // 原始 JSON 树按证据身份缓存。模板里直接调用 buildModelRequestJsonTree 会让每次重渲染
 // （搜索输入、折叠、定位高亮）都重建整棵树；缓存随会话投影一起失效。
 let jsonTrees = new Map<string, ModelRequestJsonNode>()
-const collapsedCards = ref(new Set<string>())
-const expandedTools = ref(new Set<string>())
-const expandedTextTargets = ref(new Set<string>())
 const contentElement = ref<HTMLElement>()
 const navigationElement = ref<HTMLElement>()
 const collapsedNavigationGroups = ref(new Set<ModelRequestAnalysisGroupKey>())
@@ -634,20 +649,12 @@ const locator = createEvidenceLocator({
   },
   expandCard,
   setToolExpanded: expandTool,
-  isMessageRaw: evidenceId => rawMessages.value.has(evidenceId),
-  setMessageRaw: (evidenceId, raw) => {
-    const next = new Set(rawMessages.value)
-    raw ? next.add(evidenceId) : next.delete(evidenceId)
-    rawMessages.value = next
-  },
+  isMessageRaw,
+  setMessageRaw,
   isResponseRaw: () => responseRaw.value,
-  setResponseRaw: (raw) => {
-    responseRaw.value = raw
-  },
-  getExpandedText: () => [...expandedTextTargets.value],
-  setExpandedText: (targets) => {
-    expandedTextTargets.value = new Set(targets)
-  },
+  setResponseRaw,
+  getExpandedText,
+  setExpandedText,
   setHighlight: (target) => {
     highlightedTarget.value = target ?? ''
   },
@@ -672,21 +679,18 @@ const locator = createEvidenceLocator({
 
 watch(normalizedSearch, async (query) => {
   if (!query) return
-  // 展开是集合替换；逐条 expandCard 会为每一条命中复制一次整个集合。
-  const cards = new Set(collapsedCards.value)
-  for (const message of conversation.value.messages) {
-    if (messageMatches(message)) cards.delete(modelAnalysisTargetId(message.evidenceId))
-  }
-  if (responseSearchText.value.includes(query)) cards.delete(MODEL_ANALYSIS_RESPONSE_TARGET)
-  for (const variable of props.detail.variables) {
-    if (variableMatches(variable)) cards.delete(modelAnalysisVariableTargetId(variable.id))
-  }
-  if (cards.size !== collapsedCards.value.size) collapsedCards.value = cards
-  const tools = new Set(expandedTools.value)
-  for (const tool of conversation.value.tools) {
-    if (toolMatches(tool)) tools.add(tool.evidenceId)
-  }
-  if (tools.size !== expandedTools.value.size) expandedTools.value = tools
+  expandSearchMatches({
+    cardTargets: [
+      ...conversation.value.messages
+        .filter(messageMatches)
+        .map(message => modelAnalysisTargetId(message.evidenceId)),
+      ...(responseSearchText.value.includes(query) ? [MODEL_ANALYSIS_RESPONSE_TARGET] : []),
+      ...props.detail.variables
+        .filter(variableMatches)
+        .map(variable => modelAnalysisVariableTargetId(variable.id)),
+    ],
+    toolEvidenceIds: conversation.value.tools.filter(toolMatches).map(tool => tool.evidenceId),
+  })
   // 轨迹检查器已经选中了具体账本行，搜索只高亮匹配卡片，不再抢走当前定位。
   if (props.layout === 'inspector') return
   const first = visibleNavigationGroups.value.flatMap(group => group.items).find(itemMatches)
@@ -701,16 +705,6 @@ watch(conversation, () => {
   jsonTrees = new Map()
 })
 
-// 原始视图一旦被切开就把它登记为已挂载；再次切回格式化内容时树留在 DOM 里，展开状态不丢。
-watch(rawMessages, (next) => {
-  if ([...next].every(evidenceId => rawMountedMessages.value.has(evidenceId))) return
-  rawMountedMessages.value = new Set([...rawMountedMessages.value, ...next])
-})
-
-watch(responseRaw, (raw) => {
-  if (raw) responseRawMounted.value = true
-})
-
 onMounted(() => {
   void locateRequestedEvidence()
   nextTick(setupNavigationTracking)
@@ -723,16 +717,9 @@ watch(visibleNavigationGroups, () => {
 
 watch(() => props.detail.id, (next, previous) => {
   if (next === previous) return
-  responseRaw.value = false
-  rawMessages.value = new Set()
-  rawMountedMessages.value = new Set()
-  responseRawMounted.value = false
-  rawHistoryVariables.value = new Set()
+  resetExpansion()
   historyPreviewCache.clear()
   jsonTrees = new Map()
-  collapsedCards.value = new Set()
-  expandedTools.value = new Set()
-  expandedTextTargets.value = new Set()
   collapsedNavigationGroups.value = new Set()
   activeNavigationTarget.value = ''
   navigationTargetsDirty = true
@@ -862,12 +849,6 @@ function historyPreview(variable: SandboxModelRequestVariable): readonly ModelRe
   return historyPreviewCache.get(cacheKey)
 }
 
-function toggleHistoryRaw(variableId: string) {
-  const next = new Set(rawHistoryVariables.value)
-  next.has(variableId) ? next.delete(variableId) : next.add(variableId)
-  rawHistoryVariables.value = next
-}
-
 function cachedJsonTree(cacheKey: string, rootKey: string, read: () => unknown): ModelRequestJsonNode {
   const cached = jsonTrees.get(cacheKey)
   if (cached) return cached
@@ -939,29 +920,6 @@ function hasTool(name: string) {
   return conversation.value.tools.some(tool => tool.name === name)
 }
 
-function toggleRaw(evidenceId: string) {
-  expandCard(modelAnalysisTargetId(evidenceId))
-  const next = new Set(rawMessages.value)
-  next.has(evidenceId) ? next.delete(evidenceId) : next.add(evidenceId)
-  rawMessages.value = next
-}
-
-function toggleResponseRaw() {
-  expandCard(MODEL_ANALYSIS_RESPONSE_TARGET)
-  responseRaw.value = !responseRaw.value
-}
-
-function isCardCollapsed(target: string) {
-  return collapsedCards.value.has(target)
-}
-
-// 折叠仅隐藏正文而不卸载内容，避免原始模式和长文本展开状态在再次展开时丢失。
-function toggleCard(target: string) {
-  const next = new Set(collapsedCards.value)
-  next.has(target) ? next.delete(target) : next.add(target)
-  collapsedCards.value = next
-}
-
 // 第二次按下时阻止浏览器按单词选中，但保留单击折叠和拖选复制。
 function preventCardHeaderDoubleClickSelection(event: MouseEvent) {
   if (event.detail < 2) return
@@ -975,24 +933,6 @@ function toggleCardFromHeader(event: MouseEvent, target: string) {
   if (selection && !selection.isCollapsed) return
   if (event.target instanceof Element && event.target.closest('button')) return
   toggleCard(target)
-}
-
-function expandCard(target: string) {
-  if (!collapsedCards.value.has(target)) return
-  const next = new Set(collapsedCards.value)
-  next.delete(target)
-  collapsedCards.value = next
-}
-
-function expandTool(path: string) {
-  if (expandedTools.value.has(path)) return
-  expandedTools.value = new Set([...expandedTools.value, path])
-}
-
-function toggleTool(path: string) {
-  const next = new Set(expandedTools.value)
-  next.has(path) ? next.delete(path) : next.add(path)
-  expandedTools.value = next
 }
 
 // 工具摘要同时允许复制文本；拖选结束会触发 click，必须区分位移和折叠操作，避免选中文字时意外收起卡片。
