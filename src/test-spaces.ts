@@ -228,8 +228,8 @@ export class SandboxTestSpaceService {
     const space = this.requireSpace(spaceId)
     this.spaces.delete(spaceId)
     // 删除空间时清空并落盘独立调试证据，再 dispose，避免恢复到已删空间记录。
-    space.control.clearOneBotDebugRecords()
-    space.control.clearModelRequestRecords()
+    space.control.getOneBotDebugStore().clear()
+    space.control.getModelRequestStore().clear()
     void space.control.waitForPersistence().finally(() => {
       void space.control.dispose().finally(() => {
         // 空间目录由本服务分配（spaces/<id>/），删除空间后必须整棵回收，

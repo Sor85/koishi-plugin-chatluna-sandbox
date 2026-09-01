@@ -297,11 +297,19 @@ export class SandboxOneBotDebugStore {
   }
 
   waitForPersistence(): Promise<void> {
+    return this.settle()
+  }
+
+  /**
+   * 等到已入队的写入全部提交。与模型请求库同形——那边的收尾等待还要覆盖旁路采集的外部
+   * Promise，调试记录没有那一类，因此两者在这里重合，但落盘等待的实现仍然只有这一处。
+   */
+  private settle(): Promise<void> {
     return this.writes.settle()
   }
 
   async getCapacity(): Promise<SandboxOneBotDebugCapacity> {
-    await this.waitForPersistence()
+    await this.settle()
     return this.readCapacity()
   }
 
@@ -347,7 +355,7 @@ export class SandboxOneBotDebugStore {
 
   async getRecords(input: GetSandboxOneBotDebugRecordsInput = {}): Promise<SandboxOneBotDebugRecordsPage> {
     const limit = Math.min(Math.max(Number(input.limit ?? DEFAULT_DEBUG_PAGE_SIZE) || DEFAULT_DEBUG_PAGE_SIZE, 1), MAX_DEBUG_PAGE_SIZE)
-    await this.waitForPersistence()
+    await this.settle()
     const earliestCursor = this.summary.earliestSequence
     if (input.beforeSequence !== undefined) {
       if (!Number.isInteger(input.beforeSequence) || input.beforeSequence < 1) {
@@ -385,7 +393,7 @@ export class SandboxOneBotDebugStore {
   }
 
   async getRecord(recordId: string, includeLargeValues = false): Promise<SandboxOneBotDebugRecord | undefined> {
-    await this.waitForPersistence()
+    await this.settle()
     const record = await this.persistence.find(recordId)
     return record ? presentOneBotDebugRecord(record, includeLargeValues) : undefined
   }

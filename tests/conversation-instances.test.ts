@@ -274,7 +274,7 @@ describe('原始 OneBot action 的会话观察', () => {
   }
 
   async function findObservedRecord(control: SandboxControlService, action: string) {
-    const { records } = await control.getOneBotDebugRecords({ direction: 'action', action })
+    const { records } = await control.getOneBotDebugStore().getRecords({ direction: 'action', action })
     expect(records).toHaveLength(1)
     return records[0]!
   }
@@ -374,7 +374,7 @@ describe('原始 OneBot action 的会话观察', () => {
     expect(control.getSnapshot().messages.find(({ content }) => content === '标准路径回复')?.conversationId)
       .toBe(conversationId)
     // 标准发送路径不经过 OneBot action，因此根本不产生机器人动作记录。
-    expect((await control.getOneBotDebugRecords({ direction: 'action' })).records).toEqual([])
+    expect((await control.getOneBotDebugStore().getRecords({ direction: 'action' })).records).toEqual([])
   })
 
   /** 收到消息后按账号或群号查历史——chatluna-character 冷启动回填走的正是这条路径。 */
@@ -409,7 +409,7 @@ describe('原始 OneBot action 的会话观察', () => {
 
     // 第一次事件来自根会话，读到根会话自己的历史；第二次来自空实例，只读到实例里那一条。
     expect(histories).toEqual([['根会话里的旧问题'], ['在实例里提问']])
-    const { records } = await control.getOneBotDebugRecords({
+    const { records } = await control.getOneBotDebugStore().getRecords({
       direction: 'action',
       action: 'get_friend_msg_history',
       order: 'asc',
@@ -437,7 +437,7 @@ describe('原始 OneBot action 的会话观察', () => {
     await control.sendMessage({ operatorId: '10001', conversationId, content: '在群实例里提问' })
 
     expect(histories).toEqual([['群根会话里的旧问题'], ['在群实例里提问']])
-    expect((await control.getOneBotDebugRecords({
+    expect((await control.getOneBotDebugStore().getRecords({
       direction: 'action',
       action: 'get_group_msg_history',
       order: 'desc',
@@ -491,7 +491,7 @@ describe('原始 OneBot action 的会话观察', () => {
     await control.sendMessage({ operatorId: '10001', conversationId, content: '在实例里提问' })
 
     expect(histories.at(-1)).toEqual(['另一个联系人的历史'])
-    expect((await control.getOneBotDebugRecords({
+    expect((await control.getOneBotDebugStore().getRecords({
       direction: 'action',
       action: 'get_friend_msg_history',
       order: 'desc',

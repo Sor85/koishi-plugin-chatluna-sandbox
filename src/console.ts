@@ -20,6 +20,7 @@ import {
   UNATTRIBUTED_MODEL_REQUEST_SCOPE_ID,
   type SandboxModelRequestStore,
 } from './model-request'
+import type { SandboxOneBotDebugStore } from './onebot-debug'
 import { createScopeDirectory, type SceneScope } from './scope-directory'
 import type {
   ClearSandboxOneBotDebugRecordsResult,
@@ -172,11 +173,11 @@ export function registerConsole(
     ? mainSource
     : { type: 'test-space', spaceId: scope.id, name: scope.name })
   const getDebugPage = async (
-    activeControl: SandboxControlService,
+    store: SandboxOneBotDebugStore,
     source: SandboxEntitySource,
     input: GetSandboxOneBotDebugRecordsInput,
   ): Promise<SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord>> => {
-    const page = await activeControl.getOneBotDebugRecords(input)
+    const page = await store.getRecords(input)
     return {
       ...page,
       records: page.records.map((record) => ({ ...record, source })),
@@ -191,7 +192,7 @@ export function registerConsole(
       const space = testSpaces.getSpace(input.spaceId)
       const spaceControl = testSpaces.getControl(space.id)
       await spaceControl.waitForPersistence()
-      return getDebugPage(spaceControl, {
+      return getDebugPage(spaceControl.getOneBotDebugStore(), {
         type: 'test-space',
         spaceId: space.id,
         name: space.name,
@@ -199,7 +200,7 @@ export function registerConsole(
     }
     // 联邦视图跨多个独立 sequence，仅聚合首页；精确游标分页必须带 spaceId，因此不声明续页游标。
     return scopes.federate(
-      (scope) => getDebugPage(scope.control, sceneSource(scope), { ...query, beforeSequence: undefined }),
+      (scope) => getDebugPage(scope.debugRecords, sceneSource(scope), { ...query, beforeSequence: undefined }),
       {
         limit: Math.min(Math.max(Number(query.limit ?? 50) || 50, 1), 200),
         order: query.order === 'asc' ? 'asc' : 'desc',
@@ -209,24 +210,25 @@ export function registerConsole(
   }
   const getDebugRecord = async (input: SpaceScoped<GetSandboxOneBotDebugRecordInput>): Promise<SandboxConsoleOneBotDebugRecord> => {
     const query = withoutSpaceId(input)
+    const includeLargeValues = query.includeLargeValues === true
     if (input.spaceId) {
       if (!testSpaces) throw new Error('AI 测试空间服务不可用')
       const space = testSpaces.getSpace(input.spaceId)
       const spaceControl = testSpaces.getControl(space.id)
       await spaceControl.waitForPersistence()
       return {
-        ...await spaceControl.getOneBotDebugStore().requireRecord(query.recordId, query.includeLargeValues === true),
+        ...await spaceControl.getOneBotDebugStore().requireRecord(query.recordId, includeLargeValues),
         source: { type: 'test-space', spaceId: space.id, name: space.name },
       }
     }
-    const hit = await scopes.findFirst((scope) => scope.control.findOneBotDebugRecord(query))
+    const hit = await scopes.findFirst((scope) => scope.debugRecords.getRecord(query.recordId, includeLargeValues))
     if (!hit) throw new SandboxDomainError(`调试记录不存在：${query.recordId}`)
     return { ...hit.value, source: sceneSource(hit.scope) }
   }
   const clearDebugRecords = async (input: { spaceId?: string } = {}): Promise<ClearSandboxOneBotDebugRecordsResult> => {
-    if (input.spaceId) return { cleared: await resolveControl(input, true).clearOneBotDebugRecords() }
+    if (input.spaceId) return { cleared: await resolveControl(input, true).getOneBotDebugStore().clear() }
     // 主调试页展示的是联邦视图，清理必须覆盖运行中的 AI 空间，不能要求用户先接管。
-    const cleared = await scopes.forEachScene(({ control: scopeControl }) => scopeControl.clearOneBotDebugRecords())
+    const cleared = await scopes.forEachScene(({ debugRecords }) => debugRecords.clear())
     return { cleared: cleared.reduce((total, count) => total + count, 0) }
   }
   const getWorkspace = async (input: SpaceScoped<GetSandboxWorkspaceInput> = {}): Promise<SandboxWorkspaceState> => {
@@ -415,7 +417,7 @@ export function registerConsole(
       const query = federatedModelRequestQuery(input)
       // 「全部」排除未归属不写在这里：联邦读取本来就只遍历拥有场景的记录域。
       const { next, ...page } = await scopes.federate(async (scope) => {
-        const scopePage = await scope.control.getModelRequestRecords(query)
+        const scopePage = await scope.records.getRecords(query)
         return { ...scopePage, records: scopePage.records.map((record) => ({ ...record, source: sceneSource(scope) })) }
       }, {
         limit: Math.min(Math.max(Number(input.limit ?? DEFAULT_MODEL_REQUEST_PAGE_SIZE) || DEFAULT_MODEL_REQUEST_PAGE_SIZE, 1), MAX_MODEL_REQUEST_PAGE_SIZE),
@@ -429,7 +431,7 @@ export function registerConsole(
     const source = resolveModelRequestSource(input)
     const page = input.scope === 'unattributed'
       ? await requireUnattributedModelRequests().getRecords(input)
-      : await resolveModelRequestControl(input)!.getModelRequestRecords(input)
+      : await resolveModelRequestControl(input)!.getModelRequestStore().getRecords(input)
     return {
       ...page,
       records: page.records.map((record) => ({ ...record, source })),
@@ -463,7 +465,7 @@ export function registerConsole(
   const clearModelRequestRecords = async (input: SandboxModelRequestScope): Promise<ClearSandboxModelRequestRecordsResult> => {
     if (input.scope === 'all') throw new Error('全部空间视图不支持一次性清理')
     if (input.scope === 'unattributed') return { cleared: await requireUnattributedModelRequests().clear() }
-    return { cleared: await resolveModelRequestControl(input)!.clearModelRequestRecords() }
+    return { cleared: await resolveModelRequestControl(input)!.getModelRequestStore().clear() }
   }
 
   registerListener('chatluna-sandbox/debug-records', listDebugRecords, { authority: 4 })

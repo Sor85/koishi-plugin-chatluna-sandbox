@@ -1,3 +1,4 @@
+import type { SandboxModelRequestStore } from './model-request'
 import type { SandboxChatLunaRequestError, SandboxModelRequestRecord } from './types'
 
 export const CHATLUNA_ERROR_CODE_DOCUMENTATION_URL = 'https://chatluna.chat/guide/faq/error_code.html'
@@ -51,6 +52,29 @@ export function findLatestFailedModelRequest(
     if (matchingConversation) return matchingConversation
   }
   return candidates[0]
+}
+
+/**
+ * 把一次 ChatLuna 上游错误回填到该会话最近一条失败记录上。
+ *
+ * 住在这里而不是记录库里：记录库不该认识 ChatLuna 的错误格式。它需要的两件事——解析上游错误、
+ * 找到「最近一条失败记录」——都已经在本 module 里，回填只是把两者接上记录库的单行更新。
+ */
+export function archiveChatLunaModelRequestError(
+  store: SandboxModelRequestStore,
+  error: unknown,
+  target: { readonly conversationId: string },
+): void {
+  const chatlunaError = readChatLunaRequestError(error)
+  if (!chatlunaError) return
+  // ChatLuna 的错误回调是同步的，记录查找与单行更新只能在后台完成；
+  // 收尾等待通过 trackUpdate 覆盖它，避免关机时丢掉这次归档。
+  const task = store.getRawRecords().then(async (records) => {
+    const record = findLatestFailedModelRequest(records, target.conversationId)
+    if (!record) return
+    await store.update(record.id, { chatlunaError })
+  }).catch(() => undefined)
+  store.trackUpdate(task)
 }
 
 function readRecord(value: unknown): Record<string, unknown> | undefined {

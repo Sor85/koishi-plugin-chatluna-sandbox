@@ -798,7 +798,7 @@ describe('模拟 QQ 环境消息闭环', () => {
       conversationId: 'private:10001:20001',
       messageIds: [older.messageId],
     })
-    expect((await control.getOneBotDebugRecords({ direction: 'action', action: 'send_forward_msg' })).records[0]).toMatchObject({
+    expect((await control.getOneBotDebugStore().getRecords({ direction: 'action', action: 'send_forward_msg' })).records[0]).toMatchObject({
       requestedAction: 'send_forward_msg',
       status: 'success',
     })

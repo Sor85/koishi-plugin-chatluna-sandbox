@@ -828,7 +828,7 @@ describe('Koishi 与 OneBot 机器人桥接', () => {
       group_id: 30001,
       group_name: '测试群',
     })
-    expect((await control.getOneBotDebugRecords({ direction: 'action' })).records[0]).toMatchObject({
+    expect((await control.getOneBotDebugStore().getRecords({ direction: 'action' })).records[0]).toMatchObject({
       requestedAction: 'get_group_info',
       action: 'get_group_info',
       status: 'success',

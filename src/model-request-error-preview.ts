@@ -1,4 +1,4 @@
-import type { SandboxControlService } from './control-service'
+import type { SandboxModelRequestStore } from './model-request'
 
 const PREVIEW_INTERACTION_PREFIX = 'dev-chatluna-error-preview:'
 
@@ -24,15 +24,18 @@ const PREVIEW_ERRORS: readonly DevelopmentErrorPreview[] = [
   { code: 309, title: '模型空响应', originMessage: 'The model returned an empty response.', responseStatus: 502 },
 ] as const
 
-export async function seedDevelopmentModelRequestErrors(control: SandboxControlService): Promise<number> {
+/**
+ * 直接写进记录库而不是经控制服务：这条便利仅在开发模式下生效，不值得在对外 interface 上占一个键。
+ */
+export async function seedDevelopmentModelRequestErrors(store: SandboxModelRequestStore): Promise<number> {
   if (process.env.NODE_ENV !== 'development') return 0
-  await control.waitForPersistence()
+  await store.waitForPersistence()
   let created = 0
   for (const preview of PREVIEW_ERRORS) {
     const interactionId = `${PREVIEW_INTERACTION_PREFIX}${preview.code}`
-    if ((await control.getModelRequestRecords({ interactionId, limit: 1 })).records.length) continue
+    if ((await store.getRecords({ interactionId, limit: 1 })).records.length) continue
     const model = `error-preview-${preview.code}`
-    control.recordModelRequest({
+    store.append({
       status: 'error',
       durationMs: preview.code === 102 ? 60_000 : 120 + preview.code,
       method: 'POST',
@@ -76,6 +79,6 @@ export async function seedDevelopmentModelRequestErrors(control: SandboxControlS
     })
     created += 1
   }
-  await control.waitForPersistence()
+  await store.waitForPersistence()
   return created
 }

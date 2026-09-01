@@ -68,7 +68,7 @@ describe('OneBot 调试记录持久化与分页', () => {
     }, 30)
 
     await control.waitForPersistence()
-    expect((await control.getOneBotDebugRecords({ limit: 10 })).records.map(({ requestedAction, sequence }) => ({ requestedAction, sequence }))).toEqual([
+    expect((await control.getOneBotDebugStore().getRecords({ limit: 10 })).records.map(({ requestedAction, sequence }) => ({ requestedAction, sequence }))).toEqual([
       { requestedAction: 'startup_action', sequence: 8 },
       { requestedAction: 'historical_action', sequence: 7 },
     ])
@@ -94,14 +94,14 @@ describe('OneBot 调试记录持久化与分页', () => {
 
     const second = new SandboxControlService(app, { debugPersistence: persistence })
     await second.waitForPersistence()
-    const restored = (await second.getOneBotDebugRecords({ limit: 10 }))
+    const restored = (await second.getOneBotDebugStore().getRecords({ limit: 10 }))
     expect(restored.records.map(({ requestedAction, sequence }) => ({ requestedAction, sequence }))).toEqual([
       { requestedAction: 'get_login_info', sequence: 2 },
       { requestedAction: 'get_status', sequence: 1 },
     ])
 
     await second.bot.internal._request('get_version_info', {})
-    const afterAppend = (await second.getOneBotDebugRecords({ limit: 10 }))
+    const afterAppend = (await second.getOneBotDebugStore().getRecords({ limit: 10 }))
     expect(afterAppend.records[0]).toMatchObject({ requestedAction: 'get_version_info', sequence: 3 })
   })
 
@@ -128,7 +128,7 @@ describe('OneBot 调试记录持久化与分页', () => {
       status: 'success',
       durationMs: 1,
     })
-    expect((await control.getOneBotDebugRecords()).records).toHaveLength(1)
+    expect((await control.getOneBotDebugStore().getRecords()).records).toHaveLength(1)
     await control.waitForPersistence()
 
     spaces.deleteSpace(space.id)
@@ -138,6 +138,6 @@ describe('OneBot 调试记录持久化与分页', () => {
       runtimeActive: false,
     })
     await recreated.waitForPersistence()
-    expect((await recreated.getOneBotDebugRecords()).records).toEqual([])
+    expect((await recreated.getOneBotDebugStore().getRecords()).records).toEqual([])
   })
 })

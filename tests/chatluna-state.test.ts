@@ -135,7 +135,7 @@ describe('ChatLuna 多机器人对话状态', () => {
     const groupSession = createGroupSession(control, '20001')
 
     await emitChatLunaEvent(app, 'chatluna/before-chat', 'chatluna:direct', {}, {}, {}, directSession)
-    control.recordModelRequest({
+    control.getModelRequestStore().append({
       status: 'error',
       durationMs: 10,
       model: 'direct-model',
@@ -145,7 +145,7 @@ describe('ChatLuna 多机器人对话状态', () => {
       responseBodyStatus: 'unavailable',
       error: { code: 'model_request_error', message: 'HTTP 500', retryable: false, traceId: 'direct-trace' },
     })
-    control.recordModelRequest({
+    control.getModelRequestStore().append({
       status: 'error',
       durationMs: 10,
       model: 'group-model',
@@ -164,21 +164,21 @@ describe('ChatLuna 多机器人对话状态', () => {
 
     // 错误归档要先查最近的失败请求再单行更新，只能在后台完成；收尾等待覆盖它。
     await control.waitForPersistence()
-    expect((await control.getModelRequestRecords({ model: 'direct-model' })).records[0]).toMatchObject({
+    expect((await control.getModelRequestStore().getRecords({ model: 'direct-model' })).records[0]).toMatchObject({
       chatlunaError: {
         code: 103,
         message: 'API 请求失败 (103)',
         originMessage: 'provider rejected request',
       },
     })
-    expect((await control.getModelRequestRecords({ model: 'group-model' })).records[0]?.chatlunaError).toBeUndefined()
+    expect((await control.getModelRequestStore().getRecords({ model: 'group-model' })).records[0]?.chatlunaError).toBeUndefined()
   })
 
   it('ChatLuna 会话同时映射多个机器人时不把错误串到任意模型请求', async () => {
     const { app, control } = await createControl()
     await emitChatLunaEvent(app, 'chatluna/before-chat', 'chatluna:shared-error', {}, {}, {}, createGroupSession(control, '20001'))
     await emitChatLunaEvent(app, 'chatluna/before-chat', 'chatluna:shared-error', {}, {}, {}, createGroupSession(control, '20002'))
-    const request = control.recordModelRequest({
+    const request = control.getModelRequestStore().append({
       status: 'error',
       durationMs: 10,
       attribution: 'attributed',

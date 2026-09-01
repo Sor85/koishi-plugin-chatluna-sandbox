@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  archiveChatLunaModelRequestError,
   findLatestFailedModelRequest,
   getChatLunaErrorPossibleCauses,
   readChatLunaRequestError,
 } from '../src/chatluna-error'
+import { SandboxModelRequestStore } from '../src/model-request'
 import type { SandboxModelRequestDetail } from '../src/types'
 
 function record(sequence: number, input: Partial<SandboxModelRequestDetail> = {}): SandboxModelRequestDetail {
@@ -58,5 +60,54 @@ describe('ChatLuna 模型请求错误', () => {
     ]
     expect(findLatestFailedModelRequest(records, 'conversation-a')?.id).toBe('request-1')
     expect(findLatestFailedModelRequest(records, 'conversation-missing')?.id).toBe('request-2')
+  })
+})
+
+/**
+ * 失败回填住在本 module 而不是记录库里：记录库不该认识 ChatLuna 的错误格式。
+ * 它依赖的两件事（解析上游错误、找到最近一条失败记录）都在这里。
+ */
+describe('ChatLuna 失败记录回填', () => {
+  function failed(store: SandboxModelRequestStore, model: string, conversationId: string) {
+    return store.append({
+      status: 'error',
+      durationMs: 10,
+      model,
+      attribution: 'attributed',
+      entities: { conversationId },
+      requestBodyAvailable: false,
+      error: { code: 'model_request_error', message: 'HTTP 500', retryable: false, traceId: `${model}-trace` },
+    })
+  }
+
+  it('回填该会话最近一条失败记录，且这次更新被收尾等待覆盖', async () => {
+    const store = new SandboxModelRequestStore()
+    const target = failed(store, 'direct-model', 'private:10001:20001')
+    const other = failed(store, 'group-model', 'group:30001')
+
+    archiveChatLunaModelRequestError(store, {
+      errorCode: 103,
+      message: 'API 请求失败 (103)',
+      originError: new Error('provider rejected request'),
+    }, { conversationId: 'private:10001:20001' })
+
+    // 查找与单行更新只在后台完成；这里除了收尾等待没有别的同步手段，等到即证明它被覆盖。
+    await store.waitForPersistence()
+    expect((await store.getRecord(target.id))?.chatlunaError).toEqual({
+      code: 103,
+      message: 'API 请求失败 (103)',
+      originMessage: 'provider rejected request',
+    })
+    expect((await store.getRecord(other.id))?.chatlunaError).toBeUndefined()
+  })
+
+  it('上游错误里没有可用信息时不回填，也不留下待办更新', async () => {
+    const store = new SandboxModelRequestStore()
+    const target = failed(store, 'direct-model', 'private:10001:20001')
+
+    archiveChatLunaModelRequestError(store, undefined, { conversationId: 'private:10001:20001' })
+
+    await store.waitForPersistence()
+    expect((await store.getRecord(target.id))?.chatlunaError).toBeUndefined()
   })
 })

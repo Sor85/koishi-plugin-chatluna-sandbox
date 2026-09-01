@@ -41,11 +41,11 @@ describe('模型请求 Console 协议', () => {
     }
     registerConsole(registrar, control, appearance, undefined, spaces, unattributed)
 
-    const mainRecord = control.recordModelRequest({
+    const mainRecord = control.getModelRequestStore().append({
       status: 'success', durationMs: 3, model: 'main-model',
       attribution: 'attributed', entities: { scopeId: 'main' }, requestBodyAvailable: false,
     })
-    space.control.recordModelRequest({
+    space.control.getModelRequestStore().append({
       status: 'success', durationMs: 4, model: 'space-model',
       attribution: 'attributed', entities: { scopeId: space.id }, requestBodyAvailable: false,
     })
@@ -95,8 +95,8 @@ describe('模型请求 Console 协议', () => {
     await expect(Reflect.apply(clearRecords, undefined, [{ scope: 'all' }])).rejects.toThrow('全部空间视图不支持一次性清理')
 
     expect(await Reflect.apply(clearRecords, undefined, [{ scope: 'space', spaceId: space.id }])).toEqual({ cleared: 1 })
-    expect((await space.control.getModelRequestRecords()).records).toEqual([])
-    expect((await control.getModelRequestRecords()).records).toHaveLength(1)
+    expect((await space.control.getModelRequestStore().getRecords()).records).toEqual([])
+    expect((await control.getModelRequestStore().getRecords()).records).toHaveLength(1)
     expect(await Reflect.apply(clearRecords, undefined, [{ scope: 'unattributed' }])).toEqual({ cleared: 1 })
     expect((await unattributed.getRecords()).records).toEqual([])
   })
@@ -201,7 +201,7 @@ describe('模型请求 Console 协议', () => {
     let usageService: ChatLunaUsageLookup | undefined
     registerConsole(registrar, control, appearance, undefined, undefined, undefined, () => usageService)
 
-    const record = control.recordModelRequest({
+    const record = control.getModelRequestStore().append({
       status: 'success', durationMs: 5613, model: 'gemini-3.7-flash-high',
       attribution: 'attributed', entities: { scopeId: 'main' }, requestBodyAvailable: false,
     })

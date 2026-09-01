@@ -354,7 +354,7 @@ describe('模型请求采集', () => {
 
     await plugin.fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', body: chatBody('none') })
     expect((await unattributed.getRecords()).records[0]).toMatchObject({ attribution: 'unattributed', model: 'none' })
-    expect((await space.control.getModelRequestRecords()).records).toEqual([])
+    expect((await space.control.getModelRequestStore().getRecords()).records).toEqual([])
 
     const session = space.control.getRuntimeBot('21001').session({
       type: 'message',
@@ -370,7 +370,7 @@ describe('模型请求采集', () => {
       session,
     )
     await plugin.fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', body: chatBody('attributed') })
-    expect((await space.control.getModelRequestRecords()).records[0]).toMatchObject({
+    expect((await space.control.getModelRequestStore().getRecords()).records[0]).toMatchObject({
       attribution: 'attributed',
       model: 'attributed',
       entities: { scopeId: space.id, botId: '21001', conversationId: 'private:11001:21001' },
@@ -394,6 +394,6 @@ describe('模型请求采集', () => {
       attribution: 'unattributed',
       entities: {},
     })
-    expect((await main.getModelRequestRecords()).records).toEqual([])
+    expect((await main.getModelRequestStore().getRecords()).records).toEqual([])
   })
 })

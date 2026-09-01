@@ -3,20 +3,18 @@ import { Context, h, Random, Universal } from 'koishi'
 import { resolve } from 'node:path'
 import { SandboxBot } from './bot'
 import { BUILTIN_AVATARS, findBuiltinAvatarByReference, getBuiltinAvatarReference, pickUnusedBuiltinAvatar } from './builtin-avatars'
-import { SandboxChatLunaStateStore, type SandboxChatLunaErrorTarget } from './chatluna-state'
+import { SandboxChatLunaStateStore } from './chatluna-state'
 import {
   SandboxChatLunaCharacterContext,
   findChatLunaCharacterChatContext,
   resolveChatLunaCharacterSessionKey,
 } from './chatluna-character-context'
-import { findLatestFailedModelRequest, readChatLunaRequestError } from './chatluna-error'
+import { archiveChatLunaModelRequestError } from './chatluna-error'
 import { SandboxMediaStorage, MAX_MEDIA_SIZE, toMediaMetadata } from './media-storage'
 import { SandboxOneBotDebugStore, createOneBotDebugError, type AppendOneBotDebugRecordInput, type SandboxOneBotDebugPersistence } from './onebot-debug'
 import {
   SandboxModelRequestStore,
-  type AppendModelRequestRecordInput,
   type SandboxModelRequestPersistence,
-  type UpdateModelRequestRecordInput,
 } from './model-request'
 import { toOneBotMessageSegments, toOneBotRawMessage } from './onebot-message'
 import type { SandboxSceneLoadResult, SandboxScenePersistence } from './persistence'
@@ -73,13 +71,6 @@ import {
   type GetMediaContentInput,
   type GetSandboxBotDeliveriesInput,
   type GetMessageHistoryInput,
-  type GetSandboxOneBotDebugRecordsInput,
-  type GetSandboxOneBotDebugRecordInput,
-  type GetSandboxModelRequestRecordInput,
-  type GetSandboxModelRequestRecordsInput,
-  type SandboxOneBotDebugRecordsPage,
-  type SandboxModelRequestDetail,
-  type SandboxModelRequestRecordsPage,
   type PerformFriendActionInput,
   type PerformFriendActionResult,
   type PerformGroupActionInput,
@@ -405,7 +396,7 @@ export class SandboxControlService {
     }, () => this.notifySceneMutation(), (botParticipantId, conversationId, result, messageIds) => {
       this.archiveChatLunaResult(botParticipantId, conversationId, result, messageIds)
     }, (error, targets) => {
-      this.archiveChatLunaModelRequestError(error, targets)
+      archiveChatLunaModelRequestError(this.modelRequests, error, targets)
     })
     this.chatLunaCharacterContext = new SandboxChatLunaCharacterContext(() => findChatLunaCharacterChatContext(ctx))
     this.syncRuntimeBots()
@@ -670,29 +661,11 @@ export class SandboxControlService {
   /**
    * 取得调试记录库。
    *
-   * 「这条记录在不在」归记录库自己，本类不再替它转述；这个入口只负责把记录库交出去，
-   * 与模型请求库那个入口同形。
+   * 「这条记录在不在」「读一页」「清一次」都归记录库自己，本类不再替它转述；这个入口只负责
+   * 把记录库交出去，与模型请求库那个入口同形。
    */
   getOneBotDebugStore(): SandboxOneBotDebugStore {
     return this.oneBotDebug
-  }
-
-  getOneBotDebugRecords(input: GetSandboxOneBotDebugRecordsInput = {}): Promise<SandboxOneBotDebugRecordsPage> {
-    return this.oneBotDebug.getRecords(input)
-  }
-
-  /**
-   * 未命中返回 undefined，读取故障照原样抛出。
-   *
-   * 跨记录域查找需要把两者分开：用异常表达未命中时遍历只能靠 try/catch 跳过，一次真实的
-   * 持久化故障就会被当成「这里没有」静默继续，最终报给用户「记录不存在」。
-   */
-  findOneBotDebugRecord(input: GetSandboxOneBotDebugRecordInput): Promise<SandboxOneBotDebugRecord | undefined> {
-    return this.oneBotDebug.getRecord(input.recordId, input.includeLargeValues === true)
-  }
-
-  clearOneBotDebugRecords(): Promise<number> {
-    return this.oneBotDebug.clear()
   }
 
   getModelRequestStore(): SandboxModelRequestStore {
@@ -707,35 +680,6 @@ export class SandboxControlService {
 
   recordChatLunaModelRequest(scopeId: string, recordId: string, botParticipantId: string, conversationId: string): void {
     this.chatLunaState.recordModelRequest(botParticipantId, conversationId, { scopeId, recordId })
-  }
-
-  private archiveChatLunaModelRequestError(error: unknown, target: SandboxChatLunaErrorTarget): void {
-    const chatlunaError = readChatLunaRequestError(error)
-    if (!chatlunaError) return
-    // ChatLuna 的错误回调是同步的，记录查找与单行更新只能在后台完成；
-    // 收尾等待通过 trackUpdate 覆盖它，避免关机时丢掉这次归档。
-    const task = this.modelRequests.getRawRecords().then(async (records) => {
-      const record = findLatestFailedModelRequest(records, target.conversationId)
-      if (!record) return
-      await this.modelRequests.update(record.id, { chatlunaError })
-    }).catch(() => undefined)
-    this.modelRequests.trackUpdate(task)
-  }
-
-  getModelRequestRecords(input: GetSandboxModelRequestRecordsInput = {}): Promise<SandboxModelRequestRecordsPage> {
-    return this.modelRequests.getRecords(input)
-  }
-
-  clearModelRequestRecords(): Promise<number> {
-    return this.modelRequests.clear()
-  }
-
-  recordModelRequest(input: AppendModelRequestRecordInput) {
-    return this.modelRequests.append(input)
-  }
-
-  updateModelRequest(recordId: string, input: UpdateModelRequestRecordInput) {
-    return this.modelRequests.update(recordId, input)
   }
 
   recordOneBotDebug(input: AppendOneBotDebugRecordInput): SandboxOneBotDebugRecord {

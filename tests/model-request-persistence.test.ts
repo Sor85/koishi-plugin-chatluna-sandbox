@@ -55,7 +55,7 @@ describe('模型请求记录持久化与生命周期', () => {
     runningApps.push(app)
     const control = new SandboxControlService(app, { modelRequestPersistence: persistence })
 
-    control.recordModelRequest({
+    control.getModelRequestStore().append({
       status: 'success', durationMs: 1, model: 'startup-model',
       attribution: 'attributed', entities: { scopeId: 'main' }, requestBodyAvailable: false,
     })
@@ -64,7 +64,7 @@ describe('模型请求记录持久化与生命周期', () => {
     }, 30)
 
     await control.waitForPersistence()
-    expect((await control.getModelRequestRecords()).records.map(({ id, model, sequence }) => ({ id, model, sequence }))).toEqual([
+    expect((await control.getModelRequestStore().getRecords()).records.map(({ id, model, sequence }) => ({ id, model, sequence }))).toEqual([
       expect.objectContaining({ model: 'startup-model', sequence: 8 }),
       { id: 'historical', model: 'historical-model', sequence: 7 },
     ])
@@ -103,13 +103,13 @@ describe('模型请求记录持久化与生命周期', () => {
     const control = new SandboxControlService(app, { modelRequestPersistence: persistence })
     await control.waitForPersistence()
 
-    control.recordModelRequest({
+    control.getModelRequestStore().append({
       status: 'success', durationMs: 1, model: 'current-model',
       attribution: 'attributed', entities: { scopeId: 'main' }, requestBodyAvailable: false,
     })
     await control.waitForPersistence()
 
-    expect((await control.getModelRequestRecords()).records.map(({ model }) => model)).toEqual(['current-model'])
+    expect((await control.getModelRequestStore().getRecords()).records.map(({ model }) => model)).toEqual(['current-model'])
     expect(await control.getModelRequestStore().requireRecord('legacy').catch(() => 'missing')).toBe('missing')
   })
 
@@ -119,11 +119,11 @@ describe('模型请求记录持久化与生命周期', () => {
     const persistence = new MemoryModelRequestPersistence('main')
     const first = new SandboxControlService(app, { modelRequestPersistence: persistence })
     await first.waitForPersistence()
-    first.recordModelRequest({
+    first.getModelRequestStore().append({
       status: 'success', durationMs: 1, model: 'first',
       attribution: 'attributed', entities: { scopeId: 'main' }, requestBodyAvailable: false,
     })
-    first.recordModelRequest({
+    first.getModelRequestStore().append({
       status: 'success', durationMs: 2, model: 'second',
       attribution: 'attributed', entities: { scopeId: 'main' }, requestBodyAvailable: false,
     })
@@ -131,15 +131,15 @@ describe('模型请求记录持久化与生命周期', () => {
 
     const second = new SandboxControlService(app, { modelRequestPersistence: persistence })
     await second.waitForPersistence()
-    expect((await second.getModelRequestRecords()).records.map(({ model, sequence }) => ({ model, sequence }))).toEqual([
+    expect((await second.getModelRequestStore().getRecords()).records.map(({ model, sequence }) => ({ model, sequence }))).toEqual([
       { model: 'second', sequence: 2 },
       { model: 'first', sequence: 1 },
     ])
-    second.recordModelRequest({
+    second.getModelRequestStore().append({
       status: 'success', durationMs: 3, model: 'third',
       attribution: 'attributed', entities: { scopeId: 'main' }, requestBodyAvailable: false,
     })
-    expect((await second.getModelRequestRecords()).records[0]).toMatchObject({ model: 'third', sequence: 3 })
+    expect((await second.getModelRequestStore().getRecords()).records[0]).toMatchObject({ model: 'third', sequence: 3 })
   })
 
   it('重置场景只清理对应空间记录，完成空间仍保留记录', async () => {
@@ -156,25 +156,25 @@ describe('模型请求记录持久化与生命周期', () => {
       return created
     })
     const space = spaces.createSpace({ name: '请求空间' })
-    main.recordModelRequest({
+    main.getModelRequestStore().append({
       status: 'success', durationMs: 1, model: 'main-model',
       attribution: 'attributed', entities: { scopeId: 'main' }, requestBodyAvailable: false,
     })
-    space.control.recordModelRequest({
+    space.control.getModelRequestStore().append({
       status: 'success', durationMs: 1, model: 'space-model',
       attribution: 'attributed', entities: { scopeId: space.id }, requestBodyAvailable: false,
     })
 
     space.control.resetScene()
-    expect((await space.control.getModelRequestRecords()).records).toEqual([])
-    expect((await main.getModelRequestRecords()).records).toHaveLength(1)
+    expect((await space.control.getModelRequestStore().getRecords()).records).toEqual([])
+    expect((await main.getModelRequestStore().getRecords()).records).toHaveLength(1)
 
-    space.control.recordModelRequest({
+    space.control.getModelRequestStore().append({
       status: 'success', durationMs: 1, model: 'kept-after-complete',
       attribution: 'attributed', entities: { scopeId: space.id }, requestBodyAvailable: false,
     })
     spaces.completeSpace(space.id)
-    expect((await space.control.getModelRequestRecords()).records).toHaveLength(1)
+    expect((await space.control.getModelRequestStore().getRecords()).records).toHaveLength(1)
   })
 
   it('删除测试空间时清理其独立模型请求记录', async () => {
@@ -191,7 +191,7 @@ describe('模型请求记录持久化与生命周期', () => {
     })
     const space = spaces.createSpace({ name: '待删空间' })
     const control = spaces.getControl(space.id)
-    control.recordModelRequest({
+    control.getModelRequestStore().append({
       status: 'success', durationMs: 1, model: 'doomed',
       attribution: 'attributed', entities: { scopeId: space.id }, requestBodyAvailable: false,
     })
@@ -204,6 +204,6 @@ describe('模型请求记录持久化与生命周期', () => {
       runtimeActive: false,
     })
     await recreated.waitForPersistence()
-    expect((await recreated.getModelRequestRecords()).records).toEqual([])
+    expect((await recreated.getModelRequestStore().getRecords()).records).toEqual([])
   })
 })

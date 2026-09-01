@@ -51,11 +51,11 @@ describe('模型请求 MCP 工具', () => {
     }) as { spaceId: string }
     const spaceControl = testSpaces.getControl(created.spaceId)
 
-    control.recordModelRequest({
+    control.getModelRequestStore().append({
       status: 'success', durationMs: 1, model: 'main-model',
       attribution: 'attributed', entities: { scopeId: 'main' }, requestBodyAvailable: false,
     })
-    const spaceRecord = spaceControl.recordModelRequest({
+    const spaceRecord = spaceControl.getModelRequestStore().append({
       status: 'success', durationMs: 2, model: 'space-model',
       attribution: 'attributed', entities: { scopeId: created.spaceId },
       requestBodyAvailable: true, requestBody: { model: 'space-model', messages: [{ role: 'user', content: 'hi' }] },
@@ -99,17 +99,17 @@ describe('模型请求 MCP 工具', () => {
       code: 'invalid_arguments',
     })
     expect(await service.callTool(credential.token, 'clear_model_request_records', { spaceId: created.spaceId })).toEqual({ cleared: 1 })
-    expect((await spaceControl.getModelRequestRecords()).records).toEqual([])
+    expect((await spaceControl.getModelRequestStore().getRecords()).records).toEqual([])
     expect((await unattributed.getRecords()).records).toHaveLength(1)
   })
 
   it('scope=all 按记录 ID 跨全部已归属记录域读详情，并标注来源', async () => {
     const harness = createHarness()
-    const mainRecord = harness.control.recordModelRequest({
+    const mainRecord = harness.control.getModelRequestStore().append({
       status: 'success', durationMs: 1, model: 'main-model',
       attribution: 'attributed', entities: { scopeId: 'main' }, requestBodyAvailable: false,
     })
-    const spaceRecord = harness.space.control.recordModelRequest({
+    const spaceRecord = harness.space.control.getModelRequestStore().append({
       status: 'success', durationMs: 2, model: 'space-model',
       attribution: 'attributed', entities: { scopeId: harness.space.id },
       requestBodyAvailable: true, requestBody: { model: 'space-model', messages: [{ role: 'user', content: 'hi' }] },

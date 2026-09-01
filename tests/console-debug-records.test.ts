@@ -119,8 +119,8 @@ describe('OneBot 调试 Console 协议', () => {
       ],
     })
     expect(await listeners.get('chatluna-sandbox/clear-debug-records')?.({})).toEqual({ cleared: 2 })
-    expect(await control.getOneBotDebugRecords()).toMatchObject({ records: [], hasMore: false })
-    expect(await first.control.getOneBotDebugRecords()).toMatchObject({ records: [], hasMore: false })
+    expect(await control.getOneBotDebugStore().getRecords()).toMatchObject({ records: [], hasMore: false })
+    expect(await first.control.getOneBotDebugStore().getRecords()).toMatchObject({ records: [], hasMore: false })
   })
 
   /**

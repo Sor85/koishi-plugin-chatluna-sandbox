@@ -1,5 +1,6 @@
 import type { SandboxControlService } from './control-service'
 import { MAIN_MODEL_REQUEST_SCOPE_ID, UNATTRIBUTED_MODEL_REQUEST_SCOPE_ID, type SandboxModelRequestStore } from './model-request'
+import type { SandboxOneBotDebugStore } from './onebot-debug'
 import type { SandboxTestSpaceService } from './test-spaces'
 
 /**
@@ -20,8 +21,9 @@ export const UNATTRIBUTED_SCOPE_NAME = '未归属'
 /**
  * 一份沙盒场景对应的记录域：主模拟 QQ 环境或某个 AI 测试空间，两者都有控制服务。
  *
- * 也带模型请求库：跨记录域读一条记录原先要写成「取记录域 → 取控制服务 → 取记录库」，
- * 穿两层只为拿到一个字段。`control` 仍然留着，读取之外的事（等就绪、清场景）还归它。
+ * 也带两种证据的记录库：跨记录域读一页或读一条原先要写成「取记录域 → 取控制服务 → 取记录库」，
+ * 穿两层只为拿到一个字段。两种记录同时带上而不是只带一种——它们的封装程度不该取决于哪一种先写。
+ * `control` 仍然留着，读取之外的事（等就绪、清场景）还归它。
  */
 export interface SceneScope {
   readonly kind: 'main' | 'test-space'
@@ -29,6 +31,7 @@ export interface SceneScope {
   readonly name: string
   readonly control: SandboxControlService
   readonly records: SandboxModelRequestStore
+  readonly debugRecords: SandboxOneBotDebugStore
 }
 
 /**
@@ -169,6 +172,7 @@ export function createScopeDirectory({ control, testSpaces, unattributedModelReq
       name: MAIN_SCOPE_NAME,
       control,
       records: control.getModelRequestStore(),
+      debugRecords: control.getOneBotDebugStore(),
     },
     ...(testSpaces?.listSpaces() ?? []).map(({ id, name }): SceneScope => {
       const spaceControl = testSpaces!.getControl(id)
@@ -178,6 +182,7 @@ export function createScopeDirectory({ control, testSpaces, unattributedModelReq
         name,
         control: spaceControl,
         records: spaceControl.getModelRequestStore(),
+        debugRecords: spaceControl.getOneBotDebugStore(),
       }
     }),
   ]

@@ -83,6 +83,80 @@ interface ArchitectureRule {
 }
 
 /**
+ * 内置集合与值类型不算协作 module：读自己的集合不是转售。
+ */
+const OWN_VALUE_TYPE_PATTERN = /^(?:Map|Set|WeakMap|WeakSet|Array|ReadonlyMap|ReadonlySet|ReadonlyArray|Promise|Record|Date|RegExp|Error|Buffer)$/
+
+/**
+ * 「哪些私有字段是协作 module 的实例」的两种声明写法：带类型注解的字段（含构造函数参数属性）
+ * 与用 `new` 初始化的字段。按声明类型判定而不是按字段名列举，新增一个协作 module 时规则自动覆盖它。
+ */
+const COLLABORATOR_FIELD_PATTERNS: readonly RegExp[] = [
+  /(?:private|protected)\s+(?:readonly\s+)?([A-Za-z_$][\w$]*)\s*\??\s*:\s*([^,)=;\n{]+)/g,
+  /(?:private|protected)\s+(?:readonly\s+)?([A-Za-z_$][\w$]*)\s*=\s*new\s+([A-Za-z_$][\w$]*)/g,
+]
+
+function collaboratorFields(source: string): Set<string> {
+  // 同文件里声明的类不算「另一个 module 的类」：读本 module 自己的内部结构不是转售。
+  const sameModule = new Set([...source.matchAll(/(?:^|\n)(?:export\s+)?(?:abstract\s+)?class\s+([A-Za-z_$][\w$]*)/g)].map(([, name]) => name!))
+  const fields = new Set<string>()
+  for (const pattern of COLLABORATOR_FIELD_PATTERNS) {
+    for (const [, field, declared] of source.matchAll(pattern)) {
+      const type = declared!.trim()
+      // 数组字面量与数组类型都是自己的集合，不是协作 module。
+      if (type.endsWith('[]')) continue
+      const head = /^[A-Za-z_$][\w$]*/.exec(type)?.[0]
+      if (!head || !/^[A-Z]/.test(head) || OWN_VALUE_TYPE_PATTERN.test(head) || sameModule.has(head)) continue
+      fields.add(field!)
+    }
+  }
+  return fields
+}
+
+interface ClassMemberBody {
+  readonly name: string
+  readonly body: string
+}
+
+/**
+ * 公开成员及其成员体。
+ *
+ * 按仓库的书写约定切块：类成员缩进两空格，成员体要么在同一行内闭合，要么以行末的 `{` 开头、
+ * 由一行 `  }` 收尾。构造函数与私有、受保护、静态成员都不在公开成员表里，因此不参与判定。
+ */
+function publicMemberBodies(source: string): ClassMemberBody[] {
+  const lines = source.split('\n')
+  const members: ClassMemberBody[] = []
+  for (const [index, line] of lines.entries()) {
+    const header = /^ {2}((?:public |private |protected |static |readonly |async |get |set )*)([A-Za-z_$][\w$]*)\s*[(<]/.exec(line)
+    if (!header || /\b(?:private|protected|static)\b/.test(header[1]!) || header[2] === 'constructor') continue
+    const trimmed = line.trimEnd()
+    const openIndex = trimmed.endsWith('{') ? trimmed.length - 1 : trimmed.indexOf('{')
+    if (openIndex < 0) continue
+    const inline = trimmed.slice(openIndex + 1)
+    if (inline.includes('}')) {
+      members.push({ name: header[2]!, body: inline.slice(0, inline.lastIndexOf('}')) })
+      continue
+    }
+    const end = lines.indexOf('  }', index + 1)
+    if (end < 0) continue
+    members.push({ name: header[2]!, body: lines.slice(index + 1, end).join('\n') })
+  }
+  return members
+}
+
+/** 成员体是否恰好只有一次 `this.<字段>.<方法>(…)`；`return this.<字段>`（没有调用）不算。 */
+function readSingleDelegation(body: string): { field: string, method: string } | undefined {
+  const statement = body.replace(/\/\/[^\n]*/g, '').trim().replace(/;$/, '')
+  const head = /^(?:return\s+)?this\s*\.\s*([A-Za-z_$][\w$]*)\s*\.\s*([A-Za-z_$][\w$]*)\s*\(/.exec(statement)
+  if (!head) return
+  const openIndex = head[0].length - 1
+  // 调用括号闭合之后不能再有别的语句，否则「两句都在转售」会被当成一句。
+  if (statement.slice(openIndex + readBalanced(statement, openIndex).length + 2).trim()) return
+  return { field: head[1]!, method: head[2]! }
+}
+
+/**
  * 规则制而不是白名单制：谓词跑遍服务端全部源码，新增文件默认受约束。
  */
 const rules: readonly ArchitectureRule[] = [
@@ -106,11 +180,34 @@ const rules: readonly ArchitectureRule[] = [
         .map(() => '枚举 AI 测试空间后逐个取控制服务')
     },
   },
+  {
+    /**
+     * 一行转售是 shallow 的定义：interface 和 implementation 一样宽，读它的人多学一个名字却
+     * 什么也没少知道。九个替证据记录库说话的成员就是这样攒起来的，规则拦住下一个。
+     */
+    name: '公开成员不得只转售协作 module',
+    extensions: ['.ts'],
+    findViolations: (_file, source) => {
+      const fields = collaboratorFields(source)
+      return publicMemberBodies(source).flatMap(({ name, body }) => {
+        const delegation = readSingleDelegation(body)
+        if (!delegation || !fields.has(delegation.field)) return []
+        return [`公开成员 ${name} 只转售 ${delegation.field}.${delegation.method}(…)`]
+      })
+    },
+  },
 ]
 
 interface ArchitectureExemption {
   readonly file: string
   readonly rule: string
+  /**
+   * 成员级豁免：只放行这一个成员。省略表示放行该文件下该规则的全部违规。
+   *
+   * 「公开成员不得只转售协作 module」这条要的就是成员级粒度：它的两处豁免同在一个文件里，
+   * 沿用文件级匹配会让同文件长出第三个转售成员被静默放过。
+   */
+  readonly member?: string
   /** 必填：为什么当前允许它违反规则。 */
   readonly reason: string
   /** 必填：负责消化这条债务的后续工作。 */
@@ -121,10 +218,25 @@ interface ArchitectureExemption {
  * 已知违规的显式豁免清单，与守卫断言放在同一处，改服务端代码的人立刻看到。
  * 理由与负责人均为必填；豁免不是放行，是有主的债务。
  *
- * 当前为空：全部会话查找都已经收进解析模块，全部记录域枚举都已经收进记录域目录，两条规则因此
- * 都是无例外的不变量。清单与它的三条守卫断言保留，下一次真有取舍时按同一形状登记。
+ * 前两条规则当前无例外：全部会话查找都已经收进解析模块，全部记录域枚举都已经收进记录域目录。
+ * 第三条规则留下两处，都在同一个文件里，因此按成员登记——同一文件长出第三个转售成员仍要报出。
  */
-const exemptions: readonly ArchitectureExemption[] = []
+const exemptions: readonly ArchitectureExemption[] = [
+  {
+    file: 'src/control-service.ts',
+    rule: '公开成员不得只转售协作 module',
+    member: 'getChatLunaStates',
+    reason: 'ChatLuna 对话状态库尚未决定归属：它不是证据记录，读取方是工作区状态投影而不是记录页，与本轮收拢的两个记录库不同源。就地把状态库交出去会让工作区投影直接依赖 ChatLuna 事件模型，代价大于这一个键。',
+    owner: '后续候选「ChatLuna 状态库的归属」：先判定状态库该由谁持有，再一并收掉这两个成员。',
+  },
+  {
+    file: 'src/control-service.ts',
+    rule: '公开成员不得只转售协作 module',
+    member: 'recordChatLunaModelRequest',
+    reason: '与 getChatLunaStates 同源：写入侧的这一句同样只是替 ChatLuna 状态库转述，两者要在同一次判定里一起处理，单独收掉写入侧会让读写两侧的持有者不一致。',
+    owner: '后续候选「ChatLuna 状态库的归属」：先判定状态库该由谁持有，再一并收掉这两个成员。',
+  },
+]
 
 function listSourceFiles(directory: string, extensions: readonly string[]): string[] {
   return readdirSync(resolve(directory), { withFileTypes: true }).flatMap((entry) => {
@@ -143,11 +255,15 @@ function findAllViolations(): string[] {
 }
 
 function isExempted(violation: string, allowed: readonly ArchitectureExemption[]): boolean {
-  return allowed.some(({ file, rule }) => violation.startsWith(`${file} 违反「${rule}」：`))
+  return allowed.some(({ file, rule, member }) => (
+    violation.startsWith(`${file} 违反「${rule}」：`)
+    // 登记了成员就只放行那一个成员；同一文件同一规则下的别的成员仍要报出。
+    && (!member || violation.includes(`成员 ${member} `))
+  ))
 }
 
 describe('服务端架构守卫', () => {
-  it('两条规则对服务端源码全量生效，未登记的违规按文件与规则报出', () => {
+  it('三条规则对服务端源码全量生效，未登记的违规按文件、规则与成员报出', () => {
     expect(findAllViolations().filter((violation) => !isExempted(violation, exemptions))).toEqual([])
   })
 
@@ -183,9 +299,9 @@ describe('服务端架构守卫', () => {
 
     // 链式遍历与 for…of 两种写法，以及测试控制端点自己那层包装，都是同一件事。
     expect(scopeRule.findViolations('src/x.ts', 'testSpaces.listSpaces().map((space) => testSpaces.getControl(space.id))')).not.toEqual([])
-    expect(scopeRule.findViolations('src/x.ts', '...(testSpaces?.listSpaces() ?? []).map((space) => testSpaces!.getControl(space.id)\n  .getModelRequestRecords(query))')).not.toEqual([])
-    expect(scopeRule.findViolations('src/x.ts', 'for (const space of testSpaces?.listSpaces() ?? []) {\n  cleared += await testSpaces!.getControl(space.id).clearOneBotDebugRecords()\n}')).not.toEqual([])
-    expect(scopeRule.findViolations('src/x.ts', '...(this.testSpaces?.listSpaces() ?? []).map((space) => this.resolveControl({ spaceId: space.id }, false).getModelRequestRecords(query))')).not.toEqual([])
+    expect(scopeRule.findViolations('src/x.ts', '...(testSpaces?.listSpaces() ?? []).map((space) => testSpaces!.getControl(space.id)\n  .getModelRequestStore().getRecords(query))')).not.toEqual([])
+    expect(scopeRule.findViolations('src/x.ts', 'for (const space of testSpaces?.listSpaces() ?? []) {\n  cleared += await testSpaces!.getControl(space.id).getOneBotDebugStore().clear()\n}')).not.toEqual([])
+    expect(scopeRule.findViolations('src/x.ts', '...(this.testSpaces?.listSpaces() ?? []).map((space) => this.resolveControl({ spaceId: space.id }, false).getModelRequestStore().getRecords(query))')).not.toEqual([])
     // 纯粹把清单列给用户或外部测试控制器看：只取清单，不取控制服务。
     expect(scopeRule.findViolations('src/x.ts', "registerListener('test-spaces', () => testSpaces.listSpaces()\n  .map((space) => ({ ...space, snapshot: trimSnapshotMessages(space.snapshot, 10) })), { authority: 4 })\nconst spaceControl = testSpaces.getControl(input.spaceId)")).toEqual([])
     expect(scopeRule.findViolations('src/x.ts', "if (tool === 'list_test_spaces') return this.requireTestSpaces().listSpaces()\nreturn this.requireTestSpaces().getControl(args.spaceId)")).toEqual([])
@@ -195,6 +311,129 @@ describe('服务端架构守卫', () => {
     expect(scopeRule.findViolations('src/x.ts', 'listSpaces(): SandboxTestSpaceSummary[] {\n  return [...this.spaces.values()].map((space) => this.getControl(space.id))\n}')).toEqual([])
     // 记录域目录自身是规则的持有者。
     expect(scopeRule.findViolations('src/scope-directory.ts', 'testSpaces.listSpaces().map(({ id }) => testSpaces.getControl(id))')).toEqual([])
+  })
+
+  it('转售规则认得出一行委托，也不误报读自己集合、裸字段返回、自由函数与记录库自身', () => {
+    const resellRule = rules.find(({ name }) => name === '公开成员不得只转售协作 module')
+    if (!resellRule) throw new Error('转售架构规则缺失')
+
+    /** 三个字段各代表一类：协作 module、内置集合、数组字面量。 */
+    const thing = (...members: string[]) => [
+      "import { SandboxModelRequestStore } from './model-request'",
+      '',
+      'export class Thing {',
+      '  private records: SandboxModelRequestStore',
+      '  private rows = new Map<string, string>()',
+      '  private names: SandboxName[] = []',
+      '',
+      ...members,
+      '}',
+      '',
+    ].join('\n')
+
+    // 带返回值、不带返回值与 async 三种形态都是同一件事。
+    expect(resellRule.findViolations('src/x.ts', thing(
+      '  getRecords(input: Query): Promise<Page> {',
+      '    return this.records.getRecords(input)',
+      '  }',
+    ))).toEqual(['公开成员 getRecords 只转售 records.getRecords(…)'])
+    expect(resellRule.findViolations('src/x.ts', thing(
+      '  trackUpdate(task: Promise<void>): void {',
+      '    this.records.trackUpdate(task)',
+      '  }',
+    ))).toEqual(['公开成员 trackUpdate 只转售 records.trackUpdate(…)'])
+    expect(resellRule.findViolations('src/x.ts', thing(
+      '  async clearRecords(): Promise<number> {',
+      '    return this.records.clear()',
+      '  }',
+    ))).toEqual(['公开成员 clearRecords 只转售 records.clear(…)'])
+    // 参数跨行不改变「只有一句」这个事实。
+    expect(resellRule.findViolations('src/x.ts', thing(
+      '  requireRecord(recordId: string, includeLargeValues: boolean) {',
+      '    return this.records.requireRecord(',
+      '      recordId,',
+      '      includeLargeValues,',
+      '    )',
+      '  }',
+    ))).toEqual(['公开成员 requireRecord 只转售 records.requireRecord(…)'])
+
+    // 读自己的集合不是转售。
+    expect(resellRule.findViolations('src/x.ts', thing(
+      '  listRows(): string[] {',
+      '    return this.rows.get(key)',
+      '  }',
+      '',
+      '  listNames(): SandboxName[] {',
+      '    return this.names.map(toName)',
+      '  }',
+    ))).toEqual([])
+    // 把记录库整个交出去正是本规则想要的结果，没有调用就不是转售。
+    expect(resellRule.findViolations('src/x.ts', thing(
+      '  getModelRequestStore(): SandboxModelRequestStore {',
+      '    return this.records',
+      '  }',
+    ))).toEqual([])
+    // 只有一句但调用的是自由函数：这一句是本 module 自己的判断。
+    expect(resellRule.findViolations('src/x.ts', thing(
+      '  describe(input: Query): string {',
+      '    return describeQuery(this.records, input)',
+      '  }',
+    ))).toEqual([])
+    // 私有成员不在公开成员表里。
+    expect(resellRule.findViolations('src/x.ts', thing(
+      '  private forward(input: Query) {',
+      '    return this.records.getRecords(input)',
+      '  }',
+    ))).toEqual([])
+    // 两句都在转售时不能被当成一句放过。
+    expect(resellRule.findViolations('src/x.ts', thing(
+      '  clearBoth(): void {',
+      '    this.records.clear()',
+      '    this.records.trackUpdate(task)',
+      '  }',
+    ))).toEqual([])
+
+    // 同 module 内声明的类不是「另一个 module 的类」：读本 module 自己的内部结构不是转售。
+    expect(resellRule.findViolations('src/record-store.ts', [
+      'export class ScopeRowIndex {',
+      '  summary(): Summary {',
+      '    return { recordCount: 0 }',
+      '  }',
+      '}',
+      '',
+      'export class InMemoryRecordRows {',
+      '  private index = new ScopeRowIndex()',
+      '',
+      '  async summarize(): Promise<Summary> {',
+      '    return this.index.summary()',
+      '  }',
+      '}',
+      '',
+    ].join('\n'))).toEqual([])
+
+    // 记录库自身：读取要先等落盘再问持久化，是多句；落盘等待的那一句委托是私有的。
+    expect(resellRule.findViolations('src/onebot-debug.ts', [
+      "import { SerialWriteQueue } from './record-store'",
+      '',
+      'export class SandboxOneBotDebugStore {',
+      '  private persistence: SandboxOneBotDebugPersistence',
+      '  private readonly writes: SerialWriteQueue',
+      '',
+      '  waitForPersistence(): Promise<void> {',
+      '    return this.settle()',
+      '  }',
+      '',
+      '  async getRecord(recordId: string): Promise<Record | undefined> {',
+      '    await this.settle()',
+      '    return this.persistence.find(recordId)',
+      '  }',
+      '',
+      '  private settle(): Promise<void> {',
+      '    return this.writes.settle()',
+      '  }',
+      '}',
+      '',
+    ].join('\n'))).toEqual([])
   })
 
   /**
@@ -210,7 +449,7 @@ describe('服务端架构守卫', () => {
     }
   })
 
-  it('豁免按文件与规则成对匹配，移除后违规重新暴露', () => {
+  it('未登记成员的豁免按文件与规则成对匹配，移除后违规重新暴露', () => {
     const violation = 'src/x.ts 违反「只有会话解析模块能直接读写会话集合与实例集合」：直接读写会话集合 .conversations'
     const exemption: ArchitectureExemption = {
       file: 'src/x.ts',
@@ -225,16 +464,42 @@ describe('服务端架构守卫', () => {
     expect(isExempted(violation, [])).toBe(false)
   })
 
+  /**
+   * 转售规则的两处豁免同在一个文件里。文件级匹配会让同文件长出第三个转售成员被静默放过，
+   * 因此登记了成员的豁免必须只放行那一个成员。
+   */
+  it('登记了成员的豁免只放行那一个成员，同文件同规则的别的成员仍然报出', () => {
+    const rule = '公开成员不得只转售协作 module'
+    const exempted = `src/control-service.ts 违反「${rule}」：公开成员 getChatLunaStates 只转售 chatLunaState.getStates(…)`
+    const another = `src/control-service.ts 违反「${rule}」：公开成员 getMediaLabel 只转售 mediaStorage.describe(…)`
+    const exemption: ArchitectureExemption = {
+      file: 'src/control-service.ts',
+      rule,
+      member: 'getChatLunaStates',
+      reason: '合成条目，仅用于自测成员级豁免匹配。',
+      owner: '无',
+    }
+
+    expect(isExempted(exempted, [exemption])).toBe(true)
+    expect(isExempted(another, [exemption])).toBe(false)
+    // 成员名相同但文件不同时同样不得放行。
+    expect(isExempted(exempted.replace('src/control-service.ts', 'src/y.ts'), [exemption])).toBe(false)
+  })
+
   it('每条豁免都写明理由与负责消化它的后续工作', () => {
     for (const exemption of exemptions) {
       expect(exemption.reason.trim(), `${exemption.file} / ${exemption.rule} 缺少理由`).not.toBe('')
       expect(exemption.owner.trim(), `${exemption.file} / ${exemption.rule} 缺少负责人`).not.toBe('')
+      // 占位文字不算理由。
+      expect(exemption.reason, `${exemption.file} / ${exemption.rule} 的理由是占位文字`).not.toMatch(/^(?:TODO|待补|暂时|无)/)
+      expect(exemption.owner, `${exemption.file} / ${exemption.rule} 的负责人是占位文字`).not.toMatch(/^(?:TODO|待补|暂时|无)$/)
     }
   })
 
   /**
    * 逐条移除豁免后对应文件必须重新报错：证明规则真的在逐文件起作用，
    * 而不是被豁免清单整体旁路，也顺带保证清单里没有已经消化掉的陈旧条目。
+   * 成员级豁免同样如此：移除它只应暴露它自己那一个成员。
    */
   it('移除任一豁免后对应文件重新报错', () => {
     const violations = findAllViolations()
@@ -244,6 +509,10 @@ describe('服务端架构守卫', () => {
       expect(exposed.length, `移除 ${removed.file} / ${removed.rule} 后规则没有报错`).toBeGreaterThan(0)
       expect([...new Set(exposed.map((violation) => violation.split('：')[0]!))], `${removed.file} / ${removed.rule}`)
         .toEqual([`${removed.file} 违反「${removed.rule}」`])
+      if (removed.member) {
+        expect(exposed, `移除 ${removed.file} / ${removed.member} 后暴露的不只是它自己`)
+          .toEqual([expect.stringContaining(`成员 ${removed.member} `)])
+      }
     }
   })
 })

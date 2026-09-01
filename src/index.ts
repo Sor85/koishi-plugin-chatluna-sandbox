@@ -334,7 +334,7 @@ export function apply(ctx: Context, config: Config) {
       registerConsole(inner.console, control, config, mcp, testSpaces, unattributedModelRequests, getChatLunaUsage, presetService)
       inner.on('ready', async () => {
         await control.waitForSceneReady()
-        const seeded = await seedDevelopmentModelRequestErrors(control)
+        const seeded = await seedDevelopmentModelRequestErrors(control.getModelRequestStore())
         if (seeded) inner.logger('chatluna-sandbox').info(`已生成 ${seeded} 条开发环境 ChatLuna 错误预览记录。`)
         await testEndpointServer.start().catch((error) => inner.logger('chatluna-sandbox').error('测试控制端点监听器启动失败；WebQQ 仍可继续使用。', error))
       })
@@ -354,7 +354,7 @@ export function apply(ctx: Context, config: Config) {
       registerConsole(inner.console, control, config, undefined, testSpaces, unattributedModelRequests, getChatLunaUsage, presetService)
       inner.on('ready', async () => {
         await control.waitForSceneReady()
-        const seeded = await seedDevelopmentModelRequestErrors(control)
+        const seeded = await seedDevelopmentModelRequestErrors(control.getModelRequestStore())
         if (seeded) inner.logger('chatluna-sandbox').info(`已生成 ${seeded} 条开发环境 ChatLuna 错误预览记录。`)
       })
       inner.on('dispose', () => {
