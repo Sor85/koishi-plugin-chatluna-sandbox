@@ -258,8 +258,8 @@ function describeReplyDenial(denial: MessageCapabilityDenial, messageId: string)
  * 两条通道各自在自己的入口上渲染。
  */
 const GROUP_ACTION_LABELS = {
-  // 退群的拒绝原因不带动作名；这一条只为渲染函数保持一个总的签名，规则将来给退群加一条带
-  // 动作名的原因时不必改调用点。
+  // 退群的拒绝原因不带动作名。这一条只是让渲染函数的动作名参数保持必填，八个调用点因此是
+  // 同一种写法，而不是分成带动作名与不带两种。
   leave: '退出群组',
   'set-name': '修改群名称',
   kick: '踢出成员',

@@ -206,8 +206,9 @@ function denyGroupMemberManagement(
   const authority = denyGroupAuthority(actor)
   if (authority) return authority
   if (target.role === 'owner' || (actor.role === 'admin' && target.role === 'admin')) return 'target-outranks-actor'
-  // 自己对自己今天走不到这里：同一个成员角色相同，上面两条必有一条先命中。原样保留是为了在阶梯
-  // 将来放宽（例如允许管理员管理同级）时仍然挡住「对自己执行」，而不是留下一个新的缺口。
+  // 收拢前那道阶梯的第三步，逐字搬过来。它今天走不到：自己对自己角色必然相同，上面两条必有
+  // 一条先命中（基线里「管理员踢自己」返回的正是上一句）。留着是因为删掉它就等于删掉
+  // 「不能对自己执行某个操作」这条规则本身，而那不是本轮的判定。
   return actor.participantId === target.participantId ? 'target-is-actor' : undefined
 }
 
