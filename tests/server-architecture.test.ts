@@ -147,6 +147,28 @@ function stripTypeofOperands(source: string): string {
   return source.replace(/\btypeof\s+[A-Za-z_$][\w$.]*/g, 'typeof')
 }
 
+/**
+ * 关系规则模块自身是「群成员角色怎么比较」这条规则的唯一持有者，同样按形状判定。
+ */
+const RELATIONSHIP_ACTIONS_MODULE_PATTERN = /(?:^|\/)relationship-actions\.ts$/
+
+/**
+ * 群成员角色比较不得出现在关系规则模块之外。
+ *
+ * 谁能踢谁、谁能改群名、谁能审批入群申请，全部是同一族判定；它们此前在用户通道与机器人通道的
+ * 入口里各写一遍，修一处群权限要改两处，漏掉一处不会报错。规则拦住下一个想在通道入口里重新写
+ * 一遍权限判定的人。
+ *
+ * 谓词按标识符名收窄，与工具名那条同一个手法：只认 `actor`／`target`／`operator` 这三个名字上的
+ * 角色字段与字面量比较。因此两处合法命中天然被避开——场景校验里判断群里有没有群主用的是解构出的
+ * 裸 `role` 与 `member.role`，机器人适配器把角色渲染成中文名用的也是 `member.role`。真正会命中的
+ * 只剩共用消息能力规则里那道撤回阶梯，它按文件登记为有主豁免。
+ */
+const GROUP_ROLE_COMPARISON_PREDICATES: readonly ArchitecturePredicate[] = [
+  { evidence: '群成员角色与字符串字面量相等或不等比较', pattern: /\b(?:actor|target|operator)\s*\.\s*role\s*(?:={2,3}|!={1,2})\s*'/ },
+  { evidence: '字符串字面量与群成员角色相等或不等比较', pattern: /'[^']*'\s*(?:={2,3}|!={1,2})\s*(?:actor|target|operator)\s*\.\s*role\b/ },
+]
+
 interface ArchitectureRule {
   readonly name: string
   readonly extensions: readonly string[]
@@ -299,6 +321,21 @@ const rules: readonly ArchitectureRule[] = [
         .map(({ evidence }) => evidence)
     },
   },
+  {
+    /**
+     * 关系操作的规则收进一个 module 之后，两条操作通道退成 adapter：用户通道直接调它，虚拟
+     * OneBot 机器人经自身 OneBot action 落到同一份规则上。规则拦住第二份角色判定——它今天的
+     * 失败形态是「从 WebQQ 操作正常、机器人操作却不对」，两条路都通，只是规则不一样。
+     */
+    name: '群成员角色比较只允许出现在关系规则模块里',
+    extensions: ['.ts'],
+    findViolations: (file, source) => {
+      if (RELATIONSHIP_ACTIONS_MODULE_PATTERN.test(file)) return []
+      return GROUP_ROLE_COMPARISON_PREDICATES
+        .filter(({ pattern }) => pattern.test(source))
+        .map(({ evidence }) => evidence)
+    },
+  },
 ]
 
 interface ArchitectureExemption {
@@ -321,11 +358,18 @@ interface ArchitectureExemption {
  * 已知违规的显式豁免清单，与守卫断言放在同一处，改服务端代码的人立刻看到。
  * 理由与负责人均为必填；豁免不是放行，是有主的债务。
  *
- * 五条规则里四条当前无例外：全部会话查找都已经收进解析模块，全部记录域枚举都已经收进记录域
+ * 六条规则里四条当前无例外：全部会话查找都已经收进解析模块，全部记录域枚举都已经收进记录域
  * 目录，入站消息事件组装只剩投递模块那一处，工具名在治理路径上已经不存在。转售那条留下两处，
- * 都在同一个文件里，因此按成员登记——同一文件长出第三个转售成员仍要报出。
+ * 都在同一个文件里，因此按成员登记——同一文件长出第三个转售成员仍要报出。角色比较那条留下一处，
+ * 按文件登记：它是共用消息能力规则自己的职责。
  */
 const exemptions: readonly ArchitectureExemption[] = [
+  {
+    file: 'src/message-capabilities.ts',
+    rule: '群成员角色比较只允许出现在关系规则模块里',
+    reason: '撤回的群角色阶梯是消息能力判据自己的职责（ADR-0078）：它回答「一条消息能不能被撤回」，而关系规则那道阶梯回答「一个成员能对另一个成员做什么」，两者在那条 ADR 里已经判定各自成立、不合并。把它搬进关系规则模块会让消息能力判据反过来依赖关系规则，而它是服务端与客户端共用的纯函数模块。',
+    owner: 'ADR-0078 的持有者：这两道阶梯的分工由那条决定钉住；要合并必须先推翻它，而不是在本规则里放行更多文件。',
+  },
   {
     file: 'src/control-service.ts',
     rule: '公开成员不得只转售协作 module',
@@ -367,7 +411,7 @@ function isExempted(violation: string, allowed: readonly ArchitectureExemption[]
 }
 
 describe('服务端架构守卫', () => {
-  it('五条规则对服务端源码全量生效，未登记的违规按文件、规则与成员报出', () => {
+  it('六条规则对服务端源码全量生效，未登记的违规按文件、规则与成员报出', () => {
     expect(findAllViolations().filter((violation) => !isExempted(violation, exemptions))).toEqual([])
   })
 
@@ -620,6 +664,40 @@ describe('服务端架构守卫', () => {
     expect(rule.findViolations('src/x.ts', 'if (input.tool && record.tool !== input.tool) return false')).toEqual([])
     // 模型证据那一族里这处名字比较是合法的：宽松形状会把它当成违规，因此规则按标识符名判定。
     expect(rule.findViolations('src/model-evidence/request.ts', "if (name === 'input') return isRecord(value)")).toEqual([])
+  })
+
+  /**
+   * 会话解析模块与领域类型一样被客户端一同引用。它一旦 import 'koishi'，整个 Koishi 运行时
+   * 就会被打进前端产物（实测 +460 KB）。这类回归不会报错，只会让产物默默变大，因此需要守卫。
+   */
+  it('角色比较规则认得出三个标识符名上的两种写法，也不误报场景校验与角色名渲染', () => {
+    const rule = rules.find(({ name }) => name === '群成员角色比较只允许出现在关系规则模块里')
+    if (!rule) throw new Error('角色比较架构规则缺失')
+
+    // 三个标识符名各代表一类：行为者、目标、审批申请的操作者；相等与不等两种写法都算。
+    expect(rule.findViolations('src/x.ts', "if (actor.role === 'member') throw new SandboxDomainError('只有群主或管理员可以踢出成员')")).not.toEqual([])
+    expect(rule.findViolations('src/x.ts', "if (target.role === 'owner') throw new SandboxDomainError('不能修改群主权限')")).not.toEqual([])
+    expect(rule.findViolations('src/x.ts', "if (actor.role !== 'owner') throw new SandboxDomainError('只有群主可以设置管理员')")).not.toEqual([])
+    expect(rule.findViolations('src/x.ts', "if (operator.role !== 'owner' && operator.role !== 'admin') throw new SandboxDomainError('只有群主或管理员可以处理入群申请')")).not.toEqual([])
+    // 字面量写在左边一样算。
+    expect(rule.findViolations('src/x.ts', "if ('owner' === target.role) return 'target-is-owner'")).not.toEqual([])
+    expect(rule.findViolations('src/x.ts', "if ('member' !== actor.role) return undefined")).not.toEqual([])
+
+    // 场景校验里判断群里有没有群主：用的是解构出的裸 role 与 member.role，天然不命中。
+    expect(rule.findViolations('src/x.ts', "if (group.members.filter(({ role }) => role === 'owner').length !== 1) throw new SandboxDomainError('群组必须且只能有一个群主')")).toEqual([])
+    expect(rule.findViolations('src/x.ts', "if (member.role === 'owner') continue")).toEqual([])
+    // 按角色挑收件机器人同样是解构出的裸 role。
+    expect(rule.findViolations('src/x.ts', "group.members.flatMap(({ participantId, role }) => role === 'owner' || role === 'admin' ? [participantId] : [])")).toEqual([])
+    // 机器人适配器把角色渲染成中文名：这是呈现而不是权限判定，用的也是 member.role。
+    expect(rule.findViolations('src/bot.ts', "const roleName = member.role === 'owner' ? '群主' : member.role === 'admin' ? '管理员' : '成员'")).toEqual([])
+    // 角色当值用不是比较。
+    expect(rule.findViolations('src/x.ts', "target.role = enabled ? 'admin' : 'member'")).toEqual([])
+    expect(rule.findViolations('src/x.ts', 'roles: [{ id: member.role }]')).toEqual([])
+    // 两个标识符之间的比较不是按角色开特例。
+    expect(rule.findViolations('src/x.ts', 'if (actor.role === target.role) return undefined')).toEqual([])
+
+    // 关系规则模块自身是规则的持有者。
+    expect(rule.findViolations('src/relationship-actions.ts', "return actor.role === 'member' ? 'requires-group-authority' : undefined")).toEqual([])
   })
 
   /**

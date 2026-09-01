@@ -63,6 +63,12 @@ import {
 } from './message-capabilities'
 import { getOneBotCapabilityMatrix, getOneBotMessageSequence, normalizeDisabledCapabilities, resolveOneBotMessageId, type SandboxOneBotCapability } from './onebot-profiles'
 import {
+  createRelationshipActions,
+  denyGroupAuthority,
+  type RelationshipActionDenial,
+  type RelationshipActions,
+} from './relationship-actions'
+import {
   createDirectConversationId,
   createGroupConversationId,
   isSandboxGroupMemberMuted,
@@ -175,8 +181,6 @@ const ADMIN_USER_ID = '10003'
 const DEFAULT_BOT_ID = '20001'
 const DEFAULT_GROUP_ID = '30001'
 const DEFAULT_DATABASE_READY_TIMEOUT_MS = 10_000
-// 与真实 QQ 群禁言上限一致，避免插件写入不可能的到期时间。
-const MAX_GROUP_MUTE_SECONDS = 30 * 24 * 60 * 60
 // 防止插件或 WebQQ 多选无限塞 node 导致场景膨胀。
 const MAX_FORWARD_NODES = 100
 // 新建会话实例的默认名：用户不必为每次试验先想名字。
@@ -243,6 +247,61 @@ function describeReplyDenial(denial: MessageCapabilityDenial, messageId: string)
     default:
       // 回复目标是否在当前会话里可读已在上方判定，走到这里只能是判据新增了依据。
       return `回复消息不存在：${messageId}`
+  }
+}
+
+/**
+ * 群操作在拒绝文案里的动作名。
+ *
+ * 两条通道共用这一份：这八个动作的拒绝措辞今天在用户通道与机器人通道上逐字相同，把动作名再
+ * 抄一遍等于把刚消掉的重复换个位置放回来。文案不同的那一处（入群申请审批）不在这张表里，它由
+ * 两条通道各自在自己的入口上渲染。
+ */
+const GROUP_ACTION_LABELS = {
+  // 退群的拒绝原因不带动作名；这一条只为渲染函数保持一个总的签名，规则将来给退群加一条带
+  // 动作名的原因时不必改调用点。
+  leave: '退出群组',
+  'set-name': '修改群名称',
+  kick: '踢出成员',
+  'set-admin': '设置管理员',
+  'set-card': '修改群名片',
+  'transfer-owner': '转让群主身份',
+  'set-title': '设置专属头衔',
+  mute: '禁言成员',
+  unmute: '解除禁言',
+} as const
+
+/**
+ * 群操作被关系规则拒绝时的错误文案。
+ *
+ * 规则只回答「不行，因为什么」，措辞在这里成形——形状与上面三个消息能力渲染函数一致。这些文案
+ * 是 WebQQ 与被测插件已经在断言的用户可见事实，规则收成一处后一句不改。
+ */
+function describeGroupActionDenial(denial: RelationshipActionDenial, action: keyof typeof GROUP_ACTION_LABELS): string {
+  const label = GROUP_ACTION_LABELS[action]
+  switch (denial) {
+    case 'owner-cannot-leave':
+      return '群主不能直接退出群组'
+    case 'requires-group-authority':
+      return `只有群主或管理员可以${label}`
+    case 'requires-group-owner':
+      return `只有群主可以${label}`
+    case 'target-outranks-actor':
+      return '管理员不能管理群主或其他管理员'
+    case 'target-is-owner':
+      return '不能修改群主权限'
+    case 'target-is-actor':
+      return `不能对自己执行${label}`
+    case 'owner-transfer-to-self':
+      return '不能把群主身份转让给自己'
+    case 'group-name-empty':
+      return '群名称不能为空'
+    case 'title-too-long':
+      return '专属头衔不能超过 64 个字符'
+    case 'mute-duration-negative':
+      return '禁言时长不能为负数'
+    case 'mute-duration-too-long':
+      return '禁言时长不能超过 30 天'
   }
 }
 
@@ -328,6 +387,7 @@ export class SandboxControlService {
   private inboundEventConversations: InboundEventConversations = createInboundEventConversations()
   /** 投递规则的唯一持有者；三条发送路径与六种事件都经它。 */
   private inboundDelivery: InboundDelivery
+  private relationshipActions: RelationshipActions
   private chatLunaState: SandboxChatLunaStateStore
   /**
    * 被测 chatluna-character 的对话上下文只按账号或群号归档，看不见会话实例这一级；
@@ -415,6 +475,15 @@ export class SandboxControlService {
       followInboundConversation: (input) => this.chatLunaCharacterContext.followInboundConversation(input),
       logger: ctx.logger('chatluna-sandbox'),
       eventConversations: this.inboundEventConversations,
+    })
+    this.relationshipActions = createRelationshipActions({
+      commitSceneMutation: () => this.commitSceneMutation(),
+      dispatchGroupNotice: (group, noticeType, data) => this.dispatchGroupNotice(group, noticeType, data),
+      removeGroupMember: (group, participantId) => this.removeGroupMember(group, participantId),
+      removeRelationshipRequest: (requestId) => this.removeRelationshipRequest(requestId),
+      addFriendship: (firstId, secondId) => this.addFriendship(firstId, secondId),
+      addApprovedGroupMember: ({ group, participantId, operatorId, subType }) => this
+        .addApprovedGroupMember(group, participantId, operatorId, subType),
     })
     this.syncRuntimeBots()
     this.contextDisposers.push(ctx.on('ready', async () => {
@@ -1292,73 +1361,45 @@ export class SandboxControlService {
     }
 
     if (input.action === 'leave') {
-      if (actor.role === 'owner') throw new SandboxDomainError('群主不能直接退出群组')
-      await this.dispatchGroupNotice(group, 'group_decrease', {
-        sub_type: 'leave',
-        operator_id: Number(input.operatorId),
-        user_id: Number(input.operatorId),
-      })
-      this.removeGroupMember(group, input.operatorId)
+      const denial = await this.relationshipActions.leaveGroup({ group, actor })
+      if (denial) throw new SandboxDomainError(describeGroupActionDenial(denial, 'leave'))
       return { revision: this.scene.revision }
     }
 
     if (input.action === 'set-name') {
-      if (actor.role === 'member') throw new SandboxDomainError('只有群主或管理员可以修改群名称')
-      const previousName = group.name
-      group.name = this.validateName(input.name, '群名称')
-      this.commitSceneMutation()
-      await this.dispatchGroupNotice(group, 'group_name', {
-        user_id: Number(input.operatorId),
-        name_old: previousName,
-        name_new: group.name,
-      })
+      const denial = await this.relationshipActions.renameGroup({ group, actor, name: input.name })
+      if (denial) throw new SandboxDomainError(describeGroupActionDenial(denial, 'set-name'))
       return { revision: this.scene.revision }
     }
 
     const target = this.requireGroupMember(group, input.targetId)
     if (input.action === 'kick') {
-      this.assertCanManageMember(actor, target, '踢出成员')
-      await this.dispatchGroupNotice(group, 'group_decrease', (botId) => ({
-        sub_type: botId === target.participantId ? 'kick_me' : 'kick',
-        operator_id: Number(input.operatorId),
-        user_id: Number(target.participantId),
-      }))
-      this.removeGroupMember(group, target.participantId)
+      const denial = await this.relationshipActions.kickGroupMember({ group, actor, target })
+      if (denial) throw new SandboxDomainError(describeGroupActionDenial(denial, 'kick'))
       return { revision: this.scene.revision }
     }
 
     if (input.action === 'set-admin') {
-      if (actor.role !== 'owner') throw new SandboxDomainError('只有群主可以设置管理员')
-      if (target.role === 'owner') throw new SandboxDomainError('不能修改群主权限')
-      target.role = input.enabled ? 'admin' : 'member'
-      this.commitSceneMutation()
-      await this.dispatchGroupNotice(group, 'group_admin', {
-        sub_type: input.enabled ? 'set' : 'unset',
-        user_id: Number(target.participantId),
-      })
+      const denial = await this.relationshipActions.setGroupAdmin({ group, actor, target, enabled: input.enabled })
+      if (denial) throw new SandboxDomainError(describeGroupActionDenial(denial, 'set-admin'))
       return { revision: this.scene.revision }
     }
 
     if (input.action === 'transfer-owner') {
-      await this.transferGroupOwner(group, actor, target)
+      const denial = await this.relationshipActions.transferGroupOwner({ group, actor, target })
+      if (denial) throw new SandboxDomainError(describeGroupActionDenial(denial, 'transfer-owner'))
       return { revision: this.scene.revision }
     }
 
     if (input.action === 'set-card') {
-      if (target.participantId !== input.operatorId) this.assertCanManageMember(actor, target, '修改群名片')
-      const previousCard = target.card ?? ''
-      target.card = input.card.trim() || undefined
-      this.commitSceneMutation()
-      await this.dispatchGroupNotice(group, 'group_card', {
-        user_id: Number(target.participantId),
-        card_old: previousCard,
-        card_new: target.card ?? '',
-      })
+      const denial = await this.relationshipActions.setGroupCard({ group, actor, target, card: input.card })
+      if (denial) throw new SandboxDomainError(describeGroupActionDenial(denial, 'set-card'))
       return { revision: this.scene.revision }
     }
 
     if (input.action === 'set-title') {
-      this.setGroupMemberTitle(actor, target, input.title)
+      const denial = this.relationshipActions.setGroupMemberTitle({ actor, target, title: input.title })
+      if (denial) throw new SandboxDomainError(describeGroupActionDenial(denial, 'set-title'))
       return { revision: this.scene.revision }
     }
 
@@ -1387,41 +1428,47 @@ export class SandboxControlService {
 
   async handleBotFriendRequest(botId: string, input: { flag: string; approve: boolean; remark?: string }) {
     if (!this.isBot(botId)) throw new SandboxDomainError(`机器人不存在：${botId}`)
-    const requestIndex = this.scene.requests.findIndex(({ id, type, targetId }) => id === input.flag && type === 'friend' && targetId === botId)
-    if (requestIndex < 0) throw new SandboxDomainError(`好友申请不存在：${input.flag}`)
-    const [request] = this.scene.requests.splice(requestIndex, 1)
-    if (input.approve) {
-      const friendship = this.addFriendship(request.requesterId, botId)
-      const remark = input.remark?.trim()
-      if (remark) friendship.remarks[botId] = remark
-    }
-    this.commitSceneMutation()
+    // 机器人通道按「发给自己的好友申请」查找；用户通道没有这个条件，两条通道的输入本来就不同。
+    const request = this.scene.requests.find(({ id, type, targetId }) => id === input.flag && type === 'friend' && targetId === botId)
+    if (!request) throw new SandboxDomainError(`好友申请不存在：${input.flag}`)
+    this.relationshipActions.settleFriendRequest({
+      requestId: request.id,
+      requesterId: request.requesterId,
+      targetId: botId,
+      approve: input.approve,
+      // 备注只有机器人通道支持：`set_friend_add_request` 带 remark，用户通道没有这个参数。
+      onApproved: (friendship) => {
+        const remark = input.remark?.trim()
+        if (remark) friendship.remarks[botId] = remark
+      },
+    })
     return { status: 'ok', retcode: 0, data: null }
   }
 
   async handleBotGroupRequest(botId: string, input: { flag: string; subType: 'add' | 'invite'; approve: boolean; reason?: string }) {
     if (!this.isBot(botId)) throw new SandboxDomainError(`机器人不存在：${botId}`)
-    const requestIndex = this.scene.requests.findIndex(({ id, type, subType }) => id === input.flag
+    // 机器人通道按 OneBot 的子类型语义查找：调用方必须传子类型，传错就当找不到这条申请。
+    const request = this.scene.requests.find(({ id, type, subType }) => id === input.flag
       && type === 'group' && (subType ?? 'add') === input.subType)
-    if (requestIndex < 0) throw new SandboxDomainError(`群申请不存在：${input.flag}`)
-    const request = this.scene.requests[requestIndex]
+    if (!request) throw new SandboxDomainError(`群申请不存在：${input.flag}`)
     const group = this.scene.groups.find(({ id }) => id === request.groupId)
     if (!group) throw new SandboxDomainError(`群组不存在：${request.groupId}`)
 
     if (input.subType === 'invite') {
       if (request.targetId !== botId) throw new SandboxDomainError('只能处理发给自己的群邀请')
-    } else {
-      const operator = this.requireGroupMember(group, botId)
-      if (operator.role !== 'owner' && operator.role !== 'admin') throw new SandboxDomainError('机器人没有审批入群申请的权限')
+    } else if (denyGroupAuthority(this.requireGroupMember(group, botId))) {
+      // 与用户通道同一道角色判定，只有措辞不同：机器人通道这句已被按文案断言，逐字保留。
+      throw new SandboxDomainError('机器人没有审批入群申请的权限')
     }
 
-    this.scene.requests.splice(requestIndex, 1)
-    if (input.approve) {
-      const participantId = input.subType === 'invite' ? botId : request.requesterId
-      await this.addApprovedGroupMember(group, participantId, input.subType === 'invite' ? request.requesterId : botId, input.subType)
-    } else {
-      this.commitSceneMutation()
-    }
+    await this.relationshipActions.settleGroupRequest({
+      group,
+      requestId: request.id,
+      participantId: input.subType === 'invite' ? botId : request.requesterId,
+      operatorId: input.subType === 'invite' ? request.requesterId : botId,
+      subType: input.subType,
+      approve: input.approve,
+    })
     return { status: 'ok', retcode: 0, data: null }
   }
 
@@ -1446,77 +1493,51 @@ export class SandboxControlService {
     const actor = this.requireGroupMember(group, botId)
 
     if (input.action === 'leave') {
-      if (actor.role === 'owner') throw new SandboxDomainError('群主不能直接退出群组')
-      await this.dispatchGroupNotice(group, 'group_decrease', {
-        sub_type: 'leave',
-        operator_id: Number(botId),
-        user_id: Number(botId),
-      })
-      this.removeGroupMember(group, botId)
+      const denial = await this.relationshipActions.leaveGroup({ group, actor })
+      if (denial) throw new SandboxDomainError(describeGroupActionDenial(denial, 'leave'))
       return { status: 'ok', retcode: 0, data: null }
     }
 
     if (input.action === 'set-name') {
-      if (actor.role === 'member') throw new SandboxDomainError('只有群主或管理员可以修改群名称')
-      const previousName = group.name
-      group.name = this.validateName(input.name, '群名称')
-      this.commitSceneMutation()
-      await this.dispatchGroupNotice(group, 'group_name', {
-        user_id: Number(botId),
-        name_old: previousName,
-        name_new: group.name,
-      })
+      const denial = await this.relationshipActions.renameGroup({ group, actor, name: input.name })
+      if (denial) throw new SandboxDomainError(describeGroupActionDenial(denial, 'set-name'))
       return { status: 'ok', retcode: 0, data: null }
     }
 
     const target = this.requireGroupMember(group, input.targetId)
     if (input.action === 'kick') {
-      this.assertCanManageMember(actor, target, '踢出成员')
-      await this.dispatchGroupNotice(group, 'group_decrease', (receiverBotId) => ({
-        sub_type: receiverBotId === target.participantId ? 'kick_me' : 'kick',
-        operator_id: Number(botId),
-        user_id: Number(target.participantId),
-      }))
-      this.removeGroupMember(group, target.participantId)
+      const denial = await this.relationshipActions.kickGroupMember({ group, actor, target })
+      if (denial) throw new SandboxDomainError(describeGroupActionDenial(denial, 'kick'))
       return { status: 'ok', retcode: 0, data: null }
     }
 
     if (input.action === 'set-admin') {
-      if (actor.role !== 'owner') throw new SandboxDomainError('只有群主可以设置管理员')
-      if (target.role === 'owner') throw new SandboxDomainError('不能修改群主权限')
-      target.role = input.enabled ? 'admin' : 'member'
-      this.commitSceneMutation()
-      await this.dispatchGroupNotice(group, 'group_admin', {
-        sub_type: input.enabled ? 'set' : 'unset',
-        user_id: Number(target.participantId),
-      })
+      const denial = await this.relationshipActions.setGroupAdmin({ group, actor, target, enabled: input.enabled })
+      if (denial) throw new SandboxDomainError(describeGroupActionDenial(denial, 'set-admin'))
       return { status: 'ok', retcode: 0, data: null }
     }
 
     if (input.action === 'transfer-owner') {
-      await this.transferGroupOwner(group, actor, target)
+      const denial = await this.relationshipActions.transferGroupOwner({ group, actor, target })
+      if (denial) throw new SandboxDomainError(describeGroupActionDenial(denial, 'transfer-owner'))
       return { status: 'ok', retcode: 0, data: null }
     }
 
     if (input.action === 'set-title') {
-      this.setGroupMemberTitle(actor, target, input.title)
+      const denial = this.relationshipActions.setGroupMemberTitle({ actor, target, title: input.title })
+      if (denial) throw new SandboxDomainError(describeGroupActionDenial(denial, 'set-title'))
       return { status: 'ok', retcode: 0, data: null }
     }
 
     if (input.action === 'set-ban') {
-      this.setGroupMemberMute(actor, target, input.durationSeconds)
+      const { durationSeconds } = input
+      const denial = this.relationshipActions.muteGroupMember({ actor, target, durationSeconds })
+      if (denial) throw new SandboxDomainError(describeGroupActionDenial(denial, durationSeconds > 0 ? 'mute' : 'unmute'))
       return { status: 'ok', retcode: 0, data: null }
     }
 
-    if (target.participantId !== botId) this.assertCanManageMember(actor, target, '修改群名片')
-    const previousCard = target.card ?? ''
-    target.card = input.card.trim() || undefined
-    this.commitSceneMutation()
-    await this.dispatchGroupNotice(group, 'group_card', {
-      user_id: Number(target.participantId),
-      card_old: previousCard,
-      card_new: target.card ?? '',
-    })
+    const denial = await this.relationshipActions.setGroupCard({ group, actor, target, card: input.card })
+    if (denial) throw new SandboxDomainError(describeGroupActionDenial(denial, 'set-card'))
     return { status: 'ok', retcode: 0, data: null }
   }
 
@@ -2565,15 +2586,18 @@ export class SandboxControlService {
   }
 
   private handleUserRelationshipRequest(input: Extract<PerformFriendActionInput, { action: 'handle-request' }>): PerformFriendActionResult | Promise<PerformGroupActionResult> {
-    const requestIndex = this.scene.requests.findIndex(({ id }) => id === input.requestId)
-    if (requestIndex < 0) throw new SandboxDomainError(`关系申请不存在：${input.requestId}`)
-    const request = this.scene.requests[requestIndex]
+    const request = this.scene.requests.find(({ id }) => id === input.requestId)
+    if (!request) throw new SandboxDomainError(`关系申请不存在：${input.requestId}`)
     if (request.type === 'friend') {
+      // 机器人的决定必须由机器人自己经 OneBot action 作出，这条守卫属于用户 adapter。
       if (this.isBot(request.targetId)) throw new SandboxDomainError('机器人申请必须由机器人处理')
       if (request.targetId !== input.operatorId) throw new SandboxDomainError('只能处理发给自己的好友申请')
-      this.scene.requests.splice(requestIndex, 1)
-      if (input.approve) this.addFriendship(request.requesterId, input.operatorId)
-      this.commitSceneMutation()
+      this.relationshipActions.settleFriendRequest({
+        requestId: request.id,
+        requesterId: request.requesterId,
+        targetId: input.operatorId,
+        approve: input.approve,
+      })
       return { revision: this.scene.revision }
     }
 
@@ -2586,29 +2610,32 @@ export class SandboxControlService {
   }
 
   private async handleUserGroupRequest(input: Extract<PerformGroupActionInput, { action: 'handle-request' }>): Promise<PerformGroupActionResult> {
-    const requestIndex = this.scene.requests.findIndex(({ id, type }) => id === input.requestId && type === 'group')
-    if (requestIndex < 0) throw new SandboxDomainError(`群申请不存在：${input.requestId}`)
-    const request = this.scene.requests[requestIndex]
+    const request = this.scene.requests.find(({ id, type }) => id === input.requestId && type === 'group')
+    if (!request) throw new SandboxDomainError(`群申请不存在：${input.requestId}`)
     const group = this.scene.groups.find(({ id }) => id === request.groupId)
     if (!group) throw new SandboxDomainError(`群组不存在：${request.groupId}`)
     const subType = request.subType ?? 'add'
 
+    let participantId = request.requesterId
     if (subType === 'invite') {
+      // 与好友申请同源的守卫：邀请机器人入群这件事只能由那个机器人自己决定。
       if (this.isBot(request.targetId)) throw new SandboxDomainError('机器人邀请必须由机器人处理')
       if (request.targetId !== input.operatorId) throw new SandboxDomainError('只能处理发给自己的群邀请')
-    } else {
-      const operator = this.requireGroupMember(group, input.operatorId)
-      if (operator.role !== 'owner' && operator.role !== 'admin') throw new SandboxDomainError('只有群主或管理员可以处理入群申请')
+      if (!request.targetId) throw new SandboxDomainError('群申请缺少目标参与者')
+      participantId = request.targetId
+    } else if (denyGroupAuthority(this.requireGroupMember(group, input.operatorId))) {
+      // 与机器人通道同一道角色判定，只有措辞不同：这句已被按文案断言，逐字保留。
+      throw new SandboxDomainError('只有群主或管理员可以处理入群申请')
     }
 
-    this.scene.requests.splice(requestIndex, 1)
-    if (input.approve) {
-      const participantId = subType === 'invite' ? request.targetId : request.requesterId
-      if (!participantId) throw new SandboxDomainError('群申请缺少目标参与者')
-      await this.addApprovedGroupMember(group, participantId, input.operatorId, subType)
-    } else {
-      this.commitSceneMutation()
-    }
+    await this.relationshipActions.settleGroupRequest({
+      group,
+      requestId: request.id,
+      participantId,
+      operatorId: input.operatorId,
+      subType,
+      approve: input.approve,
+    })
     return { revision: this.scene.revision }
   }
 
@@ -2618,54 +2645,8 @@ export class SandboxControlService {
     return member
   }
 
-  private assertCanManageMember(
-    actor: SandboxGroup['members'][number],
-    target: SandboxGroup['members'][number],
-    action: string,
-  ) {
-    if (actor.role === 'member') throw new SandboxDomainError(`只有群主或管理员可以${action}`)
-    if (target.role === 'owner' || (actor.role === 'admin' && target.role === 'admin')) {
-      throw new SandboxDomainError('管理员不能管理群主或其他管理员')
-    }
-    if (actor.participantId === target.participantId) throw new SandboxDomainError(`不能对自己执行${action}`)
-  }
-
-  // 专属头衔与禁言过去只做权限校验后确认调用，插件无法验证结果；两者现在都写入
-  // 群成员状态，使 WebQQ、场景快照和 OneBot 查询读到同一份事实。
-  private setGroupMemberTitle(actor: SandboxGroupMember, target: SandboxGroupMember, title: string): void {
-    if (actor.role !== 'owner') throw new SandboxDomainError('只有群主可以设置专属头衔')
-    target.title = this.validateOptionalName(title, '专属头衔')
-    this.commitSceneMutation()
-  }
-
-  private setGroupMemberMute(actor: SandboxGroupMember, target: SandboxGroupMember, durationSeconds: number): void {
-    if (!Number.isFinite(durationSeconds) || durationSeconds < 0) throw new SandboxDomainError('禁言时长不能为负数')
-    if (durationSeconds > MAX_GROUP_MUTE_SECONDS) throw new SandboxDomainError('禁言时长不能超过 30 天')
-    this.assertCanManageMember(actor, target, durationSeconds > 0 ? '禁言成员' : '解除禁言')
-    target.mutedUntil = durationSeconds > 0
-      ? new Date(Date.now() + durationSeconds * 1000).toISOString()
-      : undefined
-    this.commitSceneMutation()
-  }
-
-  private validateOptionalName(value: string, label: string): string | undefined {
-    const trimmed = value.trim()
-    if (!trimmed) return undefined
-    if (trimmed.length > 64) throw new SandboxDomainError(`${label}不能超过 64 个字符`)
-    return trimmed
-  }
-
-  private async transferGroupOwner(group: SandboxGroup, actor: SandboxGroupMember, target: SandboxGroupMember) {    if (actor.role !== 'owner') throw new SandboxDomainError('只有群主可以转让群主身份')
-    if (actor.participantId === target.participantId) throw new SandboxDomainError('不能把群主身份转让给自己')
-    actor.role = 'member'
-    target.role = 'owner'
-    this.commitSceneMutation()
-    await this.dispatchGroupNotice(group, 'group_owner', {
-      operator_id: Number(actor.participantId),
-      user_id: Number(target.participantId),
-      owner_id_old: Number(actor.participantId),
-      owner_id_new: Number(target.participantId),
-    })
+  private removeRelationshipRequest(requestId: string): void {
+    this.scene.requests = this.scene.requests.filter(({ id }) => id !== requestId)
   }
 
   private async addApprovedGroupMember(group: SandboxGroup, participantId: string, operatorId: string, subType: 'add' | 'invite') {
