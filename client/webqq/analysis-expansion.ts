@@ -30,6 +30,18 @@ export interface AnalysisSearchMatches {
   readonly toolEvidenceIds: readonly string[]
 }
 
+/**
+ * 翻转一个集合成员，交出替换用的新集合。
+ *
+ * 卡片、工具、历史变量原文与导航分组四处切换是同一个形状，各自抄一份会让其中一处在后续改动里
+ * 悄悄分叉——例如某一处改成「只加不删」，界面上表现为那一类东西再也收不起来。
+ */
+function toggled<T>(members: ReadonlySet<T>, member: T): Set<T> {
+  const next = new Set(members)
+  next.has(member) ? next.delete(member) : next.add(member)
+  return next
+}
+
 export function createAnalysisExpansion() {
   const collapsedCards = ref(new Set<string>())
   const expandedTools = ref(new Set<string>())
@@ -53,9 +65,7 @@ export function createAnalysisExpansion() {
 
   /** 折叠仅隐藏正文而不卸载内容，避免原文模式与长文本展开状态在再次展开时丢失。 */
   function toggleCard(target: string): void {
-    const next = new Set(collapsedCards.value)
-    next.has(target) ? next.delete(target) : next.add(target)
-    collapsedCards.value = next
+    collapsedCards.value = toggled(collapsedCards.value, target)
   }
 
   function expandCard(target: string): void {
@@ -75,9 +85,7 @@ export function createAnalysisExpansion() {
   }
 
   function toggleTool(evidenceId: string): void {
-    const next = new Set(expandedTools.value)
-    next.has(evidenceId) ? next.delete(evidenceId) : next.add(evidenceId)
-    expandedTools.value = next
+    expandedTools.value = toggled(expandedTools.value, evidenceId)
   }
 
   function isMessageRaw(evidenceId: string): boolean {
@@ -118,9 +126,7 @@ export function createAnalysisExpansion() {
   }
 
   function toggleHistoryVariableRaw(variableId: string): void {
-    const next = new Set(rawHistoryVariables.value)
-    next.has(variableId) ? next.delete(variableId) : next.add(variableId)
-    rawHistoryVariables.value = next
+    rawHistoryVariables.value = toggled(rawHistoryVariables.value, variableId)
   }
 
   function isTextForceExpanded(target: string): boolean {
@@ -142,9 +148,7 @@ export function createAnalysisExpansion() {
 
   /** 左侧导航分组默认全部展开，各自独立折叠；折叠一个分组不改变当前导航目标。 */
   function toggleNavigationGroup(group: ModelRequestAnalysisGroupKey): void {
-    const next = new Set(collapsedNavigationGroups.value)
-    next.has(group) ? next.delete(group) : next.add(group)
-    collapsedNavigationGroups.value = next
+    collapsedNavigationGroups.value = toggled(collapsedNavigationGroups.value, group)
   }
 
   /**

@@ -315,6 +315,12 @@ describe('模型请求分析展示模型', () => {
     expect(matchesAnalysisSearch(navigation, item.id, normalizeAnalysisQuery('歧义'))).toBe(false)
   })
 
+  /**
+   * 「切原文」这个转换本身已经下沉到 `analysis-expansion`；这里保留的
+   * `@click="toggleHistoryVariableRaw(variable.id)"` 与那条 `v-else-if` 守的是**接线**而不是判定
+   * ——切原文按钮接到的是不是那个转换、预览与原文两个分支读的是不是同一个变量身份。
+   * 少接这根线不会报错，表现为点了「查看原始 XML」界面上什么都不变（ADR 0073 第 4 类）。
+   */
   it('history_new 和 history_last 默认渲染消息预览，并保留原始 XML 切换', () => {
     const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
     const preview = readFileSync(resolve('client/model-request-history-preview.vue'), 'utf8')
@@ -386,6 +392,13 @@ describe('模型请求分析展示模型', () => {
     expect(workspace).not.toContain('@open-message=')
   })
 
+  /**
+   * 折叠这个转换已经下沉到 `analysis-expansion`；这里保留三类断言。
+   * 一是**接线**：头部与折叠按钮接到的是不是同一个变量卡片目标——少接一根线不会报错，
+   * 表现为点了头部空白或箭头没反应，或者点头部折叠的是另一张卡。
+   * 二是指针与选区守卫的判定，它读窗口选区与事件目标，属于留在视图里的 DOM 细节
+   * （`event.detail < 2`、`event.preventDefault()`）。三是结构与样式契约（ADR 0073 第 2、3、4 类）。
+   */
   it('变量卡片正文保持卡片内边距，支持头部和按钮折叠，并标注空值', () => {
     const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
@@ -450,8 +463,8 @@ describe('模型请求分析展示模型', () => {
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
 
     expect(view).toContain('@click="toggleNavigationGroup(group.key)"')
-    expect(view).toContain(':aria-expanded="!collapsedNavigationGroups.has(group.key)"')
-    expect(view).toContain('v-show="!collapsedNavigationGroups.has(group.key)"')
+    expect(view).toContain(':aria-expanded="!isNavigationGroupCollapsed(group.key)"')
+    expect(view).toContain('v-show="!isNavigationGroupCollapsed(group.key)"')
     expect(styles).toMatch(/\.webqq-model-request-analysis \.webqq-model-analysis-nav \{[^}]*position: sticky;[^}]*top: var\(--webqq-model-trajectory-sticky-height[^}]*max-height: calc\(var\(--webqq-model-analysis-nav-height[^}]*- var\(--webqq-model-trajectory-sticky-height[^}]*overflow: auto;/s)
   })
 
@@ -533,6 +546,12 @@ describe('模型请求分析展示模型', () => {
     expect(responseSection).not.toContain(':value="call.arguments || \'{}\'"')
   })
 
+  /**
+   * 两条 `toggleCardFromHeader` 是**接线**：消息卡片与响应卡片的头部空白各自接到自己那个折叠目标。
+   * 少接一根线不会报错，表现为其中一类卡片点头部空白没反应，或者折叠了另一张卡。
+   * `event.target.closest('button')` 是留在视图里的守卫判定：不加它，点头部里的按钮会连着折叠一次
+   * （ADR 0073 第 4 类）。其余是否定式的已删实现守卫与布局分支契约。
+   */
   it('去掉完整请求 JSON 入口，卡片正文不再标「内容」，头部空白可折叠', () => {
     const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
 

@@ -338,6 +338,87 @@
         "true",
         "true"
       ]
+    },
+    {
+      "label": "11 检查器初始渲染",
+      "length": 122321,
+      "sha256": "1e3bb614fbd3658416801fcd1aaf5c71",
+      "scrollTop": 608,
+      "collapsedMessageCards": 0,
+      "collapsedVariableCards": 0,
+      "expandedTools": 0,
+      "collapsedNavGroups": 0,
+      "mountedRawBlocks": 0,
+      "hiddenRawBlocks": 0,
+      "historyPreviews": 2,
+      "currentNavTarget": [],
+      "cardHeaderLabels": [
+        "查看第 0 条消息原始 JSON",
+        "收起第 0 条消息卡片",
+        "查看第 1 条消息原始 JSON",
+        "收起第 1 条消息卡片",
+        "查看第 2 条消息原始 JSON",
+        "收起第 2 条消息卡片",
+        "查看第 3 条消息原始 JSON",
+        "收起第 3 条消息卡片",
+        "查看响应原始 JSON",
+        "收起响应卡片"
+      ],
+      "navExpanded": []
+    },
+    {
+      "label": "12 检查器里折叠一张卡",
+      "length": 122358,
+      "sha256": "1cc265f079285f8e10111a83c4db1c9a",
+      "scrollTop": 608,
+      "collapsedMessageCards": 1,
+      "collapsedVariableCards": 0,
+      "expandedTools": 0,
+      "collapsedNavGroups": 0,
+      "mountedRawBlocks": 0,
+      "hiddenRawBlocks": 0,
+      "historyPreviews": 2,
+      "currentNavTarget": [],
+      "cardHeaderLabels": [
+        "查看第 0 条消息原始 JSON",
+        "收起第 0 条消息卡片",
+        "查看第 1 条消息原始 JSON",
+        "展开第 1 条消息卡片",
+        "查看第 2 条消息原始 JSON",
+        "收起第 2 条消息卡片",
+        "查看第 3 条消息原始 JSON",
+        "收起第 3 条消息卡片",
+        "查看响应原始 JSON",
+        "收起响应卡片"
+      ],
+      "navExpanded": []
+    },
+    {
+      "label": "13 检查器里切某条消息看原文",
+      "length": 124477,
+      "sha256": "4fe7d84e8606222a4d4192047beda5ed",
+      "scrollTop": 608,
+      "collapsedMessageCards": 1,
+      "collapsedVariableCards": 0,
+      "expandedTools": 0,
+      "collapsedNavGroups": 0,
+      "mountedRawBlocks": 1,
+      "hiddenRawBlocks": 0,
+      "historyPreviews": 2,
+      "currentNavTarget": [],
+      "cardHeaderLabels": [
+        "查看第 0 条消息原始 JSON",
+        "收起第 0 条消息卡片",
+        "查看第 1 条消息原始 JSON",
+        "展开第 1 条消息卡片",
+        "查看第 2 条消息格式化内容",
+        "收起第 2 条消息卡片",
+        "查看第 3 条消息原始 JSON",
+        "收起第 3 条消息卡片",
+        "查看响应原始 JSON",
+        "收起响应卡片"
+      ],
+      "navExpanded": []
     }
   ],
   "consoleErrors": []

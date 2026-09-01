@@ -26,8 +26,8 @@
           :class="[
             `is-${group.key}`,
             {
-              'is-active': !collapsedNavigationGroups.has(group.key),
-              'is-collapsed': collapsedNavigationGroups.has(group.key),
+              'is-active': !isNavigationGroupCollapsed(group.key),
+              'is-collapsed': isNavigationGroupCollapsed(group.key),
               'is-muted': normalizedSearch && !group.items.some(itemMatches),
             },
           ]"
@@ -35,7 +35,7 @@
           <button
             type="button"
             class="webqq-model-analysis-nav-heading"
-            :aria-expanded="!collapsedNavigationGroups.has(group.key)"
+            :aria-expanded="!isNavigationGroupCollapsed(group.key)"
             @click="toggleNavigationGroup(group.key)"
           >
             <component :is="groupIcon(group.key)" :size="15" aria-hidden="true" />
@@ -43,7 +43,7 @@
             <small>{{ group.count }}</small>
             <IconChevronDown class="webqq-model-analysis-nav-chevron" :size="15" aria-hidden="true" />
           </button>
-          <div v-show="!collapsedNavigationGroups.has(group.key)" class="webqq-model-analysis-nav-items">
+          <div v-show="!isNavigationGroupCollapsed(group.key)" class="webqq-model-analysis-nav-items">
             <button
               v-for="item in group.items"
               :key="item.id"
@@ -569,7 +569,6 @@ const responseVisible = computed(() => (
 // 展开态与原文态住在 analysis-expansion 里；这里只是它的渲染面。
 const {
   activeNavigationTarget,
-  collapsedNavigationGroups,
   expandCard,
   expandSearchMatches,
   expandTool,
@@ -579,6 +578,7 @@ const {
   isHistoryVariableRaw,
   isMessageRaw,
   isMessageRawMounted,
+  isNavigationGroupCollapsed,
   isTextForceExpanded,
   isToolExpanded,
   reset: resetExpansion,
@@ -780,7 +780,10 @@ function updateActiveNavigationTarget() {
     .map(({ target, element }) => ({ target, top: element.getBoundingClientRect().top }))
     .sort((left, right) => left.top - right.top)
   const nextTarget = resolveActiveAnalysisTarget(targetPositions, scrollerTop, scroller.clientHeight)
-  if (focusNavigationTarget(nextTarget)) nextTick(() => scrollNavigationTargetIntoView(nextTarget!))
+  // 只有当前目标真的变了才把左侧条目滚进视野；要滚的就是刚写进去的那个当前目标。
+  if (focusNavigationTarget(nextTarget)) {
+    nextTick(() => scrollNavigationTargetIntoView(activeNavigationTarget.value))
+  }
 }
 
 function resolveNavigationTargetElements(content: HTMLElement) {

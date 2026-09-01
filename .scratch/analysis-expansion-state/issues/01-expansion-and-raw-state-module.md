@@ -80,7 +80,9 @@
 - `yarn typecheck`：通过。
 - `yarn build`：通过。
 - DOM 快照：`evidence/dom-baseline-{chromium,firefox}.json` 与
-  `evidence/dom-after-01-{chromium,firefox}.json`，十个采样点的 DOM 哈希、滚动量、
+  `evidence/dom-after-{chromium,firefox}.json`，十三个采样点的 DOM 哈希、滚动量、
   折叠／展开／已挂载各项计数与当前导航目标全部一致；两份归一化全文逐字节相同；控制台 0 错误。
-  基线在改动前于干净工作区采集，并在 Chromium 连跑三次、Firefox 连跑两次确认确定性。
+  本票的验收面是 `01`–`08`（`11`–`13` 是检查器布局，见 `evidence/README.md`）。
+  基线用 `git checkout ff5b4d1 -- client/webqq/analysis-view.vue` 取，Chromium 连跑三次、
+  Firefox 连跑两次确认确定性。
 - `git diff --stat` 不含 `src/` 路径。

@@ -23,6 +23,9 @@ if (!output) throw new Error('用法：node dom-snapshot.mjs <输出 json> [chro
 
 const ANALYSIS = '.webqq-model-analysis'
 const SCROLLER = '.webqq-model-request-detail'
+/** 分析视图的第二个挂载点：轨迹账本选中一行后右侧的检查器，它自己滚动，且不渲染左侧导航。 */
+const INSPECTOR = '.webqq-model-analysis.is-inspector'
+const INSPECTOR_SCROLLER = '.webqq-model-trajectory-inspector-body'
 
 const engine = engineName === 'firefox' ? firefox : chromium
 const browser = await engine.launch()
@@ -43,43 +46,43 @@ function normalize(html) {
 const samples = []
 const documents = []
 
-async function sample(label) {
+async function sample(label, root = ANALYSIS, scroller = SCROLLER) {
   await page.waitForTimeout(900)
-  const raw = await page.locator(ANALYSIS).innerHTML()
+  const raw = await page.locator(root).innerHTML()
   const dom = normalize(raw)
   documents.push(`===== ${label} =====\n${dom}\n`)
   samples.push({
     label,
     length: dom.length,
     sha256: createHash('sha256').update(dom).digest('hex').slice(0, 32),
-    scrollTop: await page.locator(SCROLLER).evaluate(element => element.scrollTop),
-    collapsedMessageCards: await page.locator(`${ANALYSIS} .webqq-model-analysis-card.is-collapsed`).count(),
-    collapsedVariableCards: await page.locator(`${ANALYSIS} .webqq-model-analysis-variable-card.is-collapsed`).count(),
-    expandedTools: await page.locator(`${ANALYSIS} .webqq-model-analysis-tool-card.is-expanded`).count(),
-    collapsedNavGroups: await page.locator(`${ANALYSIS} .webqq-model-analysis-nav-group.is-collapsed`).count(),
+    scrollTop: await page.locator(scroller).evaluate(element => element.scrollTop),
+    collapsedMessageCards: await page.locator(`${root} .webqq-model-analysis-card.is-collapsed`).count(),
+    collapsedVariableCards: await page.locator(`${root} .webqq-model-analysis-variable-card.is-collapsed`).count(),
+    expandedTools: await page.locator(`${root} .webqq-model-analysis-tool-card.is-expanded`).count(),
+    collapsedNavGroups: await page.locator(`${root} .webqq-model-analysis-nav-group.is-collapsed`).count(),
     // 已挂载的原文块与其中隐藏着的那些：两个数字合起来就是「原文一旦挂载就留着」。
-    mountedRawBlocks: await page.locator(`${ANALYSIS} .webqq-model-analysis-json`).count(),
-    hiddenRawBlocks: await page.locator(`${ANALYSIS} .webqq-model-analysis-json`)
+    mountedRawBlocks: await page.locator(`${root} .webqq-model-analysis-json`).count(),
+    hiddenRawBlocks: await page.locator(`${root} .webqq-model-analysis-json`)
       .evaluateAll(elements => elements.filter(element => element.style.display === 'none').length),
-    historyPreviews: await page.locator(`${ANALYSIS} .webqq-model-history-preview`).count(),
-    currentNavTarget: await page.locator(`${ANALYSIS} .webqq-model-analysis-nav-item.is-current`)
+    historyPreviews: await page.locator(`${root} .webqq-model-history-preview`).count(),
+    currentNavTarget: await page.locator(`${root} .webqq-model-analysis-nav-item.is-current`)
       .evaluateAll(elements => elements.map(element => element.dataset.target)),
-    cardHeaderLabels: await page.locator(`${ANALYSIS} .webqq-model-analysis-card header button`)
+    cardHeaderLabels: await page.locator(`${root} .webqq-model-analysis-card header button`)
       .evaluateAll(elements => elements.map(element => element.getAttribute('aria-label'))),
-    navExpanded: await page.locator(`${ANALYSIS} .webqq-model-analysis-nav-heading`)
+    navExpanded: await page.locator(`${root} .webqq-model-analysis-nav-heading`)
       .evaluateAll(elements => elements.map(element => element.getAttribute('aria-expanded'))),
   })
 }
 
-/** 按无障碍标签点一个分析视图内的按钮，不经 Playwright 的滚动。 */
-async function clickLabel(label) {
-  const target = page.locator(`${ANALYSIS} [aria-label="${label}"]`).first()
+/** 按无障碍标签点一个按钮，不经 Playwright 的滚动。 */
+async function clickLabel(label, root = ANALYSIS) {
+  const target = page.locator(`${root} [aria-label="${label}"]`).first()
   await target.evaluate(element => element.click())
   await page.waitForTimeout(700)
 }
 
-async function clickSelector(selector, index = 0) {
-  await page.locator(`${ANALYSIS} ${selector}`).nth(index).evaluate(element => element.click())
+async function clickSelector(selector, index = 0, root = ANALYSIS) {
+  await page.locator(`${root} ${selector}`).nth(index).evaluate(element => element.click())
   await page.waitForTimeout(700)
 }
 
@@ -128,6 +131,21 @@ await sample('09 折叠一个导航分组')
 await page.locator('.webqq-model-request-item').nth(1).click()
 await page.waitForTimeout(3500)
 await sample('10 切换到另一条记录')
+
+// 分析视图的第二个挂载点。检查器不渲染左侧导航、滚动的是 inspector-body，因此它是另一条
+// 代码路径；选中账本行会带一次定位，短暂高亮 1500ms 后自动清除，采样前等够时间。
+await page.locator('.webqq-model-request-view-switch button', { hasText: '轨迹' }).first().click()
+await page.waitForTimeout(2500)
+await page.locator('.webqq-model-trajectory-row').nth(2).evaluate(element => element.click())
+await page.waitForSelector(INSPECTOR, { timeout: 30_000 })
+await page.waitForTimeout(2500)
+await sample('11 检查器初始渲染', INSPECTOR, INSPECTOR_SCROLLER)
+
+await clickLabel('收起第 1 条消息卡片', INSPECTOR)
+await sample('12 检查器里折叠一张卡', INSPECTOR, INSPECTOR_SCROLLER)
+
+await clickLabel('查看第 2 条消息原始 JSON', INSPECTOR)
+await sample('13 检查器里切某条消息看原文', INSPECTOR, INSPECTOR_SCROLLER)
 
 mkdirSync(dirname(output), { recursive: true })
 writeFileSync(output, `${JSON.stringify({ engine: engineName, samples, consoleErrors }, null, 2)}\n`)

@@ -403,7 +403,7 @@ const treatedAssertionExemptions: readonly ArchitectureExemption[] = ([
 ] as const).map(([file, feature, owner]) => ({
   file,
   rule: '组件测试文件不得出现裸的肯定式源码断言',
-  reason: '该文件的组件行为已下沉成模块并由模块的行为断言执行；剩余的肯定式断言是接线、DOM 结构契约与成本结构（五类判据第 3、4 类），规则无从按形状与被禁止的实现细节断言区分。',
+  reason: '该文件的组件行为已下沉成模块并由模块的行为断言执行；剩余的肯定式断言是接线、DOM 结构契约或成本结构（五类判据第 3、4 类），规则无从按形状与被禁止的实现细节断言区分。',
   owner: `${feature}（已完成）：${owner}；若日后把接线本身也变成可执行 interface，再收掉这条豁免`,
 }))
 

@@ -73,6 +73,29 @@
 的「处理 ADR 冲突」不得静默覆盖，因此**本轮没有动它**，在此登记冲突等决定：要么在 ADR-0062 里
 把那句改成「展开态由 `analysis-expansion` 拥有，定位器只拥有展开决策」，要么为展开态单开一条记录。
 
+### 复审修正（`/code-review`）
+
+- **四处集合翻转收成一个 `toggled` helper**（Duplicated Code）。`toggleCard` / `toggleTool` /
+  `toggleHistoryVariableRaw` / `toggleNavigationGroup` 原先各抄一遍
+  `next.has(x) ? next.delete(x) : next.add(x)`；抄四份的代价是其中一处在后续改动里悄悄分叉，
+  表现为那一类东西再也收不起来。`setMessageRaw` 与 `setResponseRaw` 的「一切就登记挂载」没有合并：
+  一个是集合并集、一个是布尔赋值，形状只是相似，合并会把两种类型塞进一个签名。
+- **模板的导航折叠读取改走 `isNavigationGroupCollapsed`。** 原先模板直接读集合
+  （`collapsedNavigationGroups.has(group.key)`），而谓词只有测试在用——同一个事实两条读法，
+  其中一条在生产代码里没人走。收敛后的口径是：集合成员一律经谓词读（调用方不必知道那是个 `Set`），
+  纯布尔仍以 `ref` 形式读（`v-if="responseRawMounted"` 是惯用写法，包一层函数只是噪音）。
+  集合本身不再从解构里取，`aria-expanded` 与 `v-show` 那两条结构契约断言跟着改标识符，口径未变。
+- **`nextTarget!` 去掉。** 改成 `scrollNavigationTargetIntoView(activeNavigationTarget.value)`
+  ——要滚进视野的本来就是刚写进去的那个当前目标，不需要非空断言，也不必在视图里重复一遍空目标判定。
+- **三个 `it` 补上 ADR-0073 要求的块注释。** 本票把 `tests/model-request-analysis.test.ts` 移入
+  「已消化」，那条记录因此开始生效：下沉后仍保留的接线断言必须在块注释里写明保护的是接线而不是判定、
+  以及少接一根线的表现形态。补的是历史变量原文切换、变量卡片折叠、卡片头部空白折叠三处。
+- **已消化那组共用理由改成析取**（「接线、DOM 结构契约**或**成本结构」）：合取会让先前三条条目
+  的理由带上不适用于它们的「成本结构」。
+- **补了检查器布局的三个采样点。** 分析视图有两个挂载点，原先只采了工作台那个。检查器不渲染左侧
+  导航、滚动的是 `inspector-body`，是另一条代码路径。两张票都没要求，补上是因为「行为一字不变」
+  对两个挂载点都要成立；十三个采样点在两个引擎下全部与基线一致。
+
 ### 别处变红的处置
 
 | 位置 | 变红原因 | 真红／假红 | 处置 |
@@ -95,7 +118,7 @@
   当前目标只在变了时才改变、十项复位）。
 - `yarn typecheck`：通过。
 - `yarn build`：通过。
-- DOM 快照：`evidence/dom-after-02-{chromium,firefox}.json` 与基线的十个采样点全部一致，
+- DOM 快照：`evidence/dom-after-{chromium,firefox}.json` 与基线的十三个采样点全部一致，
   归一化全文逐字节相同，控制台 0 错误。采样点 09（折叠一个导航分组）与 10（切换到另一条记录，
   验复位）是本票的观察面：09 的折叠分组数 0 → 1、`aria-expanded` 第五项 true → false；
   10 的折叠卡片、展开工具、折叠分组、已挂载原文块与当前导航目标全部回到初始。
