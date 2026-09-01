@@ -304,6 +304,15 @@ export function apply(ctx: Context, config: Config) {
       // 运行时预设快照只按记录域标识归属，因此按标识取一次即可；空间被并发删除时目录里没有它。
       getTestSpaceModelRequests: (spaceId) => scopes.getModelRequests(spaceId),
     })
+    /**
+     * 端点可用性是一个可空值，而不是两条各自装配一遍的代码路径。
+     *
+     * MCP 服务与监听器要么一起有要么一起没有，因此装在同一个值里：拆成两个各自可空的字段会让
+     * 「只有 MCP 服务、没有监听器」这个不可能的状态变得可表达。`try` 只包住两次构造——构造失败的
+     * 唯一实际来源是建数据目录或读凭证文件，而后面的 Console 注册与两个钩子注册在两条路上完全相同，
+     * 留在 `try` 里只会让它们抛出时被记成与事实不符的文案并再注册一遍。
+     */
+    let endpoint: { mcp: SandboxMcpService; server: SandboxTestEndpointServer } | undefined
     try {
       const mcp = new SandboxMcpService(inner, control, {
         dataDirectory: resolve(inner.baseDir, 'data/chatluna-sandbox'),
@@ -317,7 +326,7 @@ export function apply(ctx: Context, config: Config) {
         testSpaces,
         unattributedModelRequests,
       })
-      const testEndpointServer = new SandboxTestEndpointServer(inner, mcp, {
+      const server = new SandboxTestEndpointServer(inner, mcp, {
         // 逐字段构造传输配置：监听器只要门禁与路径，不需要配额；整体铺开会让读代码的人以为它也用配额。
         // 配置页的 `shared` 分组是展示分工，监听器接口按自己需要的字段扁平声明，两者在此对接。
         host: config.testEndpoint.shared.host,
@@ -329,41 +338,29 @@ export function apply(ctx: Context, config: Config) {
         mcp: config.testEndpoint.mcp,
         http: config.testEndpoint.http,
       })
-      // chatluna-usage 位于另一个 loader group，Cordis 会为服务建立隔离映射；复用 usage 插件的 Context 才能解析到同一实例。
-      const getChatLunaUsage = () => findChatLunaUsage(inner)
-      registerConsole(inner.console, control, config, mcp, testSpaces, unattributedModelRequests, getChatLunaUsage, presetService)
-      inner.on('ready', async () => {
-        await control.waitForSceneReady()
-        const seeded = await seedDevelopmentModelRequestErrors(control.getModelRequestStore())
-        if (seeded) inner.logger('chatluna-sandbox').info(`已生成 ${seeded} 条开发环境 ChatLuna 错误预览记录。`)
-        await testEndpointServer.start().catch((error) => inner.logger('chatluna-sandbox').error('测试控制端点监听器启动失败；WebQQ 仍可继续使用。', error))
-      })
-      inner.on('dispose', () => {
-        disposeModelRequestCollector()
-        presetSnapshots.dispose()
-        // Koishi 的 dispose 不可等待（cordis scope.reset 不 await disposer），
-        // 这里只保证收尾写入的失败进日志，而不是被静默丢弃。
-        void unattributedModelRequests.waitForPersistence().catch((error) => {
-          inner.logger('chatluna-sandbox').error('未归属模型请求关机收尾持久化失败。', error)
-        })
-        testEndpointServer.stop()
-      })
+      endpoint = { mcp, server }
     } catch (error) {
       inner.logger('chatluna-sandbox').error('测试控制端点初始化失败；WebQQ 仍可继续使用。', error)
-      const getChatLunaUsage = () => findChatLunaUsage(inner)
-      registerConsole(inner.console, control, config, undefined, testSpaces, unattributedModelRequests, getChatLunaUsage, presetService)
-      inner.on('ready', async () => {
-        await control.waitForSceneReady()
-        const seeded = await seedDevelopmentModelRequestErrors(control.getModelRequestStore())
-        if (seeded) inner.logger('chatluna-sandbox').info(`已生成 ${seeded} 条开发环境 ChatLuna 错误预览记录。`)
-      })
-      inner.on('dispose', () => {
-        disposeModelRequestCollector()
-        presetSnapshots.dispose()
-        void unattributedModelRequests.waitForPersistence().catch((error) => {
-          inner.logger('chatluna-sandbox').error('未归属模型请求关机收尾持久化失败。', error)
-        })
-      })
     }
+    // chatluna-usage 位于另一个 loader group，Cordis 会为服务建立隔离映射；复用 usage 插件的 Context 才能解析到同一实例。
+    const getChatLunaUsage = () => findChatLunaUsage(inner)
+    registerConsole(inner.console, control, config, endpoint?.mcp, testSpaces, unattributedModelRequests, getChatLunaUsage, presetService)
+    inner.on('ready', async () => {
+      await control.waitForSceneReady()
+      const seeded = await seedDevelopmentModelRequestErrors(control.getModelRequestStore())
+      if (seeded) inner.logger('chatluna-sandbox').info(`已生成 ${seeded} 条开发环境 ChatLuna 错误预览记录。`)
+      // 端点没造出来就没有要启动的东西；两种协议都没启用时监听器自己就返回，因此这里只有一次可选调用。
+      await endpoint?.server.start().catch((error) => inner.logger('chatluna-sandbox').error('测试控制端点监听器启动失败；WebQQ 仍可继续使用。', error))
+    })
+    inner.on('dispose', () => {
+      disposeModelRequestCollector()
+      presetSnapshots.dispose()
+      // Koishi 的 dispose 不可等待（cordis scope.reset 不 await disposer），
+      // 这里只保证收尾写入的失败进日志，而不是被静默丢弃。
+      void unattributedModelRequests.waitForPersistence().catch((error) => {
+        inner.logger('chatluna-sandbox').error('未归属模型请求关机收尾持久化失败。', error)
+      })
+      endpoint?.server.stop()
+    })
   })
 }
