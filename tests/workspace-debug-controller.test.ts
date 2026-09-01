@@ -1,32 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { createFakeWorkspacePort } from '../client/webqq/fake-workspace-port'
+import { createFakeOneBotDebugPort } from '../client/webqq/fake-onebot-debug-port'
 import { createTestWorkspaceController } from './helpers/workspace-controller'
-import type { SandboxConsoleOneBotDebugRecord, SandboxWorkspaceState } from '../src/types'
-
-const workspace: SandboxWorkspaceState = {
-  snapshot: {
-    revision: 0,
-    participants: [
-      { kind: 'user', id: '10001', name: '测试用户1' },
-      { kind: 'bot', id: '20001', name: 'Koishi', implementation: 'napcat', enabled: true },
-    ],
-    groups: [],
-    conversations: [{ id: 'private:10001:20001', type: 'direct', participantIds: ['10001', '20001'], messageIds: [] }],
-    messages: [],
-    forwards: [],
-    friendships: [],
-    requests: [],
-  },
-  chatLunaStates: [],
-  appearance: {
-    enableSandboxFrostedGlass: true,
-    sandboxTimBubbleTail: true,
-    sandboxColorMode: 'auto',
-    sandboxAccentColor: '#2563eb',
-    sandboxMarkRecalledMessages: true,
-  },
-  persistence: { mode: 'memory', available: true, persisted: false },
-}
+import type { SandboxConsoleOneBotDebugRecord } from '../src/types'
 
 const record: SandboxConsoleOneBotDebugRecord = {
   id: 'debug-1',
@@ -47,14 +22,14 @@ const record: SandboxConsoleOneBotDebugRecord = {
 
 describe('WebQQ OneBot 调试控制器', () => {
   it('通过端口加载筛选记录并清理当前缓冲区', async () => {
-    const port = createFakeWorkspacePort(workspace)
+    const port = createFakeOneBotDebugPort()
     port.debugRecordsResult = {
       records: [record],
       hasMore: false,
       earliestCursor: 1,
       capacity: { recordCount: 1, totalBytes: 128, maxRecords: 5000, maxBytes: 50 * 1024 * 1024 },
     }
-    const controller = createTestWorkspaceController({ workspace: port })
+    const controller = createTestWorkspaceController({ oneBotDebug: port })
 
     await controller.loadOneBotDebugRecords({ botId: '20001', direction: 'action' })
     expect(controller.oneBotDebugRecords.value).toEqual([record])

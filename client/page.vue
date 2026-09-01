@@ -214,6 +214,7 @@ import { rememberFloatingPanelAnchor } from './webqq/floating-panel'
 import { createKoishiMcpAdminPort } from './webqq/koishi-mcp-admin-port'
 import { createKoishiMcpCallRecordPort } from './webqq/koishi-mcp-call-record-port'
 import { createKoishiModelRequestPort } from './webqq/koishi-model-request-port'
+import { createKoishiOneBotDebugPort } from './webqq/koishi-onebot-debug-port'
 import { createKoishiPresetPort } from './webqq/koishi-preset-port'
 import { createKoishiTestSpacePort } from './webqq/koishi-test-space-port'
 import { createKoishiWorkspacePort } from './webqq/koishi-workspace-port'
@@ -226,14 +227,17 @@ import { createAiTestSpaceShell } from './webqq/test-space-shell'
 
 const activeSpaceId = ref<string>()
 const workspacePort = createKoishiWorkspacePort(() => activeSpaceId.value)
-// 记录域那三道端口的适配器不注入当前观察空间，因此不需要第二份实例，构造一次就够。
+// 调试记录那道跟工作区端口收同一个「解析当前空间标识」的实参；余下三道的适配器不注入空间
+// 标识，因此不需要第二份实例，构造一次就够。
 const workspaceController = createWorkspaceController({
   workspace: workspacePort,
+  oneBotDebug: createKoishiOneBotDebugPort(() => activeSpaceId.value),
   modelRequest: createKoishiModelRequestPort(),
   preset: createKoishiPresetPort(),
   mcpCallRecord: createKoishiMcpCallRecordPort(),
 }, window.localStorage)
 // 总览要读主场景与任意测试空间的头像媒体，因此另配一个不跟随当前活动空间的工作区端口。
+// 拆分后它只剩场景那一道：缩略图要的就是越过隐式定域读任意空间的媒体。
 const mainWorkspacePort = createKoishiWorkspacePort()
 const testSpacePort = createKoishiTestSpacePort()
 const mcpAdminPort = createKoishiMcpAdminPort()

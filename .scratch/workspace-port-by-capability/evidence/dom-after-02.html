@@ -1,0 +1,1361 @@
+<div>
+<main class="chatluna-sandbox-chat webqq-debug-workspace" aria-label="OneBot 调试工作台">
+<header class="webqq-debug-header">
+<div>
+<h1>OneBot 调试</h1>
+<p>查看最近的 action、原始事件和错误</p>
+</div>
+<div class="webqq-debug-actions">
+<label class="webqq-debug-live">
+<!--[-->
+<button role="switch" type="button" value="on" aria-label="自动刷新" aria-checked="false" aria-required="false" data-state="unchecked" data-slot="switch" class="peer data-[state=checked]:bg-primary data-[state=unchecked]:bg-input focus-visible:border-ring focus-visible:ring-ring/50 inline-flex h-5 w-9 shrink-0 items-center rounded-full border border-transparent shadow-xs transition-all outline-none focus-visible:ring-3 disabled:opacity-50">
+<!--[-->
+<span data-state="unchecked" data-slot="switch-thumb" class="bg-background pointer-events-none block size-4 rounded-full ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0.5">
+<!--[-->
+<!--]-->
+</span>
+<!--]-->
+</button>
+<!--v-if-->
+<!--]-->
+<span>自动刷新</span>
+</label>
+<button data-slot="button" data-variant="outline" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 h-9 px-4 py-2 has-[&gt;svg]:px-3">
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="16" aria-hidden="true" class="tabler-icon tabler-icon-refresh">
+<path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4">
+</path>
+<path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4">
+</path>
+</svg> 刷新 <!--]-->
+</button>
+<button data-slot="button" data-variant="destructive" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-red-600 text-white shadow-xs hover:bg-red-700 focus-visible:ring-red-500/20 dark:bg-red-600 dark:hover:bg-red-500 h-9 px-4 py-2 has-[&gt;svg]:px-3">
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="16" aria-hidden="true" class="tabler-icon tabler-icon-trash">
+<path d="M4 7l16 0">
+</path>
+<path d="M10 11l0 6">
+</path>
+<path d="M14 11l0 6">
+</path>
+<path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12">
+</path>
+<path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3">
+</path>
+</svg> 清理调试记录 <!--]-->
+</button>
+</div>
+</header>
+<!--v-if-->
+<div class="webqq-debug-split">
+<section class="webqq-debug-list-pane" aria-label="调试记录列表">
+<header class="webqq-debug-list-toolbar webqq-overlay-header">
+<h2>调用列表</h2>
+<div class="webqq-debug-list-tools">
+<button type="button" class="webqq-debug-sort" aria-label="当前按时间倒序，点击改为正序">按时间倒序 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="16" aria-hidden="true" class="tabler-icon tabler-icon-chevron-down">
+<path d="M6 9l6 6l6 -6">
+</path>
+</svg>
+</button>
+<!--[-->
+<!--[-->
+<!--[-->
+<button data-slot="popover-trigger" data-variant="outline" data-size="icon-sm" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 size-8 webqq-debug-filter-trigger" id="reka-popover-trigger-v-0" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls data-state="closed" aria-label="筛选调试记录，当前：无筛选">
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="16" aria-hidden="true" class="tabler-icon tabler-icon-filter">
+<path d="M4 4h16v2.172a2 2 0 0 1 -.586 1.414l-4.414 4.414v7l-6 2v-8.5l-4.48 -4.928a2 2 0 0 1 -.52 -1.345v-2.227">
+</path>
+</svg>
+<!--]-->
+</button>
+<!--v-if-->
+<!--]-->
+<!--]-->
+<!--]-->
+</div>
+</header>
+<div class="webqq-debug-list">
+<!--[-->
+<button type="button" class="webqq-debug-item is-active">
+<header>
+<div class="webqq-debug-item-copy">
+<div class="webqq-debug-item-name">
+<strong>get_login_info</strong>
+<span data-slot="badge" data-variant="default" class="sandbox-badge border-transparent bg-primary text-primary-foreground webqq-debug-status-success" data-v-1fc1707e>
+<!--[-->成功<!--]-->
+</span>
+<span data-slot="badge" data-variant="outline" class="sandbox-badge border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300 webqq-debug-direction" data-v-1fc1707e>
+<!--[-->ACTION<!--]-->
+</span>
+<span data-slot="badge" data-variant="outline" class="sandbox-badge border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300 webqq-debug-source" data-v-1fc1707e>
+<!--[-->主环境<!--]-->
+</span>
+</div>
+<div class="webqq-debug-timing">
+<time>
+<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="14" aria-hidden="true" class="tabler-icon tabler-icon-calendar-time">
+<path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4">
+</path>
+<path d="M14 18a4 4 0 1 0 8 0a4 4 0 1 0 -8 0">
+</path>
+<path d="M15 3v4">
+</path>
+<path d="M7 3v4">
+</path>
+<path d="M3 11h16">
+</path>
+<path d="M18 16.496v1.504l1 1">
+</path>
+</svg> 2026-08-30 20:00:00</time>
+<span>
+<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="14" aria-hidden="true" class="tabler-icon tabler-icon-clock">
+<path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0">
+</path>
+<path d="M12 7v5l3 3">
+</path>
+</svg> 3 ms</span>
+</div>
+</div>
+</header>
+</button>
+<!--]-->
+</div>
+</section>
+<section class="webqq-debug-detail-pane" aria-label="调试记录详情">
+<article class="webqq-debug-detail">
+<header>
+<div class="webqq-debug-item-copy">
+<div class="webqq-debug-item-name">
+<strong>get_login_info</strong>
+<span data-slot="badge" data-variant="default" class="sandbox-badge border-transparent bg-primary text-primary-foreground webqq-debug-status-success" data-v-1fc1707e>
+<!--[-->成功<!--]-->
+</span>
+<span data-slot="badge" data-variant="outline" class="sandbox-badge border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300 webqq-debug-direction" data-v-1fc1707e>
+<!--[-->ACTION<!--]-->
+</span>
+</div>
+<div class="webqq-debug-timing">
+<time>
+<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="14" aria-hidden="true" class="tabler-icon tabler-icon-calendar-time">
+<path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4">
+</path>
+<path d="M14 18a4 4 0 1 0 8 0a4 4 0 1 0 -8 0">
+</path>
+<path d="M15 3v4">
+</path>
+<path d="M7 3v4">
+</path>
+<path d="M3 11h16">
+</path>
+<path d="M18 16.496v1.504l1 1">
+</path>
+</svg> 2026-08-30 20:00:00</time>
+<span>
+<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="14" aria-hidden="true" class="tabler-icon tabler-icon-clock">
+<path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0">
+</path>
+<path d="M12 7v5l3 3">
+</path>
+</svg> 3 ms</span>
+</div>
+</div>
+</header>
+<div class="webqq-debug-meta-list">
+<p class="webqq-debug-meta">
+<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="17" aria-hidden="true" class="tabler-icon tabler-icon-robot">
+<path d="M6 6a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2l0 -4">
+</path>
+<path d="M12 2v2">
+</path>
+<path d="M9 12v9">
+</path>
+<path d="M15 12v9">
+</path>
+<path d="M5 16l4 -2">
+</path>
+<path d="M15 14l4 2">
+</path>
+<path d="M9 18h6">
+</path>
+<path d="M10 8v.01">
+</path>
+<path d="M14 8v.01">
+</path>
+</svg>
+<span class="webqq-debug-meta-label">机器人</span>
+<span class="webqq-debug-meta-value">Koishi · 20001</span>
+</p>
+<p class="webqq-debug-meta">
+<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="17" aria-hidden="true" class="tabler-icon tabler-icon-box">
+<path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5">
+</path>
+<path d="M12 12l8 -4.5">
+</path>
+<path d="M12 12l0 9">
+</path>
+<path d="M12 12l-8 -4.5">
+</path>
+</svg>
+<span class="webqq-debug-meta-label">来源</span>
+<span class="webqq-debug-meta-value">主环境</span>
+</p>
+<p class="webqq-debug-meta">
+<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="17" aria-hidden="true" class="tabler-icon tabler-icon-cpu">
+<path d="M5 6a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1l0 -12">
+</path>
+<path d="M9 9h6v6h-6l0 -6">
+</path>
+<path d="M3 10h2">
+</path>
+<path d="M3 14h2">
+</path>
+<path d="M10 3v2">
+</path>
+<path d="M14 3v2">
+</path>
+<path d="M21 10h-2">
+</path>
+<path d="M21 14h-2">
+</path>
+<path d="M14 21v-2">
+</path>
+<path d="M10 21v-2">
+</path>
+</svg>
+<span class="webqq-debug-meta-label">实现</span>
+<span class="webqq-debug-meta-value">NapCat</span>
+</p>
+<p class="webqq-debug-meta">
+<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="17" aria-hidden="true" class="tabler-icon tabler-icon-link">
+<path d="M9 15l6 -6">
+</path>
+<path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464">
+</path>
+<path d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463">
+</path>
+</svg>
+<span class="webqq-debug-meta-label">关联实体</span>
+<span class="webqq-debug-meta-value">无关联实体</span>
+</p>
+<!--v-if-->
+<!--v-if-->
+</div>
+<!--v-if-->
+<!--v-if-->
+<div class="webqq-debug-payloads">
+<section>
+<header class="webqq-debug-section-heading">
+<span>
+<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="17" aria-hidden="true" class="tabler-icon tabler-icon-braces">
+<path d="M7 4a2 2 0 0 0 -2 2v3a2 3 0 0 1 -2 3a2 3 0 0 1 2 3v3a2 2 0 0 0 2 2">
+</path>
+<path d="M17 4a2 2 0 0 1 2 2v3a2 3 0 0 0 2 3a2 3 0 0 0 -2 3v3a2 2 0 0 1 -2 2">
+</path>
+</svg>
+<strong>输入</strong>
+</span>
+</header>
+<pre>{}</pre>
+<!--v-if-->
+</section>
+<section>
+<header class="webqq-debug-section-heading">
+<span>
+<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="17" aria-hidden="true" class="tabler-icon tabler-icon-braces">
+<path d="M7 4a2 2 0 0 0 -2 2v3a2 3 0 0 1 -2 3a2 3 0 0 1 2 3v3a2 2 0 0 0 2 2">
+</path>
+<path d="M17 4a2 2 0 0 1 2 2v3a2 3 0 0 0 2 3a2 3 0 0 0 -2 3v3a2 2 0 0 1 -2 2">
+</path>
+</svg>
+<strong>输出</strong>
+</span>
+</header>
+<pre>{
+  &quot;status&quot;: &quot;ok&quot;
+}</pre>
+<!--v-if-->
+</section>
+</div>
+</article>
+</section>
+</div>
+</main>
+<main class="chatluna-sandbox-chat webqq-mcp-call-workspace" aria-label="MCP 调用工作台">
+<header class="webqq-mcp-call-header">
+<div>
+<h1>MCP 调用</h1>
+<p>查看外部测试控制器的工具调用</p>
+</div>
+<div class="webqq-mcp-call-actions">
+<label class="webqq-mcp-call-live">
+<!--[-->
+<button role="switch" type="button" value="on" aria-label="自动刷新" aria-checked="false" aria-required="false" data-state="unchecked" data-slot="switch" class="peer data-[state=checked]:bg-primary data-[state=unchecked]:bg-input focus-visible:border-ring focus-visible:ring-ring/50 inline-flex h-5 w-9 shrink-0 items-center rounded-full border border-transparent shadow-xs transition-all outline-none focus-visible:ring-3 disabled:opacity-50">
+<!--[-->
+<span data-state="unchecked" data-slot="switch-thumb" class="bg-background pointer-events-none block size-4 rounded-full ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0.5">
+<!--[-->
+<!--]-->
+</span>
+<!--]-->
+</button>
+<!--v-if-->
+<!--]-->
+<span>自动刷新</span>
+</label>
+<button data-slot="button" data-variant="outline" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 h-9 px-4 py-2 has-[&gt;svg]:px-3">
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="16" aria-hidden="true" class="tabler-icon tabler-icon-refresh">
+<path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4">
+</path>
+<path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4">
+</path>
+</svg> 刷新 <!--]-->
+</button>
+<button data-slot="button" data-variant="destructive" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-red-600 text-white shadow-xs hover:bg-red-700 focus-visible:ring-red-500/20 dark:bg-red-600 dark:hover:bg-red-500 h-9 px-4 py-2 has-[&gt;svg]:px-3">
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="16" aria-hidden="true" class="tabler-icon tabler-icon-trash">
+<path d="M4 7l16 0">
+</path>
+<path d="M10 11l0 6">
+</path>
+<path d="M14 11l0 6">
+</path>
+<path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12">
+</path>
+<path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3">
+</path>
+</svg> 清理调用记录 <!--]-->
+</button>
+</div>
+</header>
+<!--v-if-->
+<div class="webqq-mcp-call-split">
+<section class="webqq-mcp-call-list-pane" aria-label="MCP 调用列表">
+<header class="webqq-mcp-call-list-toolbar webqq-overlay-header">
+<h2>调用列表</h2>
+<div class="webqq-mcp-call-list-tools">
+<button type="button" class="webqq-mcp-call-sort" aria-label="当前按时间倒序，点击改为正序">按时间倒序 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="16" aria-hidden="true" class="tabler-icon tabler-icon-chevron-down">
+<path d="M6 9l6 6l6 -6">
+</path>
+</svg>
+</button>
+<!--[-->
+<!--[-->
+<!--[-->
+<button data-slot="popover-trigger" data-variant="outline" data-size="icon-sm" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 size-8 webqq-mcp-call-filter-trigger" id="reka-popover-trigger-v-1" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls data-state="closed" aria-label="筛选 MCP 调用，当前：无筛选">
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="16" aria-hidden="true" class="tabler-icon tabler-icon-filter">
+<path d="M4 4h16v2.172a2 2 0 0 1 -.586 1.414l-4.414 4.414v7l-6 2v-8.5l-4.48 -4.928a2 2 0 0 1 -.52 -1.345v-2.227">
+</path>
+</svg>
+<!--]-->
+</button>
+<!--v-if-->
+<!--]-->
+<!--]-->
+<!--]-->
+</div>
+</header>
+<div class="webqq-mcp-call-list">
+<!--[-->
+<button type="button" class="webqq-mcp-call-item is-active">
+<header>
+<div class="webqq-mcp-call-item-copy">
+<div class="webqq-mcp-call-item-name">
+<strong>get_server_info</strong>
+<span data-slot="badge" data-variant="default" class="sandbox-badge border-transparent bg-primary text-primary-foreground webqq-mcp-call-status-success" data-v-1fc1707e>
+<!--[-->成功<!--]-->
+</span>
+<span data-slot="badge" data-variant="outline" class="sandbox-badge border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300 webqq-mcp-call-credential" data-v-1fc1707e>
+<!--[-->测试凭证<!--]-->
+</span>
+</div>
+<div class="webqq-mcp-call-timing">
+<time>
+<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="14" aria-hidden="true" class="tabler-icon tabler-icon-calendar-time">
+<path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4">
+</path>
+<path d="M14 18a4 4 0 1 0 8 0a4 4 0 1 0 -8 0">
+</path>
+<path d="M15 3v4">
+</path>
+<path d="M7 3v4">
+</path>
+<path d="M3 11h16">
+</path>
+<path d="M18 16.496v1.504l1 1">
+</path>
+</svg> 2026-08-30 20:00:02</time>
+<span>
+<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="14" aria-hidden="true" class="tabler-icon tabler-icon-clock">
+<path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0">
+</path>
+<path d="M12 7v5l3 3">
+</path>
+</svg> 4 ms</span>
+<span>
+<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="14" aria-hidden="true" class="tabler-icon tabler-icon-plug">
+<path d="M9.785 6l8.215 8.215l-2.054 2.054a5.81 5.81 0 1 1 -8.215 -8.215l2.054 -2.054">
+</path>
+<path d="M4 20l3.5 -3.5">
+</path>
+<path d="M15 4l-3.5 3.5">
+</path>
+<path d="M20 9l-3.5 3.5">
+</path>
+</svg> MCP</span>
+</div>
+</div>
+</header>
+</button>
+<!--]-->
+</div>
+</section>
+<section class="webqq-mcp-call-detail-pane" aria-label="MCP 调用详情">
+<article class="webqq-mcp-call-detail">
+<header>
+<div class="webqq-mcp-call-item-copy">
+<div class="webqq-mcp-call-item-name">
+<strong>get_server_info</strong>
+<span data-slot="badge" data-variant="default" class="sandbox-badge border-transparent bg-primary text-primary-foreground webqq-mcp-call-status-success" data-v-1fc1707e>
+<!--[-->成功<!--]-->
+</span>
+</div>
+<div class="webqq-mcp-call-timing">
+<time>
+<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="14" aria-hidden="true" class="tabler-icon tabler-icon-calendar-time">
+<path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4">
+</path>
+<path d="M14 18a4 4 0 1 0 8 0a4 4 0 1 0 -8 0">
+</path>
+<path d="M15 3v4">
+</path>
+<path d="M7 3v4">
+</path>
+<path d="M3 11h16">
+</path>
+<path d="M18 16.496v1.504l1 1">
+</path>
+</svg> 2026-08-30 20:00:02</time>
+<span>
+<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="14" aria-hidden="true" class="tabler-icon tabler-icon-clock">
+<path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0">
+</path>
+<path d="M12 7v5l3 3">
+</path>
+</svg> 4 ms</span>
+</div>
+</div>
+</header>
+<div class="webqq-mcp-call-meta-list">
+<p class="webqq-mcp-call-meta">
+<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="17" aria-hidden="true" class="tabler-icon tabler-icon-key">
+<path d="M16.555 3.843l3.602 3.602a2.877 2.877 0 0 1 0 4.069l-2.643 2.643a2.877 2.877 0 0 1 -4.069 0l-.301 -.301l-6.558 6.558a2 2 0 0 1 -1.239 .578l-.175 .008h-1.172a1 1 0 0 1 -.993 -.883l-.007 -.117v-1.172a2 2 0 0 1 .467 -1.284l.119 -.13l.414 -.414h2v-2h2v-2l2.144 -2.144l-.301 -.301a2.877 2.877 0 0 1 0 -4.069l2.643 -2.643a2.877 2.877 0 0 1 4.069 0">
+</path>
+<path d="M15 9h.01">
+</path>
+</svg>
+<span class="webqq-mcp-call-meta-label">凭证</span>
+<span class="webqq-mcp-call-meta-value">测试凭证</span>
+</p>
+<p class="webqq-mcp-call-meta">
+<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="17" aria-hidden="true" class="tabler-icon tabler-icon-plug">
+<path d="M9.785 6l8.215 8.215l-2.054 2.054a5.81 5.81 0 1 1 -8.215 -8.215l2.054 -2.054">
+</path>
+<path d="M4 20l3.5 -3.5">
+</path>
+<path d="M15 4l-3.5 3.5">
+</path>
+<path d="M20 9l-3.5 3.5">
+</path>
+</svg>
+<span class="webqq-mcp-call-meta-label">来路</span>
+<span class="webqq-mcp-call-meta-value">MCP 客户端</span>
+</p>
+<p class="webqq-mcp-call-meta">
+<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="17" aria-hidden="true" class="tabler-icon tabler-icon-world">
+<path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0">
+</path>
+<path d="M3.6 9h16.8">
+</path>
+<path d="M3.6 15h16.8">
+</path>
+<path d="M11.5 3a17 17 0 0 0 0 18">
+</path>
+<path d="M12.5 3a17 17 0 0 1 0 18">
+</path>
+</svg>
+<span class="webqq-mcp-call-meta-label">来源</span>
+<span class="webqq-mcp-call-meta-value">127.0.0.1</span>
+</p>
+<!--v-if-->
+<!--v-if-->
+</div>
+<!--v-if-->
+<div class="webqq-mcp-call-payloads">
+<section>
+<header class="webqq-mcp-call-section-heading">
+<span>
+<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="17" aria-hidden="true" class="tabler-icon tabler-icon-braces">
+<path d="M7 4a2 2 0 0 0 -2 2v3a2 3 0 0 1 -2 3a2 3 0 0 1 2 3v3a2 2 0 0 0 2 2">
+</path>
+<path d="M17 4a2 2 0 0 1 2 2v3a2 3 0 0 0 2 3a2 3 0 0 0 -2 3v3a2 2 0 0 1 -2 2">
+</path>
+</svg>
+<strong>参数</strong>
+</span>
+</header>
+<pre>{}</pre>
+</section>
+<section>
+<header class="webqq-mcp-call-section-heading">
+<span>
+<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="17" aria-hidden="true" class="tabler-icon tabler-icon-braces">
+<path d="M7 4a2 2 0 0 0 -2 2v3a2 3 0 0 1 -2 3a2 3 0 0 1 2 3v3a2 2 0 0 0 2 2">
+</path>
+<path d="M17 4a2 2 0 0 1 2 2v3a2 3 0 0 0 2 3a2 3 0 0 0 -2 3v3a2 2 0 0 1 -2 2">
+</path>
+</svg>
+<strong>结果</strong>
+</span>
+</header>
+<pre>{
+  &quot;name&quot;: &quot;chatluna-sandbox&quot;
+}</pre>
+</section>
+<!--v-if-->
+</div>
+</article>
+</section>
+</div>
+</main>
+<main class="chatluna-sandbox-chat webqq-preset-workspace" aria-label="预设工作台">
+<header class="webqq-preset-header">
+<div>
+<h1>预设</h1>
+<p>管理和编辑 ChatLuna YAML 预设文件</p>
+</div>
+<div class="webqq-preset-header-actions">
+<button data-slot="button" data-variant="outline" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 h-9 px-4 py-2 has-[&gt;svg]:px-3">
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-icon="inline-start" aria-hidden="true" class="tabler-icon tabler-icon-refresh">
+<path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4">
+</path>
+<path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4">
+</path>
+</svg> 刷新 <!--]-->
+</button>
+<button data-slot="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 has-[&gt;svg]:px-3">
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-icon="inline-start" aria-hidden="true" class="tabler-icon tabler-icon-plus">
+<path d="M12 5l0 14">
+</path>
+<path d="M5 12l14 0">
+</path>
+</svg> 新建预设 <!--]-->
+</button>
+</div>
+</header>
+<!--v-if-->
+<div class="webqq-preset-layout">
+<aside class="webqq-preset-list-pane" aria-label="预设文件列表">
+<label class="webqq-preset-search webqq-overlay-header">
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="tabler-icon tabler-icon-search">
+<path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0">
+</path>
+<path d="M21 21l-6 -6">
+</path>
+</svg>
+<input data-slot="input" class="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive" type="search" placeholder="搜索文件名或展示名称">
+</label>
+<div class="webqq-preset-groups">
+<!--[-->
+<section class="webqq-preset-group">
+<header>
+<strong>ChatLuna</strong>
+<span data-slot="badge" data-variant="secondary" class="sandbox-badge border-transparent bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300" data-v-1fc1707e>
+<!--[-->1<!--]-->
+</span>
+</header>
+<!--[-->
+<button type="button" class="webqq-preset-list-item is-active">
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="tabler-icon tabler-icon-file-code">
+<path d="M14 3v4a1 1 0 0 0 1 1h4">
+</path>
+<path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2">
+</path>
+<path d="M10 13l-1 2l1 2">
+</path>
+<path d="M14 13l1 2l-1 2">
+</path>
+</svg>
+<span>
+<strong>assistant</strong>
+<small>assistant.yml</small>
+</span>
+<time>08/22</time>
+</button>
+<!--]-->
+<!--v-if-->
+</section>
+<section class="webqq-preset-group">
+<header>
+<strong>Character</strong>
+<span data-slot="badge" data-variant="secondary" class="sandbox-badge border-transparent bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300" data-v-1fc1707e>
+<!--[-->0<!--]-->
+</span>
+</header>
+<!--[-->
+<!--]-->
+<p class="webqq-preset-empty">没有匹配的Character预设</p>
+</section>
+<!--]-->
+</div>
+</aside>
+<section class="webqq-preset-editor-pane" aria-label="预设源码">
+<!--[-->
+<div class="webqq-preset-editor-overlay webqq-overlay-header">
+<header class="webqq-preset-document-header">
+<div>
+<span class="webqq-preset-document-title">
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="tabler-icon tabler-icon-file-code">
+<path d="M14 3v4a1 1 0 0 0 1 1h4">
+</path>
+<path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2">
+</path>
+<path d="M10 13l-1 2l1 2">
+</path>
+<path d="M14 13l1 2l-1 2">
+</path>
+</svg>
+<strong>assistant</strong>
+<span data-slot="badge" data-variant="outline" class="sandbox-badge border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300" data-v-1fc1707e>
+<!--[-->ChatLuna<!--]-->
+</span>
+</span>
+</div>
+<div class="webqq-preset-document-actions">
+<!--v-if-->
+<button data-slot="button" data-variant="outline" data-size="sm" class="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 h-8 rounded-md gap-1.5 px-3 has-[&gt;svg]:px-2.5">
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-icon="inline-start" aria-hidden="true" class="tabler-icon tabler-icon-pencil">
+<path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4">
+</path>
+<path d="M13.5 6.5l4 4">
+</path>
+</svg> 重命名 <!--]-->
+</button>
+<button data-slot="button" data-variant="destructive" data-size="sm" class="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-red-600 text-white shadow-xs hover:bg-red-700 focus-visible:ring-red-500/20 dark:bg-red-600 dark:hover:bg-red-500 h-8 rounded-md gap-1.5 px-3 has-[&gt;svg]:px-2.5">
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-icon="inline-start" aria-hidden="true" class="tabler-icon tabler-icon-trash">
+<path d="M4 7l16 0">
+</path>
+<path d="M10 11l0 6">
+</path>
+<path d="M14 11l0 6">
+</path>
+<path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12">
+</path>
+<path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3">
+</path>
+</svg> 删除 <!--]-->
+</button>
+<button data-slot="button" data-size="sm" class="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-primary text-primary-foreground hover:bg-primary/90 h-8 rounded-md gap-1.5 px-3 has-[&gt;svg]:px-2.5" disabled>
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-icon="inline-start" aria-hidden="true" class="tabler-icon tabler-icon-device-floppy">
+<path d="M6 4h10l4 4v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2">
+</path>
+<path d="M10 14a2 2 0 1 0 4 0a2 2 0 1 0 -4 0">
+</path>
+<path d="M14 4l0 4l-6 0l0 -4">
+</path>
+</svg> 保存 <!--]-->
+</button>
+</div>
+</header>
+<!--v-if-->
+</div>
+<div class="webqq-preset-source-editor" aria-label="预设 YAML 源码编辑器">
+</div>
+<footer class="webqq-preset-editor-footer">
+<!--v-if-->
+</footer>
+<!--]-->
+</section>
+</div>
+<!--[-->
+<!--[-->
+<!--v-if-->
+<!--]-->
+<!--]-->
+<!--[-->
+<!--[-->
+<!--v-if-->
+<!--]-->
+<!--]-->
+<!--[-->
+<!--[-->
+<!--v-if-->
+<!--]-->
+<!--]-->
+<!--[-->
+<!--[-->
+<!--v-if-->
+<!--]-->
+<!--]-->
+<!--[-->
+<!--[-->
+<!--v-if-->
+<!--]-->
+<!--]-->
+</main>
+<main class="chatluna-sandbox-chat webqq-model-request-workspace" aria-label="模型请求工作台">
+<header class="webqq-model-request-header">
+<div>
+<h1>模型请求</h1>
+<p>查看模型调用请求日志</p>
+</div>
+<div class="webqq-model-request-actions">
+<div class="webqq-model-request-action-row">
+<label class="webqq-model-request-live">
+<!--[-->
+<button role="switch" type="button" value="on" aria-label="自动刷新" aria-checked="false" aria-required="false" data-state="unchecked" data-slot="switch" class="peer data-[state=checked]:bg-primary data-[state=unchecked]:bg-input focus-visible:border-ring focus-visible:ring-ring/50 inline-flex h-5 w-9 shrink-0 items-center rounded-full border border-transparent shadow-xs transition-all outline-none focus-visible:ring-3 disabled:opacity-50">
+<!--[-->
+<span data-state="unchecked" data-slot="switch-thumb" class="bg-background pointer-events-none block size-4 rounded-full ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0.5">
+<!--[-->
+<!--]-->
+</span>
+<!--]-->
+</button>
+<!--v-if-->
+<!--]-->
+<span>自动刷新</span>
+</label>
+<button data-slot="button" data-variant="outline" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 h-9 px-4 py-2 has-[&gt;svg]:px-3">
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="16" aria-hidden="true" class="tabler-icon tabler-icon-refresh">
+<path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4">
+</path>
+<path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4">
+</path>
+</svg> 刷新 <!--]-->
+</button>
+<!--v-if-->
+</div>
+<!--v-if-->
+</div>
+</header>
+<!--v-if-->
+<div class="webqq-model-request-split">
+<section class="webqq-model-request-list-pane" aria-label="模型请求列表">
+<header class="webqq-model-request-list-toolbar webqq-overlay-header">
+<h2>请求列表</h2>
+<div class="webqq-model-request-list-tools">
+<button type="button" class="webqq-model-request-sort" aria-label="当前按时间倒序，点击改为正序">按时间倒序 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="16" aria-hidden="true" class="tabler-icon tabler-icon-chevron-down">
+<path d="M6 9l6 6l6 -6">
+</path>
+</svg>
+</button>
+<!--[-->
+<!--[-->
+<!--[-->
+<button data-slot="popover-trigger" data-variant="outline" data-size="icon-sm" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 size-8 webqq-model-request-filter-trigger" id="reka-popover-trigger-v-2" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls data-state="closed" aria-label="筛选模型请求，当前：全部空间">
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="16" aria-hidden="true" class="tabler-icon tabler-icon-filter">
+<path d="M4 4h16v2.172a2 2 0 0 1 -.586 1.414l-4.414 4.414v7l-6 2v-8.5l-4.48 -4.928a2 2 0 0 1 -.52 -1.345v-2.227">
+</path>
+</svg>
+<!--]-->
+</button>
+<!--v-if-->
+<!--]-->
+<!--]-->
+<!--]-->
+</div>
+</header>
+<div class="webqq-model-request-list">
+<!--[-->
+<button type="button" class="webqq-model-request-item">
+<header>
+<div class="webqq-model-request-item-title">
+<span class="webqq-model-request-bot">
+<span class="webqq-identity-avatar is-bot">
+<!--[-->未<!--]-->
+</span>
+<span class="webqq-model-request-bot-copy">
+<span class="webqq-model-request-bot-name">
+<strong>未归属机器人</strong>
+<span data-slot="badge" data-variant="default" class="sandbox-badge border-transparent bg-primary text-primary-foreground webqq-model-request-complete" data-v-1fc1707e>
+<!--[-->已完成<!--]-->
+</span>
+<span data-slot="badge" data-variant="outline" class="sandbox-badge border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300 webqq-model-request-source" data-v-1fc1707e>
+<!--[-->未识别<!--]-->
+</span>
+</span>
+<span class="webqq-model-request-timing">
+<time>
+<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="14" aria-hidden="true" class="tabler-icon tabler-icon-calendar-time">
+<path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4">
+</path>
+<path d="M14 18a4 4 0 1 0 8 0a4 4 0 1 0 -8 0">
+</path>
+<path d="M15 3v4">
+</path>
+<path d="M7 3v4">
+</path>
+<path d="M3 11h16">
+</path>
+<path d="M18 16.496v1.504l1 1">
+</path>
+</svg> 2026-08-30 20:00:01</time>
+<span>
+<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="14" aria-hidden="true" class="tabler-icon tabler-icon-clock">
+<path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0">
+</path>
+<path d="M12 7v5l3 3">
+</path>
+</svg> 12 ms</span>
+</span>
+</span>
+</span>
+</div>
+</header>
+</button>
+<!--]-->
+<button data-slot="button" data-variant="outline" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 h-9 px-4 py-2 has-[&gt;svg]:px-3 webqq-model-request-more">
+<!--[--> 加载更多 <!--]-->
+</button>
+</div>
+</section>
+<section class="webqq-model-request-detail-pane" aria-label="模型请求详情">
+<article class="webqq-model-request-detail has-sticky-trajectory">
+<header>
+<div class="webqq-model-request-item-title">
+<span class="webqq-model-request-bot">
+<span class="webqq-identity-avatar is-bot">
+<!--[-->未<!--]-->
+</span>
+<span class="webqq-model-request-bot-copy">
+<span class="webqq-model-request-bot-name">
+<strong>未归属机器人</strong>
+</span>
+<span class="webqq-model-request-timing">
+<time>
+<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="14" aria-hidden="true" class="tabler-icon tabler-icon-calendar-time">
+<path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4">
+</path>
+<path d="M14 18a4 4 0 1 0 8 0a4 4 0 1 0 -8 0">
+</path>
+<path d="M15 3v4">
+</path>
+<path d="M7 3v4">
+</path>
+<path d="M3 11h16">
+</path>
+<path d="M18 16.496v1.504l1 1">
+</path>
+</svg> 2026-08-30 20:00:01</time>
+</span>
+</span>
+</span>
+</div>
+<div class="webqq-model-request-detail-nav">
+<section class="webqq-model-request-view-switch" aria-label="详情显示方式">
+<button data-slot="button" data-variant="secondary" data-size="sm" class="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-secondary text-secondary-foreground hover:bg-secondary/80 h-8 rounded-md gap-1.5 px-3 has-[&gt;svg]:px-2.5">
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-icon="inline-start" aria-hidden="true" class="tabler-icon tabler-icon-file-code">
+<path d="M14 3v4a1 1 0 0 0 1 1h4">
+</path>
+<path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2">
+</path>
+<path d="M10 13l-1 2l1 2">
+</path>
+<path d="M14 13l1 2l-1 2">
+</path>
+</svg> 请求 <!--]-->
+</button>
+<button data-slot="button" data-variant="ghost" data-size="sm" class="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 h-8 rounded-md gap-1.5 px-3 has-[&gt;svg]:px-2.5">
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-icon="inline-start" aria-hidden="true" class="tabler-icon tabler-icon-timeline-event">
+<path d="M10 20a2 2 0 1 0 4 0a2 2 0 1 0 -4 0">
+</path>
+<path d="M10 20h-6">
+</path>
+<path d="M14 20h6">
+</path>
+<path d="M12 15l-2 -2h-3a1 1 0 0 1 -1 -1v-8a1 1 0 0 1 1 -1h10a1 1 0 0 1 1 1v8a1 1 0 0 1 -1 1h-3l-2 2">
+</path>
+</svg> 轨迹 <!--]-->
+</button>
+</section>
+</div>
+</header>
+<!--[-->
+<section class="webqq-model-request-overview" aria-label="请求概览">
+<header class="webqq-model-request-section-heading">
+<span>
+<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="17" aria-hidden="true" class="tabler-icon tabler-icon-layout-grid">
+<path d="M4 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4">
+</path>
+<path d="M14 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4">
+</path>
+<path d="M4 15a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4">
+</path>
+<path d="M14 15a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4">
+</path>
+</svg>
+<strong>概览</strong>
+</span>
+<span data-slot="badge" data-variant="default" class="sandbox-badge border-transparent bg-primary text-primary-foreground webqq-model-request-complete" data-v-1fc1707e>
+<!--[-->已完成<!--]-->
+</span>
+</header>
+<div class="webqq-model-request-overview-grid">
+<article>
+<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="17" aria-hidden="true" class="tabler-icon tabler-icon-route">
+<path d="M3 19a2 2 0 1 0 4 0a2 2 0 0 0 -4 0">
+</path>
+<path d="M19 7a2 2 0 1 0 0 -4a2 2 0 0 0 0 4">
+</path>
+<path d="M11 19h5.5a3.5 3.5 0 0 0 0 -7h-8a3.5 3.5 0 0 1 0 -7h4.5">
+</path>
+</svg>
+<span>来源</span>
+<strong>未识别</strong>
+</article>
+<article>
+<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="17" aria-hidden="true" class="tabler-icon tabler-icon-cpu">
+<path d="M5 6a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1l0 -12">
+</path>
+<path d="M9 9h6v6h-6l0 -6">
+</path>
+<path d="M3 10h2">
+</path>
+<path d="M3 14h2">
+</path>
+<path d="M10 3v2">
+</path>
+<path d="M14 3v2">
+</path>
+<path d="M21 10h-2">
+</path>
+<path d="M21 14h-2">
+</path>
+<path d="M14 21v-2">
+</path>
+<path d="M10 21v-2">
+</path>
+</svg>
+<span>模型 ID</span>
+<strong>gpt-4.1</strong>
+</article>
+<article>
+<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="17" aria-hidden="true" class="tabler-icon tabler-icon-clock">
+<path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0">
+</path>
+<path d="M12 7v5l3 3">
+</path>
+</svg>
+<span>耗时</span>
+<strong>12 ms</strong>
+</article>
+<article>
+<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="17" aria-hidden="true" class="tabler-icon tabler-icon-braces">
+<path d="M7 4a2 2 0 0 0 -2 2v3a2 3 0 0 1 -2 3a2 3 0 0 1 2 3v3a2 2 0 0 0 2 2">
+</path>
+<path d="M17 4a2 2 0 0 1 2 2v3a2 3 0 0 0 2 3a2 3 0 0 0 -2 3v3a2 2 0 0 1 -2 2">
+</path>
+</svg>
+<span>字段</span>
+<strong>—</strong>
+</article>
+<article>
+<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="17" aria-hidden="true" class="tabler-icon tabler-icon-messages">
+<path d="M21 14l-3 -3h-7a1 1 0 0 1 -1 -1v-6a1 1 0 0 1 1 -1h9a1 1 0 0 1 1 1v10">
+</path>
+<path d="M14 15v2a1 1 0 0 1 -1 1h-7l-3 3v-10a1 1 0 0 1 1 -1h2">
+</path>
+</svg>
+<span>消息</span>
+<strong>—</strong>
+</article>
+<article>
+<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="17" aria-hidden="true" class="tabler-icon tabler-icon-tools">
+<path d="M3 21h4l13 -13a1.5 1.5 0 0 0 -4 -4l-13 13v4">
+</path>
+<path d="M14.5 5.5l4 4">
+</path>
+<path d="M12 8l-5 -5l-4 4l5 5">
+</path>
+<path d="M7 8l-1.5 1.5">
+</path>
+<path d="M16 12l5 5l-4 4l-5 -5">
+</path>
+<path d="M16 17l-1.5 1.5">
+</path>
+</svg>
+<span>工具</span>
+<strong>—</strong>
+</article>
+</div>
+</section>
+<section class="webqq-model-request-usage" aria-label="Token 用量">
+<header class="webqq-model-request-section-heading">
+<span>
+<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="17" aria-hidden="true" class="tabler-icon tabler-icon-chart-bar">
+<path d="M3 13a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -6">
+</path>
+<path d="M15 9a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -10">
+</path>
+<path d="M9 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -14">
+</path>
+<path d="M4 20h14">
+</path>
+</svg>
+<strong>用量</strong>
+</span>
+</header>
+<div class="webqq-model-request-usage-grid">
+<!--[-->
+<article>
+<span>输入</span>
+<strong>—</strong>
+</article>
+<article>
+<span>输出</span>
+<strong>—</strong>
+</article>
+<article>
+<span>推理</span>
+<strong>—</strong>
+</article>
+<article>
+<span>缓存</span>
+<strong>—</strong>
+</article>
+<article>
+<span>总 Token</span>
+<strong>—</strong>
+</article>
+<article>
+<span>TTFT</span>
+<strong>—</strong>
+</article>
+<article>
+<span>TPS</span>
+<strong>—</strong>
+</article>
+<article>
+<span>总耗时</span>
+<strong>—</strong>
+</article>
+<!--]-->
+</div>
+</section>
+<div class="webqq-model-request-meta-list">
+<!--v-if-->
+<p class="webqq-model-request-meta">
+<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="17" aria-hidden="true" class="tabler-icon tabler-icon-topology-star-3">
+<path d="M10 19a2 2 0 1 0 -4 0a2 2 0 0 0 4 0">
+</path>
+<path d="M18 5a2 2 0 1 0 -4 0a2 2 0 0 0 4 0">
+</path>
+<path d="M10 5a2 2 0 1 0 -4 0a2 2 0 0 0 4 0">
+</path>
+<path d="M6 12a2 2 0 1 0 -4 0a2 2 0 0 0 4 0">
+</path>
+<path d="M18 19a2 2 0 1 0 -4 0a2 2 0 0 0 4 0">
+</path>
+<path d="M14 12a2 2 0 1 0 -4 0a2 2 0 0 0 4 0">
+</path>
+<path d="M22 12a2 2 0 1 0 -4 0a2 2 0 0 0 4 0">
+</path>
+<path d="M6 12h4">
+</path>
+<path d="M14 12h4">
+</path>
+<path d="M15 7l-2 3">
+</path>
+<path d="M9 7l2 3">
+</path>
+<path d="M11 14l-2 3">
+</path>
+<path d="M13 14l2 3">
+</path>
+</svg>
+<span class="webqq-model-request-meta-label">关联实体</span>
+<span class="webqq-model-request-meta-value">无关联实体</span>
+</p>
+<!--v-if-->
+<!--v-if-->
+</div>
+<!--v-if-->
+<section class="webqq-model-request-body">
+<div class="webqq-model-request-body-header">
+<div class="webqq-model-request-body-tabs" role="tablist" aria-label="模型请求内容">
+<button data-slot="button" data-variant="secondary" data-size="sm" class="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-secondary text-secondary-foreground hover:bg-secondary/80 h-8 rounded-md gap-1.5 px-3 has-[&gt;svg]:px-2.5" role="tab" aria-selected="true">
+<!--[--> 分析 <!--]-->
+</button>
+<button data-slot="button" data-variant="ghost" data-size="sm" class="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 h-8 rounded-md gap-1.5 px-3 has-[&gt;svg]:px-2.5" role="tab" aria-selected="false">
+<!--[--> 请求 <!--]-->
+</button>
+<button data-slot="button" data-variant="ghost" data-size="sm" class="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 h-8 rounded-md gap-1.5 px-3 has-[&gt;svg]:px-2.5" role="tab" aria-selected="false">
+<!--[--> 响应 <!--]-->
+</button>
+</div>
+<!--v-if-->
+</div>
+<section class="webqq-model-trajectory is-analysis webqq-model-request-analysis" aria-label="模型请求轨迹">
+<!--[-->
+<div class="webqq-model-trajectory-header webqq-overlay-header">
+<!--v-if-->
+<div class="webqq-model-trajectory-sticky-header">
+<div class="webqq-model-trajectory-controls" role="toolbar" aria-label="轨迹显示控制">
+<div class="webqq-model-trajectory-control-actions">
+<!--v-if-->
+<!--v-if-->
+<!--v-if-->
+<!--[-->
+<button data-slot="button" data-variant="ghost" data-size="sm" class="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 h-8 rounded-md gap-1.5 px-3 has-[&gt;svg]:px-2.5" aria-pressed="false" aria-label="隐藏 SYSTEM 证据">
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-icon="inline-start" aria-hidden="true" class="tabler-icon tabler-icon-square-minus">
+<path d="M9 12h6">
+</path>
+<path d="M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14">
+</path>
+</svg> SYSTEM<!--]-->
+</button>
+<button data-slot="button" data-variant="ghost" data-size="sm" class="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 h-8 rounded-md gap-1.5 px-3 has-[&gt;svg]:px-2.5" aria-pressed="false" aria-label="隐藏 USER 证据">
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-icon="inline-start" aria-hidden="true" class="tabler-icon tabler-icon-square-minus">
+<path d="M9 12h6">
+</path>
+<path d="M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14">
+</path>
+</svg> USER<!--]-->
+</button>
+<button data-slot="button" data-variant="ghost" data-size="sm" class="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 h-8 rounded-md gap-1.5 px-3 has-[&gt;svg]:px-2.5" aria-pressed="false" aria-label="隐藏 VARIABLE 证据">
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-icon="inline-start" aria-hidden="true" class="tabler-icon tabler-icon-square-minus">
+<path d="M9 12h6">
+</path>
+<path d="M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14">
+</path>
+</svg> VARIABLE<!--]-->
+</button>
+<button data-slot="button" data-variant="ghost" data-size="sm" class="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 h-8 rounded-md gap-1.5 px-3 has-[&gt;svg]:px-2.5" aria-pressed="false" aria-label="隐藏 TOOL DEFS 证据">
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-icon="inline-start" aria-hidden="true" class="tabler-icon tabler-icon-square-minus">
+<path d="M9 12h6">
+</path>
+<path d="M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14">
+</path>
+</svg> TOOL DEFS<!--]-->
+</button>
+<!--]-->
+<button data-slot="button" data-variant="ghost" data-size="sm" class="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 h-8 rounded-md gap-1.5 px-3 has-[&gt;svg]:px-2.5" aria-expanded="false" aria-controls="v-3" aria-label="展开更多过滤选项">
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-icon="inline-start" aria-hidden="true" class="tabler-icon tabler-icon-chevron-right">
+<path d="M9 6l6 6l-6 6">
+</path>
+</svg> 更多<!--]-->
+</button>
+</div>
+<div id="v-3" class="webqq-model-trajectory-control-filters is-collapsed" role="group" aria-label="更多证据过滤">
+<div class="webqq-model-trajectory-control-filters-inner">
+<!--[-->
+<button data-slot="button" data-variant="ghost" data-size="sm" class="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 h-8 rounded-md gap-1.5 px-3 has-[&gt;svg]:px-2.5" aria-pressed="false" aria-label="隐藏 ASSISTANT 证据">
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-icon="inline-start" aria-hidden="true" class="tabler-icon tabler-icon-square-minus">
+<path d="M9 12h6">
+</path>
+<path d="M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14">
+</path>
+</svg> ASSISTANT<!--]-->
+</button>
+<button data-slot="button" data-variant="ghost" data-size="sm" class="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 h-8 rounded-md gap-1.5 px-3 has-[&gt;svg]:px-2.5" aria-pressed="false" aria-label="隐藏 TOOL CALL 证据">
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-icon="inline-start" aria-hidden="true" class="tabler-icon tabler-icon-square-minus">
+<path d="M9 12h6">
+</path>
+<path d="M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14">
+</path>
+</svg> TOOL CALL<!--]-->
+</button>
+<button data-slot="button" data-variant="ghost" data-size="sm" class="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 h-8 rounded-md gap-1.5 px-3 has-[&gt;svg]:px-2.5" aria-pressed="false" aria-label="隐藏 TOOL RESULT 证据">
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-icon="inline-start" aria-hidden="true" class="tabler-icon tabler-icon-square-minus">
+<path d="M9 12h6">
+</path>
+<path d="M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14">
+</path>
+</svg> TOOL RESULT<!--]-->
+</button>
+<!--]-->
+</div>
+</div>
+<div class="webqq-model-trajectory-control-query">
+<!--v-if-->
+<label class="webqq-model-trajectory-search">
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="tabler-icon tabler-icon-search">
+<path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0">
+</path>
+<path d="M21 21l-6 -6">
+</path>
+</svg>
+<input data-slot="input" class="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive" type="search" aria-label="搜索轨迹事件" placeholder="搜索">
+</label>
+</div>
+</div>
+<!--[-->
+<!--[-->
+<div class="webqq-model-trajectory-composition-empty">当前请求体没有可统计的提示词内容</div>
+<!--]-->
+<!--]-->
+</div>
+<!--v-if-->
+</div>
+<section class="webqq-model-analysis" aria-label="模型请求分析">
+<div class="webqq-model-analysis-main">
+<aside class="webqq-model-analysis-nav" aria-label="分析导航">
+<button type="button" class="webqq-model-analysis-boundary is-success">
+<span class="webqq-model-analysis-boundary-title">
+<span class="webqq-model-analysis-boundary-dot" aria-hidden="true">
+</span>
+<strong>请求 8</strong>
+<small>已完成</small>
+</span>
+<span class="webqq-model-analysis-boundary-meta">openai / gpt-4.1 · 12 ms</span>
+</button>
+<!--[-->
+<section class="webqq-model-analysis-nav-group is-response is-active">
+<button type="button" class="webqq-model-analysis-nav-heading" aria-expanded="true">
+<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="15" aria-hidden="true" class="tabler-icon tabler-icon-message">
+<path d="M8 9h8">
+</path>
+<path d="M8 13h6">
+</path>
+<path d="M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12">
+</path>
+</svg>
+<strong>
+<span>Response</span>
+</strong>
+<small>1</small>
+<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="tabler-icon tabler-icon-chevron-down webqq-model-analysis-nav-chevron" size="15" aria-hidden="true">
+<path d="M6 9l6 6l6 -6">
+</path>
+</svg>
+</button>
+<div class="webqq-model-analysis-nav-items">
+<!--[-->
+<button type="button" class="webqq-model-analysis-nav-item" data-target="model-analysis-response">
+<span class="webqq-model-analysis-nav-kind is-response">
+<span>RESPONSE</span>
+</span>
+<!--v-if-->
+<span class="webqq-model-analysis-nav-preview">
+<span>响应不可用</span>
+</span>
+</button>
+<!--]-->
+</div>
+</section>
+<!--]-->
+</aside>
+<div class="webqq-model-analysis-content">
+<header class="webqq-model-analysis-heading">
+<h3>Messages <span>(0)</span>
+</h3>
+</header>
+<!-- 一个 Provider 覆盖整段分析：每张卡片各自挂一个 Provider 会随消息数线性增加组件实例。 -->
+<!--[-->
+<!--[-->
+<div class="webqq-model-analysis-conversation">
+<div class="webqq-model-analysis-empty">
+<p>当前过滤条件下没有请求消息</p>
+</div>
+<!--[-->
+<!--]-->
+<!--v-if-->
+<!--[-->
+<section class="webqq-model-analysis-response-heading">
+<h3>Response</h3>
+</section>
+<article id="model-analysis-response" class="webqq-model-analysis-card is-response">
+<header>
+<span class="webqq-model-analysis-role">RESPONSE</span>
+<span class="webqq-model-analysis-path">JSON</span>
+<span class="webqq-model-analysis-chars">0 chars</span>
+<!--[-->
+<!--[-->
+<!--[-->
+<button data-slot="tooltip-trigger" data-variant="ghost" data-size="icon-sm" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 size-8" data-state="closed" data-grace-area-trigger disabled aria-label="查看响应原始 JSON">
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="16" aria-hidden="true" class="tabler-icon tabler-icon-code">
+<path d="M7 8l-4 4l4 4">
+</path>
+<path d="M17 8l4 4l-4 4">
+</path>
+<path d="M14 4l-4 16">
+</path>
+</svg>
+<!--]-->
+</button>
+<!--v-if-->
+<!--]-->
+<!--]-->
+<!--]-->
+<!--[-->
+<!--[-->
+<!--[-->
+<button data-slot="tooltip-trigger" data-variant="ghost" data-size="icon-sm" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg:not([class*=&#39;size-&#39;])]:size-4 shrink-0 [&amp;_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 size-8 webqq-model-analysis-collapse" data-state="closed" data-grace-area-trigger aria-expanded="true" aria-label="收起响应卡片">
+<!--[-->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" size="16" aria-hidden="true" class="tabler-icon tabler-icon-chevron-down">
+<path d="M6 9l6 6l6 -6">
+</path>
+</svg>
+<!--]-->
+</button>
+<!--v-if-->
+<!--]-->
+<!--]-->
+<!--]-->
+</header>
+<!--v-if-->
+<div class="webqq-model-analysis-formatted">
+<p class="webqq-model-analysis-empty">响应不可用</p>
+<!--v-if-->
+<!--v-if-->
+<!--v-if-->
+<!--v-if-->
+<!--v-if-->
+</div>
+</article>
+<!--]-->
+<section id="model-analysis-tools" class="webqq-model-analysis-tools">
+<h3>Tools <span>(0)</span>
+</h3>
+<p class="webqq-model-analysis-empty">请求未声明工具定义</p>
+<!--[-->
+<!--]-->
+</section>
+</div>
+<!--]-->
+<!--]-->
+</div>
+</div>
+</section>
+<!--]-->
+</section>
+</section>
+<!--]-->
+</article>
+</section>
+</div>
+<!--[-->
+<!--[-->
+<!--v-if-->
+<!--]-->
+<!--]-->
+</main>
+</div>

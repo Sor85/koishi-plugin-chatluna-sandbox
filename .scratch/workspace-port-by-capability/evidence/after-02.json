@@ -1,0 +1,451 @@
+{
+  "loaded": {
+    "debugWorkspaceModel": {
+      "records": [
+        {
+          "id": "debug-1",
+          "sequence": 1,
+          "createdAt": "2026-08-30T12:00:00.000Z",
+          "botId": "20001",
+          "implementation": "napcat",
+          "direction": "action",
+          "requestedAction": "get_login_info",
+          "action": "get_login_info",
+          "status": "success",
+          "durationMs": 3,
+          "payload": {},
+          "result": {
+            "status": "ok"
+          },
+          "entities": {},
+          "source": {
+            "type": "main",
+            "name": "主环境"
+          }
+        }
+      ],
+      "detail": {
+        "id": "debug-1",
+        "sequence": 1,
+        "createdAt": "2026-08-30T12:00:00.000Z",
+        "botId": "20001",
+        "implementation": "napcat",
+        "direction": "action",
+        "requestedAction": "get_login_info",
+        "action": "get_login_info",
+        "status": "success",
+        "durationMs": 3,
+        "payload": {},
+        "result": {
+          "status": "ok"
+        },
+        "entities": {},
+        "source": {
+          "type": "main",
+          "name": "主环境"
+        }
+      },
+      "loading": false,
+      "detailLoading": false,
+      "error": ""
+    },
+    "mcpCallWorkspaceModel": {
+      "records": [
+        {
+          "id": "call-1",
+          "createdAt": "2026-08-30T12:00:02.000Z",
+          "credentialName": "测试凭证",
+          "transport": "mcp",
+          "sourceIp": "127.0.0.1",
+          "tool": "get_server_info",
+          "durationMs": 4,
+          "status": "success",
+          "affected": []
+        }
+      ],
+      "detail": {
+        "id": "call-1",
+        "createdAt": "2026-08-30T12:00:02.000Z",
+        "credentialName": "测试凭证",
+        "transport": "mcp",
+        "sourceIp": "127.0.0.1",
+        "tool": "get_server_info",
+        "durationMs": 4,
+        "status": "success",
+        "affected": [],
+        "arguments": {},
+        "result": {
+          "name": "chatluna-sandbox"
+        }
+      },
+      "loading": false,
+      "detailLoading": false,
+      "error": ""
+    },
+    "modelRequestWorkspaceModel": {
+      "records": [
+        {
+          "id": "record-1",
+          "sequence": 8,
+          "createdAt": "2026-08-30T12:00:01.000Z",
+          "status": "success",
+          "durationMs": 12,
+          "model": "gpt-4.1",
+          "provider": "openai",
+          "attribution": "unattributed",
+          "entities": {},
+          "requestBodyAvailable": true,
+          "responseBodyStatus": "complete",
+          "responseBodyFormat": "json",
+          "responseStatus": 200
+        }
+      ],
+      "detail": {
+        "id": "record-1",
+        "sequence": 8,
+        "createdAt": "2026-08-30T12:00:01.000Z",
+        "status": "success",
+        "durationMs": 12,
+        "model": "gpt-4.1",
+        "provider": "openai",
+        "attribution": "unattributed",
+        "entities": {},
+        "requestBodyAvailable": true,
+        "responseBodyStatus": "complete",
+        "responseBodyFormat": "json",
+        "responseStatus": 200,
+        "variables": [],
+        "requestBody": {
+          "model": "gpt-4.1",
+          "messages": []
+        }
+      },
+      "hasMore": true,
+      "nextCursor": 8,
+      "nextCreatedAt": "2026-08-30T12:00:01.000Z",
+      "nextId": "record-1",
+      "trajectory": {
+        "mode": "request",
+        "records": [
+          {
+            "id": "record-1",
+            "sequence": 8,
+            "createdAt": "2026-08-30T12:00:01.000Z",
+            "status": "success",
+            "durationMs": 12,
+            "model": "gpt-4.1",
+            "provider": "openai",
+            "attribution": "unattributed",
+            "entities": {},
+            "requestBodyAvailable": true,
+            "responseBodyStatus": "complete",
+            "responseBodyFormat": "json",
+            "responseStatus": 200
+          }
+        ],
+        "rows": [
+          {
+            "id": "record-1:request",
+            "index": 1,
+            "kind": "request",
+            "preview": "openai / gpt-4.1",
+            "requestId": "record-1"
+          }
+        ],
+        "promptComposition": [],
+        "complete": true
+      },
+      "loading": false,
+      "detailLoading": false,
+      "error": ""
+    },
+    "presetWorkspaceModel": {
+      "catalog": [
+        {
+          "kind": "core",
+          "fileName": "assistant.yml",
+          "displayName": "assistant",
+          "source": "keywords:\n  - assistant\n",
+          "revision": "rev-1",
+          "size": 24,
+          "modifiedAt": "2026-08-22T00:00:00.000Z",
+          "templateFields": [],
+          "expressions": [],
+          "diagnostics": []
+        }
+      ],
+      "document": {
+        "kind": "core",
+        "fileName": "assistant.yml",
+        "displayName": "assistant",
+        "source": "keywords:\n  - assistant\n",
+        "revision": "rev-1",
+        "size": 24,
+        "modifiedAt": "2026-08-22T00:00:00.000Z",
+        "templateFields": [],
+        "expressions": [],
+        "diagnostics": []
+      },
+      "loading": false,
+      "saving": false,
+      "error": "",
+      "evidenceContext": {
+        "scope": {
+          "scope": "space",
+          "spaceId": "space-1"
+        }
+      }
+    },
+    "composerModel": {
+      "senders": [
+        {
+          "kind": "user",
+          "id": "10001",
+          "name": "测试用户1",
+          "type": "user",
+          "avatar": ""
+        },
+        {
+          "kind": "user",
+          "id": "10002",
+          "name": "测试用户2",
+          "type": "user",
+          "avatar": ""
+        },
+        {
+          "kind": "bot",
+          "id": "20001",
+          "name": "Koishi",
+          "implementation": "napcat",
+          "enabled": true,
+          "type": "bot",
+          "avatar": ""
+        }
+      ],
+      "currentOperatorId": "10001",
+      "conversationId": "private:10001:20001",
+      "mentionCandidates": [],
+      "accentColor": "#2563eb",
+      "colorMode": "light",
+      "externalError": ""
+    }
+  },
+  "cleared": {
+    "debugWorkspaceModel": {
+      "records": [],
+      "detail": "<undefined>",
+      "loading": false,
+      "detailLoading": false,
+      "error": ""
+    },
+    "mcpCallWorkspaceModel": {
+      "records": [],
+      "detail": "<undefined>",
+      "loading": false,
+      "detailLoading": false,
+      "error": ""
+    },
+    "modelRequestWorkspaceModel": {
+      "records": [],
+      "detail": "<undefined>",
+      "hasMore": false,
+      "nextCursor": "<undefined>",
+      "nextCreatedAt": "<undefined>",
+      "nextId": "<undefined>",
+      "trajectory": "<undefined>",
+      "loading": false,
+      "detailLoading": false,
+      "error": ""
+    },
+    "presetWorkspaceModel": {
+      "catalog": [],
+      "document": "<undefined>",
+      "loading": false,
+      "saving": false,
+      "error": "",
+      "evidenceContext": {
+        "scope": {
+          "scope": "space",
+          "spaceId": "space-1"
+        }
+      }
+    },
+    "composerModel": {
+      "senders": [
+        {
+          "kind": "user",
+          "id": "10001",
+          "name": "测试用户1",
+          "type": "user",
+          "avatar": ""
+        },
+        {
+          "kind": "user",
+          "id": "10002",
+          "name": "测试用户2",
+          "type": "user",
+          "avatar": ""
+        },
+        {
+          "kind": "bot",
+          "id": "20001",
+          "name": "Koishi",
+          "implementation": "napcat",
+          "enabled": true,
+          "type": "bot",
+          "avatar": ""
+        }
+      ],
+      "currentOperatorId": "10001",
+      "conversationId": "private:10001:20001",
+      "mentionCandidates": [],
+      "accentColor": "#2563eb",
+      "colorMode": "light",
+      "externalError": ""
+    }
+  },
+  "calls": {
+    "workspace": [
+      {
+        "operation": "getWorkspace",
+        "input": "<undefined>"
+      }
+    ],
+    "oneBotDebug": [
+      {
+        "operation": "getOneBotDebugRecords",
+        "input": {
+          "botId": "20001",
+          "direction": "action"
+        }
+      },
+      {
+        "operation": "getOneBotDebugRecord",
+        "input": {
+          "recordId": "debug-1",
+          "includeLargeValues": true
+        }
+      },
+      {
+        "operation": "clearOneBotDebugRecords",
+        "input": "<undefined>"
+      }
+    ],
+    "modelRequest": [
+      {
+        "operation": "getModelRequestRecords",
+        "input": {
+          "scope": "space",
+          "spaceId": "main",
+          "limit": 50
+        }
+      },
+      {
+        "operation": "getModelRequestRecord",
+        "input": {
+          "scope": "space",
+          "spaceId": "main",
+          "recordId": "record-1"
+        }
+      },
+      {
+        "operation": "getModelRequestTrajectory",
+        "input": {
+          "scope": "space",
+          "spaceId": "main",
+          "recordId": "record-1",
+          "mode": "request"
+        }
+      },
+      {
+        "operation": "clearModelRequestRecords",
+        "input": {
+          "scope": "unattributed"
+        }
+      }
+    ],
+    "preset": [
+      {
+        "operation": "getPresetCatalog",
+        "input": {}
+      },
+      {
+        "operation": "readPreset",
+        "input": {
+          "kind": "core",
+          "fileName": "assistant.yml"
+        }
+      },
+      {
+        "operation": "createPreset",
+        "input": {
+          "kind": "core",
+          "fileName": "created.yml",
+          "source": "a: 1\n"
+        }
+      },
+      {
+        "operation": "savePreset",
+        "input": {
+          "kind": "core",
+          "fileName": "assistant.yml",
+          "source": "a: 2\n",
+          "expectedRevision": "rev-1"
+        }
+      },
+      {
+        "operation": "renamePreset",
+        "input": {
+          "kind": "core",
+          "fileName": "assistant.yml",
+          "newFileName": "renamed.yml",
+          "expectedRevision": "rev-1",
+          "confirmed": true
+        }
+      },
+      {
+        "operation": "locatePresetExpression",
+        "input": {
+          "document": {
+            "kind": "core",
+            "fileName": "renamed.yml",
+            "revision": "rev-1"
+          },
+          "expression": {
+            "stableId": "expression-1"
+          },
+          "scope": {
+            "scope": "main"
+          }
+        }
+      },
+      {
+        "operation": "deletePreset",
+        "input": {
+          "kind": "core",
+          "fileName": "renamed.yml",
+          "expectedRevision": "rev-1",
+          "confirmed": true
+        }
+      }
+    ],
+    "mcpCallRecord": [
+      {
+        "operation": "getMcpCallRecords",
+        "input": {
+          "tool": "get_server_info"
+        }
+      },
+      {
+        "operation": "getMcpCallRecord",
+        "input": {
+          "recordId": "call-1"
+        }
+      },
+      {
+        "operation": "clearMcpCallRecords",
+        "input": "<undefined>"
+      }
+    ]
+  }
+}

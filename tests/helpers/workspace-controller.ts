@@ -1,5 +1,6 @@
 import { createFakeMcpCallRecordPort } from '../../client/webqq/fake-mcp-call-record-port'
 import { createFakeModelRequestPort } from '../../client/webqq/fake-model-request-port'
+import { createFakeOneBotDebugPort } from '../../client/webqq/fake-onebot-debug-port'
 import { createFakePresetPort } from '../../client/webqq/fake-preset-port'
 import { createFakeWorkspacePort } from '../../client/webqq/fake-workspace-port'
 import {
@@ -53,6 +54,7 @@ export function createTestWorkspaceController(
 ) {
   return createWorkspaceController({
     workspace: ports.workspace ?? createFakeWorkspacePort(emptyWorkspace),
+    oneBotDebug: ports.oneBotDebug ?? createFakeOneBotDebugPort(),
     modelRequest: ports.modelRequest ?? createFakeModelRequestPort(),
     preset: ports.preset ?? createFakePresetPort(),
     mcpCallRecord: ports.mcpCallRecord ?? createFakeMcpCallRecordPort(),

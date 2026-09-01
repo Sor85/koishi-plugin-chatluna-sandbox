@@ -11,6 +11,7 @@ import OneBotDebugWorkspace from '../../../client/onebot-debug-workspace.vue'
 import PresetWorkspace from '../../../client/preset-workspace.vue'
 import { createFakeMcpCallRecordPort } from '../../../client/webqq/fake-mcp-call-record-port'
 import { createFakeModelRequestPort } from '../../../client/webqq/fake-model-request-port'
+import { createFakeOneBotDebugPort } from '../../../client/webqq/fake-onebot-debug-port'
 import { createFakePresetPort } from '../../../client/webqq/fake-preset-port'
 import { createFakeWorkspacePort } from '../../../client/webqq/fake-workspace-port'
 import { createWorkspaceController } from '../../../client/webqq/workspace-controller'
@@ -43,13 +44,14 @@ const spaces = [{ id: 'main', name: '主环境' }]
 
 async function main() {
   const workspacePort = createFakeWorkspacePort(workspace)
-  workspacePort.debugRecordsResult = {
+  const oneBotDebugPort = createFakeOneBotDebugPort()
+  oneBotDebugPort.debugRecordsResult = {
     records: [debugRecord],
     hasMore: false,
     earliestCursor: 1,
     capacity: { recordCount: 1, totalBytes: 128, maxRecords: 5000, maxBytes: 50 * 1024 * 1024 },
   }
-  workspacePort.debugRecordResult = debugRecord
+  oneBotDebugPort.debugRecordResult = debugRecord
   const modelRequestPort = createFakeModelRequestPort()
   modelRequestPort.modelRequestRecordsResult = {
     records: [modelRequestItem],
@@ -69,6 +71,7 @@ async function main() {
 
   const controller = createWorkspaceController({
     workspace: workspacePort,
+    oneBotDebug: oneBotDebugPort,
     modelRequest: modelRequestPort,
     preset: presetPort,
     mcpCallRecord: mcpCallRecordPort,

@@ -1,7 +1,6 @@
 import type { SandboxSceneMutationPayload } from '../../src/console-contract'
 import type {
   DeleteGroupAnnouncementInput,
-  ClearSandboxOneBotDebugRecordsResult,
   GetForwardMessageInput,
   GetMediaContentInput,
   GetMessageHistoryInput,
@@ -11,8 +10,6 @@ import type {
   RenameConversationInstanceInput,
   SandboxConversationInstanceResult,
   GetSandboxWorkspaceInput,
-  GetSandboxOneBotDebugRecordInput,
-  GetSandboxOneBotDebugRecordsInput,
   ManageSandboxEnvironmentInput,
   PerformFriendActionInput,
   PerformGroupActionInput,
@@ -20,12 +17,10 @@ import type {
   ClearConversationMessagesInput,
   SearchConversationMessagesInput,
   SetMessageReactionInput,
-  SandboxConsoleOneBotDebugRecord,
   SandboxForward,
   SandboxMediaContent,
   SandboxMessageHistory,
   SandboxMessageSearchResult,
-  SandboxOneBotDebugRecordsPage,
   SandboxWorkspaceState,
   SendForwardMessageInput,
   SendMediaMessageInput,
@@ -60,9 +55,6 @@ export interface WorkspacePort {
   manageEnvironment(input: ManageSandboxEnvironmentInput): Promise<SandboxWorkspaceState>
   performFriendAction(input: PerformFriendActionInput): Promise<SandboxWorkspaceState>
   performGroupAction(input: PerformGroupActionInput): Promise<SandboxWorkspaceState>
-  getOneBotDebugRecords(input?: GetSandboxOneBotDebugRecordsInput): Promise<SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord>>
-  getOneBotDebugRecord(input: GetSandboxOneBotDebugRecordInput & { spaceId?: string }): Promise<SandboxConsoleOneBotDebugRecord>
-  clearOneBotDebugRecords(): Promise<ClearSandboxOneBotDebugRecordsResult>
   /**
    * 订阅服务端的场景变更广播，返回退订函数。适配器负责把一份底层广播扇出给全部订阅者，
    * 因此一个页面退订不会让仍存活的页面失聪。

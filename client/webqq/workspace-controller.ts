@@ -41,6 +41,7 @@ import {
   type SandboxWorkspaceView,
 } from './workspace-state'
 import type { WorkspacePort } from './workspace-port'
+import type { OneBotDebugPort } from './onebot-debug-port'
 import type { ModelRequestPort } from './model-request-port'
 import type { PresetPort } from './preset-port'
 import type { McpCallRecordPort } from './mcp-call-record-port'
@@ -160,13 +161,20 @@ const emptySnapshot: SandboxSnapshot = {
  */
 export interface WorkspaceControllerPorts {
   workspace: WorkspacePort
+  oneBotDebug: OneBotDebugPort
   modelRequest: ModelRequestPort
   preset: PresetPort
   mcpCallRecord: McpCallRecordPort
 }
 
 export function createWorkspaceController(ports: WorkspaceControllerPorts, storage: WorkspaceStorage) {
-  const { workspace: workspacePort, modelRequest: modelRequestPort, preset: presetPort, mcpCallRecord: mcpCallRecordPort } = ports
+  const {
+    workspace: workspacePort,
+    oneBotDebug: oneBotDebugPort,
+    modelRequest: modelRequestPort,
+    preset: presetPort,
+    mcpCallRecord: mcpCallRecordPort,
+  } = ports
   const workspaceState = ref<SandboxWorkspaceState>({
     snapshot: emptySnapshot,
     chatLunaStates: [],
@@ -596,7 +604,7 @@ export function createWorkspaceController(ports: WorkspaceControllerPorts, stora
 
   async function loadOneBotDebugRecords(input: GetSandboxOneBotDebugRecordsInput = {}) {
     try {
-      const page = await workspacePort.getOneBotDebugRecords(input)
+      const page = await oneBotDebugPort.getOneBotDebugRecords(input)
       oneBotDebugRecordsState.value = page.records
     } catch (error) {
       throw normalizeWorkspaceError(error, '读取 OneBot 调试记录失败')
@@ -605,7 +613,7 @@ export function createWorkspaceController(ports: WorkspaceControllerPorts, stora
 
   async function loadOneBotDebugRecord(input: GetSandboxOneBotDebugRecordInput & { spaceId?: string }) {
     try {
-      oneBotDebugRecordState.value = await workspacePort.getOneBotDebugRecord(input)
+      oneBotDebugRecordState.value = await oneBotDebugPort.getOneBotDebugRecord(input)
       return oneBotDebugRecordState.value
     } catch (error) {
       throw normalizeWorkspaceError(error, '读取 OneBot 调试详情失败')
@@ -614,7 +622,7 @@ export function createWorkspaceController(ports: WorkspaceControllerPorts, stora
 
   async function clearOneBotDebugRecords() {
     try {
-      await workspacePort.clearOneBotDebugRecords()
+      await oneBotDebugPort.clearOneBotDebugRecords()
       oneBotDebugRecordsState.value = []
       oneBotDebugRecordState.value = undefined
     } catch (error) {

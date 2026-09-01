@@ -2,10 +2,12 @@ import { ref } from 'vue'
 import { describe, expect, it } from 'vitest'
 import { createFakeMcpCallRecordPort } from '../client/webqq/fake-mcp-call-record-port'
 import { createFakeModelRequestPort } from '../client/webqq/fake-model-request-port'
+import { createFakeOneBotDebugPort } from '../client/webqq/fake-onebot-debug-port'
 import { createFakePresetPort } from '../client/webqq/fake-preset-port'
 import { createFakeWorkspacePort, type WorkspacePortOperation } from '../client/webqq/fake-workspace-port'
 import type { McpCallRecordPortOperation } from '../client/webqq/mcp-call-record-port'
 import type { ModelRequestPortOperation } from '../client/webqq/model-request-port'
+import type { OneBotDebugPortOperation } from '../client/webqq/onebot-debug-port'
 import type { PresetPortOperation } from '../client/webqq/preset-port'
 import { createWorkspaceController } from '../client/webqq/workspace-controller'
 import { createWorkspaceLayout } from '../client/webqq/workspace-layout'
@@ -61,6 +63,7 @@ function createStorage() {
 
 type RegionOperation =
   | WorkspacePortOperation
+  | OneBotDebugPortOperation
   | ModelRequestPortOperation
   | PresetPortOperation
   | McpCallRecordPortOperation
@@ -71,12 +74,14 @@ type RegionOperation =
  */
 function createRegionPorts() {
   const workspace = createFakeWorkspacePort(createWorkspace())
+  const oneBotDebug = createFakeOneBotDebugPort()
   const modelRequest = createFakeModelRequestPort()
   const preset = createFakePresetPort()
   const mcpCallRecord = createFakeMcpCallRecordPort()
-  const owners = [workspace, modelRequest, preset, mcpCallRecord]
+  const owners = [workspace, oneBotDebug, modelRequest, preset, mcpCallRecord]
   return {
     workspace,
+    oneBotDebug,
     modelRequest,
     preset,
     mcpCallRecord,

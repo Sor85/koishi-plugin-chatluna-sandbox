@@ -1,6 +1,5 @@
 import type {
   DeleteGroupAnnouncementInput,
-  ClearSandboxOneBotDebugRecordsResult,
   GetForwardMessageInput,
   GetMediaContentInput,
   GetMessageHistoryInput,
@@ -9,8 +8,6 @@ import type {
   DeleteConversationInstanceInput,
   RenameConversationInstanceInput,
   GetSandboxWorkspaceInput,
-  GetSandboxOneBotDebugRecordInput,
-  GetSandboxOneBotDebugRecordsInput,
   ManageSandboxEnvironmentInput,
   PerformFriendActionInput,
   PerformGroupActionInput,
@@ -18,12 +15,10 @@ import type {
   ClearConversationMessagesInput,
   SearchConversationMessagesInput,
   SetMessageReactionInput,
-  SandboxConsoleOneBotDebugRecord,
   SandboxForward,
   SandboxMediaContent,
   SandboxMessageHistory,
   SandboxMessageSearchResult,
-  SandboxOneBotDebugRecordsPage,
   SandboxWorkspaceState,
   SendForwardMessageInput,
   SendMediaMessageInput,
@@ -61,13 +56,6 @@ export class FakeWorkspacePort implements WorkspacePort {
     reference: 'sandbox-media://media-1',
     dataBase64: '',
   }
-  debugRecordsResult: SandboxOneBotDebugRecordsPage<SandboxConsoleOneBotDebugRecord> = {
-    records: [],
-    hasMore: false,
-    capacity: { recordCount: 0, totalBytes: 0, maxRecords: 500, maxBytes: 50 * 1024 * 1024 },
-  }
-  debugRecordResult?: SandboxConsoleOneBotDebugRecord
-  clearDebugRecordsResult: ClearSandboxOneBotDebugRecordsResult = { cleared: 0 }
   /** 新建或分叉会话实例后返回的会话 ID；用例可改写它来断言选中行为。 */
   createdConversationInstanceId = 'conversation-instance-1'
   private readonly recorder = new FakePortRecorder<WorkspacePortOperation>()
@@ -178,21 +166,6 @@ export class FakeWorkspacePort implements WorkspacePort {
 
   performGroupAction(input: PerformGroupActionInput) {
     return this.invoke('performGroupAction', input, this.workspaceResult)
-  }
-
-  getOneBotDebugRecords(input?: GetSandboxOneBotDebugRecordsInput) {
-    return this.invoke('getOneBotDebugRecords', input, this.debugRecordsResult)
-  }
-
-  getOneBotDebugRecord(input: GetSandboxOneBotDebugRecordInput & { spaceId?: string }) {
-    const record = this.debugRecordResult
-      ?? this.debugRecordsResult.records.find(({ id }) => id === input.recordId)
-    if (!record) this.rejectNext('getOneBotDebugRecord', new Error('调试记录不存在'))
-    return this.invoke('getOneBotDebugRecord', input, record as SandboxConsoleOneBotDebugRecord)
-  }
-
-  clearOneBotDebugRecords() {
-    return this.invoke('clearOneBotDebugRecords', undefined, this.clearDebugRecordsResult)
   }
 
   subscribeSceneMutation(listener: SceneMutationListener) {

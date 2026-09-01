@@ -1,10 +1,11 @@
 /**
- * 重构后采集（票 01：模型请求、预设、MCP 调用记录三道端口已拆出）。输出与 baseline.ts
+ * 重构后采集（票 02：四道记录域端口全部拆出）。输出与 baseline.ts
  * 完全同一份 JSON——四个工作台模型、发送控件模型，以及按能力分组的调用序列。
  */
 import { ref } from 'vue'
 import { createFakeMcpCallRecordPort } from '../../../client/webqq/fake-mcp-call-record-port'
 import { createFakeModelRequestPort } from '../../../client/webqq/fake-model-request-port'
+import { createFakeOneBotDebugPort } from '../../../client/webqq/fake-onebot-debug-port'
 import { createFakePresetPort } from '../../../client/webqq/fake-preset-port'
 import { createFakeWorkspacePort } from '../../../client/webqq/fake-workspace-port'
 import { createWorkspaceController } from '../../../client/webqq/workspace-controller'
@@ -14,7 +15,6 @@ import {
   canonical,
   createStorage,
   debugRecord,
-  groupCalls,
   mcpCallDetail,
   mcpCallItem,
   modelRequestDetail,
@@ -27,13 +27,14 @@ import {
 
 async function main() {
   const workspacePort = createFakeWorkspacePort(workspace)
-  workspacePort.debugRecordsResult = {
+  const oneBotDebugPort = createFakeOneBotDebugPort()
+  oneBotDebugPort.debugRecordsResult = {
     records: [debugRecord],
     hasMore: false,
     earliestCursor: 1,
     capacity: { recordCount: 1, totalBytes: 128, maxRecords: 5000, maxBytes: 50 * 1024 * 1024 },
   }
-  workspacePort.debugRecordResult = debugRecord
+  oneBotDebugPort.debugRecordResult = debugRecord
   const modelRequestPort = createFakeModelRequestPort()
   modelRequestPort.modelRequestRecordsResult = {
     records: [modelRequestItem],
@@ -55,6 +56,7 @@ async function main() {
 
   const controller = createWorkspaceController({
     workspace: workspacePort,
+    oneBotDebug: oneBotDebugPort,
     modelRequest: modelRequestPort,
     preset: presetPort,
     mcpCallRecord: mcpCallRecordPort,
@@ -109,9 +111,10 @@ async function main() {
       presetWorkspaceModel: shell.presetWorkspaceModel.value,
       composerModel: shell.chatPaneModel.value.composer,
     },
+    // 五道端口各有一份记录器，分组直接就是分好的；基线侧只有一份记录器，按操作名分组。
     calls: {
-      // 调试记录本票仍在工作区端口上，因此这一份仍按操作名分组；票 02 之后它有自己的记录器。
-      ...groupCalls(workspacePort.calls),
+      workspace: workspacePort.calls,
+      oneBotDebug: oneBotDebugPort.calls,
       modelRequest: modelRequestPort.calls,
       preset: presetPort.calls,
       mcpCallRecord: mcpCallRecordPort.calls,

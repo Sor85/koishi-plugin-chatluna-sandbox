@@ -1,5 +1,6 @@
 import { receive, send } from '@koishijs/client'
 import type { SandboxSceneMutationPayload } from '../../src/console-contract'
+import { createSpaceScope } from './koishi-space-scope'
 import type { SceneMutationListener, WorkspacePort } from './workspace-port'
 
 const mutationListeners = new Set<SceneMutationListener>()
@@ -29,13 +30,7 @@ export function installContextSceneMutationReceiver(ctx: unknown) {
 }
 
 export function createKoishiWorkspacePort(resolveSpaceId: () => string | undefined = () => undefined): WorkspacePort {
-  const scoped = <Input extends object>(input: Input): Input & { spaceId?: string } => {
-    const explicit = (input as { spaceId?: string }).spaceId
-    // 显式定域优先：调用方已经指名 spaceId 时不得被当前活动空间覆盖。
-    if (explicit !== undefined) return input as Input & { spaceId?: string }
-    const spaceId = resolveSpaceId()
-    return spaceId ? { ...input, spaceId } : input
-  }
+  const scoped = createSpaceScope(resolveSpaceId)
   return {
   // Koishi Console 会把省略的 send 参数序列化为 null；服务端工作区接口需要收到普通对象才能执行 fallback。
   getWorkspace: (input = {}) => send('chatluna-sandbox/workspace', scoped(input)),
@@ -58,9 +53,6 @@ export function createKoishiWorkspacePort(resolveSpaceId: () => string | undefin
   manageEnvironment: (input) => send('chatluna-sandbox/manage-environment', scoped(input)),
   performFriendAction: (input) => send('chatluna-sandbox/friend-action', scoped(input)),
   performGroupAction: (input) => send('chatluna-sandbox/group-action', scoped(input)),
-  getOneBotDebugRecords: (input = {}) => send('chatluna-sandbox/debug-records', scoped(input)),
-  getOneBotDebugRecord: (input) => send('chatluna-sandbox/debug-record', scoped(input)),
-  clearOneBotDebugRecords: () => send('chatluna-sandbox/clear-debug-records', scoped({})),
   // 场景变更广播不定域：载荷自带 spaceId，订阅方按自己当前观察的空间过滤。
   subscribeSceneMutation: (listener) => {
     installMutationReceiver()
