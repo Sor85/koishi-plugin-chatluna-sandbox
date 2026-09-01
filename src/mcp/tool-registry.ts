@@ -31,7 +31,7 @@ import type {
   SandboxSnapshot,
 } from '../types'
 import { SandboxModelRequestCursorExpiredError, SandboxOneBotDebugCursorExpiredError } from '../types'
-import { asRecord, requireString, stableValue } from './arguments'
+import { asRecord, readSpaceId, requireString, stableValue } from './arguments'
 import type { ListSandboxMcpCallRecordsInput, SandboxMcpCallRecordsPage } from './call-records'
 import {
   SandboxMcpError,
@@ -350,11 +350,6 @@ function requireCapabilityList(value: unknown): string[] | undefined {
   return value.map(String)
 }
 
-/** 参数里的空间标识原文。非字符串一律视为省略，与空间解析的口径一致。 */
-function readSpaceId(args: Record<string, unknown>): string | undefined {
-  return typeof args.spaceId === 'string' ? args.spaceId : undefined
-}
-
 function assertRevision(control: SandboxControlService, value: unknown) {
   if (Number(value) !== control.getSnapshot().revision) throw new SandboxMcpError('revision_conflict', '场景版本已变化，请重新读取快照')
 }
@@ -373,7 +368,7 @@ function toMcpConversation(snapshot: SandboxSnapshot, conversation: ResolvedConv
  * 能力覆盖矩阵。
  *
  * 复用 requireImplementation 的显式失败规则，不在这里二次实现判定。inputSchema 声明了 enum 但
- * 传输层按 ADR 只把它当文档暴露、不做参数校验，校验责任落在工具执行体内部。implementation 在
+ * 两种协议表述都只把它当文档暴露、不做参数校验，校验责任落在工具执行体内部。implementation 在
  * get_capability_matrix 上是可选参数，省略时仍默认 napcat。
  *
  * 导出供 `chatluna-sandbox://capabilities/*` 两个只读资源复用：那两条路径与本工具答的是同一件事。
@@ -450,7 +445,7 @@ function listConversations(runtime: SandboxMcpToolRuntime, args: Record<string, 
 /**
  * 会话列表的条目集合：默认只有根会话，显式传 `rootConversationId` 时换成该根会话下的会话实例。
  *
- * 默认不混入实例是因为实例不是新的联系人：混进列表会让外部测试控制器把一条对话线误判成一段
+ * 默认不混入实例是因为实例不是新的联系人：混进列表会让外部测试控制器把一个会话实例误判成一段
  * 新增的关系，而两者的形状完全相同、没有任何可察觉的迹象。实例只在被显式问到时出现。
  *
  * 参数指向某个实例时归一化到它的根会话，与领域模块「层级严格两层」的口径一致——不存在第三层可问。
@@ -1031,7 +1026,7 @@ function listMcpCallRecords(runtime: SandboxMcpToolRuntime, args: Record<string,
 }
 
 /**
- * 测试控制端点对外提供的全部工具，按 `tools/list` 的返回顺序排列。
+ * 作者书写的 40 条条目，按 `tools/list` 的返回顺序排列；下面那一步给它们统一补上调用标注参数。
  *
  * 顺序本身是对外契约的一部分（`tests/helpers/mcp-tool-catalogue.ts` 逐条钉住它），因此新增工具
  * 时要放到它所属能力范围那一段的末尾，而不是文件末尾。
@@ -1702,14 +1697,14 @@ function withTestRunId(schema: Record<string, unknown>): Record<string, unknown>
  * 那一处统一注入——所有对外读取声明的路径都经同一处，声明因此不可能与实际配置漂移。注册表变成
  * 实例构造的东西就要重写这条保证。
  */
-const REGISTERED_TOOLS: readonly SandboxMcpToolEntry[] = TOOL_ENTRIES
+const TOOL_REGISTRY: readonly SandboxMcpToolEntry[] = TOOL_ENTRIES
   .map((entry) => ({ ...entry, inputSchema: withTestRunId(entry.inputSchema) }))
 
 /** 工具清单的对外自述，是注册表条目的投影而不是第二份声明。 */
-export const SANDBOX_MCP_TOOL_DECLARATIONS: readonly SandboxMcpToolCapability[] = REGISTERED_TOOLS
+export const SANDBOX_MCP_TOOL_DECLARATIONS: readonly SandboxMcpToolCapability[] = TOOL_REGISTRY
   .map(({ name, scope, description, inputSchema }) => ({ name, scope, description, inputSchema }))
 
-const TOOLS_BY_NAME = new Map(REGISTERED_TOOLS.map((entry) => [entry.name, entry]))
+const TOOLS_BY_NAME = new Map(TOOL_REGISTRY.map((entry) => [entry.name, entry]))
 
 /** 按名字取条目。取不到即该工具不存在——注册表是唯一的答案，没有第二处分派可落。 */
 export function findSandboxMcpTool(name: string): SandboxMcpToolEntry | undefined {

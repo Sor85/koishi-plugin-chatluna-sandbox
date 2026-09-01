@@ -8,7 +8,7 @@ import { createScopeDirectory, type ScopeDirectory } from '../scope-directory'
 import type { SandboxTestSpaceService } from '../test-spaces'
 import type { SandboxMedia } from '../types'
 import { isRecalledMessage, SandboxDomainError } from '../types'
-import { asRecord, requireString, stableValue } from './arguments'
+import { asRecord, readSpaceId, requireString, stableValue } from './arguments'
 import {
   matchesMcpCallRecordFilter,
   presentMcpCallRecord,
@@ -591,7 +591,7 @@ export class SandboxMcpService {
     args: Record<string, unknown>,
     transport: SandboxMcpCallTransport,
   ): SandboxMcpToolRuntime {
-    const spaceId = typeof args.spaceId === 'string' ? args.spaceId : undefined
+    const spaceId = readSpaceId(args)
     const control = entry.spaceResolution === 'none'
       ? this.control
       : this.resolveControl(args, entry.spaceResolution === 'mutation')
@@ -711,7 +711,7 @@ export class SandboxMcpService {
     const sequence = Number(cursor.sequence)
     if (this.events.length && sequence < this.events[0].cursor.sequence - 1) throw new SandboxMcpError('cursor_expired', '事件游标已离开缓冲区')
     const timeoutMs = Math.min(Math.max(Number(args.timeoutSeconds ?? 30), 1), 120) * 1000
-    const spaceId = typeof args.spaceId === 'string' ? args.spaceId : undefined
+    const spaceId = readSpaceId(args)
     const matches = () => this.events.find((event) => event.cursor.sequence > sequence && event.spaceId === spaceId && predicate(event))
     const existing = matches()
     if (existing) return { matched: true, event: existing, cursor: existing.cursor }

@@ -56,3 +56,16 @@
 **没有别处变红。** 完整测试一次跑绿；`tests/` 下除新增的守卫规则与它的自测外一行未改。
 
 **验证命令。** `yarn typecheck`、`yarn test`（180 文件 / 1657 断言）、`yarn build` 全部通过；`evidence/02-after.json` 与 `evidence/01-baseline-head.json` 逐字节相同；`git diff --stat` 里没有客户端路径。
+
+### 评审处置
+
+`/code-review` 两轴各报三条，全部已处置：
+
+- **规格轴（真问题）**：守卫只认裸标识符 `tool`／`toolName`，而治理今天持有的是条目，`entry.name === 'upload_media'` 不会被报出——规格 L49「工具名不再出现在治理路径的条件判定里」挡不住下一句特例。已把 `entry.name`／`definition.name` 两个形状加进三条谓词，自测钉住相等、不等与前缀三种写法。仍不放宽到任意 `X.name`：那正是规格 L92 点名会误报模型证据那处 `name === 'input'` 的形状。代价是目录项遍历里的 `entry.name` 落进同一个名字，今天不冲突（那两处用 `endsWith` 与正则），真撞上时改循环变量名比加豁免便宜，这一条写进规则注释。
+- **规格轴（代价陈述偏重）**：评审指出跨批共用的只有 `waitFor`，而它留在测试控制服务里，因此「合并两批」的实际代价比票 01 写的小。接受这条修正——合并的理由仍成立（两批的执行体要么全在注册表要么全在服务，中间态是 40 条元数据一半在注册表一半在旧表），但「必须复制 20 个执行体」这句话说重了。
+- **标准轴（硬性，词汇表）**：`arguments.ts` 与 `tool-registry.ts` 的注释用了 `CONTEXT.md` 里 **协议表述** 明确列入 `_Avoid_` 的「传输层」，以及 **会话实例** 列入 `_Avoid_` 的「对话线」（后者是搬迁旧文）。两处均已改写。`src/mcp/service.ts` 里五处「传输层」是 `b59464e` 就有的旧文，本轮行为中立，不顺手改动无关注释。
+- **标准轴（Duplicated Code）**：`typeof args.spaceId === 'string' ? args.spaceId : undefined` 在三处同形，而 `arguments.ts` 本就是为共享这类形状拆出来的。已把 `readSpaceId` 收进 `arguments.ts`，注册表、调用治理建运行时、等待类过滤事件三处共用一份。
+- **标准轴（Mysterious Name）**：一张表三个阶段三个名字。中间那个 `REGISTERED_TOOLS` 改名 `TOOL_REGISTRY`（它就是注册表本身），`TOOL_ENTRIES` 的文档说明它是作者书写的形态、下一步统一补调用标注参数。两个内部名是「注入一次」这个决定固有的。
+- **标准轴（Divergent Change，抑制）**：1718 行的注册表随任一工具变——这正是 ADR-0086 要的「全部事实住一条条目」，仓库文档优先于基线。
+
+处置后重新验证：`yarn typecheck`、`yarn test`（180 文件 / 1657 断言）、`yarn build` 通过；基线仍逐字节相同。

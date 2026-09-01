@@ -123,13 +123,18 @@ function enumerationBodies(source: string): string[] {
  * 一个工具的配额档、空间解析方式、幂等与确认令牌标记以及执行体都是工具注册表条目上的字段，因此
  * 治理里没有按名字分支的余地。规则拦住下一个想加特例的人。
  *
- * 谓词按标识符名判定（`tool`、`toolName`），刻意不用宽松的「某个名字等于字面量」形状：后者在模型
- * 证据那一族里有一处合法命中（`name === 'input'` 判定的是模型请求变量的键），会变成误报。
+ * 谓词按标识符名判定：裸的 `tool`／`toolName`，以及注册表条目自己那个字段 `entry.name`／
+ * `definition.name`——治理今天持有的是条目而不是名字，只认裸标识符会漏掉 `entry.name === '…'`
+ * 这条最近的加特例路径。刻意不放宽到任意 `X.name`：那个形状在模型证据那一族里有一处合法命中
+ * （`name === 'input'` 判定的是模型请求变量的键），会变成误报。
+ *
+ * 代价是目录项遍历里的 `entry.name` 落进了同一个名字。今天不冲突（那两处用 `endsWith` 与正则，
+ * 命不中本规则），真撞上时改循环变量名比加豁免便宜。
  */
 const TOOL_NAME_LITERAL_PREDICATES: readonly ArchitecturePredicate[] = [
-  { evidence: '工具名与字符串字面量相等或不等比较', pattern: /\b(?:tool|toolName)\s*(?:={2,3}|!={1,2})\s*'/ },
-  { evidence: '字符串字面量与工具名相等或不等比较', pattern: /'[^']*'\s*(?:={2,3}|!={1,2})\s*(?:[A-Za-z_$][\w$]*\s*\.\s*)?\b(?:tool|toolName)\b/ },
-  { evidence: '在工具名上做前缀判定', pattern: /\b(?:tool|toolName)\s*\.\s*startsWith\s*\(\s*'/ },
+  { evidence: '工具名与字符串字面量相等或不等比较', pattern: /\b(?:tool|toolName|(?:entry|definition)\s*\.\s*name)\s*(?:={2,3}|!={1,2})\s*'/ },
+  { evidence: '字符串字面量与工具名相等或不等比较', pattern: /'[^']*'\s*(?:={2,3}|!={1,2})\s*(?:[A-Za-z_$][\w$]*\s*\.\s*)?\b(?:tool|toolName)\b|'[^']*'\s*(?:={2,3}|!={1,2})\s*(?:entry|definition)\s*\.\s*name\b/ },
+  { evidence: '在工具名上做前缀判定', pattern: /\b(?:tool|toolName|(?:entry|definition)\s*\.\s*name)\s*\.\s*startsWith\s*\(\s*'/ },
 ]
 
 /**
@@ -593,6 +598,17 @@ describe('服务端架构守卫', () => {
     expect(rule.findViolations('src/x.ts', "if (args.tool === 'reset_scene') return true")).not.toEqual([])
     expect(rule.findViolations('src/x.ts', "if ('clear_scene' === confirmation.tool) return true")).not.toEqual([])
     expect(rule.findViolations('src/x.ts', "if (toolName === 'upload_media') return 'upload'")).not.toEqual([])
+    // 治理今天持有的是注册表条目而不是名字，`entry.name` 是最近的一条加特例路径。
+    expect(rule.findViolations('src/x.ts', "if (entry.name === 'upload_media') return 'upload'")).not.toEqual([])
+    expect(rule.findViolations('src/x.ts', "if (entry.name.startsWith('wait_for_')) return 'wait'")).not.toEqual([])
+    expect(rule.findViolations('src/x.ts', "if ('reset_scene' === definition.name) return true")).not.toEqual([])
+
+    // 目录项遍历里的 entry.name 落进同一个名字，但那两处用 endsWith 与正则，命不中本规则。
+    expect(rule.findViolations('src/presets/repository.ts', "if (!entry.name.endsWith('.yml') || !entry.isFile()) continue")).toEqual([])
+    expect(rule.findViolations('src/media-storage.ts', "if (!/^[a-f0-9]{32}$/.test(entry.name)) continue")).toEqual([])
+    // 条目名字当值用不是比较。
+    expect(rule.findViolations('src/x.ts', 'new Map(REGISTERED.map((entry) => [entry.name, entry]))')).toEqual([])
+    expect(rule.findViolations('src/x.ts', 'toolName: definition.name,')).toEqual([])
 
     // 注册表条目里工具名是属性值而不是比较，谓词命不中它——这正是本规则零豁免的原因。
     expect(rule.findViolations('src/mcp/tool-registry.ts', "{ name: 'get_server_info', scope: 'read', quota: 'read' }")).toEqual([])

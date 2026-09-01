@@ -18,6 +18,17 @@ export function asRecord(value: unknown): Record<string, unknown> {
 }
 
 /**
+ * 参数里的空间标识原文。
+ *
+ * 非字符串一律视为省略，与空间解析的口径一致；刻意不 trim——事件归属与媒体缓存键取的是原文，
+ * 只有空间解析自己会去掉首尾空白。三处读它（调用治理建运行时、等待类按空间过滤事件、记录域
+ * 自己解析空间），因此收在这里一份。
+ */
+export function readSpaceId(args: Record<string, unknown>): string | undefined {
+  return typeof args.spaceId === 'string' ? args.spaceId : undefined
+}
+
+/**
  * 与键序无关的稳定序列化。
  *
  * 幂等键的参数指纹与确认令牌的参数指纹都取它：同一份参数换个书写顺序必须得到同一个摘要，
