@@ -1,0 +1,1692 @@
+{
+  "debugRecordsFederated": {
+    "ok": {
+      "records": [
+        {
+          "id": "<debug:1>",
+          "sequence": 1,
+          "createdAt": "<time:1>",
+          "botId": "21001",
+          "implementation": "llbot",
+          "direction": "action",
+          "requestedAction": "baseline_action_1",
+          "action": "baseline_action_1",
+          "status": "success",
+          "durationMs": 7,
+          "payload": {
+            "user_id": "10001"
+          },
+          "result": {
+            "ok": true
+          },
+          "entities": {
+            "userId": "10001"
+          },
+          "source": {
+            "type": "test-space",
+            "spaceId": "<space:1>",
+            "name": "基线空间"
+          }
+        },
+        {
+          "id": "<debug:2>",
+          "sequence": 1,
+          "createdAt": "<time:2>",
+          "botId": "20001",
+          "implementation": "napcat",
+          "direction": "action",
+          "requestedAction": "baseline_action_0",
+          "action": "baseline_action_0",
+          "status": "success",
+          "durationMs": 7,
+          "payload": {
+            "user_id": "10001"
+          },
+          "result": {
+            "ok": true
+          },
+          "entities": {
+            "userId": "10001"
+          },
+          "source": {
+            "type": "main",
+            "name": "主环境"
+          }
+        }
+      ],
+      "hasMore": false,
+      "earliestCursor": 1,
+      "capacity": {
+        "recordCount": 2,
+        "totalBytes": 627,
+        "maxRecords": 10000,
+        "maxBytes": 104857600
+      }
+    }
+  },
+  "debugRecordsAsc": {
+    "ok": {
+      "records": [
+        {
+          "id": "<debug:2>",
+          "sequence": 1,
+          "createdAt": "<time:2>",
+          "botId": "20001",
+          "implementation": "napcat",
+          "direction": "action",
+          "requestedAction": "baseline_action_0",
+          "action": "baseline_action_0",
+          "status": "success",
+          "durationMs": 7,
+          "payload": {
+            "user_id": "10001"
+          },
+          "result": {
+            "ok": true
+          },
+          "entities": {
+            "userId": "10001"
+          },
+          "source": {
+            "type": "main",
+            "name": "主环境"
+          }
+        },
+        {
+          "id": "<debug:1>",
+          "sequence": 1,
+          "createdAt": "<time:1>",
+          "botId": "21001",
+          "implementation": "llbot",
+          "direction": "action",
+          "requestedAction": "baseline_action_1",
+          "action": "baseline_action_1",
+          "status": "success",
+          "durationMs": 7,
+          "payload": {
+            "user_id": "10001"
+          },
+          "result": {
+            "ok": true
+          },
+          "entities": {
+            "userId": "10001"
+          },
+          "source": {
+            "type": "test-space",
+            "spaceId": "<space:1>",
+            "name": "基线空间"
+          }
+        }
+      ],
+      "hasMore": false,
+      "earliestCursor": 1,
+      "capacity": {
+        "recordCount": 2,
+        "totalBytes": 627,
+        "maxRecords": 10000,
+        "maxBytes": 104857600
+      }
+    }
+  },
+  "debugRecordsSpace": {
+    "ok": {
+      "records": [
+        {
+          "id": "<debug:1>",
+          "sequence": 1,
+          "createdAt": "<time:1>",
+          "botId": "21001",
+          "implementation": "llbot",
+          "direction": "action",
+          "requestedAction": "baseline_action_1",
+          "action": "baseline_action_1",
+          "status": "success",
+          "durationMs": 7,
+          "payload": {
+            "user_id": "10001"
+          },
+          "result": {
+            "ok": true
+          },
+          "entities": {
+            "userId": "10001"
+          },
+          "source": {
+            "type": "test-space",
+            "spaceId": "<space:1>",
+            "name": "基线空间"
+          }
+        }
+      ],
+      "hasMore": false,
+      "earliestCursor": 1,
+      "capacity": {
+        "recordCount": 1,
+        "totalBytes": 313,
+        "maxRecords": 5000,
+        "maxBytes": 52428800
+      }
+    }
+  },
+  "debugRecordsPaged": {
+    "ok": {
+      "records": [
+        {
+          "id": "<debug:1>",
+          "sequence": 1,
+          "createdAt": "<time:1>",
+          "botId": "21001",
+          "implementation": "llbot",
+          "direction": "action",
+          "requestedAction": "baseline_action_1",
+          "action": "baseline_action_1",
+          "status": "success",
+          "durationMs": 7,
+          "payload": {
+            "user_id": "10001"
+          },
+          "result": {
+            "ok": true
+          },
+          "entities": {
+            "userId": "10001"
+          },
+          "source": {
+            "type": "test-space",
+            "spaceId": "<space:1>",
+            "name": "基线空间"
+          }
+        }
+      ],
+      "hasMore": true,
+      "earliestCursor": 1,
+      "capacity": {
+        "recordCount": 2,
+        "totalBytes": 627,
+        "maxRecords": 10000,
+        "maxBytes": 104857600
+      }
+    }
+  },
+  "debugRecordFederated": {
+    "ok": {
+      "id": "<debug:1>",
+      "sequence": 1,
+      "createdAt": "<time:1>",
+      "botId": "21001",
+      "implementation": "llbot",
+      "direction": "action",
+      "requestedAction": "baseline_action_1",
+      "action": "baseline_action_1",
+      "status": "success",
+      "durationMs": 7,
+      "payload": {
+        "user_id": "10001"
+      },
+      "result": {
+        "ok": true
+      },
+      "entities": {
+        "userId": "10001"
+      },
+      "source": {
+        "type": "test-space",
+        "spaceId": "<space:1>",
+        "name": "基线空间"
+      }
+    }
+  },
+  "debugRecordFederatedLarge": {
+    "ok": {
+      "id": "<debug:1>",
+      "sequence": 1,
+      "createdAt": "<time:1>",
+      "botId": "21001",
+      "implementation": "llbot",
+      "direction": "action",
+      "requestedAction": "baseline_action_1",
+      "action": "baseline_action_1",
+      "status": "success",
+      "durationMs": 7,
+      "payload": {
+        "user_id": "10001"
+      },
+      "result": {
+        "ok": true
+      },
+      "entities": {
+        "userId": "10001"
+      },
+      "source": {
+        "type": "test-space",
+        "spaceId": "<space:1>",
+        "name": "基线空间"
+      }
+    }
+  },
+  "debugRecordSpace": {
+    "ok": {
+      "id": "<debug:1>",
+      "sequence": 1,
+      "createdAt": "<time:1>",
+      "botId": "21001",
+      "implementation": "llbot",
+      "direction": "action",
+      "requestedAction": "baseline_action_1",
+      "action": "baseline_action_1",
+      "status": "success",
+      "durationMs": 7,
+      "payload": {
+        "user_id": "10001"
+      },
+      "result": {
+        "ok": true
+      },
+      "entities": {
+        "userId": "10001"
+      },
+      "source": {
+        "type": "test-space",
+        "spaceId": "<space:1>",
+        "name": "基线空间"
+      }
+    }
+  },
+  "debugRecordMissingFederated": {
+    "error": "SandboxDomainError: 调试记录不存在：缺失"
+  },
+  "debugRecordMissingSpace": {
+    "error": "SandboxDomainError: 调试记录不存在：缺失"
+  },
+  "modelRequestsMain": {
+    "ok": {
+      "records": [
+        {
+          "id": "<record:2>",
+          "sequence": 2,
+          "createdAt": "<time:3>",
+          "status": "error",
+          "durationMs": 42,
+          "method": "POST",
+          "url": "https://api.example.invalid/v1/chat/completions",
+          "provider": "baseline",
+          "model": "main-b",
+          "attribution": "attributed",
+          "entities": {
+            "scopeId": "main",
+            "botId": "20001",
+            "conversationId": "private:10001:20001"
+          },
+          "requestBodyAvailable": true,
+          "responseBodyStatus": "complete",
+          "responseBodyFormat": "json",
+          "responseStatus": 500,
+          "error": {
+            "code": "model_request_error",
+            "message": "HTTP 500",
+            "retryable": false,
+            "traceId": "baseline-main-b"
+          },
+          "source": {
+            "type": "main",
+            "name": "主环境"
+          }
+        },
+        {
+          "id": "<record:1>",
+          "sequence": 1,
+          "createdAt": "<time:4>",
+          "status": "success",
+          "durationMs": 42,
+          "method": "POST",
+          "url": "https://api.example.invalid/v1/chat/completions",
+          "provider": "baseline",
+          "model": "main-a",
+          "attribution": "attributed",
+          "entities": {
+            "scopeId": "main",
+            "botId": "20001",
+            "conversationId": "private:10001:20001"
+          },
+          "requestBodyAvailable": true,
+          "responseBodyStatus": "complete",
+          "responseBodyFormat": "json",
+          "responseStatus": 200,
+          "source": {
+            "type": "main",
+            "name": "主环境"
+          }
+        }
+      ],
+      "hasMore": false,
+      "earliestCursor": 1,
+      "capacity": {
+        "recordCount": 2,
+        "totalBytes": 1484,
+        "maxRecords": 500,
+        "maxBytes": 52428800
+      }
+    }
+  },
+  "modelRequestsSpace": {
+    "ok": {
+      "records": [
+        {
+          "id": "<record:3>",
+          "sequence": 1,
+          "createdAt": "<time:5>",
+          "status": "success",
+          "durationMs": 42,
+          "method": "POST",
+          "url": "https://api.example.invalid/v1/chat/completions",
+          "provider": "baseline",
+          "model": "space-a",
+          "attribution": "attributed",
+          "entities": {
+            "scopeId": "<space:1>",
+            "botId": "20001",
+            "conversationId": "group:30001"
+          },
+          "requestBodyAvailable": true,
+          "responseBodyStatus": "complete",
+          "responseBodyFormat": "json",
+          "responseStatus": 200,
+          "source": {
+            "type": "test-space",
+            "spaceId": "<space:1>",
+            "name": "基线空间"
+          }
+        }
+      ],
+      "hasMore": false,
+      "earliestCursor": 1,
+      "capacity": {
+        "recordCount": 1,
+        "totalBytes": 718,
+        "maxRecords": 500,
+        "maxBytes": 52428800
+      }
+    }
+  },
+  "modelRequestsUnattributed": {
+    "ok": {
+      "records": [
+        {
+          "id": "<record:4>",
+          "sequence": 1,
+          "createdAt": "<time:6>",
+          "status": "success",
+          "durationMs": 42,
+          "method": "POST",
+          "url": "https://api.example.invalid/v1/chat/completions",
+          "provider": "baseline",
+          "model": "lost-a",
+          "attribution": "unattributed",
+          "entities": {},
+          "requestBodyAvailable": true,
+          "responseBodyStatus": "complete",
+          "responseBodyFormat": "json",
+          "responseStatus": 200,
+          "source": {
+            "type": "unattributed",
+            "name": "未归属"
+          }
+        }
+      ],
+      "hasMore": false,
+      "earliestCursor": 1,
+      "capacity": {
+        "recordCount": 1,
+        "totalBytes": 621,
+        "maxRecords": 500,
+        "maxBytes": 52428800
+      }
+    }
+  },
+  "modelRequestsAll": {
+    "ok": {
+      "records": [
+        {
+          "id": "<record:3>",
+          "sequence": 1,
+          "createdAt": "<time:5>",
+          "status": "success",
+          "durationMs": 42,
+          "method": "POST",
+          "url": "https://api.example.invalid/v1/chat/completions",
+          "provider": "baseline",
+          "model": "space-a",
+          "attribution": "attributed",
+          "entities": {
+            "scopeId": "<space:1>",
+            "botId": "20001",
+            "conversationId": "group:30001"
+          },
+          "requestBodyAvailable": true,
+          "responseBodyStatus": "complete",
+          "responseBodyFormat": "json",
+          "responseStatus": 200,
+          "source": {
+            "type": "test-space",
+            "spaceId": "<space:1>",
+            "name": "基线空间"
+          }
+        },
+        {
+          "id": "<record:2>",
+          "sequence": 2,
+          "createdAt": "<time:3>",
+          "status": "error",
+          "durationMs": 42,
+          "method": "POST",
+          "url": "https://api.example.invalid/v1/chat/completions",
+          "provider": "baseline",
+          "model": "main-b",
+          "attribution": "attributed",
+          "entities": {
+            "scopeId": "main",
+            "botId": "20001",
+            "conversationId": "private:10001:20001"
+          },
+          "requestBodyAvailable": true,
+          "responseBodyStatus": "complete",
+          "responseBodyFormat": "json",
+          "responseStatus": 500,
+          "error": {
+            "code": "model_request_error",
+            "message": "HTTP 500",
+            "retryable": false,
+            "traceId": "baseline-main-b"
+          },
+          "source": {
+            "type": "main",
+            "name": "主环境"
+          }
+        },
+        {
+          "id": "<record:1>",
+          "sequence": 1,
+          "createdAt": "<time:4>",
+          "status": "success",
+          "durationMs": 42,
+          "method": "POST",
+          "url": "https://api.example.invalid/v1/chat/completions",
+          "provider": "baseline",
+          "model": "main-a",
+          "attribution": "attributed",
+          "entities": {
+            "scopeId": "main",
+            "botId": "20001",
+            "conversationId": "private:10001:20001"
+          },
+          "requestBodyAvailable": true,
+          "responseBodyStatus": "complete",
+          "responseBodyFormat": "json",
+          "responseStatus": 200,
+          "source": {
+            "type": "main",
+            "name": "主环境"
+          }
+        }
+      ],
+      "hasMore": false,
+      "earliestCursor": 1,
+      "capacity": {
+        "recordCount": 3,
+        "totalBytes": 2202,
+        "maxRecords": 1000,
+        "maxBytes": 104857600
+      }
+    }
+  },
+  "modelRequestsAllPaged": {
+    "ok": {
+      "records": [
+        {
+          "id": "<record:3>",
+          "sequence": 1,
+          "createdAt": "<time:5>",
+          "status": "success",
+          "durationMs": 42,
+          "method": "POST",
+          "url": "https://api.example.invalid/v1/chat/completions",
+          "provider": "baseline",
+          "model": "space-a",
+          "attribution": "attributed",
+          "entities": {
+            "scopeId": "<space:1>",
+            "botId": "20001",
+            "conversationId": "group:30001"
+          },
+          "requestBodyAvailable": true,
+          "responseBodyStatus": "complete",
+          "responseBodyFormat": "json",
+          "responseStatus": 200,
+          "source": {
+            "type": "test-space",
+            "spaceId": "<space:1>",
+            "name": "基线空间"
+          }
+        }
+      ],
+      "hasMore": true,
+      "earliestCursor": 1,
+      "capacity": {
+        "recordCount": 3,
+        "totalBytes": 2202,
+        "maxRecords": 1000,
+        "maxBytes": 104857600
+      },
+      "nextCreatedAt": "<time:5>",
+      "nextId": "<record:3>"
+    }
+  },
+  "modelRequestsErrorsOnly": {
+    "ok": {
+      "records": [
+        {
+          "id": "<record:2>",
+          "sequence": 2,
+          "createdAt": "<time:3>",
+          "status": "error",
+          "durationMs": 42,
+          "method": "POST",
+          "url": "https://api.example.invalid/v1/chat/completions",
+          "provider": "baseline",
+          "model": "main-b",
+          "attribution": "attributed",
+          "entities": {
+            "scopeId": "main",
+            "botId": "20001",
+            "conversationId": "private:10001:20001"
+          },
+          "requestBodyAvailable": true,
+          "responseBodyStatus": "complete",
+          "responseBodyFormat": "json",
+          "responseStatus": 500,
+          "error": {
+            "code": "model_request_error",
+            "message": "HTTP 500",
+            "retryable": false,
+            "traceId": "baseline-main-b"
+          },
+          "source": {
+            "type": "main",
+            "name": "主环境"
+          }
+        }
+      ],
+      "hasMore": false,
+      "earliestCursor": 1,
+      "capacity": {
+        "recordCount": 3,
+        "totalBytes": 2202,
+        "maxRecords": 1000,
+        "maxBytes": 104857600
+      }
+    }
+  },
+  "modelRequestRecordMain": {
+    "ok": {
+      "id": "<record:1>",
+      "sequence": 1,
+      "createdAt": "<time:4>",
+      "status": "success",
+      "durationMs": 42,
+      "method": "POST",
+      "url": "https://api.example.invalid/v1/chat/completions",
+      "provider": "baseline",
+      "model": "main-a",
+      "attribution": "attributed",
+      "entities": {
+        "scopeId": "main",
+        "botId": "20001",
+        "conversationId": "private:10001:20001"
+      },
+      "requestBodyAvailable": true,
+      "requestBody": {
+        "model": "main-a",
+        "messages": [
+          {
+            "role": "user",
+            "content": "基线 main-a"
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "noop",
+              "description": "无操作",
+              "parameters": {
+                "type": "object"
+              }
+            }
+          }
+        ]
+      },
+      "responseBodyStatus": "complete",
+      "responseBodyFormat": "json",
+      "responseStatus": 200,
+      "responseBodyRaw": "{\"content\":\"回应 main-a\"}",
+      "requestBodyKeyCount": 3,
+      "evidenceCounts": {
+        "requestMessageCount": 1,
+        "toolDefinitionCount": 1
+      },
+      "variables": [],
+      "source": {
+        "type": "main",
+        "name": "主环境"
+      }
+    }
+  },
+  "modelRequestRecordSpace": {
+    "ok": {
+      "id": "<record:3>",
+      "sequence": 1,
+      "createdAt": "<time:5>",
+      "status": "success",
+      "durationMs": 42,
+      "method": "POST",
+      "url": "https://api.example.invalid/v1/chat/completions",
+      "provider": "baseline",
+      "model": "space-a",
+      "attribution": "attributed",
+      "entities": {
+        "scopeId": "<space:1>",
+        "botId": "20001",
+        "conversationId": "group:30001"
+      },
+      "requestBodyAvailable": true,
+      "requestBody": {
+        "model": "space-a",
+        "messages": [
+          {
+            "role": "user",
+            "content": "基线 space-a"
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "noop",
+              "description": "无操作",
+              "parameters": {
+                "type": "object"
+              }
+            }
+          }
+        ]
+      },
+      "responseBodyStatus": "complete",
+      "responseBodyFormat": "json",
+      "responseStatus": 200,
+      "responseBodyRaw": "{\"content\":\"回应 space-a\"}",
+      "requestBodyKeyCount": 3,
+      "evidenceCounts": {
+        "requestMessageCount": 1,
+        "toolDefinitionCount": 1
+      },
+      "variables": [],
+      "source": {
+        "type": "test-space",
+        "spaceId": "<space:1>",
+        "name": "基线空间"
+      }
+    }
+  },
+  "modelRequestRecordUnattributed": {
+    "ok": {
+      "id": "<record:4>",
+      "sequence": 1,
+      "createdAt": "<time:6>",
+      "status": "success",
+      "durationMs": 42,
+      "method": "POST",
+      "url": "https://api.example.invalid/v1/chat/completions",
+      "provider": "baseline",
+      "model": "lost-a",
+      "attribution": "unattributed",
+      "entities": {},
+      "requestBodyAvailable": true,
+      "requestBody": {
+        "model": "lost-a",
+        "messages": [
+          {
+            "role": "user",
+            "content": "基线 lost-a"
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "noop",
+              "description": "无操作",
+              "parameters": {
+                "type": "object"
+              }
+            }
+          }
+        ]
+      },
+      "responseBodyStatus": "complete",
+      "responseBodyFormat": "json",
+      "responseStatus": 200,
+      "responseBodyRaw": "{\"content\":\"回应 lost-a\"}",
+      "requestBodyKeyCount": 3,
+      "evidenceCounts": {
+        "requestMessageCount": 1,
+        "toolDefinitionCount": 1
+      },
+      "variables": [],
+      "source": {
+        "type": "unattributed",
+        "name": "未归属"
+      }
+    }
+  },
+  "modelRequestRecordAllMain": {
+    "ok": {
+      "id": "<record:1>",
+      "sequence": 1,
+      "createdAt": "<time:4>",
+      "status": "success",
+      "durationMs": 42,
+      "method": "POST",
+      "url": "https://api.example.invalid/v1/chat/completions",
+      "provider": "baseline",
+      "model": "main-a",
+      "attribution": "attributed",
+      "entities": {
+        "scopeId": "main",
+        "botId": "20001",
+        "conversationId": "private:10001:20001"
+      },
+      "requestBodyAvailable": true,
+      "requestBody": {
+        "model": "main-a",
+        "messages": [
+          {
+            "role": "user",
+            "content": "基线 main-a"
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "noop",
+              "description": "无操作",
+              "parameters": {
+                "type": "object"
+              }
+            }
+          }
+        ]
+      },
+      "responseBodyStatus": "complete",
+      "responseBodyFormat": "json",
+      "responseStatus": 200,
+      "responseBodyRaw": "{\"content\":\"回应 main-a\"}",
+      "requestBodyKeyCount": 3,
+      "evidenceCounts": {
+        "requestMessageCount": 1,
+        "toolDefinitionCount": 1
+      },
+      "variables": [],
+      "source": {
+        "type": "main",
+        "name": "主环境"
+      }
+    }
+  },
+  "modelRequestRecordAllSpace": {
+    "ok": {
+      "id": "<record:3>",
+      "sequence": 1,
+      "createdAt": "<time:5>",
+      "status": "success",
+      "durationMs": 42,
+      "method": "POST",
+      "url": "https://api.example.invalid/v1/chat/completions",
+      "provider": "baseline",
+      "model": "space-a",
+      "attribution": "attributed",
+      "entities": {
+        "scopeId": "<space:1>",
+        "botId": "20001",
+        "conversationId": "group:30001"
+      },
+      "requestBodyAvailable": true,
+      "requestBody": {
+        "model": "space-a",
+        "messages": [
+          {
+            "role": "user",
+            "content": "基线 space-a"
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "noop",
+              "description": "无操作",
+              "parameters": {
+                "type": "object"
+              }
+            }
+          }
+        ]
+      },
+      "responseBodyStatus": "complete",
+      "responseBodyFormat": "json",
+      "responseStatus": 200,
+      "responseBodyRaw": "{\"content\":\"回应 space-a\"}",
+      "requestBodyKeyCount": 3,
+      "evidenceCounts": {
+        "requestMessageCount": 1,
+        "toolDefinitionCount": 1
+      },
+      "variables": [],
+      "source": {
+        "type": "test-space",
+        "spaceId": "<space:1>",
+        "name": "基线空间"
+      }
+    }
+  },
+  "modelRequestRecordMissingMain": {
+    "error": "SandboxDomainError: 模型请求记录不存在：缺失"
+  },
+  "modelRequestRecordMissingSpace": {
+    "error": "SandboxDomainError: 模型请求记录不存在：缺失"
+  },
+  "modelRequestRecordMissingUnattributed": {
+    "error": "SandboxDomainError: 模型请求记录不存在：缺失"
+  },
+  "modelRequestRecordMissingAll": {
+    "error": "SandboxDomainError: 模型请求记录不存在：缺失"
+  },
+  "trajectoryMainRequest": {
+    "ok": {
+      "mode": "request",
+      "conversationId": "private:10001:20001",
+      "records": [
+        {
+          "id": "<record:1>",
+          "sequence": 1,
+          "createdAt": "<time:4>",
+          "status": "success",
+          "durationMs": 42,
+          "method": "POST",
+          "url": "https://api.example.invalid/v1/chat/completions",
+          "provider": "baseline",
+          "model": "main-a",
+          "attribution": "attributed",
+          "entities": {
+            "scopeId": "main",
+            "botId": "20001",
+            "conversationId": "private:10001:20001"
+          },
+          "requestBodyAvailable": true,
+          "responseBodyStatus": "complete",
+          "responseBodyFormat": "json",
+          "responseStatus": 200,
+          "requestBodyKeyCount": 3,
+          "evidenceCounts": {
+            "requestMessageCount": 1,
+            "toolDefinitionCount": 1
+          },
+          "variables": [],
+          "source": {
+            "type": "main",
+            "name": "主环境"
+          }
+        }
+      ],
+      "rows": [
+        {
+          "id": "<record:1>:request",
+          "index": 1,
+          "kind": "request",
+          "preview": "baseline / main-a · 42 ms",
+          "durationMs": 42,
+          "startedAt": "<time:4>",
+          "requestId": "<record:1>",
+          "status": "success"
+        },
+        {
+          "id": "<record:1>:req:message:messages.0",
+          "index": 2,
+          "requestId": "<record:1>",
+          "source": "request",
+          "evidenceId": "req:message:messages.0",
+          "kind": "user",
+          "preview": "基线 main-a"
+        },
+        {
+          "id": "<record:1>:req:tool-definition:tools.0.function",
+          "index": 3,
+          "requestId": "<record:1>",
+          "source": "request",
+          "evidenceId": "req:tool-definition:tools.0.function",
+          "kind": "tool-definition",
+          "preview": "工具定义 · noop",
+          "toolName": "noop"
+        }
+      ],
+      "promptComposition": [
+        {
+          "kind": "user",
+          "evidenceId": "req:message:messages.0",
+          "characters": 9
+        },
+        {
+          "kind": "tool-definition",
+          "evidenceId": "req:tool-definition:tools.0.function",
+          "characters": 66
+        }
+      ],
+      "complete": true
+    }
+  },
+  "trajectoryMainConversation": {
+    "ok": {
+      "mode": "conversation",
+      "conversationId": "private:10001:20001",
+      "records": [
+        {
+          "id": "<record:1>",
+          "sequence": 1,
+          "createdAt": "<time:4>",
+          "status": "success",
+          "durationMs": 42,
+          "method": "POST",
+          "url": "https://api.example.invalid/v1/chat/completions",
+          "provider": "baseline",
+          "model": "main-a",
+          "attribution": "attributed",
+          "entities": {
+            "scopeId": "main",
+            "botId": "20001",
+            "conversationId": "private:10001:20001"
+          },
+          "requestBodyAvailable": true,
+          "responseBodyStatus": "complete",
+          "responseBodyFormat": "json",
+          "responseStatus": 200
+        },
+        {
+          "id": "<record:2>",
+          "sequence": 2,
+          "createdAt": "<time:3>",
+          "status": "error",
+          "durationMs": 42,
+          "method": "POST",
+          "url": "https://api.example.invalid/v1/chat/completions",
+          "provider": "baseline",
+          "model": "main-b",
+          "attribution": "attributed",
+          "entities": {
+            "scopeId": "main",
+            "botId": "20001",
+            "conversationId": "private:10001:20001"
+          },
+          "requestBodyAvailable": true,
+          "responseBodyStatus": "complete",
+          "responseBodyFormat": "json",
+          "responseStatus": 500,
+          "error": {
+            "code": "model_request_error",
+            "message": "HTTP 500",
+            "retryable": false,
+            "traceId": "baseline-main-b"
+          }
+        }
+      ],
+      "rows": [
+        {
+          "id": "<record:1>:request",
+          "index": 1,
+          "kind": "request",
+          "preview": "baseline / main-a · 42 ms",
+          "durationMs": 42,
+          "startedAt": "<time:4>",
+          "requestId": "<record:1>",
+          "status": "success"
+        },
+        {
+          "id": "<record:1>:req:message:messages.0",
+          "index": 2,
+          "requestId": "<record:1>",
+          "source": "request",
+          "evidenceId": "req:message:messages.0",
+          "kind": "user",
+          "preview": "基线 main-a"
+        },
+        {
+          "id": "<record:1>:req:tool-definition:tools.0.function",
+          "index": 3,
+          "requestId": "<record:1>",
+          "source": "request",
+          "evidenceId": "req:tool-definition:tools.0.function",
+          "kind": "tool-definition",
+          "preview": "工具定义 · noop",
+          "toolName": "noop"
+        },
+        {
+          "id": "<record:2>:request",
+          "index": 4,
+          "kind": "request",
+          "preview": "baseline / main-b · 请求失败",
+          "durationMs": 42,
+          "startedAt": "<time:3>",
+          "requestId": "<record:2>",
+          "status": "error"
+        },
+        {
+          "id": "<record:2>:req:message:messages.0",
+          "index": 5,
+          "requestId": "<record:2>",
+          "source": "request",
+          "evidenceId": "req:message:messages.0",
+          "kind": "user",
+          "preview": "基线 main-b"
+        },
+        {
+          "id": "<record:2>:req:tool-definition:tools.0.function",
+          "index": 6,
+          "requestId": "<record:2>",
+          "source": "request",
+          "evidenceId": "req:tool-definition:tools.0.function",
+          "kind": "tool-definition",
+          "preview": "工具定义 · noop",
+          "toolName": "noop"
+        }
+      ],
+      "promptComposition": [
+        {
+          "kind": "user",
+          "evidenceId": "req:message:messages.0",
+          "characters": 9,
+          "requestId": "<record:1>"
+        },
+        {
+          "kind": "tool-definition",
+          "evidenceId": "req:tool-definition:tools.0.function",
+          "characters": 66,
+          "requestId": "<record:1>"
+        },
+        {
+          "kind": "user",
+          "evidenceId": "req:message:messages.0",
+          "characters": 9,
+          "requestId": "<record:2>"
+        },
+        {
+          "kind": "tool-definition",
+          "evidenceId": "req:tool-definition:tools.0.function",
+          "characters": 66,
+          "requestId": "<record:2>"
+        }
+      ],
+      "complete": true
+    }
+  },
+  "trajectorySpaceConversation": {
+    "ok": {
+      "mode": "conversation",
+      "conversationId": "group:30001",
+      "records": [
+        {
+          "id": "<record:3>",
+          "sequence": 1,
+          "createdAt": "<time:5>",
+          "status": "success",
+          "durationMs": 42,
+          "method": "POST",
+          "url": "https://api.example.invalid/v1/chat/completions",
+          "provider": "baseline",
+          "model": "space-a",
+          "attribution": "attributed",
+          "entities": {
+            "scopeId": "<space:1>",
+            "botId": "20001",
+            "conversationId": "group:30001"
+          },
+          "requestBodyAvailable": true,
+          "responseBodyStatus": "complete",
+          "responseBodyFormat": "json",
+          "responseStatus": 200
+        }
+      ],
+      "rows": [
+        {
+          "id": "<record:3>:request",
+          "index": 1,
+          "kind": "request",
+          "preview": "baseline / space-a · 42 ms",
+          "durationMs": 42,
+          "startedAt": "<time:5>",
+          "requestId": "<record:3>",
+          "status": "success"
+        },
+        {
+          "id": "<record:3>:req:message:messages.0",
+          "index": 2,
+          "requestId": "<record:3>",
+          "source": "request",
+          "evidenceId": "req:message:messages.0",
+          "kind": "user",
+          "preview": "基线 space-a"
+        },
+        {
+          "id": "<record:3>:req:tool-definition:tools.0.function",
+          "index": 3,
+          "requestId": "<record:3>",
+          "source": "request",
+          "evidenceId": "req:tool-definition:tools.0.function",
+          "kind": "tool-definition",
+          "preview": "工具定义 · noop",
+          "toolName": "noop"
+        }
+      ],
+      "promptComposition": [
+        {
+          "kind": "user",
+          "evidenceId": "req:message:messages.0",
+          "characters": 10,
+          "requestId": "<record:3>"
+        },
+        {
+          "kind": "tool-definition",
+          "evidenceId": "req:tool-definition:tools.0.function",
+          "characters": 66,
+          "requestId": "<record:3>"
+        }
+      ],
+      "complete": true
+    }
+  },
+  "trajectoryUnattributedRequest": {
+    "ok": {
+      "mode": "request",
+      "records": [
+        {
+          "id": "<record:4>",
+          "sequence": 1,
+          "createdAt": "<time:6>",
+          "status": "success",
+          "durationMs": 42,
+          "method": "POST",
+          "url": "https://api.example.invalid/v1/chat/completions",
+          "provider": "baseline",
+          "model": "lost-a",
+          "attribution": "unattributed",
+          "entities": {},
+          "requestBodyAvailable": true,
+          "responseBodyStatus": "complete",
+          "responseBodyFormat": "json",
+          "responseStatus": 200,
+          "requestBodyKeyCount": 3,
+          "evidenceCounts": {
+            "requestMessageCount": 1,
+            "toolDefinitionCount": 1
+          },
+          "variables": [],
+          "source": {
+            "type": "unattributed",
+            "name": "未归属"
+          }
+        }
+      ],
+      "rows": [
+        {
+          "id": "<record:4>:request",
+          "index": 1,
+          "kind": "request",
+          "preview": "baseline / lost-a · 42 ms",
+          "durationMs": 42,
+          "startedAt": "<time:6>",
+          "requestId": "<record:4>",
+          "status": "success"
+        },
+        {
+          "id": "<record:4>:req:message:messages.0",
+          "index": 2,
+          "requestId": "<record:4>",
+          "source": "request",
+          "evidenceId": "req:message:messages.0",
+          "kind": "user",
+          "preview": "基线 lost-a"
+        },
+        {
+          "id": "<record:4>:req:tool-definition:tools.0.function",
+          "index": 3,
+          "requestId": "<record:4>",
+          "source": "request",
+          "evidenceId": "req:tool-definition:tools.0.function",
+          "kind": "tool-definition",
+          "preview": "工具定义 · noop",
+          "toolName": "noop"
+        }
+      ],
+      "promptComposition": [
+        {
+          "kind": "user",
+          "evidenceId": "req:message:messages.0",
+          "characters": 9
+        },
+        {
+          "kind": "tool-definition",
+          "evidenceId": "req:tool-definition:tools.0.function",
+          "characters": 66
+        }
+      ],
+      "complete": true
+    }
+  },
+  "trajectoryUnattributedConversation": {
+    "ok": {
+      "mode": "conversation",
+      "records": [
+        {
+          "id": "<record:4>",
+          "sequence": 1,
+          "createdAt": "<time:6>",
+          "status": "success",
+          "durationMs": 42,
+          "method": "POST",
+          "url": "https://api.example.invalid/v1/chat/completions",
+          "provider": "baseline",
+          "model": "lost-a",
+          "attribution": "unattributed",
+          "entities": {},
+          "requestBodyAvailable": true,
+          "responseBodyStatus": "complete",
+          "responseBodyFormat": "json",
+          "responseStatus": 200,
+          "requestBodyKeyCount": 3,
+          "evidenceCounts": {
+            "requestMessageCount": 1,
+            "toolDefinitionCount": 1
+          },
+          "variables": [],
+          "source": {
+            "type": "unattributed",
+            "name": "未归属"
+          }
+        }
+      ],
+      "rows": [
+        {
+          "id": "<record:4>:request",
+          "index": 1,
+          "kind": "request",
+          "preview": "baseline / lost-a · 42 ms",
+          "durationMs": 42,
+          "startedAt": "<time:6>",
+          "requestId": "<record:4>",
+          "status": "success"
+        },
+        {
+          "id": "<record:4>:req:message:messages.0",
+          "index": 2,
+          "requestId": "<record:4>",
+          "source": "request",
+          "evidenceId": "req:message:messages.0",
+          "kind": "user",
+          "preview": "基线 lost-a"
+        },
+        {
+          "id": "<record:4>:req:tool-definition:tools.0.function",
+          "index": 3,
+          "requestId": "<record:4>",
+          "source": "request",
+          "evidenceId": "req:tool-definition:tools.0.function",
+          "kind": "tool-definition",
+          "preview": "工具定义 · noop",
+          "toolName": "noop"
+        }
+      ],
+      "promptComposition": [
+        {
+          "kind": "user",
+          "evidenceId": "req:message:messages.0",
+          "characters": 9,
+          "requestId": "<record:4>"
+        },
+        {
+          "kind": "tool-definition",
+          "evidenceId": "req:tool-definition:tools.0.function",
+          "characters": 66,
+          "requestId": "<record:4>"
+        }
+      ],
+      "complete": true
+    }
+  },
+  "trajectoryAllMainConversation": {
+    "ok": {
+      "mode": "conversation",
+      "conversationId": "private:10001:20001",
+      "records": [
+        {
+          "id": "<record:1>",
+          "sequence": 1,
+          "createdAt": "<time:4>",
+          "status": "success",
+          "durationMs": 42,
+          "method": "POST",
+          "url": "https://api.example.invalid/v1/chat/completions",
+          "provider": "baseline",
+          "model": "main-a",
+          "attribution": "attributed",
+          "entities": {
+            "scopeId": "main",
+            "botId": "20001",
+            "conversationId": "private:10001:20001"
+          },
+          "requestBodyAvailable": true,
+          "responseBodyStatus": "complete",
+          "responseBodyFormat": "json",
+          "responseStatus": 200
+        },
+        {
+          "id": "<record:2>",
+          "sequence": 2,
+          "createdAt": "<time:3>",
+          "status": "error",
+          "durationMs": 42,
+          "method": "POST",
+          "url": "https://api.example.invalid/v1/chat/completions",
+          "provider": "baseline",
+          "model": "main-b",
+          "attribution": "attributed",
+          "entities": {
+            "scopeId": "main",
+            "botId": "20001",
+            "conversationId": "private:10001:20001"
+          },
+          "requestBodyAvailable": true,
+          "responseBodyStatus": "complete",
+          "responseBodyFormat": "json",
+          "responseStatus": 500,
+          "error": {
+            "code": "model_request_error",
+            "message": "HTTP 500",
+            "retryable": false,
+            "traceId": "baseline-main-b"
+          }
+        }
+      ],
+      "rows": [
+        {
+          "id": "<record:1>:request",
+          "index": 1,
+          "kind": "request",
+          "preview": "baseline / main-a · 42 ms",
+          "durationMs": 42,
+          "startedAt": "<time:4>",
+          "requestId": "<record:1>",
+          "status": "success"
+        },
+        {
+          "id": "<record:1>:req:message:messages.0",
+          "index": 2,
+          "requestId": "<record:1>",
+          "source": "request",
+          "evidenceId": "req:message:messages.0",
+          "kind": "user",
+          "preview": "基线 main-a"
+        },
+        {
+          "id": "<record:1>:req:tool-definition:tools.0.function",
+          "index": 3,
+          "requestId": "<record:1>",
+          "source": "request",
+          "evidenceId": "req:tool-definition:tools.0.function",
+          "kind": "tool-definition",
+          "preview": "工具定义 · noop",
+          "toolName": "noop"
+        },
+        {
+          "id": "<record:2>:request",
+          "index": 4,
+          "kind": "request",
+          "preview": "baseline / main-b · 请求失败",
+          "durationMs": 42,
+          "startedAt": "<time:3>",
+          "requestId": "<record:2>",
+          "status": "error"
+        },
+        {
+          "id": "<record:2>:req:message:messages.0",
+          "index": 5,
+          "requestId": "<record:2>",
+          "source": "request",
+          "evidenceId": "req:message:messages.0",
+          "kind": "user",
+          "preview": "基线 main-b"
+        },
+        {
+          "id": "<record:2>:req:tool-definition:tools.0.function",
+          "index": 6,
+          "requestId": "<record:2>",
+          "source": "request",
+          "evidenceId": "req:tool-definition:tools.0.function",
+          "kind": "tool-definition",
+          "preview": "工具定义 · noop",
+          "toolName": "noop"
+        }
+      ],
+      "promptComposition": [
+        {
+          "kind": "user",
+          "evidenceId": "req:message:messages.0",
+          "characters": 9,
+          "requestId": "<record:1>"
+        },
+        {
+          "kind": "tool-definition",
+          "evidenceId": "req:tool-definition:tools.0.function",
+          "characters": 66,
+          "requestId": "<record:1>"
+        },
+        {
+          "kind": "user",
+          "evidenceId": "req:message:messages.0",
+          "characters": 9,
+          "requestId": "<record:2>"
+        },
+        {
+          "kind": "tool-definition",
+          "evidenceId": "req:tool-definition:tools.0.function",
+          "characters": 66,
+          "requestId": "<record:2>"
+        }
+      ],
+      "complete": true
+    }
+  },
+  "trajectoryAllSpaceConversation": {
+    "ok": {
+      "mode": "conversation",
+      "conversationId": "group:30001",
+      "records": [
+        {
+          "id": "<record:3>",
+          "sequence": 1,
+          "createdAt": "<time:5>",
+          "status": "success",
+          "durationMs": 42,
+          "method": "POST",
+          "url": "https://api.example.invalid/v1/chat/completions",
+          "provider": "baseline",
+          "model": "space-a",
+          "attribution": "attributed",
+          "entities": {
+            "scopeId": "<space:1>",
+            "botId": "20001",
+            "conversationId": "group:30001"
+          },
+          "requestBodyAvailable": true,
+          "responseBodyStatus": "complete",
+          "responseBodyFormat": "json",
+          "responseStatus": 200
+        }
+      ],
+      "rows": [
+        {
+          "id": "<record:3>:request",
+          "index": 1,
+          "kind": "request",
+          "preview": "baseline / space-a · 42 ms",
+          "durationMs": 42,
+          "startedAt": "<time:5>",
+          "requestId": "<record:3>",
+          "status": "success"
+        },
+        {
+          "id": "<record:3>:req:message:messages.0",
+          "index": 2,
+          "requestId": "<record:3>",
+          "source": "request",
+          "evidenceId": "req:message:messages.0",
+          "kind": "user",
+          "preview": "基线 space-a"
+        },
+        {
+          "id": "<record:3>:req:tool-definition:tools.0.function",
+          "index": 3,
+          "requestId": "<record:3>",
+          "source": "request",
+          "evidenceId": "req:tool-definition:tools.0.function",
+          "kind": "tool-definition",
+          "preview": "工具定义 · noop",
+          "toolName": "noop"
+        }
+      ],
+      "promptComposition": [
+        {
+          "kind": "user",
+          "evidenceId": "req:message:messages.0",
+          "characters": 10,
+          "requestId": "<record:3>"
+        },
+        {
+          "kind": "tool-definition",
+          "evidenceId": "req:tool-definition:tools.0.function",
+          "characters": 66,
+          "requestId": "<record:3>"
+        }
+      ],
+      "complete": true
+    }
+  },
+  "clearModelRequestsAll": {
+    "error": "Error: 全部空间视图不支持一次性清理"
+  },
+  "clearModelRequestsSpace": {
+    "ok": {
+      "cleared": 1
+    }
+  },
+  "clearModelRequestsUnattributed": {
+    "ok": {
+      "cleared": 1
+    }
+  },
+  "modelRequestsAfterClear": {
+    "ok": {
+      "records": [
+        {
+          "id": "<record:2>",
+          "sequence": 2,
+          "createdAt": "<time:3>",
+          "status": "error",
+          "durationMs": 42,
+          "method": "POST",
+          "url": "https://api.example.invalid/v1/chat/completions",
+          "provider": "baseline",
+          "model": "main-b",
+          "attribution": "attributed",
+          "entities": {
+            "scopeId": "main",
+            "botId": "20001",
+            "conversationId": "private:10001:20001"
+          },
+          "requestBodyAvailable": true,
+          "responseBodyStatus": "complete",
+          "responseBodyFormat": "json",
+          "responseStatus": 500,
+          "error": {
+            "code": "model_request_error",
+            "message": "HTTP 500",
+            "retryable": false,
+            "traceId": "baseline-main-b"
+          },
+          "source": {
+            "type": "main",
+            "name": "主环境"
+          }
+        },
+        {
+          "id": "<record:1>",
+          "sequence": 1,
+          "createdAt": "<time:4>",
+          "status": "success",
+          "durationMs": 42,
+          "method": "POST",
+          "url": "https://api.example.invalid/v1/chat/completions",
+          "provider": "baseline",
+          "model": "main-a",
+          "attribution": "attributed",
+          "entities": {
+            "scopeId": "main",
+            "botId": "20001",
+            "conversationId": "private:10001:20001"
+          },
+          "requestBodyAvailable": true,
+          "responseBodyStatus": "complete",
+          "responseBodyFormat": "json",
+          "responseStatus": 200,
+          "source": {
+            "type": "main",
+            "name": "主环境"
+          }
+        }
+      ],
+      "hasMore": false,
+      "earliestCursor": 1,
+      "capacity": {
+        "recordCount": 2,
+        "totalBytes": 1484,
+        "maxRecords": 1000,
+        "maxBytes": 104857600
+      }
+    }
+  },
+  "clearDebugRecordsFederated": {
+    "ok": {
+      "cleared": 2
+    }
+  },
+  "debugRecordsAfterClear": {
+    "ok": {
+      "records": [],
+      "hasMore": false,
+      "capacity": {
+        "recordCount": 0,
+        "totalBytes": 0,
+        "maxRecords": 10000,
+        "maxBytes": 104857600
+      }
+    }
+  }
+}
