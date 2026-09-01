@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import type { Context } from 'koishi'
 import { SandboxMcpError } from './types'
-import { SandboxMcpService, TOOL_DEFINITIONS } from './service'
+import { SandboxMcpService } from './service'
 import { HTTP_API_MAX_BODY_BYTES, handleHttpApiRequest, isHttpApiPath, toHttpApiErrorResponse } from './http-api'
 
 /** 一种协议表述在端点上的启用开关与路径。两种表述共用同一个监听器与同一套门禁。 */
@@ -245,8 +245,8 @@ export class SandboxTestEndpointServer {
 
   // 使用低层 Server 而非 McpServer.registerTool：后者要求 zod schema 才能生成
   // tools/list 的 inputSchema（通配 record 会序列化为空 properties，客户端将无从
-  // 得知参数契约）。参数校验本就在 service.executeTool 内完成，这里只需把
-  // TOOL_DEFINITIONS 携带的 JSON Schema 原样暴露。
+  // 得知参数契约）。参数校验本就在工具执行体内部完成，这里只需把工具注册表条目
+  // 携带的 JSON Schema 原样暴露。
   private createMcpServer(token: string, sourceIp: string): Server {
     const server = new Server({ name: 'koishi-plugin-chatluna-sandbox', version: '0.0.1' }, { capabilities: { tools: {}, resources: {} } })
     server.setRequestHandler(ListToolsRequestSchema, async () => ({

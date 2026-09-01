@@ -117,6 +117,31 @@ function enumerationBodies(source: string): string[] {
   })
 }
 
+/**
+ * 工具名不得出现在治理路径的判定里。
+ *
+ * 一个工具的配额档、空间解析方式、幂等与确认令牌标记以及执行体都是工具注册表条目上的字段，因此
+ * 治理里没有按名字分支的余地。规则拦住下一个想加特例的人。
+ *
+ * 谓词按标识符名判定（`tool`、`toolName`），刻意不用宽松的「某个名字等于字面量」形状：后者在模型
+ * 证据那一族里有一处合法命中（`name === 'input'` 判定的是模型请求变量的键），会变成误报。
+ */
+const TOOL_NAME_LITERAL_PREDICATES: readonly ArchitecturePredicate[] = [
+  { evidence: '工具名与字符串字面量相等或不等比较', pattern: /\b(?:tool|toolName)\s*(?:={2,3}|!={1,2})\s*'/ },
+  { evidence: '字符串字面量与工具名相等或不等比较', pattern: /'[^']*'\s*(?:={2,3}|!={1,2})\s*(?:[A-Za-z_$][\w$]*\s*\.\s*)?\b(?:tool|toolName)\b/ },
+  { evidence: '在工具名上做前缀判定', pattern: /\b(?:tool|toolName)\s*\.\s*startsWith\s*\(\s*'/ },
+]
+
+/**
+ * 抹掉 `typeof` 的操作数，只留运算符自身。
+ *
+ * `typeof args.tool === 'string'` 比较的是类型名而不是工具名，不抹掉它规则会把每一处参数取值
+ * 都当成违规。
+ */
+function stripTypeofOperands(source: string): string {
+  return source.replace(/\btypeof\s+[A-Za-z_$][\w$.]*/g, 'typeof')
+}
+
 interface ArchitectureRule {
   readonly name: string
   readonly extensions: readonly string[]
@@ -254,6 +279,21 @@ const rules: readonly ArchitectureRule[] = [
         .map(() => '事件类型与 raw message 出现在同一个对象字面量里')
     },
   },
+  {
+    /**
+     * 工具名从治理路径上消失是工具注册表落地的直接结果：分类与标记都是条目上的字段，执行体挂在
+     * 同一条条目上。规则跑遍服务端源码、不列文件白名单，也不需要持有者——注册表条目里工具名是
+     * 属性值而不是比较，谓词命不中它。
+     */
+    name: '工具名不得与字符串字面量比较',
+    extensions: ['.ts'],
+    findViolations: (_file, source) => {
+      const normalized = stripTypeofOperands(source)
+      return TOOL_NAME_LITERAL_PREDICATES
+        .filter(({ pattern }) => pattern.test(normalized))
+        .map(({ evidence }) => evidence)
+    },
+  },
 ]
 
 interface ArchitectureExemption {
@@ -276,9 +316,9 @@ interface ArchitectureExemption {
  * 已知违规的显式豁免清单，与守卫断言放在同一处，改服务端代码的人立刻看到。
  * 理由与负责人均为必填；豁免不是放行，是有主的债务。
  *
- * 四条规则里三条当前无例外：全部会话查找都已经收进解析模块，全部记录域枚举都已经收进记录域
- * 目录，入站消息事件组装只剩投递模块那一处。转售那条留下两处，都在同一个文件里，因此按成员
- * 登记——同一文件长出第三个转售成员仍要报出。
+ * 五条规则里四条当前无例外：全部会话查找都已经收进解析模块，全部记录域枚举都已经收进记录域
+ * 目录，入站消息事件组装只剩投递模块那一处，工具名在治理路径上已经不存在。转售那条留下两处，
+ * 都在同一个文件里，因此按成员登记——同一文件长出第三个转售成员仍要报出。
  */
 const exemptions: readonly ArchitectureExemption[] = [
   {
@@ -322,7 +362,7 @@ function isExempted(violation: string, allowed: readonly ArchitectureExemption[]
 }
 
 describe('服务端架构守卫', () => {
-  it('四条规则对服务端源码全量生效，未登记的违规按文件、规则与成员报出', () => {
+  it('五条规则对服务端源码全量生效，未登记的违规按文件、规则与成员报出', () => {
     expect(findAllViolations().filter((violation) => !isExempted(violation, exemptions))).toEqual([])
   })
 
@@ -539,6 +579,31 @@ describe('服务端架构守卫', () => {
 
     // 投递模块自身是规则的持有者。
     expect(rule.findViolations('src/inbound-delivery.ts', "{ post_type: 'message', raw_message: rawMessage }")).toEqual([])
+  })
+
+  it('工具名规则认得出相等、不等与前缀三种写法，也不误报属性值、类型判定与模型证据那处名字比较', () => {
+    const rule = rules.find(({ name }) => name === '工具名不得与字符串字面量比较')
+    if (!rule) throw new Error('工具名架构规则缺失')
+
+    // 分派链、配额分类与那句九项否定条件原先的三种写法。
+    expect(rule.findViolations('src/x.ts', "if (tool === 'get_server_info') return this.serverInfo()")).not.toEqual([])
+    expect(rule.findViolations('src/x.ts', "this.resolveControl(args, tool !== 'get_scene_snapshot' && tool !== 'export_scene')")).not.toEqual([])
+    expect(rule.findViolations('src/x.ts', "const category = tool.startsWith('wait_for_') ? 'wait' : 'read'")).not.toEqual([])
+    // 换个持有工具名的表达式一样算，规则不靠「裸标识符」这个形状。
+    expect(rule.findViolations('src/x.ts', "if (args.tool === 'reset_scene') return true")).not.toEqual([])
+    expect(rule.findViolations('src/x.ts', "if ('clear_scene' === confirmation.tool) return true")).not.toEqual([])
+    expect(rule.findViolations('src/x.ts', "if (toolName === 'upload_media') return 'upload'")).not.toEqual([])
+
+    // 注册表条目里工具名是属性值而不是比较，谓词命不中它——这正是本规则零豁免的原因。
+    expect(rule.findViolations('src/mcp/tool-registry.ts', "{ name: 'get_server_info', scope: 'read', quota: 'read' }")).toEqual([])
+    expect(rule.findViolations('src/mcp/tool-registry.ts', "tool: { type: 'string', enum: ['reset_scene', 'clear_scene'] }")).toEqual([])
+    // 类型判定比较的是类型名而不是工具名。
+    expect(rule.findViolations('src/x.ts', "tool: typeof args.tool === 'string' ? args.tool : undefined")).toEqual([])
+    // 两个标识符之间的比较不是按名字开特例。
+    expect(rule.findViolations('src/x.ts', 'if (confirmation.tool !== entry.name) return false')).toEqual([])
+    expect(rule.findViolations('src/x.ts', 'if (input.tool && record.tool !== input.tool) return false')).toEqual([])
+    // 模型证据那一族里这处名字比较是合法的：宽松形状会把它当成违规，因此规则按标识符名判定。
+    expect(rule.findViolations('src/model-evidence/request.ts', "if (name === 'input') return isRecord(value)")).toEqual([])
   })
 
   /**
