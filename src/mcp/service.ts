@@ -1954,7 +1954,7 @@ export class SandboxMcpService {
      * 不跟着放开，这处能力不对等见 ADR-0083。
      */
     if (scope.kind === 'all') {
-      const hit = await this.scopes.findFirst((recordScope) => recordScope.control.getModelRequestStore().getRecord(recordId))
+      const hit = await this.scopes.findFirst((recordScope) => recordScope.records.getRecord(recordId))
       if (!hit) throw new SandboxMcpError('record_not_found', `模型请求记录不存在：${recordId}`)
       return { ...hit.value, source: this.describeRecordScope(hit.scope) }
     }

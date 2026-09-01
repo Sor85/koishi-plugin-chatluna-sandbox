@@ -134,6 +134,57 @@ describe('模型请求 Console 协议', () => {
     }
   })
 
+  /**
+   * 会话轨迹要按记录域取到那条记录所属的记录库才聚得起同会话步骤。三种来路各断言一次：
+   * 收拢前这里是按来路三层嵌套的三元表达式，换一种来路就多一层。
+   */
+  it('主环境、测试空间与未归属三种来路的会话轨迹都聚得起同会话步骤', async () => {
+    const app = new App()
+    runningApps.push(app)
+    const runtimeBots = new SandboxRuntimeBotRegistry()
+    const control = new SandboxControlService(app, { runtimeBots })
+    const spaces = new SandboxTestSpaceService(app, runtimeBots)
+    const space = spaces.createSpace({ name: '轨迹空间' })
+    const unattributed = new SandboxModelRequestStore()
+    const listeners = new Map<string, (...args: any[]) => any>()
+    registerConsole({
+      addEntry() {},
+      addListener(event, callback) { listeners.set(event, callback as never) },
+      broadcast() {},
+    }, control, appearance, undefined, spaces, unattributed)
+
+    const request = (model: string, conversationId: string) => ({
+      status: 'success' as const,
+      durationMs: 1,
+      model,
+      attribution: 'attributed' as const,
+      entities: { scopeId: 'main', botId: '20001', conversationId },
+      requestBodyAvailable: true,
+      requestBody: { model, messages: [{ role: 'user', content: model }] },
+    })
+    const mainStore = control.getModelRequestStore()
+    const spaceStore = space.control.getModelRequestStore()
+    const mainFirst = mainStore.append(request('main-1', 'private:10001:20001'))
+    mainStore.append(request('main-2', 'private:10001:20001'))
+    const spaceFirst = spaceStore.append(request('space-1', 'group:30001'))
+    spaceStore.append(request('space-2', 'group:30001'))
+    const lostFirst = unattributed.append({ ...request('lost-1', 'group:30002'), attribution: 'unattributed' })
+    unattributed.append({ ...request('lost-2', 'group:30002'), attribution: 'unattributed' })
+
+    const trajectory = listeners.get('chatluna-sandbox/model-request-trajectory')
+    if (!trajectory) throw new Error('模型请求轨迹监听器未注册')
+    const models = async (input: unknown) => (
+      (await trajectory(input) as { records: Array<{ model?: string }> }).records.map(({ model }) => model)
+    )
+
+    expect(await models({ scope: 'main', recordId: mainFirst.id, mode: 'conversation' })).toEqual(['main-1', 'main-2'])
+    expect(await models({ scope: 'space', spaceId: space.id, recordId: spaceFirst.id, mode: 'conversation' })).toEqual(['space-1', 'space-2'])
+    expect(await models({ scope: 'unattributed', recordId: lostFirst.id, mode: 'conversation' })).toEqual(['lost-1', 'lost-2'])
+    // 全部空间视图下来源标注决定去哪个记录库聚合，主环境与测试空间各走一次。
+    expect(await models({ scope: 'all', recordId: mainFirst.id, mode: 'conversation' })).toEqual(['main-1', 'main-2'])
+    expect(await models({ scope: 'all', recordId: spaceFirst.id, mode: 'conversation' })).toEqual(['space-1', 'space-2'])
+  })
+
   it('在详情读取时解析后加载的 ChatLuna Usage 服务', async () => {
     const app = new App()
     runningApps.push(app)

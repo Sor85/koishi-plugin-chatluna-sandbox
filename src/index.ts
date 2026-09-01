@@ -280,9 +280,9 @@ export function apply(ctx: Context, config: Config) {
           // 请求归属后空间可能被并发删除；此时不把引用错误写入其他空间。
         }
       },
-      getCandidates: () => scopes.listScenes().map(({ id, control: scopeControl }) => ({
+      getCandidates: () => scopes.listScenes().map(({ id, records, control: scopeControl }) => ({
         scopeId: id,
-        store: scopeControl.getModelRequestStore(),
+        store: records,
         thinking: scopeControl.getThinkingModelRequestTargets(),
       })),
     })
@@ -290,9 +290,7 @@ export function apply(ctx: Context, config: Config) {
       ? 'ChatLuna 模型请求采集器已安装。'
       : '未找到 ChatLuna 运行时，模型请求采集器未安装。')
     // 用量关联要覆盖未归属记录库，因此用完整清单而不是只看拥有场景的那些。
-    const modelRequestStores = () => scopes.listScopes().map((scope) => (scope.kind === 'unattributed'
-      ? scope.records
-      : scope.control.getModelRequestStore()))
+    const modelRequestStores = () => scopes.listScopes().map(({ records }) => records)
     inner.on('chatluna/model-usage', (payload) => {
       // 记录库读取是异步的，事件回调不可等待；失败只写日志，不影响 ChatLuna 主流程。
       void linkChatLunaUsageRequest(modelRequestStores(), payload).catch((error) => {
@@ -303,14 +301,8 @@ export function apply(ctx: Context, config: Config) {
     const presetService = new SandboxPresetService({
       baseDir: inner.baseDir,
       mainModelRequests: control.getModelRequestStore(),
-      getTestSpaceModelRequests: (spaceId) => {
-        if (spaceId === MAIN_MODEL_REQUEST_SCOPE_ID) return control.getModelRequestStore()
-        try {
-          return testSpaces.getControl(spaceId).getModelRequestStore()
-        } catch {
-          return undefined
-        }
-      },
+      // 运行时预设快照只按记录域标识归属，因此按标识取一次即可；空间被并发删除时目录里没有它。
+      getTestSpaceModelRequests: (spaceId) => scopes.getModelRequests(spaceId),
     })
     try {
       const mcp = new SandboxMcpService(inner, control, {

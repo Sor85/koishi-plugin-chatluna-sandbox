@@ -17,6 +17,7 @@ import {
   DEFAULT_MODEL_REQUEST_PAGE_SIZE,
   MAIN_MODEL_REQUEST_SCOPE_ID,
   MAX_MODEL_REQUEST_PAGE_SIZE,
+  UNATTRIBUTED_MODEL_REQUEST_SCOPE_ID,
   type SandboxModelRequestStore,
 } from './model-request'
 import { createScopeDirectory, type SceneScope } from './scope-directory'
@@ -375,6 +376,16 @@ export function registerConsole(
     const space = testSpaces.getSpace(input.spaceId)
     return { type: 'test-space', spaceId: space.id, name: space.name }
   }
+  /**
+   * 来源标注反过来给出记录域标识：这是记录库查找的唯一入参，来路种类不再决定分支数。
+   *
+   * 反向映射写在这里而不是记录域目录里：`SandboxModelRequestSource` 是 Console 契约的出参形状，
+   * 记录域目录只认标识。
+   */
+  const modelRequestScopeId = (source: SandboxModelRequestSource): string => {
+    if (source.type === 'test-space') return source.spaceId
+    return source.type === 'unattributed' ? UNATTRIBUTED_MODEL_REQUEST_SCOPE_ID : MAIN_MODEL_REQUEST_SCOPE_ID
+  }
   const resolveModelRequestControl = (input: SandboxModelRequestScope) => {
     if (input.scope === 'unattributed' || input.scope === 'all') return
     if (input.scope === 'main') return control
@@ -426,7 +437,7 @@ export function registerConsole(
   }
   const readModelRequestRecord = async (input: ReadSandboxModelRequestRecordInput): Promise<SandboxConsoleModelRequestDetail> => {
     if (input.scope === 'all') {
-      const hit = await scopes.findFirst((scope) => scope.control.getModelRequestStore().getRecord(input.recordId))
+      const hit = await scopes.findFirst((scope) => scope.records.getRecord(input.recordId))
       if (!hit) throw new SandboxDomainError(`模型请求记录不存在：${input.recordId}`)
       return { ...hit.value, source: sceneSource(hit.scope) }
     }
@@ -444,15 +455,9 @@ export function registerConsole(
   }
   const getModelRequestTrajectory = async (input: ReadSandboxModelRequestTrajectoryInput): Promise<SandboxModelRequestTrajectory> => {
     const detail = await readModelRequestRecord(input)
-    const store = input.scope === 'all'
-      ? detail.source.type === 'main'
-        ? control.getModelRequestStore()
-        : detail.source.type === 'test-space'
-          ? testSpaces?.getControl(detail.source.spaceId).getModelRequestStore()
-          : undefined
-      : input.scope === 'unattributed'
-        ? requireUnattributedModelRequests()
-        : resolveModelRequestControl(input)?.getModelRequestStore()
+    // 来源标注已经说明这条记录属于哪个记录域，因此记录库按同一个标识取一次就够，
+    // 不必再按「全部空间 / 未归属 / 单空间」三种来路各挑一遍。
+    const store = scopes.getModelRequests(modelRequestScopeId(detail.source))
     return buildSandboxModelRequestTrajectoryFromStore({ record: detail, mode: input.mode, store })
   }
   const clearModelRequestRecords = async (input: SandboxModelRequestScope): Promise<ClearSandboxModelRequestRecordsResult> => {

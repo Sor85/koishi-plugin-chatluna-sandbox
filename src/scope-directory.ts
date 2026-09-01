@@ -17,12 +17,18 @@ import type { SandboxTestSpaceService } from './test-spaces'
 export const MAIN_SCOPE_NAME = '主环境'
 export const UNATTRIBUTED_SCOPE_NAME = '未归属'
 
-/** 一份沙盒场景对应的记录域：主模拟 QQ 环境或某个 AI 测试空间，两者都有控制服务。 */
+/**
+ * 一份沙盒场景对应的记录域：主模拟 QQ 环境或某个 AI 测试空间，两者都有控制服务。
+ *
+ * 也带模型请求库：跨记录域读一条记录原先要写成「取记录域 → 取控制服务 → 取记录库」，
+ * 穿两层只为拿到一个字段。`control` 仍然留着，读取之外的事（等就绪、清场景）还归它。
+ */
 export interface SceneScope {
   readonly kind: 'main' | 'test-space'
   readonly id: string
   readonly name: string
   readonly control: SandboxControlService
+  readonly records: SandboxModelRequestStore
 }
 
 /**
@@ -112,6 +118,13 @@ export interface ScopeDirectory {
   /** 只要有沙盒场景的那些记录域。归属查找与联邦读取都只看这一批。 */
   listScenes(): SceneScope[]
   /**
+   * 按记录域标识取模型请求库；标识不属于任何记录域时返回 undefined。
+   *
+   * 「主模拟 QQ 环境、AI 测试空间、未归属各自的记录库在哪」只有这一处答案。原先它写成按记录
+   * 来路三层嵌套的三元表达式，每加一种来路就多一层；现在换一种来路只是换一个标识。
+   */
+  getModelRequests(scopeId: string): SandboxModelRequestStore | undefined
+  /**
    * 跨全部沙盒场景读一次并合并成一页。未归属永不参与——这条规则由本模块拥有，
    * 而不是由每个调用点各写一次 `filter`。
    */
@@ -150,13 +163,36 @@ export interface ScopeDirectoryInput {
 
 export function createScopeDirectory({ control, testSpaces, unattributedModelRequests }: ScopeDirectoryInput): ScopeDirectory {
   const listScenes = (): SceneScope[] => [
-    { kind: 'main', id: MAIN_MODEL_REQUEST_SCOPE_ID, name: MAIN_SCOPE_NAME, control },
-    ...(testSpaces?.listSpaces() ?? []).map(({ id, name }): SceneScope => ({
-      kind: 'test-space',
-      id,
-      name,
-      control: testSpaces!.getControl(id),
-    })),
+    {
+      kind: 'main',
+      id: MAIN_MODEL_REQUEST_SCOPE_ID,
+      name: MAIN_SCOPE_NAME,
+      control,
+      records: control.getModelRequestStore(),
+    },
+    ...(testSpaces?.listSpaces() ?? []).map(({ id, name }): SceneScope => {
+      const spaceControl = testSpaces!.getControl(id)
+      return {
+        kind: 'test-space',
+        id,
+        name,
+        control: spaceControl,
+        records: spaceControl.getModelRequestStore(),
+      }
+    }),
+  ]
+
+  /** 全部记录域，未归属排在末尾；缺席的成员不出现，而不是留一个空洞。 */
+  const listScopes = (): RecordScope[] => [
+    ...listScenes(),
+    ...(unattributedModelRequests
+      ? [{
+          kind: 'unattributed' as const,
+          id: UNATTRIBUTED_MODEL_REQUEST_SCOPE_ID,
+          name: UNATTRIBUTED_SCOPE_NAME,
+          records: unattributedModelRequests,
+        }]
+      : []),
   ]
 
   /**
@@ -173,17 +209,8 @@ export function createScopeDirectory({ control, testSpaces, unattributedModelReq
 
   return {
     listScenes,
-    listScopes: () => [
-      ...listScenes(),
-      ...(unattributedModelRequests
-        ? [{
-            kind: 'unattributed' as const,
-            id: UNATTRIBUTED_MODEL_REQUEST_SCOPE_ID,
-            name: UNATTRIBUTED_SCOPE_NAME,
-            records: unattributedModelRequests,
-          }]
-        : []),
-    ],
+    listScopes,
+    getModelRequests: (scopeId) => listScopes().find(({ id }) => id === scopeId)?.records,
 
     async federate(read, options) {
       const scenes = listScenes()

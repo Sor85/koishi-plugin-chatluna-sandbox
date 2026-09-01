@@ -237,4 +237,41 @@ describe('记录域目录', () => {
 
     expect(await directory.forEachScene(async ({ name }) => name)).toEqual(['主环境', '甲', '乙'])
   })
+
+  /**
+   * 记录域自己带模型请求库：跨记录域读一条记录不再写成「取记录域 → 取控制服务 → 取记录库」。
+   */
+  it('场景那一支直接给出模型请求库，从记录域读一条记录不经控制服务', async () => {
+    const { directory, control, created } = createHarness({ spaces: ['甲'], unattributed: true })
+    const [main, space] = directory.listScenes()
+    const appended = main!.records.append({
+      status: 'success', durationMs: 1, model: 'main-model',
+      attribution: 'attributed', entities: { scopeId: 'main' }, requestBodyAvailable: false,
+    })
+
+    expect(main!.records).toBe(control.getModelRequestStore())
+    expect(space!.records).not.toBe(main!.records)
+    expect((await main!.records.getRecord(appended.id))?.model).toBe('main-model')
+    expect(await space!.records.getRecord(appended.id)).toBeUndefined()
+    const hit = await directory.findFirst((scope) => scope.records.getRecord(appended.id))
+    expect(hit?.scope).toMatchObject({ kind: 'main', id: 'main' })
+    expect(created[0]!.id).toBe(space!.id)
+  })
+
+  it('按记录域标识取模型请求库，主环境、测试空间与未归属各一处答案', () => {
+    const { directory, control, created } = createHarness({ spaces: ['甲'], unattributed: true })
+    const [, space] = directory.listScopes()
+    const unattributed = directory.listScopes().at(-1)!
+
+    expect(directory.getModelRequests('main')).toBe(control.getModelRequestStore())
+    expect(directory.getModelRequests(created[0]!.id)).toBe(space!.records)
+    expect(directory.getModelRequests('unattributed')).toBe(unattributed.records)
+    expect(directory.getModelRequests('不存在的记录域')).toBeUndefined()
+  })
+
+  it('未归属缺席时按它的标识也取不到记录库', () => {
+    const { directory } = createHarness({ spaces: ['甲'] })
+
+    expect(directory.getModelRequests('unattributed')).toBeUndefined()
+  })
 })
