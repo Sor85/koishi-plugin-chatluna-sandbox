@@ -73,7 +73,9 @@
 
 ### 领域词汇
 
-核过一遍：`CONTEXT.md` 已有 OneBot 调试记录、模型请求记录、MCP 调用记录、预设文档等条目，「端口」「隐式定域」属架构层面而非领域词汇（既有 ADR 0074 承担）。无需新词，未改动。
+核过一遍，`CONTEXT.md` 无需新词、未改动：OneBot 调试记录、模型请求记录、**测试调用记录**、预设文档等条目都已在册；「端口」「隐式定域」属架构层面而非领域词汇（既有 ADR 0074 承担）。
+
+初次核对时把「MCP 调用记录」当成了正式词，实际它在「机器人动作记录」的 `_Avoid_` 行上，正式词是**测试调用记录**。本次新写的散文（ADR 0074 新增段、`mcp-call-record-port.ts` 与 `fake-mcp-call-record-port.ts` 的文档注释）已按 `docs/agents/domain.md`「不得重新使用词汇表中明确列入 `_Avoid_` 的同义词」改正；interface 名与方法名沿用既有 `Mcp` 前缀不动。
 
 ### ADR
 
@@ -88,3 +90,9 @@
 - DOM 快照：`evidence/dom-baseline.html` 与 `evidence/dom-after-02.html` 逐字节相同。
 - `git diff --stat` 不含 `src/` 路径（两票累计 `git diff --stat -- src` 为空）。
 - 架构守卫：零新增违规、零新增豁免，`UNTREATED_FILE_BUDGET` 未动。
+
+### 复审补记（`/code-review`）
+
+- 隐式定域模块从 `koishi-space-scope.ts` / `createSpaceScope` 改名为 `koishi-implicit-space-scope.ts` / `createImplicitSpaceScope`：`scope` 在本仓库已被模型请求记录的**分类**占用，容易读成同一个概念；新名字直接对上 ADR 里的「隐式定域」。
+- 「共用一个实参」落到字面：页面装配原先给两道定域端口各写了一个同形的箭头函数，现在提成 `const resolveActiveSpaceId = () => activeSpaceId.value` 传给两处。外壳的 `getActiveSpaceId` 与场景广播过滤那两处读的是同一个 ref，但不是适配器的定域实参，本轮不动。
+- 未采纳：`tests/workspace-shell-regions.test.ts` 里 `createRegionPorts().rejectNext` 按 `operation in candidate` 找宿主再转调，形状上像 Feature Envy。保留的理由是它买到的东西——用例继续只陈述「哪个操作的失败落进哪个区域的错误位」，不必再复述哪道端口拥有哪个操作，而后者恰恰是这次拆分不该教给这个用例的知识。操作名跨五道端口不重名，找不到宿主时直接抛错，不会静默漏掉。

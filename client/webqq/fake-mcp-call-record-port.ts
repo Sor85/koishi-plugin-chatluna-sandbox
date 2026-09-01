@@ -3,7 +3,7 @@ import type { SandboxMcpCallRecord } from '../../src/mcp/types'
 import { FakePortRecorder } from './fake-port-recorder'
 import type { McpCallRecordPort, McpCallRecordPortOperation } from './mcp-call-record-port'
 
-/** 内存 MCP 调用记录端口。详情可以直接改写，也可以由列表结果按记录标识兜出来。 */
+/** 内存测试调用记录端口。详情可以直接改写，也可以由列表结果按记录标识兜出来。 */
 export class FakeMcpCallRecordPort implements McpCallRecordPort {
   mcpCallRecordsResult: SandboxMcpCallRecordsPage = { records: [] }
   mcpCallRecordResult?: SandboxMcpCallRecord

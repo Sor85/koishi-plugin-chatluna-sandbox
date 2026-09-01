@@ -226,12 +226,15 @@ import { createWebqqWorkspaceShell } from './webqq/workspace-shell'
 import { createAiTestSpaceShell } from './webqq/test-space-shell'
 
 const activeSpaceId = ref<string>()
-const workspacePort = createKoishiWorkspacePort(() => activeSpaceId.value)
+// 两道定域的端口收同一个「解析当前空间标识」的实参，不是各写一个同形的箭头函数：
+// 定域来源只有一处，改它不会漏掉其中一道。
+const resolveActiveSpaceId = () => activeSpaceId.value
+const workspacePort = createKoishiWorkspacePort(resolveActiveSpaceId)
 // 调试记录那道跟工作区端口收同一个「解析当前空间标识」的实参；余下三道的适配器不注入空间
 // 标识，因此不需要第二份实例，构造一次就够。
 const workspaceController = createWorkspaceController({
   workspace: workspacePort,
-  oneBotDebug: createKoishiOneBotDebugPort(() => activeSpaceId.value),
+  oneBotDebug: createKoishiOneBotDebugPort(resolveActiveSpaceId),
   modelRequest: createKoishiModelRequestPort(),
   preset: createKoishiPresetPort(),
   mcpCallRecord: createKoishiMcpCallRecordPort(),

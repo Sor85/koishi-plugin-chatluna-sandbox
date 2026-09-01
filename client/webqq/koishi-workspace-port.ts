@@ -1,6 +1,6 @@
 import { receive, send } from '@koishijs/client'
 import type { SandboxSceneMutationPayload } from '../../src/console-contract'
-import { createSpaceScope } from './koishi-space-scope'
+import { createImplicitSpaceScope } from './koishi-implicit-space-scope'
 import type { SceneMutationListener, WorkspacePort } from './workspace-port'
 
 const mutationListeners = new Set<SceneMutationListener>()
@@ -30,7 +30,7 @@ export function installContextSceneMutationReceiver(ctx: unknown) {
 }
 
 export function createKoishiWorkspacePort(resolveSpaceId: () => string | undefined = () => undefined): WorkspacePort {
-  const scoped = createSpaceScope(resolveSpaceId)
+  const scoped = createImplicitSpaceScope(resolveSpaceId)
   return {
   // Koishi Console 会把省略的 send 参数序列化为 null；服务端工作区接口需要收到普通对象才能执行 fallback。
   getWorkspace: (input = {}) => send('chatluna-sandbox/workspace', scoped(input)),
