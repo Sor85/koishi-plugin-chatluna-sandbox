@@ -41,6 +41,48 @@ const SCOPE_DIRECTORY_MODULE_PATTERN = /(?:^|\/)scope-directory\.ts$/
 /** 按标识取控制服务的全部写法，外加测试控制端点自己那层包装。 */
 const CONTROL_LOOKUP_PATTERN = /\b(?:getControl|resolveControl|requireReadable|requireAiControl|requireUserControl)\s*\(/
 
+/**
+ * 入站投递模块自身是「入站消息事件字段怎么组装」这条规则的唯一持有者，同样按形状判定。
+ */
+const INBOUND_DELIVERY_MODULE_PATTERN = /(?:^|\/)inbound-delivery\.ts$/
+
+/**
+ * 入站消息事件组装的形状：事件类型与 raw message 出现在**同一个**对象字面量里。
+ *
+ * 两者分处不同字面量都不算：读取方向那份 `get_msg` 回执带 raw message 但不带事件类型，
+ * notice 与 request 那五份带事件类型但不带 raw message，两类都命不中，因此不需要豁免。
+ */
+const INBOUND_EVENT_TYPE_PATTERN = /\bpost_type\s*:/
+const INBOUND_RAW_MESSAGE_PATTERN = /\braw_message\s*:/
+
+/** 去掉嵌套层，只留本层文本，用于判定两个键是不是同一个对象字面量的自有属性。 */
+function stripNestedBraces(body: string): string {
+  let depth = 0
+  let stripped = ''
+  for (const char of body) {
+    if (char === '{') {
+      depth += 1
+      continue
+    }
+    if (char === '}') {
+      depth -= 1
+      continue
+    }
+    if (depth === 0) stripped += char
+  }
+  return stripped
+}
+
+/** 源码里每个对象字面量的自有属性文本。 */
+function objectLiteralOwnLevels(source: string): string[] {
+  const levels: string[] = []
+  for (let index = 0; index < source.length; index += 1) {
+    if (source[index] !== '{') continue
+    levels.push(stripNestedBraces(readBalanced(source, index)))
+  }
+  return levels
+}
+
 /** 从开括号处取出与之配对的那一段文本，用于把「清单交给了谁」这段范围切出来。 */
 function readBalanced(source: string, openIndex: number): string {
   const open = source[openIndex]!
@@ -196,6 +238,22 @@ const rules: readonly ArchitectureRule[] = [
       })
     },
   },
+  {
+    /**
+     * 三条发送路径原先各自组装一份几乎相同的投递数据，第四份在机器人适配器里。收进投递模块
+     * 之后，规则拦住第五份：给投递加一种能力时三条路自动都有，不会出现只加了一条路的情况。
+     */
+    name: '只有入站投递模块能组装入站消息事件字段',
+    extensions: ['.ts'],
+    findViolations: (file, source) => {
+      if (INBOUND_DELIVERY_MODULE_PATTERN.test(file)) return []
+      // 绝大多数文件里没有 raw message，先短路省掉逐个字面量的扫描。
+      if (!INBOUND_RAW_MESSAGE_PATTERN.test(source)) return []
+      return objectLiteralOwnLevels(source)
+        .filter((level) => INBOUND_EVENT_TYPE_PATTERN.test(level) && INBOUND_RAW_MESSAGE_PATTERN.test(level))
+        .map(() => '事件类型与 raw message 出现在同一个对象字面量里')
+    },
+  },
 ]
 
 interface ArchitectureExemption {
@@ -218,8 +276,9 @@ interface ArchitectureExemption {
  * 已知违规的显式豁免清单，与守卫断言放在同一处，改服务端代码的人立刻看到。
  * 理由与负责人均为必填；豁免不是放行，是有主的债务。
  *
- * 前两条规则当前无例外：全部会话查找都已经收进解析模块，全部记录域枚举都已经收进记录域目录。
- * 第三条规则留下两处，都在同一个文件里，因此按成员登记——同一文件长出第三个转售成员仍要报出。
+ * 四条规则里三条当前无例外：全部会话查找都已经收进解析模块，全部记录域枚举都已经收进记录域
+ * 目录，入站消息事件组装只剩投递模块那一处。转售那条留下两处，都在同一个文件里，因此按成员
+ * 登记——同一文件长出第三个转售成员仍要报出。
  */
 const exemptions: readonly ArchitectureExemption[] = [
   {
@@ -263,7 +322,7 @@ function isExempted(violation: string, allowed: readonly ArchitectureExemption[]
 }
 
 describe('服务端架构守卫', () => {
-  it('三条规则对服务端源码全量生效，未登记的违规按文件、规则与成员报出', () => {
+  it('四条规则对服务端源码全量生效，未登记的违规按文件、规则与成员报出', () => {
     expect(findAllViolations().filter((violation) => !isExempted(violation, exemptions))).toEqual([])
   })
 
@@ -434,6 +493,52 @@ describe('服务端架构守卫', () => {
       '}',
       '',
     ].join('\n'))).toEqual([])
+  })
+
+  it('入站消息事件规则认得出同一字面量里的事件类型与 raw message，也不误报读取方向与通知那两族', () => {
+    const rule = rules.find(({ name }) => name === '只有入站投递模块能组装入站消息事件字段')
+    if (!rule) throw new Error('入站投递架构规则缺失')
+
+    // 沙盒挂在会话上的原始载荷就是这个形状，嵌一层也照样认得出。
+    expect(rule.findViolations('src/x.ts', [
+      'Object.assign(session, {',
+      '  onebot: {',
+      "    post_type: 'message',",
+      "    message_type: 'private',",
+      '    message: segments,',
+      '    raw_message: rawMessage,',
+      '  },',
+      '})',
+    ].join('\n'))).toEqual(['事件类型与 raw message 出现在同一个对象字面量里'])
+
+    // 读取方向那份带 raw message 但不带事件类型，是 get_msg 的回执而不是一次入站事件。
+    expect(rule.findViolations('src/x.ts', [
+      'return {',
+      "  message_type: conversation?.type === 'group' ? 'group' : 'private',",
+      '  message: onebotMessage,',
+      '  raw_message: toOneBotRawMessage(onebotMessage),',
+      '}',
+    ].join('\n'))).toEqual([])
+
+    // notice 与 request 那五份带事件类型但不带 raw message，组装留在控制服务是本轮的决定。
+    expect(rule.findViolations('src/x.ts', [
+      'Object.assign(session, {',
+      '  onebot: {',
+      "    post_type: 'notice',",
+      '    notice_type: noticeType,',
+      '    ...noticeData,',
+      '  },',
+      '})',
+    ].join('\n'))).toEqual([])
+
+    // 两者分处不同字面量不是一次组装，不得合报。
+    expect(rule.findViolations('src/x.ts', [
+      "const head = { post_type: 'message' }",
+      'const body = { raw_message: rawMessage }',
+    ].join('\n'))).toEqual([])
+
+    // 投递模块自身是规则的持有者。
+    expect(rule.findViolations('src/inbound-delivery.ts', "{ post_type: 'message', raw_message: rawMessage }")).toEqual([])
   })
 
   /**

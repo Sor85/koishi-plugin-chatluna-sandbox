@@ -21,6 +21,7 @@ import {
   resolveOneBotMessageId,
 } from './onebot-profiles'
 import { createOneBotDebugError } from './onebot-debug'
+import type { InboundEventConversations } from './inbound-delivery'
 import { MAX_MEDIA_SIZE } from './media-storage'
 import {
   listVisibleConversationIds,
@@ -92,7 +93,17 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
   private implementation: SandboxImplementationProfile
   private disabledCapabilities: string[]
 
-  constructor(ctx: Context, public control: SandboxControlService, config: SandboxBot.Config) {
+  constructor(
+    ctx: Context,
+    public control: SandboxControlService,
+    config: SandboxBot.Config,
+    /**
+     * 本机器人此刻正在处理的入站消息事件来自哪个会话，由入站投递维护。
+     *
+     * 直接读窗口而不是转手一层控制服务：这件事的持有者是投递模块，中间那一层什么也不知道。
+     */
+    private readonly inboundEventConversations: InboundEventConversations,
+  ) {
     // 被测插件通常按 session.platform === 'onebot' 选择协议逻辑；
     // 沙盒身份由服务和机器人配置区分，不能伪造一个插件无法识别的新平台名。
     super(ctx, config, 'onebot')
@@ -923,7 +934,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
    */
   private resolveHistoryConversation(target: OneBotActionTarget, rootConversationId: string): string {
     target.addressedRootConversationId = rootConversationId
-    const eventConversationId = this.control.getInboundEventConversationId(this.selfId)
+    const eventConversationId = this.inboundEventConversations.current(this.selfId)
     const source = eventConversationId
       ? resolveConversation(this.control.getSnapshot(), eventConversationId)
       : undefined
@@ -946,7 +957,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
    */
   private observeConversation(target: OneBotActionTarget): SandboxOneBotConversationObservation | undefined {
     const { conversationId, addressedRootConversationId } = target
-    const eventConversationId = this.control.getInboundEventConversationId(this.selfId)
+    const eventConversationId = this.inboundEventConversations.current(this.selfId)
     if (!conversationId || !eventConversationId) return undefined
     if (addressedRootConversationId !== undefined) {
       // 读取路径：寻址结果被改写过就说明跟随发生了，此时读到的会话一定是来源实例本身。

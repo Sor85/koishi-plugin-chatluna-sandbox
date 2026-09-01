@@ -1,0 +1,1001 @@
+{
+  "captured": [
+    {
+      "event": {
+        "type": "message-created",
+        "timestamp": 1767225604000,
+        "user": {
+          "id": "10001",
+          "name": "测试用户1"
+        },
+        "channel": {
+          "id": "private:10001:20001",
+          "type": 1
+        },
+        "message": {
+          "id": "<message-1>",
+          "messageId": "<message-1>",
+          "content": "基线私聊文本"
+        },
+        "selfId": "20001",
+        "platform": "onebot",
+        "sn": 3,
+        "login": {
+          "sn": 1,
+          "user": {
+            "id": "20001",
+            "name": "Koishi",
+            "avatar": "<avatar-4>"
+          },
+          "platform": "onebot",
+          "selfId": "20001",
+          "status": 1,
+          "hidden": true,
+          "features": [
+            "message.create",
+            "message.delete",
+            "message.get",
+            "message.list",
+            "upload.create",
+            "guild.get",
+            "guild.list",
+            "guild.member.get",
+            "guild.member.list",
+            "guild.member.kick",
+            "guild.member.role.set",
+            "guild.member.role.unset",
+            "login.get",
+            "user.get",
+            "user.channel.create",
+            "friend.list",
+            "friend.delete",
+            "friend.approve",
+            "guild.approve",
+            "guild.member.approve"
+          ],
+          "adapter": "onebot"
+        },
+        "id": 3
+      },
+      "onebot": {
+        "time": 1767225605,
+        "self_id": 20001,
+        "post_type": "message",
+        "message_type": "private",
+        "sub_type": "friend",
+        "message_id": "<sequence-1>",
+        "message_seq": "<sequence-1>",
+        "message_format": "array",
+        "font": 0,
+        "real_id": "<sequence-1>",
+        "user_id": 10001,
+        "message": [
+          {
+            "type": "text",
+            "data": {
+              "text": "基线私聊文本"
+            }
+          }
+        ],
+        "raw_message": "基线私聊文本",
+        "sender": {
+          "user_id": 10001,
+          "nickname": "测试用户1"
+        }
+      }
+    },
+    {
+      "event": {
+        "type": "message-created",
+        "timestamp": 1767225611000,
+        "user": {
+          "id": "10001",
+          "name": "测试用户1"
+        },
+        "channel": {
+          "id": "private:10001:20001",
+          "type": 1
+        },
+        "message": {
+          "id": "<message-2>",
+          "messageId": "<message-2>",
+          "content": "<quote id=\"<message-1>\"><user id=\"10001\" name=\"测试用户1\" no-is-bot/>基线私聊文本</quote>基线私聊引用回复",
+          "quote": {
+            "id": "<message-1>",
+            "messageId": "<message-1>",
+            "content": "基线私聊文本",
+            "elements": [
+              {
+                "type": "text",
+                "attrs": {
+                  "content": "基线私聊文本"
+                },
+                "children": []
+              }
+            ],
+            "timestamp": 1767225603000,
+            "user": {
+              "id": "10001",
+              "name": "测试用户1",
+              "isBot": false
+            }
+          }
+        },
+        "selfId": "20001",
+        "platform": "onebot",
+        "sn": 4,
+        "login": {
+          "sn": 1,
+          "user": {
+            "id": "20001",
+            "name": "Koishi",
+            "avatar": "<avatar-4>"
+          },
+          "platform": "onebot",
+          "selfId": "20001",
+          "status": 1,
+          "hidden": true,
+          "features": [
+            "message.create",
+            "message.delete",
+            "message.get",
+            "message.list",
+            "upload.create",
+            "guild.get",
+            "guild.list",
+            "guild.member.get",
+            "guild.member.list",
+            "guild.member.kick",
+            "guild.member.role.set",
+            "guild.member.role.unset",
+            "login.get",
+            "user.get",
+            "user.channel.create",
+            "friend.list",
+            "friend.delete",
+            "friend.approve",
+            "guild.approve",
+            "guild.member.approve"
+          ],
+          "adapter": "onebot"
+        },
+        "id": 4
+      },
+      "onebot": {
+        "time": 1767225612,
+        "self_id": 20001,
+        "post_type": "message",
+        "message_type": "private",
+        "sub_type": "friend",
+        "message_id": "<sequence-2>",
+        "message_seq": "<sequence-2>",
+        "message_format": "array",
+        "font": 0,
+        "real_id": "<sequence-2>",
+        "user_id": 10001,
+        "message": [
+          {
+            "type": "reply",
+            "data": {
+              "id": "<sequence-1>"
+            }
+          },
+          {
+            "type": "text",
+            "data": {
+              "text": "基线私聊引用回复"
+            }
+          }
+        ],
+        "raw_message": "[CQ:reply,id=<sequence-1>]基线私聊引用回复",
+        "sender": {
+          "user_id": 10001,
+          "nickname": "测试用户1"
+        }
+      }
+    },
+    {
+      "event": {
+        "type": "message-created",
+        "timestamp": 1767225618000,
+        "user": {
+          "id": "10001",
+          "name": "测试用户1"
+        },
+        "channel": {
+          "id": "group:30001",
+          "type": 0
+        },
+        "guild": {
+          "id": "30001",
+          "name": "测试群"
+        },
+        "message": {
+          "id": "<message-3>",
+          "messageId": "<message-3>",
+          "content": "基线群文本 [CQ:at,qq=20001]"
+        },
+        "selfId": "20001",
+        "platform": "onebot",
+        "sn": 5,
+        "login": {
+          "sn": 1,
+          "user": {
+            "id": "20001",
+            "name": "Koishi",
+            "avatar": "<avatar-4>"
+          },
+          "platform": "onebot",
+          "selfId": "20001",
+          "status": 1,
+          "hidden": true,
+          "features": [
+            "message.create",
+            "message.delete",
+            "message.get",
+            "message.list",
+            "upload.create",
+            "guild.get",
+            "guild.list",
+            "guild.member.get",
+            "guild.member.list",
+            "guild.member.kick",
+            "guild.member.role.set",
+            "guild.member.role.unset",
+            "login.get",
+            "user.get",
+            "user.channel.create",
+            "friend.list",
+            "friend.delete",
+            "friend.approve",
+            "guild.approve",
+            "guild.member.approve"
+          ],
+          "adapter": "onebot"
+        },
+        "id": 5
+      },
+      "onebot": {
+        "time": 1767225619,
+        "self_id": 20001,
+        "post_type": "message",
+        "message_type": "group",
+        "sub_type": "normal",
+        "message_id": "<sequence-3>",
+        "message_seq": "<sequence-3>",
+        "message_format": "array",
+        "font": 0,
+        "real_id": "<sequence-3>",
+        "user_id": 10001,
+        "group_id": 30001,
+        "message": [
+          {
+            "type": "text",
+            "data": {
+              "text": "基线群文本 [CQ:at,qq=20001]"
+            }
+          }
+        ],
+        "raw_message": "基线群文本 [CQ:at,qq=20001]",
+        "sender": {
+          "user_id": 10001,
+          "nickname": "测试用户1"
+        }
+      }
+    },
+    {
+      "event": {
+        "type": "message-created",
+        "timestamp": 1767225625000,
+        "user": {
+          "id": "10001",
+          "name": "测试用户1"
+        },
+        "channel": {
+          "id": "group:30001",
+          "type": 0
+        },
+        "guild": {
+          "id": "30001",
+          "name": "测试群"
+        },
+        "message": {
+          "id": "<message-4>",
+          "messageId": "<message-4>",
+          "content": "<quote id=\"<message-3>\"><user id=\"10001\" name=\"测试用户1\" no-is-bot/>基线群文本 [CQ:at,qq=20001]</quote><img src=\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==\" url=\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==\" title=\"基线图片.png\" mime=\"image/png\" size=\"70\"/>基线群图片说明",
+          "quote": {
+            "id": "<message-3>",
+            "messageId": "<message-3>",
+            "content": "基线群文本 [CQ:at,qq=20001]",
+            "elements": [
+              {
+                "type": "text",
+                "attrs": {
+                  "content": "基线群文本 [CQ:at,qq=20001]"
+                },
+                "children": []
+              }
+            ],
+            "timestamp": 1767225617000,
+            "user": {
+              "id": "10001",
+              "name": "测试用户1",
+              "isBot": false
+            }
+          }
+        },
+        "selfId": "20001",
+        "platform": "onebot",
+        "sn": 6,
+        "login": {
+          "sn": 1,
+          "user": {
+            "id": "20001",
+            "name": "Koishi",
+            "avatar": "<avatar-4>"
+          },
+          "platform": "onebot",
+          "selfId": "20001",
+          "status": 1,
+          "hidden": true,
+          "features": [
+            "message.create",
+            "message.delete",
+            "message.get",
+            "message.list",
+            "upload.create",
+            "guild.get",
+            "guild.list",
+            "guild.member.get",
+            "guild.member.list",
+            "guild.member.kick",
+            "guild.member.role.set",
+            "guild.member.role.unset",
+            "login.get",
+            "user.get",
+            "user.channel.create",
+            "friend.list",
+            "friend.delete",
+            "friend.approve",
+            "guild.approve",
+            "guild.member.approve"
+          ],
+          "adapter": "onebot"
+        },
+        "id": 6
+      },
+      "onebot": {
+        "time": 1767225626,
+        "self_id": 20001,
+        "post_type": "message",
+        "message_type": "group",
+        "sub_type": "normal",
+        "message_id": "<sequence-4>",
+        "message_seq": "<sequence-4>",
+        "message_format": "array",
+        "font": 0,
+        "real_id": "<sequence-4>",
+        "user_id": 10001,
+        "group_id": 30001,
+        "message": [
+          {
+            "type": "reply",
+            "data": {
+              "id": "<sequence-3>"
+            }
+          },
+          {
+            "type": "image",
+            "data": {
+              "file": "sandbox-media://<media-1>"
+            }
+          },
+          {
+            "type": "text",
+            "data": {
+              "text": "基线群图片说明"
+            }
+          }
+        ],
+        "raw_message": "[CQ:reply,id=<sequence-3>][CQ:image,file=sandbox-media://<media-1>]基线群图片说明",
+        "sender": {
+          "user_id": 10001,
+          "nickname": "测试用户1"
+        }
+      }
+    },
+    {
+      "event": {
+        "type": "message-created",
+        "timestamp": 1767225632000,
+        "user": {
+          "id": "10001",
+          "name": "测试用户1"
+        },
+        "channel": {
+          "id": "private:10001:20001",
+          "type": 1
+        },
+        "message": {
+          "id": "<message-5>",
+          "messageId": "<message-5>",
+          "content": "<audio src=\"sandbox-media://<media-2>\" file=\"sandbox-media://<media-2>\" title=\"基线语音.ogg\" mime=\"audio/ogg\" size=\"18\"/><file src=\"sandbox-media://<media-3>\" file=\"sandbox-media://<media-3>\" title=\"基线附件.pdf\" mime=\"application/pdf\" size=\"18\"/>"
+        },
+        "selfId": "20001",
+        "platform": "onebot",
+        "sn": 7,
+        "login": {
+          "sn": 1,
+          "user": {
+            "id": "20001",
+            "name": "Koishi",
+            "avatar": "<avatar-4>"
+          },
+          "platform": "onebot",
+          "selfId": "20001",
+          "status": 1,
+          "hidden": true,
+          "features": [
+            "message.create",
+            "message.delete",
+            "message.get",
+            "message.list",
+            "upload.create",
+            "guild.get",
+            "guild.list",
+            "guild.member.get",
+            "guild.member.list",
+            "guild.member.kick",
+            "guild.member.role.set",
+            "guild.member.role.unset",
+            "login.get",
+            "user.get",
+            "user.channel.create",
+            "friend.list",
+            "friend.delete",
+            "friend.approve",
+            "guild.approve",
+            "guild.member.approve"
+          ],
+          "adapter": "onebot"
+        },
+        "id": 7
+      },
+      "onebot": {
+        "time": 1767225633,
+        "self_id": 20001,
+        "post_type": "message",
+        "message_type": "private",
+        "sub_type": "friend",
+        "message_id": "<sequence-5>",
+        "message_seq": "<sequence-5>",
+        "message_format": "array",
+        "font": 0,
+        "real_id": "<sequence-5>",
+        "user_id": 10001,
+        "message": [
+          {
+            "type": "record",
+            "data": {
+              "file": "sandbox-media://<media-2>"
+            }
+          },
+          {
+            "type": "file",
+            "data": {
+              "file": "sandbox-media://<media-3>"
+            }
+          }
+        ],
+        "raw_message": "[CQ:record,file=sandbox-media://<media-2>][CQ:file,file=sandbox-media://<media-3>]",
+        "sender": {
+          "user_id": 10001,
+          "nickname": "测试用户1"
+        }
+      }
+    },
+    {
+      "event": {
+        "type": "message-created",
+        "timestamp": 1767225641000,
+        "user": {
+          "id": "10001",
+          "name": "测试用户1"
+        },
+        "channel": {
+          "id": "private:10001:20001",
+          "type": 1
+        },
+        "message": {
+          "id": "<message-6>",
+          "messageId": "<message-6>",
+          "content": "<forward id=\"<forward-1>\"/>"
+        },
+        "selfId": "20001",
+        "platform": "onebot",
+        "sn": 8,
+        "login": {
+          "sn": 1,
+          "user": {
+            "id": "20001",
+            "name": "Koishi",
+            "avatar": "<avatar-4>"
+          },
+          "platform": "onebot",
+          "selfId": "20001",
+          "status": 1,
+          "hidden": true,
+          "features": [
+            "message.create",
+            "message.delete",
+            "message.get",
+            "message.list",
+            "upload.create",
+            "guild.get",
+            "guild.list",
+            "guild.member.get",
+            "guild.member.list",
+            "guild.member.kick",
+            "guild.member.role.set",
+            "guild.member.role.unset",
+            "login.get",
+            "user.get",
+            "user.channel.create",
+            "friend.list",
+            "friend.delete",
+            "friend.approve",
+            "guild.approve",
+            "guild.member.approve"
+          ],
+          "adapter": "onebot"
+        },
+        "id": 8
+      },
+      "onebot": {
+        "time": 1767225642,
+        "self_id": 20001,
+        "post_type": "message",
+        "message_type": "private",
+        "sub_type": "friend",
+        "message_id": "<sequence-6>",
+        "message_seq": "<sequence-6>",
+        "message_format": "array",
+        "font": 0,
+        "real_id": "<sequence-6>",
+        "user_id": 10001,
+        "message": [
+          {
+            "type": "forward",
+            "data": {
+              "id": "<forward-1>"
+            }
+          }
+        ],
+        "raw_message": "[CQ:forward,id=<forward-1>]",
+        "sender": {
+          "user_id": 10001,
+          "nickname": "测试用户1"
+        }
+      }
+    }
+  ],
+  "deliveries": [
+    {
+      "id": "<delivery-1>",
+      "recipientBotId": "20001",
+      "messageId": "<message-1>",
+      "conversationId": "private:10001:20001",
+      "createdAt": "2026-01-01T00:00:09.000Z"
+    },
+    {
+      "id": "<delivery-2>",
+      "recipientBotId": "20001",
+      "messageId": "<message-2>",
+      "conversationId": "private:10001:20001",
+      "createdAt": "2026-01-01T00:00:16.000Z"
+    },
+    {
+      "id": "<delivery-3>",
+      "recipientBotId": "20001",
+      "messageId": "<message-3>",
+      "conversationId": "group:30001",
+      "createdAt": "2026-01-01T00:00:23.000Z"
+    },
+    {
+      "id": "<delivery-4>",
+      "recipientBotId": "20001",
+      "messageId": "<message-4>",
+      "conversationId": "group:30001",
+      "createdAt": "2026-01-01T00:00:30.000Z"
+    },
+    {
+      "id": "<delivery-5>",
+      "recipientBotId": "20001",
+      "messageId": "<message-5>",
+      "conversationId": "private:10001:20001",
+      "createdAt": "2026-01-01T00:00:37.000Z"
+    },
+    {
+      "id": "<delivery-6>",
+      "recipientBotId": "20001",
+      "messageId": "<message-6>",
+      "conversationId": "private:10001:20001",
+      "createdAt": "2026-01-01T00:00:46.000Z"
+    }
+  ],
+  "debugEvents": [
+    {
+      "id": "<debug-1>",
+      "sequence": 1,
+      "createdAt": "2026-01-01T00:00:08.000Z",
+      "botId": "20001",
+      "implementation": "napcat",
+      "direction": "event",
+      "requestedAction": "message.private",
+      "action": "message.private",
+      "status": "success",
+      "durationMs": 1000,
+      "payload": {
+        "time": 1767225605,
+        "self_id": 20001,
+        "post_type": "message",
+        "message_type": "private",
+        "sub_type": "friend",
+        "message_id": "<sequence-1>",
+        "message_seq": "<sequence-1>",
+        "message_format": "array",
+        "font": 0,
+        "real_id": "<sequence-1>",
+        "user_id": 10001,
+        "message": [
+          {
+            "type": "text",
+            "data": {
+              "text": "[文本已省略，<字符数> 字符]"
+            }
+          }
+        ],
+        "raw_message": "[文本已省略，<字符数> 字符]",
+        "sender": {
+          "user_id": 10001,
+          "nickname": "测试用户1"
+        }
+      },
+      "result": {
+        "delivered": true
+      },
+      "entities": {
+        "userId": "10001",
+        "messageId": "<sequence-1>"
+      }
+    },
+    {
+      "id": "<debug-2>",
+      "sequence": 2,
+      "createdAt": "2026-01-01T00:00:15.000Z",
+      "botId": "20001",
+      "implementation": "napcat",
+      "direction": "event",
+      "requestedAction": "message.private",
+      "action": "message.private",
+      "status": "success",
+      "durationMs": 1000,
+      "payload": {
+        "time": 1767225612,
+        "self_id": 20001,
+        "post_type": "message",
+        "message_type": "private",
+        "sub_type": "friend",
+        "message_id": "<sequence-2>",
+        "message_seq": "<sequence-2>",
+        "message_format": "array",
+        "font": 0,
+        "real_id": "<sequence-2>",
+        "user_id": 10001,
+        "message": [
+          {
+            "type": "reply",
+            "data": {
+              "id": "<sequence-1>"
+            }
+          },
+          {
+            "type": "text",
+            "data": {
+              "text": "[文本已省略，<字符数> 字符]"
+            }
+          }
+        ],
+        "raw_message": "[文本已省略，<字符数> 字符]",
+        "sender": {
+          "user_id": 10001,
+          "nickname": "测试用户1"
+        }
+      },
+      "result": {
+        "delivered": true
+      },
+      "entities": {
+        "userId": "10001",
+        "messageId": "<sequence-2>"
+      }
+    },
+    {
+      "id": "<debug-3>",
+      "sequence": 3,
+      "createdAt": "2026-01-01T00:00:22.000Z",
+      "botId": "20001",
+      "implementation": "napcat",
+      "direction": "event",
+      "requestedAction": "message.group",
+      "action": "message.group",
+      "status": "success",
+      "durationMs": 1000,
+      "payload": {
+        "time": 1767225619,
+        "self_id": 20001,
+        "post_type": "message",
+        "message_type": "group",
+        "sub_type": "normal",
+        "message_id": "<sequence-3>",
+        "message_seq": "<sequence-3>",
+        "message_format": "array",
+        "font": 0,
+        "real_id": "<sequence-3>",
+        "user_id": 10001,
+        "group_id": 30001,
+        "message": [
+          {
+            "type": "text",
+            "data": {
+              "text": "[文本已省略，<字符数> 字符]"
+            }
+          }
+        ],
+        "raw_message": "[文本已省略，<字符数> 字符]",
+        "sender": {
+          "user_id": 10001,
+          "nickname": "测试用户1"
+        }
+      },
+      "result": {
+        "delivered": true
+      },
+      "entities": {
+        "userId": "10001",
+        "groupId": "30001",
+        "messageId": "<sequence-3>"
+      }
+    },
+    {
+      "id": "<debug-4>",
+      "sequence": 4,
+      "createdAt": "2026-01-01T00:00:29.000Z",
+      "botId": "20001",
+      "implementation": "napcat",
+      "direction": "event",
+      "requestedAction": "message.group",
+      "action": "message.group",
+      "status": "success",
+      "durationMs": 1000,
+      "payload": {
+        "time": 1767225626,
+        "self_id": 20001,
+        "post_type": "message",
+        "message_type": "group",
+        "sub_type": "normal",
+        "message_id": "<sequence-4>",
+        "message_seq": "<sequence-4>",
+        "message_format": "array",
+        "font": 0,
+        "real_id": "<sequence-4>",
+        "user_id": 10001,
+        "group_id": 30001,
+        "message": [
+          {
+            "type": "reply",
+            "data": {
+              "id": "<sequence-3>"
+            }
+          },
+          {
+            "type": "image",
+            "data": {
+              "file": "sandbox-media://<media-1>"
+            }
+          },
+          {
+            "type": "text",
+            "data": {
+              "text": "[文本已省略，<字符数> 字符]"
+            }
+          }
+        ],
+        "raw_message": "[文本已省略，<字符数> 字符]",
+        "sender": {
+          "user_id": 10001,
+          "nickname": "测试用户1"
+        }
+      },
+      "result": {
+        "delivered": true
+      },
+      "entities": {
+        "userId": "10001",
+        "groupId": "30001",
+        "messageId": "<sequence-4>"
+      }
+    },
+    {
+      "id": "<debug-5>",
+      "sequence": 5,
+      "createdAt": "2026-01-01T00:00:36.000Z",
+      "botId": "20001",
+      "implementation": "napcat",
+      "direction": "event",
+      "requestedAction": "message.private",
+      "action": "message.private",
+      "status": "success",
+      "durationMs": 1000,
+      "payload": {
+        "time": 1767225633,
+        "self_id": 20001,
+        "post_type": "message",
+        "message_type": "private",
+        "sub_type": "friend",
+        "message_id": "<sequence-5>",
+        "message_seq": "<sequence-5>",
+        "message_format": "array",
+        "font": 0,
+        "real_id": "<sequence-5>",
+        "user_id": 10001,
+        "message": [
+          {
+            "type": "record",
+            "data": {
+              "file": "sandbox-media://<media-2>"
+            }
+          },
+          {
+            "type": "file",
+            "data": {
+              "file": "sandbox-media://<media-3>"
+            }
+          }
+        ],
+        "raw_message": "[文本已省略，<字符数> 字符]",
+        "sender": {
+          "user_id": 10001,
+          "nickname": "测试用户1"
+        }
+      },
+      "result": {
+        "delivered": true
+      },
+      "entities": {
+        "userId": "10001",
+        "messageId": "<sequence-5>"
+      }
+    },
+    {
+      "id": "<debug-6>",
+      "sequence": 6,
+      "createdAt": "2026-01-01T00:00:45.000Z",
+      "botId": "20001",
+      "implementation": "napcat",
+      "direction": "event",
+      "requestedAction": "message.private",
+      "action": "message.private",
+      "status": "success",
+      "durationMs": 1000,
+      "payload": {
+        "time": 1767225642,
+        "self_id": 20001,
+        "post_type": "message",
+        "message_type": "private",
+        "sub_type": "friend",
+        "message_id": "<sequence-6>",
+        "message_seq": "<sequence-6>",
+        "message_format": "array",
+        "font": 0,
+        "real_id": "<sequence-6>",
+        "user_id": 10001,
+        "message": [
+          {
+            "type": "forward",
+            "data": {
+              "id": "<forward-1>"
+            }
+          }
+        ],
+        "raw_message": "[文本已省略，<字符数> 字符]",
+        "sender": {
+          "user_id": 10001,
+          "nickname": "测试用户1"
+        }
+      },
+      "result": {
+        "delivered": true
+      },
+      "entities": {
+        "userId": "10001",
+        "messageId": "<sequence-6>"
+      }
+    }
+  ],
+  "snapshotMessages": [
+    {
+      "id": "<message-1>",
+      "authorId": "10001",
+      "conversationId": "private:10001:20001",
+      "content": "基线私聊文本",
+      "createdAt": "2026-01-01T00:00:03.000Z"
+    },
+    {
+      "id": "<message-2>",
+      "authorId": "10001",
+      "conversationId": "private:10001:20001",
+      "content": "基线私聊引用回复",
+      "createdAt": "2026-01-01T00:00:10.000Z",
+      "replyToMessageId": "<message-1>"
+    },
+    {
+      "id": "<message-3>",
+      "authorId": "10001",
+      "conversationId": "group:30001",
+      "content": "基线群文本 [CQ:at,qq=20001]",
+      "createdAt": "2026-01-01T00:00:17.000Z"
+    },
+    {
+      "id": "<message-4>",
+      "authorId": "10001",
+      "conversationId": "group:30001",
+      "content": "基线群图片说明",
+      "createdAt": "2026-01-01T00:00:24.000Z",
+      "replyToMessageId": "<message-3>",
+      "media": [
+        {
+          "id": "<media-1>",
+          "type": "image",
+          "name": "基线图片.png",
+          "mimeType": "image/png",
+          "size": 70,
+          "reference": "sandbox-media://<media-1>"
+        }
+      ]
+    },
+    {
+      "id": "<message-5>",
+      "authorId": "10001",
+      "conversationId": "private:10001:20001",
+      "content": "[语音] 基线语音.ogg [文件] 基线附件.pdf",
+      "createdAt": "2026-01-01T00:00:31.000Z",
+      "media": [
+        {
+          "id": "<media-2>",
+          "type": "audio",
+          "name": "基线语音.ogg",
+          "mimeType": "audio/ogg",
+          "size": 18,
+          "reference": "sandbox-media://<media-2>"
+        },
+        {
+          "id": "<media-3>",
+          "type": "file",
+          "name": "基线附件.pdf",
+          "mimeType": "application/pdf",
+          "size": 18,
+          "reference": "sandbox-media://<media-3>"
+        }
+      ]
+    },
+    {
+      "id": "<message-6>",
+      "authorId": "10001",
+      "conversationId": "private:10001:20001",
+      "content": "测试用户1：基线私聊文本\n测试用户2：基线转发自定义节点",
+      "createdAt": "2026-01-01T00:00:40.000Z",
+      "forwardId": "<forward-1>"
+    }
+  ]
+}

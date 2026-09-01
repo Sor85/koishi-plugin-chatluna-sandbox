@@ -7,16 +7,23 @@ import { SandboxChatLunaStateStore } from './chatluna-state'
 import {
   SandboxChatLunaCharacterContext,
   findChatLunaCharacterChatContext,
-  resolveChatLunaCharacterSessionKey,
 } from './chatluna-character-context'
 import { archiveChatLunaModelRequestError } from './chatluna-error'
+import {
+  createInboundDelivery,
+  createInboundEventConversations,
+  type InboundDelivery,
+  type InboundEventConversations,
+  type InboundMessageContext,
+  type InboundQuotedMessage,
+} from './inbound-delivery'
 import { SandboxMediaStorage, MAX_MEDIA_SIZE, toMediaMetadata } from './media-storage'
-import { SandboxOneBotDebugStore, createOneBotDebugError, type AppendOneBotDebugRecordInput, type SandboxOneBotDebugPersistence } from './onebot-debug'
+import { SandboxOneBotDebugStore, type AppendOneBotDebugRecordInput, type SandboxOneBotDebugPersistence } from './onebot-debug'
 import {
   SandboxModelRequestStore,
   type SandboxModelRequestPersistence,
 } from './model-request'
-import { toOneBotMessageSegments, toOneBotRawMessage } from './onebot-message'
+import { toOneBotMessageSegments, toOneBotRawMessage, type SandboxOneBotMessageSegment } from './onebot-message'
 import type { SandboxSceneLoadResult, SandboxScenePersistence } from './persistence'
 import {
   appendConversationMessageId,
@@ -54,7 +61,7 @@ import {
   type MessageCapabilityDenial,
   type MessageCapabilityInput,
 } from './message-capabilities'
-import { getOneBotCapabilityMatrix, getOneBotMessageEventFields, getOneBotMessageSequence, normalizeDisabledCapabilities, resolveOneBotMessageId, type SandboxOneBotCapability } from './onebot-profiles'
+import { getOneBotCapabilityMatrix, getOneBotMessageSequence, normalizeDisabledCapabilities, resolveOneBotMessageId, type SandboxOneBotCapability } from './onebot-profiles'
 import {
   createDirectConversationId,
   createGroupConversationId,
@@ -154,11 +161,11 @@ export class SandboxRuntimeBotRegistry {
   }
 }
 
-interface SandboxMessageContext {
-  operator: SandboxParticipant
-  peer?: SandboxParticipant
-  conversation: ResolvedConversation
-  group?: SandboxGroup
+/**
+ * 一次发送所处的领域位置。投递只读其中前四项（见 {@link InboundMessageContext}）；
+ * 引用目标是发送路径自己组装消息段时用的，投递按已解析好的引用收到它。
+ */
+interface SandboxMessageContext extends InboundMessageContext {
   reply?: SandboxMessage
 }
 
@@ -313,14 +320,14 @@ export class SandboxControlService {
   private runtimeOwner = {}
   private botDeliveries: SandboxBotDelivery[] = []
   /**
-   * 每个虚拟 OneBot 机器人当前正在处理的入站消息事件来自哪个会话，按嵌套顺序入栈。
+   * 入站事件会话窗口，由投递模块进出栈，由虚拟 OneBot 机器人读取。
    *
-   * 写入落点不看它，只观察：原始 OneBot action 的回复仍然落到根会话。读取跟随它：原始历史
-   * 查询按来源会话作答，否则插件在会话实例里会读到另一条对话线的历史并静默拿去请求模型。
-   * 窗口从事件派发开始到该事件的中间件链结束，也就是插件真正有机会回复的那段时间；事件派发
-   * 之后异步发出的 action 不在窗口内，因此不会被归因，这是有意的下限而不是遗漏。
+   * 控制服务只负责把同一个实例交给两边，自己不读也不写：读取跟随与会话观察都发生在机器人适配器
+   * 那一侧，写入落点不看它（ADR-0076 的写入偏离照旧）。
    */
-  private inboundEventConversations = new Map<string, string[]>()
+  private inboundEventConversations: InboundEventConversations = createInboundEventConversations()
+  /** 投递规则的唯一持有者；三条发送路径与六种事件都经它。 */
+  private inboundDelivery: InboundDelivery
   private chatLunaState: SandboxChatLunaStateStore
   /**
    * 被测 chatluna-character 的对话上下文只按账号或群号归档，看不见会话实例这一级；
@@ -399,6 +406,16 @@ export class SandboxControlService {
       archiveChatLunaModelRequestError(this.modelRequests, error, targets)
     })
     this.chatLunaCharacterContext = new SandboxChatLunaCharacterContext(() => findChatLunaCharacterChatContext(ctx))
+    this.inboundDelivery = createInboundDelivery({
+      getRuntimeBot: (botId) => this.runtimeBots.get(botId),
+      getBotProfile: (botId) => this.getBots().find(({ id }) => id === botId),
+      onMiddlewareFinished: (listener) => ctx.on('middleware', listener),
+      recordDebug: (input) => this.recordOneBotDebug(input),
+      recordDelivery: (delivery) => this.botDeliveries.push(delivery),
+      followInboundConversation: (input) => this.chatLunaCharacterContext.followInboundConversation(input),
+      logger: ctx.logger('chatluna-sandbox'),
+      eventConversations: this.inboundEventConversations,
+    })
     this.syncRuntimeBots()
     this.contextDisposers.push(ctx.on('ready', async () => {
       try {
@@ -750,35 +767,6 @@ export class SandboxControlService {
     return structuredClone(this.botDeliveries.filter(({ messageId }) => (
       !input.messageId || messageId === input.messageId
     )))
-  }
-
-  /**
-   * 某个虚拟 OneBot 机器人此刻正在处理的入站消息事件来自哪个会话；不在处理入站事件时为
-   * undefined。嵌套派发取最内层。
-   *
-   * 两个用途：让机器人动作记录能给出会话观察，以及让原始历史查询跟随来源会话。写入落点不用它
-   * ——原始 OneBot action 的回复仍然只落到根会话，沙盒不替插件归位。
-   */
-  getInboundEventConversationId(botId: string): string | undefined {
-    return this.inboundEventConversations.get(botId)?.at(-1)
-  }
-
-  private async withInboundEventConversation<T>(
-    botId: string,
-    conversationId: string,
-    dispatch: () => Promise<T>,
-  ): Promise<T> {
-    const stack = this.inboundEventConversations.get(botId) ?? []
-    if (!stack.length) this.inboundEventConversations.set(botId, stack)
-    stack.push(conversationId)
-    try {
-      return await dispatch()
-    } finally {
-      // 按值删除而不是 pop()：同一机器人上并发派发时出栈顺序不保证与入栈顺序相反。
-      const index = stack.lastIndexOf(conversationId)
-      if (index >= 0) stack.splice(index, 1)
-      if (!stack.length) this.inboundEventConversations.delete(botId)
-    }
   }
 
   getChatLunaStates(): SandboxChatLunaState[] {
@@ -1913,13 +1901,15 @@ export class SandboxControlService {
       })
     })
     if (text) elements.push(h.text(text))
-    const onebotMessage: Array<{ type: string; data: Record<string, string> }> = [
+    const onebotMessage: SandboxOneBotMessageSegment[] = [
       ...(context.reply ? [{ type: 'reply', data: { id: String(getOneBotMessageSequence(context.reply.id)) } }] : []),
       ...media.map((item) => ({ type: item.type === 'audio' ? 'record' : item.type, data: { file: item.reference } })),
       ...(text ? [{ type: 'text', data: { text } }] : []),
     ]
-    const rawMessage = `${context.reply ? `[CQ:reply,id=${getOneBotMessageSequence(context.reply.id)}]` : ''}${media.map((item) => `[CQ:${item.type === 'audio' ? 'record' : item.type},file=${item.reference}]`).join('')}${text}`
-    const delivery = this.dispatchMessageToBots(context, message, elements, onebotMessage, rawMessage)
+    // raw message 与另两路同源：手搓那份与助手函数逐段对得上（回复段、媒体段、文本段），
+    // 但没有任何东西保证它继续一致。媒体段只带文件引用这处口径不动，改它会改变被测插件收到的
+    // 事件保真度，归「OneBot 事件构造的两个方向」候选。
+    const delivery = this.dispatchMessageToBots(context, message, elements, onebotMessage, toOneBotRawMessage(onebotMessage))
     return { result: { messageId: message.id, revision: this.scene.revision }, delivery }
   }
 
@@ -1943,123 +1933,26 @@ export class SandboxControlService {
     return this.mediaStorage.readById(input.mediaId)
   }
 
-  private async dispatchMessageToBots(
-    context: SandboxMessageContext,
-    message: SandboxMessage,
-    elements: ReturnType<typeof h>[],
-    onebotMessage: Array<{ type: string; data: Record<string, string> }>,
-    rawMessage: string,
-  ): Promise<void> {
-    await Promise.all(this.getMessageRecipientBots(context).map((recipientBot) => this.dispatchMessageToBot(
-      recipientBot,
-      context,
-      message,
-      elements,
-      onebotMessage,
-      rawMessage,
-    )))
-  }
-
   /**
-   * 让被测 chatluna-character 的对话上下文跟上这次入站事件所属的对话线。
+   * 三条发送路径共同的投递入口：把已落库的这条消息交给投递模块。
    *
-   * 失败只写日志：重置不成功最坏是这一轮带上另一条对话线的历史，而中断投递会让被测插件
-   * 根本收不到消息，那比上下文不干净严重得多。
+   * 这里只补一件发送路径知道而投递模块不知道的事——引用回复要按作者标识查参与者，而参与者集合
+   * 归场景所有。接收机器人推导、事件字段构造、上下文跟随、中间件等待与投递记录都在模块里。
    */
-  private async followChatLunaCharacterConversation(botId: string, context: SandboxMessageContext): Promise<void> {
-    try {
-      await this.chatLunaCharacterContext.followInboundConversation({
-        botId,
-        conversationId: context.conversation.id,
-        sessionKey: resolveChatLunaCharacterSessionKey(context.conversation, context.operator.id),
-      })
-    } catch (error) {
-      this.ctx.logger('chatluna-sandbox')
-        .warn('重置 chatluna-character 对话上下文失败；这一轮可能带上另一条对话线的历史。', error)
-    }
-  }
-
-  private async dispatchMessageToBot(
-    recipientBot: SandboxBotProfile,
+  private dispatchMessageToBots(
     context: SandboxMessageContext,
     message: SandboxMessage,
     elements: ReturnType<typeof h>[],
-    onebotMessage: Array<{ type: string; data: Record<string, string> }>,
+    onebotMessage: SandboxOneBotMessageSegment[],
     rawMessage: string,
   ): Promise<void> {
-    const runtimeBot = this.runtimeBots.get(recipientBot.id)
-    if (!runtimeBot) throw new SandboxDomainError(`机器人运行时不存在：${recipientBot.id}`)
-    await this.followChatLunaCharacterConversation(recipientBot.id, context)
-    // ChatLuna allowQuoteReply / character 只认 session.quote.user.id === bot.userId|selfId，
-    // 不依赖 @。quote 必须带齐 user 与 timestamp，character 才能拼出和真 QQ 一样的引用 XML。
-    const session = runtimeBot.session({
-      type: 'message',
-      timestamp: Date.now(),
-      user: { id: context.operator.id, name: context.operator.name },
-      channel: {
-        id: context.conversation.id,
-        type: context.conversation.type === 'group' ? Universal.Channel.Type.TEXT : Universal.Channel.Type.DIRECT,
-      },
-      guild: context.group ? { id: context.group.id, name: context.group.name } : undefined,
-      message: {
-        id: message.id,
-        messageId: message.id,
-        content: elements.join(''),
-        elements,
-        quote: context.reply ? this.resolveInboundQuote(context.reply) : undefined,
-      },
-    })
-    Object.assign(session, {
-      onebot: {
-        time: Math.floor(Date.now() / 1000),
-        self_id: Number(recipientBot.id),
-        post_type: 'message',
-        message_type: context.conversation.type === 'group' ? 'group' : 'private',
-        sub_type: context.conversation.type === 'group' ? 'normal' : 'friend',
-        ...getOneBotMessageEventFields(recipientBot.implementation, message.id),
-        user_id: Number(context.operator.id),
-        group_id: context.group ? Number(context.group.id) : undefined,
-        message: onebotMessage,
-        raw_message: rawMessage,
-        sender: { user_id: Number(context.operator.id), nickname: context.operator.name },
-      },
-    })
-
-    // Koishi 的 dispatch() 是同步触发事件、异步执行中间件；等待 middleware
-    // 完成才能保证控制台 RPC 返回时，插件通过 session.send() 写入的回复已可见。
-    // ChatLuna 等长耗时中间件可能永不触发同 session 的 middleware 结束事件，
-    // 或阻塞在外部请求上；无超时会让 void 掉的投递 Promise 永久挂起，堆积监听器并拖垮运行时。
-    let disposeMiddlewareWait: (() => void) | undefined
-    const middlewareFinished = new Promise<void>((resolve) => {
-      const timer = setTimeout(() => {
-        disposeMiddlewareWait?.()
-        disposeMiddlewareWait = undefined
-        resolve()
-      }, 15_000)
-      disposeMiddlewareWait = this.ctx.on('middleware', (processedSession) => {
-        if (processedSession.id !== session.id) return
-        clearTimeout(timer)
-        disposeMiddlewareWait?.()
-        disposeMiddlewareWait = undefined
-        resolve()
-      })
-    })
-
-    try {
-      await this.withInboundEventConversation(recipientBot.id, context.conversation.id, async () => {
-        await this.dispatchOneBotEvent(runtimeBot, session)
-        await middlewareFinished
-      })
-    } finally {
-      disposeMiddlewareWait?.()
-      disposeMiddlewareWait = undefined
-    }
-    this.botDeliveries.push({
-      id: Random.id(),
-      recipientBotId: recipientBot.id,
+    return this.inboundDelivery.deliverMessage({
+      context,
       messageId: message.id,
-      conversationId: context.conversation.id,
-      createdAt: new Date().toISOString(),
+      elements,
+      segments: onebotMessage,
+      rawMessage,
+      quote: context.reply ? this.resolveInboundQuote(context.reply) : undefined,
     })
   }
 
@@ -2268,7 +2161,7 @@ export class SandboxControlService {
         message_id: getOneBotMessageSequence(messageId),
       },
     })
-    await this.dispatchOneBotEvent(bot, session)
+    await this.inboundDelivery.dispatchEvent(bot, session)
     // 与群通知路径一致：OneBot 插件监听原始 notice，标准事件与原始事件复用同一个 Session。
     ;(this.ctx.emit as unknown as (session: unknown, name: string, payload: unknown) => void)(session, 'notice', session)
   }
@@ -2555,7 +2448,7 @@ export class SandboxControlService {
     return isConversationVisible(this.scene, operatorId, conversation)
   }
 
-  private resolveInboundQuote(reply: SandboxMessage) {
+  private resolveInboundQuote(reply: SandboxMessage): InboundQuotedMessage {
     const author = this.scene.participants.find(({ id }) => id === reply.authorId)
     return {
       id: reply.id,
@@ -2620,19 +2513,6 @@ export class SandboxControlService {
     }
   }
 
-  private getMessageRecipientBots(context: SandboxMessageContext): SandboxBotProfile[] {
-    // 消息本体只记录作者和逻辑会话；接收机器人必须在投递时按当前关系推导，
-    // 才能让一条群消息复用同一个 ID 派发给多个机器人，并避免成员变更留下过期归属。
-    if (context.conversation.type === 'direct') {
-      return context.peer?.kind === 'bot' && context.peer.enabled ? [context.peer] : []
-    }
-    return (context.group?.members ?? [])
-      .map(({ participantId }) => this.scene.participants.find(({ id }) => id === participantId))
-      .filter((participant): participant is SandboxBotProfile => participant?.kind === 'bot'
-        && participant.enabled
-        && participant.id !== context.operator.id)
-  }
-
   private getMediaLabel(media: SandboxMedia): string {
     return media.type === 'image' ? '图片' : media.type === 'audio' ? '语音' : media.type === 'video' ? '视频' : '文件'
   }
@@ -2645,7 +2525,7 @@ export class SandboxControlService {
   private createRuntimeBot(config: SandboxBot.Config) {
     this.runtimeBotRegistry.claim(config.selfId, this.runtimeOwner)
     try {
-      const bot = new SandboxBot(this.ctx, this, config)
+      const bot = new SandboxBot(this.ctx, this, config, this.inboundEventConversations)
       this.runtimeBots.set(config.selfId, bot)
       return bot
     } catch (error) {
@@ -2854,7 +2734,7 @@ export class SandboxControlService {
         flag,
       },
     })
-    await this.dispatchOneBotEvent(bot, session)
+    await this.inboundDelivery.dispatchEvent(bot, session)
   }
 
   private async dispatchBotNotice(botId: string, userId: string, noticeType: 'notify' | 'friend_del') {
@@ -2884,7 +2764,7 @@ export class SandboxControlService {
         target_id: Number(botId),
       },
     })
-    await this.dispatchOneBotEvent(bot, session)
+    await this.inboundDelivery.dispatchEvent(bot, session)
   }
 
   private async dispatchGroupRequest(group: SandboxGroup, request: SandboxSnapshot['requests'][number]) {
@@ -2913,7 +2793,7 @@ export class SandboxControlService {
           flag: request.id,
         },
       })
-      await this.dispatchOneBotEvent(bot, session)
+      await this.inboundDelivery.dispatchEvent(bot, session)
     }))
   }
 
@@ -2976,57 +2856,13 @@ export class SandboxControlService {
           ...noticeData,
         },
       })
-      await this.dispatchOneBotEvent(bot, session)
+      await this.inboundDelivery.dispatchEvent(bot, session)
       if (standardType !== 'notice') {
         // OneBot 插件仍会监听原始 notice；标准事件和原始事件必须复用同一个 Session，
         // 避免重复派发 internal/session 导致调试记录和等待器各收到两次。
         ;(this.ctx.emit as unknown as (session: unknown, name: string, payload: unknown) => void)(session, 'notice', session)
       }
     }))
-  }
-
-  private async dispatchOneBotEvent(bot: SandboxBot, session: ReturnType<SandboxBot['session']>): Promise<void> {
-    const startedAt = Date.now()
-    const payload = Reflect.get(session, 'onebot')
-    const profile = this.getBots().find(({ id }) => id === bot.selfId)
-    if (!profile) throw new SandboxDomainError(`机器人不存在：${bot.selfId}`)
-    const type = this.getOneBotEventType(payload)
-    try {
-      await bot.dispatch(session)
-      this.recordOneBotDebug({
-        botId: bot.selfId,
-        implementation: profile.implementation,
-        direction: 'event',
-        requestedAction: type,
-        action: type,
-        status: 'success',
-        durationMs: Date.now() - startedAt,
-        payload,
-        result: { delivered: true },
-      })
-    } catch (error) {
-      const debugError = createOneBotDebugError(error)
-      this.ctx.logger('chatluna-sandbox').error(`OneBot 原始事件派发失败 [${debugError.traceId}]`, error)
-      this.recordOneBotDebug({
-        botId: bot.selfId,
-        implementation: profile.implementation,
-        direction: 'event',
-        requestedAction: type,
-        action: type,
-        status: 'error',
-        durationMs: Date.now() - startedAt,
-        payload,
-        error: debugError,
-      })
-      throw error
-    }
-  }
-
-  private getOneBotEventType(payload: unknown): string {
-    if (!payload || typeof payload !== 'object') return 'unknown'
-    const postType = String(Reflect.get(payload, 'post_type') ?? 'unknown')
-    const detail = Reflect.get(payload, `${postType}_type`)
-    return detail === undefined ? postType : `${postType}.${String(detail)}`
   }
 
   private deleteConversations(predicate: (conversation: ResolvedConversation) => boolean): void {
