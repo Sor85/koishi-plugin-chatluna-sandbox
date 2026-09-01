@@ -1,0 +1,60 @@
+{
+  "engine": "firefox",
+  "samples": [
+    {
+      "label": "首屏",
+      "domLength": 29331,
+      "domSha256": "e1eae7f5cc38fb4e",
+      "spinners": 0,
+      "errorTexts": []
+    },
+    {
+      "label": "模型请求",
+      "domLength": 54999,
+      "domSha256": "65acb4a1e418a718",
+      "spinners": 0,
+      "errorTexts": [
+        "错误",
+        "错误",
+        "错误",
+        "错误",
+        "错误",
+        "错误",
+        "错误",
+        "错误",
+        "错误",
+        "错误",
+        "错误"
+      ]
+    },
+    {
+      "label": "预设",
+      "domLength": 15271,
+      "domSha256": "e52ad475cc3bd5fa",
+      "spinners": 0,
+      "errorTexts": []
+    },
+    {
+      "label": "OneBot 调试",
+      "domLength": 98153,
+      "domSha256": "3621e443305a7e8c",
+      "spinners": 0,
+      "errorTexts": []
+    },
+    {
+      "label": "MCP 调用",
+      "domLength": 13250,
+      "domSha256": "13e86c2f2eb7ace6",
+      "spinners": 0,
+      "errorTexts": []
+    },
+    {
+      "label": "消息",
+      "domLength": 29309,
+      "domSha256": "0675d3800a92f3ff",
+      "spinners": 0,
+      "errorTexts": []
+    }
+  ],
+  "consoleErrors": []
+}

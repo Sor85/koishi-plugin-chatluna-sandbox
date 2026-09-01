@@ -44,6 +44,8 @@ import {
   createEvidenceNavigation,
   type PresetOriginSnapshot,
 } from './evidence-navigation'
+import { createErrorSlot } from './error-slot'
+import { createRegionReadGate } from './region-read-gate'
 import { createPresetDirtyGuard } from './preset-dirty-guard'
 
 type WorkspaceController = ReturnType<typeof createWorkspaceController>
@@ -75,22 +77,24 @@ export function createWebqqWorkspaceShell(
   const detailsVisible = workspaceLayout.detailsVisible
   const mediaSources = ref<Record<string, string>>({})
   const mediaLoadFailures = ref<Record<string, true>>({})
-  const errorMessage = ref('')
-  const debugLoading = ref(false)
-  const debugDetailLoading = ref(false)
-  const debugError = ref('')
-  const mcpCallLoading = ref(false)
-  const mcpCallDetailLoading = ref(false)
-  const mcpCallError = ref('')
-  const modelRequestLoading = ref(false)
-  const modelRequestDetailLoading = ref(false)
-  const modelRequestError = ref('')
+  // 操作那一族共用一个全局错误位，唯一的消费方是发送控件上的外部错误字段。
+  // 「后一次操作的错误覆盖前一次」因此是它的可观察语义，本轮原样保留。
+  const actionErrorSlot = createErrorSlot()
+  const errorMessage = actionErrorSlot.error
+  // 四个区域各有一个错误位，区域内的进行中通道共用它——这是今天的行为。三个区域各声明列表与
+  // 详情两条通道；预设没有详情通道，读目录与读单个预设共用 `read`，另有一条保存通道。
+  // 四个区域的形状差异因此写在这几行声明上，而不是表现为「少了一个引用」。
+  const debugErrorSlot = createErrorSlot()
+  const debugGate = createRegionReadGate(debugErrorSlot, ['list', 'detail'])
+  const mcpCallErrorSlot = createErrorSlot()
+  const mcpCallGate = createRegionReadGate(mcpCallErrorSlot, ['list', 'detail'])
+  const modelRequestErrorSlot = createErrorSlot()
+  const modelRequestGate = createRegionReadGate(modelRequestErrorSlot, ['list', 'detail'])
+  const presetErrorSlot = createErrorSlot()
+  const presetGate = createRegionReadGate(presetErrorSlot, ['read', 'save'])
   const debugVisitKey = ref(0)
   const mcpCallVisitKey = ref(0)
   const modelRequestVisitKey = ref(0)
-  const presetLoading = ref(false)
-  const presetSaving = ref(false)
-  const presetError = ref('')
   const presetDirtyGuard = createPresetDirtyGuard()
   const presetDiscardGuard = ref(presetDirtyGuard.peek())
   // 跨视图往返的全部决策与四个一次性触发编号都在证据导航 module 里；这里不再镜像任何状态。
@@ -307,16 +311,16 @@ export function createWebqqWorkspaceShell(
   const debugWorkspaceModel = computed(() => ({
     records: workspaceController.oneBotDebugRecords.value,
     detail: workspaceController.oneBotDebugRecord.value,
-    loading: debugLoading.value,
-    detailLoading: debugDetailLoading.value,
-    error: debugError.value,
+    loading: debugGate.loading.list.value,
+    detailLoading: debugGate.loading.detail.value,
+    error: debugGate.error.value,
   }))
   const mcpCallWorkspaceModel = computed(() => ({
     records: workspaceController.mcpCallRecords.value,
     detail: workspaceController.mcpCallRecord.value,
-    loading: mcpCallLoading.value,
-    detailLoading: mcpCallDetailLoading.value,
-    error: mcpCallError.value,
+    loading: mcpCallGate.loading.list.value,
+    detailLoading: mcpCallGate.loading.detail.value,
+    error: mcpCallGate.error.value,
   }))
   const modelRequestWorkspaceModel = computed(() => ({
     records: workspaceController.modelRequestRecords.value,
@@ -326,16 +330,16 @@ export function createWebqqWorkspaceShell(
     nextCreatedAt: workspaceController.modelRequestRecordsPage.value.nextCreatedAt,
     nextId: workspaceController.modelRequestRecordsPage.value.nextId,
     trajectory: workspaceController.modelRequestTrajectory.value,
-    loading: modelRequestLoading.value,
-    detailLoading: modelRequestDetailLoading.value,
-    error: modelRequestError.value,
+    loading: modelRequestGate.loading.list.value,
+    detailLoading: modelRequestGate.loading.detail.value,
+    error: modelRequestGate.error.value,
   }))
   const presetWorkspaceModel = computed(() => ({
     catalog: workspaceController.presetCatalog.value,
     document: workspaceController.presetDocument.value,
-    loading: presetLoading.value,
-    saving: presetSaving.value,
-    error: presetError.value,
+    loading: presetGate.loading.read.value,
+    saving: presetGate.loading.save.value,
+    error: presetGate.error.value,
     evidenceContext: presetEvidenceContext.value,
   }))
 
@@ -366,24 +370,14 @@ export function createWebqqWorkspaceShell(
 
   /** 新建会话实例。失败走界面既有的错误展示路径，不落进浏览器控制台。 */
   async function createConversationInstance(rootConversationId: string) {
-    errorMessage.value = ''
-    try {
-      await workspaceController.createConversationInstance({ rootConversationId })
-    } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : '创建会话失败'
-    }
+    await actionErrorSlot.run('创建会话失败', () => workspaceController.createConversationInstance({ rootConversationId }))
   }
 
   /** 从当前会话的某条消息分叉出一个会话实例。 */
   async function branchConversationInstance(messageId: string) {
     const conversationId = currentConversation.value?.id
     if (!conversationId) return
-    errorMessage.value = ''
-    try {
-      await workspaceController.branchConversationInstance({ conversationId, messageId })
-    } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : '创建会话分支失败'
-    }
+    await actionErrorSlot.run('创建会话分支失败', () => workspaceController.branchConversationInstance({ conversationId, messageId }))
   }
 
   /** 重命名会话实例：对话框预填当前名字，只有实例才有名字可改。 */
@@ -394,24 +388,17 @@ export function createWebqqWorkspaceShell(
   }
 
   async function saveConversationRename(input: { conversationId: string, title: string }, resolve: Resolve, reject: Reject) {
-    errorMessage.value = ''
     try {
-      await workspaceController.renameConversationInstance(input)
+      await actionErrorSlot.runOrThrow('重命名会话失败', () => workspaceController.renameConversationInstance(input))
       resolve()
     } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : '重命名会话失败'
       reject(error)
     }
   }
 
   /** 删除会话实例：领域删除，连带清掉它的消息，刷新后不会回来。 */
   async function deleteConversationInstance(conversationId: string) {
-    errorMessage.value = ''
-    try {
-      await workspaceController.deleteConversationInstance({ conversationId })
-    } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : '删除会话失败'
-    }
+    await actionErrorSlot.run('删除会话失败', () => workspaceController.deleteConversationInstance({ conversationId }))
   }
 
   async function manageEnvironment(input: ManageSandboxEnvironmentInput, resolve: Resolve, reject: Reject) {
@@ -424,21 +411,11 @@ export function createWebqqWorkspaceShell(
   }
 
   async function performFriendAction(input: SandboxFriendAction) {
-    errorMessage.value = ''
-    try {
-      await workspaceController.performFriendAction(input)
-    } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : '好友操作失败'
-    }
+    await actionErrorSlot.run('好友操作失败', () => workspaceController.performFriendAction(input))
   }
 
   async function performGroupAction(input: SandboxGroupAction) {
-    errorMessage.value = ''
-    try {
-      await workspaceController.performGroupAction(input)
-    } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : '群组操作失败'
-    }
+    await actionErrorSlot.run('群组操作失败', () => workspaceController.performGroupAction(input))
   }
 
   function requestFriend(targetId: string) {
@@ -497,18 +474,18 @@ export function createWebqqWorkspaceShell(
     resolve: Resolve,
     reject: Reject,
   ) {
-    errorMessage.value = ''
     try {
-      if (input.mode === 'name') {
-        await workspaceController.performGroupAction({ action: 'set-name', groupId: input.groupId, name: input.value })
-      } else if (input.targetId && input.mode === 'title') {
-        await workspaceController.performGroupAction({ action: 'set-title', groupId: input.groupId, targetId: input.targetId, title: input.value })
-      } else if (input.targetId) {
-        await workspaceController.performGroupAction({ action: 'set-card', groupId: input.groupId, targetId: input.targetId, card: input.value })
-      }
+      await actionErrorSlot.runOrThrow('群组操作失败', async () => {
+        if (input.mode === 'name') {
+          await workspaceController.performGroupAction({ action: 'set-name', groupId: input.groupId, name: input.value })
+        } else if (input.targetId && input.mode === 'title') {
+          await workspaceController.performGroupAction({ action: 'set-title', groupId: input.groupId, targetId: input.targetId, title: input.value })
+        } else if (input.targetId) {
+          await workspaceController.performGroupAction({ action: 'set-card', groupId: input.groupId, targetId: input.targetId, card: input.value })
+        }
+      })
       resolve()
     } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : '群组操作失败'
       reject(error)
     }
   }
@@ -521,35 +498,20 @@ export function createWebqqWorkspaceShell(
   async function recallMessage(messageId: string) {
     const conversationId = currentConversation.value?.id
     if (!conversationId) return
-    errorMessage.value = ''
-    try {
-      await workspaceController.recallMessage({ conversationId, messageId })
-    } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : '撤回失败'
-    }
+    await actionErrorSlot.run('撤回失败', () => workspaceController.recallMessage({ conversationId, messageId }))
   }
 
   async function clearConversationMessages() {
     const conversationId = currentConversation.value?.id
     if (!conversationId) return
-    errorMessage.value = ''
-    try {
-      await workspaceController.clearConversationMessages({ conversationId })
-    } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : '清空会话记录失败'
-    }
+    await actionErrorSlot.run('清空会话记录失败', () => workspaceController.clearConversationMessages({ conversationId }))
   }
 
   async function setMessageReaction(messageId: string, emojiId: string, enabled: boolean) {
     const conversationId = currentConversation.value?.id
     if (!conversationId) return
-    errorMessage.value = ''
-    try {
-      // 带上当前会话，服务端才能判定目标是不是继承前缀：分支里那一段与原会话共享同一份记录，只读。
-      await workspaceController.setMessageReaction({ conversationId, messageId, emojiId, enabled })
-    } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : '贴表情失败'
-    }
+    // 带上当前会话，服务端才能判定目标是不是继承前缀：分支里那一段与原会话共享同一份记录，只读。
+    await actionErrorSlot.run('贴表情失败', () => workspaceController.setMessageReaction({ conversationId, messageId, emojiId, enabled }))
   }
 
   function deleteFriend(targetId: string) {
@@ -563,12 +525,10 @@ export function createWebqqWorkspaceShell(
   }
 
   async function saveFriendRemark(input: { targetId: string, remark: string }, resolve: Resolve, reject: Reject) {
-    errorMessage.value = ''
     try {
-      await workspaceController.performFriendAction({ action: 'set-remark', ...input })
+      await actionErrorSlot.runOrThrow('好友操作失败', () => workspaceController.performFriendAction({ action: 'set-remark', ...input }))
       resolve()
     } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : '好友操作失败'
       reject(error)
     }
   }
@@ -646,87 +606,31 @@ export function createWebqqWorkspaceShell(
   }
 
   async function loadOneBotDebugRecords(input: GetSandboxOneBotDebugRecordsInput = {}) {
-    debugLoading.value = true
-    debugError.value = ''
-    try {
-      await workspaceController.loadOneBotDebugRecords(input)
-    } catch (error) {
-      debugError.value = error instanceof Error ? error.message : '读取 OneBot 调试记录失败'
-    } finally {
-      debugLoading.value = false
-    }
+    await debugGate.read('list', '读取 OneBot 调试记录失败', () => workspaceController.loadOneBotDebugRecords(input))
   }
 
   async function loadOneBotDebugRecord(input: GetSandboxOneBotDebugRecordInput & { spaceId?: string }) {
-    debugDetailLoading.value = true
-    debugError.value = ''
-    try {
-      await workspaceController.loadOneBotDebugRecord(input)
-    } catch (error) {
-      debugError.value = error instanceof Error ? error.message : '读取 OneBot 调试详情失败'
-    } finally {
-      debugDetailLoading.value = false
-    }
+    await debugGate.read('detail', '读取 OneBot 调试详情失败', () => workspaceController.loadOneBotDebugRecord(input))
   }
 
   async function loadMcpCallRecords(input: ListSandboxMcpCallRecordsInput = {}) {
-    mcpCallLoading.value = true
-    mcpCallError.value = ''
-    try {
-      await workspaceController.loadMcpCallRecords(input)
-    } catch (error) {
-      mcpCallError.value = error instanceof Error ? error.message : '读取 MCP 调用记录失败'
-    } finally {
-      mcpCallLoading.value = false
-    }
+    await mcpCallGate.read('list', '读取 MCP 调用记录失败', () => workspaceController.loadMcpCallRecords(input))
   }
 
   async function loadMcpCallRecord(input: { recordId: string }) {
-    mcpCallDetailLoading.value = true
-    mcpCallError.value = ''
-    try {
-      await workspaceController.loadMcpCallRecord(input)
-    } catch (error) {
-      mcpCallError.value = error instanceof Error ? error.message : '读取 MCP 调用详情失败'
-    } finally {
-      mcpCallDetailLoading.value = false
-    }
+    await mcpCallGate.read('detail', '读取 MCP 调用详情失败', () => workspaceController.loadMcpCallRecord(input))
   }
 
   async function clearMcpCallRecords() {
-    mcpCallLoading.value = true
-    mcpCallError.value = ''
-    try {
-      await workspaceController.clearMcpCallRecords()
-    } catch (error) {
-      mcpCallError.value = error instanceof Error ? error.message : '清理 MCP 调用记录失败'
-    } finally {
-      mcpCallLoading.value = false
-    }
+    await mcpCallGate.read('list', '清理 MCP 调用记录失败', () => workspaceController.clearMcpCallRecords())
   }
 
   async function clearOneBotDebugRecords() {
-    debugLoading.value = true
-    debugError.value = ''
-    try {
-      await workspaceController.clearOneBotDebugRecords()
-    } catch (error) {
-      debugError.value = error instanceof Error ? error.message : '清理 OneBot 调试记录失败'
-    } finally {
-      debugLoading.value = false
-    }
+    await debugGate.read('list', '清理 OneBot 调试记录失败', () => workspaceController.clearOneBotDebugRecords())
   }
 
   async function loadModelRequestRecords(input: ModelRequestRecordsQuery, mode: 'replace' | 'append' = 'replace') {
-    modelRequestLoading.value = true
-    modelRequestError.value = ''
-    try {
-      await workspaceController.loadModelRequestRecords(input, mode)
-    } catch (error) {
-      modelRequestError.value = error instanceof Error ? error.message : '读取模型请求记录失败'
-    } finally {
-      modelRequestLoading.value = false
-    }
+    await modelRequestGate.read('list', '读取模型请求记录失败', () => workspaceController.loadModelRequestRecords(input, mode))
   }
 
   async function loadMoreModelRequestRecords(input: ModelRequestRecordsQuery) {
@@ -734,78 +638,27 @@ export function createWebqqWorkspaceShell(
   }
 
   async function loadModelRequestRecord(input: ModelRequestRecordQuery) {
-    modelRequestDetailLoading.value = true
-    modelRequestError.value = ''
-    try {
-      return await workspaceController.loadModelRequestRecord(input)
-    } catch (error) {
-      modelRequestError.value = error instanceof Error ? error.message : '读取模型请求详情失败'
-      throw error
-    } finally {
-      modelRequestDetailLoading.value = false
-    }
+    return modelRequestGate.readOrThrow('detail', '读取模型请求详情失败', () => workspaceController.loadModelRequestRecord(input))
   }
 
   async function loadModelRequestTrajectory(input: ModelRequestTrajectoryQuery) {
-    modelRequestDetailLoading.value = true
-    modelRequestError.value = ''
-    try {
-      await workspaceController.loadModelRequestTrajectory(input)
-    } catch (error) {
-      modelRequestError.value = error instanceof Error ? error.message : '读取模型请求轨迹失败'
-    } finally {
-      modelRequestDetailLoading.value = false
-    }
+    await modelRequestGate.read('detail', '读取模型请求轨迹失败', () => workspaceController.loadModelRequestTrajectory(input))
   }
 
   async function clearModelRequestRecords(input: ClearModelRequestRecordsQuery) {
-    modelRequestLoading.value = true
-    modelRequestError.value = ''
-    try {
-      await workspaceController.clearModelRequestRecords(input)
-    } catch (error) {
-      modelRequestError.value = error instanceof Error ? error.message : '清理模型请求记录失败'
-    } finally {
-      modelRequestLoading.value = false
-    }
+    await modelRequestGate.read('list', '清理模型请求记录失败', () => workspaceController.clearModelRequestRecords(input))
   }
 
   async function loadPresetCatalog() {
-    presetLoading.value = true
-    presetError.value = ''
-    try {
-      await workspaceController.loadPresetCatalog()
-    } catch (error) {
-      presetError.value = error instanceof Error ? error.message : '读取预设目录失败'
-    } finally {
-      presetLoading.value = false
-    }
+    await presetGate.read('read', '读取预设目录失败', () => workspaceController.loadPresetCatalog())
   }
 
   async function readPreset(input: ReadSandboxPresetInput) {
-    presetLoading.value = true
-    presetError.value = ''
-    try {
-      return await workspaceController.readPreset(input)
-    } catch (error) {
-      presetError.value = error instanceof Error ? error.message : '读取预设失败'
-      throw error
-    } finally {
-      presetLoading.value = false
-    }
+    return presetGate.readOrThrow('read', '读取预设失败', () => workspaceController.readPreset(input))
   }
 
   async function runPresetMutation<T>(operation: () => Promise<T>) {
-    presetSaving.value = true
-    presetError.value = ''
-    try {
-      return await operation()
-    } catch (error) {
-      presetError.value = error instanceof Error ? error.message : '预设操作失败'
-      throw error
-    } finally {
-      presetSaving.value = false
-    }
+    return presetGate.readOrThrow('save', '预设操作失败', operation)
   }
 
   const createPreset = (input: CreatePresetInput) => runPresetMutation(() => workspaceController.createPreset(input))
@@ -818,13 +671,8 @@ export function createWebqqWorkspaceShell(
   const deletePreset = (input: DeletePresetInput) => runPresetMutation(() => workspaceController.deletePreset(input))
 
   async function locatePresetExpression(input: LocateSandboxPresetExpressionInput) {
-    presetError.value = ''
-    try {
-      return await workspaceController.locatePresetExpression(input)
-    } catch (error) {
-      presetError.value = error instanceof Error ? error.message : '定位预设表达式失败'
-      throw error
-    }
+    // 定位不展示进行中：它今天没有进度通道，因此直接用区域错误位而不是经闸门。
+    return presetErrorSlot.runOrThrow('定位预设表达式失败', () => workspaceController.locatePresetExpression(input))
   }
 
   function navigateToModelRequest(reference: SandboxMessageModelRequestReference) {
@@ -840,7 +688,7 @@ export function createWebqqWorkspaceShell(
   }
 
   function reportEvidenceNavigationFailure(message: string) {
-    modelRequestError.value = message
+    modelRequestErrorSlot.error.value = message
   }
 
   function returnToPresetOrigin() {
@@ -889,12 +737,14 @@ export function createWebqqWorkspaceShell(
     const conversation = currentConversation.value
     const beforeMessageId = conversation ? readConversationMessageIds(snapshot.value, conversation.id)[0] : undefined
     if (!conversation || !currentOperator.value || !beforeMessageId) return resolve()
-    errorMessage.value = ''
     try {
-      await workspaceController.loadMessageHistory({ conversationId: conversation.id, beforeMessageId, limit: 50 })
+      await actionErrorSlot.runOrThrow('读取历史消息失败', () => workspaceController.loadMessageHistory({
+        conversationId: conversation.id,
+        beforeMessageId,
+        limit: 50,
+      }))
       resolve()
     } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : '读取历史消息失败'
       reject(error)
     }
   }
@@ -905,11 +755,9 @@ export function createWebqqWorkspaceShell(
     resolve: (result: Awaited<ReturnType<WorkspaceController['searchConversationMessages']>>) => void,
     reject: Reject,
   ) {
-    errorMessage.value = ''
     try {
-      resolve(await workspaceController.searchConversationMessages(input))
+      resolve(await actionErrorSlot.runOrThrow('搜索会话消息失败', () => workspaceController.searchConversationMessages(input)))
     } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : '搜索会话消息失败'
       reject(error)
     }
   }
@@ -942,12 +790,10 @@ export function createWebqqWorkspaceShell(
     resolve: Resolve,
     reject: Reject,
   ) {
-    errorMessage.value = ''
     try {
-      await workspaceController.sendForwardMessage(input)
+      await actionErrorSlot.runOrThrow('合并转发失败', () => workspaceController.sendForwardMessage(input))
       resolve()
     } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : '合并转发失败'
       reject(error)
     }
   }
@@ -958,9 +804,10 @@ export function createWebqqWorkspaceShell(
     reject: Reject,
   ) {
     try {
-      resolve(await workspaceController.getForwardMessage(input))
+      // 经错误位表达后这一处也会在调用前清掉上一条错误。收拢前它是十七处里唯一漏了这一步的，
+      // 表现是读取成功后上一条过期报错仍留在发送控件上。
+      resolve(await actionErrorSlot.runOrThrow('读取合并转发失败', () => workspaceController.getForwardMessage(input)))
     } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : '读取合并转发失败'
       reject(error)
     }
   }

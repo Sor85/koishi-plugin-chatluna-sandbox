@@ -1,0 +1,60 @@
+{
+  "engine": "chromium",
+  "samples": [
+    {
+      "label": "首屏",
+      "domLength": 29331,
+      "domSha256": "8ef664ca56e5579e",
+      "spinners": 0,
+      "errorTexts": []
+    },
+    {
+      "label": "模型请求",
+      "domLength": 54999,
+      "domSha256": "8779b6199bd6cc07",
+      "spinners": 0,
+      "errorTexts": [
+        "错误",
+        "错误",
+        "错误",
+        "错误",
+        "错误",
+        "错误",
+        "错误",
+        "错误",
+        "错误",
+        "错误",
+        "错误"
+      ]
+    },
+    {
+      "label": "预设",
+      "domLength": 15271,
+      "domSha256": "24f05f56c507d544",
+      "spinners": 0,
+      "errorTexts": []
+    },
+    {
+      "label": "OneBot 调试",
+      "domLength": 98153,
+      "domSha256": "715bd313e494491f",
+      "spinners": 0,
+      "errorTexts": []
+    },
+    {
+      "label": "MCP 调用",
+      "domLength": 13250,
+      "domSha256": "9c1ce1214fd28658",
+      "spinners": 0,
+      "errorTexts": []
+    },
+    {
+      "label": "消息",
+      "domLength": 29309,
+      "domSha256": "6a0a6e59ffdfdd61",
+      "spinners": 0,
+      "errorTexts": []
+    }
+  ],
+  "consoleErrors": []
+}

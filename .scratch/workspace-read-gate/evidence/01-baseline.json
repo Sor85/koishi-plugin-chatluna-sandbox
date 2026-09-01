@@ -1,0 +1,5479 @@
+{
+  "samples": [
+    {
+      "label": "初始",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "调试记录列表读取 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": true,
+          "detailLoading": false,
+          "error": ""
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "调试记录列表读取 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "调试记录列表读取失败 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": true,
+          "detailLoading": false,
+          "error": ""
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "调试记录列表读取失败 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录读取失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "调试记录列表重试 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": true,
+          "detailLoading": false,
+          "error": ""
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "调试记录列表重试 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "调试记录详情读取失败 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": true,
+          "error": ""
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "调试记录详情读取失败 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录不存在"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "调试记录清理失败 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": true,
+          "detailLoading": false,
+          "error": ""
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "调试记录清理失败 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "MCP 调用列表读取 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": true,
+          "detailLoading": false,
+          "error": ""
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "MCP 调用列表读取 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "MCP 调用列表读取失败 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": true,
+          "detailLoading": false,
+          "error": ""
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "MCP 调用列表读取失败 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用读取失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "MCP 调用详情读取失败 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": true,
+          "error": ""
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "MCP 调用详情读取失败 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用记录不存在"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "MCP 调用清理失败 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": true,
+          "detailLoading": false,
+          "error": ""
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "MCP 调用清理失败 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "模型请求列表读取 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": true,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "模型请求列表读取 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "模型请求列表读取失败 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": true,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "模型请求列表读取失败 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": false,
+          "error": "模型请求读取失败：上游拒绝"
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "模型请求追加读取 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": true,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "模型请求追加读取 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "模型请求详情读取失败 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": true,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "模型请求详情读取失败 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": false,
+          "error": "模型请求记录不存在"
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "模型请求轨迹读取 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "loading": false,
+          "detailLoading": true,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "模型请求轨迹读取 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "模型请求清理失败 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": true,
+          "detailLoading": false,
+          "error": ""
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "模型请求清理失败 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "模型请求清理失败：上游拒绝"
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "证据导航失败直接报到模型请求错误位",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "预设目录读取 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [],
+          "loading": true,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "预设目录读取 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "预设目录读取失败 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [],
+          "loading": true,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "预设目录读取失败 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "预设目录读取失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "预设读取失败 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [],
+          "loading": true,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "预设读取失败 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "预设不存在",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "预设保存失败 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": true,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "预设保存失败 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": false,
+          "error": "预设保存失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "预设保存成功 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [],
+          "loading": false,
+          "saving": true,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "预设保存成功 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "预设表达式定位失败 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "预设表达式定位失败 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "新建会话实例失败 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "新建会话实例失败 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": "会话不存在：private:10002:20001"
+        }
+      }
+    },
+    {
+      "label": "好友操作失败 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "好友操作失败 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": "好友不存在"
+        }
+      }
+    },
+    {
+      "label": "群组操作覆盖前一条错误 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "群组操作覆盖前一条错误 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": "群组不存在"
+        }
+      }
+    },
+    {
+      "label": "撤回失败 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "撤回失败 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": "消息不存在：message-9"
+        }
+      }
+    },
+    {
+      "label": "贴表情失败 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "贴表情失败 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": "消息不存在：message-9"
+        }
+      }
+    },
+    {
+      "label": "清空会话记录失败 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "清空会话记录失败 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": "会话不存在"
+        }
+      }
+    },
+    {
+      "label": "合并转发失败 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "合并转发失败 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": "转发目标不存在"
+        }
+      }
+    },
+    {
+      "label": "读取合并转发失败 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": "转发目标不存在"
+        }
+      }
+    },
+    {
+      "label": "读取合并转发失败 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": "合并转发不存在"
+        }
+      }
+    },
+    {
+      "label": "读取合并转发成功 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": "合并转发不存在"
+        }
+      }
+    },
+    {
+      "label": "读取合并转发成功 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": "合并转发不存在"
+        }
+      }
+    },
+    {
+      "label": "重命名会话失败 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "重命名会话失败 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": "会话名称不能为空"
+        }
+      }
+    },
+    {
+      "label": "删除会话失败 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "删除会话失败 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": "会话实例不存在：instance-1"
+        }
+      }
+    },
+    {
+      "label": "读取历史消息失败 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "读取历史消息失败 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": "历史消息读取失败"
+        }
+      }
+    },
+    {
+      "label": "搜索会话消息失败 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "搜索会话消息失败 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": "搜索失败"
+        }
+      }
+    },
+    {
+      "label": "搜索会话消息成功 · 调用途中",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    },
+    {
+      "label": "搜索会话消息成功 · 调用结束",
+      "models": {
+        "debug": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "调试记录清理失败：上游拒绝"
+        },
+        "mcpCall": {
+          "records": [],
+          "loading": false,
+          "detailLoading": false,
+          "error": "MCP 调用清理失败：上游拒绝"
+        },
+        "modelRequest": {
+          "records": [],
+          "hasMore": false,
+          "trajectory": {
+            "mode": "request",
+            "records": [],
+            "rows": [],
+            "promptComposition": [],
+            "complete": true
+          },
+          "loading": false,
+          "detailLoading": false,
+          "error": "证据导航失败：目标记录不在轨迹里"
+        },
+        "preset": {
+          "catalog": [
+            {
+              "kind": "core",
+              "fileName": "a.yml",
+              "source": "x",
+              "expectedRevision": "r",
+              "revision": "revision:x",
+              "size": 1,
+              "modifiedAt": "2026-08-22T00:00:00.000Z",
+              "templateFields": [],
+              "expressions": [],
+              "diagnostics": []
+            }
+          ],
+          "document": {
+            "kind": "core",
+            "fileName": "a.yml",
+            "source": "x",
+            "expectedRevision": "r",
+            "revision": "revision:x",
+            "size": 1,
+            "modifiedAt": "2026-08-22T00:00:00.000Z",
+            "templateFields": [],
+            "expressions": [],
+            "diagnostics": []
+          },
+          "loading": false,
+          "saving": false,
+          "error": "定位失败：上游拒绝",
+          "evidenceContext": {
+            "scope": {
+              "scope": "main"
+            }
+          }
+        },
+        "composer": {
+          "senders": [
+            {
+              "kind": "user",
+              "id": "10001",
+              "name": "测试用户1",
+              "type": "user",
+              "avatar": ""
+            },
+            {
+              "kind": "bot",
+              "id": "20001",
+              "name": "Koishi",
+              "implementation": "napcat",
+              "enabled": true,
+              "type": "bot",
+              "avatar": ""
+            }
+          ],
+          "currentOperatorId": "10001",
+          "conversationId": "private:10001:20001",
+          "mentionCandidates": [],
+          "accentColor": "#2563eb",
+          "colorMode": "light",
+          "externalError": ""
+        }
+      }
+    }
+  ]
+}
