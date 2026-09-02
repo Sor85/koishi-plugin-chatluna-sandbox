@@ -50,9 +50,9 @@ export const MCP_TOOL_CATALOGUE: McpToolCatalogueEntry[] = [
   { name: 'list_model_request_records', scope: 'debug' },
   { name: 'get_model_request_record', scope: 'debug' },
   { name: 'clear_model_request_records', scope: 'debug' },
-  { name: 'list_mcp_call_records', scope: 'debug' },
-  { name: 'get_mcp_call_record', scope: 'debug' },
-  { name: 'clear_mcp_call_records', scope: 'debug' },
+  { name: 'list_test_call_records', scope: 'debug' },
+  { name: 'get_test_call_record', scope: 'debug' },
+  { name: 'clear_test_call_records', scope: 'debug' },
 ]
 
 /** 按能力范围筛选清单，供 `listTools` 的按权限发现断言复用。 */

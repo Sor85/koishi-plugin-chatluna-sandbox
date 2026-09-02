@@ -289,14 +289,14 @@ describe('MCP 清理类工具', () => {
     await service.callTool(credential.token, 'get_scene_snapshot', {})
     await service.callTool(credential.token, 'export_scene', {})
 
-    const before = await service.callTool(credential.token, 'list_mcp_call_records', {}) as { records: Array<{ tool: string }> }
+    const before = await service.callTool(credential.token, 'list_test_call_records', {}) as { records: Array<{ tool: string }> }
     // 调用记录在工具执行完成之后写入，因此读取自身不出现在它返回的页里。
     expect(before.records.map(({ tool }) => tool)).toEqual(['export_scene', 'get_scene_snapshot', 'get_server_info'])
 
     // 同理，cleared 覆盖清理调用之前的全部记录，包括上一次读取自身留下的那条。
-    expect(await service.callTool(credential.token, 'clear_mcp_call_records', {})).toEqual({ cleared: before.records.length + 1 })
-    const after = await service.callTool(credential.token, 'list_mcp_call_records', {}) as { records: Array<{ tool: string }> }
-    expect(after.records.map(({ tool }) => tool)).toEqual(['clear_mcp_call_records'])
+    expect(await service.callTool(credential.token, 'clear_test_call_records', {})).toEqual({ cleared: before.records.length + 1 })
+    const after = await service.callTool(credential.token, 'list_test_call_records', {}) as { records: Array<{ tool: string }> }
+    expect(after.records.map(({ tool }) => tool)).toEqual(['clear_test_call_records'])
   })
 })
 

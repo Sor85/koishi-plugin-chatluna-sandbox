@@ -63,17 +63,17 @@
           @open="loadOneBotDebugRecord"
           @clear="clearOneBotDebugRecords"
         />
-        <McpCallWorkspace
-          v-else-if="currentView === 'mcp-calls'"
-          :records="mcpCallWorkspaceModel.records"
-          :detail="mcpCallWorkspaceModel.detail"
-          :loading="mcpCallWorkspaceModel.loading"
-          :detail-loading="mcpCallWorkspaceModel.detailLoading"
-          :error="mcpCallWorkspaceModel.error"
-          :visit-key="mcpCallVisitKey"
-          @query="loadMcpCallRecords"
-          @open="loadMcpCallRecord"
-          @clear="clearMcpCallRecords"
+        <TestCallWorkspace
+          v-else-if="currentView === 'test-calls'"
+          :records="testCallWorkspaceModel.records"
+          :detail="testCallWorkspaceModel.detail"
+          :loading="testCallWorkspaceModel.loading"
+          :detail-loading="testCallWorkspaceModel.detailLoading"
+          :error="testCallWorkspaceModel.error"
+          :visit-key="testCallVisitKey"
+          @query="loadTestCallRecords"
+          @open="loadTestCallRecord"
+          @clear="clearTestCallRecords"
         />
         <PresetWorkspace
           v-else-if="currentView === 'presets'"
@@ -201,7 +201,7 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 import AgentObserveOverlay from './agent-observe-overlay.vue'
 import AiTestSpaceOverview from './ai-test-space-overview.vue'
 import EnvironmentManager from './environment-manager.vue'
-import McpCallWorkspace from './mcp-call-workspace.vue'
+import TestCallWorkspace from './test-call-workspace.vue'
 import ModelRequestWorkspace from './model-request-workspace.vue'
 import OneBotDebugWorkspace from './onebot-debug-workspace.vue'
 import PresetWorkspace from './preset-workspace.vue'
@@ -212,7 +212,7 @@ import WorkspaceOverlayHost from './workspace-overlay-host.vue'
 import { useResolvedColorMode, useFrostedSurfaceFlag } from './webqq/color-scheme'
 import { rememberFloatingPanelAnchor } from './webqq/floating-panel'
 import { createKoishiMcpAdminPort } from './webqq/koishi-mcp-admin-port'
-import { createKoishiMcpCallRecordPort } from './webqq/koishi-mcp-call-record-port'
+import { createKoishiTestCallRecordPort } from './webqq/koishi-test-call-record-port'
 import { createKoishiModelRequestPort } from './webqq/koishi-model-request-port'
 import { createKoishiOneBotDebugPort } from './webqq/koishi-onebot-debug-port'
 import { createKoishiPresetPort } from './webqq/koishi-preset-port'
@@ -237,7 +237,7 @@ const workspaceController = createWorkspaceController({
   oneBotDebug: createKoishiOneBotDebugPort(resolveActiveSpaceId),
   modelRequest: createKoishiModelRequestPort(),
   preset: createKoishiPresetPort(),
-  mcpCallRecord: createKoishiMcpCallRecordPort(),
+  testCallRecord: createKoishiTestCallRecordPort(),
 }, window.localStorage)
 // 总览要读主场景与任意测试空间的头像媒体，因此另配一个不跟随当前活动空间的工作区端口。
 // 拆分后它只剩场景那一道：缩略图要的就是越过隐式定域读任意空间的媒体。
@@ -250,7 +250,7 @@ const {
   appearance,
   chatPaneModel,
   clearOneBotDebugRecords,
-  clearMcpCallRecords,
+  clearTestCallRecords,
   clearModelRequestRecords,
   closeDetails,
   currentView,
@@ -260,8 +260,8 @@ const {
   detailsVisible,
   debugVisitKey,
   debugWorkspaceModel,
-  mcpCallVisitKey,
-  mcpCallWorkspaceModel,
+  testCallVisitKey,
+  testCallWorkspaceModel,
   modelRequestVisitKey,
   modelRequestWorkspaceModel,
   evidenceNavigation,
@@ -273,8 +273,8 @@ const {
   searchConversationMessages,
   loadOneBotDebugRecords,
   loadOneBotDebugRecord,
-  loadMcpCallRecords,
-  loadMcpCallRecord,
+  loadTestCallRecords,
+  loadTestCallRecord,
   loadModelRequestRecords,
   loadMoreModelRequestRecords,
   loadModelRequestRecord,

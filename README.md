@@ -51,7 +51,7 @@ curl -s -H "authorization: Bearer $TOKEN" --get --data-urlencode 'uri=chatluna-s
 
 状态码按稳定错误码映射：参数与契约类为 `400`，凭证缺失为 `401`，权限不足为 `403`，实体或路径不存在为 `404`，动词不符为 `405`，乐观并发与空间状态冲突为 `409`，游标过期为 `410`，需要确认令牌为 `428`，请求体超限为 `413`，限流与并发超限为 `429`（带 `Retry-After`），领域主动拒绝为 `422`，未预期异常为 `500`。完整错误码清单从 `chatluna-sandbox://errors` 资源读取。
 
-失败响应里的 `traceId` 就是那次失败写下的测试调用记录 ID，可用 `get_mcp_call_record` 取回完整参数与错误。WebQQ 的 MCP 调用工作台会标注每条记录的来路，并支持按 `MCP 客户端` / `HTTP 接口` 筛选。
+失败响应里的 `traceId` 就是那次失败写下的测试调用记录 ID，可用 `get_test_call_record` 取回完整参数与错误。WebQQ 的测试调用工作台会标注每条记录的来路，并支持按 `MCP 客户端` / `HTTP 接口` 筛选。
 
 ## OneBot 基线
 

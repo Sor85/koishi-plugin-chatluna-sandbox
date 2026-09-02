@@ -32,11 +32,11 @@ import type {
 } from '../types'
 import { SandboxModelRequestCursorExpiredError, SandboxOneBotDebugCursorExpiredError } from '../types'
 import { asRecord, readSpaceId, requireString, stableValue } from './arguments'
-import type { ListSandboxMcpCallRecordsInput, SandboxMcpCallRecordsPage } from './call-records'
+import type { ListSandboxTestCallRecordsInput, SandboxTestCallRecordsPage } from './call-records'
 import {
   SandboxMcpError,
-  type SandboxMcpCallRecord,
-  type SandboxMcpCallTransport,
+  type SandboxTestCallRecord,
+  type SandboxTestCallTransport,
   type SandboxMcpEvent,
   type SandboxMcpEventCursor,
   type SandboxMcpExport,
@@ -90,7 +90,7 @@ export interface SandboxMcpToolRuntime {
   /** 本次调用的控制服务：按条目的 `spaceResolution` 解析；`none` 时是主场景控制服务。 */
   readonly control: SandboxControlService
   /** 承载本次调用的协议表述，只用于服务自述与调用记录标注。 */
-  readonly transport: SandboxMcpCallTransport
+  readonly transport: SandboxTestCallTransport
   /** 发起本次调用的测试凭证标识，用于登记一次性确认令牌。 */
   readonly credentialId: string
   /** 参数里的空间标识原文；事件归属与媒体缓存键都取它。 */
@@ -108,8 +108,8 @@ export interface SandboxMcpToolRuntime {
   rememberUploadedMedia(mediaId: string, media: SandboxMedia): void
   findUploadedMedia(mediaId: string): SandboxMedia | undefined
   rememberConfirmation(token: string, confirmation: SandboxMcpConfirmation): void
-  listCallRecords(input: ListSandboxMcpCallRecordsInput): SandboxMcpCallRecordsPage
-  getCallRecord(recordId: string): SandboxMcpCallRecord
+  listCallRecords(input: ListSandboxTestCallRecordsInput): SandboxTestCallRecordsPage
+  getCallRecord(recordId: string): SandboxTestCallRecord
   clearCallRecords(): { cleared: number }
 }
 
@@ -150,9 +150,9 @@ const TIMEOUT_SECONDS = { type: 'number', minimum: 1, maximum: 120, description:
 const OPERATOR_ID = { type: 'string', description: '操作者参与者 ID（十进制数字字符串）' }
 const PARTICIPANT_ID = { type: 'string', description: '参与者 ID（十进制数字字符串）' }
 const IMPLEMENTATION = { type: 'string', enum: ['napcat', 'llbot'] }
-// 调用标注参数：每次调用都被写进测试调用记录，也是 list_mcp_call_records 的筛选维度。它对全部
+// 调用标注参数：每次调用都被写进测试调用记录，也是 list_test_call_records 的筛选维度。它对全部
 // 工具生效而非某个工具的业务参数，因此由 withTestRunId 统一注入，不逐个工具书写。
-const TEST_RUN_ID = { type: 'string', description: '本次测试编排的标识；写入测试调用记录，可用 list_mcp_call_records 按它回溯同一轮编排的全部调用' }
+const TEST_RUN_ID = { type: 'string', description: '本次测试编排的标识；写入测试调用记录，可用 list_test_call_records 按它回溯同一轮编排的全部调用' }
 const ACCOUNT_PROFILE_PROPERTIES = {
   personalNote: { type: 'string', description: '个性签名' },
   sex: { type: 'string', enum: ['unknown', 'male', 'female'], description: '也接受 OneBot 的 0、1、2' },
@@ -1006,14 +1006,14 @@ async function getModelRequestRecord(runtime: SandboxMcpToolRuntime, args: Recor
  */
 async function clearModelRequestRecords(runtime: SandboxMcpToolRuntime, args: Record<string, unknown>) {
   if (args.scope === 'unattributed') {
-    throw new SandboxMcpError('invalid_arguments', 'MCP 不能清理未归属模型请求记录')
+    throw new SandboxMcpError('invalid_arguments', '测试控制端点不能清理未归属模型请求记录')
   }
   return { cleared: await runtime.resolveControl(readSpaceId(args), true).getModelRequestStore().clear() }
 }
 
 // —— 执行体：测试调用记录 ——
 
-function listMcpCallRecords(runtime: SandboxMcpToolRuntime, args: Record<string, unknown>) {
+function listTestCallRecords(runtime: SandboxMcpToolRuntime, args: Record<string, unknown>) {
   return runtime.listCallRecords({
     tool: typeof args.tool === 'string' ? args.tool : undefined,
     credentialName: typeof args.credentialName === 'string' ? args.credentialName : undefined,
@@ -1636,9 +1636,9 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
     run: clearModelRequestRecords,
   },
   {
-    name: 'list_mcp_call_records',
+    name: 'list_test_call_records',
     scope: 'debug',
-    description: '读取 MCP 调用记录摘要',
+    description: '读取测试调用记录摘要',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1652,12 +1652,12 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
       },
     },
     quota: 'read', spaceResolution: 'none', idempotent: false, requiresConfirmation: false,
-    run: listMcpCallRecords,
+    run: listTestCallRecords,
   },
   {
-    name: 'get_mcp_call_record',
+    name: 'get_test_call_record',
     scope: 'debug',
-    description: '读取单条 MCP 调用记录详情',
+    description: '读取单条测试调用记录详情',
     inputSchema: {
       type: 'object',
       description: '按记录 ID 读取单条脱敏测试调用记录，包含参数、结果和错误。',
@@ -1668,9 +1668,9 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
     run: (runtime, args) => runtime.getCallRecord(requireString(args.recordId, 'recordId')),
   },
   {
-    name: 'clear_mcp_call_records',
+    name: 'clear_test_call_records',
     scope: 'debug',
-    description: '清理 MCP 调用记录',
+    description: '清理测试调用记录',
     inputSchema: { type: 'object', properties: {} },
     quota: 'read', spaceResolution: 'none', idempotent: false, requiresConfirmation: false,
     run: (runtime) => runtime.clearCallRecords(),
@@ -1681,7 +1681,7 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
  * 给工具 schema 补上通用的 `testRunId` 声明。
  *
  * 它在每个工具上都会被读取（写入测试调用记录），因此逐个工具书写既冗余又必然漏；在这里统一注入
- * 让「新增工具自动带上它」成为默认行为。已经自行声明 `testRunId` 的工具（`list_mcp_call_records`
+ * 让「新增工具自动带上它」成为默认行为。已经自行声明 `testRunId` 的工具（`list_test_call_records`
  * 上它是筛选维度）保留自己的描述。
  */
 function withTestRunId(schema: Record<string, unknown>): Record<string, unknown> {

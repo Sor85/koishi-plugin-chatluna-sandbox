@@ -1,4 +1,4 @@
-.webqq-mcp-call-workspace {
+.webqq-test-call-workspace {
   grid-template-rows: auto auto minmax(0, 1fr);
   gap: 16px;
   min-width: 0;
@@ -7,79 +7,79 @@
   background: var(--webqq-bg);
 }
 
-.webqq-mcp-call-header,
-.webqq-mcp-call-item-name,
-.webqq-mcp-call-actions,
-.webqq-mcp-call-live,
-.webqq-mcp-call-error-filter,
-.webqq-mcp-call-timing,
-.webqq-mcp-call-timing > time,
-.webqq-mcp-call-timing > span,
-.webqq-mcp-call-section-heading,
-.webqq-mcp-call-section-heading > span {
+.webqq-test-call-header,
+.webqq-test-call-item-name,
+.webqq-test-call-actions,
+.webqq-test-call-live,
+.webqq-test-call-error-filter,
+.webqq-test-call-timing,
+.webqq-test-call-timing > time,
+.webqq-test-call-timing > span,
+.webqq-test-call-section-heading,
+.webqq-test-call-section-heading > span {
   display: flex;
   align-items: center;
 }
 
-.webqq-mcp-call-header {
+.webqq-test-call-header {
   justify-content: space-between;
   gap: 24px;
 }
 
-.webqq-mcp-call-header h1 {
+.webqq-test-call-header h1 {
   margin: 0 0 8px;
   font-size: var(--webqq-font-3xl);
   font-weight: 700;
 }
 
-.webqq-mcp-call-header p,
-.webqq-mcp-call-item p,
-.webqq-mcp-call-detail p {
+.webqq-test-call-header p,
+.webqq-test-call-item p,
+.webqq-test-call-detail p {
   margin: 0;
   color: var(--webqq-muted);
   font-size: var(--webqq-font-md);
 }
 
-.webqq-mcp-call-actions,
-.webqq-mcp-call-item-name,
-.webqq-mcp-call-live,
-.webqq-mcp-call-error-filter {
+.webqq-test-call-actions,
+.webqq-test-call-item-name,
+.webqq-test-call-live,
+.webqq-test-call-error-filter {
   gap: 8px;
 }
 
-.webqq-mcp-call-live {
+.webqq-test-call-live {
   min-height: 40px;
   color: var(--webqq-muted);
   font-size: var(--webqq-font-lg);
   white-space: nowrap;
 }
 
-.webqq-mcp-call-live [data-slot="switch"] {
+.webqq-test-call-live [data-slot="switch"] {
   width: 36px;
   height: 20px;
   background: #e5e7eb;
   box-shadow: none;
 }
 
-.webqq-mcp-call-live [data-slot="switch"][data-state="checked"] {
+.webqq-test-call-live [data-slot="switch"][data-state="checked"] {
   background: var(--webqq-accent);
 }
 
-.webqq-workspace[data-color-mode="dark"] .webqq-mcp-call-live [data-slot="switch"]:not([data-state="checked"]) {
+.webqq-workspace[data-color-mode="dark"] .webqq-test-call-live [data-slot="switch"]:not([data-state="checked"]) {
   background: #3f3f46;
 }
 
-.webqq-mcp-call-list-toolbar,
-.webqq-mcp-call-list-tools,
-.webqq-mcp-call-sort {
+.webqq-test-call-list-toolbar,
+.webqq-test-call-list-tools,
+.webqq-test-call-sort {
   display: flex;
 }
 
-.webqq-mcp-call-filter-popover > label:not(.webqq-mcp-call-error-filter) {
+.webqq-test-call-filter-popover > label:not(.webqq-test-call-error-filter) {
   display: grid;
 }
 
-.webqq-mcp-call-list-toolbar {
+.webqq-test-call-list-toolbar {
   z-index: 2;
   align-items: center;
   justify-content: space-between;
@@ -91,23 +91,23 @@
   --webqq-overlay-header-surface: var(--webqq-surface);
 }
 
-.webqq-mcp-call-list-toolbar::before {
+.webqq-test-call-list-toolbar::before {
   border-radius: 15px 15px 0 0;
 }
 
-.webqq-mcp-call-list-toolbar h2 {
+.webqq-test-call-list-toolbar h2 {
   margin: 0;
   color: var(--webqq-text);
   font-size: var(--webqq-font-xl);
   font-weight: 600;
 }
 
-.webqq-mcp-call-list-tools {
+.webqq-test-call-list-tools {
   align-items: center;
   gap: 8px;
 }
 
-.webqq-mcp-call-sort {
+.webqq-test-call-sort {
   align-items: center;
   gap: 4px;
   padding: 0;
@@ -117,39 +117,39 @@
   font-size: var(--webqq-font-md);
 }
 
-.webqq-mcp-call-filter-trigger {
+.webqq-test-call-filter-trigger {
   border-radius: 8px;
 }
 
-.webqq-mcp-call-filter-trigger.is-filtered {
+.webqq-test-call-filter-trigger.is-filtered {
   color: var(--webqq-accent);
   border-color: color-mix(in srgb, var(--webqq-accent) 34%, var(--webqq-border));
   background: color-mix(in srgb, var(--webqq-accent) 10%, var(--webqq-surface));
 }
 
-.webqq-mcp-call-filter-popover {
+.webqq-test-call-filter-popover {
   display: grid;
   gap: 12px;
   width: 280px;
 }
 
-.webqq-mcp-call-filter-popover > label:not(.webqq-mcp-call-error-filter) {
+.webqq-test-call-filter-popover > label:not(.webqq-test-call-error-filter) {
   gap: 8px;
   min-width: 0;
   font-weight: 600;
 }
 
-.webqq-mcp-call-control {
+.webqq-test-call-control {
   width: 100%;
 }
 
-.webqq-mcp-call-error-filter {
+.webqq-test-call-error-filter {
   align-self: end;
   min-height: 40px;
   white-space: nowrap;
 }
 
-.webqq-mcp-call-split {
+.webqq-test-call-split {
   display: grid;
   grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
   grid-row: 3;
@@ -157,8 +157,8 @@
   gap: 16px;
 }
 
-.webqq-mcp-call-list-pane,
-.webqq-mcp-call-detail-pane {
+.webqq-test-call-list-pane,
+.webqq-test-call-detail-pane {
   display: grid;
   min-width: 0;
   min-height: 0;
@@ -168,19 +168,19 @@
   background: var(--webqq-surface);
 }
 
-.webqq-mcp-call-list-pane {
+.webqq-test-call-list-pane {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
 }
 
-.webqq-mcp-call-list,
-.webqq-mcp-call-detail {
+.webqq-test-call-list,
+.webqq-test-call-detail {
   height: 100%;
   min-height: 0;
   overflow: auto;
 }
 
-.webqq-mcp-call-list {
+.webqq-test-call-list {
   display: grid;
   align-content: start;
   grid-auto-rows: max-content;
@@ -190,7 +190,7 @@
   scroll-padding-top: 64px;
 }
 
-.webqq-mcp-call-item {
+.webqq-test-call-item {
   display: grid;
   gap: 8px;
   width: 100%;
@@ -202,29 +202,29 @@
   text-align: left;
 }
 
-.webqq-mcp-call-item.is-active,
-.webqq-mcp-call-item:hover,
-.webqq-mcp-call-item:focus-visible {
+.webqq-test-call-item.is-active,
+.webqq-test-call-item:hover,
+.webqq-test-call-item:focus-visible {
   background: var(--webqq-hover);
 }
 
-.webqq-mcp-call-item:focus-visible {
+.webqq-test-call-item:focus-visible {
   outline: 2px solid var(--webqq-accent);
   outline-offset: 2px;
 }
 
-.webqq-mcp-call-item-copy {
+.webqq-test-call-item-copy {
   display: grid;
   gap: 2px;
   min-width: 0;
 }
 
-.webqq-mcp-call-item-name {
+.webqq-test-call-item-name {
   min-width: 0;
   flex-wrap: wrap;
 }
 
-.webqq-mcp-call-item-name strong {
+.webqq-test-call-item-name strong {
   min-width: 0;
   overflow: hidden;
   color: var(--webqq-text);
@@ -238,24 +238,24 @@
  * 再加一项会让长工具名那几行折行、短工具名那几行不折，列表高度参差。时间行三项都是短定长文本，
  * 折行行为对所有记录一致。
  */
-.webqq-mcp-call-timing {
+.webqq-test-call-timing {
   flex-wrap: wrap;
   gap: 4px 12px;
   color: var(--webqq-muted);
 }
 
-.webqq-mcp-call-timing > time,
-.webqq-mcp-call-timing > span {
+.webqq-test-call-timing > time,
+.webqq-test-call-timing > span {
   gap: 4px;
   min-width: 0;
   white-space: nowrap;
 }
 
-.webqq-mcp-call-timing svg {
+.webqq-test-call-timing svg {
   flex: 0 0 auto;
 }
 
-.sandbox-badge.webqq-mcp-call-credential {
+.sandbox-badge.webqq-test-call-credential {
   max-width: 7.5em;
   overflow: hidden;
   border-color: var(--webqq-border);
@@ -264,34 +264,34 @@
   text-overflow: ellipsis;
 }
 
-.webqq-mcp-call-item time,
-.webqq-mcp-call-detail time,
-.webqq-mcp-call-timing,
-.webqq-mcp-call-trace {
+.webqq-test-call-item time,
+.webqq-test-call-detail time,
+.webqq-test-call-timing,
+.webqq-test-call-trace {
   font-size: var(--webqq-font-md);
 }
 
-.webqq-workspace .sandbox-badge.webqq-mcp-call-status-success {
+.webqq-workspace .sandbox-badge.webqq-test-call-status-success {
   color: #047857;
   background: #d1fae5;
 }
 
-.webqq-workspace[data-color-mode="dark"] .sandbox-badge.webqq-mcp-call-status-success {
+.webqq-workspace[data-color-mode="dark"] .sandbox-badge.webqq-test-call-status-success {
   color: #a7f3d0;
   background: #064e3b;
 }
 
-.webqq-mcp-call-error,
-.webqq-mcp-call-trace {
+.webqq-test-call-error,
+.webqq-test-call-trace {
   color: #b91c1c;
 }
 
-.webqq-workspace .sandbox-badge.webqq-mcp-call-status-error {
+.webqq-workspace .sandbox-badge.webqq-test-call-status-error {
   color: #b91c1c;
   background: #fee2e2;
 }
 
-.webqq-mcp-call-detail {
+.webqq-test-call-detail {
   display: grid;
   align-content: start;
   grid-auto-rows: max-content;
@@ -299,7 +299,7 @@
   padding: 16px;
 }
 
-.webqq-mcp-call-meta-list {
+.webqq-test-call-meta-list {
   display: grid;
   overflow: hidden;
   border: 1px solid var(--webqq-border);
@@ -307,7 +307,7 @@
   background: color-mix(in srgb, var(--webqq-surface-muted) 52%, transparent);
 }
 
-.webqq-mcp-call-meta {
+.webqq-test-call-meta {
   display: grid;
   grid-template-columns: 17px minmax(64px, auto) minmax(0, 1fr);
   align-items: center;
@@ -317,25 +317,25 @@
   line-height: 20px;
 }
 
-.webqq-mcp-call-meta + .webqq-mcp-call-meta {
+.webqq-test-call-meta + .webqq-test-call-meta {
   border-top: 1px solid var(--webqq-border);
 }
 
-.webqq-mcp-call-meta svg {
+.webqq-test-call-meta svg {
   display: block;
   width: 17px;
   height: 17px;
   color: var(--webqq-accent);
 }
 
-.webqq-mcp-call-meta-label {
+.webqq-test-call-meta-label {
   color: var(--webqq-muted);
   font-weight: 600;
   line-height: 20px;
   white-space: nowrap;
 }
 
-.webqq-mcp-call-meta-value {
+.webqq-test-call-meta-value {
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--webqq-text);
@@ -343,7 +343,7 @@
   user-select: text;
 }
 
-.webqq-mcp-call-error-diagnostic {
+.webqq-test-call-error-diagnostic {
   display: grid;
   gap: 12px;
   padding: 14px;
@@ -352,37 +352,37 @@
   background: color-mix(in srgb, #fee2e2 46%, var(--webqq-surface));
 }
 
-.webqq-mcp-call-section-heading {
+.webqq-test-call-section-heading {
   justify-content: space-between;
   gap: 12px;
 }
 
-.webqq-mcp-call-section-heading > span {
+.webqq-test-call-section-heading > span {
   gap: 7px;
 }
 
-.webqq-mcp-call-section-heading svg {
+.webqq-test-call-section-heading svg {
   flex: 0 0 auto;
   color: var(--webqq-accent);
 }
 
-.webqq-mcp-call-payloads {
+.webqq-test-call-payloads {
   display: grid;
   gap: 16px;
 }
 
-.webqq-mcp-call-payloads > section {
+.webqq-test-call-payloads > section {
   display: grid;
   gap: 8px;
 }
 
-.webqq-mcp-call-payloads h2,
-.webqq-mcp-call-section-heading strong {
+.webqq-test-call-payloads h2,
+.webqq-test-call-section-heading strong {
   margin: 0;
   font-size: var(--webqq-font-md);
 }
 
-.webqq-mcp-call-payloads pre {
+.webqq-test-call-payloads pre {
   max-height: 320px;
   overflow: auto;
   padding: 12px;
@@ -398,8 +398,8 @@
   user-select: text;
 }
 
-.webqq-mcp-call-empty,
-.webqq-mcp-call-error {
+.webqq-test-call-empty,
+.webqq-test-call-error {
   display: grid;
   place-items: center;
   min-height: 0;
@@ -408,17 +408,17 @@
 }
 
 @media (max-width: 960px) {
-  .webqq-mcp-call-workspace {
+  .webqq-test-call-workspace {
     padding: 16px;
   }
 
-  .webqq-mcp-call-split {
+  .webqq-test-call-split {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 720px) {
-  .webqq-mcp-call-header {
+  .webqq-test-call-header {
     align-items: flex-start;
     flex-direction: column;
   }

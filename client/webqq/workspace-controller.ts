@@ -44,7 +44,7 @@ import type { WorkspacePort } from './workspace-port'
 import type { OneBotDebugPort } from './onebot-debug-port'
 import type { ModelRequestPort } from './model-request-port'
 import type { PresetPort } from './preset-port'
-import type { McpCallRecordPort } from './mcp-call-record-port'
+import type { TestCallRecordPort } from './test-call-record-port'
 import type {
   LocateSandboxPresetExpressionInput,
   LocateSandboxPresetExpressionResult,
@@ -63,8 +63,8 @@ import {
   readConversationMessageIds,
   type ResolvedConversation,
 } from '../../src/conversation-resolution'
-import type { ListSandboxMcpCallRecordsInput } from '../../src/mcp/call-records'
-import type { SandboxMcpCallRecord, SandboxMcpCallRecordListItem } from '../../src/mcp/types'
+import type { ListSandboxTestCallRecordsInput } from '../../src/mcp/call-records'
+import type { SandboxTestCallRecord, SandboxTestCallRecordListItem } from '../../src/mcp/types'
 import {
   emptyModelRequestCapacity,
   type ClearModelRequestRecordsQuery,
@@ -164,7 +164,7 @@ export interface WorkspaceControllerPorts {
   oneBotDebug: OneBotDebugPort
   modelRequest: ModelRequestPort
   preset: PresetPort
-  mcpCallRecord: McpCallRecordPort
+  testCallRecord: TestCallRecordPort
 }
 
 export function createWorkspaceController(ports: WorkspaceControllerPorts, storage: WorkspaceStorage) {
@@ -173,7 +173,7 @@ export function createWorkspaceController(ports: WorkspaceControllerPorts, stora
     oneBotDebug: oneBotDebugPort,
     modelRequest: modelRequestPort,
     preset: presetPort,
-    mcpCallRecord: mcpCallRecordPort,
+    testCallRecord: testCallRecordPort,
   } = ports
   const workspaceState = ref<SandboxWorkspaceState>({
     snapshot: emptySnapshot,
@@ -192,8 +192,8 @@ export function createWorkspaceController(ports: WorkspaceControllerPorts, stora
   const presetCatalogState = ref<SandboxPresetDocument[]>([])
   const presetDocumentState = ref<SandboxPresetDocument>()
   const presetLocateResultState = ref<LocateSandboxPresetExpressionResult>()
-  const mcpCallRecordsState = ref<SandboxMcpCallRecordListItem[]>([])
-  const mcpCallRecordState = ref<SandboxMcpCallRecord>()
+  const testCallRecordsState = ref<SandboxTestCallRecordListItem[]>([])
+  const testCallRecordState = ref<SandboxTestCallRecord>()
   const modelRequestRecordsPageState = ref<ModelRequestRecordsPageState>({
     hasMore: false,
     capacity: emptyModelRequestCapacity,
@@ -749,31 +749,31 @@ export function createWorkspaceController(ports: WorkspaceControllerPorts, stora
     }
   }
 
-  async function loadMcpCallRecords(input: ListSandboxMcpCallRecordsInput = {}) {
+  async function loadTestCallRecords(input: ListSandboxTestCallRecordsInput = {}) {
     try {
-      const page = await mcpCallRecordPort.getMcpCallRecords(input)
-      mcpCallRecordsState.value = page.records
+      const page = await testCallRecordPort.getTestCallRecords(input)
+      testCallRecordsState.value = page.records
     } catch (error) {
-      throw normalizeWorkspaceError(error, '读取 MCP 调用记录失败')
+      throw normalizeWorkspaceError(error, '读取测试调用记录失败')
     }
   }
 
-  async function loadMcpCallRecord(input: { recordId: string }) {
+  async function loadTestCallRecord(input: { recordId: string }) {
     try {
-      mcpCallRecordState.value = await mcpCallRecordPort.getMcpCallRecord(input)
-      return mcpCallRecordState.value
+      testCallRecordState.value = await testCallRecordPort.getTestCallRecord(input)
+      return testCallRecordState.value
     } catch (error) {
-      throw normalizeWorkspaceError(error, '读取 MCP 调用详情失败')
+      throw normalizeWorkspaceError(error, '读取测试调用详情失败')
     }
   }
 
-  async function clearMcpCallRecords() {
+  async function clearTestCallRecords() {
     try {
-      await mcpCallRecordPort.clearMcpCallRecords()
-      mcpCallRecordsState.value = []
-      mcpCallRecordState.value = undefined
+      await testCallRecordPort.clearTestCallRecords()
+      testCallRecordsState.value = []
+      testCallRecordState.value = undefined
     } catch (error) {
-      throw normalizeWorkspaceError(error, '清理 MCP 调用记录失败')
+      throw normalizeWorkspaceError(error, '清理测试调用记录失败')
     }
   }
 
@@ -824,8 +824,8 @@ export function createWorkspaceController(ports: WorkspaceControllerPorts, stora
     presetCatalog: readonly(presetCatalogState),
     presetDocument: readonly(presetDocumentState),
     presetLocateResult: readonly(presetLocateResultState),
-    mcpCallRecords: readonly(mcpCallRecordsState),
-    mcpCallRecord: readonly(mcpCallRecordState),
+    testCallRecords: readonly(testCallRecordsState),
+    testCallRecord: readonly(testCallRecordState),
     sidebar,
     chat,
     composer,
@@ -842,8 +842,8 @@ export function createWorkspaceController(ports: WorkspaceControllerPorts, stora
     loadModelRequestRecord,
     loadModelRequestTrajectory,
     loadPresetCatalog,
-    loadMcpCallRecords,
-    loadMcpCallRecord,
+    loadTestCallRecords,
+    loadTestCallRecord,
     readPreset,
     createPreset,
     savePreset,
@@ -856,7 +856,7 @@ export function createWorkspaceController(ports: WorkspaceControllerPorts, stora
     performGroupAction,
     clearOneBotDebugRecords,
     clearModelRequestRecords,
-    clearMcpCallRecords,
+    clearTestCallRecords,
     recallMessage,
     clearConversationMessages,
     createConversationInstance,

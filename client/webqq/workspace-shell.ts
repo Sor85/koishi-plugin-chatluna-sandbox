@@ -5,7 +5,7 @@ import type { WebqqDetailsPanelModel } from '../webqq-details-panel.vue'
 import type { WebqqForwardTargetModel, WebqqForwardTargetOption } from '../webqq-forward-target-dialog.vue'
 import type { WebqqMessageListModel } from '../webqq-message-list.vue'
 import type { WebqqSidebarModel } from '../webqq-sidebar.vue'
-import type { ListSandboxMcpCallRecordsInput } from '../../src/mcp/call-records'
+import type { ListSandboxTestCallRecordsInput } from '../../src/mcp/call-records'
 import { readConversationMessageIds, type ResolvedConversation } from '../../src/conversation-resolution'
 import type {
   GetSandboxOneBotDebugRecordInput,
@@ -86,14 +86,14 @@ export function createWebqqWorkspaceShell(
   // 四个区域的形状差异因此写在这几行声明上，而不是表现为「少了一个引用」。
   const debugErrorSlot = createErrorSlot()
   const debugGate = createRegionReadGate(debugErrorSlot, ['list', 'detail'])
-  const mcpCallErrorSlot = createErrorSlot()
-  const mcpCallGate = createRegionReadGate(mcpCallErrorSlot, ['list', 'detail'])
+  const testCallErrorSlot = createErrorSlot()
+  const testCallGate = createRegionReadGate(testCallErrorSlot, ['list', 'detail'])
   const modelRequestErrorSlot = createErrorSlot()
   const modelRequestGate = createRegionReadGate(modelRequestErrorSlot, ['list', 'detail'])
   const presetErrorSlot = createErrorSlot()
   const presetGate = createRegionReadGate(presetErrorSlot, ['read', 'save'])
   const debugVisitKey = ref(0)
-  const mcpCallVisitKey = ref(0)
+  const testCallVisitKey = ref(0)
   const modelRequestVisitKey = ref(0)
   const presetDirtyGuard = createPresetDirtyGuard()
   const presetDiscardGuard = ref(presetDirtyGuard.peek())
@@ -315,12 +315,12 @@ export function createWebqqWorkspaceShell(
     detailLoading: debugGate.loading.detail.value,
     error: debugGate.error.value,
   }))
-  const mcpCallWorkspaceModel = computed(() => ({
-    records: workspaceController.mcpCallRecords.value,
-    detail: workspaceController.mcpCallRecord.value,
-    loading: mcpCallGate.loading.list.value,
-    detailLoading: mcpCallGate.loading.detail.value,
-    error: mcpCallGate.error.value,
+  const testCallWorkspaceModel = computed(() => ({
+    records: workspaceController.testCallRecords.value,
+    detail: workspaceController.testCallRecord.value,
+    loading: testCallGate.loading.list.value,
+    detailLoading: testCallGate.loading.detail.value,
+    error: testCallGate.error.value,
   }))
   const modelRequestWorkspaceModel = computed(() => ({
     records: workspaceController.modelRequestRecords.value,
@@ -348,7 +348,7 @@ export function createWebqqWorkspaceShell(
     // 视图会从本地偏好直接恢复为独立页，此路径不会触发侧栏点击处理器；
     // 必须在工作区恢复后主动读取，否则重启后的首屏会一直显示空状态。
     if (currentView.value === 'debug') debugVisitKey.value += 1
-    if (currentView.value === 'mcp-calls') mcpCallVisitKey.value += 1
+    if (currentView.value === 'test-calls') testCallVisitKey.value += 1
     if (currentView.value === 'presets') await loadPresetCatalog()
   })
 
@@ -573,7 +573,7 @@ export function createWebqqWorkspaceShell(
     if (view !== 'model-requests') evidenceNavigation.clear()
     workspaceController.selectView(view)
     if (view === 'debug') debugVisitKey.value += 1
-    if (view === 'mcp-calls') mcpCallVisitKey.value += 1
+    if (view === 'test-calls') testCallVisitKey.value += 1
     if (view === 'model-requests') modelRequestVisitKey.value += 1
     if (view === 'presets') void loadPresetCatalog()
     return true
@@ -613,16 +613,16 @@ export function createWebqqWorkspaceShell(
     await debugGate.read('detail', '读取 OneBot 调试详情失败', () => workspaceController.loadOneBotDebugRecord(input))
   }
 
-  async function loadMcpCallRecords(input: ListSandboxMcpCallRecordsInput = {}) {
-    await mcpCallGate.read('list', '读取 MCP 调用记录失败', () => workspaceController.loadMcpCallRecords(input))
+  async function loadTestCallRecords(input: ListSandboxTestCallRecordsInput = {}) {
+    await testCallGate.read('list', '读取测试调用记录失败', () => workspaceController.loadTestCallRecords(input))
   }
 
-  async function loadMcpCallRecord(input: { recordId: string }) {
-    await mcpCallGate.read('detail', '读取 MCP 调用详情失败', () => workspaceController.loadMcpCallRecord(input))
+  async function loadTestCallRecord(input: { recordId: string }) {
+    await testCallGate.read('detail', '读取测试调用详情失败', () => workspaceController.loadTestCallRecord(input))
   }
 
-  async function clearMcpCallRecords() {
-    await mcpCallGate.read('list', '清理 MCP 调用记录失败', () => workspaceController.clearMcpCallRecords())
+  async function clearTestCallRecords() {
+    await testCallGate.read('list', '清理测试调用记录失败', () => workspaceController.clearTestCallRecords())
   }
 
   async function clearOneBotDebugRecords() {
@@ -852,7 +852,7 @@ export function createWebqqWorkspaceShell(
     appearance,
     chatPaneModel,
     clearOneBotDebugRecords,
-    clearMcpCallRecords,
+    clearTestCallRecords,
     clearModelRequestRecords,
     closeDetails,
     currentView,
@@ -862,8 +862,8 @@ export function createWebqqWorkspaceShell(
     detailsVisible,
     debugVisitKey,
     debugWorkspaceModel,
-    mcpCallVisitKey,
-    mcpCallWorkspaceModel,
+    testCallVisitKey,
+    testCallWorkspaceModel,
     modelRequestVisitKey,
     modelRequestWorkspaceModel,
     evidenceNavigation,
@@ -875,8 +875,8 @@ export function createWebqqWorkspaceShell(
     searchConversationMessages,
     loadOneBotDebugRecords,
     loadOneBotDebugRecord,
-    loadMcpCallRecords,
-    loadMcpCallRecord,
+    loadTestCallRecords,
+    loadTestCallRecord,
     loadModelRequestRecords,
     loadMoreModelRequestRecords,
     loadModelRequestRecord,

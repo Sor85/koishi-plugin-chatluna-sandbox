@@ -15,7 +15,7 @@ import { createMcpTestService, stopMcpTestApps } from './helpers/mcp-service-har
  * 每个工具声明的顶层参数名集合。
  *
  * `testRunId` 是通用的调用标注参数：它在 `appendCallRecord` 里对**所有**工具生效，而不是某个工具的
- * 业务参数，因此每个工具都声明它。`list_mcp_call_records` 上它另有筛选含义，由该工具自己的声明覆盖。
+ * 业务参数，因此每个工具都声明它。`list_test_call_records` 上它另有筛选含义，由该工具自己的声明覆盖。
  */
 const TOOL_PARAMETERS: Record<string, string[]> = {
   get_server_info: ['testRunId'],
@@ -55,9 +55,9 @@ const TOOL_PARAMETERS: Record<string, string[]> = {
   list_model_request_records: ['scope', 'spaceId', 'botId', 'conversationId', 'interactionId', 'model', 'errorsOnly', 'order', 'limit', 'beforeSequence', 'beforeCreatedAt', 'beforeId', 'testRunId'],
   get_model_request_record: ['scope', 'spaceId', 'recordId', 'testRunId'],
   clear_model_request_records: ['scope', 'spaceId', 'testRunId'],
-  list_mcp_call_records: ['tool', 'credentialName', 'transport', 'spaceId', 'testRunId', 'errorsOnly', 'order'],
-  get_mcp_call_record: ['recordId', 'testRunId'],
-  clear_mcp_call_records: ['testRunId'],
+  list_test_call_records: ['tool', 'credentialName', 'transport', 'spaceId', 'testRunId', 'errorsOnly', 'order'],
+  get_test_call_record: ['recordId', 'testRunId'],
+  clear_test_call_records: ['testRunId'],
 }
 
 /** 每种环境变更声明的 `data` 字段集合。`profile` 与 `remarks` 是实现一直在读却没有声明的两处。 */

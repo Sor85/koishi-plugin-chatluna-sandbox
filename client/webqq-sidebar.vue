@@ -392,7 +392,7 @@ interface SidebarParticipant {
 
 export interface WebqqSidebarModel {
   appearance: SandboxAppearance
-  currentView: 'messages' | 'contacts' | 'profile' | 'debug' | 'mcp-calls' | 'model-requests' | 'presets' | 'spaces'
+  currentView: 'messages' | 'contacts' | 'profile' | 'debug' | 'test-calls' | 'model-requests' | 'presets' | 'spaces'
   activeConversationId?: string
   currentGroupId?: string
   currentGroupMemberIds: string[]
@@ -450,7 +450,7 @@ const navigationItems = [
   { id: 'model-requests' as const, label: '模型请求', icon: IconBrain },
   { id: 'presets' as const, label: '预设', icon: IconFileCode },
   { id: 'debug' as const, label: 'OneBot 调试', icon: IconBug },
-  { id: 'mcp-calls' as const, label: 'MCP 调用', icon: IconHistory },
+  { id: 'test-calls' as const, label: '测试调用', icon: IconHistory },
   { id: 'profile' as const, label: '环境管理', icon: IconSettings },
   { id: 'spaces' as const, label: 'AI 测试空间' },
 ]

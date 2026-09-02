@@ -10,14 +10,14 @@ import type { SandboxMedia } from '../types'
 import { isRecalledMessage, SandboxDomainError } from '../types'
 import { asRecord, readSpaceId, requireString, stableValue } from './arguments'
 import {
-  matchesMcpCallRecordFilter,
-  presentMcpCallRecord,
-  redactMcpCallValue,
-  resolveMcpCallSpaceId,
-  summarizeMcpCallError,
-  toMcpCallRecordListItem,
-  type ListSandboxMcpCallRecordsInput,
-  type SandboxMcpCallRecordsPage,
+  matchesTestCallRecordFilter,
+  presentTestCallRecord,
+  redactTestCallValue,
+  resolveTestCallSpaceId,
+  summarizeTestCallError,
+  toTestCallRecordListItem,
+  type ListSandboxTestCallRecordsInput,
+  type SandboxTestCallRecordsPage,
 } from './call-records'
 import {
   findSandboxMcpTool,
@@ -31,8 +31,8 @@ import {
 } from './tool-registry'
 import {
   SandboxMcpError,
-  type SandboxMcpCallRecord,
-  type SandboxMcpCallTransport,
+  type SandboxTestCallRecord,
+  type SandboxTestCallTransport,
   type SandboxMcpCapabilityCatalog,
   type SandboxMcpCreatedCredential,
   type SandboxMcpCredential,
@@ -43,10 +43,10 @@ import {
 } from './types'
 
 /** 一次工具调用的传输层上下文；只用于标注测试调用记录，不参与权限与配额判定。 */
-export interface SandboxMcpCallContext {
+export interface SandboxTestCallContext {
   sourceIp?: string
   /** 承载本次调用的协议表述，默认 `mcp`。 */
-  transport?: SandboxMcpCallTransport
+  transport?: SandboxTestCallTransport
 }
 
 // 测试凭证配额：四档调用频率上限与三档并发上限。执行位置在本服务的额度消耗与
@@ -196,7 +196,7 @@ function normalizeStoredCredential(value: unknown): SandboxMcpCredential | undef
 export class SandboxMcpService {
   private credentials: SandboxMcpCredential[] = []
   private events: SandboxMcpEvent[] = []
-  private callRecords: SandboxMcpCallRecord[] = []
+  private callRecords: SandboxTestCallRecord[] = []
   private epoch = randomUUID()
   private sequence = 0
   // 只缓存媒体元数据。正文由 SandboxMediaStorage 按内容寻址落盘，发送时从磁盘读取；
@@ -537,7 +537,7 @@ export class SandboxMcpService {
    * `get_server_info` 的自述，不参与任何权限或配额判定：同一个凭证在两种表述下拥有完全相同的
    * 能力与额度。
    */
-  async callTool(token: string, tool: string, argumentsValue: unknown, context: SandboxMcpCallContext = {}): Promise<unknown> {
+  async callTool(token: string, tool: string, argumentsValue: unknown, context: SandboxTestCallContext = {}): Promise<unknown> {
     const credential = this.requireCredential(token)
     const args = asRecord(argumentsValue)
     const transport = context.transport ?? 'mcp'
@@ -556,7 +556,7 @@ export class SandboxMcpService {
       return result
     } catch (error) {
       const normalized = this.normalizeToolError(tool, error)
-      // 记录 ID 就是对外的 traceId：消费者拿错误信封里的 traceId 调 get_mcp_call_record
+      // 记录 ID 就是对外的 traceId：消费者拿错误信封里的 traceId 调 get_test_call_record
       // 即可取回这次失败的记录。此前信封里的 traceId 是当场生成的随机值，与任何记录都对不上。
       normalized.traceId = this.appendCallRecord(credential, tool, args, context.sourceIp, transport, 'error', undefined, normalized, Date.now() - startedAt)
       // 场景版本走同一条回填路径：传输层此前无条件读主场景，测试空间里的失败会报错的乐观并发基线。
@@ -576,7 +576,7 @@ export class SandboxMcpService {
     credential: SandboxMcpCredential,
     entry: SandboxMcpToolEntry,
     args: Record<string, unknown>,
-    transport: SandboxMcpCallTransport,
+    transport: SandboxTestCallTransport,
   ): Promise<unknown> {
     const runtime = this.createToolRuntime(credential, entry, args, transport)
     if (entry.requiresConfirmation) return await this.withConfirmation(runtime, entry, args)
@@ -589,7 +589,7 @@ export class SandboxMcpService {
     credential: SandboxMcpCredential,
     entry: SandboxMcpToolEntry,
     args: Record<string, unknown>,
-    transport: SandboxMcpCallTransport,
+    transport: SandboxTestCallTransport,
   ): SandboxMcpToolRuntime {
     const spaceId = readSpaceId(args)
     const control = entry.spaceResolution === 'none'
@@ -670,17 +670,17 @@ export class SandboxMcpService {
     return new SandboxMcpError('internal_error', '工具调用发生未预期异常，详情见 Koishi 日志。', false, '请携带错误信封里的 traceId 反馈该缺陷。')
   }
 
-  listCallRecords(input: ListSandboxMcpCallRecordsInput = {}): SandboxMcpCallRecordsPage {
+  listCallRecords(input: ListSandboxTestCallRecordsInput = {}): SandboxTestCallRecordsPage {
     const records = this.callRecords
-      .filter((record) => matchesMcpCallRecordFilter(record, input))
-      .map(toMcpCallRecordListItem)
+      .filter((record) => matchesTestCallRecordFilter(record, input))
+      .map(toTestCallRecordListItem)
     return { records: input.order === 'asc' ? records : records.reverse() }
   }
 
-  getCallRecord(recordId: string): SandboxMcpCallRecord {
+  getCallRecord(recordId: string): SandboxTestCallRecord {
     const record = this.callRecords.find(({ id }) => id === recordId)
-    if (!record) throw new SandboxMcpError('record_not_found', `MCP 调用记录不存在：${recordId}`)
-    return presentMcpCallRecord(record)
+    if (!record) throw new SandboxMcpError('record_not_found', `测试调用记录不存在：${recordId}`)
+    return presentTestCallRecord(record)
   }
 
   clearCallRecords(): { cleared: number } {
@@ -844,7 +844,7 @@ export class SandboxMcpService {
     tool: string,
     args: Record<string, unknown>,
     sourceIp: string | undefined,
-    transport: SandboxMcpCallTransport,
+    transport: SandboxTestCallTransport,
     status: 'success' | 'error',
     result: unknown,
     error: SandboxMcpError | undefined,
@@ -853,7 +853,7 @@ export class SandboxMcpService {
     const affected = result && typeof result === 'object' && Array.isArray(Reflect.get(result, 'affected'))
       ? Reflect.get(result, 'affected').map(String)
       : []
-    const spaceId = resolveMcpCallSpaceId(args, result)
+    const spaceId = resolveTestCallSpaceId(args, result)
     const id = randomUUID()
     this.callRecords.push({
       id,
@@ -868,9 +868,9 @@ export class SandboxMcpService {
       status,
       affected,
       errorCode: error?.code,
-      arguments: redactMcpCallValue(args),
-      result: result === undefined ? undefined : redactMcpCallValue(result),
-      error: error ? summarizeMcpCallError(error) : undefined,
+      arguments: redactTestCallValue(args),
+      result: result === undefined ? undefined : redactTestCallValue(result),
+      error: error ? summarizeTestCallError(error) : undefined,
     })
     if (this.callRecords.length > this.callRecordLimit) this.callRecords.splice(0, this.callRecords.length - this.callRecordLimit)
     return id

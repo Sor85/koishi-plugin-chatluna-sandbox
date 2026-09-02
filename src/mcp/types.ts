@@ -56,7 +56,7 @@ export interface SandboxMcpEvent {
   data: unknown
 }
 
-export interface SandboxMcpCallRecordError {
+export interface SandboxTestCallRecordError {
   code: string
   message: string
   retryable: boolean
@@ -71,13 +71,13 @@ export interface SandboxMcpCallRecordError {
  * 两种表述共用同一套测试凭证、配额与测试调用记录，因此只看凭证名与来源 IP 分不出调用来路——
  * 同一个凭证既可能被 MCP 客户端使用，也可能被 HTTP 脚本使用。复盘时必须能区分，故单独建模。
  */
-export type SandboxMcpCallTransport = 'mcp' | 'http'
+export type SandboxTestCallTransport = 'mcp' | 'http'
 
-export interface SandboxMcpCallRecordListItem {
+export interface SandboxTestCallRecordListItem {
   id: string
   createdAt: string
   credentialName: string
-  transport: SandboxMcpCallTransport
+  transport: SandboxTestCallTransport
   sourceIp?: string
   tool: string
   testRunId?: string
@@ -88,10 +88,10 @@ export interface SandboxMcpCallRecordListItem {
   errorCode?: string
 }
 
-export interface SandboxMcpCallRecord extends SandboxMcpCallRecordListItem {
+export interface SandboxTestCallRecord extends SandboxTestCallRecordListItem {
   arguments: unknown
   result?: unknown
-  error?: SandboxMcpCallRecordError
+  error?: SandboxTestCallRecordError
 }
 
 export interface SandboxMcpExport {
@@ -103,7 +103,7 @@ export interface SandboxMcpExport {
 export class SandboxMcpError extends Error {
   /**
    * 失败调用对应的测试调用记录 ID。由 `callTool` 在写入记录后回填，传输层错误信封原样携带，
-   * 因此消费者可以拿信封里的 traceId 直接调 `get_mcp_call_record` 取回这次失败的记录。
+   * 因此消费者可以拿信封里的 traceId 直接调 `get_test_call_record` 取回这次失败的记录。
    * 凭证校验阶段（尚无记录可写）抛出的错误没有该字段。
    */
   traceId?: string

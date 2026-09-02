@@ -348,7 +348,7 @@ describe('SandboxMcpService', () => {
     expect(control.getSnapshot().participants.some(({ id }) => id === '10010')).toBe(false)
   })
 
-  it('按凭证限制调用频率并记录脱敏 MCP 调用', async () => {
+  it('按凭证限制调用频率并记录脱敏测试调用', async () => {
     const app = registerMcpTestApp(new App())
     const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-mcp-limit-'))
     const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media') })

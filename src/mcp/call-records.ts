@@ -1,15 +1,15 @@
 import { createHash } from 'node:crypto'
 import { LARGE_BASE64_CHAR_THRESHOLD } from '../onebot-debug'
-import type { SandboxMcpCallRecord, SandboxMcpCallRecordListItem, SandboxMcpCallTransport, SandboxMcpError } from './types'
+import type { SandboxTestCallRecord, SandboxTestCallRecordListItem, SandboxTestCallTransport, SandboxMcpError } from './types'
 
 const SENSITIVE_KEY_PATTERN = /authorization|access[_-]?token|(?:^|_)token$|secret|password|cookie|private[_-]?key|confirmation[_-]?token|data[_-]?base64/i
 const BASE64_BODY_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
 
-export interface ListSandboxMcpCallRecordsInput {
+export interface ListSandboxTestCallRecordsInput {
   tool?: string
   credentialName?: string
   /** 按承载调用的协议表述筛选；省略时同时返回 MCP 与 HTTP 两种来路的记录。 */
-  transport?: SandboxMcpCallTransport
+  transport?: SandboxTestCallTransport
   spaceId?: string
   testRunId?: string
   errorsOnly?: boolean
@@ -17,23 +17,23 @@ export interface ListSandboxMcpCallRecordsInput {
   order?: 'asc' | 'desc'
 }
 
-export interface SandboxMcpCallRecordsPage {
-  records: SandboxMcpCallRecordListItem[]
+export interface SandboxTestCallRecordsPage {
+  records: SandboxTestCallRecordListItem[]
 }
 
-export function redactMcpCallValue(value: unknown, key = ''): unknown {
+export function redactTestCallValue(value: unknown, key = ''): unknown {
   if (SENSITIVE_KEY_PATTERN.test(key)) return '[已脱敏]'
   // 与 OneBot 调试记录不同：测试调用记录要复盘工具参数，content/message/text 必须保留。
   if (typeof value === 'string') return foldLargeBase64(value)
-  if (Array.isArray(value)) return value.map((item) => redactMcpCallValue(item, key))
+  if (Array.isArray(value)) return value.map((item) => redactTestCallValue(item, key))
   if (!value || typeof value !== 'object') return value
   return Object.fromEntries(Object.entries(value).map(([entryKey, entryValue]) => [
     entryKey,
-    redactMcpCallValue(entryValue, entryKey),
+    redactTestCallValue(entryValue, entryKey),
   ]))
 }
 
-export function resolveMcpCallSpaceId(args: Record<string, unknown>, result?: unknown): string | undefined {
+export function resolveTestCallSpaceId(args: Record<string, unknown>, result?: unknown): string | undefined {
   if (typeof args.spaceId === 'string' && args.spaceId.trim()) return args.spaceId
   if (result && typeof result === 'object') {
     const spaceId = Reflect.get(result, 'spaceId')
@@ -41,7 +41,7 @@ export function resolveMcpCallSpaceId(args: Record<string, unknown>, result?: un
   }
 }
 
-export function toMcpCallRecordListItem(record: SandboxMcpCallRecord): SandboxMcpCallRecordListItem {
+export function toTestCallRecordListItem(record: SandboxTestCallRecord): SandboxTestCallRecordListItem {
   return {
     id: record.id,
     createdAt: record.createdAt,
@@ -58,16 +58,16 @@ export function toMcpCallRecordListItem(record: SandboxMcpCallRecord): SandboxMc
   }
 }
 
-export function presentMcpCallRecord(record: SandboxMcpCallRecord): SandboxMcpCallRecord {
+export function presentTestCallRecord(record: SandboxTestCallRecord): SandboxTestCallRecord {
   return {
-    ...toMcpCallRecordListItem(record),
+    ...toTestCallRecordListItem(record),
     arguments: structuredClone(record.arguments),
     result: structuredClone(record.result),
     error: record.error ? structuredClone(record.error) : undefined,
   }
 }
 
-export function matchesMcpCallRecordFilter(record: SandboxMcpCallRecord, input: ListSandboxMcpCallRecordsInput = {}): boolean {
+export function matchesTestCallRecordFilter(record: SandboxTestCallRecord, input: ListSandboxTestCallRecordsInput = {}): boolean {
   if (input.tool && record.tool !== input.tool) return false
   if (input.credentialName && record.credentialName !== input.credentialName) return false
   if (input.transport && record.transport !== input.transport) return false
@@ -77,13 +77,13 @@ export function matchesMcpCallRecordFilter(record: SandboxMcpCallRecord, input: 
   return true
 }
 
-export function summarizeMcpCallError(error: SandboxMcpError): NonNullable<SandboxMcpCallRecord['error']> {
+export function summarizeTestCallError(error: SandboxMcpError): NonNullable<SandboxTestCallRecord['error']> {
   return {
     code: error.code,
     message: error.message,
     retryable: error.retryable,
     recovery: error.recovery,
-    ...(error.details === undefined ? {} : { details: redactMcpCallValue(error.details) }),
+    ...(error.details === undefined ? {} : { details: redactTestCallValue(error.details) }),
     ...(error.retryAfterMs === undefined ? {} : { retryAfterMs: error.retryAfterMs }),
   }
 }

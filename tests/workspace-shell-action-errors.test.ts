@@ -89,7 +89,7 @@ function externalError(shell: Shell) {
 function regionErrors(shell: Shell) {
   return [
     shell.debugWorkspaceModel.value.error,
-    shell.mcpCallWorkspaceModel.value.error,
+    shell.testCallWorkspaceModel.value.error,
     shell.modelRequestWorkspaceModel.value.error,
     shell.presetWorkspaceModel.value.error,
   ]

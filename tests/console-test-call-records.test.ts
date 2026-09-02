@@ -24,7 +24,7 @@ afterEach(async () => {
   await Promise.all(runningApps.splice(0).map((app) => app.stop()))
 })
 
-describe('MCP 调用记录 Console 协议', () => {
+describe('测试调用记录 Console 协议', () => {
   it('只暴露筛选查询、详情和清理，不提供记录重放入口', async () => {
     const app = new App()
     runningApps.push(app)
@@ -44,15 +44,15 @@ describe('MCP 调用记录 Console 协议', () => {
     }
     registerConsole(consoleRegistrar, control, appearance, mcp)
 
-    const listRecords = listeners.get('chatluna-sandbox/mcp-call-records')
+    const listRecords = listeners.get('chatluna-sandbox/test-call-records')
     const getCapabilities = listeners.get('chatluna-sandbox/mcp-capabilities')
-    const getRecord = listeners.get('chatluna-sandbox/mcp-call-record')
-    const clearRecords = listeners.get('chatluna-sandbox/clear-mcp-call-records')
+    const getRecord = listeners.get('chatluna-sandbox/test-call-record')
+    const clearRecords = listeners.get('chatluna-sandbox/clear-test-call-records')
     expect(listRecords).toBeTypeOf('function')
     expect(getCapabilities).toBeTypeOf('function')
     expect(getRecord).toBeTypeOf('function')
     expect(clearRecords).toBeTypeOf('function')
-    expect(listeners.has('chatluna-sandbox/replay-mcp-call-record')).toBe(false)
+    expect(listeners.has('chatluna-sandbox/replay-test-call-record')).toBe(false)
     if (typeof listRecords !== 'function' || typeof getCapabilities !== 'function' || typeof getRecord !== 'function' || typeof clearRecords !== 'function') {
       throw new Error('MCP Console 监听器未注册')
     }
@@ -99,9 +99,9 @@ describe('MCP 调用记录 Console 协议', () => {
     const control = new SandboxControlService(app)
     registerConsole(consoleRegistrar, control, appearance)
 
-    expect(listeners.has('chatluna-sandbox/mcp-call-records')).toBe(false)
-    expect(listeners.has('chatluna-sandbox/mcp-call-record')).toBe(false)
-    expect(listeners.has('chatluna-sandbox/clear-mcp-call-records')).toBe(false)
+    expect(listeners.has('chatluna-sandbox/test-call-records')).toBe(false)
+    expect(listeners.has('chatluna-sandbox/test-call-record')).toBe(false)
+    expect(listeners.has('chatluna-sandbox/clear-test-call-records')).toBe(false)
     expect(listeners.has('chatluna-sandbox/mcp-activity')).toBe(false)
     expect(listeners.has('chatluna-sandbox/mcp-capabilities')).toBe(false)
   })

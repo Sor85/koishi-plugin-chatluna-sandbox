@@ -51,9 +51,9 @@ import type {
   SandboxPresetDocument,
   SavePresetInput,
 } from './presets'
-import type { ListSandboxMcpCallRecordsInput, SandboxMcpCallRecordsPage } from './mcp/call-records'
+import type { ListSandboxTestCallRecordsInput, SandboxTestCallRecordsPage } from './mcp/call-records'
 import type {
-  SandboxMcpCallRecord,
+  SandboxTestCallRecord,
   SandboxMcpCapabilityCatalog,
   SandboxMcpCreatedCredential,
   SandboxMcpPublicCredential,
@@ -130,15 +130,18 @@ export interface SandboxPresetConsoleEvents {
 }
 
 /**
- * MCP 管理：调用记录、能力目录、凭证与服务器活动。
+ * 测试端点管理：测试调用记录、能力目录、凭证与服务器活动。
+ *
+ * 前三个端点不带 `mcp` 前缀：HTTP 测试接口的调用写进同一批记录，用 MCP 命名会把「只记
+ * 得下 MCP 那一种表述」写进契约。
  *
  * `mcp-activity` 同时是请求端点与广播频道，这不是重复：一个回答「现在跑着吗」，
  * 一个通知「状态变了」，因此两者各自登记。
  */
 export interface SandboxMcpConsoleEvents {
-  'chatluna-sandbox/mcp-call-records': (input?: ListSandboxMcpCallRecordsInput) => SandboxMcpCallRecordsPage
-  'chatluna-sandbox/mcp-call-record': (input: { recordId: string }) => SandboxMcpCallRecord
-  'chatluna-sandbox/clear-mcp-call-records': () => { cleared: number }
+  'chatluna-sandbox/test-call-records': (input?: ListSandboxTestCallRecordsInput) => SandboxTestCallRecordsPage
+  'chatluna-sandbox/test-call-record': (input: { recordId: string }) => SandboxTestCallRecord
+  'chatluna-sandbox/clear-test-call-records': () => { cleared: number }
   'chatluna-sandbox/mcp-activity': () => SandboxMcpActivityPayload
   'chatluna-sandbox/mcp-capabilities': () => SandboxMcpCapabilityCatalog
   'chatluna-sandbox/mcp-credentials': () => SandboxMcpPublicCredential[]

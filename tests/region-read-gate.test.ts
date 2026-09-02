@@ -81,11 +81,11 @@ describe('区域读取闸门', () => {
   it('失败写文案：上游给出的错误消息优先于调用点传入的兜底', async () => {
     const { gate } = createGate('list')
 
-    await gate.read('list', '读取 MCP 调用记录失败', async () => { throw new Error('实例不存在') })
+    await gate.read('list', '读取测试调用记录失败', async () => { throw new Error('实例不存在') })
     expect(gate.error.value).toBe('实例不存在')
 
-    await gate.read('list', '读取 MCP 调用记录失败', async () => { throw ' ' })
-    expect(gate.error.value).toBe('读取 MCP 调用记录失败')
+    await gate.read('list', '读取测试调用记录失败', async () => { throw ' ' })
+    expect(gate.error.value).toBe('读取测试调用记录失败')
   })
 
   it('两条通道共用一个错误位：详情读取失败后列表也看到同一条错误', async () => {

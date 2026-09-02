@@ -41,7 +41,7 @@ describe('WebQQ 顶部导航与会话栏', () => {
     expect(source).toContain('visibleNavigationItems')
     expect(source).toContain("id === 'messages' || id === 'spaces'")
     expect(source).not.toContain("id === 'messages' || id === 'model-requests' || id === 'presets' || id === 'spaces'")
-    expect(source).toContain("label: 'MCP 调用'")
+    expect(source).toContain("label: '测试调用'")
     expect(source).toContain('IconHistory')
     expect(source).toContain("label: '模型请求'")
     expect(source).toContain('IconBrain')
@@ -53,7 +53,7 @@ describe('WebQQ 顶部导航与会话栏', () => {
       '模型请求',
       '预设',
       'OneBot 调试',
-      'MCP 调用',
+      '测试调用',
       '环境管理',
       'AI 测试空间',
     ])

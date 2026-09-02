@@ -159,7 +159,7 @@ describe('HTTP 测试接口端到端', () => {
 
     const invalid = await call('/v1/tools/get_conversation', { method: 'POST', body: JSON.stringify({ operatorId: '10001', conversationId: '  ' }) })
     expect(invalid.status).toBe(400)
-    // 失败也写测试调用记录，traceId 就是那条记录的 ID，可据此调 get_mcp_call_record 复盘。
+    // 失败也写测试调用记录，traceId 就是那条记录的 ID，可据此调 get_test_call_record 复盘。
     expect(await invalid.json()).toMatchObject({ code: 'invalid_arguments', traceId: expect.any(String) })
 
     const brokenJson = await call('/v1/tools/get_server_info', { method: 'POST', body: '{' })
@@ -264,7 +264,7 @@ describe('测试调用记录的协议表述标注', () => {
     expect(service.listCallRecords({ transport: 'mcp' }).records.map(({ transport }) => transport)).toEqual(['mcp'])
 
     // 同一份筛选维度也从工具侧可用，外部测试控制器不必只能靠 Console 面板区分来路。
-    const listed = await call('/v1/tools/list_mcp_call_records', { method: 'POST', body: JSON.stringify({ transport: 'http', tool: 'get_server_info' }) })
+    const listed = await call('/v1/tools/list_test_call_records', { method: 'POST', body: JSON.stringify({ transport: 'http', tool: 'get_server_info' }) })
     expect((await listed.json() as { records: Array<{ transport: string }> }).records.every(({ transport }) => transport === 'http')).toBe(true)
   })
 

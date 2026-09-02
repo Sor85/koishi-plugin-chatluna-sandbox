@@ -112,7 +112,7 @@ describe('MCP Streamable HTTP', () => {
     expect(result.structuredContent).toMatchObject({ code: 'permission_denied', traceId: envelope.traceId })
 
     // 追踪标识必须真的能把这次失败对应到沙盒侧记录，而不只是一个形状正确的字符串。
-    expect(payload(await callTool('get_mcp_call_record', { recordId: envelope.traceId }))).toMatchObject({
+    expect(payload(await callTool('get_test_call_record', { recordId: envelope.traceId }))).toMatchObject({
       id: envelope.traceId,
       tool: 'create_test_space',
       status: 'error',

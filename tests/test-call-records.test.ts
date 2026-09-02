@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { App } from '@koishijs/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SandboxControlService, SandboxRuntimeBotRegistry } from '../src/control-service'
-import { redactMcpCallValue } from '../src/mcp/call-records'
+import { redactTestCallValue } from '../src/mcp/call-records'
 import { SandboxMcpService } from '../src/mcp/service'
 import { SandboxTestSpaceService } from '../src/test-spaces'
 
@@ -13,7 +13,7 @@ const apps: App[] = []
 function createService(scopes: Array<'read' | 'interact' | 'manage' | 'debug'> = ['read'], enableTestSpaces = false) {
   const app = new App()
   apps.push(app)
-  const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-mcp-calls-'))
+  const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-test-calls-'))
   const runtimeBots = new SandboxRuntimeBotRegistry()
   const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media'), runtimeBots })
   const testSpaces = new SandboxTestSpaceService(app, runtimeBots)
@@ -29,9 +29,9 @@ afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.stop()))
 })
 
-describe('MCP 调用值脱敏', () => {
+describe('测试调用值脱敏', () => {
   it('保留消息正文，只脱敏敏感字段', () => {
-    expect(redactMcpCallValue({
+    expect(redactTestCallValue({
       content: '你好世界',
       message: 'hello',
       text: 'short',
@@ -66,7 +66,7 @@ describe('MCP 测试调用记录', () => {
       testRunId: 'run-redact',
     }, { sourceIp: '10.0.0.8' })
 
-    const page = await service.callTool(debugCredential.token, 'list_mcp_call_records', {}) as {
+    const page = await service.callTool(debugCredential.token, 'list_test_call_records', {}) as {
       records: Array<Record<string, unknown>>
     }
     const sendRecord = page.records.find((item) => item.tool === 'send_message')
@@ -81,7 +81,7 @@ describe('MCP 测试调用记录', () => {
     expect(sendRecord).not.toHaveProperty('result')
     expect(JSON.stringify(page.records)).not.toContain(credential.token)
 
-    const detail = await service.callTool(debugCredential.token, 'get_mcp_call_record', {
+    const detail = await service.callTool(debugCredential.token, 'get_test_call_record', {
       recordId: sendRecord!.id,
     }) as Record<string, unknown>
     expect(detail.arguments).toMatchObject({
@@ -104,7 +104,7 @@ describe('MCP 测试调用记录', () => {
   it('鉴权成功后的权限和限流失败也写入记录，无效凭证不写入', async () => {
     const app = new App()
     apps.push(app)
-    const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-mcp-calls-limit-'))
+    const directory = mkdtempSync(join(tmpdir(), 'chatluna-sandbox-test-calls-limit-'))
     const control = new SandboxControlService(app, { mediaDirectory: join(directory, 'media') })
     const service = new SandboxMcpService(app, control, { dataDirectory: directory, readPerMinute: 1 })
     const credential = service.createCredential('限流凭证', ['read'])
@@ -156,7 +156,7 @@ describe('MCP 测试调用记录', () => {
     expect(filtered.records).toEqual([
       expect.objectContaining({ tool: 'get_scene_snapshot', spaceId: created.spaceId }),
     ])
-    const listed = await service.callTool(credential.token, 'list_mcp_call_records', {}) as { records: Array<Record<string, unknown>> }
+    const listed = await service.callTool(credential.token, 'list_test_call_records', {}) as { records: Array<Record<string, unknown>> }
     expect(listed.records).toEqual(expect.arrayContaining([
       expect.objectContaining({ tool: 'create_test_space', spaceId: created.spaceId }),
       expect.objectContaining({ tool: 'get_server_info' }),
@@ -178,7 +178,7 @@ describe('MCP 测试调用记录', () => {
       'get_scene_snapshot',
       'get_server_info',
     ])
-    const listed = await service.callTool(credential.token, 'list_mcp_call_records', { order: 'asc' }) as {
+    const listed = await service.callTool(credential.token, 'list_test_call_records', { order: 'asc' }) as {
       records: Array<{ tool: string }>
     }
     expect(listed.records.map(({ tool }) => tool)).toEqual([

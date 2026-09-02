@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 describe('WebQQ 区域样式', () => {
   it('按视觉区域加载且入口不保留区域规则', () => {
     const entry = readFileSync(resolve('client/style.css'), 'utf8')
-    const files = ['sidebar', 'chat', 'messages', 'composer', 'details', 'debug', 'mcp-calls', 'model-requests', 'presets']
+    const files = ['sidebar', 'chat', 'messages', 'composer', 'details', 'debug', 'test-calls', 'model-requests', 'presets']
     const sources = Object.fromEntries(files.map((name) => [name, readFileSync(resolve(`client/styles/webqq-${name}.css`), 'utf8')]))
 
     expect(files.map((name) => entry.indexOf(`@import "./styles/webqq-${name}.css";`)))
@@ -29,7 +29,7 @@ describe('WebQQ 区域样式', () => {
     expect(sources.details).toMatch(/\.chatluna-sandbox-group-announcements \{[^}]*background: var\(--webqq-bg\);/s)
     expect(sources['model-requests']).toMatch(/\.webqq-model-request-list\s*\{[^}]*margin-top:\s*-56px;[^}]*padding-top:\s*64px;/s)
     expect(sources.debug).toMatch(/\.webqq-debug-list\s*\{[^}]*margin-top:\s*-56px;[^}]*padding-top:\s*64px;/s)
-    expect(sources['mcp-calls']).toMatch(/\.webqq-mcp-call-list\s*\{[^}]*margin-top:\s*-56px;[^}]*padding-top:\s*64px;/s)
+    expect(sources['test-calls']).toMatch(/\.webqq-test-call-list\s*\{[^}]*margin-top:\s*-56px;[^}]*padding-top:\s*64px;/s)
     expect(sources.presets).toMatch(/\.webqq-preset-groups\s*\{[^}]*margin-top:\s*-61px;[^}]*padding-top:\s*69px;/s)
     expect(entry).not.toContain('.webqq-session {')
     expect(entry).not.toContain('.chatluna-sandbox-message-row {\n  max-width: 74%')
@@ -60,7 +60,7 @@ describe('WebQQ 区域样式', () => {
     const modelRequests = readFileSync(resolve('client/model-request-trajectory.vue'), 'utf8')
     const modelRequestWorkspace = readFileSync(resolve('client/model-request-workspace.vue'), 'utf8')
     const debugWorkspace = readFileSync(resolve('client/onebot-debug-workspace.vue'), 'utf8')
-    const mcpCallWorkspace = readFileSync(resolve('client/mcp-call-workspace.vue'), 'utf8')
+    const testCallWorkspace = readFileSync(resolve('client/test-call-workspace.vue'), 'utf8')
     const presetWorkspace = readFileSync(resolve('client/preset-workspace.vue'), 'utf8')
     const environmentManager = readFileSync(resolve('client/environment-manager.vue'), 'utf8')
     const chatPane = readFileSync(resolve('client/webqq-chat-pane.vue'), 'utf8')
@@ -76,7 +76,7 @@ describe('WebQQ 区域样式', () => {
     expect(modelRequests).toContain('class="webqq-model-trajectory-header webqq-overlay-header"')
     expect(modelRequestWorkspace).toContain('class="webqq-model-request-list-toolbar webqq-overlay-header"')
     expect(debugWorkspace).toContain('class="webqq-debug-list-toolbar webqq-overlay-header"')
-    expect(mcpCallWorkspace).toContain('class="webqq-mcp-call-list-toolbar webqq-overlay-header"')
+    expect(testCallWorkspace).toContain('class="webqq-test-call-list-toolbar webqq-overlay-header"')
     expect(presetWorkspace).toContain('class="webqq-preset-search webqq-overlay-header"')
     expect(environmentManager).toContain('class="environment-list-toolbar webqq-overlay-header"')
     expect(environmentManager).toContain('margin-top: -56px')

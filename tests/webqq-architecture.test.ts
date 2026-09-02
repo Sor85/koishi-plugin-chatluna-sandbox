@@ -432,7 +432,7 @@ const untreatedAssertionExemptions: readonly ArchitectureExemption[] = ([
   ['tests/webqq-avatar.test.ts', '待开候选：头像呈现投影下沉'],
   ['tests/webqq-debug-workspace.test.ts', '待开候选：OneBot 调试工作台行为下沉'],
   ['tests/webqq-details-panel.test.ts', '待开候选：详情栏行为下沉'],
-  ['tests/webqq-mcp-call-workspace.test.ts', '待开候选：MCP 调用工作台行为下沉'],
+  ['tests/webqq-test-call-workspace.test.ts', '待开候选：测试调用工作台行为下沉'],
   ['tests/webqq-page-shell.test.ts', '待开候选：页面外壳装配行为下沉'],
   ['tests/webqq-profile-card.test.ts', '待开候选：资料卡行为下沉'],
   ['tests/webqq-region-css.test.ts', '待开候选：区域类名结构契约转规则制守卫'],
@@ -651,7 +651,7 @@ describe('WebQQ 模块化架构', () => {
       "const message = cause instanceof Error ? cause.message : '读取失败; 请重试'\n",
     )).not.toEqual([])
     // 经模块表达的写法只有一次调用，没有条件表达式可认。
-    expect(fallbackRule.findViolations('client/webqq/x.ts', "await gate.read('list', '读取 MCP 调用记录失败', () => controller.loadMcpCallRecords())")).toEqual([])
+    expect(fallbackRule.findViolations('client/webqq/x.ts', "await gate.read('list', '读取测试调用记录失败', () => controller.loadTestCallRecords())")).toEqual([])
     expect(fallbackRule.findViolations('client/webqq/x.ts', "await slot.run('撤回失败', () => controller.recallMessage(input))")).toEqual([])
     // 两侧主语不同不是这个形状；取的不是消息也不是。
     expect(fallbackRule.findViolations('client/webqq/x.ts', "const m = cause instanceof Error ? other.message : '失败了'")).toEqual([])

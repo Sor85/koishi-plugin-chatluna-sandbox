@@ -261,7 +261,7 @@ export class SandboxTestEndpointServer {
         // jsonContent 的 JSON.stringify 也在本 try 内，序列化失败会抛非 SandboxMcpError 的异常。
         const normalized = error instanceof SandboxMcpError ? error : new SandboxMcpError('internal_error', '工具结果序列化失败')
         if (!(error instanceof SandboxMcpError)) this.ctx.logger('chatluna-sandbox').error(`MCP 工具 ${request.params.name} 的结果无法序列化。`, error)
-        // traceId 用失败调用写下的测试调用记录 ID，消费者可据此调 get_mcp_call_record 取回该次失败；
+        // traceId 用失败调用写下的测试调用记录 ID，消费者可据此调 get_test_call_record 取回该次失败；
         // revision 同样由 callTool 回填成失败真正发生的那个空间的版本。凭证校验阶段抛出的错误既没有
         // 记录可指，也没有空间可指，只能退回随机标识与主场景版本。
         return { ...jsonContent({ code: normalized.code, message: normalized.message, retryable: normalized.retryable, recovery: normalized.recovery, details: normalized.details, retryAfterMs: normalized.retryAfterMs, revision: normalized.revision ?? this.service.getRevision(), traceId: normalized.traceId ?? randomUUID() }), isError: true }

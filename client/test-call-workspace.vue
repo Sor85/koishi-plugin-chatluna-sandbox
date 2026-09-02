@@ -1,12 +1,12 @@
 <template>
-  <main class="chatluna-sandbox-chat webqq-mcp-call-workspace" aria-label="MCP 调用工作台">
-    <header class="webqq-mcp-call-header">
+  <main class="chatluna-sandbox-chat webqq-test-call-workspace" aria-label="测试调用工作台">
+    <header class="webqq-test-call-header">
       <div>
-        <h1>MCP 调用</h1>
+        <h1>测试调用</h1>
         <p>查看外部测试控制器的工具调用</p>
       </div>
-      <div class="webqq-mcp-call-actions">
-        <label class="webqq-mcp-call-live">
+      <div class="webqq-test-call-actions">
+        <label class="webqq-test-call-live">
           <Switch v-model="liveRefresh" aria-label="自动刷新" />
           <span>自动刷新</span>
         </label>
@@ -21,15 +21,15 @@
       </div>
     </header>
 
-    <p v-if="error" class="webqq-mcp-call-error" role="alert">{{ error }}</p>
-    <div class="webqq-mcp-call-split">
-      <section class="webqq-mcp-call-list-pane" aria-label="MCP 调用列表">
-        <header class="webqq-mcp-call-list-toolbar webqq-overlay-header">
+    <p v-if="error" class="webqq-test-call-error" role="alert">{{ error }}</p>
+    <div class="webqq-test-call-split">
+      <section class="webqq-test-call-list-pane" aria-label="测试调用列表">
+        <header class="webqq-test-call-list-toolbar webqq-overlay-header">
           <h2>调用列表</h2>
-          <div class="webqq-mcp-call-list-tools">
+          <div class="webqq-test-call-list-tools">
             <button
               type="button"
-              class="webqq-mcp-call-sort"
+              class="webqq-test-call-sort"
               :aria-label="sortOrder === 'asc' ? '当前按时间正序，点击改为倒序' : '当前按时间倒序，点击改为正序'"
               @click="toggleSortOrder"
             >
@@ -42,30 +42,30 @@
                 <Button
                   variant="outline"
                   size="icon-sm"
-                  class="webqq-mcp-call-filter-trigger"
+                  class="webqq-test-call-filter-trigger"
                   :class="{ 'is-filtered': filtersActive }"
-                  :aria-label="`筛选 MCP 调用，当前：${filterSummary}`"
+                  :aria-label="`筛选测试调用，当前：${filterSummary}`"
                 >
                   <IconFilter :size="16" aria-hidden="true" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent
                 align="end"
-                class="webqq-mcp-call-filter-popover"
-                aria-label="MCP 调用筛选"
+                class="webqq-test-call-filter-popover"
+                aria-label="测试调用筛选"
               >
                 <label>
                   <span>工具</span>
-                  <Input v-model="tool" class="webqq-mcp-call-control" placeholder="例如 send_message" @keyup.enter="applyFilters" />
+                  <Input v-model="tool" class="webqq-test-call-control" placeholder="例如 send_message" @keyup.enter="applyFilters" />
                 </label>
                 <label>
                   <span>凭证</span>
-                  <Input v-model="credentialName" class="webqq-mcp-call-control" placeholder="例如 测试凭证" @keyup.enter="applyFilters" />
+                  <Input v-model="credentialName" class="webqq-test-call-control" placeholder="例如 测试凭证" @keyup.enter="applyFilters" />
                 </label>
                 <label>
                   <span>来路</span>
                   <Select v-model="transport">
-                    <SelectTrigger class="webqq-mcp-call-control" aria-label="按协议表述筛选">
+                    <SelectTrigger class="webqq-test-call-control" aria-label="按协议表述筛选">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent :portal-to="filterSelectPortalTarget" class="z-[120]">
@@ -77,13 +77,13 @@
                 </label>
                 <label>
                   <span>空间</span>
-                  <Input v-model="spaceId" class="webqq-mcp-call-control" placeholder="例如 space-1" @keyup.enter="applyFilters" />
+                  <Input v-model="spaceId" class="webqq-test-call-control" placeholder="例如 space-1" @keyup.enter="applyFilters" />
                 </label>
                 <label>
                   <span>测试关联</span>
-                  <Input v-model="testRunId" class="webqq-mcp-call-control" placeholder="例如 run-1" @keyup.enter="applyFilters" />
+                  <Input v-model="testRunId" class="webqq-test-call-control" placeholder="例如 run-1" @keyup.enter="applyFilters" />
                 </label>
-                <label class="webqq-mcp-call-error-filter">
+                <label class="webqq-test-call-error-filter">
                   <Checkbox v-model="errorsOnly" />
                   <span>仅显示错误</span>
                 </label>
@@ -97,25 +97,25 @@
           </div>
         </header>
 
-        <div v-if="loading && !records.length" class="webqq-mcp-call-empty">正在读取 MCP 调用记录…</div>
-        <div v-else-if="!records.length" class="webqq-mcp-call-empty">暂无符合条件的 MCP 调用记录</div>
-        <div v-else v-webqq-scrollbar class="webqq-mcp-call-list">
+        <div v-if="loading && !records.length" class="webqq-test-call-empty">正在读取测试调用记录…</div>
+        <div v-else-if="!records.length" class="webqq-test-call-empty">暂无符合条件的测试调用记录</div>
+        <div v-else v-webqq-scrollbar class="webqq-test-call-list">
           <button
             v-for="item in orderedRecords"
             :key="item.id"
             type="button"
-            class="webqq-mcp-call-item"
+            class="webqq-test-call-item"
             :class="{ 'is-active': item.id === selectedRecordId }"
             @click="openRecord(item.id)"
           >
             <header>
-              <div class="webqq-mcp-call-item-copy">
-                <div class="webqq-mcp-call-item-name">
+              <div class="webqq-test-call-item-copy">
+                <div class="webqq-test-call-item-name">
                   <strong>{{ item.tool }}</strong>
                   <Badge :class="statusClass(item.status)">{{ statusLabel(item.status) }}</Badge>
-                  <Badge variant="outline" class="webqq-mcp-call-credential">{{ item.credentialName }}</Badge>
+                  <Badge variant="outline" class="webqq-test-call-credential">{{ item.credentialName }}</Badge>
                 </div>
-                <div class="webqq-mcp-call-timing">
+                <div class="webqq-test-call-timing">
                   <time>
                     <IconCalendarTime :size="14" aria-hidden="true" />
                     {{ formatTime(item.createdAt) }}
@@ -135,17 +135,17 @@
         </div>
       </section>
 
-      <section class="webqq-mcp-call-detail-pane" aria-label="MCP 调用详情">
-        <div v-if="detailLoading && !detail" class="webqq-mcp-call-empty">正在读取调用详情…</div>
-        <div v-else-if="!detail" class="webqq-mcp-call-empty">选择一条记录查看参数和结果</div>
-        <article v-else v-webqq-scrollbar class="webqq-mcp-call-detail">
+      <section class="webqq-test-call-detail-pane" aria-label="测试调用详情">
+        <div v-if="detailLoading && !detail" class="webqq-test-call-empty">正在读取调用详情…</div>
+        <div v-else-if="!detail" class="webqq-test-call-empty">选择一条记录查看参数和结果</div>
+        <article v-else v-webqq-scrollbar class="webqq-test-call-detail">
           <header>
-            <div class="webqq-mcp-call-item-copy">
-              <div class="webqq-mcp-call-item-name">
+            <div class="webqq-test-call-item-copy">
+              <div class="webqq-test-call-item-name">
                 <strong>{{ detail.tool }}</strong>
                 <Badge :class="statusClass(detail.status)">{{ statusLabel(detail.status) }}</Badge>
               </div>
-              <div class="webqq-mcp-call-timing">
+              <div class="webqq-test-call-timing">
                 <time>
                   <IconCalendarTime :size="14" aria-hidden="true" />
                   {{ formatTime(detail.createdAt) }}
@@ -158,47 +158,47 @@
             </div>
           </header>
 
-          <div class="webqq-mcp-call-meta-list">
-            <p class="webqq-mcp-call-meta">
+          <div class="webqq-test-call-meta-list">
+            <p class="webqq-test-call-meta">
               <IconKey :size="17" aria-hidden="true" />
-              <span class="webqq-mcp-call-meta-label">凭证</span>
-              <span class="webqq-mcp-call-meta-value">{{ detail.credentialName }}</span>
+              <span class="webqq-test-call-meta-label">凭证</span>
+              <span class="webqq-test-call-meta-value">{{ detail.credentialName }}</span>
             </p>
-            <p class="webqq-mcp-call-meta">
+            <p class="webqq-test-call-meta">
               <IconPlug :size="17" aria-hidden="true" />
-              <span class="webqq-mcp-call-meta-label">来路</span>
-              <span class="webqq-mcp-call-meta-value">{{ transportLabel(detail.transport) }}</span>
+              <span class="webqq-test-call-meta-label">来路</span>
+              <span class="webqq-test-call-meta-value">{{ transportLabel(detail.transport) }}</span>
             </p>
-            <p v-if="detail.sourceIp" class="webqq-mcp-call-meta">
+            <p v-if="detail.sourceIp" class="webqq-test-call-meta">
               <IconWorld :size="17" aria-hidden="true" />
-              <span class="webqq-mcp-call-meta-label">来源</span>
-              <span class="webqq-mcp-call-meta-value">{{ detail.sourceIp }}</span>
+              <span class="webqq-test-call-meta-label">来源</span>
+              <span class="webqq-test-call-meta-value">{{ detail.sourceIp }}</span>
             </p>
-            <p v-if="detail.spaceId" class="webqq-mcp-call-meta">
+            <p v-if="detail.spaceId" class="webqq-test-call-meta">
               <IconBox :size="17" aria-hidden="true" />
-              <span class="webqq-mcp-call-meta-label">空间</span>
-              <span class="webqq-mcp-call-meta-value">{{ detail.spaceId }}</span>
+              <span class="webqq-test-call-meta-label">空间</span>
+              <span class="webqq-test-call-meta-value">{{ detail.spaceId }}</span>
             </p>
-            <p v-if="detail.testRunId" class="webqq-mcp-call-meta">
+            <p v-if="detail.testRunId" class="webqq-test-call-meta">
               <IconTag :size="17" aria-hidden="true" />
-              <span class="webqq-mcp-call-meta-label">测试关联</span>
-              <span class="webqq-mcp-call-meta-value">{{ detail.testRunId }}</span>
+              <span class="webqq-test-call-meta-label">测试关联</span>
+              <span class="webqq-test-call-meta-value">{{ detail.testRunId }}</span>
             </p>
           </div>
 
-          <section v-if="detail.error" class="webqq-mcp-call-error-diagnostic" aria-label="错误诊断">
-            <header class="webqq-mcp-call-section-heading">
+          <section v-if="detail.error" class="webqq-test-call-error-diagnostic" aria-label="错误诊断">
+            <header class="webqq-test-call-section-heading">
               <span>
                 <IconAlertCircle :size="17" aria-hidden="true" />
                 <strong>错误诊断</strong>
               </span>
             </header>
-            <p class="webqq-mcp-call-trace">{{ detail.error.code }} · {{ detail.error.message }}</p>
+            <p class="webqq-test-call-trace">{{ detail.error.code }} · {{ detail.error.message }}</p>
           </section>
 
-          <div class="webqq-mcp-call-payloads">
+          <div class="webqq-test-call-payloads">
             <section>
-              <header class="webqq-mcp-call-section-heading">
+              <header class="webqq-test-call-section-heading">
                 <span>
                   <IconBraces :size="17" aria-hidden="true" />
                   <strong>参数</strong>
@@ -207,7 +207,7 @@
               <pre v-webqq-scrollbar>{{ formatPayload(detail.arguments) }}</pre>
             </section>
             <section v-if="detail.result !== undefined">
-              <header class="webqq-mcp-call-section-heading">
+              <header class="webqq-test-call-section-heading">
                 <span>
                   <IconBraces :size="17" aria-hidden="true" />
                   <strong>结果</strong>
@@ -216,7 +216,7 @@
               <pre v-webqq-scrollbar>{{ formatPayload(detail.result) }}</pre>
             </section>
             <section v-if="detail.error">
-              <header class="webqq-mcp-call-section-heading">
+              <header class="webqq-test-call-section-heading">
                 <span>
                   <IconAlertCircle :size="17" aria-hidden="true" />
                   <strong>错误</strong>
@@ -259,19 +259,19 @@ import { Switch } from './components/ui/switch'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import { formatDuration } from './webqq/format-duration'
 import { createModelRequestEnterRefresh, createModelRequestLiveRefresh } from './webqq/model-request-live-refresh'
-import type { ListSandboxMcpCallRecordsInput } from '../src/mcp/call-records'
-import type { SandboxMcpCallRecord, SandboxMcpCallRecordListItem, SandboxMcpCallTransport } from '../src/mcp/types'
+import type { ListSandboxTestCallRecordsInput } from '../src/mcp/call-records'
+import type { SandboxTestCallRecord, SandboxTestCallRecordListItem, SandboxTestCallTransport } from '../src/mcp/types'
 
 const props = defineProps<{
-  records: readonly SandboxMcpCallRecordListItem[]
-  detail?: SandboxMcpCallRecord
+  records: readonly SandboxTestCallRecordListItem[]
+  detail?: SandboxTestCallRecord
   loading: boolean
   detailLoading: boolean
   error: string
   visitKey?: number
 }>()
 const emit = defineEmits<{
-  query: [input: ListSandboxMcpCallRecordsInput]
+  query: [input: ListSandboxTestCallRecordsInput]
   open: [input: { recordId: string }]
   clear: []
 }>()
@@ -279,7 +279,7 @@ const emit = defineEmits<{
 const tool = ref('')
 const credentialName = ref('')
 // 'all' 是筛选面板自己的空值表述，不是领域里的第三种来路；发查询时它被折成 undefined。
-const transport = ref<SandboxMcpCallTransport | 'all'>('all')
+const transport = ref<SandboxTestCallTransport | 'all'>('all')
 const spaceId = ref('')
 const testRunId = ref('')
 const errorsOnly = ref(false)
@@ -351,7 +351,7 @@ function toggleSortOrder() {
 }
 
 function orderRecordsByTime(
-  records: readonly SandboxMcpCallRecordListItem[],
+  records: readonly SandboxTestCallRecordListItem[],
   order: 'asc' | 'desc',
 ) {
   const sign = order === 'asc' ? 1 : -1
@@ -374,11 +374,11 @@ function openRecord(recordId: string) {
   emit('open', { recordId })
 }
 
-function statusLabel(status: SandboxMcpCallRecordListItem['status']) {
+function statusLabel(status: SandboxTestCallRecordListItem['status']) {
   return status === 'error' ? '错误' : '成功'
 }
 
-function transportLabel(transport: SandboxMcpCallTransport) {
+function transportLabel(transport: SandboxTestCallTransport) {
   return transport === 'http' ? 'HTTP 接口' : 'MCP 客户端'
 }
 
@@ -389,12 +389,12 @@ function transportLabel(transport: SandboxMcpCallTransport) {
  * 「0 ms」比「1 ms」宽 3px 就足以让那些行折成两行，列表高度随耗时数字忽高忽低。缩成协议名后留出
  * 约 34px 余量，折行不再取决于耗时。完整文案仍出现在详情面板与筛选项里，语义没有丢。
  */
-function transportShortLabel(transport: SandboxMcpCallTransport) {
+function transportShortLabel(transport: SandboxTestCallTransport) {
   return transport === 'http' ? 'HTTP' : 'MCP'
 }
 
-function statusClass(status: SandboxMcpCallRecordListItem['status']) {
-  return status === 'error' ? 'webqq-mcp-call-status-error' : 'webqq-mcp-call-status-success'
+function statusClass(status: SandboxTestCallRecordListItem['status']) {
+  return status === 'error' ? 'webqq-test-call-status-error' : 'webqq-test-call-status-success'
 }
 
 function formatTime(value: string) {

@@ -1,11 +1,11 @@
 import { ref } from 'vue'
 import { describe, expect, it } from 'vitest'
-import { createFakeMcpCallRecordPort } from '../client/webqq/fake-mcp-call-record-port'
+import { createFakeTestCallRecordPort } from '../client/webqq/fake-test-call-record-port'
 import { createFakeModelRequestPort } from '../client/webqq/fake-model-request-port'
 import { createFakeOneBotDebugPort } from '../client/webqq/fake-onebot-debug-port'
 import { createFakePresetPort } from '../client/webqq/fake-preset-port'
 import { createFakeWorkspacePort, type WorkspacePortOperation } from '../client/webqq/fake-workspace-port'
-import type { McpCallRecordPortOperation } from '../client/webqq/mcp-call-record-port'
+import type { TestCallRecordPortOperation } from '../client/webqq/test-call-record-port'
 import type { ModelRequestPortOperation } from '../client/webqq/model-request-port'
 import type { OneBotDebugPortOperation } from '../client/webqq/onebot-debug-port'
 import type { PresetPortOperation } from '../client/webqq/preset-port'
@@ -66,7 +66,7 @@ type RegionOperation =
   | OneBotDebugPortOperation
   | ModelRequestPortOperation
   | PresetPortOperation
-  | McpCallRecordPortOperation
+  | TestCallRecordPortOperation
 
 /**
  * 四个区域各驱动自己那道端口。用例问的是「失败写进哪个区域的错误位」，因此这里按操作名
@@ -77,14 +77,14 @@ function createRegionPorts() {
   const oneBotDebug = createFakeOneBotDebugPort()
   const modelRequest = createFakeModelRequestPort()
   const preset = createFakePresetPort()
-  const mcpCallRecord = createFakeMcpCallRecordPort()
-  const owners = [workspace, oneBotDebug, modelRequest, preset, mcpCallRecord]
+  const testCallRecord = createFakeTestCallRecordPort()
+  const owners = [workspace, oneBotDebug, modelRequest, preset, testCallRecord]
   return {
     workspace,
     oneBotDebug,
     modelRequest,
     preset,
-    mcpCallRecord,
+    testCallRecord,
     rejectNext(operation: RegionOperation, error: unknown) {
       const owner = owners.find((candidate) => operation in candidate)
       if (!owner) throw new Error(`没有端口提供操作：${operation}`)
@@ -123,7 +123,7 @@ type Shell = Awaited<ReturnType<typeof createShell>>['shell']
 function progressOf(shell: Shell) {
   return {
     debug: [shell.debugWorkspaceModel.value.loading, shell.debugWorkspaceModel.value.detailLoading],
-    mcpCall: [shell.mcpCallWorkspaceModel.value.loading, shell.mcpCallWorkspaceModel.value.detailLoading],
+    testCall: [shell.testCallWorkspaceModel.value.loading, shell.testCallWorkspaceModel.value.detailLoading],
     modelRequest: [shell.modelRequestWorkspaceModel.value.loading, shell.modelRequestWorkspaceModel.value.detailLoading],
     preset: [shell.presetWorkspaceModel.value.loading, shell.presetWorkspaceModel.value.saving],
   }
@@ -132,7 +132,7 @@ function progressOf(shell: Shell) {
 function errorsOf(shell: Shell) {
   return {
     debug: shell.debugWorkspaceModel.value.error,
-    mcpCall: shell.mcpCallWorkspaceModel.value.error,
+    testCall: shell.testCallWorkspaceModel.value.error,
     modelRequest: shell.modelRequestWorkspaceModel.value.error,
     preset: shell.presetWorkspaceModel.value.error,
     composer: shell.chatPaneModel.value.composer.externalError,
@@ -141,12 +141,12 @@ function errorsOf(shell: Shell) {
 
 const noProgress = {
   debug: [false, false],
-  mcpCall: [false, false],
+  testCall: [false, false],
   modelRequest: [false, false],
   preset: [false, false],
 }
 
-const noError = { debug: '', mcpCall: '', modelRequest: '', preset: '', composer: '' }
+const noError = { debug: '', testCall: '', modelRequest: '', preset: '', composer: '' }
 
 const presetLocateInput = {
   document: { kind: 'core' as const, fileName: 'a.yml', revision: 'r' },
@@ -176,11 +176,11 @@ describe('四个区域的读取闸门', () => {
       expect(progressOf(shell)).toEqual({ ...noProgress, debug: [false, true] })
     })
 
-    await acrossCall(() => shell.loadMcpCallRecords(), () => {
-      expect(progressOf(shell)).toEqual({ ...noProgress, mcpCall: [true, false] })
+    await acrossCall(() => shell.loadTestCallRecords(), () => {
+      expect(progressOf(shell)).toEqual({ ...noProgress, testCall: [true, false] })
     })
-    await acrossCall(() => shell.loadMcpCallRecord({ recordId: 'missing' }), () => {
-      expect(progressOf(shell)).toEqual({ ...noProgress, mcpCall: [false, true] })
+    await acrossCall(() => shell.loadTestCallRecord({ recordId: 'missing' }), () => {
+      expect(progressOf(shell)).toEqual({ ...noProgress, testCall: [false, true] })
     })
 
     await acrossCall(() => shell.loadModelRequestRecords({ scope: 'main' }), () => {
@@ -222,16 +222,16 @@ describe('四个区域的读取闸门', () => {
   it('读取失败后进行中一定复位，界面不会一直转圈', async () => {
     const { ports, shell } = await createShell()
     ports.rejectNext('getOneBotDebugRecords', new Error('上游失败'))
-    ports.rejectNext('getMcpCallRecords', new Error('上游失败'))
+    ports.rejectNext('getTestCallRecords', new Error('上游失败'))
     ports.rejectNext('getModelRequestRecords', new Error('上游失败'))
     ports.rejectNext('getPresetCatalog', new Error('上游失败'))
 
     await shell.loadOneBotDebugRecords()
-    await shell.loadMcpCallRecords()
+    await shell.loadTestCallRecords()
     await shell.loadModelRequestRecords({ scope: 'main' })
     await shell.loadPresetCatalog()
     await shell.loadOneBotDebugRecord({ recordId: 'missing' }).catch(() => undefined)
-    await shell.loadMcpCallRecord({ recordId: 'missing' }).catch(() => undefined)
+    await shell.loadTestCallRecord({ recordId: 'missing' }).catch(() => undefined)
     await shell.loadModelRequestRecord({ scope: 'main', recordId: 'missing' }).catch(() => undefined)
     await shell.savePreset({ kind: 'core', fileName: 'a.yml', source: 'x', expectedRevision: 'r' }).catch(() => undefined)
 
@@ -245,8 +245,8 @@ describe('四个区域的读取闸门', () => {
     await shell.loadOneBotDebugRecords()
     expect(errorsOf(shell)).toEqual({ ...noError, debug: '调试记录读取失败' })
 
-    ports.rejectNext('getMcpCallRecords', new Error('MCP 调用读取失败'))
-    await shell.loadMcpCallRecords()
+    ports.rejectNext('getTestCallRecords', new Error('测试调用读取失败'))
+    await shell.loadTestCallRecords()
     ports.rejectNext('getModelRequestRecords', new Error('模型请求读取失败'))
     await shell.loadModelRequestRecords({ scope: 'main' })
     ports.rejectNext('getPresetCatalog', new Error('预设目录读取失败'))
@@ -255,7 +255,7 @@ describe('四个区域的读取闸门', () => {
     // 四条错误同时在场且各归各位；发送控件上的外部错误始终为空。
     expect(errorsOf(shell)).toEqual({
       debug: '调试记录读取失败',
-      mcpCall: 'MCP 调用读取失败',
+      testCall: '测试调用读取失败',
       modelRequest: '模型请求读取失败',
       preset: '预设目录读取失败',
       composer: '',
@@ -285,14 +285,14 @@ describe('四个区域的读取闸门', () => {
     expect(await wrote('clearOneBotDebugRecords', '调试清理失败', () => shell.clearOneBotDebugRecords()))
       .toEqual({ ...noError, debug: '调试清理失败' })
 
-    expect(await wrote('getMcpCallRecords', 'MCP 列表失败', () => shell.loadMcpCallRecords()))
-      .toEqual({ ...noError, debug: '调试清理失败', mcpCall: 'MCP 列表失败' })
-    expect(await wrote('getMcpCallRecord', 'MCP 详情失败', () => shell.loadMcpCallRecord({ recordId: 'r' })))
-      .toEqual({ ...noError, debug: '调试清理失败', mcpCall: 'MCP 详情失败' })
-    expect(await wrote('clearMcpCallRecords', 'MCP 清理失败', () => shell.clearMcpCallRecords()))
-      .toEqual({ ...noError, debug: '调试清理失败', mcpCall: 'MCP 清理失败' })
+    expect(await wrote('getTestCallRecords', 'MCP 列表失败', () => shell.loadTestCallRecords()))
+      .toEqual({ ...noError, debug: '调试清理失败', testCall: 'MCP 列表失败' })
+    expect(await wrote('getTestCallRecord', 'MCP 详情失败', () => shell.loadTestCallRecord({ recordId: 'r' })))
+      .toEqual({ ...noError, debug: '调试清理失败', testCall: 'MCP 详情失败' })
+    expect(await wrote('clearTestCallRecords', 'MCP 清理失败', () => shell.clearTestCallRecords()))
+      .toEqual({ ...noError, debug: '调试清理失败', testCall: 'MCP 清理失败' })
 
-    const beforeModelRequest = { debug: '调试清理失败', mcpCall: 'MCP 清理失败' }
+    const beforeModelRequest = { debug: '调试清理失败', testCall: 'MCP 清理失败' }
     expect(await wrote('getModelRequestRecords', '模型请求列表失败', () => shell.loadModelRequestRecords({ scope: 'main' })))
       .toEqual({ ...noError, ...beforeModelRequest, modelRequest: '模型请求列表失败' })
     expect(await wrote('getModelRequestRecords', '模型请求追加失败', () => shell.loadMoreModelRequestRecords({ scope: 'main' })))
