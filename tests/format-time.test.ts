@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatSandboxDateTime, formatSandboxTimeOfDay } from '../client/webqq/format-time'
+import { formatSandboxDateTime, formatSandboxTimeOfDay } from '../client/shared/format-time'
 
 describe('记录时间格式化', () => {
   it('按年月日时分秒补零渲染，并按给定时区解释时刻', () => {

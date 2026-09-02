@@ -1,6 +1,6 @@
 import { nextTick, ref } from 'vue'
 import { describe, expect, it } from 'vitest'
-import { createWorkspaceLayout } from '../client/webqq/workspace-layout'
+import { createWorkspaceLayout } from '../client/workspace/layout'
 
 describe('WebQQ 工作区布局状态', () => {
   it('统一处理手动切换和浏览器宽度变化', async () => {

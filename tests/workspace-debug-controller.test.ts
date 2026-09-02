@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createFakeOneBotDebugPort } from '../client/webqq/fake-onebot-debug-port'
+import { createFakeOneBotDebugPort } from '../client/onebot-debug/fake-port'
 import { createTestWorkspaceController } from './helpers/workspace-controller'
 import type { SandboxConsoleOneBotDebugRecord } from '../src/types'
 

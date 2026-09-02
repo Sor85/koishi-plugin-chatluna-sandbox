@@ -4,15 +4,15 @@ import { describe, expect, it } from 'vitest'
 
 describe('WebQQ 预设工作台源码契约', () => {
   it('接入独立导航、CRUD、CodeMirror 表达式装饰和跨页证据意图', () => {
-    const page = readFileSync(resolve('client/page.vue'), 'utf8')
-    const sidebar = readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
-    const workspace = readFileSync(resolve('client/preset-workspace.vue'), 'utf8')
-    const editor = readFileSync(resolve('client/preset-source-editor.vue'), 'utf8')
-    const sourceExpressions = readFileSync(resolve('client/webqq/preset-source-expressions.ts'), 'utf8')
-    const modelRequests = readFileSync(resolve('client/model-request-workspace.vue'), 'utf8')
-    const trajectory = readFileSync(resolve('client/model-request-trajectory.vue'), 'utf8')
-    const shell = readFileSync(resolve('client/webqq/workspace-shell.ts'), 'utf8')
-    const navigation = readFileSync(resolve('client/webqq/evidence-navigation.ts'), 'utf8')
+    const page = readFileSync(resolve('client/workspace/page.vue'), 'utf8')
+    const sidebar = readFileSync(resolve('client/webqq/sidebar.vue'), 'utf8')
+    const workspace = readFileSync(resolve('client/preset/workspace.vue'), 'utf8')
+    const editor = readFileSync(resolve('client/preset/source-editor.vue'), 'utf8')
+    const sourceExpressions = readFileSync(resolve('client/preset/source-expressions.ts'), 'utf8')
+    const modelRequests = readFileSync(resolve('client/model-request/workspace.vue'), 'utf8')
+    const trajectory = readFileSync(resolve('client/model-request/trajectory.vue'), 'utf8')
+    const shell = readFileSync(resolve('client/workspace/shell.ts'), 'utf8')
+    const navigation = readFileSync(resolve('client/shared/evidence-navigation.ts'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-presets.css'), 'utf8')
 
     expect(sidebar).toMatch(/label:\s*['"]预设['"]/) 

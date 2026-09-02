@@ -51,7 +51,7 @@ describe('发送框用户头像组', () => {
   })
 
   it('重叠头像使用 WebQQ 小胶囊的遮罩裁切而不是背景描边', () => {
-    const composerSource = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
+    const composerSource = readFileSync(resolve('client/webqq/composer.vue'), 'utf8')
     const composerStyles = readFileSync(resolve('client/styles/webqq-composer.css'), 'utf8')
 
     expect(composerSource).toContain("'is-overlapped': index > 0")
@@ -72,8 +72,8 @@ describe('发送框用户头像组', () => {
   })
 
   it('在发送消息控件中统一创建普通用户和机器人', () => {
-    const composerSource = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
-    const popoverSource = readFileSync(resolve('client/environment-create-popover.vue'), 'utf8')
+    const composerSource = readFileSync(resolve('client/webqq/composer.vue'), 'utf8')
+    const popoverSource = readFileSync(resolve('client/environment/create-popover.vue'), 'utf8')
 
     expect(composerSource).toContain('type="participant"')
     expect(popoverSource).toContain('<SelectItem value="user"')
@@ -81,7 +81,7 @@ describe('发送框用户头像组', () => {
   })
 
   it('头像菜单在 Tooltip 内部直接绑定按钮以保留右键坐标', () => {
-    const composerSource = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
+    const composerSource = readFileSync(resolve('client/webqq/composer.vue'), 'utf8')
 
     expect(composerSource).toContain('<Tooltip v-for="(sender, index) in orderedSenders"')
     expect(composerSource).toContain('<ContextMenu>\n                      <ContextMenuTrigger as-child>\n                        <button')
@@ -95,7 +95,7 @@ describe('发送框用户头像组', () => {
    * 少接这根线的表现是切换发送者时头像瞬移而不是滑动，不会报错。
    */
   it('切换发送者时对头像区做 FLIP 布局动画', () => {
-    const composerSource = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
+    const composerSource = readFileSync(resolve('client/webqq/composer.vue'), 'utf8')
 
     expect(composerSource).toContain('recordUserStackLayout')
     expect(composerSource).toContain("await layout.animate({ duration: 260, ease: 'out(3)' })")

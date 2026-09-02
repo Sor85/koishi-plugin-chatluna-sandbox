@@ -5,7 +5,7 @@ import { expectUserFacingCopy } from './helpers/user-facing-copy'
 
 describe('WebQQ 消息多选与目标选择', () => {
   it('消息列表提供多选入口、默认选中与行内 toggle', () => {
-    const source = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
+    const source = readFileSync(resolve('client/webqq/message-list.vue'), 'utf8')
 
     expect(source).toContain("emit('enterSelection', message.id)")
     expect(source).toContain('多选')
@@ -28,7 +28,7 @@ describe('WebQQ 消息多选与目标选择', () => {
   })
 
   it('chat-pane 在多选时用操作栏替换 composer，并在切会话时清空', () => {
-    const source = readFileSync(resolve('client/webqq-chat-pane.vue'), 'utf8')
+    const source = readFileSync(resolve('client/webqq/chat-pane.vue'), 'utf8')
 
     /**
      * 类别：实现细节契约（肯定式）。
@@ -55,9 +55,9 @@ describe('WebQQ 消息多选与目标选择', () => {
   })
 
   it('目标会话对话框支持最近/好友/群/搜索/单选', () => {
-    const source = readFileSync(resolve('client/webqq-forward-target-dialog.vue'), 'utf8')
-    const shellSource = readFileSync(resolve('client/webqq/workspace-shell.ts'), 'utf8')
-    const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
+    const source = readFileSync(resolve('client/webqq/forward-target-dialog.vue'), 'utf8')
+    const shellSource = readFileSync(resolve('client/workspace/shell.ts'), 'utf8')
+    const pageSource = readFileSync(resolve('client/workspace/page.vue'), 'utf8')
 
     expect(source).toContain("label: '最近'")
     expect(source).toContain("label: '好友'")

@@ -132,13 +132,13 @@ describe('WebQQ 个人信息卡模型', () => {
 
 describe('WebQQ 个人信息卡入口', () => {
   it('消息、私聊头部和好友列表提供查看资料，群成员操作菜单不重复显示', () => {
-    const messageList = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
-    const chatPane = readFileSync(resolve('client/webqq-chat-pane.vue'), 'utf8')
-    const sidebar = readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
-    const details = readFileSync(resolve('client/webqq-details-panel.vue'), 'utf8')
-    const groupMemberMenu = readFileSync(resolve('client/group-member-menu.vue'), 'utf8')
-    const overlay = readFileSync(resolve('client/workspace-overlay-host.vue'), 'utf8')
-    const page = readFileSync(resolve('client/page.vue'), 'utf8')
+    const messageList = readFileSync(resolve('client/webqq/message-list.vue'), 'utf8')
+    const chatPane = readFileSync(resolve('client/webqq/chat-pane.vue'), 'utf8')
+    const sidebar = readFileSync(resolve('client/webqq/sidebar.vue'), 'utf8')
+    const details = readFileSync(resolve('client/webqq/details-panel.vue'), 'utf8')
+    const groupMemberMenu = readFileSync(resolve('client/webqq/group-member-menu.vue'), 'utf8')
+    const overlay = readFileSync(resolve('client/workspace/overlay-host.vue'), 'utf8')
+    const page = readFileSync(resolve('client/workspace/page.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-overlays.css'), 'utf8')
 
     expect(messageList).toContain('handleMessageAvatarClick(message, $event)')

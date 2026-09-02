@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createFakeTestCallRecordPort } from '../client/webqq/fake-test-call-record-port'
+import { createFakeTestCallRecordPort } from '../client/test-call/fake-port'
 import { createTestWorkspaceController } from './helpers/workspace-controller'
 import type { SandboxTestCallRecord, SandboxTestCallRecordListItem } from '../src/mcp/types'
 

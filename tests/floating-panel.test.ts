@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampFloatingPanelPosition, getFloatingPanelPosition, getFloatingPanelRectAnchor, isFloatingPanelInteractiveTarget } from '../client/webqq/floating-panel'
+import { clampFloatingPanelPosition, getFloatingPanelPosition, getFloatingPanelRectAnchor, isFloatingPanelInteractiveTarget } from '../client/shared/floating-panel'
 
 describe('WebQQ 局部浮层定位', () => {
   it('从点击位置右下方展开，并在视口边缘内翻', () => {

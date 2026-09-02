@@ -63,11 +63,11 @@ describe('模型请求视图的重复计算', () => {
    * 大请求的分析变慢、搜索时输入掉帧——没有任何红灯，因此这些肯定式断言按 ADR 0073 第 4 类保留。
    *
    * 「原文一旦挂载就留着」与「从未切开的消息不进已挂载集合」这两条**行为**已经下沉到
-   * `client/webqq/analysis-expansion.ts`，由 `tests/analysis-expansion.test.ts` 断言；
+   * `client/model-request/analysis-expansion.ts`，由 `tests/analysis-expansion.test.ts` 断言；
    * 这里只剩「已挂载才挂载」这一处渲染面的接线。
    */
   it('分析页的原始 JSON 树按需挂载并缓存', () => {
-    const view = read('client/webqq/analysis-view.vue')
+    const view = read('client/model-request/analysis-view.vue')
 
     expect(view).toContain('v-if="isMessageRawMounted(message.evidenceId)"')
     expect(view).toContain('v-if="responseRawMounted"')
@@ -90,7 +90,7 @@ describe('模型请求视图的重复计算', () => {
   })
 
   it('轨迹账本按身份表定位请求，不再逐行扫描记录', () => {
-    const view = read('client/model-request-trajectory.vue')
+    const view = read('client/model-request/trajectory.vue')
 
     expect(view).toContain('const requestOrderById = computed(')
     expect(view).toContain('const requestLabelById = computed(')
@@ -106,7 +106,7 @@ describe('模型请求视图的重复计算', () => {
   })
 
   it('历史消息预览分趟量测并合并到一帧', () => {
-    const preview = read('client/model-request-history-preview.vue')
+    const preview = read('client/model-request/history-preview.vue')
     const clear = preview.indexOf("content.style.removeProperty('--webqq-model-history-content-max-width')")
     const measureRect = preview.indexOf('const previewRect = preview.getBoundingClientRect()')
     const write = preview.indexOf("content.style.setProperty('--webqq-model-history-content-max-width'")
@@ -126,7 +126,7 @@ describe('模型请求视图的重复计算', () => {
   })
 
   it('模型请求列表按空间与机器人索引目录', () => {
-    const workspace = read('client/model-request-workspace.vue')
+    const workspace = read('client/model-request/workspace.vue')
 
     expect(workspace).toContain('const botsByScope = computed(')
     expect(workspace).toContain('botsByScope.value.get(')

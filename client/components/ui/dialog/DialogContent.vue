@@ -5,7 +5,7 @@ import { IconX } from '@tabler/icons-vue'
 import { reactiveOmit } from '@vueuse/core'
 import { DialogClose, DialogContent, DialogOverlay, DialogPortal, useForwardPropsEmits } from 'reka-ui'
 import { cn } from '#client/lib/utils'
-import { vWebqqScrollbar } from '#client/webqq-scrollbar'
+import { vWebqqScrollbar } from '#client/shared/scrollbar'
 
 defineOptions({ inheritAttrs: false })
 

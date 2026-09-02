@@ -7,10 +7,10 @@ import { scopePreflight } from '../scripts/scope-preflight.mjs'
 
 /** 每个 teleport / Portal 浮层落在哪个渲染根上。新增浮层必须同时补进这里和 SANDBOX_STYLE_ROOTS。 */
 const PORTAL_INVENTORY: Array<[string, string]> = [
-  ['client/webqq-forward-modal.vue', '.chatluna-sandbox-forward-modal-backdrop'],
-  ['client/webqq-image-preview.vue', '.chatluna-sandbox-image-preview'],
-  ['client/webqq-emoji-picker.vue', '.chatluna-sandbox-secondary-page'],
-  ['client/workspace-overlay-host.vue', '.chatluna-sandbox-secondary-page'],
+  ['client/webqq/forward-modal.vue', '.chatluna-sandbox-forward-modal-backdrop'],
+  ['client/webqq/image-preview.vue', '.chatluna-sandbox-image-preview'],
+  ['client/webqq/emoji-picker.vue', '.chatluna-sandbox-secondary-page'],
+  ['client/workspace/overlay-host.vue', '.chatluna-sandbox-secondary-page'],
   ['client/components/ui/dialog/DialogContent.vue', '[data-slot="dialog-overlay"]'],
   ['client/components/ui/dialog/DialogContent.vue', '.sandbox-dialog-content'],
   ['client/components/ui/popover/PopoverContent.vue', '.sandbox-popover-content'],

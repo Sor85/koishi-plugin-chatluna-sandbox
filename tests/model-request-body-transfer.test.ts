@@ -6,7 +6,7 @@ import {
   resolveModelRequestBodyText,
   serializeModelRequestBody,
   type ModelRequestBodySource,
-} from '../client/webqq/model-request-body-transfer'
+} from '../client/model-request/body-transfer'
 
 function source(overrides: Partial<ModelRequestBodySource> = {}): ModelRequestBodySource {
   return {

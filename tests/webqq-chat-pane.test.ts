@@ -23,7 +23,7 @@ describe('WebQQ 聊天区域', () => {
   })
 
   it('装配顶栏、消息列表与发送控件', () => {
-    const source = readFileSync(resolve('client/webqq-chat-pane.vue'), 'utf8')
+    const source = readFileSync(resolve('client/webqq/chat-pane.vue'), 'utf8')
 
     /**
      * 类别：DOM 结构与元素顺序。
@@ -45,7 +45,7 @@ describe('WebQQ 聊天区域', () => {
   })
 
   it('合并转发弹窗按入口决定 replace 还是 push', () => {
-    const source = readFileSync(resolve('client/webqq-chat-pane.vue'), 'utf8')
+    const source = readFileSync(resolve('client/webqq/chat-pane.vue'), 'utf8')
 
     expect(source).toContain('<WebqqForwardModal')
     expect(source).toContain('@open-forward="openForwardDialog"')
@@ -62,8 +62,8 @@ describe('WebQQ 聊天区域', () => {
   })
 
   it('页面把聊天区域接进工作台，自己不画顶栏', () => {
-    const source = readFileSync(resolve('client/webqq-chat-pane.vue'), 'utf8')
-    const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
+    const source = readFileSync(resolve('client/webqq/chat-pane.vue'), 'utf8')
+    const pageSource = readFileSync(resolve('client/workspace/page.vue'), 'utf8')
 
     // 类别：DOM 结构与元素顺序。顶栏只能有一处，页面自己再画一个会出现两层标题。
     expect(pageSource).toContain('<WebqqChatPane')
@@ -86,7 +86,7 @@ describe('WebQQ 聊天区域', () => {
   })
 
   it('顶栏的查找入口与展开态', () => {
-    const source = readFileSync(resolve('client/webqq-chat-pane.vue'), 'utf8')
+    const source = readFileSync(resolve('client/webqq/chat-pane.vue'), 'utf8')
 
     /**
      * 类别：DOM 结构与元素顺序。
@@ -104,7 +104,7 @@ describe('WebQQ 聊天区域', () => {
   })
 
   it('搜索编排的接线：模块、注入与外点关闭', () => {
-    const source = readFileSync(resolve('client/webqq-chat-pane.vue'), 'utf8')
+    const source = readFileSync(resolve('client/webqq/chat-pane.vue'), 'utf8')
 
     /**
      * 类别：实现细节契约（肯定式）。
@@ -113,7 +113,7 @@ describe('WebQQ 聊天区域', () => {
      * 哪几个注入点通向哪个真实能力、哪个事件驱动哪个编排入口。模块看不到接线，
      * 少接一根线的表现是「点了没反应」，而不是判定出错。
      */
-    expect(source).toContain("from '#client/webqq/message-search'")
+    expect(source).toContain("from './message-search'")
     expect(source).toContain('createMessageSearchController')
     expect(source).toContain('searchTriggerRef.value?.focus()')
     expect(source).toContain('messageListRef.value?.revealMessage')
@@ -135,7 +135,7 @@ describe('WebQQ 聊天区域', () => {
   })
 
   it('搜索面板的输入、防抖与结果呈现', () => {
-    const searchSource = readFileSync(resolve('client/webqq-message-search.vue'), 'utf8')
+    const searchSource = readFileSync(resolve('client/webqq/message-search-panel.vue'), 'utf8')
 
     expect(searchSource).toContain('id="chatluna-sandbox-message-search-results"')
     expect(searchSource).toContain('v-if="hasCriteria"')
@@ -152,7 +152,7 @@ describe('WebQQ 聊天区域', () => {
     expect(searchSource).toContain('inputElement.value?.focus()')
     expect(searchSource).toContain("}, { immediate: true })")
     expect(searchSource).toContain('setTimeout(emitSearch, 250)')
-    expect(searchSource).toContain("import WebqqAvatar from './webqq-avatar.vue'")
+    expect(searchSource).toContain("import WebqqAvatar from '#client/shared/avatar.vue'")
     expect(searchSource).toContain('<WebqqAvatar')
     expect(searchSource).toContain('participant(hit.authorId).isBot')
     expect(searchSource).toContain('participant(hit.authorId).avatar')
@@ -163,7 +163,7 @@ describe('WebQQ 聊天区域', () => {
   })
 
   it('按日期筛选复用日历控件而不是原生日期输入', () => {
-    const searchSource = readFileSync(resolve('client/webqq-message-search.vue'), 'utf8')
+    const searchSource = readFileSync(resolve('client/webqq/message-search-panel.vue'), 'utf8')
 
     expect(searchSource).not.toContain('type="date"')
     expect(searchSource).not.toContain("from '#client/components/ui/input'")
@@ -270,9 +270,9 @@ describe('WebQQ 聊天区域', () => {
   })
 
   it('查找聊天记录的跨层接线：页面、外壳与消息列表', () => {
-    const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
-    const shellSource = readFileSync(resolve('client/webqq/workspace-shell.ts'), 'utf8')
-    const messageListSource = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
+    const pageSource = readFileSync(resolve('client/workspace/page.vue'), 'utf8')
+    const shellSource = readFileSync(resolve('client/workspace/shell.ts'), 'utf8')
+    const messageListSource = readFileSync(resolve('client/webqq/message-list.vue'), 'utf8')
 
     /**
      * 类别：实现细节契约（肯定式）。

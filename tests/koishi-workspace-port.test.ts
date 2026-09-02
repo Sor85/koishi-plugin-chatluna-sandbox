@@ -8,7 +8,7 @@ import {
   createKoishiWorkspacePort,
   installContextSceneMutationReceiver,
   koishiWorkspacePort,
-} from '../client/webqq/koishi-workspace-port'
+} from '../client/workspace/koishi-port'
 
 type SceneMutationListener = (payload: { spaceId?: string, revision: number }) => void
 

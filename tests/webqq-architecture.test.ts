@@ -3,10 +3,11 @@ import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /**
- * 客户端端口适配器的命名约定。规则按这个形状判定而不是列举文件名：新增适配器只要叫
- * `koishi-<能力>-port.ts` 就自动被认作合法持有者，其余任何文件默认受约束。
+ * 客户端端口适配器的命名约定。规则按这个形状判定而不是列举文件名：能力目录下叫
+ * `koishi-port.ts` 的那一个文件自动被认作合法持有者，其余任何文件默认受约束。
+ * 能力标识由目录承担（`client/<能力>/koishi-port.ts`），所以文件名里不再重复一遍。
  */
-const PORT_ADAPTER_PATTERN = /(?:^|\/)koishi-[a-z0-9-]+-port\.ts$/
+const PORT_ADAPTER_PATTERN = /(?:^|\/)koishi-port\.ts$/
 
 interface ArchitecturePredicate {
   readonly evidence: string
@@ -344,7 +345,7 @@ const rules: readonly ArchitectureRule[] = [
   },
   /**
    * ADR 0060 与 ADR 0071 此前只由消息列表测试里的四条肯定式源码断言守着——它们钉的是
-   * `client/webqq-scrollbar.ts` 的源码文本，既不属于消息列表，也管不到别的样式表。
+   * `client/shared/scrollbar.ts` 的源码文本，既不属于消息列表，也管不到别的样式表。
    * 这两条决策的失效形态都是「不会报错、只会静默错」，因此先转成对全仓样式表生效的规则，
    * 再从组件测试里删掉那四条断言。
    */
@@ -453,13 +454,13 @@ const untreatedAssertionExemptions: readonly ArchitectureExemption[] = ([
  * 不是一次机械迁移，而且每个都要各自的基线比对。
  */
 const errorFallbackExemptions: readonly ArchitectureExemption[] = ([
-  ['client/webqq-details-panel.vue', '两处群公告操作的错误写进详情栏本地状态', '待开候选：详情栏行为下沉'],
-  ['client/webqq-sidebar.vue', '关系申请处理的错误写进侧栏本地的通知错误位', '待开候选：侧边栏其余行为下沉'],
-  ['client/webqq-forward-target-dialog.vue', '多选期间发送控件不可见，错误必须留在本对话框', '待开候选：转发目标对话框行为下沉'],
-  ['client/webqq-composer.vue', '切换发送者的错误写进发送控件自己的本地错误位', '待开候选：发送控件其余行为下沉'],
-  ['client/preset-workspace.vue', '预设操作的错误经一个本地取消息函数，兜底里还套了一层 String()', '预设工作台候选：源文档与运行时证据关联'],
-  ['client/environment-entity-dialog.vue', '环境管理的错误写进弹层本地状态并阻塞关闭', '待开候选：环境管理弹层行为下沉'],
-  ['client/environment-create-popover.vue', '新建实体的错误写进浮层本地状态并阻塞关闭', '待开候选：环境管理弹层行为下沉'],
+  ['client/webqq/details-panel.vue', '两处群公告操作的错误写进详情栏本地状态', '待开候选：详情栏行为下沉'],
+  ['client/webqq/sidebar.vue', '关系申请处理的错误写进侧栏本地的通知错误位', '待开候选：侧边栏其余行为下沉'],
+  ['client/webqq/forward-target-dialog.vue', '多选期间发送控件不可见，错误必须留在本对话框', '待开候选：转发目标对话框行为下沉'],
+  ['client/webqq/composer.vue', '切换发送者的错误写进发送控件自己的本地错误位', '待开候选：发送控件其余行为下沉'],
+  ['client/preset/workspace.vue', '预设操作的错误经一个本地取消息函数，兜底里还套了一层 String()', '预设工作台候选：源文档与运行时证据关联'],
+  ['client/environment/entity-dialog.vue', '环境管理的错误写进弹层本地状态并阻塞关闭', '待开候选：环境管理弹层行为下沉'],
+  ['client/environment/create-popover.vue', '新建实体的错误写进浮层本地状态并阻塞关闭', '待开候选：环境管理弹层行为下沉'],
   ['client/webqq/message-search.ts', '同一文件另外两处已改用具名常量，这一处的定位失败仍是字面量；写入前还要过一道过期请求判定', '待开候选：搜索编排的错误位统一'],
   ['client/webqq/composer-send.ts', '发送编排持有自己的进行中与错误位，是发送控件模型的一部分', '待开候选：发送编排改用区域读取闸门'],
 ] as const).map(([file, reason, owner]) => ({
@@ -544,8 +545,9 @@ describe('WebQQ 模块化架构', () => {
 
     expect(rpcRule.findViolations('client/x.vue', "await send('chatluna-sandbox/workspace')")).not.toEqual([])
     expect(rpcRule.findViolations('client/webqq/x.ts', "receive('chatluna-sandbox/mcp-activity', handler)")).not.toEqual([])
-    expect(rpcRule.findViolations('client/webqq/koishi-x-port.ts', "await send('chatluna-sandbox/workspace')")).toEqual([])
-    expect(rpcRule.findViolations('client/webqq/x-port.ts', "await send('chatluna-sandbox/workspace')")).not.toEqual([])
+    expect(rpcRule.findViolations('client/mcp/koishi-port.ts', "await send('chatluna-sandbox/workspace')")).toEqual([])
+    expect(rpcRule.findViolations('client/mcp/port.ts', "await send('chatluna-sandbox/workspace')")).not.toEqual([])
+    expect(rpcRule.findViolations('client/mcp/koishi-mcp-admin-port.ts', "await send('chatluna-sandbox/workspace')")).not.toEqual([])
 
     // 判定词打头与可行性后缀收尾两种形状都要认得，换一种拼法不能让规则静默失效。
     expect(capabilityRule.findViolations('client/x.vue', 'function canRecallMessage(message) {}')).not.toEqual([])
@@ -624,7 +626,7 @@ describe('WebQQ 模块化架构', () => {
       'x = cause instanceof Error ? cause.message : (\n  fallback || \'创建失败\'\n)\n',
     )).not.toEqual([])
     // 兜底当参数传进来、或指向具名常量，都是收拢后的合法形态。
-    expect(fallbackRule.findViolations('client/webqq/error-slot.ts', 'return cause instanceof Error ? cause.message : fallback')).toEqual([])
+    expect(fallbackRule.findViolations('client/workspace/error-slot.ts', 'return cause instanceof Error ? cause.message : fallback')).toEqual([])
     expect(fallbackRule.findViolations('client/webqq/x.ts', 'error.value = failure instanceof Error ? failure.message : SEARCH_FAILED_TEXT')).toEqual([])
     // 规范化非 Error 值的那条三元链里带着 `'string'`、`'message'` 这些非中文字面量，不得误报。
     expect(fallbackRule.findViolations(
@@ -790,7 +792,7 @@ describe('WebQQ 模块化架构', () => {
   })
 
   it('主页面只负责工作台初始化与区域装配', () => {
-    const source = readFileSync(resolve('client/page.vue'), 'utf8')
+    const source = readFileSync(resolve('client/workspace/page.vue'), 'utf8')
 
     expect(source).toContain('createWebqqWorkspaceShell')
     expect(source).not.toMatch(/SandboxSnapshot|ctx\.console|document\./)

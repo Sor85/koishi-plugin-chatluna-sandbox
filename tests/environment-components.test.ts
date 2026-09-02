@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest'
 describe('环境管理组件传输边界', () => {
   it('创建和编辑组件只提交结构化环境命令', () => {
     const sources = [
-      readFileSync(resolve('client/environment-create-popover.vue'), 'utf8'),
-      readFileSync(resolve('client/environment-entity-dialog.vue'), 'utf8'),
+      readFileSync(resolve('client/environment/create-popover.vue'), 'utf8'),
+      readFileSync(resolve('client/environment/entity-dialog.vue'), 'utf8'),
     ]
 
     for (const source of sources) {
@@ -17,8 +17,8 @@ describe('环境管理组件传输边界', () => {
   })
 
   it('环境管理页联邦展示主环境和测试空间机器人，并使用与模型请求页一致的左右布局', () => {
-    const source = readFileSync(resolve('client/environment-manager.vue'), 'utf8')
-    const page = readFileSync(resolve('client/page.vue'), 'utf8')
+    const source = readFileSync(resolve('client/environment/manager.vue'), 'utf8')
+    const page = readFileSync(resolve('client/workspace/page.vue'), 'utf8')
 
     expect(page).toContain('<EnvironmentManager :directory="environmentDirectory" :port="mcpAdminPort" />')
     expect(source).toContain('<h1>环境管理</h1>')
@@ -43,8 +43,8 @@ describe('环境管理组件传输边界', () => {
   })
 
   it('跨区域 Dialog 由窄输入 OverlayHost 统一渲染', () => {
-    const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
-    const overlaySource = readFileSync(resolve('client/workspace-overlay-host.vue'), 'utf8')
+    const pageSource = readFileSync(resolve('client/workspace/page.vue'), 'utf8')
+    const overlaySource = readFileSync(resolve('client/workspace/overlay-host.vue'), 'utf8')
 
     expect(pageSource).toContain('<WorkspaceOverlayHost')
     expect(pageSource).not.toContain('<Dialog')
@@ -59,10 +59,10 @@ describe('环境管理组件传输边界', () => {
   })
 
   it('三类实体编辑与创建表单通过二级页面选择内置或本地头像', () => {
-    const source = readFileSync(resolve('client/environment-entity-dialog.vue'), 'utf8')
-    const picker = readFileSync(resolve('client/webqq-avatar-picker.vue'), 'utf8')
-    const create = readFileSync(resolve('client/environment-create-popover.vue'), 'utf8')
-    const shell = readFileSync(resolve('client/webqq/workspace-shell.ts'), 'utf8')
+    const source = readFileSync(resolve('client/environment/entity-dialog.vue'), 'utf8')
+    const picker = readFileSync(resolve('client/environment/avatar-picker.vue'), 'utf8')
+    const create = readFileSync(resolve('client/environment/create-popover.vue'), 'utf8')
+    const shell = readFileSync(resolve('client/workspace/shell.ts'), 'utf8')
 
     expect(source).toContain('<WebqqAvatarPicker')
     expect(source).toContain('class="webqq-avatar-editor-trigger"')
@@ -87,7 +87,7 @@ describe('环境管理组件传输边界', () => {
   })
 
   it('群组编辑以全部用户和机器人头像管理成员资料', () => {
-    const source = readFileSync(resolve('client/environment-entity-dialog.vue'), 'utf8')
+    const source = readFileSync(resolve('client/environment/entity-dialog.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-overlays.css'), 'utf8')
 
     expect(source).toContain('v-for="participant in participants"')
@@ -113,7 +113,7 @@ describe('环境管理组件传输边界', () => {
   })
 
   it('机器人编辑 Dialog 使用 shadcn-vue 能力覆盖控件', () => {
-    const source = readFileSync(resolve('client/environment-entity-dialog.vue'), 'utf8')
+    const source = readFileSync(resolve('client/environment/entity-dialog.vue'), 'utf8')
 
     expect(source).toContain('getOneBotProfileBaseline')
     expect(source).toContain('能力覆盖')
@@ -131,7 +131,7 @@ describe('环境管理组件传输边界', () => {
   })
 
   it('实体编辑 Dialog 将标题、滚动正文和操作区分层，避免长表单遮挡操作按钮', () => {
-    const source = readFileSync(resolve('client/environment-entity-dialog.vue'), 'utf8')
+    const source = readFileSync(resolve('client/environment/entity-dialog.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-overlays.css'), 'utf8')
 
     expect(source).toContain("'webqq-entity-editor-dialog': mode === 'edit'")
@@ -147,9 +147,9 @@ describe('环境管理组件传输边界', () => {
     const dialogTitle = readFileSync(resolve('client/components/ui/dialog/DialogTitle.vue'), 'utf8')
     const dialogDescription = readFileSync(resolve('client/components/ui/dialog/DialogDescription.vue'), 'utf8')
     const dialogIndex = readFileSync(resolve('client/components/ui/dialog/index.ts'), 'utf8')
-    const entityDialog = readFileSync(resolve('client/environment-entity-dialog.vue'), 'utf8')
-    const overlayHost = readFileSync(resolve('client/workspace-overlay-host.vue'), 'utf8')
-    const createPopover = readFileSync(resolve('client/environment-create-popover.vue'), 'utf8')
+    const entityDialog = readFileSync(resolve('client/environment/entity-dialog.vue'), 'utf8')
+    const overlayHost = readFileSync(resolve('client/workspace/overlay-host.vue'), 'utf8')
+    const createPopover = readFileSync(resolve('client/environment/create-popover.vue'), 'utf8')
 
     expect(dialogContent).toContain('gap: var(--webqq-secondary-row-gap, 8px)')
     expect(dialogContent).toContain('v-webqq-scrollbar="{ showOverlay: false, zIndex: 160 }"')
@@ -169,7 +169,7 @@ describe('环境管理组件传输边界', () => {
   })
 
   it('危险按钮和下拉浮层使用统一控件基线，避免 Portal 中样式退化', () => {
-    const entityDialog = readFileSync(resolve('client/environment-entity-dialog.vue'), 'utf8')
+    const entityDialog = readFileSync(resolve('client/environment/entity-dialog.vue'), 'utf8')
     const dialogContent = readFileSync(resolve('client/components/ui/dialog/DialogContent.vue'), 'utf8')
     const popoverContent = readFileSync(resolve('client/components/ui/popover/PopoverContent.vue'), 'utf8')
     const selectContent = readFileSync(resolve('client/components/ui/select/SelectContent.vue'), 'utf8')
@@ -224,8 +224,8 @@ describe('环境管理组件传输边界', () => {
   })
 
   it('环境管理展示服务端权威 MCP 工具、资源和协议能力目录', () => {
-    const manager = readFileSync(resolve('client/environment-manager.vue'), 'utf8')
-    const catalog = readFileSync(resolve('client/mcp-capability-catalog.vue'), 'utf8')
+    const manager = readFileSync(resolve('client/environment/manager.vue'), 'utf8')
+    const catalog = readFileSync(resolve('client/mcp/capability-catalog.vue'), 'utf8')
     const contract = readFileSync(resolve('src/console-contract.ts'), 'utf8')
 
     expect(manager).toContain("'mcp-capabilities'")
@@ -248,7 +248,7 @@ describe('环境管理组件传输边界', () => {
   })
 
   it('已创建的 MCP 凭证可以查看并修改名称和权限', () => {
-    const source = readFileSync(resolve('client/mcp-credential-manager.vue'), 'utf8')
+    const source = readFileSync(resolve('client/mcp/credential-manager.vue'), 'utf8')
     const contract = readFileSync(resolve('src/console-contract.ts'), 'utf8')
 
     expect(source).toContain('openEdit(credential)')

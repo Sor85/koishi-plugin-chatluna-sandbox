@@ -7,7 +7,7 @@ import {
   modelEvidenceFilterSummary,
   toggleFilterMember,
   type ModelEvidenceFilter,
-} from '../client/webqq/model-request-filter'
+} from '../client/model-request/filter'
 import { SANDBOX_EVIDENCE_KINDS, type SandboxEvidenceKind } from '../src/evidence-kind'
 
 function filter(kinds: SandboxEvidenceKind[] = []): ModelEvidenceFilter {

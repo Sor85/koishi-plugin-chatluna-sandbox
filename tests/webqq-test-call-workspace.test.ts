@@ -4,10 +4,10 @@ import { describe, expect, it } from 'vitest'
 
 describe('WebQQ 测试调用工作台', () => {
   it('从最左侧导航进入独立视图，并提供筛选、详情和清理控件', () => {
-    const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
-    const sidebarSource = readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
-    const shellSource = readFileSync(resolve('client/webqq/workspace-shell.ts'), 'utf8')
-    const workspaceSource = readFileSync(resolve('client/test-call-workspace.vue'), 'utf8')
+    const pageSource = readFileSync(resolve('client/workspace/page.vue'), 'utf8')
+    const sidebarSource = readFileSync(resolve('client/webqq/sidebar.vue'), 'utf8')
+    const shellSource = readFileSync(resolve('client/workspace/shell.ts'), 'utf8')
+    const workspaceSource = readFileSync(resolve('client/test-call/workspace.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-test-calls.css'), 'utf8')
 
     expect(sidebarSource).toMatch(/label:\s*['"]测试调用['"]/)
@@ -87,7 +87,7 @@ describe('WebQQ 测试调用工作台', () => {
    * 同一个凭证是被 MCP 客户端还是被 HTTP 脚本使用的，因此列表徽标、详情条目与筛选三处都要有。
    */
   it('标注每条记录的协议表述，并可按来路筛选', () => {
-    const workspaceSource = readFileSync(resolve('client/test-call-workspace.vue'), 'utf8')
+    const workspaceSource = readFileSync(resolve('client/test-call/workspace.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-test-calls.css'), 'utf8')
 
     expect(workspaceSource).toContain("from '#client/components/ui/select'")

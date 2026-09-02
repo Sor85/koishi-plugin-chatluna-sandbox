@@ -29,12 +29,12 @@ describe('群聊右键提及成员', () => {
   })
 
   it('群成员列表与聊天头像共用提及事件并送入发送控件', () => {
-    const menuSource = readFileSync(resolve('client/group-member-menu.vue'), 'utf8')
-    const detailsSource = readFileSync(resolve('client/webqq-details-panel.vue'), 'utf8')
-    const messageSource = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
-    const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
-    const composerSource = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
-    const shellSource = readFileSync(resolve('client/webqq/workspace-shell.ts'), 'utf8')
+    const menuSource = readFileSync(resolve('client/webqq/group-member-menu.vue'), 'utf8')
+    const detailsSource = readFileSync(resolve('client/webqq/details-panel.vue'), 'utf8')
+    const messageSource = readFileSync(resolve('client/webqq/message-list.vue'), 'utf8')
+    const pageSource = readFileSync(resolve('client/workspace/page.vue'), 'utf8')
+    const composerSource = readFileSync(resolve('client/webqq/composer.vue'), 'utf8')
+    const shellSource = readFileSync(resolve('client/workspace/shell.ts'), 'utf8')
     // 会话列表预览的口径住在会话树投影 module 里；行为本身由 tests/conversation-tree.test.ts 验证。
     const conversationTreeSource = readFileSync(resolve('client/webqq/conversation-tree.ts'), 'utf8')
 

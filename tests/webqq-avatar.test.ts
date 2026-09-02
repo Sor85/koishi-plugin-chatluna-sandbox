@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 describe('WebQQ 共享头像', () => {
   it('只渲染头像身份而不接管外层交互', () => {
-    const source = readFileSync(resolve('client/webqq-avatar.vue'), 'utf8')
+    const source = readFileSync(resolve('client/shared/avatar.vue'), 'utf8')
 
     expect(source).toContain("kind: 'user' | 'bot' | 'group'")
     expect(source).toContain("['webqq-identity-avatar'")
@@ -32,14 +32,14 @@ describe('WebQQ 共享头像', () => {
   })
 
   it('主要身份区域统一使用共享头像', () => {
-    const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
-    const composerSource = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
-    const messageListSource = readFileSync(resolve('client/webqq-message-list.vue'), 'utf8')
-    const detailsPanelSource = readFileSync(resolve('client/webqq-details-panel.vue'), 'utf8')
-    const sidebarSource = readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
-    const searchSource = readFileSync(resolve('client/webqq-message-search.vue'), 'utf8')
-    const notificationSource = readFileSync(resolve('client/notification-menu.vue'), 'utf8')
-    const environmentSource = readFileSync(resolve('client/environment-manager.vue'), 'utf8')
+    const pageSource = readFileSync(resolve('client/workspace/page.vue'), 'utf8')
+    const composerSource = readFileSync(resolve('client/webqq/composer.vue'), 'utf8')
+    const messageListSource = readFileSync(resolve('client/webqq/message-list.vue'), 'utf8')
+    const detailsPanelSource = readFileSync(resolve('client/webqq/details-panel.vue'), 'utf8')
+    const sidebarSource = readFileSync(resolve('client/webqq/sidebar.vue'), 'utf8')
+    const searchSource = readFileSync(resolve('client/webqq/message-search-panel.vue'), 'utf8')
+    const notificationSource = readFileSync(resolve('client/webqq/notification-menu.vue'), 'utf8')
+    const environmentSource = readFileSync(resolve('client/environment/manager.vue'), 'utf8')
 
     const avatarCount = [pageSource, composerSource, messageListSource, detailsPanelSource, sidebarSource]
       .reduce((count, source) => count + (source.match(/<WebqqAvatar/g)?.length ?? 0), 0)
@@ -52,8 +52,8 @@ describe('WebQQ 共享头像', () => {
   })
 
   it('把 sandbox-media 头像引用解析为可显示的 data URL', () => {
-    const shellSource = readFileSync(resolve('client/webqq/workspace-shell.ts'), 'utf8')
-    const sidebarSource = readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
+    const shellSource = readFileSync(resolve('client/workspace/shell.ts'), 'utf8')
+    const sidebarSource = readFileSync(resolve('client/webqq/sidebar.vue'), 'utf8')
     expect(shellSource).toContain('resolveAvatar(reference')
     expect(shellSource).toContain('snapshot.value.participants.map(({ avatar }) => avatar)')
     expect(shellSource).toContain('data:${content.mimeType};base64,${content.dataBase64}')

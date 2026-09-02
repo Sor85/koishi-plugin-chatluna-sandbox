@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildWorkspaceThumbnailModels } from '../client/webqq/workspace-thumbnail-model'
+import { buildWorkspaceThumbnailModels } from '../client/test-space/thumbnail-model'
 import type { SandboxAppearance, SandboxSnapshot } from '../src/types'
 
 const appearance: SandboxAppearance = {

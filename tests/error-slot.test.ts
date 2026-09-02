@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createErrorSlot } from '../client/webqq/error-slot'
+import { createErrorSlot } from '../client/workspace/error-slot'
 import { deferred } from './helpers/deferred'
 
 describe('错误位', () => {

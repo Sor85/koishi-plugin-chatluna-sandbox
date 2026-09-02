@@ -6,8 +6,8 @@ const clientMocks = vi.hoisted(() => ({
 
 vi.mock('@koishijs/client', () => clientMocks)
 
-import { FakeTestSpacePort } from '../client/webqq/fake-test-space-port'
-import { createKoishiTestSpacePort } from '../client/webqq/koishi-test-space-port'
+import { FakeTestSpacePort } from '../client/test-space/fake-port'
+import { createKoishiTestSpacePort } from '../client/test-space/koishi-port'
 import type { SandboxTestSpaceSummary } from '../src/test-spaces'
 
 function space(overrides: Partial<SandboxTestSpaceSummary> = {}): SandboxTestSpaceSummary {

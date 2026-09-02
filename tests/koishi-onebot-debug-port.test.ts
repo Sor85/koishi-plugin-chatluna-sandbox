@@ -4,7 +4,7 @@ const { send } = vi.hoisted(() => ({ send: vi.fn() }))
 
 vi.mock('@koishijs/client', () => ({ send }))
 
-import { createKoishiOneBotDebugPort } from '../client/webqq/koishi-onebot-debug-port'
+import { createKoishiOneBotDebugPort } from '../client/onebot-debug/koishi-port'
 
 describe('Koishi OneBot 调试记录端口', () => {
   /**

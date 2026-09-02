@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createFakeWorkspacePort } from '../client/webqq/fake-workspace-port'
-import { createSceneMutationSync } from '../client/webqq/scene-sync'
+import { createFakeWorkspacePort } from '../client/workspace/fake-port'
+import { createSceneMutationSync } from '../client/workspace/scene-sync'
 import type { SandboxWorkspaceState } from '../src/types'
 
 const workspace: SandboxWorkspaceState = {

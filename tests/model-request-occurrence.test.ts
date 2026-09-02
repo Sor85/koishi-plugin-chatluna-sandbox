@@ -4,8 +4,8 @@ import {
   modelRequestOccurrenceTargetId,
   renderModelRequestOccurrence,
   resolveModelRequestOccurrence,
-} from '../client/webqq/model-request-occurrence'
-import { parseModelRequestConversationDetail } from '../client/webqq/model-request-conversation'
+} from '../client/model-request/occurrence'
+import { parseModelRequestConversationDetail } from '../client/model-request/conversation'
 import type { SandboxModelRequestDetail } from '../src/types'
 
 function detail(content: string): SandboxModelRequestDetail {

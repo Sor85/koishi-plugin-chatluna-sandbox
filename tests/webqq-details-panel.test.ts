@@ -4,8 +4,8 @@ import { describe, expect, it } from 'vitest'
 
 describe('WebQQ 右侧信息栏', () => {
   it('持有公告与成员界面状态并通过事件提交命令', () => {
-    const source = readFileSync(resolve('client/webqq-details-panel.vue'), 'utf8')
-    const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
+    const source = readFileSync(resolve('client/webqq/details-panel.vue'), 'utf8')
+    const pageSource = readFileSync(resolve('client/workspace/page.vue'), 'utf8')
 
     expect(source).toContain('model: WebqqDetailsPanelModel')
     expect(source).toContain('persistence: SandboxPersistenceStatus')

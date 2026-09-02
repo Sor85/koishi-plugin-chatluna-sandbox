@@ -7,7 +7,7 @@ import {
   MODEL_REQUEST_REFRESH_LIMIT_MAX,
   resolveModelRequestRefreshLimit,
   shouldPollModelRequests,
-} from '../client/webqq/model-request-live-refresh'
+} from '../client/model-request/live-refresh'
 
 describe('模型请求自动刷新策略', () => {
   it('列表或详情里有进行中请求就算有进行中请求', () => {

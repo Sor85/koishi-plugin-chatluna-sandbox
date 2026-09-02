@@ -7,7 +7,7 @@ const readSource = (path: string) => readFileSync(resolve(path), 'utf8')
 
 describe('WebQQ 消息列表', () => {
   it('消息行按方向、分簇与呈现状态挂类名', () => {
-    const source = readSource('client/webqq-message-list.vue')
+    const source = readSource('client/webqq/message-list.vue')
 
     /**
      * 类别：DOM 结构与元素顺序（ADR 0073 五类判据第 3 类，全留）。
@@ -23,7 +23,7 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('多选态的入口、勾选标记与右键禁用', () => {
-    const source = readSource('client/webqq-message-list.vue')
+    const source = readSource('client/webqq/message-list.vue')
 
     /**
      * 类别：实现细节契约（肯定式）。
@@ -36,9 +36,9 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('滚动追踪、位置恢复与加载更早历史的接线', () => {
-    const source = readSource('client/webqq-message-list.vue')
+    const source = readSource('client/webqq/message-list.vue')
     const styles = readSource('client/styles/webqq-messages.css')
-    const scrollbarSource = readSource('client/webqq-scrollbar.ts')
+    const scrollbarSource = readSource('client/shared/scrollbar.ts')
 
     /**
      * 类别：实现细节契约（肯定式）。
@@ -53,11 +53,11 @@ describe('WebQQ 消息列表', () => {
      */
     expect(source).toContain('ref="messagesElement"')
     expect(source).toContain('@scroll="handleMessagesScroll"')
-    expect(source).toContain("from '#client/webqq/message-list-scroll'")
-    expect(source).toContain("from '#client/webqq/message-reveal'")
-    expect(source).toContain("from '#client/webqq/message-list-scroll-restore'")
-    expect(source).toContain("from '#client/webqq/message-list-conversation-switch'")
-    expect(source).toContain("from '#client/webqq/message-list-history-load'")
+    expect(source).toContain("from './message-list-scroll'")
+    expect(source).toContain("from './message-reveal'")
+    expect(source).toContain("from './message-list-scroll-restore'")
+    expect(source).toContain("from './message-list-conversation-switch'")
+    expect(source).toContain("from './message-list-history-load'")
     expect(source).toContain('function revealMessage(messageId: string)')
     expect(source).toContain('defineExpose({')
     expect(source).toContain('createMessageListFollowController')
@@ -69,11 +69,11 @@ describe('WebQQ 消息列表', () => {
     expect(source).toContain('contentResize.disconnect()')
     expect(source).toContain('watch(scrollStateKey')
     expect(source).toContain('saveMessageListScrollState()')
-    expect(source).toContain("from '#client/webqq/message-list-scroll-state'")
+    expect(source).toContain("from './message-list-scroll-state'")
     expect(source).toContain('@wheel.passive="handleMessageListUserScroll"')
     expect(source).toContain('@touchstart.passive="handleMessageListUserScroll"')
     expect(source).toContain('@pointerdown="finishMessageListScrollRestore"')
-    expect(source).toContain("from '#client/webqq/message-list-follow'")
+    expect(source).toContain("from './message-list-follow'")
 
     // 类别：样式文本（ADR 0073 第一类例外）。浏览器的滚动锚定会和自定义恢复算术打架。
     expect(styles).toContain('overflow-anchor: none')
@@ -91,13 +91,13 @@ describe('WebQQ 消息列表', () => {
      * 类别：实现细节契约（肯定式）。
      * 依据：这三处的行为由各自组件的候选负责，不在本轮范围内。
      */
-    expect(readSource('client/webqq-emoji-picker.vue')).toContain("v-webqq-scrollbar=\"{ showOverlay: false, tone: 'accent', zIndex: 140 }\"")
-    expect(readSource('client/webqq-forward-modal.vue')).toContain('v-webqq-scrollbar="{ showOverlay: false }"')
-    expect(readSource('client/webqq-forward-target-dialog.vue')).toContain("v-webqq-scrollbar=\"{ showOverlay: false, tone: 'accent' }\"")
+    expect(readSource('client/webqq/emoji-picker.vue')).toContain("v-webqq-scrollbar=\"{ showOverlay: false, tone: 'accent', zIndex: 140 }\"")
+    expect(readSource('client/webqq/forward-modal.vue')).toContain('v-webqq-scrollbar="{ showOverlay: false }"')
+    expect(readSource('client/webqq/forward-target-dialog.vue')).toContain("v-webqq-scrollbar=\"{ showOverlay: false, tone: 'accent' }\"")
   })
 
   it('空会话显示欢迎页，机器人会话多一段状态说明', () => {
-    const source = readSource('client/webqq-message-list.vue')
+    const source = readSource('client/webqq/message-list.vue')
 
     // 类别：DOM 结构与元素顺序。这些类名与 webqq-messages.css 的欢迎页规则构成结构契约。
     expect(source).toContain('class="webqq-welcome"')
@@ -115,7 +115,7 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('消息操作菜单只能由气泡本身触发', () => {
-    const source = readSource('client/webqq-message-list.vue')
+    const source = readSource('client/webqq/message-list.vue')
 
     /**
      * 类别：DOM 结构与元素顺序。
@@ -130,8 +130,8 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('清空会话与跳转到对应请求的入口', () => {
-    const source = readSource('client/webqq-message-list.vue')
-    const chatPaneSource = readSource('client/webqq-chat-pane.vue')
+    const source = readSource('client/webqq/message-list.vue')
+    const chatPaneSource = readSource('client/webqq/chat-pane.vue')
 
     // 类别：用户可见文案。
     expectUserFacingCopy(source, '清空会话记录')
@@ -152,7 +152,7 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('聊天区域装配消息列表与合并转发弹窗，自己不画消息容器', () => {
-    const chatPaneSource = readSource('client/webqq-chat-pane.vue')
+    const chatPaneSource = readSource('client/webqq/chat-pane.vue')
 
     // 类别：DOM 结构与元素顺序。消息容器只能有一处，否则会出现两层滚动区。
     expect(chatPaneSource).toContain('<WebqqMessageList')
@@ -162,9 +162,9 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('合并转发卡片 1:1 复刻 quote/forward 尺寸与入口文案', () => {
-    const source = readSource('client/webqq-message-list.vue')
+    const source = readSource('client/webqq/message-list.vue')
     const styles = readSource('client/styles/webqq-messages.css')
-    const modalSource = readSource('client/webqq-forward-modal.vue')
+    const modalSource = readSource('client/webqq/forward-modal.vue')
     const overlays = readSource('client/styles/webqq-overlays.css')
 
     /**
@@ -226,7 +226,7 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('按机器人参与者和逻辑会话渲染 ChatLuna 等待态', () => {
-    const source = readSource('client/webqq-message-list.vue')
+    const source = readSource('client/webqq/message-list.vue')
     const styles = readSource('client/styles/webqq-messages.css')
 
     expect(source).toContain('chatLunaStates: SandboxChatLunaState[]')
@@ -236,7 +236,7 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('思考指标 1:1 复用 onebot-webqq 的结构与交互', () => {
-    const source = readSource('client/webqq-message-list.vue')
+    const source = readSource('client/webqq/message-list.vue')
     const styles = readSource('client/styles/webqq-messages.css')
 
     /**
@@ -270,7 +270,7 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('机器人在左侧时 Token 镜像到右侧但箭头仍紧跟思考时长', () => {
-    const source = readSource('client/webqq-message-list.vue')
+    const source = readSource('client/webqq/message-list.vue')
     const styles = readSource('client/styles/webqq-messages.css')
     const readRule = (selector: string) => styles.slice(styles.indexOf(`\n${selector} {`) + 1).split('}')[0]
 
@@ -291,7 +291,7 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('固定 TIM 并显示消息时间与群身份', () => {
-    const source = readSource('client/webqq-message-list.vue')
+    const source = readSource('client/webqq/message-list.vue')
     const styles = readSource('client/styles/webqq-messages.css')
 
     /**
@@ -323,12 +323,12 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('专属头衔复用群身份徽标位置并提供设置入口', () => {
-    const source = readSource('client/webqq-message-list.vue')
+    const source = readSource('client/webqq/message-list.vue')
     const styles = readSource('client/styles/webqq-messages.css')
-    const menuSource = readSource('client/group-member-menu.vue')
-    const detailsSource = readSource('client/webqq-details-panel.vue')
-    const overlaySource = readSource('client/workspace-overlay-host.vue')
-    const pageSource = readSource('client/page.vue')
+    const menuSource = readSource('client/webqq/group-member-menu.vue')
+    const detailsSource = readSource('client/webqq/details-panel.vue')
+    const overlaySource = readSource('client/workspace/overlay-host.vue')
+    const pageSource = readSource('client/workspace/page.vue')
 
     /**
      * 类别：DOM 结构与元素顺序。头衔沿用同一个徽标槽位，不新增第二个徽标元素。
@@ -347,9 +347,9 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('撤回消息按 markRecalledMessages 在原气泡与事件之间切换', () => {
-    const source = readSource('client/webqq-message-list.vue')
+    const source = readSource('client/webqq/message-list.vue')
     const styles = readSource('client/styles/webqq-messages.css')
-    const shellSource = readSource('client/webqq/workspace-shell.ts')
+    const shellSource = readSource('client/workspace/shell.ts')
 
     /**
      * 类别：DOM 结构与元素顺序。
@@ -381,12 +381,12 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('私聊与群聊展示表情回应，并在聊天区打开二级选择页', () => {
-    const source = readSource('client/webqq-message-list.vue')
-    const reactionsSource = readSource('client/webqq-message-reactions.vue')
-    const pickerSource = readSource('client/webqq-emoji-picker.vue')
+    const source = readSource('client/webqq/message-list.vue')
+    const reactionsSource = readSource('client/webqq/message-reactions.vue')
+    const pickerSource = readSource('client/webqq/emoji-picker.vue')
     const styles = readSource('client/styles/webqq-messages.css')
-    const chatPaneSource = readSource('client/webqq-chat-pane.vue')
-    const pageSource = readSource('client/page.vue')
+    const chatPaneSource = readSource('client/webqq/chat-pane.vue')
+    const pageSource = readSource('client/workspace/page.vue')
 
     // 类别：DOM 结构与元素顺序。
     expect(source).toContain('<WebqqMessageReactions')
@@ -437,7 +437,7 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('继承前缀与其余四类判定都改读投影给出的能力位', () => {
-    const source = readSource('client/webqq-message-list.vue')
+    const source = readSource('client/webqq/message-list.vue')
 
     // 判定本身住在 src/message-capabilities 并由它的测试逐条执行；能力位接线由 messageList
     // 投影的行为断言守（webqq-message-capabilities.test.ts），三个写入入口各自读到自己那一位
@@ -450,7 +450,7 @@ describe('WebQQ 消息列表', () => {
   })
 
   it('分支在继承前缀与自有消息之间显示分界，继承部分整段弱化', () => {
-    const source = readSource('client/webqq-message-list.vue')
+    const source = readSource('client/webqq/message-list.vue')
     const styles = readSource('client/styles/webqq-messages.css')
 
     // 分界位置与整段弱化的判定由 fork-boundary 模块的测试逐条执行；这里守的是用户可见文案与

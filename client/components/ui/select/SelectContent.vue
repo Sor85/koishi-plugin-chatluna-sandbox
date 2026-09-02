@@ -9,7 +9,7 @@ import {
   useForwardPropsEmits,
 } from "reka-ui"
 import { cn } from "#client/lib/utils"
-import { vWebqqScrollbar } from "#client/webqq-scrollbar"
+import { vWebqqScrollbar } from "#client/shared/scrollbar"
 import { SelectScrollDownButton, SelectScrollUpButton } from "."
 
 defineOptions({

@@ -59,8 +59,8 @@ describe('群成员右键菜单权限', () => {
   })
 
   it('群成员菜单只在转让群主后显示紧凑扩展标记', () => {
-    const menuSource = readFileSync(resolve('client/group-member-menu.vue'), 'utf8')
-    const markSource = readFileSync(resolve('client/webqq-menu-extension-mark.vue'), 'utf8')
+    const menuSource = readFileSync(resolve('client/webqq/group-member-menu.vue'), 'utf8')
+    const markSource = readFileSync(resolve('client/webqq/menu-extension-mark.vue'), 'utf8')
     const transferBlock = menuSource.slice(
       menuSource.indexOf("actions.includes('transfer-owner')"),
       menuSource.indexOf("actions.includes('kick')"),
@@ -68,10 +68,10 @@ describe('群成员右键菜单权限', () => {
     const unmarkedLabels = ['@ 用户', '戳一戳', '修改群名片', '设置专属头衔', '设为管理员', '取消管理员', '踢出群组']
 
     expect(transferBlock).toContain('<WebqqMenuExtensionMark')
-    expect(menuSource).toContain("from './webqq-menu-extension-mark.vue'")
+    expect(menuSource).toContain("from './menu-extension-mark.vue'")
     expect(markSource).toContain('沙盒扩展')
     expect(markSource).toContain('SANDBOX_EXTENSION_DESCRIPTION')
-    expect(markSource).toContain("from '#client/webqq/sandbox-extension'")
+    expect(markSource).toContain("from './sandbox-extension'")
     expect(markSource).toContain("import { Badge } from '#client/components/ui/badge'")
     expect(markSource).toContain('variant="secondary"')
     expect(markSource).toContain('class="webqq-menu-extension-mark ml-auto shrink-0"')

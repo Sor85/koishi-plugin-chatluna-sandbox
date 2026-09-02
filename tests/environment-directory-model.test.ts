@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildEnvironmentDirectoryModel,
   buildSandboxBotDirectory,
-} from '../client/webqq/environment-directory-model'
+} from '../client/environment/directory-model'
 import type { SandboxSnapshot } from '../src/types'
 
 function snapshot(overrides: Partial<SandboxSnapshot> = {}): SandboxSnapshot {

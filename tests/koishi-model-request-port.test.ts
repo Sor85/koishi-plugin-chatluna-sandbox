@@ -4,7 +4,7 @@ const { send } = vi.hoisted(() => ({ send: vi.fn() }))
 
 vi.mock('@koishijs/client', () => ({ send }))
 
-import { createKoishiModelRequestPort } from '../client/webqq/koishi-model-request-port'
+import { createKoishiModelRequestPort } from '../client/model-request/koishi-port'
 
 describe('Koishi 模型请求端口', () => {
   /** 这道端口的工厂根本不收「解析当前空间标识」的函数，分类只能由调用方显式给出。 */

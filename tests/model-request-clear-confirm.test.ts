@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createModelRequestClearConfirm } from '../client/webqq/model-request-clear-confirm'
+import { createModelRequestClearConfirm } from '../client/model-request/clear-confirm'
 
 function harness() {
   let cleared = 0

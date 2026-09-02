@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { FakeMcpAdminPort } from '../client/webqq/fake-mcp-admin-port'
-import { createMcpActivitySync } from '../client/webqq/mcp-activity-sync'
+import { FakeMcpAdminPort } from '../client/mcp/fake-port'
+import { createMcpActivitySync } from '../client/mcp/activity-sync'
 
 describe('MCP 活动实时同步', () => {
   it('每个页面各自持有一份指示灯，一个页面退订不影响仍存活的页面', () => {

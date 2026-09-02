@@ -22,8 +22,8 @@ const TEST_COMPOSER_ID = Symbol('composer')
 
 describe('WebQQ 发送控件', () => {
   it('以只读模型和领域事件隔离页面状态', () => {
-    const composerSource = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
-    const chatPaneSource = readFileSync(resolve('client/webqq-chat-pane.vue'), 'utf8')
+    const composerSource = readFileSync(resolve('client/webqq/composer.vue'), 'utf8')
+    const chatPaneSource = readFileSync(resolve('client/webqq/chat-pane.vue'), 'utf8')
 
     expect(composerSource).toContain('model: WebqqComposerModel')
     expect(composerSource).toContain('send: [input: WebqqComposerSendIntent')
@@ -42,10 +42,10 @@ describe('WebQQ 发送控件', () => {
    * 少接这一根线的表现是输入框完全不响应输入。
    */
   it('草稿、候选菜单与按键分流都接在草稿宿主上', () => {
-    const source = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
+    const source = readFileSync(resolve('client/webqq/composer.vue'), 'utf8')
 
     expect(source).toContain('createComposerDraftHost')
-    expect(source).toContain('from \'#client/webqq/composer-draft-host\'')
+    expect(source).toContain('from \'./composer-draft-host\'')
     expect(source).toContain('draftHost.routeKey({')
     // 否定式守卫：按键分流与菜单开合的判定不得回到组件里。
     expect(source).not.toContain("event.key === 'ArrowDown'")
@@ -151,13 +151,13 @@ describe('WebQQ 发送控件', () => {
    * 还给切换之后的输入框；漏掉实例令牌失效，卸载后的旧请求会去 focus 一个已经脱离文档的节点。
    */
   it('附件采集与发送编排接在各自模块上，焦点判定仍走既有模块', () => {
-    const source = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
+    const source = readFileSync(resolve('client/webqq/composer.vue'), 'utf8')
 
     expect(source).toContain('ref="inputRef"')
     expect(source).toContain('createComposerAttachments<File>')
     expect(source).toContain('createComposerSendController')
     expect(source).toContain('shouldRestoreComposerFocus')
-    expect(source).toContain('from \'#client/webqq/composer-focus\'')
+    expect(source).toContain('from \'./composer-focus\'')
     expect(source).toContain('const composerInstanceId = Symbol(\'webqq-composer\')')
     expect(source).toContain('activeComposerInstanceId = undefined')
     expect(source).toContain('inputElement: requestInput')
@@ -172,7 +172,7 @@ describe('WebQQ 发送控件', () => {
    */
   it('回复上下文与附件共用一个可换行的浮动包络', () => {
     const css = readFileSync(resolve('client/styles/webqq-composer.css'), 'utf8')
-    const source = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
+    const source = readFileSync(resolve('client/webqq/composer.vue'), 'utf8')
     const contextRule = css.slice(css.indexOf('.webqq-composer-context {'), css.indexOf('.webqq-composer-reply {'))
     const contextIndex = source.indexOf('class="webqq-composer-context"')
     const replyIndex = source.indexOf('class="webqq-composer-reply"', contextIndex)
@@ -197,7 +197,7 @@ describe('WebQQ 发送控件', () => {
 
   it('回复上下文固定在最左，正文单行省略而清除按钮不被压缩', () => {
     const css = readFileSync(resolve('client/styles/webqq-composer.css'), 'utf8')
-    const source = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
+    const source = readFileSync(resolve('client/webqq/composer.vue'), 'utf8')
     const replyRule = css.slice(css.indexOf('.webqq-composer-reply {'), css.indexOf('.webqq-composer-reply span'))
     const replyTextRule = css.slice(css.indexOf('.webqq-composer-reply span {'), css.indexOf('.webqq-composer-reply button {'))
     const replyButtonRule = css.slice(css.indexOf('.webqq-composer-reply button {'), css.indexOf('.webqq-composer-reply button:hover'))
@@ -213,7 +213,7 @@ describe('WebQQ 发送控件', () => {
 
   it('提及是输入区内联 token，不再是独立的附件行', () => {
     const css = readFileSync(resolve('client/styles/webqq-composer.css'), 'utf8')
-    const source = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
+    const source = readFileSync(resolve('client/webqq/composer.vue'), 'utf8')
 
     expect(source).toContain('chatluna-sandbox-composer-mention')
     expect(css).toContain('.chatluna-sandbox-composer-mention')
@@ -228,7 +228,7 @@ describe('WebQQ 发送控件', () => {
 
   it('深色发送者添加按钮保留中性灰底，并用主题色显示虚线与加号', () => {
     const css = readFileSync(resolve('client/styles/webqq-composer.css'), 'utf8')
-    const source = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
+    const source = readFileSync(resolve('client/webqq/composer.vue'), 'utf8')
     const darkAddRule = css
       .slice(css.indexOf('.webqq-workspace[data-color-mode="dark"] .webqq-composer-user-add {'))
       .split('}')[0]
@@ -243,7 +243,7 @@ describe('WebQQ 发送控件', () => {
 
   it('禁用的输入框、附件和发送按钮不改变鼠标样式，但保留 disabled 与透明度', () => {
     const css = readFileSync(resolve('client/styles/webqq-composer.css'), 'utf8')
-    const source = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
+    const source = readFileSync(resolve('client/webqq/composer.vue'), 'utf8')
 
     expect(css).not.toContain('cursor:')
     expect(css).toMatch(/\.webqq-composer-action:disabled\s*\{[^}]*opacity:\s*0\.45/)

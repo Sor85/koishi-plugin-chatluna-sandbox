@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { createErrorSlot } from '../client/webqq/error-slot'
-import { createRegionReadGate } from '../client/webqq/region-read-gate'
+import { createErrorSlot } from '../client/workspace/error-slot'
+import { createRegionReadGate } from '../client/workspace/region-read-gate'
 import { deferred } from './helpers/deferred'
 
 function createGate<Channel extends string>(...channels: Channel[]) {

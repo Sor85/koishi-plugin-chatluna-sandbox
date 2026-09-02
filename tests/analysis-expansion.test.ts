@@ -1,7 +1,7 @@
 import { watch, type Ref } from 'vue'
 import { describe, expect, it } from 'vitest'
-import { createAnalysisExpansion } from '../client/webqq/analysis-expansion'
-import { MODEL_ANALYSIS_RESPONSE_TARGET, modelAnalysisTargetId } from '../client/webqq/model-request-analysis'
+import { createAnalysisExpansion } from '../client/model-request/analysis-expansion'
+import { MODEL_ANALYSIS_RESPONSE_TARGET, modelAnalysisTargetId } from '../client/model-request/analysis'
 
 const SYSTEM_TARGET = modelAnalysisTargetId('req:message:messages.0')
 const USER_TARGET = modelAnalysisTargetId('req:message:messages.1')

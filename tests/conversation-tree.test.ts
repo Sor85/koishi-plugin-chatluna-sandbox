@@ -6,10 +6,10 @@ import {
   buildConversationTree,
   toRecentForwardTargets,
 } from '../client/webqq/conversation-tree'
-import { createFakeWorkspacePort } from '../client/webqq/fake-workspace-port'
+import { createFakeWorkspacePort } from '../client/workspace/fake-port'
 import { createTestWorkspaceController } from './helpers/workspace-controller'
-import { createWorkspaceLayout } from '../client/webqq/workspace-layout'
-import { createWebqqWorkspaceShell } from '../client/webqq/workspace-shell'
+import { createWorkspaceLayout } from '../client/workspace/layout'
+import { createWebqqWorkspaceShell } from '../client/workspace/shell'
 import { listVisibleConversations } from '../src/conversation-resolution'
 import type { SandboxSnapshot, SandboxWorkspaceState } from '../src/types'
 
@@ -361,7 +361,7 @@ describe('会话树投影只有一份实现', () => {
 
   // 否定式的「已删除实现」守卫（ADR-0073）：投影或它的任一口径搬回工作台外壳时这里变红。
   it('工作台外壳里不再有会话树投影的实现', () => {
-    const shell = readFileSync(resolve('client/webqq/workspace-shell.ts'), 'utf8')
+    const shell = readFileSync(resolve('client/workspace/shell.ts'), 'utf8')
 
     expect(shell).not.toContain('toSidebarConversation')
     expect(shell).not.toContain('开始一段新对话')

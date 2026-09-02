@@ -4,17 +4,17 @@ import { describe, expect, it } from 'vitest'
 
 describe('WebQQ 顶部导航与会话栏', () => {
   it('只在 WebQQ 视图输出会话侧栏，顶部导航不显示悬停提示', () => {
-    const source = readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
-    const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
+    const source = readFileSync(resolve('client/webqq/sidebar.vue'), 'utf8')
+    const pageSource = readFileSync(resolve('client/workspace/page.vue'), 'utf8')
 
-    const notificationSource = readFileSync(resolve('client/notification-menu.vue'), 'utf8')
+    const notificationSource = readFileSync(resolve('client/webqq/notification-menu.vue'), 'utf8')
     const sidebarStyles = readFileSync(resolve('client/styles/webqq-sidebar.css'), 'utf8')
 
     expect(source).toContain('<nav class="webqq-rail webqq-overlay-header"')
     expect(source).toContain('<div class="webqq-brand" aria-label="ChatLuna Sandbox">')
     expect(source).toContain('<SandboxActivityIcon />')
     expect(source).toContain('<strong>ChatLuna Sandbox</strong>')
-    expect(source).toContain("import SandboxActivityIcon from './sandbox-activity-icon.vue'")
+    expect(source).toContain("import SandboxActivityIcon from '#client/shared/sandbox-activity-icon.vue'")
     expect(source).toContain('<span v-if="item.id !== \'spaces\'" class="webqq-rail-label">{{ item.label }}</span>')
     expect(sidebarStyles).not.toMatch(/\.webqq-brand\s*\{[^}]*border-right:/s)
     expect(sidebarStyles).toMatch(/\.webqq-brand-logo\s*\{[^}]*color:\s*var\(--webqq-accent\)/s)
@@ -61,13 +61,13 @@ describe('WebQQ 顶部导航与会话栏', () => {
     expect(source).toContain("'is-rail-pin-end': item.id === 'spaces'")
     expect(source).toContain("'is-mcp-running': item.id === 'spaces' && spacesBusy")
     expect(source).toContain('<SandboxAgentControlIcon v-if="item.id === \'spaces\'" :running="spacesBusy" />')
-    expect(source).toContain("import SandboxAgentControlIcon from './sandbox-agent-control-icon.vue'")
+    expect(source).toContain("import SandboxAgentControlIcon from '#client/shared/sandbox-agent-control-icon.vue'")
     expect(source).not.toContain('IconLayoutGrid')
     expect(source).toContain('spacesBusy = computed(() => !!props.mcpRunning && !preview.value)')
     expect(pageSource).toContain(':mcp-running="mcpRunning"')
     expect(pageSource).toContain('createMcpActivitySync')
     expect(readFileSync(resolve('client/index.ts'), 'utf8')).toContain('installContextMcpActivityReceiver')
-    expect(readFileSync(resolve('client/webqq/koishi-mcp-admin-port.ts'), 'utf8')).toContain("receive('chatluna-sandbox/mcp-activity'")
+    expect(readFileSync(resolve('client/mcp/koishi-port.ts'), 'utf8')).toContain("receive('chatluna-sandbox/mcp-activity'")
     expect(sidebarStyles).toMatch(/\.webqq-rail-button\.is-rail-pin-end\s*\{[^}]*margin-left:\s*auto/s)
     expect(sidebarStyles).toContain('.webqq-rail-button.is-mcp-running')
     expect(sidebarStyles).not.toContain('@keyframes webqq-rail-mcp-glow')
@@ -118,7 +118,7 @@ describe('会话树的信息密度与展开控件', () => {
    * 重构时变红。展开按钮随实例存在与否出现、页签切换后会话树消失，都由票 08 的浏览器实测逐项
    * 执行验证（Chrome 与 Firefox 各一轮）。
    */
-  const sidebarSource = () => readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
+  const sidebarSource = () => readFileSync(resolve('client/webqq/sidebar.vue'), 'utf8')
   const sidebarStyles = () => readFileSync(resolve('client/styles/webqq-sidebar.css'), 'utf8')
 
   it('展开态与那条自动展开规则不再住在组件里', () => {
@@ -188,8 +188,8 @@ describe('会话树的改名与删除入口', () => {
   // 断言：用户可见文案，以及否定式的「已删除实现」守卫。改名与删除的行为本身由
   // tests/webqq-conversation-tree.test.ts 在工作台外壳的 interface 上逐个执行验证。
   it('实例子项的重命名与删除文案不被误删', () => {
-    const source = readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
-    const overlaySource = readFileSync(resolve('client/workspace-overlay-host.vue'), 'utf8')
+    const source = readFileSync(resolve('client/webqq/sidebar.vue'), 'utf8')
+    const overlaySource = readFileSync(resolve('client/workspace/overlay-host.vue'), 'utf8')
 
     expect(source).toContain('重命名会话')
     expect(source).toContain('删除会话')
@@ -198,8 +198,8 @@ describe('会话树的改名与删除入口', () => {
   })
 
   it('根会话行不再提供删除入口，客户端最近会话隐藏标记也不会被加回来', () => {
-    const source = readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
-    const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
+    const source = readFileSync(resolve('client/webqq/sidebar.vue'), 'utf8')
+    const pageSource = readFileSync(resolve('client/workspace/page.vue'), 'utf8')
     // 根会话的右键菜单是唯一带「创建新会话」菜单项的那个 ContextMenuContent。
     const menus = [...source.matchAll(/<ContextMenuContent[\s\S]*?<\/ContextMenuContent>/g)].map(([menu]) => menu)
     const rootMenus = menus.filter((menu) => menu.includes('创建新会话'))
@@ -210,7 +210,7 @@ describe('会话树的改名与删除入口', () => {
     // 「最近会话隐藏标记」是本票删掉的假按钮，重新加回来时这三条守卫会变红。
     expect(source).not.toContain('removeRecentConversation')
     expect(pageSource).not.toContain('removeRecentConversation')
-    for (const file of ['client/webqq/workspace-controller.ts', 'client/webqq/workspace-state.ts']) {
+    for (const file of ['client/workspace/controller.ts', 'client/workspace/state.ts']) {
       expect(readFileSync(resolve(file), 'utf8'), file).not.toContain('hiddenRecentConversations')
     }
   })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { createPresetDirtyGuard } from '../client/webqq/preset-dirty-guard'
-import { codeMirrorOffset, resolvePresetSourceExpressions } from '../client/webqq/preset-source-expressions'
+import { createPresetDirtyGuard } from '../client/preset/dirty-guard'
+import { codeMirrorOffset, resolvePresetSourceExpressions } from '../client/preset/source-expressions'
 import { expressionStableId, parsePresetSourceDocument } from '../src/presets'
 
 describe('预设客户端 UX 纯 seam', () => {

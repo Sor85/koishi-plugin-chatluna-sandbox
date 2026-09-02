@@ -4,8 +4,8 @@ import {
   createModelRequestJsonRow,
   formatModelRequestJsonImageSize,
   JSON_ROW_DRAG_THRESHOLD_PX,
-} from '../client/webqq/model-request-json-row'
-import type { ModelRequestJsonValueKind } from '../client/webqq/model-request-json'
+} from '../client/model-request/json-row'
+import type { ModelRequestJsonValueKind } from '../client/model-request/json'
 
 function harness(overrides: {
   value?: unknown

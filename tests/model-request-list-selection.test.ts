@@ -6,7 +6,7 @@ import {
   restoreModelRequestListSelection,
   selectModelRequestListRecord,
   type ModelRequestListSelectionState,
-} from '../client/webqq/model-request-list-selection'
+} from '../client/model-request/list-selection'
 import type {
   SandboxModelRequestDetail,
   SandboxModelRequestListItem,

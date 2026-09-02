@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createScrollRestore } from '../client/webqq/scroll-restore'
+import { createScrollRestore } from '../client/shared/scroll-restore'
 
 function createHarness(initial = { scrollTop: 0, maxScrollTop: 0 }) {
   const box = { ...initial }

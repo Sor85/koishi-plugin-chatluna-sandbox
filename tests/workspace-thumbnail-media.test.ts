@@ -6,7 +6,7 @@ import {
   mediaSourcesFromCache,
   resolveThumbnailAvatar,
   thumbnailMediaCacheKey,
-} from '../client/webqq/workspace-thumbnail-media'
+} from '../client/test-space/thumbnail-media'
 
 const mediaId = 'a'.repeat(32)
 

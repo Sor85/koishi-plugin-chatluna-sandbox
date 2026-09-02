@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { FakeWorkspacePort } from '../client/webqq/fake-workspace-port'
-import { createWorkspaceThumbnailProjection } from '../client/webqq/workspace-thumbnail-projection'
+import { FakeWorkspacePort } from '../client/workspace/fake-port'
+import { createWorkspaceThumbnailProjection } from '../client/test-space/thumbnail-projection'
 import type { SandboxAppearance, SandboxSnapshot, SandboxWorkspaceState } from '../src/types'
 
 const appearance = {

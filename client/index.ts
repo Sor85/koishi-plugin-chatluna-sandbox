@@ -1,8 +1,8 @@
 import { Context, icons } from '@koishijs/client'
-import Page from './page.vue'
-import SandboxActivityIcon from './sandbox-activity-icon.vue'
-import { installContextMcpActivityReceiver } from '#client/webqq/koishi-mcp-admin-port'
-import { installContextSceneMutationReceiver } from '#client/webqq/koishi-workspace-port'
+import Page from '#client/workspace/page.vue'
+import SandboxActivityIcon from '#client/shared/sandbox-activity-icon.vue'
+import { installContextMcpActivityReceiver } from '#client/mcp/koishi-port'
+import { installContextSceneMutationReceiver } from '#client/workspace/koishi-port'
 import './style.css'
 
 // 控制台内置图标表里没有 'chat'，必须注册自定义图标，否则侧边栏入口显示为空白。

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createModelRequestDetailView,
   modelRequestHeadersToggleLabel,
-} from '../client/webqq/model-request-detail-view'
+} from '../client/model-request/detail-view'
 
 describe('模型请求详情页签与轨迹模式', () => {
   it('默认停在请求页签的分析卡片，轨迹模式为单请求', () => {

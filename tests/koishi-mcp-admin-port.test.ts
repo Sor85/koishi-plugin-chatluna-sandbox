@@ -7,7 +7,7 @@ const clientMocks = vi.hoisted(() => ({
 
 vi.mock('@koishijs/client', () => clientMocks)
 
-import { createKoishiMcpAdminPort, installContextMcpActivityReceiver } from '../client/webqq/koishi-mcp-admin-port'
+import { createKoishiMcpAdminPort, installContextMcpActivityReceiver } from '../client/mcp/koishi-port'
 
 type ActivityListener = (payload: { running: boolean }) => void
 

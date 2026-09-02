@@ -1,12 +1,12 @@
-import { createFakeTestCallRecordPort } from '../../client/webqq/fake-test-call-record-port'
-import { createFakeModelRequestPort } from '../../client/webqq/fake-model-request-port'
-import { createFakeOneBotDebugPort } from '../../client/webqq/fake-onebot-debug-port'
-import { createFakePresetPort } from '../../client/webqq/fake-preset-port'
-import { createFakeWorkspacePort } from '../../client/webqq/fake-workspace-port'
+import { createFakeTestCallRecordPort } from '../../client/test-call/fake-port'
+import { createFakeModelRequestPort } from '../../client/model-request/fake-port'
+import { createFakeOneBotDebugPort } from '../../client/onebot-debug/fake-port'
+import { createFakePresetPort } from '../../client/preset/fake-port'
+import { createFakeWorkspacePort } from '../../client/workspace/fake-port'
 import {
   createWorkspaceController,
   type WorkspaceControllerPorts,
-} from '../../client/webqq/workspace-controller'
+} from '../../client/workspace/controller'
 import type { SandboxWorkspaceState } from '../../src/types'
 
 const emptyWorkspace: SandboxWorkspaceState = {

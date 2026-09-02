@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { SandboxSnapshot, SandboxWorkspaceState } from '../src/types'
-import { createFakeWorkspacePort } from '../client/webqq/fake-workspace-port'
+import { createFakeWorkspacePort } from '../client/workspace/fake-port'
 import { readConversationMessageIds } from '../src/conversation-resolution'
 import { createTestWorkspaceController } from './helpers/workspace-controller'
 

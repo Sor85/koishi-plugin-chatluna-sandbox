@@ -1,0 +1,171 @@
+<template>
+  <Teleport to="body">
+    <div
+      ref="backdropRef"
+      class="chatluna-sandbox-forward-modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="合并转发消息"
+      tabindex="0"
+      @click.self="emit('close')"
+      @keydown.esc="emit('close')"
+    >
+      <div class="chatluna-sandbox-forward-modal" @click.stop>
+        <header class="chatluna-sandbox-forward-modal-header">
+          <button
+            v-if="canNavigateBack"
+            type="button"
+            aria-label="返回上一层合并转发"
+            @click="emit('back')"
+          >
+            <IconChevronLeft :size="18" aria-hidden="true" />
+          </button>
+          <span v-else class="chatluna-sandbox-forward-modal-header-placeholder" aria-hidden="true" />
+          <strong>{{ title || '合并转发' }}</strong>
+          <button type="button" aria-label="关闭合并转发消息" @click="emit('close')">
+            <IconX :size="18" aria-hidden="true" />
+          </button>
+        </header>
+        <div v-webqq-scrollbar="{ showOverlay: false }" class="chatluna-sandbox-forward-modal-body">
+          <article
+            v-for="(item, itemIndex) in items"
+            :key="`forward:${itemIndex}`"
+            class="chatluna-sandbox-message-row is-incoming"
+            :class="[getForwardNodeClusterClass(items, itemIndex), { 'is-merged': isMergedForwardNode(items, itemIndex) }]"
+          >
+            <!-- TIM 合并项依赖 wrapper 保留头像占位并隐藏重复头像，弹窗需和普通消息保持同一结构。 -->
+            <span class="chatluna-sandbox-message-avatar-wrap">
+              <WebqqAvatar
+                class="chatluna-sandbox-message-avatar"
+                :kind="isBotParticipant(item.userId) ? 'bot' : 'user'"
+                :name="item.nickname"
+                :avatar="getParticipantAvatar(item.userId)"
+              />
+            </span>
+            <div class="chatluna-sandbox-message-content">
+              <div v-if="!isMergedForwardNode(items, itemIndex)" class="chatluna-sandbox-sender-line">
+                <span class="chatluna-sandbox-message-author">{{ item.nickname }}</span>
+              </div>
+              <div class="chatluna-sandbox-message-body">
+                <div class="chatluna-sandbox-message-stack">
+                  <div class="chatluna-sandbox-message-bubble">
+                    <button
+                      v-if="item.forwardId"
+                      class="chatluna-sandbox-message-quote chatluna-sandbox-message-forward"
+                      type="button"
+                      aria-label="查看合并转发消息"
+                      @click.stop="emit('openForward', item.forwardId)"
+                    >
+                      <strong class="chatluna-sandbox-message-quote-title">{{ getNestedForwardTitle(item) }}</strong>
+                      <template v-if="getNestedForwardLines(item).length">
+                        <span
+                          v-for="(line, lineIndex) in getNestedForwardLines(item)"
+                          :key="`forward:${itemIndex}:line:${lineIndex}`"
+                        >{{ line }}</span>
+                        <span class="chatluna-sandbox-message-forward-entry">查看{{ getNestedForwardTotal(item) }}条转发消息</span>
+                      </template>
+                      <span v-else>{{ item.content || '[合并转发]' }}</span>
+                    </button>
+                    <template v-else>
+                      <div v-for="media in item.media ?? []" :key="media.id" class="chatluna-sandbox-message-media">
+                        <button
+                          v-if="media.type === 'image' && getMediaSource(media.id)"
+                          class="chatluna-sandbox-message-image"
+                          type="button"
+                          aria-label="查看大图"
+                          @click="emit('openImage', getMediaSource(media.id))"
+                        >
+                          <img :src="getMediaSource(media.id)" :alt="media.name">
+                        </button>
+                        <audio v-else-if="media.type === 'audio' && getMediaSource(media.id)" :src="getMediaSource(media.id)" controls preload="metadata" />
+                        <video v-else-if="media.type === 'video' && getMediaSource(media.id)" :src="getMediaSource(media.id)" controls preload="metadata" />
+                        <a v-else-if="media.type === 'file' && getMediaSource(media.id)" :href="getMediaSource(media.id)" :download="media.name" class="chatluna-sandbox-message-file">
+                          <IconPaperclip :size="18" aria-hidden="true" />
+                          <span><strong>{{ media.name }}</strong><small>{{ formatMediaSize(media.size) }}</small></span>
+                        </a>
+                        <span v-else class="chatluna-sandbox-message-media-loading">{{ mediaLoadFailures[media.id] ? '媒体不可用' : '媒体加载中...' }}</span>
+                      </div>
+                      <span v-if="getNodeText(item)" class="chatluna-sandbox-message-text">{{ getNodeText(item) }}</span>
+                      <span v-else-if="!item.media?.length" class="chatluna-sandbox-message-text">[消息]</span>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+          <div v-if="!items.length" class="chatluna-sandbox-forward-modal-empty">暂无消息</div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+</template>
+
+<script setup lang="ts">
+import { IconChevronLeft, IconPaperclip, IconX } from '@tabler/icons-vue'
+import { onMounted, ref } from 'vue'
+import WebqqAvatar from '#client/shared/avatar.vue'
+import { buildForwardPreview } from './forward-preview'
+import { formatMediaSize, getMediaLabel } from './message-presentation'
+import { getForwardNodeClusterClass, isMergedForwardNode } from './forward-cluster'
+import { vWebqqScrollbar } from '#client/shared/scrollbar'
+import type { SandboxForward, SandboxForwardNode } from '../../src/types'
+
+const props = defineProps<{
+  title: string
+  items: SandboxForwardNode[]
+  // 已加载的转发资源，用于嵌套卡片摘要。
+  nestedForwards?: Record<string, SandboxForward>
+  canNavigateBack: boolean
+  participants: Record<string, { name: string; avatar?: string; isBot: boolean }>
+  mediaSources: Record<string, string>
+  mediaLoadFailures: Record<string, true>
+}>()
+
+const emit = defineEmits<{
+  back: []
+  close: []
+  openForward: [forwardId: string]
+  openImage: [url: string]
+}>()
+
+const backdropRef = ref<HTMLDivElement>()
+
+// 打开即聚焦遮罩，保证 ESC 立即可用（与 onebot-webqq 行为一致）。
+onMounted(() => backdropRef.value?.focus())
+
+function getParticipantAvatar(userId: string) {
+  return props.participants[userId]?.avatar
+}
+
+function isBotParticipant(userId: string) {
+  return props.participants[userId]?.isBot ?? false
+}
+
+function getMediaSource(mediaId: string) {
+  return props.mediaSources[mediaId] ?? ''
+}
+
+function getNodeText(item: SandboxForwardNode) {
+  if (item.media?.length === 1 && item.content === `[${getMediaLabel(item.media[0])}] ${item.media[0].name}`) return ''
+  return item.content
+}
+
+function getNestedForward(item: SandboxForwardNode) {
+  return item.forwardId ? props.nestedForwards?.[item.forwardId] : undefined
+}
+
+function getNestedForwardTitle(item: SandboxForwardNode) {
+  const nested = getNestedForward(item)
+  return nested ? buildForwardPreview(nested).title : '合并转发'
+}
+
+function getNestedForwardLines(item: SandboxForwardNode) {
+  const nested = getNestedForward(item)
+  return nested ? buildForwardPreview(nested).lines : []
+}
+
+function getNestedForwardTotal(item: SandboxForwardNode) {
+  const nested = getNestedForward(item)
+  return nested ? buildForwardPreview(nested).total : 0
+}
+</script>

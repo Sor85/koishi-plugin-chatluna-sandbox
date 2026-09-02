@@ -3,7 +3,7 @@ import {
   computeVisibleScrollbarRect,
   findScrollbarHeaderBottom,
   type ScrollbarBoundsNode,
-} from '../client/webqq/scrollbar-track-bounds'
+} from '../client/shared/scrollbar-track-bounds'
 
 /**
  * 最小结构接口的内存替身（ADR 0075）：只实现沿祖先链上行、按选择器认出兄弟、读一个矩形

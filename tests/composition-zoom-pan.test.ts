@@ -7,7 +7,7 @@ import {
   COMPOSITION_ZOOM_STEP,
   createCompositionZoomPan,
   type CompositionPanViewport,
-} from '../client/webqq/composition-zoom-pan'
+} from '../client/model-request/composition-zoom-pan'
 
 class FakeViewport implements CompositionPanViewport {
   scrollLeft = 0

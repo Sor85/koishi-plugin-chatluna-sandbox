@@ -4,7 +4,7 @@ const { send } = vi.hoisted(() => ({ send: vi.fn() }))
 
 vi.mock('@koishijs/client', () => ({ send }))
 
-import { createKoishiTestCallRecordPort } from '../client/webqq/koishi-test-call-record-port'
+import { createKoishiTestCallRecordPort } from '../client/test-call/koishi-port'
 
 describe('Koishi 测试调用记录端口', () => {
   /** 这道端口的工厂根本不收「解析当前空间标识」的函数，筛选里的 spaceId 是记录字段。 */

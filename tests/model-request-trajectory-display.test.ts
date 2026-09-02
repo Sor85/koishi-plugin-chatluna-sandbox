@@ -6,7 +6,7 @@ import {
   isModelRequestTrajectoryRowCollapsed,
   orderModelRequestTrajectoryRows,
   toggleModelRequestTrajectoryCollapse,
-} from '../client/webqq/model-request-trajectory-display'
+} from '../client/model-request/trajectory-display'
 import type { SandboxEvidenceKind } from '../src/evidence-kind'
 import type { SandboxModelRequestTrajectoryRow } from '../src/types'
 

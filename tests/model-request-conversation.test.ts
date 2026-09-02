@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseModelRequestConversationDetail } from '../client/webqq/model-request-conversation'
+import { parseModelRequestConversationDetail } from '../client/model-request/conversation'
 import type { SandboxModelRequestDetail } from '../src/types'
 
 function detail(overrides: Partial<SandboxModelRequestDetail>): SandboxModelRequestDetail {

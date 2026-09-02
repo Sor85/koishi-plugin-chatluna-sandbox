@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { FakeMcpAdminPort } from '../client/webqq/fake-mcp-admin-port'
-import { createMcpCapabilityCatalogLoader, createMcpCredentialAdmin, formatMcpScopes } from '../client/webqq/mcp-admin-shell'
+import { FakeMcpAdminPort } from '../client/mcp/fake-port'
+import { createMcpCapabilityCatalogLoader, createMcpCredentialAdmin, formatMcpScopes } from '../client/mcp/shell'
 import type { SandboxMcpPublicCredential } from '../src/mcp/types'
 
 function credential(overrides: Partial<SandboxMcpPublicCredential> = {}): SandboxMcpPublicCredential {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   isHistoryVariableName,
   parseModelRequestHistory,
-} from '../client/webqq/model-request-history'
+} from '../client/model-request/history'
 
 describe('模型请求历史消息预览', () => {
   it('解析连续消息及严格元数据，并解码 XML 实体', () => {

@@ -1,9 +1,9 @@
 import { ref } from 'vue'
 import { describe, expect, it } from 'vitest'
-import { createFakeWorkspacePort } from '../client/webqq/fake-workspace-port'
+import { createFakeWorkspacePort } from '../client/workspace/fake-port'
 import { createTestWorkspaceController } from './helpers/workspace-controller'
-import { createWorkspaceLayout } from '../client/webqq/workspace-layout'
-import { createWebqqWorkspaceShell } from '../client/webqq/workspace-shell'
+import { createWorkspaceLayout } from '../client/workspace/layout'
+import { createWebqqWorkspaceShell } from '../client/workspace/shell'
 import type { MessageCapabilities } from '../src/message-capabilities'
 import type { SandboxMessage, SandboxSnapshot, SandboxWorkspaceState } from '../src/types'
 

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createEvidenceNavigation,
   type EvidenceViewSnapshot,
-} from '../client/webqq/evidence-navigation'
+} from '../client/shared/evidence-navigation'
 import type { SandboxModelRequestTrajectory } from '../src/types'
 
 function trajectory(
@@ -554,12 +554,12 @@ describe('证据导航', () => {
       }
 
       const sources = [
-        'client/page.vue',
-        'client/model-request-workspace.vue',
-        'client/model-request-trajectory.vue',
-        'client/preset-workspace.vue',
-        'client/webqq/workspace-shell.ts',
-        'client/webqq/model-request-list-selection.ts',
+        'client/workspace/page.vue',
+        'client/model-request/workspace.vue',
+        'client/model-request/trajectory.vue',
+        'client/preset/workspace.vue',
+        'client/workspace/shell.ts',
+        'client/model-request/list-selection.ts',
       ].map((file) => readFileSync(resolve(file), 'utf8')).join('\n')
 
       for (const name of removed) expect(sources).not.toContain(name)
@@ -567,17 +567,17 @@ describe('证据导航', () => {
 
     // 客户端不再有位于证据导航 module 之外的往返触发编号。
     it('往返触发编号只在证据导航 module 内递增', () => {
-      const navigationSource = readFileSync(resolve('client/webqq/evidence-navigation.ts'), 'utf8')
+      const navigationSource = readFileSync(resolve('client/shared/evidence-navigation.ts'), 'utf8')
       expect(navigationSource).toContain('++entrySeq')
       expect(navigationSource).toContain('++locateSeq')
       expect(navigationSource).toContain('++viewRestoreSeq')
       expect(navigationSource).toContain('++presetOriginSeq')
 
       const consumers = [
-        'client/page.vue',
-        'client/model-request-workspace.vue',
-        'client/model-request-trajectory.vue',
-        'client/webqq/workspace-shell.ts',
+        'client/workspace/page.vue',
+        'client/model-request/workspace.vue',
+        'client/model-request/trajectory.vue',
+        'client/workspace/shell.ts',
       ]
       for (const file of consumers) {
         const source = readFileSync(resolve(file), 'utf8')
@@ -586,7 +586,7 @@ describe('证据导航', () => {
     })
 
     it('模型请求列表选择只保留普通选择与跨页补入', () => {
-      const source = readFileSync(resolve('client/webqq/model-request-list-selection.ts'), 'utf8')
+      const source = readFileSync(resolve('client/model-request/list-selection.ts'), 'utf8')
       expect(source).not.toContain('preserveNextClear')
       expect(source).not.toContain('releaseModelRequestListNavigationGuard')
     })

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { buildModelRequestAnalysisNavigation, modelAnalysisTargetId } from '../client/webqq/model-request-analysis'
-import { parseModelRequestConversationDetail } from '../client/webqq/model-request-conversation'
-import { createEvidenceLocator, type EvidenceMeasurement } from '../client/webqq/evidence-locator'
+import { buildModelRequestAnalysisNavigation, modelAnalysisTargetId } from '../client/model-request/analysis'
+import { parseModelRequestConversationDetail } from '../client/model-request/conversation'
+import { createEvidenceLocator, type EvidenceMeasurement } from '../client/shared/evidence-locator'
 import type { SandboxModelRequestDetail } from '../src/types'
 
 function detail(): SandboxModelRequestDetail {

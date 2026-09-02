@@ -5,8 +5,8 @@ import {
   buildModelRequestAnalysisNavigation,
   modelAnalysisTargetId,
   resolveAnalysisEvidenceTarget,
-} from '../client/webqq/model-request-analysis'
-import { parseModelRequestConversationDetail } from '../client/webqq/model-request-conversation'
+} from '../client/model-request/analysis'
+import { parseModelRequestConversationDetail } from '../client/model-request/conversation'
 import {
   anthropicMessagesJsonResponse,
   anthropicMessagesRequest,

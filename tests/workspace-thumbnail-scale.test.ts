@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calculateContainedWorkspaceThumbnailTransform } from '../client/webqq/workspace-thumbnail-scale'
+import { calculateContainedWorkspaceThumbnailTransform } from '../client/test-space/thumbnail-scale'
 
 describe('工作区缩略图缩放', () => {
   it('宽卡片按高度受限并完整保留页面宽度', () => {

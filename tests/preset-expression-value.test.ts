@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolvePresetExpressionObservedValue } from '../client/webqq/preset-expression-value'
+import { resolvePresetExpressionObservedValue } from '../client/preset/expression-value'
 import type { LocateSandboxPresetExpressionResult } from '../src/presets'
 import type { SandboxModelRequestDetail } from '../src/types'
 

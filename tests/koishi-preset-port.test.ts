@@ -4,7 +4,7 @@ const { send } = vi.hoisted(() => ({ send: vi.fn() }))
 
 vi.mock('@koishijs/client', () => ({ send }))
 
-import { createKoishiPresetPort } from '../client/webqq/koishi-preset-port'
+import { createKoishiPresetPort } from '../client/preset/koishi-port'
 
 describe('Koishi 预设端口', () => {
   /** 这道端口的工厂根本不收「解析当前空间标识」的函数，因此不存在被隐式定域盖掉的可能。 */

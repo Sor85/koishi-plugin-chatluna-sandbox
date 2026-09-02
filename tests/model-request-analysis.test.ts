@@ -11,8 +11,8 @@ import {
   resolveActiveAnalysisTarget,
   resolveAnalysisEvidenceTarget,
   shouldExpandAnalysisText,
-} from '../client/webqq/model-request-analysis'
-import { parseModelRequestConversationDetail } from '../client/webqq/model-request-conversation'
+} from '../client/model-request/analysis'
+import { parseModelRequestConversationDetail } from '../client/model-request/conversation'
 import { modelRequestVariableStatusLabel } from '../src/model-request-variables'
 import type { SandboxModelRequestDetail } from '../src/types'
 
@@ -205,8 +205,8 @@ describe('模型请求分析展示模型', () => {
 
   it('分析页、组成图、轨迹台账和响应分段共用角色色', () => {
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
-    const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
-    const trajectory = readFileSync(resolve('client/model-request-trajectory.vue'), 'utf8')
+    const view = readFileSync(resolve('client/model-request/analysis-view.vue'), 'utf8')
+    const trajectory = readFileSync(resolve('client/model-request/trajectory.vue'), 'utf8')
 
     expect(styles).toContain('--webqq-role-system: #737985')
     expect(styles).toContain('--webqq-role-user: #2f76c9')
@@ -255,7 +255,7 @@ describe('模型请求分析展示模型', () => {
       kind: 'variable', label: 'VARIABLE', preview: 'weather', searchText: expect.stringContaining('长沙晴朗'),
     })
 
-    const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
+    const view = readFileSync(resolve('client/model-request/analysis-view.vue'), 'utf8')
     expect(view).toContain(':id="modelAnalysisVariableTargetId(variable.id)"')
     expect(view).toContain(':value="variable.name"')
     expect(view).toContain(':value="variable.value ?? \'\'"')
@@ -322,8 +322,8 @@ describe('模型请求分析展示模型', () => {
    * 少接这根线不会报错，表现为点了「查看原始 XML」界面上什么都不变（ADR 0073 第 4 类）。
    */
   it('history_new 和 history_last 默认渲染消息预览，并保留原始 XML 切换', () => {
-    const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
-    const preview = readFileSync(resolve('client/model-request-history-preview.vue'), 'utf8')
+    const view = readFileSync(resolve('client/model-request/analysis-view.vue'), 'utf8')
+    const preview = readFileSync(resolve('client/model-request/history-preview.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
 
     expect(view).toContain('isHistoryVariableName(variable.name)')
@@ -384,8 +384,8 @@ describe('模型请求分析展示模型', () => {
     expect(styles).toContain('.webqq-model-history-quote.chatluna-sandbox-message-quote')
     expect(styles).toMatch(/\.webqq-model-history-quote\.chatluna-sandbox-message-quote > span \{[^}]*overflow: visible;[^}]*text-overflow: clip;[^}]*white-space: pre-wrap;[^}]*overflow-wrap: anywhere;/s)
 
-    const trajectory = readFileSync(resolve('client/model-request-trajectory.vue'), 'utf8')
-    const workspace = readFileSync(resolve('client/model-request-workspace.vue'), 'utf8')
+    const trajectory = readFileSync(resolve('client/model-request/trajectory.vue'), 'utf8')
+    const workspace = readFileSync(resolve('client/model-request/workspace.vue'), 'utf8')
     expect(view).not.toContain('WebqqMessageNavigationTarget')
     expect(view).not.toContain('@open-message=')
     expect(trajectory).not.toContain('@open-message=')
@@ -400,7 +400,7 @@ describe('模型请求分析展示模型', () => {
    * （`event.detail < 2`、`event.preventDefault()`）。三是结构与样式契约（ADR 0073 第 2、3、4 类）。
    */
   it('变量卡片正文保持卡片内边距，支持头部和按钮折叠，并标注空值', () => {
-    const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
+    const view = readFileSync(resolve('client/model-request/analysis-view.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
 
     expect(view).toContain("'is-collapsed': isCardCollapsed(modelAnalysisVariableTargetId(variable.id))")
@@ -419,7 +419,7 @@ describe('模型请求分析展示模型', () => {
 
   it('工具列表图标锁死 18px，避免 flex 把扳手挤成不同大小', () => {
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
-    const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
+    const view = readFileSync(resolve('client/model-request/analysis-view.vue'), 'utf8')
 
     expect(styles).toMatch(/\.webqq-model-analysis-tool-summary > svg \{[^}]*flex: 0 0 auto;[^}]*width: 18px;[^}]*height: 18px;/s)
     expect(view).toContain('class="webqq-model-analysis-tool-copy"')
@@ -446,7 +446,7 @@ describe('模型请求分析展示模型', () => {
   // 定位的算术与帧时序已经进入 evidence-locator 并由行为测试覆盖；
   // 这里只保留无法进入 module 的 DOM 契约：滚动容器选择规则留在视图侧。
   it('工作台分析的导航与卡片共用外层详情滚动，检查器仍滚动 inspector-body', () => {
-    const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
+    const view = readFileSync(resolve('client/model-request/analysis-view.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
 
     expect(view).toContain("content.closest<HTMLElement>('.webqq-model-request-detail')")
@@ -459,7 +459,7 @@ describe('模型请求分析展示模型', () => {
   // 「默认展开、各自独立折叠、切换记录后回到默认」三条已由 analysis-expansion 的行为断言执行；
   // 这里只保留无从进入 module 的结构契约：折叠按钮的 aria 与正文的显隐都绑在同一个分组键上。
   it('单一左侧导航保持吸顶，折叠按钮的 aria 与条目显隐绑在同一个分组键上', () => {
-    const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
+    const view = readFileSync(resolve('client/model-request/analysis-view.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
 
     expect(view).toContain('@click="toggleNavigationGroup(group.key)"')
@@ -469,7 +469,7 @@ describe('模型请求分析展示模型', () => {
   })
 
   it('分析页的过滤工具栏和请求组成轨道一起保持吸顶', () => {
-    const trajectory = readFileSync(resolve('client/model-request-trajectory.vue'), 'utf8')
+    const trajectory = readFileSync(resolve('client/model-request/trajectory.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
 
     expect(trajectory).toMatch(/webqq-model-trajectory-header[\s\S]*webqq-model-trajectory-scope[\s\S]*webqq-model-trajectory-sticky-header[\s\S]*webqq-model-trajectory-controls[\s\S]*webqq-model-trajectory-composition-shell/)
@@ -490,7 +490,7 @@ describe('模型请求分析展示模型', () => {
   })
 
   it('滚动阅读右侧时只跟随当前条目，不自动改变左侧分类折叠状态', () => {
-    const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
+    const view = readFileSync(resolve('client/model-request/analysis-view.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
 
     expect(view).not.toContain('webqq-model-analysis-nav-fallback')
@@ -528,7 +528,7 @@ describe('模型请求分析展示模型', () => {
 
   it('工具 Schema 使用请求页 JSON 树，而不是纯文本', () => {
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
-    const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
+    const view = readFileSync(resolve('client/model-request/analysis-view.vue'), 'utf8')
 
     expect(view).toContain('class="webqq-model-analysis-tool-schema webqq-model-request-json-viewer"')
     expect(view).toContain(':node="toolParametersJsonTree(tool)"')
@@ -538,7 +538,7 @@ describe('模型请求分析展示模型', () => {
   })
 
   it('响应工具调用参数使用请求页 JSON 树，而不是纯文本', () => {
-    const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
+    const view = readFileSync(resolve('client/model-request/analysis-view.vue'), 'utf8')
     const responseSection = view.slice(view.indexOf('response.toolCalls.length'))
 
     expect(responseSection).toContain(':node="toolCallArgumentsJsonTree(call)"')
@@ -553,7 +553,7 @@ describe('模型请求分析展示模型', () => {
    * （ADR 0073 第 4 类）。其余是否定式的已删实现守卫与布局分支契约。
    */
   it('去掉完整请求 JSON 入口，卡片正文不再标「内容」，头部空白可折叠', () => {
-    const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
+    const view = readFileSync(resolve('client/model-request/analysis-view.vue'), 'utf8')
 
     expect(view).not.toContain('完整请求 JSON')
     expect(view).not.toContain('返回对话')
@@ -569,7 +569,7 @@ describe('模型请求分析展示模型', () => {
 
   it('折叠长文本用渐隐遮罩并居中展开按钮，避免半透明实色透出字形', () => {
     const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
-    const view = readFileSync(resolve('client/webqq/analysis-view.vue'), 'utf8')
+    const view = readFileSync(resolve('client/model-request/analysis-view.vue'), 'utf8')
 
     expect(view).toContain("class: 'webqq-model-analysis-expand'")
     expect(view).toContain('展开全部（${blockProps.value.length} 字符）')

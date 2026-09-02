@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveSandboxColorMode } from '../client/webqq/resolve-color-mode'
+import { resolveSandboxColorMode } from '../client/workspace/resolve-color-mode'
 
 describe('WebQQ 配色模式', () => {
   it('自动模式跟随 Koishi 已解析的主题', () => {

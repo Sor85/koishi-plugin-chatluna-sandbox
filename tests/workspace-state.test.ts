@@ -7,7 +7,7 @@ import {
   resolveWorkspaceSelection,
   saveWorkspacePreferences,
   toggleDetailsPreference,
-} from '../client/webqq/workspace-state'
+} from '../client/workspace/state'
 
 const snapshot: SandboxSnapshot = {
   revision: 0,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createFakeModelRequestPort } from '../client/webqq/fake-model-request-port'
+import { createFakeModelRequestPort } from '../client/model-request/fake-port'
 import { createTestWorkspaceController } from './helpers/workspace-controller'
 import type { SandboxModelRequestDetail, SandboxModelRequestListItem } from '../src/types'
 

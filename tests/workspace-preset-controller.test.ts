@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createFakePresetPort } from '../client/webqq/fake-preset-port'
+import { createFakePresetPort } from '../client/preset/fake-port'
 import { createTestWorkspaceController } from './helpers/workspace-controller'
 import type { SandboxPresetDocument } from '../src/presets'
 

@@ -39,7 +39,7 @@ describe('沙盒扩展菜单标识', () => {
   })
 
   it('侧栏只给协议外动作显示标识', () => {
-    const source = readClientSource('webqq-sidebar.vue')
+    const source = readClientSource('webqq/sidebar.vue')
     const extensionLabels = [
       '申请加入群组',
       '编辑群组',
@@ -60,11 +60,11 @@ describe('沙盒扩展菜单标识', () => {
     for (const label of protocolLabels) {
       expect(menuBlock(source, label)).not.toContain('<WebqqMenuExtensionMark')
     }
-    expect(source).toContain("import WebqqMenuExtensionMark from './webqq-menu-extension-mark.vue'")
+    expect(source).toContain("import WebqqMenuExtensionMark from './menu-extension-mark.vue'")
   })
 
   it('消息发送者菜单区分扩展关系操作与 OneBot 操作', () => {
-    const source = readClientSource('webqq-message-list.vue')
+    const source = readClientSource('webqq/message-list.vue')
 
     expect(menuBlock(source, '发送好友申请')).toContain('<WebqqMenuExtensionMark')
     expect(menuBlock(source, '设置好友备注')).toContain('<WebqqMenuExtensionMark')
@@ -74,14 +74,14 @@ describe('沙盒扩展菜单标识', () => {
   })
 
   it('发送者栈的环境实体操作都显示标识', () => {
-    const source = readClientSource('webqq-composer.vue')
+    const source = readClientSource('webqq/composer.vue')
 
     expect(menuBlock(source, "编辑{{ sender.type === 'bot' ? '机器人' : '用户' }}")).toContain('<WebqqMenuExtensionMark')
     expect(menuBlock(source, "删除{{ sender.type === 'bot' ? '机器人' : '用户' }}")).toContain('<WebqqMenuExtensionMark')
   })
 
   it('复用可访问的 secondary Badge 且不修改鼠标指针', () => {
-    const mark = readClientSource('webqq-menu-extension-mark.vue')
+    const mark = readClientSource('webqq/menu-extension-mark.vue')
     const styles = readClientSource('styles/webqq-primitives.css')
 
     expect(mark).toContain("import { Badge } from '#client/components/ui/badge'")

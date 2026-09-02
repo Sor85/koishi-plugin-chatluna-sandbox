@@ -4,8 +4,8 @@ import { describe, expect, it } from 'vitest'
 
 describe('AI 测试空间总览', () => {
   it('在主导航提供入口并渲染固定主场景、按时间排序空间和末尾创建卡', () => {
-    const sidebar = readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
-    const overview = readFileSync(resolve('client/ai-test-space-overview.vue'), 'utf8')
+    const sidebar = readFileSync(resolve('client/webqq/sidebar.vue'), 'utf8')
+    const overview = readFileSync(resolve('client/test-space/overview.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-spaces.css'), 'utf8')
 
     expect(sidebar).toContain("label: 'AI 测试空间'")
@@ -30,10 +30,10 @@ describe('AI 测试空间总览', () => {
   })
 
   it('进入和退出空间时对整层做连续 transform 缩放', () => {
-    const overview = readFileSync(resolve('client/ai-test-space-overview.vue'), 'utf8')
-    const shell = readFileSync(resolve('client/webqq/test-space-shell.ts'), 'utf8')
-    const zoom = readFileSync(resolve('client/webqq/workspace-zoom.ts'), 'utf8')
-    expect(existsSync(resolve('client/webqq/workspace-transition.ts'))).toBe(false)
+    const overview = readFileSync(resolve('client/test-space/overview.vue'), 'utf8')
+    const shell = readFileSync(resolve('client/test-space/shell.ts'), 'utf8')
+    const zoom = readFileSync(resolve('client/test-space/zoom.ts'), 'utf8')
+    expect(existsSync(resolve('client/test-space/transition.ts'))).toBe(false)
     expect(overview).not.toContain('cloneNode')
     expect(overview).toContain(':data-space-id="space.id"')
     expect(shell).not.toContain('createLayout')
@@ -46,17 +46,17 @@ describe('AI 测试空间总览', () => {
     expect(zoom).toContain("const ZOOMING_CLASS = 'chatluna-sandbox-workspace-zooming'")
     expect(zoom).toContain('document.documentElement.classList.add(ZOOMING_CLASS)')
     expect(zoom).toContain('document.documentElement.classList.remove(ZOOMING_CLASS)')
-    const scrollbar = readFileSync(resolve('client/webqq-scrollbar.ts'), 'utf8')
+    const scrollbar = readFileSync(resolve('client/shared/scrollbar.ts'), 'utf8')
     expect(scrollbar).toContain("classList.contains('chatluna-sandbox-workspace-zooming')")
     expect(scrollbar).toContain('visible && state.showOverlay && !workspaceZooming')
     expect(zoom).toContain('prefers-reduced-motion')
   })
 
   it('卡片优先展示离开前的消息工作区缩略图，并为未访问空间解析媒体头像', () => {
-    const thumbnail = readFileSync(resolve('client/workspace-thumbnail.vue'), 'utf8')
-    const capture = readFileSync(resolve('client/webqq/workspace-thumbnail-capture.ts'), 'utf8')
-    const shell = readFileSync(resolve('client/webqq/test-space-shell.ts'), 'utf8')
-    const overview = readFileSync(resolve('client/ai-test-space-overview.vue'), 'utf8')
+    const thumbnail = readFileSync(resolve('client/test-space/thumbnail.vue'), 'utf8')
+    const capture = readFileSync(resolve('client/test-space/thumbnail-capture.ts'), 'utf8')
+    const shell = readFileSync(resolve('client/test-space/shell.ts'), 'utf8')
+    const overview = readFileSync(resolve('client/test-space/overview.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-spaces.css'), 'utf8')
     const responsiveStyles = readFileSync(resolve('client/styles/webqq-responsive.css'), 'utf8')
     expect(shell).toContain('rememberCurrentWorkspaceThumbnail()')
@@ -81,8 +81,8 @@ describe('AI 测试空间总览', () => {
     expect(thumbnail).toContain('<WebqqSidebar :model="models.sidebar" :color-mode="colorMode" preview />')
     expect(thumbnail).toContain('<WebqqDetailsPanel :model="models.detailsPanel" preview />')
     // 缩略图是 inert 视觉副本，但 Vue 指令仍会执行；必须显式禁用 body 级滚动条 Portal，避免缩放时在页面中间闪现。
-    expect(readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')).toContain("v-webqq-scrollbar=\"{ disabled: preview, tone: 'accent' }\"")
-    expect(readFileSync(resolve('client/webqq-details-panel.vue'), 'utf8')).toContain('v-webqq-scrollbar="{ disabled: preview')
+    expect(readFileSync(resolve('client/webqq/sidebar.vue'), 'utf8')).toContain("v-webqq-scrollbar=\"{ disabled: preview, tone: 'accent' }\"")
+    expect(readFileSync(resolve('client/webqq/details-panel.vue'), 'utf8')).toContain('v-webqq-scrollbar="{ disabled: preview')
     expect(capture).toContain('scrollOffsets')
     expect(capture).toContain('copyCanvasPixels')
     expect(capture).toContain('stripAgentObserveOverlay')
@@ -98,10 +98,10 @@ describe('AI 测试空间总览', () => {
   })
 
   it('复刻 ego lite 的 agent 光标与被控空间观察覆盖层', () => {
-    const cursor = readFileSync(resolve('client/agent-cursor.vue'), 'utf8')
-    const overlay = readFileSync(resolve('client/agent-observe-overlay.vue'), 'utf8')
-    const effect = readFileSync(resolve('client/webqq/agent-overlay-effect.ts'), 'utf8')
-    const page = readFileSync(resolve('client/page.vue'), 'utf8')
+    const cursor = readFileSync(resolve('client/shared/agent-cursor.vue'), 'utf8')
+    const overlay = readFileSync(resolve('client/workspace/agent-observe-overlay.vue'), 'utf8')
+    const effect = readFileSync(resolve('client/workspace/agent-overlay-effect.ts'), 'utf8')
+    const page = readFileSync(resolve('client/workspace/page.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-spaces.css'), 'utf8')
     // ego lite 官方光标 path 与随机跳位节奏（5.2-9s），到位后 400ms 点击挤压 + 闲置 loading 浮动
     expect(cursor).toContain('M6.465 15.647')
@@ -129,7 +129,7 @@ describe('AI 测试空间总览', () => {
     expect(overlay).toContain('webqq-agent-taskbar-control-icon')
     expect(overlay).toContain('<SandboxAgentControlIcon running />')
     expect(overlay).not.toContain('rotate(')
-    const controlIcon = readFileSync(resolve('client/sandbox-agent-control-icon.vue'), 'utf8')
+    const controlIcon = readFileSync(resolve('client/shared/sandbox-agent-control-icon.vue'), 'utf8')
     expect(controlIcon).toContain('viewBox="0 0 20 20"')
     expect(controlIcon).toContain('width="20"')
     expect(controlIcon).toContain('height="20"')

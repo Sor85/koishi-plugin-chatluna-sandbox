@@ -9,7 +9,7 @@ import {
   formatModelRequestSource,
   formatModelRequestTokenCount,
   formatModelRequestTokenRate,
-} from '../client/webqq/model-request-overview'
+} from '../client/model-request/overview'
 
 describe('模型请求概览取词', () => {
   it('模型 ID 与渠道采集到就照原样显示，空串与缺省都算没识别出来', () => {

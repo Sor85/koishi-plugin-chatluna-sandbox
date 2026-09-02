@@ -4,10 +4,10 @@ import { describe, expect, it } from 'vitest'
 
 describe('WebQQ OneBot 调试工作台', () => {
   it('从最左侧导航进入独立视图，并提供筛选、详情和清理控件', () => {
-    const pageSource = readFileSync(resolve('client/page.vue'), 'utf8')
-    const sidebarSource = readFileSync(resolve('client/webqq-sidebar.vue'), 'utf8')
-    const shellSource = readFileSync(resolve('client/webqq/workspace-shell.ts'), 'utf8')
-    const debugSource = readFileSync(resolve('client/onebot-debug-workspace.vue'), 'utf8')
+    const pageSource = readFileSync(resolve('client/workspace/page.vue'), 'utf8')
+    const sidebarSource = readFileSync(resolve('client/webqq/sidebar.vue'), 'utf8')
+    const shellSource = readFileSync(resolve('client/workspace/shell.ts'), 'utf8')
+    const debugSource = readFileSync(resolve('client/onebot-debug/workspace.vue'), 'utf8')
     const styles = readFileSync(resolve('client/styles/webqq-debug.css'), 'utf8')
 
     expect(sidebarSource).toMatch(/label:\s*['"]OneBot 调试['"]/)
@@ -46,7 +46,7 @@ describe('WebQQ OneBot 调试工作台', () => {
     expect(debugSource).toContain('record.source.name')
     expect(debugSource).toContain('getRecordKey(record)')
     expect(debugSource).toContain('SandboxDirectoryBot')
-    expect(debugSource).toContain("import WebqqAvatar from './webqq-avatar.vue'")
+    expect(debugSource).toContain("import WebqqAvatar from '#client/shared/avatar.vue'")
     expect(debugSource).toContain('class="webqq-debug-bot-avatar"')
     expect(debugSource).toContain(':avatar="bot.avatar"')
     expect(debugSource).not.toContain('show-bot-badge')
@@ -86,7 +86,7 @@ describe('WebQQ OneBot 调试工作台', () => {
   })
 
   it('会话观察按两个方向各自成句，不复用一条只讲偏离的文案', () => {
-    const debugSource = readFileSync(resolve('client/onebot-debug-workspace.vue'), 'utf8')
+    const debugSource = readFileSync(resolve('client/onebot-debug/workspace.vue'), 'utf8')
 
     expect(debugSource).toContain('aria-label="会话观察"')
     expect(debugSource).toContain("'reply-left-event-conversation'")
@@ -103,8 +103,8 @@ describe('WebQQ OneBot 调试工作台', () => {
   })
 
   it('使用独立网格和统一控件基线，避免筛选器溢出与黑色描边', () => {
-    const debugSource = readFileSync(resolve('client/onebot-debug-workspace.vue'), 'utf8')
-    const modelRequestSource = readFileSync(resolve('client/model-request-workspace.vue'), 'utf8')
+    const debugSource = readFileSync(resolve('client/onebot-debug/workspace.vue'), 'utf8')
+    const modelRequestSource = readFileSync(resolve('client/model-request/workspace.vue'), 'utf8')
     const debugStyles = readFileSync(resolve('client/styles/webqq-debug.css'), 'utf8')
     const primitives = readFileSync(resolve('client/styles/webqq-primitives.css'), 'utf8')
 
