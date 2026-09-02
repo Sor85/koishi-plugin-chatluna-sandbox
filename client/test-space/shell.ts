@@ -110,6 +110,10 @@ export function createAiTestSpaceShell({
 
   async function selectNavigation(view: SandboxWorkspaceView) {
     if (view !== 'spaces') {
+      // 总览上 activeSpaceId 只用来定位缩回的空间卡片，不代表人还在空间里。因此从总览点顶栏
+      // 的任何入口都落在主环境：沿用这份定域会让消息、模型请求这些页面悄悄回到刚离开的那个
+      // 空间，顶栏也跟着缩成空间内的两项。进空间的唯一入口是点卡片。
+      if (currentView.value === 'spaces' && activeSpaceId.value) await observeSpace(undefined)
       selectWorkspaceNavigation(view)
       return
     }
@@ -136,13 +140,21 @@ export function createAiTestSpaceShell({
     staggerCardsIn(cards)
   }
 
+  /**
+   * 换掉当前观察的空间：先写定域标识再读工作区。端口的隐式定域在请求发出的那一刻解析这个
+   * 标识，顺序反过来会把上一个空间的场景读回来。
+   */
+  async function observeSpace(spaceId: string | undefined) {
+    activeSpaceId.value = spaceId
+    await controller.load()
+  }
+
   async function enterTestSpace(spaceId?: string) {
     // 记录被点击卡片的位置，让真实工作区从卡片处连续放大；新建空间无卡片时从创建卡起步。
     const fromRect = captureZoomRect(
       document.querySelector(`[data-space-id="${spaceId ?? 'main'}"]`) ?? document.querySelector('.webqq-space-create'),
     )
-    activeSpaceId.value = spaceId
-    await controller.load()
+    await observeSpace(spaceId)
     selectWorkspaceNavigation('messages')
     await nextTick()
     const workspace = document.querySelector<HTMLElement>('.webqq-workspace')
