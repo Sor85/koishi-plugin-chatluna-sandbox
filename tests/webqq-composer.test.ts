@@ -45,7 +45,7 @@ describe('WebQQ 发送控件', () => {
     const source = readFileSync(resolve('client/webqq-composer.vue'), 'utf8')
 
     expect(source).toContain('createComposerDraftHost')
-    expect(source).toContain('from \'./webqq/composer-draft-host\'')
+    expect(source).toContain('from \'#client/webqq/composer-draft-host\'')
     expect(source).toContain('draftHost.routeKey({')
     // 否定式守卫：按键分流与菜单开合的判定不得回到组件里。
     expect(source).not.toContain("event.key === 'ArrowDown'")
@@ -157,7 +157,7 @@ describe('WebQQ 发送控件', () => {
     expect(source).toContain('createComposerAttachments<File>')
     expect(source).toContain('createComposerSendController')
     expect(source).toContain('shouldRestoreComposerFocus')
-    expect(source).toContain('from \'./webqq/composer-focus\'')
+    expect(source).toContain('from \'#client/webqq/composer-focus\'')
     expect(source).toContain('const composerInstanceId = Symbol(\'webqq-composer\')')
     expect(source).toContain('activeComposerInstanceId = undefined')
     expect(source).toContain('inputElement: requestInput')

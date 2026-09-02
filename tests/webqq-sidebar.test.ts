@@ -24,7 +24,7 @@ describe('WebQQ 顶部导航与会话栏', () => {
     expect(source).not.toContain("{ id: 'contacts' as const, label: '联系人'")
     expect(source).not.toContain('<TooltipProvider>')
     expect(source).not.toContain('<TooltipContent')
-    expect(source).not.toContain("from './components/ui/tooltip'")
+    expect(source).not.toContain("from '#client/components/ui/tooltip'")
     expect(source).toContain('v-for="item in visibleNavigationItems"')
     expect(source).toContain('class="webqq-rail-label">{{ item.label }}</span>')
     expect(sidebarStyles).toMatch(/\.webqq-rail-button\s*\{[^}]*gap:\s*7px[^}]*padding:\s*0 14px/s)

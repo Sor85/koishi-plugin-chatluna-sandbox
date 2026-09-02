@@ -84,7 +84,7 @@ describe('沙盒扩展菜单标识', () => {
     const mark = readClientSource('webqq-menu-extension-mark.vue')
     const styles = readClientSource('styles/webqq-primitives.css')
 
-    expect(mark).toContain("import { Badge } from './components/ui/badge'")
+    expect(mark).toContain("import { Badge } from '#client/components/ui/badge'")
     expect(mark).toContain('variant="secondary"')
     expect(mark).toContain('class="webqq-menu-extension-mark ml-auto shrink-0"')
     expect(mark).toContain('沙盒扩展')

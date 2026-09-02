@@ -8,8 +8,8 @@ import {
   SelectViewport,
   useForwardPropsEmits,
 } from "reka-ui"
-import { cn } from "../../../lib/utils"
-import { vWebqqScrollbar } from "../../../webqq-scrollbar"
+import { cn } from "#client/lib/utils"
+import { vWebqqScrollbar } from "#client/webqq-scrollbar"
 import { SelectScrollDownButton, SelectScrollUpButton } from "."
 
 defineOptions({

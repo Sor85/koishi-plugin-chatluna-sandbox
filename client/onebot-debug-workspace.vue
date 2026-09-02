@@ -281,17 +281,17 @@ import {
   IconTrash,
 } from '@tabler/icons-vue'
 import { computed, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Badge } from './components/ui/badge'
-import { Button } from './components/ui/button'
-import { Checkbox } from './components/ui/checkbox'
-import { Input } from './components/ui/input'
-import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
-import { Switch } from './components/ui/switch'
+import { Badge } from '#client/components/ui/badge'
+import { Button } from '#client/components/ui/button'
+import { Checkbox } from '#client/components/ui/checkbox'
+import { Input } from '#client/components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '#client/components/ui/popover'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#client/components/ui/select'
+import { Switch } from '#client/components/ui/switch'
 import WebqqAvatar from './webqq-avatar.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
-import { formatDuration } from './webqq/format-duration'
-import { createModelRequestEnterRefresh, createModelRequestLiveRefresh } from './webqq/model-request-live-refresh'
+import { formatDuration } from '#client/webqq/format-duration'
+import { createModelRequestEnterRefresh, createModelRequestLiveRefresh } from '#client/webqq/model-request-live-refresh'
 import type {
   GetSandboxOneBotDebugRecordInput,
   GetSandboxOneBotDebugRecordsInput,

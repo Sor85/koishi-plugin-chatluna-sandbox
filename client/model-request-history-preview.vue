@@ -58,9 +58,9 @@
 <script setup lang="ts">
 import { IconChevronDown } from '@tabler/icons-vue'
 import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref, watch, type PropType, type VNode } from 'vue'
-import { Badge } from './components/ui/badge'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip'
-import type { ModelRequestHistoryMessage } from './webqq/model-request-history'
+import { Badge } from '#client/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#client/components/ui/tooltip'
+import type { ModelRequestHistoryMessage } from '#client/webqq/model-request-history'
 
 const props = withDefaults(defineProps<{
   messages: readonly ModelRequestHistoryMessage[]

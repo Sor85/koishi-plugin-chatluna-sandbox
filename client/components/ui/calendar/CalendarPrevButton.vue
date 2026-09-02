@@ -4,8 +4,8 @@ import type { HTMLAttributes } from "vue"
 import { IconChevronLeft } from '@tabler/icons-vue'
 import { reactiveOmit } from "@vueuse/core"
 import { CalendarPrev, useForwardProps } from "reka-ui"
-import { cn } from "../../../lib/utils"
-import { buttonVariants } from '../button'
+import { cn } from "#client/lib/utils"
+import { buttonVariants } from '#client/components/ui/button'
 
 const props = defineProps<CalendarPrevProps & { class?: HTMLAttributes["class"] }>()
 

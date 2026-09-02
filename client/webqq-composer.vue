@@ -196,25 +196,25 @@
 import { createLayout, type AutoLayout } from 'animejs'
 import { IconEdit, IconFile, IconPaperclip, IconPlus, IconSend, IconTrash, IconX } from '@tabler/icons-vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from './components/ui/context-menu'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '#client/components/ui/context-menu'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#client/components/ui/tooltip'
 import EnvironmentCreatePopover from './environment-create-popover.vue'
 import WebqqAvatar from './webqq-avatar.vue'
 import WebqqImagePreview from './webqq-image-preview.vue'
 import WebqqMentionMenu from './webqq-mention-menu.vue'
 import WebqqMenuExtensionMark from './webqq-menu-extension-mark.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
-import type { MentionCandidate } from './webqq/composer-draft'
-import { createComposerAttachments } from './webqq/composer-attachments'
+import type { MentionCandidate } from '#client/webqq/composer-draft'
+import { createComposerAttachments } from '#client/webqq/composer-attachments'
 import {
   createComposerDraftHost,
   type ComposerHostCaretReading,
   type ComposerHostCaretTarget,
   type ComposerHostNodePlan,
   type ComposerHostNodeReading,
-} from './webqq/composer-draft-host'
-import { shouldRestoreComposerFocus } from './webqq/composer-focus'
-import { createComposerSendController } from './webqq/composer-send'
+} from '#client/webqq/composer-draft-host'
+import { shouldRestoreComposerFocus } from '#client/webqq/composer-focus'
+import { createComposerSendController } from '#client/webqq/composer-send'
 import {
   getUserStackLayoutMetrics,
   getUserStackMetrics,
@@ -222,7 +222,7 @@ import {
   USER_AVATAR_SIZE,
   USER_STACK_COLLAPSED_STEP,
   USER_STACK_EXPANDED_STEP,
-} from './webqq/user-stack'
+} from '#client/webqq/user-stack'
 import type { ManageSandboxEnvironmentInput } from '../src/types'
 
 export interface WebqqComposerSender {

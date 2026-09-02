@@ -3,8 +3,8 @@ import type { CalendarCellTriggerProps } from "reka-ui"
 import type { HTMLAttributes } from "vue"
 import { reactiveOmit } from "@vueuse/core"
 import { CalendarCellTrigger, useForwardProps } from "reka-ui"
-import { cn } from "../../../lib/utils"
-import { buttonVariants } from '../button'
+import { cn } from "#client/lib/utils"
+import { buttonVariants } from '#client/components/ui/button'
 
 const props = withDefaults(defineProps<CalendarCellTriggerProps & { class?: HTMLAttributes["class"] }>(), {
   as: "button",

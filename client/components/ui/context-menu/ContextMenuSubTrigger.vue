@@ -4,7 +4,7 @@ import type { HTMLAttributes } from 'vue'
 import { IconChevronRight } from '@tabler/icons-vue'
 import { reactiveOmit } from '@vueuse/core'
 import { ContextMenuSubTrigger, useForwardProps } from 'reka-ui'
-import { cn } from '../../../lib/utils'
+import { cn } from '#client/lib/utils'
 
 const props = defineProps<ContextMenuSubTriggerProps & { class?: HTMLAttributes['class'] }>()
 const delegatedProps = reactiveOmit(props, 'class')

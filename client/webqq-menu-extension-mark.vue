@@ -10,6 +10,6 @@
 </template>
 
 <script setup lang="ts">
-import { Badge } from './components/ui/badge'
-import { SANDBOX_EXTENSION_DESCRIPTION } from './webqq/sandbox-extension'
+import { Badge } from '#client/components/ui/badge'
+import { SANDBOX_EXTENSION_DESCRIPTION } from '#client/webqq/sandbox-extension'
 </script>

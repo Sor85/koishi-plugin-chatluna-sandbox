@@ -110,13 +110,13 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { Button } from './components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './components/ui/dialog'
-import { Input } from './components/ui/input'
+import { Button } from '#client/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '#client/components/ui/dialog'
+import { Input } from '#client/components/ui/input'
 import EnvironmentEntityDialog from './environment-entity-dialog.vue'
 import WebqqAvatar from './webqq-avatar.vue'
-import { getFloatingPanelStyle, clampFloatingPanelPosition, isFloatingPanelInteractiveTarget } from './webqq/floating-panel'
-import { groupProfileCardFields, type ProfileCardModel } from './webqq/profile-card'
+import { getFloatingPanelStyle, clampFloatingPanelPosition, isFloatingPanelInteractiveTarget } from '#client/webqq/floating-panel'
+import { groupProfileCardFields, type ProfileCardModel } from '#client/webqq/profile-card'
 import type {
   ManageSandboxEnvironmentInput,
   SandboxBotProfile,

@@ -13,6 +13,9 @@
     },
     "./package.json": "./package.json"
   },
+  "imports": {
+    "#client/*": "./client/*"
+  },
   "files": [
     "lib",
     "dist"

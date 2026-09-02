@@ -11,13 +11,13 @@ import { Decoration, EditorView, hoverTooltip, type DecorationSet, type Tooltip,
 import { IconExternalLink } from '@tabler/icons-vue'
 import { tags } from '@lezer/highlight'
 import { createApp, h, markRaw, onBeforeUnmount, onMounted, ref, toRaw, watch, type DeepReadonly } from 'vue'
-import { Button } from './components/ui/button'
+import { Button } from '#client/components/ui/button'
 import {
   codeMirrorOffset,
   resolvePresetSourceExpressions,
   type PresetSourceEditorExpression,
-} from './webqq/preset-source-expressions'
-import type { PresetExpressionObservedValueResult } from './webqq/preset-expression-value'
+} from '#client/webqq/preset-source-expressions'
+import type { PresetExpressionObservedValueResult } from '#client/webqq/preset-expression-value'
 import type { PresetDocumentKind, SandboxPresetExpression } from '../src/presets'
 
 const props = defineProps<{

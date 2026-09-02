@@ -121,17 +121,17 @@ import { getLocalTimeZone, today } from '@internationalized/date'
 import { IconCalendar, IconSearch, IconX } from '@tabler/icons-vue'
 import { createYearRange } from 'reka-ui/date'
 import { computed, nextTick, ref, watch } from 'vue'
-import { Button } from './components/ui/button'
-import { Calendar } from './components/ui/calendar'
-import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover'
+import { Button } from '#client/components/ui/button'
+import { Calendar } from '#client/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '#client/components/ui/popover'
 import type { SandboxMessageSearchHit } from '../src/types'
 import WebqqAvatar from './webqq-avatar.vue'
 import {
   calendarValueToLocalDate,
   localDateToCalendarValue,
-} from './webqq/message-search-date'
-import type { MessageSearchCriteria } from './webqq/message-search'
-import { formatMentionContent } from './webqq/mention'
+} from '#client/webqq/message-search-date'
+import type { MessageSearchCriteria } from '#client/webqq/message-search'
+import { formatMentionContent } from '#client/webqq/mention'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 
 /** 面板交出的条件形状由搜索编排模块定义，两处不各写一份，免得字段悄悄分叉。 */

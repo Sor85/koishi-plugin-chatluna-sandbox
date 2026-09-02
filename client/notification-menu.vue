@@ -35,7 +35,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Button } from './components/ui/button'
+import { Button } from '#client/components/ui/button'
 import WebqqAvatar from './webqq-avatar.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type { SandboxRelationshipRequest } from '../src/types'

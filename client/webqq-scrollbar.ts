@@ -1,5 +1,5 @@
 import type { Directive, DirectiveBinding } from 'vue'
-import { computeVisibleScrollbarRect } from './webqq/scrollbar-track-bounds'
+import { computeVisibleScrollbarRect } from '#client/webqq/scrollbar-track-bounds'
 
 const edgeGap = 8
 const overlayInset = 0

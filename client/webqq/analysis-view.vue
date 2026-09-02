@@ -477,10 +477,10 @@ import {
   IconUser,
 } from '@tabler/icons-vue'
 import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
-import { Button } from '../components/ui/button'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip'
-import ModelRequestHistoryPreview from '../model-request-history-preview.vue'
-import ModelRequestJsonTree from '../model-request-json-tree.vue'
+import { Button } from '#client/components/ui/button'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#client/components/ui/tooltip'
+import ModelRequestHistoryPreview from '#client/model-request-history-preview.vue'
+import ModelRequestJsonTree from '#client/model-request-json-tree.vue'
 import { formatDuration } from './format-duration'
 import {
   buildModelRequestAnalysisNavigation,

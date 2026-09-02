@@ -1,7 +1,7 @@
-import type { WebqqChatPaneModel } from '../webqq-chat-pane.vue'
-import type { WebqqDetailsPanelModel } from '../webqq-details-panel.vue'
-import type { WebqqForwardTargetModel, WebqqForwardTargetOption } from '../webqq-forward-target-dialog.vue'
-import type { WebqqSidebarModel } from '../webqq-sidebar.vue'
+import type { WebqqChatPaneModel } from '#client/webqq-chat-pane.vue'
+import type { WebqqDetailsPanelModel } from '#client/webqq-details-panel.vue'
+import type { WebqqForwardTargetModel, WebqqForwardTargetOption } from '#client/webqq-forward-target-dialog.vue'
+import type { WebqqSidebarModel } from '#client/webqq-sidebar.vue'
 import {
   getSandboxBots,
   getSandboxUsers,

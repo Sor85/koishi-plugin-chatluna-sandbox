@@ -7,8 +7,8 @@ import { createReusableTemplate, reactiveOmit, useVModel } from "@vueuse/core"
 import { CalendarRoot, useDateFormatter, useForwardPropsEmits } from "reka-ui"
 import { createYear, createYearRange, toDate } from "reka-ui/date"
 import { computed, ref, toRaw } from "vue"
-import { cn } from "../../../lib/utils"
-import { Select, SelectContent, SelectItem, SelectTrigger } from '../select'
+import { cn } from "#client/lib/utils"
+import { Select, SelectContent, SelectItem, SelectTrigger } from '#client/components/ui/select'
 import { CalendarCell, CalendarCellTrigger, CalendarGrid, CalendarGridBody, CalendarGridHead, CalendarGridRow, CalendarHeadCell, CalendarHeader, CalendarHeading, CalendarNextButton, CalendarPrevButton } from "."
 
 const props = withDefaults(defineProps<CalendarRootProps & { class?: HTMLAttributes["class"], layout?: LayoutTypes, yearRange?: DateValue[] }>(), {

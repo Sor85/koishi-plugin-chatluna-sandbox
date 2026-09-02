@@ -61,14 +61,14 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { IconPlus, IconTrash } from '@tabler/icons-vue'
-import { Badge } from './components/ui/badge'
-import { Button } from './components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
+import { Badge } from '#client/components/ui/badge'
+import { Button } from '#client/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#client/components/ui/select'
 import WorkspaceThumbnail from './workspace-thumbnail.vue'
 import type { SandboxAppearance } from '../src/types'
 import type { SandboxTestSpaceStatus, SandboxTestSpaceSummary } from '../src/test-spaces'
-import type { WorkspaceThumbnailCapture } from './webqq/workspace-thumbnail-capture'
-import type { WorkspaceThumbnailModels } from './webqq/workspace-thumbnail-model'
+import type { WorkspaceThumbnailCapture } from '#client/webqq/workspace-thumbnail-capture'
+import type { WorkspaceThumbnailModels } from '#client/webqq/workspace-thumbnail-model'
 
 const props = defineProps<{
   spaces: SandboxTestSpaceSummary[]

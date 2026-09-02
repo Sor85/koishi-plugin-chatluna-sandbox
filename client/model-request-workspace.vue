@@ -587,48 +587,48 @@ import {
   IconWorld,
 } from '@tabler/icons-vue'
 import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Badge } from './components/ui/badge'
-import { Button } from './components/ui/button'
-import { Checkbox } from './components/ui/checkbox'
-import { Switch } from './components/ui/switch'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './components/ui/dialog'
-import { Input } from './components/ui/input'
-import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
+import { Badge } from '#client/components/ui/badge'
+import { Button } from '#client/components/ui/button'
+import { Checkbox } from '#client/components/ui/checkbox'
+import { Switch } from '#client/components/ui/switch'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '#client/components/ui/dialog'
+import { Input } from '#client/components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '#client/components/ui/popover'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#client/components/ui/select'
 import ModelRequestJsonTree from './model-request-json-tree.vue'
 import ModelRequestTrajectory from './model-request-trajectory.vue'
 import ModelResponseContentPreview from './model-response-content-preview.vue'
 import WebqqAvatar from './webqq-avatar.vue'
 import { CHATLUNA_ERROR_CODE_DOCUMENTATION_URL, getChatLunaErrorPossibleCauses } from '../src/chatluna-error'
-import { formatDuration } from './webqq/format-duration'
-import { formatSandboxDateTime } from './webqq/format-time'
+import { formatDuration } from '#client/webqq/format-duration'
+import { formatSandboxDateTime } from '#client/webqq/format-time'
 import {
   buildModelRequestUsageCells,
   formatModelRequestCount,
   formatModelRequestSource,
   formatModelRequestModelName,
-} from './webqq/model-request-overview'
+} from '#client/webqq/model-request-overview'
 import {
   createModelRequestDetailView,
   modelRequestHeadersToggleLabel,
-} from './webqq/model-request-detail-view'
+} from '#client/webqq/model-request-detail-view'
 import {
   buildModelRequestBodyDownload,
   createModelRequestBodyCopy,
   resolveModelRequestBodyText,
-} from './webqq/model-request-body-transfer'
-import { createModelRequestClearConfirm } from './webqq/model-request-clear-confirm'
-import { parseModelResponseConversation } from './webqq/model-request-conversation'
-import { buildModelRequestJsonTree } from './webqq/model-request-json'
-import type { EvidenceNavigation } from './webqq/evidence-navigation'
-import { createScrollRestore } from './webqq/scroll-restore'
+} from '#client/webqq/model-request-body-transfer'
+import { createModelRequestClearConfirm } from '#client/webqq/model-request-clear-confirm'
+import { parseModelResponseConversation } from '#client/webqq/model-request-conversation'
+import { buildModelRequestJsonTree } from '#client/webqq/model-request-json'
+import type { EvidenceNavigation } from '#client/webqq/evidence-navigation'
+import { createScrollRestore } from '#client/webqq/scroll-restore'
 import {
   createModelRequestEnterRefresh,
   createModelRequestLiveRefresh,
   hasPendingModelRequest,
   resolveModelRequestRefreshLimit,
   shouldPollModelRequests,
-} from './webqq/model-request-live-refresh'
+} from '#client/webqq/model-request-live-refresh'
 import {
   beginModelRequestListNavigation,
   clearModelRequestListSelection,
@@ -636,7 +636,7 @@ import {
   restoreModelRequestListSelection,
   selectModelRequestListRecord,
   type ModelRequestListSelectionState,
-} from './webqq/model-request-list-selection'
+} from '#client/webqq/model-request-list-selection'
 import {
   createModelRequestRecordsQuery,
   createSpaceModelRequestScope,
@@ -648,7 +648,7 @@ import {
   type ModelRequestRecordQuery,
   type ModelRequestRecordsQuery,
   type ModelRequestTrajectoryQuery,
-} from './webqq/model-request-query'
+} from '#client/webqq/model-request-query'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type {
   SandboxModelRequestDetail,

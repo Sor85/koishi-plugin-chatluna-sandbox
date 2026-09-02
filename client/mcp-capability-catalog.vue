@@ -71,10 +71,10 @@
 <script setup lang="ts">
 import { IconSearch } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
-import { Badge } from './components/ui/badge'
-import { Button } from './components/ui/button'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './components/ui/collapsible'
-import { Input } from './components/ui/input'
+import { Badge } from '#client/components/ui/badge'
+import { Button } from '#client/components/ui/button'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '#client/components/ui/collapsible'
+import { Input } from '#client/components/ui/input'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type { SandboxMcpCapabilityCatalog, SandboxMcpScope } from '../src/mcp/types'
 

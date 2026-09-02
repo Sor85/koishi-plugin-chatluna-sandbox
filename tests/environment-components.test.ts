@@ -118,7 +118,7 @@ describe('环境管理组件传输边界', () => {
     expect(source).toContain('getOneBotProfileBaseline')
     expect(source).toContain('能力覆盖')
     expect(source).toContain('<Checkbox')
-    expect(source).toContain("from './components/ui/badge'")
+    expect(source).toContain("from '#client/components/ui/badge'")
     expect(source).toContain('<Badge variant="secondary"')
     expect(source).toContain('搜索 action、别名或作用')
     expect(source).toContain('absolute inset-y-0 left-3 flex items-center')

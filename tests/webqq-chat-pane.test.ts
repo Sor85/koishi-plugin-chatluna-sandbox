@@ -113,7 +113,7 @@ describe('WebQQ 聊天区域', () => {
      * 哪几个注入点通向哪个真实能力、哪个事件驱动哪个编排入口。模块看不到接线，
      * 少接一根线的表现是「点了没反应」，而不是判定出错。
      */
-    expect(source).toContain("from './webqq/message-search'")
+    expect(source).toContain("from '#client/webqq/message-search'")
     expect(source).toContain('createMessageSearchController')
     expect(source).toContain('searchTriggerRef.value?.focus()')
     expect(source).toContain('messageListRef.value?.revealMessage')
@@ -166,9 +166,9 @@ describe('WebQQ 聊天区域', () => {
     const searchSource = readFileSync(resolve('client/webqq-message-search.vue'), 'utf8')
 
     expect(searchSource).not.toContain('type="date"')
-    expect(searchSource).not.toContain("from './components/ui/input'")
-    expect(searchSource).not.toContain("from './components/ui/label'")
-    expect(searchSource).toContain("import { Calendar } from './components/ui/calendar'")
+    expect(searchSource).not.toContain("from '#client/components/ui/input'")
+    expect(searchSource).not.toContain("from '#client/components/ui/label'")
+    expect(searchSource).toContain("import { Calendar } from '#client/components/ui/calendar'")
     expect(searchSource).toContain('<Popover v-slot="{ close }" v-model:open="datePopoverOpen">')
     expect(searchSource).toContain('<Calendar')
     expect(searchSource).toContain('v-model="calendarDate"')
@@ -241,7 +241,7 @@ describe('WebQQ 聊天区域', () => {
     // 且"透明 select + 覆盖文字"的宽度对不齐会让箭头叠在文字上。
     // 年份范围由调用方收紧为近 10 年；下拉面板不显示原生滚动条。
     const calendarSource = readFileSync(resolve('client/components/ui/calendar/Calendar.vue'), 'utf8')
-    expect(calendarSource).toContain("import { Select, SelectContent, SelectItem, SelectTrigger } from '../select'")
+    expect(calendarSource).toContain("import { Select, SelectContent, SelectItem, SelectTrigger } from '#client/components/ui/select'")
     expect(calendarSource).not.toContain('NativeSelect')
     expect(calendarSource).toContain('[scrollbar-width:none]')
     expect(calendarSource).toContain('[&::-webkit-scrollbar]:hidden')

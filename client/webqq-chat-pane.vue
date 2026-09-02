@@ -158,8 +158,8 @@
 <script setup lang="ts">
 import { IconChevronLeft, IconDots, IconId, IconSearch, IconShare3 } from '@tabler/icons-vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Button } from './components/ui/button'
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from './components/ui/context-menu'
+import { Button } from '#client/components/ui/button'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '#client/components/ui/context-menu'
 import WebqqAvatar from './webqq-avatar.vue'
 import WebqqComposer, { type WebqqComposerModel, type WebqqComposerSendIntent } from './webqq-composer.vue'
 import WebqqEmojiPicker from './webqq-emoji-picker.vue'
@@ -176,7 +176,7 @@ import {
   pushForwardFrame,
   readForwardStackTop,
   type ForwardDialogFrame,
-} from './webqq/forward-dialog-stack'
+} from '#client/webqq/forward-dialog-stack'
 import {
   hasSelectedMessages,
   enterMessageSelection,
@@ -185,12 +185,12 @@ import {
   routeEscapeKey,
   toggleMessageSelection,
   type MessageSelectionState,
-} from './webqq/message-selection'
+} from '#client/webqq/message-selection'
 import {
   createMessageSearchController,
   shouldCloseMessageSearchOnOutsidePointer,
-} from './webqq/message-search'
-import { formatMentionContent } from './webqq/mention'
+} from '#client/webqq/message-search'
+import { formatMentionContent } from '#client/webqq/mention'
 import {
   type ManageSandboxEnvironmentInput,
   type SandboxForward,

@@ -71,8 +71,8 @@ describe('群成员右键菜单权限', () => {
     expect(menuSource).toContain("from './webqq-menu-extension-mark.vue'")
     expect(markSource).toContain('沙盒扩展')
     expect(markSource).toContain('SANDBOX_EXTENSION_DESCRIPTION')
-    expect(markSource).toContain("from './webqq/sandbox-extension'")
-    expect(markSource).toContain("import { Badge } from './components/ui/badge'")
+    expect(markSource).toContain("from '#client/webqq/sandbox-extension'")
+    expect(markSource).toContain("import { Badge } from '#client/components/ui/badge'")
     expect(markSource).toContain('variant="secondary"')
     expect(markSource).toContain('class="webqq-menu-extension-mark ml-auto shrink-0"')
     for (const label of unmarkedLabels) {

@@ -67,8 +67,8 @@
 <script setup lang="ts">
 import { IconBrain, IconMessage, IconTool } from '@tabler/icons-vue'
 import { computed } from 'vue'
-import { Badge } from './components/ui/badge'
-import type { ModelConversationResponse } from './webqq/model-request-conversation'
+import { Badge } from '#client/components/ui/badge'
+import type { ModelConversationResponse } from '#client/webqq/model-request-conversation'
 
 const props = defineProps<{
   response: ModelConversationResponse

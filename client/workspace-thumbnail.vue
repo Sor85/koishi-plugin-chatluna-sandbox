@@ -34,9 +34,9 @@ import {
   isWorkspaceThumbnailView,
   restoreWorkspaceThumbnailScroll,
   type WorkspaceThumbnailCapture,
-} from './webqq/workspace-thumbnail-capture'
-import type { WorkspaceThumbnailModels } from './webqq/workspace-thumbnail-model'
-import { calculateContainedWorkspaceThumbnailTransform } from './webqq/workspace-thumbnail-scale'
+} from '#client/webqq/workspace-thumbnail-capture'
+import type { WorkspaceThumbnailModels } from '#client/webqq/workspace-thumbnail-model'
+import { calculateContainedWorkspaceThumbnailTransform } from '#client/webqq/workspace-thumbnail-scale'
 import type { SandboxAppearance } from '../src/types'
 
 const THUMBNAIL_CANVAS_WIDTH = 1440

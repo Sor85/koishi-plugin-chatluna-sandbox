@@ -7,7 +7,7 @@
     "outDir": "lib",
     "baseUrl": ".",
     "paths": {
-      "@/*": [
+      "#client/*": [
         "./client/*"
       ]
     },

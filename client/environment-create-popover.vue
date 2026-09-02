@@ -130,12 +130,12 @@
 <script setup lang="ts">
 import { useMediaQuery } from '@vueuse/core'
 import { computed, reactive, ref, watch } from 'vue'
-import { Button } from './components/ui/button'
-import { Checkbox } from './components/ui/checkbox'
-import { Input } from './components/ui/input'
-import { Label } from './components/ui/label'
-import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
+import { Button } from '#client/components/ui/button'
+import { Checkbox } from '#client/components/ui/checkbox'
+import { Input } from '#client/components/ui/input'
+import { Label } from '#client/components/ui/label'
+import { Popover, PopoverContent, PopoverTrigger } from '#client/components/ui/popover'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#client/components/ui/select'
 import WebqqAvatar from './webqq-avatar.vue'
 import WebqqAvatarPicker from './webqq-avatar-picker.vue'
 import type {

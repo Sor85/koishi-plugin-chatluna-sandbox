@@ -327,26 +327,26 @@
 <script setup lang="ts">
 import { IconArrowBackUp, IconAt, IconBell, IconCheck, IconChecks, IconClock, IconExternalLink, IconGitBranch, IconHandClick, IconId, IconMessageReply, IconMoodSmile, IconPaperclip, IconTag, IconTrash, IconUserMinus, IconUserPlus, IconUsers } from '@tabler/icons-vue'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from './components/ui/context-menu'
-import { type FriendMenuState } from './webqq/friend-menu'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from '#client/components/ui/context-menu'
+import { type FriendMenuState } from '#client/webqq/friend-menu'
 // 时刻的时区与语言都是格式化模块的显式参数，缺省指向浏览器环境；这里不再包一层。
-import { formatSandboxTimeOfDay } from './webqq/format-time'
+import { formatSandboxTimeOfDay } from '#client/webqq/format-time'
 import GroupMemberMenu from './group-member-menu.vue'
-import { getMessageClusterClass, isMergedMessage } from './webqq/message-cluster'
-import { createMessageListFollowController } from './webqq/message-list-follow'
+import { getMessageClusterClass, isMergedMessage } from '#client/webqq/message-cluster'
+import { createMessageListFollowController } from '#client/webqq/message-list-follow'
 import {
   createMessageListContentResizeBinding,
   routeMessageListContentResize,
   switchMessageListConversation,
-} from './webqq/message-list-conversation-switch'
-import { loadEarlierMessageListHistory, type MessageListGeometry } from './webqq/message-list-history-load'
+} from '#client/webqq/message-list-conversation-switch'
+import { loadEarlierMessageListHistory, type MessageListGeometry } from '#client/webqq/message-list-history-load'
 import {
   readPointerContext,
   routeAvatarClick,
   routeBubbleClick,
   routeRowClick,
-} from './webqq/message-pointer-routing'
-import { formatThinkingDuration, freezeThinkingPanel, toggleThinkingExpansion } from './webqq/thinking-panel'
+} from '#client/webqq/message-pointer-routing'
+import { formatThinkingDuration, freezeThinkingPanel, toggleThinkingExpansion } from '#client/webqq/thinking-panel'
 import {
   formatMediaSize,
   getEventMessageText as readEventMessageText,
@@ -364,7 +364,7 @@ import {
   shouldShowThinking as shouldShowMessageThinking,
   shouldShowUsage as shouldShowMessageUsage,
   type MessagePresentationContext,
-} from './webqq/message-presentation'
+} from '#client/webqq/message-presentation'
 import {
   getChatFriendActions as readChatFriendActions,
   getCurrentGroupMember as readCurrentGroupMember,
@@ -378,26 +378,26 @@ import {
   isBotParticipant as readIsBotParticipant,
   type MessageParticipant,
   type ParticipantPresentationContext,
-} from './webqq/participant-presentation'
+} from '#client/webqq/participant-presentation'
 import {
   buildMessageListTail,
   scrollMessageListToBottom,
   shouldFollowMessageListTail,
-} from './webqq/message-list-scroll'
+} from '#client/webqq/message-list-scroll'
 import {
   buildMessageListScrollStateKey,
   readMessageListScrollState,
   writeMessageListScrollState,
   type MessageListScrollState,
-} from './webqq/message-list-scroll-state'
+} from '#client/webqq/message-list-scroll-state'
 import {
   createMessageListScrollRestoreScheduler,
   resolveMessageListScrollRestore,
   resolveMessageListScrollSave,
   revealMessageListMessage,
   type ScrollAnchorRow,
-} from './webqq/message-list-scroll-restore'
-import { highlightMessageElement } from './webqq/message-reveal'
+} from '#client/webqq/message-list-scroll-restore'
+import { highlightMessageElement } from '#client/webqq/message-reveal'
 import WebqqAvatar from './webqq-avatar.vue'
 import WebqqMessageReactions from './webqq-message-reactions.vue'
 import WebqqMenuExtensionMark from './webqq-menu-extension-mark.vue'

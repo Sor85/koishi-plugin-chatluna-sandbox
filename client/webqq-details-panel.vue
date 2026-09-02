@@ -97,9 +97,9 @@
 <script setup lang="ts">
 import { IconDatabase, IconDots, IconPlus, IconTrash } from '@tabler/icons-vue'
 import { computed, ref, watch } from 'vue'
-import { ContextMenu, ContextMenuTrigger } from './components/ui/context-menu'
+import { ContextMenu, ContextMenuTrigger } from '#client/components/ui/context-menu'
 import GroupMemberMenu from './group-member-menu.vue'
-import { getGroupMemberDisplayName, getGroupRoleLabel } from './webqq/group-display'
+import { getGroupMemberDisplayName, getGroupRoleLabel } from '#client/webqq/group-display'
 import WebqqAvatar from './webqq-avatar.vue'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type { SandboxBotProfile, SandboxGroup, SandboxGroupMember, SandboxPersistenceStatus } from '../src/types'

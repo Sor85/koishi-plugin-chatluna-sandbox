@@ -72,7 +72,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Input } from './components/ui/input'
+import { Input } from '#client/components/ui/input'
 import {
   getCommonSandboxEmojiFaces,
   getSandboxEmojiFace,
@@ -80,8 +80,8 @@ import {
   rememberSandboxEmojiId,
   searchSandboxEmojiFaces,
   type SandboxEmojiFace,
-} from './webqq/emoji-catalog'
-import { getFloatingPanelStyle, clampFloatingPanelPosition, isFloatingPanelInteractiveTarget } from './webqq/floating-panel'
+} from '#client/webqq/emoji-catalog'
+import { getFloatingPanelStyle, clampFloatingPanelPosition, isFloatingPanelInteractiveTarget } from '#client/webqq/floating-panel'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 
 const props = defineProps<{

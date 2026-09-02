@@ -50,7 +50,7 @@
 <script setup lang="ts">
 import { IconArrowLeft, IconChevronRight, IconUpload } from '@tabler/icons-vue'
 import { computed, ref } from 'vue'
-import { Button } from './components/ui/button'
+import { Button } from '#client/components/ui/button'
 import { BUILTIN_AVATARS, type BuiltinAvatar, type BuiltinAvatarKind } from '../src/builtin-avatar-options'
 
 const props = defineProps<{

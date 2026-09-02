@@ -202,18 +202,18 @@ import {
 } from '@tabler/icons-vue'
 import { computed, markRaw, nextTick, onBeforeUnmount, ref, shallowRef, watch, type DeepReadonly } from 'vue'
 import type { StateEffect } from '@codemirror/state'
-import { Badge } from './components/ui/badge'
-import { Button } from './components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './components/ui/dialog'
-import { Input } from './components/ui/input'
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
+import { Badge } from '#client/components/ui/badge'
+import { Button } from '#client/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '#client/components/ui/dialog'
+import { Input } from '#client/components/ui/input'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '#client/components/ui/select'
 import PresetSourceEditor from './preset-source-editor.vue'
-import { resolvePresetExpressionObservedValue, type PresetExpressionObservedValueResult } from './webqq/preset-expression-value'
+import { resolvePresetExpressionObservedValue, type PresetExpressionObservedValueResult } from '#client/webqq/preset-expression-value'
 import {
   type PresetOriginRestore,
   type PresetOriginSnapshot,
-} from './webqq/evidence-navigation'
-import { createScrollRestore } from './webqq/scroll-restore'
+} from '#client/webqq/evidence-navigation'
+import { createScrollRestore } from '#client/webqq/scroll-restore'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type {
   LocateSandboxPresetExpressionInput,

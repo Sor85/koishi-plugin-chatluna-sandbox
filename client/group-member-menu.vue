@@ -38,8 +38,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { IconAt, IconAward, IconCrown, IconHandClick, IconTag, IconUserMinus, IconUserPlus } from '@tabler/icons-vue'
-import { ContextMenuContent, ContextMenuItem, ContextMenuSubContent } from './components/ui/context-menu'
-import { getGroupMemberMenuActions } from './webqq/group-menu'
+import { ContextMenuContent, ContextMenuItem, ContextMenuSubContent } from '#client/components/ui/context-menu'
+import { getGroupMemberMenuActions } from '#client/webqq/group-menu'
 import WebqqMenuExtensionMark from './webqq-menu-extension-mark.vue'
 import type { SandboxGroupMember } from '../src/types'
 

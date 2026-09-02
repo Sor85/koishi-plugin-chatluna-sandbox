@@ -32,7 +32,7 @@
 
 <script setup lang="ts">
 import WebqqAvatar from './webqq-avatar.vue'
-import type { MentionCandidate } from './webqq/composer-draft'
+import type { MentionCandidate } from '#client/webqq/composer-draft'
 
 defineProps<{
   candidates: MentionCandidate[]

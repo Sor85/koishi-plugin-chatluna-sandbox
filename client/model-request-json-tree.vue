@@ -138,11 +138,11 @@
 <script setup lang="ts">
 import { IconChevronDown, IconChevronRight } from '@tabler/icons-vue'
 import { computed, nextTick, ref, watch } from 'vue'
-import type { ModelRequestJsonKind, ModelRequestJsonNode } from './webqq/model-request-json'
+import type { ModelRequestJsonKind, ModelRequestJsonNode } from '#client/webqq/model-request-json'
 import {
   createModelRequestJsonRow,
   formatModelRequestJsonImageSize,
-} from './webqq/model-request-json-row'
+} from '#client/webqq/model-request-json-row'
 
 defineOptions({ name: 'ModelRequestJsonTree' })
 

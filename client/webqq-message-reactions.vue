@@ -38,7 +38,7 @@
 </template>
 
 <script setup lang="ts">
-import { getSandboxEmojiFace } from './webqq/emoji-catalog'
+import { getSandboxEmojiFace } from '#client/webqq/emoji-catalog'
 import WebqqAvatar from './webqq-avatar.vue'
 import type { SandboxMessageReaction } from '../src/types'
 

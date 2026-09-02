@@ -3,7 +3,7 @@ import type { ContextMenuSubContentEmits, ContextMenuSubContentProps } from 'rek
 import type { HTMLAttributes } from 'vue'
 import { reactiveOmit } from '@vueuse/core'
 import { ContextMenuPortal, ContextMenuSubContent, useForwardPropsEmits } from 'reka-ui'
-import { cn } from '../../../lib/utils'
+import { cn } from '#client/lib/utils'
 
 defineOptions({ inheritAttrs: false })
 

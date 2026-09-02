@@ -104,9 +104,9 @@
 import { IconChevronLeft, IconPaperclip, IconX } from '@tabler/icons-vue'
 import { onMounted, ref } from 'vue'
 import WebqqAvatar from './webqq-avatar.vue'
-import { buildForwardPreview } from './webqq/forward-preview'
-import { formatMediaSize, getMediaLabel } from './webqq/message-presentation'
-import { getForwardNodeClusterClass, isMergedForwardNode } from './webqq/forward-cluster'
+import { buildForwardPreview } from '#client/webqq/forward-preview'
+import { formatMediaSize, getMediaLabel } from '#client/webqq/message-presentation'
+import { getForwardNodeClusterClass, isMergedForwardNode } from '#client/webqq/forward-cluster'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type { SandboxForward, SandboxForwardNode } from '../src/types'
 

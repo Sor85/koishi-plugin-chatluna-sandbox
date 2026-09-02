@@ -331,12 +331,12 @@ import {
   IconZoomOut,
 } from '@tabler/icons-vue'
 import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
-import { Button } from './components/ui/button'
-import { Input } from './components/ui/input'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip'
-import ModelRequestConversationAnalysis from './webqq/analysis-view.vue'
-import type { EvidenceNavigation, EvidenceViewRestore } from './webqq/evidence-navigation'
-import type { LocateRequest } from './webqq/evidence-locator'
+import { Button } from '#client/components/ui/button'
+import { Input } from '#client/components/ui/input'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#client/components/ui/tooltip'
+import ModelRequestConversationAnalysis from '#client/webqq/analysis-view.vue'
+import type { EvidenceNavigation, EvidenceViewRestore } from '#client/webqq/evidence-navigation'
+import type { LocateRequest } from '#client/webqq/evidence-locator'
 import {
   buildModelRequestTrajectorySearchMutes,
   buildModelRequestTrajectorySearchTexts,
@@ -345,23 +345,23 @@ import {
   orderModelRequestTrajectoryRows,
   toggleModelRequestTrajectoryCollapse,
   type ModelRequestTrajectorySortOrder,
-} from './webqq/model-request-trajectory-display'
+} from '#client/webqq/model-request-trajectory-display'
 import {
   COMPOSITION_ZOOM_MAX,
   COMPOSITION_ZOOM_MIN,
   COMPOSITION_ZOOM_STEP,
   createCompositionZoomPan,
-} from './webqq/composition-zoom-pan'
+} from '#client/webqq/composition-zoom-pan'
 import {
   formatModelRequestLabel,
   formatModelRequestOrdinal,
-} from './webqq/model-request-overview'
-import { createScrollRestore } from './webqq/scroll-restore'
-import { formatDuration } from './webqq/format-duration'
+} from '#client/webqq/model-request-overview'
+import { createScrollRestore } from '#client/webqq/scroll-restore'
+import { formatDuration } from '#client/webqq/format-duration'
 import {
   MODEL_EVIDENCE_FILTER_KINDS,
   toggleFilterMember,
-} from './webqq/model-request-filter'
+} from '#client/webqq/model-request-filter'
 import { sandboxEvidenceLabels, type SandboxEvidenceKind } from '../src/evidence-kind'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 import type {

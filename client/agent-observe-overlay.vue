@@ -29,7 +29,7 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import AgentCursor from './agent-cursor.vue'
 import SandboxAgentControlIcon from './sandbox-agent-control-icon.vue'
-import { mountAgentOverlayEffect } from './webqq/agent-overlay-effect'
+import { mountAgentOverlayEffect } from '#client/webqq/agent-overlay-effect'
 
 defineProps<{ spaceName: string }>()
 defineEmits<{ takeOver: []; terminate: [] }>()

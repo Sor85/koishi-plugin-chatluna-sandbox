@@ -59,13 +59,13 @@
 <script setup lang="ts">
 import { IconPlus } from '@tabler/icons-vue'
 import { onMounted } from 'vue'
-import { Button } from './components/ui/button'
-import { Checkbox } from './components/ui/checkbox'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './components/ui/dialog'
-import { Input } from './components/ui/input'
-import { Label } from './components/ui/label'
-import { createMcpCredentialAdmin, formatMcpScopes, MCP_SCOPE_OPTIONS } from './webqq/mcp-admin-shell'
-import type { McpAdminPort } from './webqq/mcp-admin-port'
+import { Button } from '#client/components/ui/button'
+import { Checkbox } from '#client/components/ui/checkbox'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '#client/components/ui/dialog'
+import { Input } from '#client/components/ui/input'
+import { Label } from '#client/components/ui/label'
+import { createMcpCredentialAdmin, formatMcpScopes, MCP_SCOPE_OPTIONS } from '#client/webqq/mcp-admin-shell'
+import type { McpAdminPort } from '#client/webqq/mcp-admin-port'
 import { vWebqqScrollbar } from './webqq-scrollbar'
 
 const props = defineProps<{ port: McpAdminPort }>()
