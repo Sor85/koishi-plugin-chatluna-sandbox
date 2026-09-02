@@ -23,6 +23,7 @@ export const MCP_TOOL_CATALOGUE: McpToolCatalogueEntry[] = [
   { name: 'list_pending_requests', scope: 'read' },
   { name: 'get_capability_matrix', scope: 'read' },
   { name: 'export_scene', scope: 'read' },
+  { name: 'get_wakeup_rules', scope: 'read' },
   { name: 'upload_media', scope: 'interact' },
   { name: 'send_message', scope: 'interact' },
   { name: 'send_forward_message', scope: 'interact' },

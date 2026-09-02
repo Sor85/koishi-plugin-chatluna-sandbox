@@ -2,6 +2,11 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypt
 import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Context } from 'koishi'
+import {
+  SandboxChatLunaWakeup,
+  readSandboxResponderRuntimes,
+  type SandboxWakeupReader,
+} from '../chatluna-wakeup'
 import type { SandboxControlService } from '../control-service'
 import type { SandboxModelRequestStore } from '../model-request'
 import { createScopeDirectory, type ScopeDirectory } from '../scope-directory'
@@ -71,6 +76,8 @@ export interface SandboxMcpServiceOptions extends Partial<SandboxMcpQuotaConfig>
   idempotencyTtlMs?: number
   testSpaces?: SandboxTestSpaceService
   unattributedModelRequests?: SandboxModelRequestStore
+  /** 唤醒规则的来源；省略时读本服务所在 Koishi 实例里的被测响应插件运行时。 */
+  wakeup?: SandboxWakeupReader
 }
 
 const READ_RESOURCES = [
@@ -224,6 +231,8 @@ export class SandboxMcpService {
   private concurrentLimits: Record<Exclude<SandboxMcpToolQuota, 'read'>, number>
   private testSpaces?: SandboxTestSpaceService
   private unattributedModelRequests?: SandboxModelRequestStore
+  /** 被测机器人当前的唤醒规则；工具声明、测试指南与 `get_wakeup_rules` 都问它。 */
+  private wakeup: SandboxWakeupReader
   /**
    * 「谁是全部记录域」的唯一答案，与 Console 注册处各自从同样三个输入包一份。
    *
@@ -234,6 +243,8 @@ export class SandboxMcpService {
   constructor(private ctx: Context, private control: SandboxControlService, options: SandboxMcpServiceOptions) {
     this.testSpaces = options.testSpaces
     this.unattributedModelRequests = options.unattributedModelRequests
+    // 默认读本服务所在实例的被测运行时。每次读取都现取，因此被测插件重载或改配置后无需重启端点。
+    this.wakeup = options.wakeup ?? new SandboxChatLunaWakeup(() => readSandboxResponderRuntimes(ctx))
     this.scopes = createScopeDirectory({
       control,
       testSpaces: options.testSpaces,
@@ -389,16 +400,24 @@ export class SandboxMcpService {
   /**
    * 工具清单的对外形态。
    *
-   * 注册表是模块级常量，写不进实例配置；幂等窗口的数值却由 `idempotencyLimit` 与
-   * `idempotencyTtlMs` 决定。所有对外读取工具声明的路径（`listTools`、`getCapabilityCatalog`、
-   * `chatluna-sandbox://guide`）都经这里，声明因此不可能与实际配置漂移。
+   * 注册表是模块级常量，写不进实例配置，也读不到被测插件的运行时；幂等窗口的数值由 `idempotencyLimit`
+   * 与 `idempotencyTtlMs` 决定，被测机器人的唤醒方式由当前装着的响应插件决定。所有对外读取工具声明的
+   * 路径（`listTools`、`getCapabilityCatalog`、`chatluna-sandbox://guide`）都经这里，声明因此不可能与
+   * 实际配置漂移。
    */
   private describeTools(): SandboxMcpToolCapability[] {
     const window = this.idempotencyWindowDescription()
+    // 唤醒指引整份清单只读一次：一次 tools/list 里的每个工具都问一遍运行时既无必要，也会让同一次
+    // 响应里出现两份不同时刻的答案。
+    const wakeup = this.wakeup.read().guidance
     return SANDBOX_MCP_TOOL_DECLARATIONS.map((declaration) => {
       const clone = structuredClone(declaration)
-      const properties = (clone.inputSchema as { properties?: Record<string, { description?: string }> }).properties
-      if (properties?.idempotencyKey) properties.idempotencyKey.description = window
+      const schema = clone.inputSchema as { description?: string; properties?: Record<string, { description?: string }> }
+      if (schema.properties?.idempotencyKey) schema.properties.idempotencyKey.description = window
+      // 按 schema 形状选注入点而不是按工具名：带消息正文参数的工具就是「正文要写成什么才能唤醒被测
+      // 机器人」的那一个，而工具名不参与任何判定（ADR-0086 的守卫规则）。今后新增带正文的工具会自动
+      // 带上指引，这正是期望行为。
+      if (schema.properties?.content) schema.description = [schema.description, wakeup].filter(Boolean).join(' ')
       return clone
     })
   }
@@ -426,7 +445,9 @@ export class SandboxMcpService {
 
   readResource(token: string, uri: string): unknown {
     this.requireScope(this.requireCredential(token), 'read')
-    if (uri === 'chatluna-sandbox://guide') return { testApiVersion: 1, tools: this.describeTools() }
+    // 指南带上唤醒规则：工具清单只说「怎么调用工具」，而「消息要写成什么样被测机器人才会回复」是
+    // 一次测试能不能开始的前提，两者一起读到才是完整的开工信息。
+    if (uri === 'chatluna-sandbox://guide') return { testApiVersion: 1, tools: this.describeTools(), wakeup: this.wakeup.read() }
     if (uri === 'chatluna-sandbox://scene-schema') return { testApiVersion: { const: 1 }, scene: { type: 'object' } }
     if (uri === 'chatluna-sandbox://capabilities/napcat') return readCapabilityMatrix(this.control, 'napcat')
     if (uri === 'chatluna-sandbox://capabilities/llbot') return readCapabilityMatrix(this.control, 'llbot')
@@ -444,6 +465,13 @@ export class SandboxMcpService {
           { action: 'create-user', data: { id: '10001', name: '测试用户' } },
           { action: 'create-bot', data: { id: '20002', name: '被测机器人', implementation: 'napcat' } },
           { action: 'set-friendship', data: { firstId: '10001', secondId: '20002' } },
+        ],
+      },
+      唤醒被测机器人: {
+        说明: '被测机器人只在唤醒条件成立时回复，条件由当前装着的 ChatLuna 响应插件决定，与沙盒无关。先读一次规则，再按它给出的方式写 content：不要假设 @ 一定有效（chatluna-character 在私聊里不判定 @），也不要假设回复一定即时（它可能要等静默若干秒，或按累计消息条数自动触发）。',
+        步骤: [
+          { tool: 'get_wakeup_rules', arguments: { spaceId: '<spaceId>', conversationId: 'group:30001' } },
+          { tool: 'send_message', arguments: { spaceId: '<spaceId>', operatorId: '10001', conversationId: 'group:30001', content: '<at id="20002"/> 你好', idempotencyKey: 'example-wakeup-1' } },
         ],
       },
       send_message: {
@@ -604,6 +632,7 @@ export class SandboxMcpService {
       currentCursor: () => this.currentCursor(),
       appendEvent: (type, data, eventSpaceId = spaceId) => this.appendEvent(type, data, eventSpaceId),
       waitFor: (waitArgs, predicate) => this.waitFor(waitArgs, predicate),
+      readWakeupRules: (wakeupTarget) => this.wakeup.read(wakeupTarget),
       requireTestSpaces: () => this.requireTestSpaces(),
       requireUnattributedModelRequests: () => this.requireUnattributedModelRequests(),
       resolveControl: (targetSpaceId, mutation) => this.resolveControl({ spaceId: targetSpaceId }, mutation),

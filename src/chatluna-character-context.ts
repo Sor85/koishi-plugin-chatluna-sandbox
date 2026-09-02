@@ -1,3 +1,4 @@
+import { findChatLunaRuntime } from './chatluna-runtime'
 import type { ResolvedConversation } from './conversation-resolution'
 
 /**
@@ -36,48 +37,17 @@ export function resolveChatLunaCharacterSessionKey(
   return conversation.type === 'group' ? `group:${conversation.groupId}` : `private:${authorId}`
 }
 
-function readRecord(value: unknown): Record<string, unknown> | undefined {
-  return value !== null && typeof value === 'object' ? value as Record<string, unknown> : undefined
-}
-
-/**
- * 从一个 Koishi 上下文取被测服务。
- *
- * 走 `get(name)` 而不是属性访问：本插件不把 chatluna-character 声明进 inject——声明了它会让
- * 被测插件每次重载都连带重建沙盒，内存模式下整份场景会跟着丢——而未声明的属性访问会被 Cordis
- * 记一条注入告警。形状按运行时读：服务来自仓库外的包，类型不在编译期可见。
- */
-function readChatContext(value: unknown): ChatLunaCharacterChatContext | undefined {
-  const get = readRecord(value)?.get
-  if (typeof get !== 'function') return undefined
-  const service = readRecord((get as (name: string) => unknown).call(value, SERVICE_NAME))
-  return typeof service?.clear === 'function' ? service as unknown as ChatLunaCharacterChatContext : undefined
-}
-
-function listRegistryContexts(value: unknown): unknown[] {
-  const registry = readRecord(readRecord(value)?.registry)
-  const values = registry?.values
-  if (typeof values !== 'function') return []
-  return [...(values as () => Iterable<unknown>).call(registry)].flatMap((runtime) => {
-    const ctx = readRecord(runtime)?.ctx
-    return ctx ? [ctx] : []
-  })
-}
-
 /**
  * 解析被测 chatluna-character 服务。
  *
- * 先在自己的上下文里取；取不到再遍历插件注册表用提供方自己的上下文取一次。第二步不是保险
- * 措施：被测插件可能装在一个隔离了服务映射的 loader group 里，此时只有提供方那份上下文能
- * 解析到实例——chatluna-usage 已经踩过同一个坑。
+ * 「怎么取到被测插件的服务」由 `chatluna-runtime` 持有：走 `get(name)` 而不是属性访问、自己的上下文
+ * 取不到时用提供方自己的上下文再取一次，两条的理由都写在那里。本模块只声明自己要的那一小块能力——
+ * 能清空会话上下文的服务才算解析成功，形状不对时当作没装，而不是等到真要重置时在调用点上炸掉。
  */
 export function findChatLunaCharacterChatContext(host: unknown): ChatLunaCharacterChatContext | undefined {
-  const direct = readChatContext(host)
-  if (direct) return direct
-  for (const ctx of listRegistryContexts(host)) {
-    const resolved = readChatContext(ctx)
-    if (resolved) return resolved
-  }
+  return findChatLunaRuntime(host, SERVICE_NAME, (service) => (
+    typeof service.clear === 'function' ? service as unknown as ChatLunaCharacterChatContext : undefined
+  ))
 }
 
 export interface ChatLunaCharacterInboundConversation {

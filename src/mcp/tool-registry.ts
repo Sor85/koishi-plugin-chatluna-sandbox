@@ -4,6 +4,7 @@ import {
   normalizeGroupMemberFromUnknown,
   parseAccountProfileFromUnknown,
 } from '../account-profile'
+import type { SandboxWakeupRules, SandboxWakeupTarget } from '../chatluna-wakeup'
 import type { SandboxControlService } from '../control-service'
 import {
   ensureDirectRootConversation,
@@ -101,6 +102,8 @@ export interface SandboxMcpToolRuntime {
   /** 追加一条事件；省略 `spaceId` 时按本次调用的空间归属写入。 */
   appendEvent(type: string, data: unknown, spaceId?: string): SandboxMcpEventCursor
   waitFor(args: Record<string, unknown>, predicate: (event: SandboxMcpEvent) => boolean): Promise<SandboxMcpWaitResult>
+  /** 被测机器人当前的唤醒规则；省略 `target` 时同时给出私聊与群聊两份通用规则。 */
+  readWakeupRules(target?: SandboxWakeupTarget): SandboxWakeupRules
   requireTestSpaces(): SandboxTestSpaceService
   requireUnattributedModelRequests(): SandboxModelRequestStore
   /** 按显式空间标识另取一个控制服务，供记录域由 `scope` 参数决定的工具使用。 */
@@ -379,6 +382,35 @@ export function readCapabilityMatrix(control: SandboxControlService, implementat
   const existing = snapshot.participants.find((participant) => participant.kind === 'bot' && participant.implementation === profile)
   if (existing?.kind === 'bot') return control.getBotCapabilities(existing.id)
   return getOneBotCapabilityMatrix(profile)
+}
+
+/**
+ * 被测机器人当前的唤醒规则。
+ *
+ * 传了会话就按那条会话解析：群聊按群号，私聊按会话里那位普通用户的账号——两个被测响应插件都按这一维
+ * 归档逐会话配置与白名单。会话实例继承根会话的参与者与群号，因此一个实例与它的根会话得到同一份答案，
+ * 这与被测插件看不见实例这一级是同一件事。
+ *
+ * 省略会话时给出私聊与群聊两份通用规则：与会话键有关的判定会明确标成待判定，而不是替被测插件猜一个。
+ */
+function getWakeupRules(runtime: SandboxMcpToolRuntime, args: Record<string, unknown>) {
+  if (args.conversationId === undefined) return runtime.readWakeupRules()
+  const conversationId = requireString(args.conversationId, 'conversationId')
+  const snapshot = runtime.control.getSnapshot()
+  const conversation = resolveConversation(snapshot, conversationId)
+  if (!conversation) throw new SandboxMcpError('conversation_not_found', `会话不存在：${conversationId}`)
+  return { conversationId, ...runtime.readWakeupRules(readWakeupTarget(snapshot, conversation)) }
+}
+
+function readWakeupTarget(snapshot: SandboxSnapshot, conversation: ResolvedConversation): SandboxWakeupTarget {
+  if (conversation.type === 'group') {
+    return { conversationType: 'group', ...(conversation.groupId ? { conversationKey: conversation.groupId } : {}) }
+  }
+  // 私聊按发言者账号归档，因此取那位不是机器人的参与者：规则要答的是「这个人发消息会怎样」。
+  const speaker = conversation.participantIds?.find((id) => (
+    snapshot.participants.find((participant) => participant.id === id)?.kind !== 'bot'
+  ))
+  return { conversationType: 'direct', ...(speaker ? { conversationKey: speaker } : {}) }
 }
 
 // —— 执行体：AI 测试空间 ——
@@ -1026,7 +1058,7 @@ function listTestCallRecords(runtime: SandboxMcpToolRuntime, args: Record<string
 }
 
 /**
- * 作者书写的 40 条条目，按 `tools/list` 的返回顺序排列；下面那一步给它们统一补上调用标注参数。
+ * 作者书写的 41 条条目，按 `tools/list` 的返回顺序排列；下面那一步给它们统一补上调用标注参数。
  *
  * 顺序本身是对外契约的一部分（`tests/helpers/mcp-tool-catalogue.ts` 逐条钉住它），因此新增工具
  * 时要放到它所属能力范围那一段的末尾，而不是文件末尾。
@@ -1148,6 +1180,24 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
     inputSchema: { type: 'object', properties: { spaceId: SPACE_OPTIONAL } },
     quota: 'read', spaceResolution: 'read', idempotent: false, requiresConfirmation: false,
     run: exportScene,
+  },
+  {
+    name: 'get_wakeup_rules',
+    scope: 'read',
+    description: '读取被测机器人当前的唤醒规则：哪个 ChatLuna 响应插件在回复、消息要怎么写才能唤醒它',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        spaceId: SPACE_OPTIONAL,
+        conversationId: {
+          type: 'string',
+          description: '按这条会话解析：群聊按群号、私聊按对方账号判定白名单与逐会话配置；省略时返回私聊与群聊两份通用规则，与会话有关的判定标成待判定',
+        },
+      },
+      description: '发消息前先读一次：被测机器人只在唤醒条件成立时回复，条件由当前装着的 ChatLuna 响应插件决定，与沙盒无关。',
+    },
+    quota: 'read', spaceResolution: 'read', idempotent: false, requiresConfirmation: false,
+    run: getWakeupRules,
   },
   {
     name: 'upload_media',

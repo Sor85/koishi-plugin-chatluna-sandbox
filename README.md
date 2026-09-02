@@ -17,7 +17,9 @@ WebQQ 的毛玻璃、气泡尾部、颜色模式和强调色由 Koishi 插件全
 
 WebQQ 顶部主导航提供测试空间总览：主环境固定在首位，AI 空间按创建时间从旧到新排列。用户可以实时观察空间、接管或归还控制权、复盘已完成空间，以及按需重新激活或删除。数据库持久化模式会同时保存主环境和测试空间场景。
 
-完整权限的 MCP 凭证可发现 40 个工具和 6 个只读资源，其中包括用于构造和按权限读取合并转发的 `send_forward_message`、`get_forward_message`，以及 7 个测试空间生命周期工具：`list_test_spaces`、`get_test_space`、`create_test_space`、`complete_test_space`、`fail_test_space`、`reactivate_test_space` 和 `delete_test_space`。环境管理页会直接展示由服务端权威定义生成的 MCP 工具、资源、权限范围和协议能力目录。
+完整权限的 MCP 凭证可发现 41 个工具和 6 个只读资源，其中包括用于构造和按权限读取合并转发的 `send_forward_message`、`get_forward_message`，以及 7 个测试空间生命周期工具：`list_test_spaces`、`get_test_space`、`create_test_space`、`complete_test_space`、`fail_test_space`、`reactivate_test_space` 和 `delete_test_space`。环境管理页会直接展示由服务端权威定义生成的 MCP 工具、资源、权限范围和协议能力目录。
+
+被测机器人只在唤醒条件成立时回复，而条件由当前装着的 ChatLuna 响应插件决定：ChatLuna 主功能与 chatluna-character 的判定口径完全不同，两者同时装上时默认只有 chatluna-character 回复，而它的白名单默认为空。`get_wakeup_rules` 按会话答出谁在响应、消息要怎么写才能唤醒它（@、引用、昵称开头、昵称任意位置、命令）、哪些触发不由消息决定（累计条数、发言等待、群活跃度、随机概率），以及哪些陷阱会让唤醒落空。同一份答案还会跟着 `send_message` 的参数说明与 `chatluna-sandbox://guide` 一起发布，因此 AI 客户端连上端点就能读到，不必先想到要问。
 
 断言插件行为时不要只看机器人回复的文本：`wait_for_onebot_action` 可以等待插件真实发起的 OneBot action 及其成败，`wait_for_message` 的 `settleSeconds` 可以跳过「稍等」这类中间回复并拿到最终结果，专属头衔、群禁言和表情回应等有状态 action 的结果都能从场景快照复查。
 
