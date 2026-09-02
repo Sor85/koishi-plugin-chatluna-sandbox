@@ -5,7 +5,7 @@ import {
   findChatLunaCharacterChatContext,
   resolveChatLunaCharacterSessionKey,
   type ChatLunaCharacterChatContext,
-} from '../src/chatluna-character-context'
+} from '../src/chatluna/character-context'
 import { SandboxControlService } from '../src/control-service'
 
 const runningApps: App[] = []

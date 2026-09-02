@@ -1,4 +1,4 @@
-import type { SandboxModelRequestRecord, SandboxModelRequestUsage } from './types'
+import type { SandboxModelRequestRecord, SandboxModelRequestUsage } from '../types'
 
 interface ModelRequestStoreLike {
   getRawRecords(input?: { limit?: number }): Promise<SandboxModelRequestRecord[]>

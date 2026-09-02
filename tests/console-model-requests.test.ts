@@ -6,7 +6,7 @@ import { SandboxModelRequestStore } from '../src/model-request'
 import { SandboxTestSpaceService } from '../src/test-spaces'
 import type { SandboxAppearance } from '../src/types'
 import { SandboxDomainError } from '../src/types'
-import type { ChatLunaUsageLookup } from '../src/chatluna-usage'
+import type { ChatLunaUsageLookup } from '../src/chatluna/usage'
 
 const appearance: SandboxAppearance = {
   enableSandboxFrostedGlass: true,

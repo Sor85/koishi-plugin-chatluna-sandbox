@@ -5,7 +5,7 @@ import {
   lookupChatLunaUsage,
   toSandboxModelRequestUsage,
   type ChatLunaUsageLookup,
-} from '../src/chatluna-usage'
+} from '../src/chatluna/usage'
 
 describe('ChatLuna Usage 模型请求关联', () => {
   it('把 chatluna-usage 行转换为模型请求详情用量', async () => {

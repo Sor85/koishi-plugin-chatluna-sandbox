@@ -1,10 +1,10 @@
 import type { Context } from 'koishi'
-import { parseThinkContent, readChatLunaResponseText } from './chatluna-thinking'
+import { parseThinkContent, readChatLunaResponseText } from './thinking'
 import type {
   SandboxChatLunaState,
   SandboxMessageChatLuna,
   SandboxMessageModelRequestReference,
-} from './types'
+} from '../types'
 
 type ValidateTarget = (botParticipantId: string, conversationId: string) => boolean
 type ArchiveResult = (

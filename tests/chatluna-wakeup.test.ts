@@ -7,7 +7,7 @@ import {
   type SandboxResponderRuntimes,
   type SandboxWakeupReader,
   type SandboxWakeupTarget,
-} from '../src/chatluna-wakeup'
+} from '../src/chatluna/wakeup'
 import { createMcpTestService, stopMcpTestApps } from './helpers/mcp-service-harness'
 
 /**

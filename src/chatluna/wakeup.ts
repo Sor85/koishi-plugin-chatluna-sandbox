@@ -1,4 +1,4 @@
-import { findChatLunaRuntime, readRecord } from './chatluna-runtime'
+import { findChatLunaRuntime, readRecord } from './runtime'
 
 /**
  * 被测机器人的唤醒规则：外部测试控制器要怎么写这条消息，被测机器人才会回复。

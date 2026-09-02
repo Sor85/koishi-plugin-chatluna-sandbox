@@ -599,7 +599,7 @@ import ModelRequestJsonTree from './json-tree.vue'
 import ModelRequestTrajectory from './trajectory.vue'
 import ModelResponseContentPreview from './response-content-preview.vue'
 import WebqqAvatar from '#client/shared/avatar.vue'
-import { CHATLUNA_ERROR_CODE_DOCUMENTATION_URL, getChatLunaErrorPossibleCauses } from '../../src/chatluna-error'
+import { CHATLUNA_ERROR_CODE_DOCUMENTATION_URL, getChatLunaErrorPossibleCauses } from '../../src/chatluna/error'
 import { formatDuration } from '#client/shared/format-duration'
 import { formatSandboxDateTime } from '#client/shared/format-time'
 import {

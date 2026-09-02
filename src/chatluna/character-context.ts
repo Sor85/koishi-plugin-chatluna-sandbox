@@ -1,5 +1,5 @@
-import { findChatLunaRuntime } from './chatluna-runtime'
-import type { ResolvedConversation } from './conversation-resolution'
+import { findChatLunaRuntime } from './runtime'
+import type { ResolvedConversation } from '../conversation-resolution'
 
 /**
  * 让被测 chatluna-character 的对话上下文跟随沙盒的对话线。

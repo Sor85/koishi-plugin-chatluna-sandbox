@@ -2,7 +2,7 @@ import { Random, Universal, h } from 'koishi'
 import {
   resolveChatLunaCharacterSessionKey,
   type ChatLunaCharacterInboundConversation,
-} from './chatluna-character-context'
+} from './chatluna/character-context'
 import type { ResolvedConversation } from './conversation-resolution'
 import { createOneBotDebugError, type AppendOneBotDebugRecordInput } from './onebot-debug'
 import type { SandboxOneBotMessageSegment } from './onebot-message'

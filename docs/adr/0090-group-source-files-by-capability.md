@@ -1,4 +1,4 @@
-# 客户端按能力分目录，而不是按文件类型
+# 源码按能力分目录，而不是按文件类型
 
 `client/` 下每个文件属于一个能力目录，视图与服务它的 module 放在一起。目录是 `workspace`、`webqq`、`model-request`、`preset`、`mcp`、`onebot-debug`、`test-call`、`test-space`、`environment`，加上三个不按能力划分的既有目录：跨能力复用的 `shared`、shadcn-vue 封装 `components`、样式表 `styles`。`client/` 根只留控制台入口 `index.ts` 与作用于整棵树的全局声明（`shims.d.ts`、`koishi-client-shim.d.ts`、`style.css`）。
 
@@ -11,3 +11,7 @@
 **守卫从清单制换成规则制。** 原先那条守卫逐个断言八个辅助 module「在 `client/webqq/` 且不在 `client/`」，它只看得见名单里的文件，名单外新增的文件默认豁免，随文件数增长自动失效。换成两条按目录成立的断言：根目录只允许那四个文件，顶层目录只允许上面列举的那些。新加一个没有归属的 `.vue` 到根目录会立刻红灯，而这是原来那张名单永远看不见的。
 
 代价是导入路径变长，且「这个文件属于哪个能力」的判断从此必须在落盘前做出——放不进任何目录的文件会被守卫拦住。这正是想要的：`client/` 根此前是默认落点，能力归属可以无限推迟。本轮不改 `client/styles/` 的文件名，那里的 `webqq-` 前缀对应的是 CSS 选择器命名空间而不是目录，两者恰好同名但不是同一个事实。
+
+**服务端只收 `src/chatluna-*` 这一组，`src/` 根其余文件保持平铺。** `src/mcp/`、`src/model-evidence/`、`src/presets/` 早已按能力切出去，剩下的根文件里只有 chatluna 那七个共享同一条边界——它们全都在读被测响应插件的运行时（[ADR-0088](./0088-read-wakeup-rules-from-the-responder-runtime.md)、[ADR-0080](./0080-follow-event-conversation-when-reading-history.md)），因此收成 `src/chatluna/`，同样去掉与目录重复的前缀。`onebot-*` 三个、`evidence-*` 两个都是各自独立的单文件概念，进目录只是换个位置，不产生任何新的边界。
+
+**服务端不按目录设第二条布局守卫。** 客户端那两条断言成立是因为它有明确的能力集合；`src/` 根的平铺文件不构成一个可枚举的集合，钉住它只会在每次新增领域模块时逼出一次无意义的名单更新。服务端真正影响导航的是单文件规模——`control-service.ts` 2934 行、`bot.ts` 1209 行、`types.ts` 1033 行——而 [ADR-0074](./0074-split-client-rpc-ports-by-capability.md) 已经写明不按成员数或文件大小设守卫：那三个文件要拆，得等某条能力真的可以按归属剥出来，建目录一点都不解决。

@@ -6,7 +6,7 @@ import {
   SandboxChatLunaWakeup,
   readSandboxResponderRuntimes,
   type SandboxWakeupReader,
-} from '../chatluna-wakeup'
+} from '../chatluna/wakeup'
 import type { SandboxControlService } from '../control-service'
 import type { SandboxModelRequestStore } from '../model-request'
 import { createScopeDirectory, type ScopeDirectory } from '../scope-directory'

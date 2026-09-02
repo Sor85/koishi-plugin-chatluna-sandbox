@@ -3,12 +3,12 @@ import { Context, h, Random, Universal } from 'koishi'
 import { resolve } from 'node:path'
 import { SandboxBot } from './bot'
 import { BUILTIN_AVATARS, findBuiltinAvatarByReference, getBuiltinAvatarReference, pickUnusedBuiltinAvatar } from './builtin-avatars'
-import { SandboxChatLunaStateStore } from './chatluna-state'
+import { SandboxChatLunaStateStore } from './chatluna/state'
 import {
   SandboxChatLunaCharacterContext,
   findChatLunaCharacterChatContext,
-} from './chatluna-character-context'
-import { archiveChatLunaModelRequestError } from './chatluna-error'
+} from './chatluna/character-context'
+import { archiveChatLunaModelRequestError } from './chatluna/error'
 import {
   createInboundDelivery,
   createInboundEventConversations,

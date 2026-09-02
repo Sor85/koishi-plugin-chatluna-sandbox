@@ -4,7 +4,7 @@ import {
   findLatestFailedModelRequest,
   getChatLunaErrorPossibleCauses,
   readChatLunaRequestError,
-} from '../src/chatluna-error'
+} from '../src/chatluna/error'
 import { SandboxModelRequestStore } from '../src/model-request'
 import type { SandboxModelRequestDetail } from '../src/types'
 

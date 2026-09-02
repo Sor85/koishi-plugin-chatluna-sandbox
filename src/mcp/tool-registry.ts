@@ -4,7 +4,7 @@ import {
   normalizeGroupMemberFromUnknown,
   parseAccountProfileFromUnknown,
 } from '../account-profile'
-import type { SandboxWakeupRules, SandboxWakeupTarget } from '../chatluna-wakeup'
+import type { SandboxWakeupRules, SandboxWakeupTarget } from '../chatluna/wakeup'
 import type { SandboxControlService } from '../control-service'
 import {
   ensureDirectRootConversation,

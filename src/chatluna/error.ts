@@ -1,5 +1,5 @@
-import type { SandboxModelRequestStore } from './model-request'
-import type { SandboxChatLunaRequestError, SandboxModelRequestRecord } from './types'
+import type { SandboxModelRequestStore } from '../model-request'
+import type { SandboxChatLunaRequestError, SandboxModelRequestRecord } from '../types'
 
 export const CHATLUNA_ERROR_CODE_DOCUMENTATION_URL = 'https://chatluna.chat/guide/faq/error_code.html'
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseThinkContent, readChatLunaResponseText } from '../src/chatluna-thinking'
+import { parseThinkContent, readChatLunaResponseText } from '../src/chatluna/thinking'
 
 describe('ChatLuna 思考内容解析', () => {
   it('从多个 think 标签中按顺序取出思考内容', () => {

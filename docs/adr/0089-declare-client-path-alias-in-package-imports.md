@@ -6,4 +6,4 @@
 
 `tsconfig.json` 里保留一份等价的 `paths`。TypeScript 在 `moduleResolution: Bundler` 下能直接读 `imports` 字段，这份 `paths` 是给不读 package.json 的 TS 周边工具用的——`components.json` 的 shadcn-vue 别名指向 `#client/*`，CLI 添加组件时按 `paths` 反解目录。两处声明指向同一个目标，改动时必须同步。
 
-代价是导入语句比相对路径长，且 `#` 前缀在生态里不如 `@/`常见。换来的是导入与文件深度解耦：客户端按能力分目录（[ADR-0090](./0090-group-client-files-by-capability.md)）时，移动文件不需要重算任何跨目录导入，`git mv` 之外的改动只剩真正换了归属的那几处。
+代价是导入语句比相对路径长，且 `#` 前缀在生态里不如 `@/`常见。换来的是导入与文件深度解耦：客户端按能力分目录（[ADR-0090](./0090-group-source-files-by-capability.md)）时，移动文件不需要重算任何跨目录导入，`git mv` 之外的改动只剩真正换了归属的那几处。

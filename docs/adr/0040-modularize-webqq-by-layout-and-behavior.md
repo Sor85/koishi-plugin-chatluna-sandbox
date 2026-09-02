@@ -1,6 +1,6 @@
 # WebQQ 按布局与行为分层模块化
 
-WebQQ 工作台采用纯结构性重构，保持现有 DOM、CSS class、视觉、动画、响应式断点和领域行为不变。Vue 视图按左侧栏、聊天区域、发送控件、右侧信息栏和跨区域 Dialog 覆盖层拆分，逻辑则按工作区状态、布局状态、覆盖层状态、参与者切换和消息交互拆分；`page.vue` 最终只负责工作台装配（[ADR-0090](./0090-group-client-files-by-capability.md) 后位于 `client/workspace/page.vue`）。
+WebQQ 工作台采用纯结构性重构，保持现有 DOM、CSS class、视觉、动画、响应式断点和领域行为不变。Vue 视图按左侧栏、聊天区域、发送控件、右侧信息栏和跨区域 Dialog 覆盖层拆分，逻辑则按工作区状态、布局状态、覆盖层状态、参与者切换和消息交互拆分；`page.vue` 最终只负责工作台装配（[ADR-0090](./0090-group-source-files-by-capability.md) 后位于 `client/workspace/page.vue`）。
 
 服务端工作区状态和领域命令统一收敛到 Vue 组合式工作区控制模块，通过类型明确的 `WorkspacePort` 和 Koishi 生产适配器访问 RPC。控制模块只向各区域暴露只读视图模型和领域命令，UI 模块不得访问完整 snapshot 或直接调用 RPC；区域内的输入、loading、错误、搜索、动画和浮层状态由所属模块本地持有，并通过窄 props 与 emits 交互。
 

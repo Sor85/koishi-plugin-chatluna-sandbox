@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type {} from '@koishijs/console'
-import { lookupChatLunaUsage, type ChatLunaUsageLookup } from './chatluna-usage'
+import { lookupChatLunaUsage, type ChatLunaUsageLookup } from './chatluna/usage'
 import { listConversationIds } from './conversation-resolution'
 import { buildSandboxModelRequestTrajectoryFromStore } from './model-request-trajectory'
 import type {

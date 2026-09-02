@@ -20,7 +20,7 @@ import {
   registerSandboxTestSpaceModel,
 } from './persistence'
 import type { SandboxOneBotDebugPersistence } from './onebot-debug'
-import { linkChatLunaUsageRequest, type ChatLunaUsageLookup } from './chatluna-usage'
+import { linkChatLunaUsageRequest, type ChatLunaUsageLookup } from './chatluna/usage'
 import { installModelRequestCollector, resolveChatLunaPluginClass } from './model-request-collector'
 import { seedDevelopmentModelRequestErrors } from './model-request-error-preview'
 import { MAIN_MODEL_REQUEST_SCOPE_ID, SandboxModelRequestStore, UNATTRIBUTED_MODEL_REQUEST_SCOPE_ID, type SandboxModelRequestPersistence } from './model-request'
@@ -39,7 +39,7 @@ export * from './onebot-debug'
 export * from './model-request'
 export * from './model-request-collector'
 export * from './model-request-error-preview'
-export * from './chatluna-error'
+export * from './chatluna/error'
 export * from './types'
 export * from './mcp/server'
 export * from './mcp/http-api'
@@ -163,7 +163,7 @@ declare module 'koishi' {
     chatlunaSandbox: SandboxControlService
   }
   interface Events {
-    'chatluna/model-usage'(payload: import('./chatluna-usage').ChatLunaModelUsageEvent): void
+    'chatluna/model-usage'(payload: import('./chatluna/usage').ChatLunaModelUsageEvent): void
   }
 }
 
