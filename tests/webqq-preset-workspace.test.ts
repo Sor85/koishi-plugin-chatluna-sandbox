@@ -13,7 +13,7 @@ describe('WebQQ 预设工作台源码契约', () => {
     const trajectory = readFileSync(resolve('client/model-request/trajectory.vue'), 'utf8')
     const shell = readFileSync(resolve('client/workspace/shell.ts'), 'utf8')
     const navigation = readFileSync(resolve('client/shared/evidence-navigation.ts'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-presets.css'), 'utf8')
+    const styles = readFileSync(resolve('client/preset/styles.css'), 'utf8')
 
     expect(sidebar).toMatch(/label:\s*['"]预设['"]/) 
     expect(sidebar).toContain('IconFileCode')
@@ -163,7 +163,7 @@ describe('WebQQ 预设工作台源码契约', () => {
   })
 
   it('表达式悬停值滚动条不绘制轨道背景', () => {
-    const styles = readFileSync(resolve('client/styles/webqq-presets.css'), 'utf8')
+    const styles = readFileSync(resolve('client/preset/styles.css'), 'utf8')
     const valueRule = styles.slice(styles.indexOf('.webqq-preset-expression-tooltip-value {')).split('}')[0]
     expect(valueRule).toContain('scrollbar-color: #94a3b8 transparent')
     const trackRule = styles

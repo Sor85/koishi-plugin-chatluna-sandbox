@@ -25,7 +25,7 @@ describe('WebQQ 模型请求工作台', () => {
 
   it('列表筛选与排序：工具栏的分类、排序、空间筛选、自动刷新开关与未归属清理确认，列表项按名称、状态、渠道、时间、耗时排列', () => {
     const workspaceSource = readFileSync(resolve('client/model-request/workspace.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const styles = readFileSync(resolve('client/model-request/styles.css'), 'utf8')
 
     expect(workspaceSource).toContain('自动刷新')
     expect(workspaceSource).not.toContain('实时刷新')
@@ -61,7 +61,7 @@ describe('WebQQ 模型请求工作台', () => {
 
   it('详情概览与元信息：详情头部的导航与视图切换、概览格、用量格、元信息列表与请求头树', () => {
     const workspaceSource = readFileSync(resolve('client/model-request/workspace.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const styles = readFileSync(resolve('client/model-request/styles.css'), 'utf8')
     const detailHeader = workspaceSource.match(/<article v-else[\s\S]*?<header>([\s\S]*?)<\/header>/)?.[1] ?? ''
     const pageHeader = workspaceSource.match(/<header class="webqq-model-request-header">([\s\S]*?)<\/header>/)?.[1] ?? ''
 
@@ -107,7 +107,7 @@ describe('WebQQ 模型请求工作台', () => {
 
   it('错误诊断：错误码、报错、原始原因与可能的原因四项及其容器', () => {
     const workspaceSource = readFileSync(resolve('client/model-request/workspace.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const styles = readFileSync(resolve('client/model-request/styles.css'), 'utf8')
 
     expect(workspaceSource).toContain('detail.error.message')
     expect(workspaceSource).toContain('错误诊断')
@@ -128,7 +128,7 @@ describe('WebQQ 模型请求工作台', () => {
   it('请求体与响应视图：三个页签的顺序、响应采集状态文案、内容预览分区与图片预览开关', () => {
     const workspaceSource = readFileSync(resolve('client/model-request/workspace.vue'), 'utf8')
     const responsePreviewSource = readFileSync(resolve('client/model-request/response-content-preview.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const styles = readFileSync(resolve('client/model-request/styles.css'), 'utf8')
 
     expect(workspaceSource).not.toContain('展开长字符串')
     expect(workspaceSource).not.toContain('收起长字符串')
@@ -161,7 +161,7 @@ describe('WebQQ 模型请求工作台', () => {
 
   it('请求组成图：轨道缩放控件、变量分段标签与空态文案', () => {
     const trajectorySource = readFileSync(resolve('client/model-request/trajectory.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const styles = readFileSync(resolve('client/model-request/styles.css'), 'utf8')
 
     expect(trajectorySource).toContain('请求体提示词内容占比')
     expect(trajectorySource).toContain('aria-label="轨道缩放"')
@@ -191,7 +191,7 @@ describe('WebQQ 模型请求工作台', () => {
 
   it('轨迹账本与检查器：模式切换、账本列与种类标签、请求折叠、检查器容器与工具栏折叠', () => {
     const trajectorySource = readFileSync(resolve('client/model-request/trajectory.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const styles = readFileSync(resolve('client/model-request/styles.css'), 'utf8')
     const toggleRequestCollapsedSource = trajectorySource.match(/function toggleRequestCollapsed\([\s\S]*?\n}\n/)?.[0] ?? ''
 
     expect(trajectorySource).toContain('单请求')
@@ -274,7 +274,7 @@ describe('WebQQ 模型请求工作台', () => {
 
   it('JSON 树交互：字符串与图片视图切换、行手势守卫与定位高亮', () => {
     const jsonSource = readFileSync(resolve('client/model-request/json-tree.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const styles = readFileSync(resolve('client/model-request/styles.css'), 'utf8')
 
     expect(jsonSource).toContain('data-json-path')
     expect(styles).toContain('.webqq-model-request-json-node.is-highlighted')
@@ -303,7 +303,7 @@ describe('WebQQ 模型请求工作台', () => {
 
   it('样式：工作台栅格、粘性轨迹头、徽标与角色配色', () => {
     const workspaceSource = readFileSync(resolve('client/model-request/workspace.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const styles = readFileSync(resolve('client/model-request/styles.css'), 'utf8')
 
     expect(workspaceSource).toContain("'has-sticky-trajectory': detailView === 'trajectory' || bodyView === 'analysis'")
     expect(workspaceSource).toContain("'is-trajectory-view': detailView === 'trajectory'")

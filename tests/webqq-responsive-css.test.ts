@@ -9,7 +9,7 @@ describe('WebQQ 响应式样式', () => {
     const responsiveImport = '@import "./styles/webqq-responsive.css";'
 
     expect(entry.trim().endsWith(responsiveImport)).toBe(true)
-    expect(entry.indexOf(responsiveImport)).toBeGreaterThan(entry.indexOf('@import "./styles/webqq-overlays.css";'))
+    expect(entry.indexOf(responsiveImport)).toBeGreaterThan(entry.indexOf('@import "./workspace/overlays.css";'))
     expect(responsive).toContain('@media (max-width: 1180px)')
     expect(responsive).toContain('@media (max-width: 768px)')
     expect(responsive).toContain('[data-mobile-view="debug"] .chatluna-sandbox-chat')

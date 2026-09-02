@@ -52,7 +52,7 @@ describe('发送框用户头像组', () => {
 
   it('重叠头像使用 WebQQ 小胶囊的遮罩裁切而不是背景描边', () => {
     const composerSource = readFileSync(resolve('client/webqq/composer.vue'), 'utf8')
-    const composerStyles = readFileSync(resolve('client/styles/webqq-composer.css'), 'utf8')
+    const composerStyles = readFileSync(resolve('client/webqq/composer.css'), 'utf8')
 
     expect(composerSource).toContain("'is-overlapped': index > 0")
     expect(composerStyles).toContain('.webqq-composer-user-switch.is-overlapped .webqq-composer-user-avatar')

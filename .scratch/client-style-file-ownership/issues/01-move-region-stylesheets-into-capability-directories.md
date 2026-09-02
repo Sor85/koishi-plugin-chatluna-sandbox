@@ -12,11 +12,19 @@
 
 **Blocked by:** 无
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] 11 张区域样式表与它们服务的视图同目录，文件名去掉 `webqq-` 前缀
-- [ ] `client/styles/` 只剩 tokens、primitives、responsive 与三张 Tailwind／主题文件
-- [ ] `client/style.css` 的 `@import` 顺序与搬迁前逐条一致，没有文件被合并或拆分
-- [ ] `tests/webqq-region-css.test.ts` 按新路径继续断言顺序递增
-- [ ] `yarn test`、`yarn typecheck`、`yarn build` 全绿
-- [ ] Chrome 与 Firefox 各复验六个区域，与搬迁前截图逐屏比对无差异
+- [x] 13 张区域样式表与它们服务的视图同目录，文件名去掉 `webqq-` 前缀
+- [x] `client/styles/` 只剩 tokens、primitives、responsive 与三张 Tailwind／主题文件
+- [x] `client/style.css` 的 `@import` 顺序与搬迁前逐条一致，没有文件被合并或拆分
+- [x] `tests/webqq-region-css.test.ts` 按新路径继续断言顺序递增
+- [x] `yarn test`、`yarn typecheck`、`yarn build` 全绿
+- [x] Chrome 与 Firefox 各复验六个区域，与搬迁前截图逐屏比对无差异
+
+## Comments
+
+**搬的是 13 张而不是 11 张。** 正文写「11 张」与本文件自己的第二条验收（`client/styles/` 只剩 tokens、primitives、responsive 与三张 Tailwind／主题文件）算不到一起：16 张 `webqq-*.css` 减去留下的 3 张是 13 张。spec 的归属草案表逐行列的也是 13 张（`webqq-workspace.css` 与 `webqq-overlays.css` 那一行归 `client/workspace/`）。按表执行。
+
+**「与搬迁前截图逐屏比对」换成了逐字节比对。** 在 `HEAD` 上另开一个 worktree，把两边 `client/style.css` 沿 `@import` 递归展开成扁平 CSS：去掉注释后 302,111 字节逐字节相同，也就是全部规则与级联顺序都没变。截图比对只能证明「看起来一样」，字节比对直接排除了级联优先级变化——那是这件事唯一会产生静默缺陷的地方。浏览器复验因此只需要证明搬迁后的相对路径在 devMode（宿主 vite 直接加载 `client/` 源码）里都解析得到：Chrome 与 Firefox 各注入 316,665 字节，16 张源样式表的探针全部命中，控制台零报错，六个区域逐个截图外观正常。
+
+**四处按目录扫样式的守卫一起扩到了 `client`**，否则它们会静默缩到剩下的几张跨能力表：架构守卫两条毛玻璃规则的 `root`、`tests/css-namespace.test.ts` 的冻结清单判定面、`tests/webqq-region-css.test.ts` 的渐变白名单、`tests/typography-scale.test.ts` 的字号标度判定面。后三处统一走新加的 `tests/helpers/client-stylesheets.ts`；架构守卫按 ADR-0073 保留规则上的 `root` 字段，另加一条元守卫断言它扫到的文件与那份观察面逐个相等（已用临时把 `root` 调回 `client/styles` 验证它会红）。决策记入 [ADR-0092](../../../docs/adr/0092-move-region-stylesheets-into-capability-directories.md)。

@@ -10,7 +10,7 @@
 
 **守卫从清单制换成规则制。** 原先那条守卫逐个断言八个辅助 module「在 `client/webqq/` 且不在 `client/`」，它只看得见名单里的文件，名单外新增的文件默认豁免，随文件数增长自动失效。换成两条按目录成立的断言：根目录只允许那四个文件，顶层目录只允许上面列举的那些。新加一个没有归属的 `.vue` 到根目录会立刻红灯，而这是原来那张名单永远看不见的。
 
-代价是导入路径变长，且「这个文件属于哪个能力」的判断从此必须在落盘前做出——放不进任何目录的文件会被守卫拦住。这正是想要的：`client/` 根此前是默认落点，能力归属可以无限推迟。本轮不改 `client/styles/`。那 16 个 `webqq-*.css` 的前缀既不对应目录也不对应内容——`webqq-messages.css` 里 190 条选择器是 `.chatluna-sandbox-*`、只有 34 条是 `.webqq-*`，`webqq-message-selection.css` 是 42 比 1。它们该按能力挪进对应目录，但那件事要同时碰 `style.css` 里靠顺序成立的级联和二十多处按文件名读样式的断言，与本轮的搬迁风险不该叠在一个提交里；命名空间本身的收敛方向见 [ADR-0091](./0091-converge-css-namespaces.md)。
+代价是导入路径变长，且「这个文件属于哪个能力」的判断从此必须在落盘前做出——放不进任何目录的文件会被守卫拦住。这正是想要的：`client/` 根此前是默认落点，能力归属可以无限推迟。本轮不改 `client/styles/`：那 16 个 `webqq-*.css` 的前缀既不对应目录也不对应内容——`webqq-messages.css` 里 190 条选择器是 `.chatluna-sandbox-*`、只有 34 条是 `.webqq-*`，`webqq-message-selection.css` 是 42 比 1。它们该按能力挪进对应目录，但那件事要同时碰 `style.css` 里靠顺序成立的级联和二十多处按文件名读样式的断言，与本轮的搬迁风险不该叠在一个提交里；那次搬迁见 [ADR-0092](./0092-move-region-stylesheets-into-capability-directories.md)，命名空间本身的收敛方向见 [ADR-0091](./0091-converge-css-namespaces.md)。
 
 **服务端只收 `src/chatluna-*` 这一组，`src/` 根其余文件保持平铺。** `src/mcp/`、`src/model-evidence/`、`src/presets/` 早已按能力切出去，剩下的根文件里只有 chatluna 那七个共享同一条边界——它们全都在读被测响应插件的运行时（[ADR-0088](./0088-read-wakeup-rules-from-the-responder-runtime.md)、[ADR-0080](./0080-follow-event-conversation-when-reading-history.md)），因此收成 `src/chatluna/`，同样去掉与目录重复的前缀。`onebot-*` 三个、`evidence-*` 两个都是各自独立的单文件概念，进目录只是换个位置，不产生任何新的边界。
 

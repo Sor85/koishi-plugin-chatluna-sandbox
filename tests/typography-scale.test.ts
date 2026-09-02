@@ -2,6 +2,8 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
+import { listClientStylesheets } from './helpers/client-stylesheets'
+
 const SCALE = {
   '--webqq-font-3xs': '9px',
   '--webqq-font-2xs': '10px',
@@ -17,12 +19,14 @@ const SCALE = {
 /** 头像首字母按圆形直径派生，是几何量而不是排版档位，允许保留字面 px。 */
 const AVATAR_DERIVED = 'clamp(9px, calc(var(--webqq-avatar-size, 38px) / 3), 32px)'
 
+/**
+ * 判定面是客户端全部样式源码加全部 `.vue`。样式表这一半必须走 `listClientStylesheets()`：
+ * 区域表已按能力归属散进 `client/<能力>/`（ADR-0092），照旧只扫 `client/styles/webqq-*.css`
+ * 会让这条守卫静默缩到剩下的三张跨能力表，而漏掉的表里再出现标度外的字面字号不会报错。
+ */
 function collectStyleSources() {
-  const files: Array<[string, string]> = []
-  for (const name of readdirSync('client/styles')) {
-    if (!name.startsWith('webqq-') || !name.endsWith('.css')) continue
-    files.push([`client/styles/${name}`, readFileSync(resolve('client/styles', name), 'utf8')])
-  }
+  const files: Array<[string, string]> = listClientStylesheets()
+    .map((path) => [path, readFileSync(resolve(path), 'utf8')])
   const walk = (dir: string) => {
     for (const entry of readdirSync(resolve(dir), { withFileTypes: true })) {
       if (entry.isDirectory()) {
@@ -50,7 +54,7 @@ describe('排版标度', () => {
   })
 
   it('工作区与浮层各自落一个基准字号，不继承宿主的 16px', () => {
-    const workspace = readFileSync(resolve('client/styles/webqq-workspace.css'), 'utf8')
+    const workspace = readFileSync(resolve('client/workspace/workspace.css'), 'utf8')
     const primitives = readFileSync(resolve('client/styles/webqq-primitives.css'), 'utf8')
 
     const workspaceRule = workspace.slice(workspace.indexOf('.webqq-workspace {')).split('}')[0]
@@ -69,17 +73,17 @@ describe('排版标度', () => {
   })
 
   it('头像首字母按直径派生，不再逐处硬编码', () => {
-    const read = (name: string) => readFileSync(resolve('client/styles', name), 'utf8')
-    const primitives = read('webqq-primitives.css')
-    const chat = read('webqq-chat.css')
+    const read = (path: string) => readFileSync(resolve('client', path), 'utf8')
+    const primitives = read('styles/webqq-primitives.css')
+    const chat = read('webqq/chat.css')
 
     expect(primitives).toContain(AVATAR_DERIVED)
-    expect(read('webqq-messages.css')).toContain(AVATAR_DERIVED)
+    expect(read('webqq/messages.css')).toContain(AVATAR_DERIVED)
 
     // 这些直径此前各自带一个手写字号（9/10/10.667/12.667/24/25.333/28/32px）。
-    for (const name of ['webqq-primitives.css', 'webqq-chat.css', 'webqq-details.css', 'webqq-debug.css', 'webqq-overlays.css']) {
+    for (const path of ['styles/webqq-primitives.css', 'webqq/chat.css', 'webqq/details.css', 'onebot-debug/styles.css', 'workspace/overlays.css']) {
       for (const stale of ['10.667px', '12.667px', '25.333px']) {
-        expect(read(name), `${name} 不应再出现派生前的字面字号 ${stale}`).not.toContain(stale)
+        expect(read(path), `${path} 不应再出现派生前的字面字号 ${stale}`).not.toContain(stale)
       }
     }
 
@@ -105,7 +109,7 @@ describe('排版标度', () => {
   })
 
   it('工具定义摘要三段文本各占一档字号', () => {
-    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const styles = readFileSync(resolve('client/model-request/styles.css'), 'utf8')
     const rule = (selector: string) => styles.slice(styles.indexOf(selector)).split('}')[0]
 
     // 三者原先都没写 font-size：工具名和描述一起继承成 16px，属性统计被

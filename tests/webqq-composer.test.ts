@@ -171,7 +171,7 @@ describe('WebQQ 发送控件', () => {
    * 这一个原本混着回复上下文、附件浮层与内联提及三件事，一处样式改动会同时点着三个主题的红灯。
    */
   it('回复上下文与附件共用一个可换行的浮动包络', () => {
-    const css = readFileSync(resolve('client/styles/webqq-composer.css'), 'utf8')
+    const css = readFileSync(resolve('client/webqq/composer.css'), 'utf8')
     const source = readFileSync(resolve('client/webqq/composer.vue'), 'utf8')
     const contextRule = css.slice(css.indexOf('.webqq-composer-context {'), css.indexOf('.webqq-composer-reply {'))
     const contextIndex = source.indexOf('class="webqq-composer-context"')
@@ -196,7 +196,7 @@ describe('WebQQ 发送控件', () => {
   })
 
   it('回复上下文固定在最左，正文单行省略而清除按钮不被压缩', () => {
-    const css = readFileSync(resolve('client/styles/webqq-composer.css'), 'utf8')
+    const css = readFileSync(resolve('client/webqq/composer.css'), 'utf8')
     const source = readFileSync(resolve('client/webqq/composer.vue'), 'utf8')
     const replyRule = css.slice(css.indexOf('.webqq-composer-reply {'), css.indexOf('.webqq-composer-reply span'))
     const replyTextRule = css.slice(css.indexOf('.webqq-composer-reply span {'), css.indexOf('.webqq-composer-reply button {'))
@@ -212,7 +212,7 @@ describe('WebQQ 发送控件', () => {
   })
 
   it('提及是输入区内联 token，不再是独立的附件行', () => {
-    const css = readFileSync(resolve('client/styles/webqq-composer.css'), 'utf8')
+    const css = readFileSync(resolve('client/webqq/composer.css'), 'utf8')
     const source = readFileSync(resolve('client/webqq/composer.vue'), 'utf8')
 
     expect(source).toContain('chatluna-sandbox-composer-mention')
@@ -227,7 +227,7 @@ describe('WebQQ 发送控件', () => {
   })
 
   it('深色发送者添加按钮保留中性灰底，并用主题色显示虚线与加号', () => {
-    const css = readFileSync(resolve('client/styles/webqq-composer.css'), 'utf8')
+    const css = readFileSync(resolve('client/webqq/composer.css'), 'utf8')
     const source = readFileSync(resolve('client/webqq/composer.vue'), 'utf8')
     const darkAddRule = css
       .slice(css.indexOf('.webqq-workspace[data-color-mode="dark"] .webqq-composer-user-add {'))
@@ -242,7 +242,7 @@ describe('WebQQ 发送控件', () => {
   })
 
   it('禁用的输入框、附件和发送按钮不改变鼠标样式，但保留 disabled 与透明度', () => {
-    const css = readFileSync(resolve('client/styles/webqq-composer.css'), 'utf8')
+    const css = readFileSync(resolve('client/webqq/composer.css'), 'utf8')
     const source = readFileSync(resolve('client/webqq/composer.vue'), 'utf8')
 
     expect(css).not.toContain('cursor:')

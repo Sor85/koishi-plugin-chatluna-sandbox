@@ -1,4 +1,4 @@
-/* 消息多选与合并转发目标选择：独立文件，避免触碰 webqq-messages.css 中的 forward 卡片规则。 */
+/* 消息多选与合并转发目标选择：独立文件，避免触碰同目录 messages.css 中的 forward 卡片规则。 */
 
 .chatluna-sandbox-messages.is-selecting .chatluna-sandbox-message-row.is-selectable {
   width: 100%;

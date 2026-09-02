@@ -191,7 +191,7 @@ describe('WebQQ 聊天区域', () => {
   })
 
   it('搜索栏与结果面板的布局样式', () => {
-    const styles = readFileSync(resolve('client/styles/webqq-chat.css'), 'utf8')
+    const styles = readFileSync(resolve('client/webqq/chat.css'), 'utf8')
     const chatRule = styles.slice(styles.indexOf('.chatluna-sandbox-chat {')).split('}')[0]
     expect(chatRule).toContain('grid-template-rows: auto minmax(0, 1fr)')
     const searchShellRule = styles.slice(styles.indexOf('.chatluna-sandbox-chat-search-shell {')).split('}')[0]

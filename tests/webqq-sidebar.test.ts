@@ -8,7 +8,7 @@ describe('WebQQ 顶部导航与会话栏', () => {
     const pageSource = readFileSync(resolve('client/workspace/page.vue'), 'utf8')
 
     const notificationSource = readFileSync(resolve('client/webqq/notification-menu.vue'), 'utf8')
-    const sidebarStyles = readFileSync(resolve('client/styles/webqq-sidebar.css'), 'utf8')
+    const sidebarStyles = readFileSync(resolve('client/webqq/sidebar.css'), 'utf8')
 
     expect(source).toContain('<nav class="webqq-rail webqq-overlay-header"')
     expect(source).toContain('<div class="webqq-brand" aria-label="ChatLuna Sandbox">')
@@ -71,7 +71,7 @@ describe('WebQQ 顶部导航与会话栏', () => {
     expect(sidebarStyles).toMatch(/\.webqq-rail-button\.is-rail-pin-end\s*\{[^}]*margin-left:\s*auto/s)
     expect(sidebarStyles).toContain('.webqq-rail-button.is-mcp-running')
     expect(sidebarStyles).not.toContain('@keyframes webqq-rail-mcp-glow')
-    expect(readFileSync(resolve('client/styles/webqq-spaces.css'), 'utf8')).toContain('@keyframes sandbox-agent-control-orbit')
+    expect(readFileSync(resolve('client/test-space/styles.css'), 'utf8')).toContain('@keyframes sandbox-agent-control-orbit')
     expect(source.indexOf("label: 'OneBot 调试'")).toBeLessThan(source.indexOf("label: 'AI 测试空间'"))
     expect(source.indexOf("label: '环境管理'")).toBeLessThan(source.indexOf("label: 'AI 测试空间'"))
     expect(sidebarStyles).toMatch(/\.webqq-sidebar-tabs button\s*\{[^}]*border-radius:\s*8px 8px 0 0/s)
@@ -119,7 +119,7 @@ describe('会话树的信息密度与展开控件', () => {
    * 执行验证（Chrome 与 Firefox 各一轮）。
    */
   const sidebarSource = () => readFileSync(resolve('client/webqq/sidebar.vue'), 'utf8')
-  const sidebarStyles = () => readFileSync(resolve('client/styles/webqq-sidebar.css'), 'utf8')
+  const sidebarStyles = () => readFileSync(resolve('client/webqq/sidebar.css'), 'utf8')
 
   it('展开态与那条自动展开规则不再住在组件里', () => {
     const source = sidebarSource()

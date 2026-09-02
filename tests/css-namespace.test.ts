@@ -2,6 +2,8 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
+import { readClientStylesheets } from './helpers/client-stylesheets'
+
 /**
  * `webqq-` 顶层块的冻结清单。终态是一套命名空间（ADR-0091），因此这份清单只允许删行：
  * 新增顶层块必须写 `chatluna-sandbox-`，把既有块改名过去时从这里删掉对应行。
@@ -66,11 +68,14 @@ function listFiles(directory: string, test: RegExp): string[] {
   })
 }
 
-/** 样式表是唯一的判定面：模板里写了但没有任何规则选中的类名不产生视觉，也不构成命名空间。 */
+/**
+ * 样式表是唯一的判定面：模板里写了但没有任何规则选中的类名不产生视觉，也不构成命名空间。
+ *
+ * 判定面是 `client/` 下的全部样式表，不是 `client/styles/` 这一个目录：区域样式表已按能力
+ * 归属散进各能力目录（ADR-0090），只扫那个目录会让这份冻结清单静默缩到剩下的几张跨能力表。
+ */
 function readStyleSheets(): string[] {
-  return readdirSync(resolve('client/styles'))
-    .filter((name) => name.endsWith('.css') && name !== 'tailwind.generated.css')
-    .map((name) => readFileSync(resolve('client/styles', name), 'utf8'))
+  return readClientStylesheets()
 }
 
 function collectBlocks(prefix: string): string[] {

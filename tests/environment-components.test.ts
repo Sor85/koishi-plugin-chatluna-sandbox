@@ -88,7 +88,7 @@ describe('环境管理组件传输边界', () => {
 
   it('群组编辑以全部用户和机器人头像管理成员资料', () => {
     const source = readFileSync(resolve('client/environment/entity-dialog.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-overlays.css'), 'utf8')
+    const styles = readFileSync(resolve('client/workspace/overlays.css'), 'utf8')
 
     expect(source).toContain('v-for="participant in participants"')
     expect(source).toContain('class="chatluna-sandbox-group-member-avatar"')
@@ -132,7 +132,7 @@ describe('环境管理组件传输边界', () => {
 
   it('实体编辑 Dialog 将标题、滚动正文和操作区分层，避免长表单遮挡操作按钮', () => {
     const source = readFileSync(resolve('client/environment/entity-dialog.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-overlays.css'), 'utf8')
+    const styles = readFileSync(resolve('client/workspace/overlays.css'), 'utf8')
 
     expect(source).toContain("'webqq-entity-editor-dialog': mode === 'edit'")
     expect(source).toContain('class="webqq-entity-editor-form"')

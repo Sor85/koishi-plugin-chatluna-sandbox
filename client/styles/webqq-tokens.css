@@ -1,8 +1,8 @@
-/* 排版标度：webqq-*.css 与 client/**.vue 里的 font-size 只允许取下面这些令牌。
+/* 排版标度：client/**.css 与 client/**.vue 里的 font-size 只允许取下面这些令牌。
    控制台没有给 html/body 设过基准字号，浏览器默认值 16px 会一路继承进工作区，
    任何漏写 font-size 的节点都会渲染成 16px，和相邻的 11~13px 文本对不上（工具
    定义行的工具名/描述/属性统计就是这么裂开的）。因此工作区必须显式落一个基准
-   字号（见 webqq-workspace.css），而所有层级差异都从这份标度里取值。
+   字号（见 client/workspace/workspace.css），而所有层级差异都从这份标度里取值。
 
    9px 只给时间轴与组成图的微标签用；正文默认是 --webqq-font-md。
    头像首字母不属于这份标度，它按 --webqq-avatar-size 派生（见 webqq-primitives.css）。

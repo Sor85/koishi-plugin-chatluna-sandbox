@@ -1,15 +1,37 @@
-import { readFileSync, readdirSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+
+import { readClientStylesheets } from './helpers/client-stylesheets'
+
+/**
+ * 九个视觉区域各自的样式表。区域标识与文件路径必须成对写在这里：样式表已按能力归属
+ * 散进 `client/<能力>/`（ADR-0090），路径不再能从区域名拼出来，而 `@import` 顺序是级联的
+ * 一部分——下面那条断言钉的就是它们在入口里递增。
+ */
+const REGION_STYLESHEETS = [
+  ['sidebar', 'webqq/sidebar.css'],
+  ['chat', 'webqq/chat.css'],
+  ['messages', 'webqq/messages.css'],
+  ['composer', 'webqq/composer.css'],
+  ['details', 'webqq/details.css'],
+  ['debug', 'onebot-debug/styles.css'],
+  ['test-calls', 'test-call/styles.css'],
+  ['model-requests', 'model-request/styles.css'],
+  ['presets', 'preset/styles.css'],
+] as const
 
 describe('WebQQ 区域样式', () => {
   it('按视觉区域加载且入口不保留区域规则', () => {
     const entry = readFileSync(resolve('client/style.css'), 'utf8')
-    const files = ['sidebar', 'chat', 'messages', 'composer', 'details', 'debug', 'test-calls', 'model-requests', 'presets']
-    const sources = Object.fromEntries(files.map((name) => [name, readFileSync(resolve(`client/styles/webqq-${name}.css`), 'utf8')]))
+    const sources = Object.fromEntries(
+      REGION_STYLESHEETS.map(([name, path]) => [name, readFileSync(resolve('client', path), 'utf8')]),
+    )
+    const positions = REGION_STYLESHEETS.map(([, path]) => entry.indexOf(`@import "./${path}";`))
 
-    expect(files.map((name) => entry.indexOf(`@import "./styles/webqq-${name}.css";`)))
-      .toEqual([...files.map((name) => entry.indexOf(`@import "./styles/webqq-${name}.css";`))].sort((a, b) => a - b))
+    // 一个都不能缺：`indexOf` 返回 -1 时排序后仍然递增，漏掉一条 @import 不会被顺序断言看见。
+    expect(positions.filter((position) => position < 0)).toEqual([])
+    expect(positions).toEqual([...positions].sort((a, b) => a - b))
     expect(sources.sidebar).toContain('.webqq-conversations')
     expect(sources.sidebar).toMatch(
       /\.webqq-sidebar-tabs-row \{[^}]*background: transparent;[^}]*\}/s,
@@ -37,11 +59,7 @@ describe('WebQQ 区域样式', () => {
   })
 
   it('只允许用于状态装饰的渐变，不使用区域背景渐变', () => {
-    const styleDirectory = resolve('client/styles')
-    const sources = readdirSync(styleDirectory)
-      .filter((name) => name.endsWith('.css') && name !== 'tailwind.generated.css')
-      .map((name) => readFileSync(resolve(styleDirectory, name), 'utf8'))
-      .join('\n')
+    const sources = readClientStylesheets().join('\n')
     const visibleBackgroundGradients = sources
       .split('\n')
       .filter((line) => /(?:background|background-image):.*gradient\s*\(/.test(line))
@@ -54,8 +72,8 @@ describe('WebQQ 区域样式', () => {
   })
 
   it('工作区层不声明 backdrop-filter，浮层雾化态由 body 属性统一驱动', () => {
-    const workspace = readFileSync(resolve('client/styles/webqq-workspace.css'), 'utf8')
-    const sidebar = readFileSync(resolve('client/styles/webqq-sidebar.css'), 'utf8')
+    const workspace = readFileSync(resolve('client/workspace/workspace.css'), 'utf8')
+    const sidebar = readFileSync(resolve('client/webqq/sidebar.css'), 'utf8')
     const primitives = readFileSync(resolve('client/styles/webqq-primitives.css'), 'utf8')
     const modelRequests = readFileSync(resolve('client/model-request/trajectory.vue'), 'utf8')
     const modelRequestWorkspace = readFileSync(resolve('client/model-request/workspace.vue'), 'utf8')
@@ -86,7 +104,7 @@ describe('WebQQ 区域样式', () => {
     expect(primitives).toContain('.webqq-workspace.is-frosted .webqq-overlay-header::before')
     expect(sidebar).toContain('background: color-mix(in srgb, var(--webqq-rail) 72%, transparent)')
     expect(sidebar).toContain('backdrop-filter: saturate(180%) blur(32px)')
-    const chatStyles = readFileSync(resolve('client/styles/webqq-chat.css'), 'utf8')
+    const chatStyles = readFileSync(resolve('client/webqq/chat.css'), 'utf8')
     expect(chatStyles).toContain('.webqq-workspace.is-frosted .chatluna-sandbox-chat-header')
     expect(chatStyles).toContain('background: color-mix(in srgb, var(--webqq-bg) 72%, transparent)')
     expect(chatStyles).toContain('.webqq-workspace.is-frosted .chatluna-sandbox-chat-header::before')
@@ -111,7 +129,7 @@ describe('WebQQ 区域样式', () => {
   })
 
   it('暗色模式区分聊天区与侧栏背景', () => {
-    const workspace = readFileSync(resolve('client/styles/webqq-workspace.css'), 'utf8')
+    const workspace = readFileSync(resolve('client/workspace/workspace.css'), 'utf8')
 
     expect(workspace).toContain('.webqq-workspace[data-color-mode="dark"] .chatluna-sandbox-chat,\n.webqq-workspace[data-color-mode="dark"] .chatluna-sandbox-chat-header {\n  background: rgb(44 44 48);')
     expect(workspace).toContain('.webqq-workspace[data-color-mode="dark"] .webqq-rail,')

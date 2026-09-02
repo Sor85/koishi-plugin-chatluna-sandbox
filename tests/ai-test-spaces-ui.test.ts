@@ -6,7 +6,7 @@ describe('AI 测试空间总览', () => {
   it('在主导航提供入口并渲染固定主场景、按时间排序空间和末尾创建卡', () => {
     const sidebar = readFileSync(resolve('client/webqq/sidebar.vue'), 'utf8')
     const overview = readFileSync(resolve('client/test-space/overview.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-spaces.css'), 'utf8')
+    const styles = readFileSync(resolve('client/test-space/styles.css'), 'utf8')
 
     expect(sidebar).toContain("label: 'AI 测试空间'")
     expect(sidebar).toContain('visibleNavigationItems')
@@ -57,7 +57,7 @@ describe('AI 测试空间总览', () => {
     const capture = readFileSync(resolve('client/test-space/thumbnail-capture.ts'), 'utf8')
     const shell = readFileSync(resolve('client/test-space/shell.ts'), 'utf8')
     const overview = readFileSync(resolve('client/test-space/overview.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-spaces.css'), 'utf8')
+    const styles = readFileSync(resolve('client/test-space/styles.css'), 'utf8')
     const responsiveStyles = readFileSync(resolve('client/styles/webqq-responsive.css'), 'utf8')
     expect(shell).toContain('rememberCurrentWorkspaceThumbnail()')
     expect(shell).toContain('captureWorkspaceThumbnail(workspace)')
@@ -102,7 +102,7 @@ describe('AI 测试空间总览', () => {
     const overlay = readFileSync(resolve('client/workspace/agent-observe-overlay.vue'), 'utf8')
     const effect = readFileSync(resolve('client/workspace/agent-overlay-effect.ts'), 'utf8')
     const page = readFileSync(resolve('client/workspace/page.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-spaces.css'), 'utf8')
+    const styles = readFileSync(resolve('client/test-space/styles.css'), 'utf8')
     // ego lite 官方光标 path 与随机跳位节奏（5.2-9s），到位后 400ms 点击挤压 + 闲置 loading 浮动
     expect(cursor).toContain('M6.465 15.647')
     expect(cursor).toContain('5200 + Math.random() * 3800')

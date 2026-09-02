@@ -466,7 +466,7 @@
   color: var(--webqq-text);
   background: color-mix(in srgb, var(--webqq-panel) 92%, transparent);
   box-shadow: 0 18px 42px rgb(15 23 42 / 18%);
-  /* 不要手写 -webkit-backdrop-filter，构建时会把无前缀声明吞掉（详见 webqq-workspace.css 毛玻璃注释）。 */
+  /* 不要手写 -webkit-backdrop-filter，构建时会把无前缀声明吞掉（详见同目录 workspace.css 毛玻璃注释）。 */
   backdrop-filter: saturate(180%) blur(20px);
 }
 

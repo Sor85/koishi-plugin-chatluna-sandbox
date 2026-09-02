@@ -21,8 +21,8 @@ describe('WebQQ 共享头像', () => {
 
   it('共享头像基线和所有尺寸变体保持圆形', () => {
     const primitives = readFileSync(resolve('client/styles/webqq-primitives.css'), 'utf8')
-    const chat = readFileSync(resolve('client/styles/webqq-chat.css'), 'utf8')
-    const overlays = readFileSync(resolve('client/styles/webqq-overlays.css'), 'utf8')
+    const chat = readFileSync(resolve('client/webqq/chat.css'), 'utf8')
+    const overlays = readFileSync(resolve('client/workspace/overlays.css'), 'utf8')
 
     expect(primitives).toMatch(/\.webqq-identity-avatar\s*\{[^}]*width:\s*var\(--webqq-avatar-size\)[^}]*height:\s*var\(--webqq-avatar-size\)[^}]*border-radius:\s*50%/s)
     expect(primitives).toMatch(/\.webqq-identity-avatar\s*>\s*img\s*\{[^}]*border-radius:\s*inherit/s)

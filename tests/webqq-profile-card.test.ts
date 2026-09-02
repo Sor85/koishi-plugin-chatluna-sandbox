@@ -139,7 +139,7 @@ describe('WebQQ 个人信息卡入口', () => {
     const groupMemberMenu = readFileSync(resolve('client/webqq/group-member-menu.vue'), 'utf8')
     const overlay = readFileSync(resolve('client/workspace/overlay-host.vue'), 'utf8')
     const page = readFileSync(resolve('client/workspace/page.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-overlays.css'), 'utf8')
+    const styles = readFileSync(resolve('client/workspace/overlays.css'), 'utf8')
 
     expect(messageList).toContain('handleMessageAvatarClick(message, $event)')
     expect(messageList).toContain("emit('openProfile', message.authorId)")

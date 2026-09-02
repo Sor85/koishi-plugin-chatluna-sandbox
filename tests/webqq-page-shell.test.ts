@@ -38,7 +38,7 @@ describe('WebQQ 主页面装配', () => {
   it('用户头像不继承机器人灰色样式', () => {
     const chatPaneSource = readFileSync(resolve('client/webqq/chat-pane.vue'), 'utf8')
     const messageListSource = readFileSync(resolve('client/webqq/message-list.vue'), 'utf8')
-    const messageStyles = readFileSync(resolve('client/styles/webqq-messages.css'), 'utf8')
+    const messageStyles = readFileSync(resolve('client/webqq/messages.css'), 'utf8')
 
     expect(chatPaneSource).not.toContain('class="webqq-avatar webqq-avatar-bot"')
     expect(messageListSource).not.toContain('class="webqq-avatar webqq-avatar-large webqq-avatar-bot"')

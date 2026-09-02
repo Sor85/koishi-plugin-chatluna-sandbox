@@ -112,7 +112,7 @@ describe('Tailwind preflight 作用域改写', () => {
   it('丢弃 html/:host 与 ::backdrop', () => {
     const { css, droppedRules } = scopePreflight(sample, ['.a'])
     // html 那条同时会把字体族换成 Tailwind 的 --font-sans，整条丢弃；
-    // 需要保留的 line-height / tab-size 由 webqq-workspace.css 显式声明。
+    // 需要保留的 line-height / tab-size 由 client/workspace/workspace.css 显式声明。
     expect(css).not.toContain('font-family: sans-serif')
     expect(css).not.toContain(':host')
     expect(css).not.toContain('::backdrop')

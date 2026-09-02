@@ -46,8 +46,8 @@ function splitSelectorList(selector) {
 function scopeSelectorPart(part, scope) {
   // html / :host 只承载继承属性，而其中的 font-family 会把工作区从控制台主题字体
   // （--font-family，用户可在控制台设置里改）换成 Tailwind 的 --font-sans。整条丢弃，
-  // 需要保留的 line-height / tab-size / tap-highlight 由 webqq-workspace.css 与
-  // webqq-primitives.css 显式声明，见 docs/adr/0068。
+  // 需要保留的 line-height / tab-size / tap-highlight 由 client/workspace/workspace.css 与
+  // client/styles/webqq-primitives.css 显式声明，见 docs/adr/0068。
   if (part === 'html' || part === ':host') return []
   // ::backdrop 只作用于 top layer 元素；本插件的浮层都是普通元素，无法也无需限定作用域。
   if (part === '::backdrop') return []

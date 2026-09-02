@@ -15,4 +15,4 @@ Dialog 和 Popover 形式的二级菜单统一使用以下垂直节奏：
 - Dialog 标题区使用 `DialogHeader`，操作区使用 `DialogFooter`。
 - 表单容器使用 `.webqq-secondary-form`。
 - 标签与控件组成的字段使用 `.webqq-secondary-field`。
-- 间距令牌统一维护在 `client/styles/webqq-overlays.css`，页面不得为相同结构另写一套间距。
+- 间距令牌统一维护在 `client/workspace/overlays.css`，页面不得为相同结构另写一套间距。

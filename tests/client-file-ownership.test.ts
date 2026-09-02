@@ -25,6 +25,21 @@ const ALLOWED_DIRECTORIES = [
   'styles',
 ]
 
+/**
+ * `client/styles/` 里允许留下的东西：跨能力的令牌、原语与断点，加上被 ADR-0053／0068 钉住
+ * 路径的 Tailwind 编译入口与主题基线。有单一能力归属的区域样式表都已搬进对应能力目录。
+ *
+ * 钉住这份清单而不是「区域样式表不在这里」：后者要靠人维护一张搬走的文件名清单，
+ * 新写一张区域表落到这个目录里不会被任何断言看见。
+ */
+const ALLOWED_STYLE_FILES = [
+  'webqq-tokens.css',
+  'webqq-primitives.css',
+  'webqq-responsive.css',
+  'tailwind.source.css',
+  'shadcn-theme.css',
+]
+
 function readClientRoot() {
   const entries = readdirSync(resolve('client'), { withFileTypes: true })
   return {
@@ -48,6 +63,20 @@ describe('客户端文件归属', () => {
     const { directories } = readClientRoot()
 
     expect(directories).toEqual([...ALLOWED_DIRECTORIES].sort())
+  })
+
+  /**
+   * 样式表按能力归属：`client/styles/` 只留跨能力的表，区域表与它服务的视图同目录。
+   *
+   * 搬回去不会报错也不会改变视觉——`client/style.css` 的 `@import` 路径一改就照旧生效——
+   * 所以这条不变量只能由断言守着。构建产物 `tailwind.generated.css` 已 gitignore，不进清单。
+   */
+  it('styles 目录只保留跨能力的令牌、原语、断点与构建入口', () => {
+    const styles = readdirSync(resolve('client/styles'))
+      .filter((name) => name.endsWith('.css') && !name.endsWith('.generated.css'))
+      .sort()
+
+    expect(styles).toEqual([...ALLOWED_STYLE_FILES].sort())
   })
 
   /**

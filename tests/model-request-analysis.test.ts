@@ -204,7 +204,7 @@ describe('模型请求分析展示模型', () => {
   })
 
   it('分析页、组成图、轨迹台账和响应分段共用角色色', () => {
-    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const styles = readFileSync(resolve('client/model-request/styles.css'), 'utf8')
     const view = readFileSync(resolve('client/model-request/analysis-view.vue'), 'utf8')
     const trajectory = readFileSync(resolve('client/model-request/trajectory.vue'), 'utf8')
 
@@ -324,7 +324,7 @@ describe('模型请求分析展示模型', () => {
   it('history_new 和 history_last 默认渲染消息预览，并保留原始 XML 切换', () => {
     const view = readFileSync(resolve('client/model-request/analysis-view.vue'), 'utf8')
     const preview = readFileSync(resolve('client/model-request/history-preview.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const styles = readFileSync(resolve('client/model-request/styles.css'), 'utf8')
 
     expect(view).toContain('isHistoryVariableName(variable.name)')
     expect(view).toContain('parseModelRequestHistory(variable.value)')
@@ -401,7 +401,7 @@ describe('模型请求分析展示模型', () => {
    */
   it('变量卡片正文保持卡片内边距，支持头部和按钮折叠，并标注空值', () => {
     const view = readFileSync(resolve('client/model-request/analysis-view.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const styles = readFileSync(resolve('client/model-request/styles.css'), 'utf8')
 
     expect(view).toContain("'is-collapsed': isCardCollapsed(modelAnalysisVariableTargetId(variable.id))")
     expect(view).toContain('@click="toggleCardFromHeader($event, modelAnalysisVariableTargetId(variable.id))"')
@@ -418,7 +418,7 @@ describe('模型请求分析展示模型', () => {
   })
 
   it('工具列表图标锁死 18px，避免 flex 把扳手挤成不同大小', () => {
-    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const styles = readFileSync(resolve('client/model-request/styles.css'), 'utf8')
     const view = readFileSync(resolve('client/model-request/analysis-view.vue'), 'utf8')
 
     expect(styles).toMatch(/\.webqq-model-analysis-tool-summary > svg \{[^}]*flex: 0 0 auto;[^}]*width: 18px;[^}]*height: 18px;/s)
@@ -437,7 +437,7 @@ describe('模型请求分析展示模型', () => {
   })
 
   it('工具列表卡片头与消息卡片头同高，不再额外垫高', () => {
-    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const styles = readFileSync(resolve('client/model-request/styles.css'), 'utf8')
 
     expect(styles).toMatch(/\.webqq-model-analysis-tool-summary \{[^}]*min-height: 44px;[^}]*padding: 8px 12px;/s)
     expect(styles).not.toMatch(/\.webqq-model-analysis-tool-summary \{[^}]*min-height: 58px;/s)
@@ -447,7 +447,7 @@ describe('模型请求分析展示模型', () => {
   // 这里只保留无法进入 module 的 DOM 契约：滚动容器选择规则留在视图侧。
   it('工作台分析的导航与卡片共用外层详情滚动，检查器仍滚动 inspector-body', () => {
     const view = readFileSync(resolve('client/model-request/analysis-view.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const styles = readFileSync(resolve('client/model-request/styles.css'), 'utf8')
 
     expect(view).toContain("content.closest<HTMLElement>('.webqq-model-request-detail')")
     expect(view).toContain("content.closest<HTMLElement>('.webqq-model-trajectory-inspector-body')")
@@ -460,7 +460,7 @@ describe('模型请求分析展示模型', () => {
   // 这里只保留无从进入 module 的结构契约：折叠按钮的 aria 与正文的显隐都绑在同一个分组键上。
   it('单一左侧导航保持吸顶，折叠按钮的 aria 与条目显隐绑在同一个分组键上', () => {
     const view = readFileSync(resolve('client/model-request/analysis-view.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const styles = readFileSync(resolve('client/model-request/styles.css'), 'utf8')
 
     expect(view).toContain('@click="toggleNavigationGroup(group.key)"')
     expect(view).toContain(':aria-expanded="!isNavigationGroupCollapsed(group.key)"')
@@ -470,7 +470,7 @@ describe('模型请求分析展示模型', () => {
 
   it('分析页的过滤工具栏和请求组成轨道一起保持吸顶', () => {
     const trajectory = readFileSync(resolve('client/model-request/trajectory.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const styles = readFileSync(resolve('client/model-request/styles.css'), 'utf8')
 
     expect(trajectory).toMatch(/webqq-model-trajectory-header[\s\S]*webqq-model-trajectory-scope[\s\S]*webqq-model-trajectory-sticky-header[\s\S]*webqq-model-trajectory-controls[\s\S]*webqq-model-trajectory-composition-shell/)
     expect(trajectory).toContain('ref="stickyHeaderElement" class="webqq-model-trajectory-header webqq-overlay-header"')
@@ -491,7 +491,7 @@ describe('模型请求分析展示模型', () => {
 
   it('滚动阅读右侧时只跟随当前条目，不自动改变左侧分类折叠状态', () => {
     const view = readFileSync(resolve('client/model-request/analysis-view.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const styles = readFileSync(resolve('client/model-request/styles.css'), 'utf8')
 
     expect(view).not.toContain('webqq-model-analysis-nav-fallback')
     expect(view).not.toContain('fallbackNavigationVisible')
@@ -514,20 +514,20 @@ describe('模型请求分析展示模型', () => {
   })
 
   it('TOOL DEFS 强调框与消息卡片一样是圆角矩形', () => {
-    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const styles = readFileSync(resolve('client/model-request/styles.css'), 'utf8')
 
     expect(styles).toMatch(/\.webqq-model-analysis-tools \{[^}]*overflow: hidden;[^}]*border-radius: 8px;/s)
     expect(styles).toContain('.webqq-model-analysis-tools.is-located')
   })
 
   it('字符数徽章保持单行，不被窄栏折成两行', () => {
-    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const styles = readFileSync(resolve('client/model-request/styles.css'), 'utf8')
 
     expect(styles).toMatch(/\.webqq-model-analysis-chars \{[^}]*flex: 0 0 auto;[^}]*white-space: nowrap;/s)
   })
 
   it('工具 Schema 使用请求页 JSON 树，而不是纯文本', () => {
-    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const styles = readFileSync(resolve('client/model-request/styles.css'), 'utf8')
     const view = readFileSync(resolve('client/model-request/analysis-view.vue'), 'utf8')
 
     expect(view).toContain('class="webqq-model-analysis-tool-schema webqq-model-request-json-viewer"')
@@ -568,7 +568,7 @@ describe('模型请求分析展示模型', () => {
   })
 
   it('折叠长文本用渐隐遮罩并居中展开按钮，避免半透明实色透出字形', () => {
-    const styles = readFileSync(resolve('client/styles/webqq-model-requests.css'), 'utf8')
+    const styles = readFileSync(resolve('client/model-request/styles.css'), 'utf8')
     const view = readFileSync(resolve('client/model-request/analysis-view.vue'), 'utf8')
 
     expect(view).toContain("class: 'webqq-model-analysis-expand'")

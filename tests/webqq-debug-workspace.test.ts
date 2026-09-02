@@ -8,7 +8,7 @@ describe('WebQQ OneBot 调试工作台', () => {
     const sidebarSource = readFileSync(resolve('client/webqq/sidebar.vue'), 'utf8')
     const shellSource = readFileSync(resolve('client/workspace/shell.ts'), 'utf8')
     const debugSource = readFileSync(resolve('client/onebot-debug/workspace.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-debug.css'), 'utf8')
+    const styles = readFileSync(resolve('client/onebot-debug/styles.css'), 'utf8')
 
     expect(sidebarSource).toMatch(/label:\s*['"]OneBot 调试['"]/)
     expect(sidebarSource).toContain('IconBug')
@@ -105,7 +105,7 @@ describe('WebQQ OneBot 调试工作台', () => {
   it('使用独立网格和统一控件基线，避免筛选器溢出与黑色描边', () => {
     const debugSource = readFileSync(resolve('client/onebot-debug/workspace.vue'), 'utf8')
     const modelRequestSource = readFileSync(resolve('client/model-request/workspace.vue'), 'utf8')
-    const debugStyles = readFileSync(resolve('client/styles/webqq-debug.css'), 'utf8')
+    const debugStyles = readFileSync(resolve('client/onebot-debug/styles.css'), 'utf8')
     const primitives = readFileSync(resolve('client/styles/webqq-primitives.css'), 'utf8')
 
     expect(debugSource).toContain('webqq-debug-control')

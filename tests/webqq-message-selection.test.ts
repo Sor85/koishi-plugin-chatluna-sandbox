@@ -76,12 +76,12 @@ describe('WebQQ 消息多选与目标选择', () => {
     expect(pageSource).toContain('sendForwardMessage,')
   })
 
-  it('多选样式独立于 webqq-messages.css 的 forward 规则', () => {
-    const selectionStyles = readFileSync(resolve('client/styles/webqq-message-selection.css'), 'utf8')
+  it('多选样式独立于 messages.css 的 forward 规则', () => {
+    const selectionStyles = readFileSync(resolve('client/webqq/message-selection.css'), 'utf8')
     const styleEntry = readFileSync(resolve('client/style.css'), 'utf8')
-    const messageStyles = readFileSync(resolve('client/styles/webqq-messages.css'), 'utf8')
+    const messageStyles = readFileSync(resolve('client/webqq/messages.css'), 'utf8')
 
-    expect(styleEntry).toContain('./styles/webqq-message-selection.css')
+    expect(styleEntry).toContain('./webqq/message-selection.css')
     expect(selectionStyles).toContain('.chatluna-sandbox-selection-bar')
     expect(selectionStyles).toContain('width: max-content')
     expect(selectionStyles).toContain('border-radius: 999px')

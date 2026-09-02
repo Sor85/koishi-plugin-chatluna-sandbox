@@ -8,7 +8,7 @@ describe('WebQQ 测试调用工作台', () => {
     const sidebarSource = readFileSync(resolve('client/webqq/sidebar.vue'), 'utf8')
     const shellSource = readFileSync(resolve('client/workspace/shell.ts'), 'utf8')
     const workspaceSource = readFileSync(resolve('client/test-call/workspace.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-test-calls.css'), 'utf8')
+    const styles = readFileSync(resolve('client/test-call/styles.css'), 'utf8')
 
     expect(sidebarSource).toMatch(/label:\s*['"]测试调用['"]/)
     expect(sidebarSource).toContain('IconHistory')
@@ -88,7 +88,7 @@ describe('WebQQ 测试调用工作台', () => {
    */
   it('标注每条记录的协议表述，并可按来路筛选', () => {
     const workspaceSource = readFileSync(resolve('client/test-call/workspace.vue'), 'utf8')
-    const styles = readFileSync(resolve('client/styles/webqq-test-calls.css'), 'utf8')
+    const styles = readFileSync(resolve('client/test-call/styles.css'), 'utf8')
 
     expect(workspaceSource).toContain("from '#client/components/ui/select'")
     expect(workspaceSource).toContain('按协议表述筛选')

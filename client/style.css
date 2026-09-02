@@ -3,19 +3,22 @@
    插件）加载本文件时无法生成工具类，只能消费编译完成的静态产物。 */
 @import "./styles/tailwind.generated.css";
 @import "./styles/shadcn-theme.css";
+/* 以下 16 条的**顺序本身是级联的一部分**：跨能力令牌与原语在前，各能力目录下的区域表
+   居中，跨区域断点收尾。区域表已按能力归属散进 client/<能力>/（docs/adr/0092），因此路径
+   不再透露加载次序——调整顺序、合并或拆分文件都不会报错，只会让某处颜色或间距静默变样。 */
 @import "./styles/webqq-tokens.css";
-@import "./styles/webqq-workspace.css";
+@import "./workspace/workspace.css";
 @import "./styles/webqq-primitives.css";
-@import "./styles/webqq-sidebar.css";
-@import "./styles/webqq-chat.css";
-@import "./styles/webqq-messages.css";
-@import "./styles/webqq-message-selection.css";
-@import "./styles/webqq-composer.css";
-@import "./styles/webqq-details.css";
-@import "./styles/webqq-overlays.css";
-@import "./styles/webqq-debug.css";
-@import "./styles/webqq-test-calls.css";
-@import "./styles/webqq-model-requests.css";
-@import "./styles/webqq-presets.css";
-@import "./styles/webqq-spaces.css";
+@import "./webqq/sidebar.css";
+@import "./webqq/chat.css";
+@import "./webqq/messages.css";
+@import "./webqq/message-selection.css";
+@import "./webqq/composer.css";
+@import "./webqq/details.css";
+@import "./workspace/overlays.css";
+@import "./onebot-debug/styles.css";
+@import "./test-call/styles.css";
+@import "./model-request/styles.css";
+@import "./preset/styles.css";
+@import "./test-space/styles.css";
 @import "./styles/webqq-responsive.css";

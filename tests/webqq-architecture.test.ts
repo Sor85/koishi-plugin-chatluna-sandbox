@@ -2,6 +2,8 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
+import { listClientStylesheets } from './helpers/client-stylesheets'
+
 /**
  * 客户端端口适配器的命名约定。规则按这个形状判定而不是列举文件名：能力目录下叫
  * `koishi-port.ts` 的那一个文件自动被认作合法持有者，其余任何文件默认受约束。
@@ -351,7 +353,7 @@ const rules: readonly ArchitectureRule[] = [
    */
   {
     name: '工作区本体与一级区域不得声明 backdrop-filter',
-    root: 'client/styles',
+    root: 'client',
     extensions: ['.css'],
     findViolations: (_file, source) => readCssRules(source)
       .filter(({ body }) => declaresBackdropFilter(body))
@@ -363,7 +365,7 @@ const rules: readonly ArchitectureRule[] = [
   },
   {
     name: '毛玻璃表头的模糊层必须放在 ::before 上',
-    root: 'client/styles',
+    root: 'client',
     extensions: ['.css'],
     findViolations: (_file, source) => readCssRules(source)
       .filter(({ body }) => declaresBackdropFilter(body))
@@ -721,6 +723,26 @@ describe('WebQQ 模块化架构', () => {
     // 架构守卫读源码是 ADR 0073 的第三类例外：它的断言对象本来就是源码结构。
     expect(assertionRule.findViolations('tests/webqq-architecture.test.ts', bare)).toEqual([])
     expect(assertionRule.findViolations('tests/server-architecture.test.ts', bare)).toEqual([])
+  })
+
+  /**
+   * 两条样式规则的扫描面必须是客户端全部样式源码，不是某一个目录。
+   *
+   * 区域样式表按能力归属散进了 `client/<能力>/`（ADR-0092），把 `root` 调回 `client/styles`
+   * 不会报错：扫过的文件更少，剩下的几张跨能力表本来就合规，上面那条全量断言照旧全绿。
+   * 因此逐个比对扫描结果与那份观察面，让缩窄扫描面变成一条会红的改动。
+   */
+  it('两条样式规则扫到客户端全部样式源码', () => {
+    const styleRules = rules.filter((rule) => rule.extensions.includes('.css'))
+    const stylesheets = listClientStylesheets()
+
+    expect(styleRules.length).toBe(2)
+    expect(stylesheets).toContain('client/styles/webqq-tokens.css')
+    expect(stylesheets).toContain('client/webqq/messages.css')
+    expect(stylesheets).toContain('client/model-request/styles.css')
+    for (const rule of styleRules) {
+      expect([...listSourceFiles(rule.root, rule.extensions)].sort(), rule.name).toEqual(stylesheets)
+    }
   })
 
   /**
