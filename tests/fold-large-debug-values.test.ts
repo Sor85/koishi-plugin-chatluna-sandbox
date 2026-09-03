@@ -131,7 +131,7 @@ describe('折叠调试记录中的大型值', () => {
     expect((await reloaded.getCapacity()).totalBytes).toBe(page.capacity.totalBytes)
   })
 
-  it('非 Base64 长文本不被误折叠，消息正文仍按既有规则脱敏', async () => {
+  it('非 Base64 长文本不被误折叠，消息正文逐字保留', async () => {
     const store = new SandboxOneBotDebugStore()
     const text = longPlainText()
     const projected = store.append({
@@ -145,11 +145,14 @@ describe('折叠调试记录中的大型值', () => {
       payload: {
         raw_message: text,
         description: text,
+        // 凭证类键仍然脱敏；正文保留不等于全量透出。
+        access_token: 'secret-token',
       },
     })
     expect(projected.payload).toEqual({
-      raw_message: `[文本已省略，${text.length} 字符]`,
+      raw_message: text,
       description: text,
+      access_token: '[已脱敏]',
     })
     expect(JSON.stringify(projected.payload)).not.toContain('"kind":"large-value"')
   })

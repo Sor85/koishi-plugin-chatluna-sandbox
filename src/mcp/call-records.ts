@@ -23,7 +23,7 @@ export interface SandboxTestCallRecordsPage {
 
 export function redactTestCallValue(value: unknown, key = ''): unknown {
   if (SENSITIVE_KEY_PATTERN.test(key)) return '[已脱敏]'
-  // 与 OneBot 调试记录不同：测试调用记录要复盘工具参数，content/message/text 必须保留。
+  // 与 OneBot 调试记录同口径：只脱敏凭证类键，content/message/text 逐字保留。
   if (typeof value === 'string') return foldLargeBase64(value)
   if (Array.isArray(value)) return value.map((item) => redactTestCallValue(item, key))
   if (!value || typeof value !== 'object') return value

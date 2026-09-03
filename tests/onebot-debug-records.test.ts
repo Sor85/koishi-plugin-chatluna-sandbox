@@ -84,8 +84,10 @@ describe('OneBot 调试记录', () => {
     expect(record.payload).toEqual(expect.objectContaining({
       post_type: 'message',
       message_type: 'private',
+      // 正文逐字入库：调试页面要能核对插件收到的报文原文。
+      raw_message: '用于调试记录的私聊消息',
+      message: [{ type: 'text', data: { text: '用于调试记录的私聊消息' } }],
     }))
-    expect(JSON.stringify(record.payload)).not.toContain('用于调试记录的私聊消息')
     expect(control.getSnapshot()).not.toHaveProperty('oneBotDebugRecords')
   })
 

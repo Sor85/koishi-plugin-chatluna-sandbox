@@ -28,21 +28,20 @@ export const MAX_DEBUG_PAGE_SIZE = 200
 export const LARGE_BASE64_CHAR_THRESHOLD = 8 * 1024
 
 const SENSITIVE_KEY_PATTERN = /authorization|access[_-]?token|secret|password|cookie|private[_-]?key/i
-const TEXT_KEY_PATTERN = /^(?:content|message|raw_message|text)$/i
 const BASE64_BODY_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
 
-function redactSensitiveAndText(value: unknown, key = ''): unknown {
+/**
+ * 只脱敏凭证类键。消息正文（content/message/raw_message/text）原样保留：调试页面要能逐字
+ * 核对插件实际发出与收到的报文，替换成长度摘要会让「发了什么」这个最常见的排查问题无法回答。
+ */
+function redactSensitive(value: unknown, key = ''): unknown {
   if (SENSITIVE_KEY_PATTERN.test(key)) return '[已脱敏]'
-  if (typeof value === 'string') {
-    // 消息正文不是协议调试所需字段，只保留长度可避免短文本绕过脱敏。
-    if (TEXT_KEY_PATTERN.test(key)) return `[文本已省略，${value.length} 字符]`
-    return value
-  }
-  if (Array.isArray(value)) return value.map((item) => redactSensitiveAndText(item, key))
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) return value.map((item) => redactSensitive(item))
   if (!value || typeof value !== 'object') return value
   return Object.fromEntries(Object.entries(value).map(([entryKey, entryValue]) => [
     entryKey,
-    redactSensitiveAndText(entryValue, entryKey),
+    redactSensitive(entryValue, entryKey),
   ]))
 }
 
@@ -314,9 +313,9 @@ export class SandboxOneBotDebugStore {
   }
 
   append(input: AppendOneBotDebugRecordInput): SandboxOneBotDebugRecord {
-    // 持久化保留完整原始大型值；仅脱敏密钥与消息正文。
-    const payload = redactSensitiveAndText(input.payload)
-    const result = redactSensitiveAndText(input.result)
+    // 持久化保留完整原始大型值；仅脱敏凭证类键。
+    const payload = redactSensitive(input.payload)
+    const result = redactSensitive(input.result)
     const record: SandboxOneBotDebugRecord = {
       id: Random.id(),
       sequence: this.nextSequence,
