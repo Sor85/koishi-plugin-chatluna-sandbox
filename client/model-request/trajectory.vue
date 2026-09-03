@@ -484,6 +484,7 @@ const REQUEST_COMPOSITION_KINDS = ['system', 'user', 'assistant', 'tool-definiti
 const CONVERSATION_COMPOSITION_KINDS = ['system', 'user', 'tool-definition'] as const
 
 interface CompositionSegment {
+  /** 渲染键。一条消息被变量切开后会产出多段同 evidenceId 的分段，键必须自带序号才唯一。 */
   id: string
   evidenceId: string
   kind: SandboxModelRequestPromptKind
@@ -510,7 +511,7 @@ const requestCompositionTracks = computed(() => {
     offset += item.percentage
     const gap = index < promptComposition.value.length - 1 ? 0.35 : 0
     return {
-      id: item.evidenceId,
+      id: `${index}:${item.evidenceId}`,
       evidenceId: item.evidenceId,
       kind: item.kind,
       characters: item.characters,
@@ -545,7 +546,7 @@ const conversationCompositionTracks = computed(() => {
       const gap = index < items.length - 1 ? Math.min(0.25, rawWidth / 4) : 0
       used += percentage
       segments.push({
-        id: `${slot.id}:${item.evidenceId}`,
+        id: `${slot.id}:${index}:${item.evidenceId}`,
         evidenceId: item.evidenceId,
         kind: item.kind,
         characters: item.characters,
