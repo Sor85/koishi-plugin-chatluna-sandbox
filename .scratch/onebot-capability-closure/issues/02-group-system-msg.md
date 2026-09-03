@@ -22,7 +22,7 @@
 - [x] NapCat 配置额外返回 `InvitedRequest` 桶且内容与 `invited_requests` 相同；LLBot 配置下该桶不出现，有断言
 - [x] NapCat 配置接受 `count` 并按它截断；LLBot 配置忽略 `count` 且不报错，两者都有断言
 - [x] 每项字段齐全（按各自上游的键，见 Comments），取值来自场景而非常量，有断言
-- [x] `checked` 对未处理申请为 `false`；已处理申请若仍在场景里则为 `true`，有断言
+- [x] `checked` 对未处理申请为 `false`，且断言与场景里那条申请的 `status` 对齐；「已处理申请若仍在场景里则为 `true`」这一半在当前领域模型下不可达，那条断言今天也因此没有区分力，见 Comments
 - [x] 入群申请的可见性用现成的 `denyGroupAuthority`，机器人只是普通成员的群的申请不出现，有断言
 - [x] 群邀请只返回发给本机器人的，发给别人的不出现，有断言
 - [x] 跨 action 闭环断言：列出申请 → 用返回的 `request_id` 调 `set_group_add_request` → 审批成功、场景里那条申请消失
@@ -48,5 +48,7 @@
 **`count` 实现成总量预算而不是按桶截断。** NapCat 上游把 `count` 交给 `getSingleScreenNotifies(false, +count)`，也就是「一次取多少条系统消息」，分桶发生在取回来之后。按桶各截一次会让插件在沙盒上看到上游给不出的组合（比如 `count: 1` 却拿到两桶各一条）。因此 `getBotGroupSystemMessages` 返回一条按场景顺序排列的平列，截断与分桶都在适配器里，顺序即 `scene.requests` 的既有顺序。
 
 **`actor` 恒为 `0`，这是场景事实而不是常量兜底。** `SandboxRelationshipRequest.status` 的类型只有 `'pending'`，审批过的申请由 `removeRelationshipRequest` 从场景里摘掉，因此场景里永远没有「已处理但还在」的申请，也就永远没有处理人——上游未处理时给的同样是 `0`。`checked` 仍然从 `status` 推出而不是写死 `false`，两者因此不会分头漂移；那条「已处理仍在场景里则为 `true`」的分支按当前领域模型走不到，要让它可达得先给申请加一个「已处理」状态，那是新建领域概念，不在本票范围内。
+
+**验收里那半句断言按可达范围重写过，并且它今天抓不出东西。** 代码评审指出「已处理则为 `true`」这一半的勾选没有对应断言，属实：不可达的分支写不出断言。改成遍历两种实现的全部四个桶、逐条断言 `checked === (场景里那条申请的 status !== 'pending')`。但要说清楚——`status` 的类型只有 `'pending'`，等式两边今天恒为 `false`，把实现改成写死 `checked: false` 这条断言照样通过（已做变异验证：改完 20 个测试全绿）。因此它不是防写死的守卫，只是一条提前写好的不变量，等申请真有了「已处理」状态那天才开始有区分力。要现在就有区分力，就得先加那个状态，而那是新建领域概念。
 
 **可见性判定没有走 `getVisibleSnapshot`。** 那个投影只裁剪会话与消息，`groups` 与 `requests` 是原样带出的，用它并不会过滤掉任何一条申请。这一票走的是「等价可见性判定」那一支：入群申请用关系规则模块导出的 `denyGroupAuthority`（与 `handleBotGroupRequest` 的入群分支同源），群邀请用 `targetId === botId`（与那条通道的邀请分支同源）。因此本票没有新写任何角色比较，架构守卫不需要新豁免。

@@ -268,6 +268,14 @@ describe('群系统消息读取', () => {
     // 没有附言时按空串返回，而不是 undefined。
     expect(napcat.join_requests[1]).toMatchObject({ message: '', requester_nick: '第二位入群申请人' })
     expect(llbotData.join_requests[1]).toMatchObject({ message: '', requester_nick: '第二位入群申请人' })
+
+    // checked 与场景里那条申请的 status 对齐。诚实地说：`status` 的类型只有 'pending'，因此这条
+    // 等式两边今天恒为 false，它抓不出「把 checked 写死成 false」——真给申请加上「已处理」状态
+    // 之后它才开始有区分力。留着是为了让那一天不必重新想这条不变量该怎么写。
+    const statusOf = (requestId: unknown) => control.getSnapshot().requests.find(({ id }) => id === requestId)!.status
+    const listed = [...napcat.join_requests, ...napcat.invited_requests, ...llbotData.join_requests, ...llbotData.invited_requests]
+    expect(listed).not.toHaveLength(0)
+    for (const item of listed) expect(item.checked).toBe(statusOf(item.request_id) !== 'pending')
   })
 
   it('NapCat 按 count 截断系统消息总量，LLBot 忽略 count 且不报错', async () => {
