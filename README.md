@@ -4,8 +4,6 @@
 
 当前版本提供 WebQQ 风格的全页工作台。用户可以在浏览器内将普通用户或虚拟 OneBot 机器人切换为当前操作者，统一使用该参与者的视图、权限和发送身份，并在同一会话中观察被测插件回复；共享场景仍由服务端统一持有。
 
-WebQQ 的毛玻璃、气泡尾部、颜色模式和强调色由 Koishi 插件全局配置统一控制。
-
 ## 灵感来源
 
 - 轨迹功能的设计灵感来源于 [DeepSeek Harness（dsh）](https://github.com/deepseek-ai/deepseek-harness)。
