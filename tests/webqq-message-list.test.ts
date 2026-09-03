@@ -129,6 +129,30 @@ describe('WebQQ 消息列表', () => {
     expect(messageActionMenuSource).not.toContain('<ContextMenuTrigger as-child :disabled="isRecalledMessage(message) || model.selectionMode">\n            <li')
   })
 
+  it('右键「回复」与「@ 用户」把焦点交给消息输入框', () => {
+    const source = readSource('client/webqq/message-list.vue')
+    const chatPaneSource = readSource('client/webqq/chat-pane.vue')
+    const composerSource = readSource('client/webqq/composer.vue')
+
+    /**
+     * 类别：实现细节契约（肯定式）。
+     * 依据：让位与否的判定已下沉到 menu-focus-handoff 并由它的五条行为断言逐条执行；聚焦时机
+     * 与光标落点住在 composer-draft-host。这里保留的是三根线——菜单项记下交接意图、reka-ui 的
+     * 还焦事件接到判定上、聊天区域把焦点交给发送控件。少接任何一根的表现都一样：回复条或提及
+     * 出现了，输入框里却没有光标，因为 reka-ui 在菜单卸载后把焦点还给右键之前那个元素（消息
+     * 气泡不可聚焦，通常是 document.body；Firefox 还会把它还给刚被右键的头像按钮）。
+     *
+     * 气泡菜单与头像菜单挂在同一条消息上，标识必须分开，否则一个的关闭会消费掉另一个的意图。
+     */
+    expect(source).toContain("menuFocusHandoff.request(message.id); emit('reply', message.id)")
+    expect(source).toContain('@close-auto-focus="handleMenuCloseAutoFocus(message.id, $event)"')
+    expect(source).toContain("menuFocusHandoff.request(avatarMenuId(message.id)); emit('mentionGroupMember', message.authorId)")
+    expect(source).toContain('@close-auto-focus="handleMenuCloseAutoFocus(avatarMenuId(message.id), $event)"')
+    expect(source).toContain('if (!menuFocusHandoff.consume(menuId)) return\n  event.preventDefault()')
+    expect(chatPaneSource).toContain('@focus-composer="focusComposer"')
+    expect(composerSource).toContain('defineExpose({ focus: () => draftHost.focus() })')
+  })
+
   it('清空会话与跳转到对应请求的入口', () => {
     const source = readSource('client/webqq/message-list.vue')
     const chatPaneSource = readSource('client/webqq/chat-pane.vue')

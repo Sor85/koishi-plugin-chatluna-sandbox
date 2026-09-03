@@ -65,11 +65,11 @@
                     <WebqqAvatar class="chatluna-sandbox-message-avatar" :kind="isBotParticipant(message.authorId) ? 'bot' : 'user'" :name="getMessageAuthorName(message.authorId)" :avatar="getParticipantAvatar(message.authorId)" />
                   </button>
                 </ContextMenuTrigger>
-                <ContextMenuContent style="z-index: 140">
+                <ContextMenuContent style="z-index: 140" @close-auto-focus="handleMenuCloseAutoFocus(avatarMenuId(message.id), $event)">
                   <ContextMenuItem @select="emit('openProfile', message.authorId)">
                     <IconId :size="16" aria-hidden="true" /> 查看资料
                   </ContextMenuItem>
-                  <ContextMenuItem v-if="getMessageGroupMemberActions(message.authorId).includes('mention')" @select="emit('mentionGroupMember', message.authorId)">
+                  <ContextMenuItem v-if="getMessageGroupMemberActions(message.authorId).includes('mention')" @select="menuFocusHandoff.request(avatarMenuId(message.id)); emit('mentionGroupMember', message.authorId)">
                     <IconAt :size="16" aria-hidden="true" /> @ 用户
                   </ContextMenuItem>
                   <ContextMenuItem v-if="getMessageGroupMemberActions(message.authorId).includes('poke')" @select="emit('pokeGroupMember', message.authorId)">
@@ -179,14 +179,14 @@
               </div>
               </div>
             </li>
-          <ContextMenuContent style="z-index: 140">
+          <ContextMenuContent style="z-index: 140" @close-auto-focus="handleMenuCloseAutoFocus(message.id, $event)">
             <ContextMenuItem
               v-if="isBotParticipant(message.authorId) && message.chatLuna?.modelRequests?.length"
               @select="emit('openModelRequest', message.chatLuna.modelRequests.at(-1)!)"
             >
               <IconExternalLink :size="16" aria-hidden="true" /> 跳转到对应请求
             </ContextMenuItem>
-            <ContextMenuItem v-if="capabilitiesOf(message).reply" @select="emit('reply', message.id)"><IconMessageReply :size="16" aria-hidden="true" /> 回复</ContextMenuItem>
+            <ContextMenuItem v-if="capabilitiesOf(message).reply" @select="menuFocusHandoff.request(message.id); emit('reply', message.id)"><IconMessageReply :size="16" aria-hidden="true" /> 回复</ContextMenuItem>
             <ContextMenuItem v-if="capabilitiesOf(message).branch" @select="emit('branchConversationInstance', message.id)">
               <IconGitBranch :size="16" aria-hidden="true" /> 创建分支
             </ContextMenuItem>
@@ -398,6 +398,7 @@ import {
   type ScrollAnchorRow,
 } from './message-list-scroll-restore'
 import { highlightMessageElement } from './message-reveal'
+import { createMenuFocusHandoff } from './menu-focus-handoff'
 import WebqqAvatar from '#client/shared/avatar.vue'
 import WebqqMessageReactions from './message-reactions.vue'
 import WebqqMenuExtensionMark from './menu-extension-mark.vue'
@@ -443,6 +444,8 @@ const props = defineProps<{ model: WebqqMessageListModel; preview?: boolean; scr
 const preview = computed(() => !!props.preview)
 const emit = defineEmits<{
   reply: [messageId: string]
+  /** 右键菜单把焦点交给消息输入框；接管的是聊天区域，列表只报出这次交接。 */
+  focusComposer: []
   recallMessage: [messageId: string]
   clearConversation: []
   branchConversationInstance: [messageId: string]
@@ -479,6 +482,37 @@ const follow = createMessageListFollowController({
   requestAnimationFrame: (callback) => requestAnimationFrame(callback),
   cancelAnimationFrame: (id) => cancelAnimationFrame(id),
 })
+/**
+ * 消息右键菜单的焦点交接。让位与否的判定住在 menu-focus-handoff 并由它的行为断言逐条执行；
+ * 这里只把 reka-ui 的还焦事件接上去。
+ */
+const menuFocusHandoff = createMenuFocusHandoff()
+
+/**
+ * 头像菜单的标识。
+ *
+ * 同一条消息上挂着两个菜单（气泡与头像），标识必须分开：共用一个的话，其中一个关闭时会消费掉
+ * 另一个刚记下的交接意图，那次让位就落空了。
+ */
+function avatarMenuId(messageId: string) {
+  return `avatar:${messageId}`
+}
+
+/**
+ * 菜单卸载前的还焦时机。
+ *
+ * 只有这一刻聚焦才留得住：菜单开着时它的焦点陷阱会把外部聚焦拉回菜单项，而还焦一旦执行，
+ * 焦点就被交给右键之前那个元素（消息气泡不可聚焦，通常是 document.body；Firefox 还会在右键时
+ * 聚焦头像按钮，于是焦点被还给那个按钮）。
+ *
+ * 「回复」与「@ 用户」交接的目标都是消息输入框，因此让位之后一律由聊天区域把焦点交过去。
+ * 提及那条路径插入提及时自己也会聚焦，这里再聚焦一次是幂等的——光标同样落在草稿记着的位置。
+ */
+function handleMenuCloseAutoFocus(menuId: string, event: Event) {
+  if (!menuFocusHandoff.consume(menuId)) return
+  event.preventDefault()
+  emit('focusComposer')
+}
 const participantNames = computed(() => Object.fromEntries(
   Object.entries(props.model.participants).map(([id, participant]) => [id, participant.name]),
 ))

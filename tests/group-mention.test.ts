@@ -40,9 +40,10 @@ describe('群聊右键提及成员', () => {
 
     expect(menuSource).toContain("actions.includes('mention')")
     expect(menuSource).toContain("emit('mention')")
-    expect(detailsSource).toContain("@mention=\"emit('mentionGroupMember', member.participantId)\"")
+    // 两处提及入口都在发出事件前记下焦点交接意图，让位判定由 menu-focus-handoff 的行为断言执行。
+    expect(detailsSource).toContain("@mention=\"menuFocusHandoff.request(member.participantId); emit('mentionGroupMember', member.participantId)\"")
     // 消息头像菜单把高频提及动作提升到一级，但继续发出相同事件。
-    expect(messageSource).toContain("@select=\"emit('mentionGroupMember', message.authorId)\"")
+    expect(messageSource).toContain("emit('mentionGroupMember', message.authorId)\"")
     expect(pageSource).toContain('@mention-group-member="mentionGroupMember"')
     // 接线断言（ADR 0073 第 4 类）：提及请求确实交给草稿宿主，插入位置与光标落点由
     // composer-draft-host.test.ts「从别处插入提及」两条执行。少接这根线的表现是右键提及无反应。

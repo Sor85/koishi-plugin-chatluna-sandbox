@@ -76,6 +76,7 @@
       :preview="preview"
       :scroll-scope="scrollScope"
       @reply="replyingToMessageId = $event"
+      @focus-composer="focusComposer"
       @recall-message="emit('recallMessage', $event)"
       @clear-conversation="emit('clearConversation')"
       @branch-conversation-instance="emit('branchConversationInstance', $event)"
@@ -119,6 +120,7 @@
 
     <WebqqComposer
       v-else
+      ref="composerRef"
       :model="composerModel"
       :preview="preview"
       @send="forwardSend"
@@ -272,6 +274,20 @@ const forwardTargetOpen = ref(false)
 const forwardLoading = ref(false)
 const previewImageUrl = ref('')
 const messageListRef = ref<{ revealMessage: (messageId: string) => boolean }>()
+/** 右键「回复」「@ 用户」之后由发送控件接管焦点；多选态下发送控件不在场，因此按可选引用取。 */
+const composerRef = ref<{ focus: () => void }>()
+
+/**
+ * 把焦点交给消息输入框。
+ *
+ * 详情栏的群成员菜单也要交接焦点，但它是聊天区域的兄弟组件，因此这个动作同时对外暴露，
+ * 由页面装配转交（详情栏自己够不到发送控件）。
+ */
+function focusComposer() {
+  composerRef.value?.focus()
+}
+
+defineExpose({ focusComposer })
 const searchShellRef = ref<HTMLElement>()
 const searchTriggerRef = ref<HTMLButtonElement>()
 /**

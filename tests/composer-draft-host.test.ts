@@ -7,6 +7,7 @@ import {
   readComposerDraftTokens,
   resolveComposerCaretFromReading,
   resolveComposerCaretTarget,
+  resolveComposerHostTextOffset,
   isComposerMentionBoundary,
   resolveComposerMentionMenu,
   routeComposerKey,
@@ -407,6 +408,53 @@ describe('WebQQ 发送控件草稿宿主', () => {
         { type: 'mention', id: '1', name: 'A' },
         { type: 'text', text: '' },
       ])
+    })
+  })
+
+  describe('把焦点交回输入框', () => {
+    /**
+     * 消息右键「回复」之后用户要接着打字。光标必须连着写：菜单打开期间焦点先落在菜单容器上，
+     * 浏览器为 contenteditable 记住的选区到这时已经作废，只聚焦会让光标落在正文最前面。
+     * 两个浏览器实测都是这个结果，因此不能指望它们各自的选区还原。
+     */
+    it('立刻聚焦并把光标写回草稿记着的位置', () => {
+      const host = createFakeHost()
+      const draftHost = createComposerDraftHost(host.adapter)
+      draftHost.apply({ tokens: TOKENS_WITH_MENTION, tokenIndex: 2, offset: 1 }, { focus: false })
+      const rendered = host.renders.length
+
+      draftHost.focus()
+
+      expect(host.calls.filter((call) => call === 'focus')).toHaveLength(1)
+      expect(host.carets).toEqual([{ kind: 'child', childIndex: 2, offset: 1 }])
+      // 交接焦点不碰正文：整体替换子节点会连带清掉浏览器的撤销栈与输入法状态。
+      expect(host.renders).toHaveLength(rendered)
+    })
+  })
+
+  describe('正文偏移换成节点偏移', () => {
+    it('没有锚点时原样返回，超出正文时停在末尾', () => {
+      expect(resolveComposerHostTextOffset('你好', 1)).toBe(1)
+      expect(resolveComposerHostTextOffset('你好', 2)).toBe(2)
+      expect(resolveComposerHostTextOffset('你好', 9)).toBe(2)
+      expect(resolveComposerHostTextOffset('你好', -1)).toBe(0)
+    })
+
+    /**
+     * 用户在空草稿里打字时，那次输入不重渲染，渲染阶段补进去的零宽锚点因此留在节点里，
+     * 而草稿 token 里没有它。差这一位的表现是：右键「回复」之后接着打的字插到草稿倒数第二位。
+     */
+    it('跳过节点里留下的零宽锚点', () => {
+      const text = `${COMPOSER_CARET_ANCHOR}你好`
+
+      expect(resolveComposerHostTextOffset(text, 0)).toBe(1)
+      expect(resolveComposerHostTextOffset(text, 1)).toBe(2)
+      expect(resolveComposerHostTextOffset(text, 2)).toBe(3)
+    })
+
+    /** 空文本 token 的节点里只有锚点：光标落在它之后，下一个字才不会插到锚点前面。 */
+    it('只有锚点的节点把光标放在锚点之后', () => {
+      expect(resolveComposerHostTextOffset(COMPOSER_CARET_ANCHOR, 0)).toBe(1)
     })
   })
 

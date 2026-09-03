@@ -126,6 +126,7 @@
         />
         <WebqqChatPane
           v-else
+          ref="chatPaneRef"
           :model="chatPaneViewModel"
           :scroll-scope="activeSpaceId ?? 'main'"
           @back="selectNavigation('contacts')"
@@ -166,6 +167,7 @@
           @publish-announcement="publishAnnouncement"
           @delete-announcement="deleteAnnouncement"
           @mention-group-member="mentionGroupMember"
+          @focus-composer="chatPaneRef?.focusComposer()"
           @poke-group-member="pokeGroupMember"
           @set-group-card="openGroupActionDialog('card', $event)"
           @set-group-title="openGroupActionDialog('title', $event)"
@@ -246,6 +248,8 @@ const testSpacePort = createKoishiTestSpacePort()
 const mcpAdminPort = createKoishiMcpAdminPort()
 const workspaceLayout = createWorkspaceLayout()
 const overlayHostRef = ref<InstanceType<typeof WorkspaceOverlayHost>>()
+/** 详情栏的群成员菜单要把焦点交给消息输入框，而发送控件在聊天区域里：这里只做转交。 */
+const chatPaneRef = ref<{ focusComposer: () => void }>()
 const {
   appearance,
   chatPaneModel,

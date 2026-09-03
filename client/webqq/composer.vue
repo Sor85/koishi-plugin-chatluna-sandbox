@@ -208,6 +208,7 @@ import type { MentionCandidate } from './composer-draft'
 import { createComposerAttachments } from './composer-attachments'
 import {
   createComposerDraftHost,
+  resolveComposerHostTextOffset,
   type ComposerHostCaretReading,
   type ComposerHostCaretTarget,
   type ComposerHostNodePlan,
@@ -360,8 +361,8 @@ function writeEditorCaret(target: ComposerHostCaretTarget) {
     const child = editor.childNodes[target.childIndex]
     if (child) {
       node = child
-      // 空文本 token 在宿主里是一个零宽字符节点，长度是 1 而不是 0；上限只有这里知道。
-      offset = Math.min(target.offset, child.textContent?.length ?? 0)
+      // 正文偏移换成节点偏移：节点里可能留着不算正文的零宽锚点，上界也一并夹住。
+      offset = resolveComposerHostTextOffset(child.textContent ?? '', target.offset)
     }
   }
 
@@ -389,6 +390,12 @@ const isDraftEmpty = draftHost.isEmpty
 const mentionMenuOpen = draftHost.mentionMenuOpen
 const filteredMentionCandidates = draftHost.mentionCandidates
 const mentionMenuIndex = draftHost.mentionMenuIndex
+
+/**
+ * 消息列表右键「回复」这类动作要把焦点交给输入框；聚焦与光标落点都由草稿宿主负责，
+ * 这里只把它的动作暴露给聊天区域接线。
+ */
+defineExpose({ focus: () => draftHost.focus() })
 
 /**
  * 附件采集的注入点。只做宿主动作：临时预览地址与 `FileReader`。

@@ -171,6 +171,27 @@ export function resolveComposerCaretTarget(
   return { kind: 'child', childIndex: tokenIndex + 1, offset: 0 }
 }
 
+/**
+ * 把正文偏移换成宿主那个文本节点里的偏移。
+ *
+ * 零宽锚点是渲染空文本 token 时补进去的占位符，回读时不算正文。用户在空草稿里打过字之后节点里
+ * 仍留着它（那次输入不重渲染），草稿 token 因此比真实节点短一位；直接把正文偏移当节点偏移写回去
+ * 会让光标停在最后一个字之前，表现为右键「回复」之后接着打的字插到草稿中间。
+ *
+ * 上界也在这里收：真实节点文本只有视图读得到，走到末尾就停下。
+ */
+export function resolveComposerHostTextOffset(text: string, offset: number): number {
+  let remaining = Math.max(offset, 0)
+  let index = 0
+  while (index < text.length && remaining > 0) {
+    if (text[index] !== COMPOSER_CARET_ANCHOR) remaining -= 1
+    index += 1
+  }
+  // 落点后面紧跟锚点时也要跨过去：停在锚点前会让下一个字插到这个不算正文的字符之前。
+  while (index < text.length && text[index] === COMPOSER_CARET_ANCHOR) index += 1
+  return index
+}
+
 /** 候选菜单开着时它盯住的那个 `@片段`：在第几个 token、从第几位开始、已经打进去了什么。 */
 export interface ComposerMentionMenuState {
   readonly tokenIndex: number
@@ -378,11 +399,19 @@ export function createComposerDraftHost(adapter: ComposerDraftHostAdapter) {
     render()
     if (options.focus === false) return
     // 等节点替换生效后再聚焦写光标；同一拍里写会落在已经被替换掉的旧节点上。
-    void adapter.nextTick().then(() => {
-      adapter.focus()
-      const current = draft.value
-      adapter.writeCaret(resolveComposerCaretTarget(current.tokens, current.tokenIndex, current.offset))
-    })
+    void adapter.nextTick().then(focus)
+  }
+
+  /**
+   * 把焦点交回输入框，光标落到草稿记着的位置。
+   *
+   * 光标必须显式写。右键菜单打开期间焦点先落在菜单容器上，浏览器为 contenteditable 记住的选区
+   * 到这时已经作废，只 focus 会让光标落在正文最前面，接着输入的字插到草稿前面。
+   */
+  function focus() {
+    adapter.focus()
+    const current = draft.value
+    adapter.writeCaret(resolveComposerCaretTarget(current.tokens, current.tokenIndex, current.offset))
   }
 
   /** 清空草稿与候选菜单。切换会话与切换发送者时用，不抢焦点——用户可能正在别处操作。 */
@@ -526,7 +555,7 @@ export function createComposerDraftHost(adapter: ComposerDraftHostAdapter) {
     },
     routeKey,
     serialize,
-    focus: () => adapter.focus(),
+    focus,
   }
 }
 

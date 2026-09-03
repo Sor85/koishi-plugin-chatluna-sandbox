@@ -63,7 +63,8 @@
             <GroupMemberMenu
               :actor="getCurrentGroupMember(model.currentOperatorId ?? '')"
               :target="member"
-              @mention="emit('mentionGroupMember', member.participantId)"
+              @close-auto-focus="handleMemberMenuCloseAutoFocus(member.participantId, $event)"
+              @mention="menuFocusHandoff.request(member.participantId); emit('mentionGroupMember', member.participantId)"
               @poke="emit('pokeGroupMember', member.participantId)"
               @set-card="emit('setGroupCard', member.participantId)"
               @set-title="emit('setGroupTitle', member.participantId)"
@@ -100,6 +101,7 @@ import { computed, ref, watch } from 'vue'
 import { ContextMenu, ContextMenuTrigger } from '#client/components/ui/context-menu'
 import GroupMemberMenu from './group-member-menu.vue'
 import { getGroupMemberDisplayName, getGroupRoleLabel } from './group-display'
+import { createMenuFocusHandoff } from './menu-focus-handoff'
 import WebqqAvatar from '#client/shared/avatar.vue'
 import { vWebqqScrollbar } from '#client/shared/scrollbar'
 import type { SandboxBotProfile, SandboxGroup, SandboxGroupMember, SandboxPersistenceStatus } from '../../src/types'
@@ -131,6 +133,8 @@ const emit = defineEmits<{
   publishAnnouncement: [content: string, resolve: () => void, reject: (error: unknown) => void]
   deleteAnnouncement: [announcementId: string, resolve: () => void, reject: (error: unknown) => void]
   mentionGroupMember: [targetId: string]
+  /** 右键菜单把焦点交给消息输入框；发送控件在聊天区域里，由页面装配转交。 */
+  focusComposer: []
   pokeGroupMember: [targetId: string]
   setGroupCard: [targetId: string]
   setGroupTitle: [targetId: string]
@@ -146,6 +150,16 @@ const announcementEditorOpen = ref(false)
 const deletingAnnouncementId = ref('')
 const groupMemberSearch = ref('')
 const errorMessage = ref('')
+/**
+ * 群成员菜单的焦点交接。让位与否的判定住在 menu-focus-handoff 并由它的行为断言逐条执行。
+ *
+ * 「@ 用户」之后用户要接着打字，而 reka-ui 的菜单在卸载时会把焦点还给右键之前那个元素
+ * （成员行不可聚焦，于是落到 document.body）。提及插入本身也会聚焦，但那一步发生在菜单退场
+ * 动画期间，实测两个浏览器都留不住，因此让位之后必须在这一刻重新把焦点交出去。
+ *
+ * 详情栏是聊天区域的兄弟组件，够不到发送控件，只能报出交接由页面装配转交。
+ */
+const menuFocusHandoff = createMenuFocusHandoff()
 const panelLabel = computed(() => props.model.view === 'profile' ? '环境摘要' : props.model.group ? '群信息' : '私聊信息')
 const persistenceTitle = computed(() => props.model.persistence.mode === 'database' ? '数据库持久化场景' : '默认内存场景')
 const persistenceLabel = computed(() => {
@@ -179,6 +193,13 @@ function getGroupMemberName(member: SandboxGroupMember) {
 
 function getCurrentGroupMember(participantId: string) {
   return props.model.group?.members.find((member) => member.participantId === participantId)
+}
+
+/** 菜单卸载前的还焦时机：只有这一刻让位并重新聚焦，焦点才留得住。 */
+function handleMemberMenuCloseAutoFocus(participantId: string, event: Event) {
+  if (!menuFocusHandoff.consume(participantId)) return
+  event.preventDefault()
+  emit('focusComposer')
 }
 
 function formatDateTime(value: string) {
