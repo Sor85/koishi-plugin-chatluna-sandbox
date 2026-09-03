@@ -183,6 +183,13 @@ describe('WebQQ 模型请求工作台', () => {
     // 变量分段的标题标签同样来自证据种类 module，不在视图里硬编码一份。
     expect(trajectorySource).toContain("`${evidenceTitleLabel('variable')} · ${segment.variableName}`")
     expect(trajectorySource).toContain('当前会话没有可投影的请求组成')
+    // 单请求与完整会话共用一份轨道清单：各留一份会让同一条会话在切换模式时凭空多出或少掉轨道。
+    expect(trajectorySource).toContain("const COMPOSITION_KINDS = ['system', 'user', 'tool-definition', 'assistant', 'tool-interaction'] as const")
+    expect(trajectorySource).not.toContain('REQUEST_COMPOSITION_KINDS')
+    expect(trajectorySource).not.toContain('CONVERSATION_COMPOSITION_KINDS')
+    expect(trajectorySource.match(/groupCompositionTracks\(COMPOSITION_KINDS, segments\)/g)).toHaveLength(2)
+    // 完整会话只排除没有请求身份的组成项——它落不到时间轴的任何一格；种类不再筛第二遍。
+    expect(trajectorySource).toMatch(/for \(const item of promptComposition\.value\) \{[\s\S]{0,200}?if \(!item\.requestId\) continue/)
     expect(styles).toMatch(/\.webqq-model-trajectory-composition-bar\s*\{[^}]*position:\s*absolute/s)
     expect(styles).toMatch(/\.webqq-model-trajectory-composition-viewport\s*\{[^}]*overflow-x:\s*auto/s)
     expect(styles).not.toMatch(/\.webqq-model-trajectory-composition-viewport[^}]*cursor:/s)

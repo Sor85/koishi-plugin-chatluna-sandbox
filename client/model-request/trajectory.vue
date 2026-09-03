@@ -480,8 +480,15 @@ const promptComposition = computed(() => {
     percentage: (item.characters / total) * 100,
   }))
 })
-const REQUEST_COMPOSITION_KINDS = ['system', 'user', 'assistant', 'tool-definition', 'tool-interaction'] as const
-const CONVERSATION_COMPOSITION_KINDS = ['system', 'user', 'tool-definition'] as const
+/**
+ * 请求组成图的轨道顺序，按证据在请求体里出现的先后排列：
+ * 系统前缀 → 用户消息 → 能力目录 → 模型自己的发言 → 工具往返。
+ * Assistant 紧贴 Tool I/O，两者的分段都落在请求尾部，同屏才能看出一次工具往返由哪条发言发起。
+ *
+ * 单请求与完整会话共用这一份顺序：两种模式的分段来自同一份组成投影，只是横轴一个按占比、
+ * 一个按时间铺开；各自留一份种类清单会让同一条会话在切换模式时凭空多出或少掉几条轨道。
+ */
+const COMPOSITION_KINDS = ['system', 'user', 'tool-definition', 'assistant', 'tool-interaction'] as const
 
 interface CompositionSegment {
   /** 渲染键。一条消息被变量切开后会产出多段同 evidenceId 的分段，键必须自带序号才唯一。 */
@@ -495,10 +502,6 @@ interface CompositionSegment {
   variableId?: string
   variableName?: string
   requestId?: string
-}
-
-function isConversationCompositionKind(kind: SandboxModelRequestPromptKind): kind is typeof CONVERSATION_COMPOSITION_KINDS[number] {
-  return (CONVERSATION_COMPOSITION_KINDS as readonly SandboxModelRequestPromptKind[]).includes(kind)
 }
 
 const compositionTracks = computed(() => (
@@ -522,13 +525,15 @@ const requestCompositionTracks = computed(() => {
       width: Math.min(Math.max(item.percentage - gap, 0.35), Math.max(100 - left, 0.35)),
     }
   })
-  return groupCompositionTracks(REQUEST_COMPOSITION_KINDS, segments)
+  return groupCompositionTracks(COMPOSITION_KINDS, segments)
 })
 
 const conversationCompositionTracks = computed(() => {
   const itemsByRequest = new Map<string, typeof promptComposition.value>()
   for (const item of promptComposition.value) {
-    if (!item.requestId || !isConversationCompositionKind(item.kind)) continue
+    // 没有请求身份的组成项无法落到时间轴的任何一格，只有它需要在这里排除；
+    // 种类不必再筛一遍，组成投影的种类集合与轨道清单同源。
+    if (!item.requestId) continue
     const items = itemsByRequest.get(item.requestId) ?? []
     items.push(item)
     itemsByRequest.set(item.requestId, items)
@@ -559,7 +564,7 @@ const conversationCompositionTracks = computed(() => {
       })
     })
   }
-  return groupCompositionTracks(CONVERSATION_COMPOSITION_KINDS, segments)
+  return groupCompositionTracks(COMPOSITION_KINDS, segments)
 })
 
 function groupCompositionTracks(
