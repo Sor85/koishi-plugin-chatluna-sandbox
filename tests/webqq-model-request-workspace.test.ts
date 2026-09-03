@@ -88,6 +88,14 @@ describe('WebQQ 模型请求工作台', () => {
     // 概览格的计数由共享模型证据投影派生，不再读旧的请求体摘要字段。
     expect(workspaceSource).not.toContain('summary.keys')
     expect(workspaceSource).toMatch(/webqq-model-request-meta-list[\s\S]*请求地址[\s\S]*关联实体/)
+    // 关联实体渲染成「标签 + 值」，项目、顺序与文案由 model-request-overview 的行为测试守；
+    // 这里守视图不再自己拼 `key=value`，且观感跟着请求地址走等宽值加强调色标签。
+    expect(workspaceSource).toMatch(/webqq-model-request-entities[\s\S]*v-for="chip in entityChips"[\s\S]*<strong>{{ chip\.label }}<\/strong>[\s\S]*webqq-model-request-entity-value[\s\S]*{{ chip\.value }}/)
+    expect(workspaceSource).toContain('无关联实体')
+    expect(workspaceSource).not.toContain('formatEntities')
+    expect(workspaceSource).not.toContain("`${key}=${value}`")
+    expect(styles).toMatch(/\.webqq-model-request-entities\s*\{[^}]*flex-wrap:\s*wrap[^}]*font-family:\s*var\(--webqq-font-mono\)/s)
+    expect(styles).toMatch(/\.webqq-model-request-entity strong\s*\{[^}]*color:\s*var\(--webqq-accent\)/s)
     expect(workspaceSource).toMatch(/<div v-if="headersExpanded" class="webqq-model-request-header-json">[\s\S]*<div class="webqq-model-request-json-viewer">[\s\S]*:node="headersTree"/)
     expect(workspaceSource).toContain(':strings-expanded="true"')
     expect(styles).toContain('.webqq-model-request-header-toggle')

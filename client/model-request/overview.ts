@@ -1,6 +1,7 @@
 import { formatDuration } from '#client/shared/format-duration'
 import type {
   SandboxModelRequestDetail,
+  SandboxModelRequestEntities,
   SandboxModelRequestListItem,
   SandboxModelRequestUsage,
   SandboxPresetDocumentKind,
@@ -22,6 +23,38 @@ const MODEL_REQUEST_MISSING_TEXT = '—'
 export interface ModelRequestUsageCell {
   label: string
   value: string
+}
+
+export interface ModelRequestEntityChip {
+  key: keyof SandboxModelRequestEntities
+  label: string
+  value: string
+}
+
+/**
+ * 关联实体的项目、顺序与文案。
+ *
+ * 记录里的 entities 是采集时按赋值先后堆起来的对象，直接遍历会把顺序交给采集实现，
+ * 加一个字段就可能让详情页的读法变样。这里按「记录域 → 机器人 → 会话」由外到内排一次；
+ * 顺序是展示契约的一部分，因此定义在这里，而不是在模板里手排。
+ *
+ * 记录域用领域词而不是筛选器上的「空间」：它还包含主模拟 QQ 环境与未归属，
+ * 把 `main` 说成空间会和 AI 测试空间混成一个概念。
+ */
+const MODEL_REQUEST_ENTITY_FIELDS: readonly (readonly [keyof SandboxModelRequestEntities, string])[] = [
+  ['scopeId', '记录域'],
+  ['botId', '机器人 ID'],
+  ['conversationId', '会话 ID'],
+]
+
+/** 空串与缺省都算没采集到：`botId=''` 渲染成一个空标签，比不渲染更难看懂。 */
+export function buildModelRequestEntityChips(
+  entities: SandboxModelRequestEntities,
+): ModelRequestEntityChip[] {
+  return MODEL_REQUEST_ENTITY_FIELDS.flatMap(([key, label]) => {
+    const value = entities[key]
+    return value ? [{ key, label, value }] : []
+  })
 }
 
 /** 模型 ID 与渠道名同一口径：采集到就照原样显示，空串与缺省都算没识别出来。 */

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildModelRequestEntityChips,
   buildModelRequestUsageCells,
   formatModelRequestChannelName,
   formatModelRequestCount,
@@ -83,5 +84,25 @@ describe('模型请求概览取词', () => {
     const cells = buildModelRequestUsageCells(undefined)
     expect(cells.map(({ label }) => label)).toEqual(['输入', '输出', '推理', '缓存', '总 Token', 'TTFT', 'TPS', '总耗时'])
     expect(cells.every(({ value }) => value === '—')).toBe(true)
+  })
+
+  it('关联实体按记录域、机器人、会话由外到内排，不跟着采集时的赋值顺序走', () => {
+    // 键顺序刻意打乱成采集顺序，输出必须仍按展示契约排列。
+    expect(buildModelRequestEntityChips({
+      conversationId: '20002',
+      botId: '10001',
+      scopeId: 'main',
+    })).toEqual([
+      { key: 'scopeId', label: '记录域', value: 'main' },
+      { key: 'botId', label: '机器人 ID', value: '10001' },
+      { key: 'conversationId', label: '会话 ID', value: '20002' },
+    ])
+  })
+
+  it('空串与缺省的字段不占标签，未归属记录没有关联实体', () => {
+    expect(buildModelRequestEntityChips({ scopeId: '', botId: '10001' })).toEqual([
+      { key: 'botId', label: '机器人 ID', value: '10001' },
+    ])
+    expect(buildModelRequestEntityChips({})).toEqual([])
   })
 })

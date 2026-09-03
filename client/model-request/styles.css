@@ -580,6 +580,36 @@
   letter-spacing: 0.03em;
 }
 
+/* 与请求地址同一套观感：等宽值加一个强调色小标签，不画方框，避免一行里堆出一排色块。 */
+.webqq-model-request-entities {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  /* 列间距要明显大于标签与值之间的 6px，否则换行后读不出哪个值属于哪个标签。 */
+  gap: 4px 16px;
+  font-family: var(--webqq-font-mono);
+}
+
+.webqq-model-request-entity {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.webqq-model-request-entity strong {
+  flex: 0 0 auto;
+  color: var(--webqq-accent);
+  font-size: var(--webqq-font-sm);
+  letter-spacing: 0.03em;
+}
+
+.webqq-model-request-entity-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--webqq-text);
+}
+
 .webqq-model-request-trace {
   display: flex;
   align-items: flex-start;
