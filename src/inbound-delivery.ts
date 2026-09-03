@@ -19,9 +19,10 @@ import {
  * 入站投递：把一条已落库的消息投递给所有该收到它的虚拟 OneBot 机器人。
  *
  * 在此之前发文字、发图片、发合并转发三条路各自组装一份几乎相同的投递数据再交给同一个派发
- * 函数，修好一条不代表另两条也修好了；而投递里有三条改坏了不报错的规则（中间件等待的超时、
- * ChatLuna 角色上下文跟随失败不中断投递、入站事件会话的进出栈）藏在一个三千行的控制服务里，
- * 要驱动它们得先起一个真的 Koishi 运行时。本模块把投递规则收成一处，并让那三条第一次有红灯。
+ * 函数，修好一条不代表另两条也修好了；而投递里有四条改坏了不报错的规则（中间件等待的超时、
+ * ChatLuna 角色上下文跟随失败不中断投递、入站事件会话的进出栈、派发之前失败也要留痕）藏在一个
+ * 三千行的控制服务里，要驱动它们得先起一个真的 Koishi 运行时。本模块把投递规则收成一处，并让
+ * 那四条第一次有红灯。
  *
  * 协作者按最小结构化 interface 注入，**不注入宿主 `Context`**：按标识取运行时机器人、按标识取
  * 机器人档案、订阅中间件完成、写调试记录、写投递记录、跟随角色上下文、记日志。因此接收机器人
@@ -174,7 +175,8 @@ export interface InboundDelivery {
    * 把一条已落库的消息投递给所有该收到它的机器人。
    *
    * 包含接收机器人推导、会话与 OneBot 事件字段构造、ChatLuna 角色上下文跟随、中间件等待与超时、
-   * 入站事件会话的进出栈、投递记录。
+   * 入站事件会话的进出栈、投递记录。任何一步失败都会留下一条 `status: 'error'` 的调试记录与一行
+   * 日志再抛出，因此调用方可以放心不等待这个 Promise。
    */
   deliverMessage(input: DeliverInboundMessageInput): Promise<void>
 }
@@ -261,69 +263,107 @@ export function createInboundDelivery({
     }
   }
 
+  /**
+   * 派发之前就失败时补上的那条记录，与 {@link InboundDelivery.dispatchEvent} 的错误记录同形。
+   *
+   * 必须有这一条：`dispatchEvent` 只覆盖 `bot.dispatch()` 自己的失败，而控制台的发送监听器为了让
+   * 消息即时显示不等待投递、直接吞掉这个 Promise。取不到运行时机器人、造不出会话、解析不了引用
+   * 都发生在那之前，少了这条记录就会得到一次三处无痕的失败：日志没有、调试记录没有、前端也不报错，
+   * 只剩一条永远不会有回复的消息气泡，而那是最难查的一种形态。
+   */
+  const recordPreDispatchFailure = (
+    recipientBot: SandboxBotProfile,
+    payload: unknown,
+    startedAt: number,
+    error: unknown,
+  ): void => {
+    const debugError = createOneBotDebugError(error)
+    logger.error(`入站消息投递在派发之前失败 [${debugError.traceId}]`, error)
+    const type = getOneBotEventType(payload)
+    recordDebug({
+      botId: recipientBot.id,
+      implementation: recipientBot.implementation,
+      direction: 'event',
+      requestedAction: type,
+      action: type,
+      status: 'error',
+      durationMs: Date.now() - startedAt,
+      payload,
+      error: debugError,
+    })
+  }
+
   const deliverToBot = async (
     recipientBot: SandboxBotProfile,
     { context, messageId, elements, segments, rawMessage, quote }: DeliverInboundMessageInput,
   ): Promise<void> => {
-    const runtimeBot = getRuntimeBot(recipientBot.id)
-    if (!runtimeBot) throw new SandboxDomainError(`机器人运行时不存在：${recipientBot.id}`)
-    await followCharacterConversation(recipientBot.id, context)
-    // ChatLuna allowQuoteReply / character 只认 session.quote.user.id === bot.userId|selfId，
-    // 不依赖 @。quote 必须带齐 user 与 timestamp，character 才能拼出和真 QQ 一样的引用 XML。
-    const session = runtimeBot.session({
-      type: 'message',
-      timestamp: Date.now(),
-      user: { id: context.operator.id, name: context.operator.name },
-      channel: {
-        id: context.conversation.id,
-        type: context.conversation.type === 'group' ? Universal.Channel.Type.TEXT : Universal.Channel.Type.DIRECT,
-      },
-      guild: context.group ? { id: context.group.id, name: context.group.name } : undefined,
-      message: {
-        id: messageId,
-        messageId,
-        content: elements.join(''),
-        elements,
-        quote,
-      },
-    })
-    Object.assign(session, {
-      onebot: {
-        time: Math.floor(Date.now() / 1000),
-        self_id: Number(recipientBot.id),
-        post_type: 'message',
-        message_type: context.conversation.type === 'group' ? 'group' : 'private',
-        sub_type: context.conversation.type === 'group' ? 'normal' : 'friend',
-        ...getOneBotMessageEventFields(recipientBot.implementation, messageId),
-        user_id: Number(context.operator.id),
-        group_id: context.group ? Number(context.group.id) : undefined,
-        message: segments,
-        raw_message: rawMessage,
-        sender: { user_id: Number(context.operator.id), nickname: context.operator.name },
-      },
-    })
-
+    const startedAt = Date.now()
+    // 载荷先于运行时机器人构造：它只依赖已落库的消息与收件机器人，因此「取不到运行时」这类派发前
+    // 失败也能带着完整载荷进调试记录，而不是只留一句话，看记录的人照样知道那条消息是什么。
+    const payload = {
+      time: Math.floor(Date.now() / 1000),
+      self_id: Number(recipientBot.id),
+      post_type: 'message',
+      message_type: context.conversation.type === 'group' ? 'group' : 'private',
+      sub_type: context.conversation.type === 'group' ? 'normal' : 'friend',
+      ...getOneBotMessageEventFields(recipientBot.implementation, messageId),
+      user_id: Number(context.operator.id),
+      group_id: context.group ? Number(context.group.id) : undefined,
+      message: segments,
+      raw_message: rawMessage,
+      sender: { user_id: Number(context.operator.id), nickname: context.operator.name },
+    }
+    // 派发已经发生过时不再补记：`dispatchEvent` 记过它那一段的失败，两处都记会让同一次失败出现两条。
+    let dispatched = false
     let disposeMiddlewareWait: (() => void) | undefined
-    const middlewareFinished = new Promise<void>((resolve) => {
-      const timer = setTimeout(() => {
-        disposeMiddlewareWait?.()
-        disposeMiddlewareWait = undefined
-        resolve()
-      }, INBOUND_MIDDLEWARE_TIMEOUT_MS)
-      disposeMiddlewareWait = onMiddlewareFinished((processedSession) => {
-        if (processedSession.id !== session.id) return
-        clearTimeout(timer)
-        disposeMiddlewareWait?.()
-        disposeMiddlewareWait = undefined
-        resolve()
-      })
-    })
-
     try {
+      const runtimeBot = getRuntimeBot(recipientBot.id)
+      if (!runtimeBot) throw new SandboxDomainError(`机器人运行时不存在：${recipientBot.id}`)
+      await followCharacterConversation(recipientBot.id, context)
+      // ChatLuna allowQuoteReply / character 只认 session.quote.user.id === bot.userId|selfId，
+      // 不依赖 @。quote 必须带齐 user 与 timestamp，character 才能拼出和真 QQ 一样的引用 XML。
+      const session = runtimeBot.session({
+        type: 'message',
+        timestamp: Date.now(),
+        user: { id: context.operator.id, name: context.operator.name },
+        channel: {
+          id: context.conversation.id,
+          type: context.conversation.type === 'group' ? Universal.Channel.Type.TEXT : Universal.Channel.Type.DIRECT,
+        },
+        guild: context.group ? { id: context.group.id, name: context.group.name } : undefined,
+        message: {
+          id: messageId,
+          messageId,
+          content: elements.join(''),
+          elements,
+          quote,
+        },
+      })
+      Object.assign(session, { onebot: payload })
+
+      const middlewareFinished = new Promise<void>((resolve) => {
+        const timer = setTimeout(() => {
+          disposeMiddlewareWait?.()
+          disposeMiddlewareWait = undefined
+          resolve()
+        }, INBOUND_MIDDLEWARE_TIMEOUT_MS)
+        disposeMiddlewareWait = onMiddlewareFinished((processedSession) => {
+          if (processedSession.id !== session.id) return
+          clearTimeout(timer)
+          disposeMiddlewareWait?.()
+          disposeMiddlewareWait = undefined
+          resolve()
+        })
+      })
+
       await eventConversations.run(recipientBot.id, context.conversation.id, async () => {
+        dispatched = true
         await dispatchEvent(runtimeBot, session)
         await middlewareFinished
       })
+    } catch (error) {
+      if (!dispatched) recordPreDispatchFailure(recipientBot, payload, startedAt, error)
+      throw error
     } finally {
       disposeMiddlewareWait?.()
       disposeMiddlewareWait = undefined

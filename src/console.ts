@@ -284,12 +284,14 @@ export function registerConsole(
     return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
   registerListener('chatluna-sandbox/send-message', async (input) => {
-    // 消息同步落库后立即返回，机器人投递在后台继续；派发失败已写入调试记录与日志。
+    // 消息同步落库后立即返回，机器人投递在后台继续：让 WebQQ 的用户消息不被插件处理时长阻塞。
+    // 吞掉这个 Promise 是安全的——投递模块对派发前后的任何失败都会写调试记录并记一行日志。
     const { delivery } = (await resolveReadyControl(input, true)).startMessageSend(assertInteractionInput(withoutSpaceId(input)) as SendMessageInput)
     delivery.catch(() => {})
     return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })
   }, { authority: 4 })
   registerListener('chatluna-sandbox/send-media-message', async (input) => {
+    // 与发送文字同一套后台投递语义，失败同样由投递模块留痕。
     const { delivery } = (await resolveReadyControl(input, true)).startMediaMessageSend(assertInteractionInput(withoutSpaceId(input)) as SendMediaMessageInput)
     delivery.catch(() => {})
     return getWorkspace({ spaceId: input.spaceId, operatorId: input.operatorId })

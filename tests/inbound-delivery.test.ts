@@ -251,6 +251,7 @@ describe('入站投递：接收机器人推导', () => {
   })
 })
 
+
 describe('入站投递：中间件等待', () => {
   it('中间件迟迟不结束时，推过超时点后投递照常结束且监听器被解除', async () => {
     vi.useFakeTimers()
@@ -468,4 +469,69 @@ describe('入站投递：事件派发与调试记录', () => {
       { id: 1 } as unknown as InboundDeliverySession,
     )).rejects.toThrow('机器人不存在：29999')
   })
+
+  it('派发之前失败时同样记一条错误记录与一行日志，不留无痕失败', async () => {
+    const harness = createHarness()
+    harness.addBot(bot('20001'))
+    harness.runtimeBots.delete('20001')
+
+    await expect(harness.delivery.deliverMessage(messageInput({
+      operator: USER,
+      peer: bot('20001'),
+      conversation: DIRECT,
+    }))).rejects.toThrow('机器人运行时不存在：20001')
+
+    expect(harness.debugRecords).toEqual([expect.objectContaining({
+      botId: '20001',
+      direction: 'event',
+      action: 'message.private',
+      status: 'error',
+      error: expect.objectContaining({ message: '机器人运行时不存在：20001', traceId: expect.any(String) }),
+    })])
+    expect(harness.errors).toEqual([[
+      expect.stringContaining('入站消息投递在派发之前失败'),
+      expect.objectContaining({ message: '机器人运行时不存在：20001' }),
+    ]])
+  })
+
+  it('派发之前失败的记录带上完整载荷，看记录就知道丢的是哪一条消息', async () => {
+    const harness = createHarness()
+    harness.addBot(bot('20001'))
+    harness.runtimeBots.delete('20001')
+
+    await expect(harness.delivery.deliverMessage(messageInput({
+      operator: USER,
+      conversation: GROUP,
+      group: group('10001', '20001'),
+    }, 'beef0002'))).rejects.toThrow('机器人运行时不存在：20001')
+
+    expect(harness.debugRecords[0]).toEqual(expect.objectContaining({
+      action: 'message.group',
+      payload: expect.objectContaining({
+        post_type: 'message',
+        message_type: 'group',
+        self_id: 20001,
+        user_id: 10001,
+        group_id: 30001,
+        raw_message: '你好',
+        message: [{ type: 'text', data: { text: '你好' } }],
+      }),
+    }))
+  })
+
+  it('派发自身失败时只记一条，投递层不重复记账', async () => {
+    const harness = createHarness()
+    const runtime = harness.addBot(bot('20001'))
+    runtime.failNextDispatch = new Error('插件监听器抛错')
+
+    await expect(harness.delivery.deliverMessage(messageInput({
+      operator: USER,
+      peer: bot('20001'),
+      conversation: DIRECT,
+    }))).rejects.toThrow('插件监听器抛错')
+
+    expect(harness.debugRecords).toHaveLength(1)
+    expect(harness.errors).toEqual([[expect.stringContaining('OneBot 原始事件派发失败'), expect.any(Error)]])
+  })
 })
+
