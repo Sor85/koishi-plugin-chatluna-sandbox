@@ -450,6 +450,21 @@
   padding-left: 36px;
 }
 
+/* 搜索图标浮层：输入框本体带 backdrop-filter（见 webqq-primitives.css 的半透明面板规则），
+   带 backdrop-filter 的元素按规范会被当成 z-index: 0 的定位元素参与绘制，DOM 顺序在图标之后
+   就会连同 72% 不透明背景和 20px 模糊一起把 z-index: auto 的绝对定位图标整块抹掉。
+   图标必须显式抬到输入框之上；定位也写进专用类，不依赖 Tailwind 工具类在样式表中的相对顺序。 */
+[data-slot='dialog-content'] .webqq-capability-search-icon {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
 .chatluna-sandbox-secondary-page {
   position: fixed;
   top: 12px;

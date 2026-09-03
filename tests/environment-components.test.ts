@@ -114,6 +114,7 @@ describe('环境管理组件传输边界', () => {
 
   it('机器人编辑 Dialog 使用 shadcn-vue 能力覆盖控件', () => {
     const source = readFileSync(resolve('client/environment/entity-dialog.vue'), 'utf8')
+    const styles = readFileSync(resolve('client/workspace/overlays.css'), 'utf8')
 
     expect(source).toContain('getOneBotProfileBaseline')
     expect(source).toContain('能力覆盖')
@@ -121,13 +122,15 @@ describe('环境管理组件传输边界', () => {
     expect(source).toContain("from '#client/components/ui/badge'")
     expect(source).toContain('<Badge variant="secondary"')
     expect(source).toContain('搜索 action、别名或作用')
-    expect(source).toContain('absolute inset-y-0 left-3 flex items-center')
+    expect(source).toContain('class="webqq-capability-search-icon"')
     expect(source).toContain('items-center gap-2')
     expect(source).toContain('class="webqq-secondary-panel overflow-hidden rounded-lg"')
     expect(source).toContain('class="webqq-capability-list grid max-h-48 gap-2 overflow-y-auto p-3"')
     expect(source).toContain('filteredCapabilities')
     expect(source).toContain('capability.description')
     expect(source).toContain('disabledCapabilities')
+    // 输入框带 backdrop-filter，会被当成 z-index: 0 的定位元素盖住图标；图标层必须显式抬高。
+    expect(styles).toMatch(/\.webqq-capability-search-icon\s*\{[^}]*position:\s*absolute[^}]*z-index:\s*1/s)
   })
 
   it('实体编辑 Dialog 将标题、滚动正文和操作区分层，避免长表单遮挡操作按钮', () => {

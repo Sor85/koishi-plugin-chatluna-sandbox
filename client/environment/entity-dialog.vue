@@ -92,8 +92,8 @@
               <Label>能力覆盖</Label>
             </div>
             <div class="relative">
-              <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center" aria-hidden="true">
-                <IconSearch class="webqq-secondary-hint size-4" />
+              <span class="webqq-capability-search-icon" aria-hidden="true">
+                <IconSearch class="webqq-secondary-hint" :size="16" />
               </span>
               <Input
                 v-model="capabilitySearch"
