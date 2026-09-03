@@ -3,6 +3,7 @@ import { Context, h, Random, Universal } from 'koishi'
 import { resolve } from 'node:path'
 import { SandboxBot } from './bot'
 import { BUILTIN_AVATARS, findBuiltinAvatarByReference, getBuiltinAvatarReference, pickUnusedBuiltinAvatar } from './builtin-avatars'
+import { SandboxChannelAssignee } from './channel-assignee'
 import { SandboxChatLunaStateStore } from './chatluna/state'
 import {
   SandboxChatLunaCharacterContext,
@@ -397,6 +398,11 @@ export class SandboxControlService {
    * 由它负责在对话线切换时重置那份上下文。
    */
   private chatLunaCharacterContext: SandboxChatLunaCharacterContext
+  /**
+   * Koishi 的 channel 受理人与虚拟机器人对不上时，非 @ 的群消息会在中间件之前被静默丢弃；
+   * 由它在投递前把受理人对齐，见 {@link SandboxChannelAssignee}。
+   */
+  private channelAssignee: SandboxChannelAssignee
   private initialScene: SandboxSnapshot
   private oneBotDebug: SandboxOneBotDebugStore
   private modelRequests: SandboxModelRequestStore
@@ -469,6 +475,13 @@ export class SandboxControlService {
       archiveChatLunaModelRequestError(this.modelRequests, error, targets)
     })
     this.chatLunaCharacterContext = new SandboxChatLunaCharacterContext(() => findChatLunaCharacterChatContext(ctx))
+    // database 服务可以晚于本插件加载，因此每次现取；取不到时 Koishi 的受理人判定本身也不生效。
+    this.channelAssignee = new SandboxChannelAssignee(async (rows) => {
+      const database = ctx.database
+      if (!database) return false
+      await database.upsert('channel', [...rows])
+      return true
+    })
     this.inboundDelivery = createInboundDelivery({
       getRuntimeBot: (botId) => this.runtimeBots.get(botId),
       getBotProfile: (botId) => this.getBots().find(({ id }) => id === botId),
@@ -476,6 +489,7 @@ export class SandboxControlService {
       recordDebug: (input) => this.recordOneBotDebug(input),
       recordDelivery: (delivery) => this.botDeliveries.push(delivery),
       followInboundConversation: (input) => this.chatLunaCharacterContext.followInboundConversation(input),
+      alignChannelAssignee: (input) => this.channelAssignee.align(input),
       logger: ctx.logger('chatluna-sandbox'),
       eventConversations: this.inboundEventConversations,
     })

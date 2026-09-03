@@ -1,4 +1,5 @@
 import { Random, Universal, h } from 'koishi'
+import type { SandboxChannelAssigneeTarget } from './channel-assignee'
 import {
   resolveChatLunaCharacterSessionKey,
   type ChatLunaCharacterInboundConversation,
@@ -19,10 +20,10 @@ import {
  * 入站投递：把一条已落库的消息投递给所有该收到它的虚拟 OneBot 机器人。
  *
  * 在此之前发文字、发图片、发合并转发三条路各自组装一份几乎相同的投递数据再交给同一个派发
- * 函数，修好一条不代表另两条也修好了；而投递里有四条改坏了不报错的规则（中间件等待的超时、
- * ChatLuna 角色上下文跟随失败不中断投递、入站事件会话的进出栈、派发之前失败也要留痕）藏在一个
- * 三千行的控制服务里，要驱动它们得先起一个真的 Koishi 运行时。本模块把投递规则收成一处，并让
- * 那四条第一次有红灯。
+ * 函数，修好一条不代表另两条也修好了；而投递里有五条改坏了不报错的规则（中间件等待的超时、
+ * ChatLuna 角色上下文跟随失败不中断投递、入站事件会话的进出栈、派发之前失败也要留痕、群聊要先
+ * 对齐 Koishi channel 受理人）藏在一个三千行的控制服务里，要驱动它们得先起一个真的 Koishi
+ * 运行时。本模块把投递规则收成一处，并让那五条第一次有红灯。
  *
  * 协作者按最小结构化 interface 注入，**不注入宿主 `Context`**：按标识取运行时机器人、按标识取
  * 机器人档案、订阅中间件完成、写调试记录、写投递记录、跟随角色上下文、记日志。因此接收机器人
@@ -153,6 +154,12 @@ export interface InboundDeliveryInput {
   recordDelivery(delivery: SandboxBotDelivery): void
   /** 让被测 chatluna-character 的对话上下文跟上这次入站事件的对话线；抛错由本模块吸收。 */
   followInboundConversation(input: ChatLunaCharacterInboundConversation): Promise<unknown>
+  /**
+   * 把这条群聊会话的 Koishi channel 受理人对齐到收件机器人；抛错由本模块吸收。
+   *
+   * 见 {@link SandboxChannelAssignee}：受理人对不上时 Koishi 会在任何中间件之前静默丢弃非 @ 消息。
+   */
+  alignChannelAssignee(input: SandboxChannelAssigneeTarget): Promise<unknown>
   readonly logger: InboundDeliveryLogger
   readonly eventConversations: InboundEventConversations
 }
@@ -188,6 +195,7 @@ export function createInboundDelivery({
   recordDebug,
   recordDelivery,
   followInboundConversation,
+  alignChannelAssignee,
   logger,
   eventConversations,
 }: InboundDeliveryInput): InboundDelivery {
@@ -264,6 +272,22 @@ export function createInboundDelivery({
   }
 
   /**
+   * 让这条群聊会话的 Koishi channel 受理人对齐到收件机器人。
+   *
+   * 失败只写日志：对齐是为了让消息能进中间件，对不上的后果是这条消息被 Koishi 丢掉——和不做对齐
+   * 时的现状一样；而因为一次数据库写失败就中断投递，会把「可能收不到」升级成「一定收不到」。
+   * 私聊不做：Koishi 那道门只在群聊生效，私聊上写 channel 行是凭空造状态。
+   */
+  const alignInboundChannel = async (botId: string, context: InboundMessageContext): Promise<void> => {
+    if (!context.group) return
+    try {
+      await alignChannelAssignee({ botId, channelId: context.conversation.id, groupId: context.group.id })
+    } catch (error) {
+      logger.warn('对齐 Koishi channel 受理人失败；这条会话可能只有 @ 消息能被被测插件收到。', error)
+    }
+  }
+
+  /**
    * 派发之前就失败时补上的那条记录，与 {@link InboundDelivery.dispatchEvent} 的错误记录同形。
    *
    * 必须有这一条：`dispatchEvent` 只覆盖 `bot.dispatch()` 自己的失败，而控制台的发送监听器为了让
@@ -319,6 +343,9 @@ export function createInboundDelivery({
     try {
       const runtimeBot = getRuntimeBot(recipientBot.id)
       if (!runtimeBot) throw new SandboxDomainError(`机器人运行时不存在：${recipientBot.id}`)
+      // 两件事都必须在派发之前：受理人对不上时 Koishi 连中间件都不会跑，上下文不跟随时插件会带上
+      // 另一条对话线的历史。两者都不阻断投递，失败各自只留一行日志。
+      await alignInboundChannel(recipientBot.id, context)
       await followCharacterConversation(recipientBot.id, context)
       // ChatLuna allowQuoteReply / character 只认 session.quote.user.id === bot.userId|selfId，
       // 不依赖 @。quote 必须带齐 user 与 timestamp，character 才能拼出和真 QQ 一样的引用 XML。

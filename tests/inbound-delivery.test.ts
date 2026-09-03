@@ -10,6 +10,7 @@ import {
   type InboundMessageContext,
 } from '../src/inbound-delivery'
 import type { AppendOneBotDebugRecordInput } from '../src/onebot-debug'
+import type { SandboxChannelAssigneeTarget } from '../src/channel-assignee'
 import type { ResolvedConversation } from '../src/conversation-resolution'
 import type { SandboxBotDelivery, SandboxBotProfile, SandboxGroup, SandboxParticipant } from '../src/types'
 
@@ -64,6 +65,7 @@ interface Harness {
   readonly debugRecords: AppendOneBotDebugRecordInput[]
   readonly warnings: unknown[][]
   readonly errors: unknown[][]
+  readonly channelAlignments: SandboxChannelAssigneeTarget[]
   readonly middlewareListeners: Set<(session: InboundDeliverySession) => void>
   readonly eventConversations: ReturnType<typeof createInboundEventConversations>
   readonly delivery: ReturnType<typeof createInboundDelivery>
@@ -71,13 +73,14 @@ interface Harness {
   addBot(profile: SandboxBotProfile): FakeBot
 }
 
-function createHarness(options: { followFails?: Error } = {}): Harness {
+function createHarness(options: { followFails?: Error; alignFails?: Error } = {}): Harness {
   const profiles = new Map<string, SandboxBotProfile>()
   const runtimeBots = new Map<string, FakeBot>()
   const deliveries: SandboxBotDelivery[] = []
   const debugRecords: AppendOneBotDebugRecordInput[] = []
   const warnings: unknown[][] = []
   const errors: unknown[][] = []
+  const channelAlignments: SandboxChannelAssigneeTarget[] = []
   const middlewareListeners = new Set<(session: InboundDeliverySession) => void>()
   const eventConversations = createInboundEventConversations()
   let nextSessionId = 1
@@ -95,6 +98,11 @@ function createHarness(options: { followFails?: Error } = {}): Harness {
       if (options.followFails) throw options.followFails
       return true
     },
+    alignChannelAssignee: async (input) => {
+      if (options.alignFails) throw options.alignFails
+      channelAlignments.push(input)
+      return true
+    },
     logger: {
       warn: (...args) => warnings.push(args),
       error: (...args) => errors.push(args),
@@ -108,6 +116,7 @@ function createHarness(options: { followFails?: Error } = {}): Harness {
     debugRecords,
     warnings,
     errors,
+    channelAlignments,
     middlewareListeners,
     eventConversations,
     delivery,
@@ -311,8 +320,51 @@ describe('入站投递：中间件等待', () => {
   })
 })
 
-describe('入站投递：ChatLuna 角色上下文跟随', () => {
-  it('跟随抛错时投递仍然完成、插件仍然收到事件，只多一条日志', async () => {
+describe('入站投递：Koishi channel 受理人对齐', () => {
+  it('群消息在派发之前按收件机器人对齐受理人，每个机器人各一次', async () => {
+    const harness = createHarness()
+    harness.addBot(bot('20001'))
+    harness.addBot(bot('20002'))
+
+    await deliverAndFinish(harness, messageInput({
+      operator: USER,
+      conversation: GROUP,
+      group: group('10001', '20001', '20002'),
+    }))
+
+    expect(harness.channelAlignments).toEqual([
+      { botId: '20001', channelId: 'group:30001', groupId: '30001' },
+      { botId: '20002', channelId: 'group:30001', groupId: '30001' },
+    ])
+  })
+
+  it('私聊不对齐：Koishi 的受理人判定只在群聊生效', async () => {
+    const harness = createHarness()
+    harness.addBot(bot('20001'))
+
+    await deliverAndFinish(harness, messageInput({ operator: USER, peer: bot('20001'), conversation: DIRECT }))
+
+    expect(harness.channelAlignments).toEqual([])
+  })
+
+  it('对齐抛错时投递仍然完成、插件仍然收到事件，只多一条日志', async () => {
+    const failure = new Error('数据库不可用')
+    const harness = createHarness({ alignFails: failure })
+    const runtime = harness.addBot(bot('20001'))
+
+    await deliverAndFinish(harness, messageInput({
+      operator: USER,
+      conversation: GROUP,
+      group: group('10001', '20001'),
+    }))
+
+    expect(runtime.dispatched).toHaveLength(1)
+    expect(harness.deliveries).toHaveLength(1)
+    expect(harness.warnings).toEqual([[expect.stringContaining('对齐 Koishi channel 受理人失败'), failure]])
+  })
+})
+
+describe('入站投递：ChatLuna 角色上下文跟随', () => {  it('跟随抛错时投递仍然完成、插件仍然收到事件，只多一条日志', async () => {
     const harness = createHarness({ followFails: new Error('chatluna-character 不可用') })
     const runtime = harness.addBot(bot('20001'))
 
