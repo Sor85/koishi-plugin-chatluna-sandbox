@@ -64,6 +64,19 @@ describe('OneBot 实现配置', () => {
       expect(baseline.capabilities).toEqual(expect.arrayContaining([
         expect.objectContaining({ id: 'group.member.shut-list', action: 'get_group_shut_list', aliases: ['getGroupShutList'], supported: true }),
       ]))
+      // 四个补齐读写端的 action 在两种实现上同名，因此不按实现分叉声明；参数与返回差异在适配器里。
+      expect(baseline.capabilities).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: 'group.notice.list', action: '_get_group_notice', handler: 'get_group_notice', surface: 'native', supported: true }),
+        expect.objectContaining({ id: 'group.system-msg', action: 'get_group_system_msg', handler: 'get_group_system_msg', surface: 'native', supported: true }),
+        expect.objectContaining({ id: 'friend.remark.set', action: 'set_friend_remark', handler: 'set_friend_remark', surface: 'native', supported: true }),
+        expect.objectContaining({ id: 'message.emoji-like.list', action: 'fetch_emoji_like', handler: 'fetch_emoji_like', surface: 'native', supported: true }),
+      ]))
+      // 两边上游都没有不带下划线的写法，沙盒也不得顺手加它。
+      expect(baseline.capabilities.map(({ action }) => action)).not.toContain('get_group_notice')
+      // 刻意偏离与沙盒限制写在作用说明里，能力覆盖界面因此看得见它们。
+      const emojiLikeList = baseline.capabilities.find(({ id }) => id === 'message.emoji-like.list')!
+      expect(emojiLikeList.description).toContain('不分页')
+      expect(emojiLikeList.description).toContain('nickName')
     }
     expect(napcat.capabilities.filter(({ supported }) => supported).map(({ action }) => action))
       .not.toEqual(llbot.capabilities.filter(({ supported }) => supported).map(({ action }) => action))

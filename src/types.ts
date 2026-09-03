@@ -1031,3 +1031,31 @@ export interface DeleteGroupAnnouncementInput {
   groupId: string
   announcementId: string
 }
+
+export interface ListGroupAnnouncementsInput {
+  operatorId: string
+  groupId: string
+}
+
+/**
+ * 一条群系统消息：待审批的入群申请或群邀请，按调用方机器人能看见的那些投影出来。
+ *
+ * 字段是领域事实而不是 OneBot 字段名——两种实现配置对同一件事用的键并不相同（LLBot 的入群
+ * 申请是 `requester_uin`，两边的群邀请都是 `invitor_uin`，NapCat 两个桶还共用同一份 schema），
+ * 翻译留在机器人适配器里。
+ */
+export interface SandboxGroupSystemMessage {
+  /** 入群申请还是群邀请；两者在 OneBot 返回里落进不同的桶。 */
+  kind: 'join' | 'invite'
+  /** 申请标识；它同时就是审批这条申请要传的 flag。 */
+  requestId: string
+  groupId: string
+  groupName: string
+  /** 入群申请的申请人，或群邀请的邀请人。 */
+  initiatorId: string
+  initiatorName: string
+  /** 申请附言，缺省为空串。 */
+  comment: string
+  /** 是否已处理；沙盒场景只保存待处理申请，因此当前恒为 false。 */
+  checked: boolean
+}

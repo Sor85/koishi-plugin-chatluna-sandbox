@@ -14,26 +14,39 @@
 
 **不做的事：** 不返回好友申请（`type === 'friend'`）——上游这个 action 只管群；好友申请在两边都是另一条路（NapCat 的 `get_friend_system_msg`／LLBot 的 `GetDoubtFriendsAddRequest` 之类），要加也是另一张票。不加 `get_group_add_request`（两边都有，但那是「查单个群的申请」，语义不同，本票不碰）。不改 `scene.requests` 的实体形状。
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `onebot-profiles.ts` 的 `nativeActions` 里声明 `group.system-msg`，两种配置的 `action` 都是 `get_group_system_msg`
-- [ ] `bot.ts` 接上 handler，读取路径经 `getVisibleSnapshot` 或等价可见性判定
-- [ ] `join_requests` 只含 `subType` 为 `add`（含缺省）的群申请，`invited_requests` 只含 `invite` 的，有断言
-- [ ] NapCat 配置额外返回 `InvitedRequest` 桶且内容与 `invited_requests` 相同；LLBot 配置下该桶不出现，有断言
-- [ ] NapCat 配置接受 `count` 并按它截断；LLBot 配置忽略 `count` 且不报错，两者都有断言
-- [ ] 每项字段齐全：`request_id`、`group_id`、`group_name`、`requester_uin`、`requester_nick`、`message`、`checked`、`actor`，取值来自场景而非常量，有断言
-- [ ] `checked` 对未处理申请为 `false`；已处理申请若仍在场景里则为 `true`，有断言
-- [ ] 入群申请的可见性用现成的 `denyGroupAuthority`，机器人只是普通成员的群的申请不出现，有断言
-- [ ] 群邀请只返回发给本机器人的，发给别人的不出现，有断言
-- [ ] 跨 action 闭环断言：列出申请 → 用返回的 `request_id` 调 `set_group_add_request` → 审批成功、场景里那条申请消失
-- [ ] 没有任何可见申请时两个（NapCat 三个）桶都是空数组，不报错，有断言
-- [ ] 读取不产生场景变更：调用前后 revision 与快照逐字节相同，有断言
-- [ ] 能力覆盖禁用 `group.system-msg` 后调用被拒，有断言
-- [ ] 没有在本票里新写任何群成员角色比较，「角色比较只允许出现在关系规则模块里」那条守卫保持全绿
-- [ ] `tests/onebot-profiles.test.ts` 的能力矩阵断言同步更新
-- [ ] `docs/onebot-profiles.md` 补上两边的参数与桶差异
-- [ ] 领域词汇核过一遍，确认「群系统消息」或等价术语的归属
-- [ ] 既有的 `set_group_add_request`、`handleBotGroupRequest` 与申请审批测试一字不改地通过
-- [ ] 完整测试、类型检查与构建通过
+- [x] `onebot-profiles.ts` 的 `nativeActions` 里声明 `group.system-msg`，两种配置的 `action` 都是 `get_group_system_msg`
+- [x] `bot.ts` 接上 handler，读取路径经 `getVisibleSnapshot` 或等价可见性判定
+- [x] `join_requests` 只含 `subType` 为 `add`（含缺省）的群申请，`invited_requests` 只含 `invite` 的，有断言
+- [x] NapCat 配置额外返回 `InvitedRequest` 桶且内容与 `invited_requests` 相同；LLBot 配置下该桶不出现，有断言
+- [x] NapCat 配置接受 `count` 并按它截断；LLBot 配置忽略 `count` 且不报错，两者都有断言
+- [x] 每项字段齐全（按各自上游的键，见 Comments），取值来自场景而非常量，有断言
+- [x] `checked` 对未处理申请为 `false`；已处理申请若仍在场景里则为 `true`，有断言
+- [x] 入群申请的可见性用现成的 `denyGroupAuthority`，机器人只是普通成员的群的申请不出现，有断言
+- [x] 群邀请只返回发给本机器人的，发给别人的不出现，有断言
+- [x] 跨 action 闭环断言：列出申请 → 用返回的 `request_id` 调 `set_group_add_request` → 审批成功、场景里那条申请消失
+- [x] 没有任何可见申请时两个（NapCat 三个）桶都是空数组，不报错，有断言
+- [x] 读取不产生场景变更：调用前后 revision 与快照逐字节相同，有断言
+- [x] 能力覆盖禁用 `group.system-msg` 后调用被拒，有断言
+- [x] 没有在本票里新写任何群成员角色比较，「角色比较只允许出现在关系规则模块里」那条守卫保持全绿
+- [x] `tests/onebot-profiles.test.ts` 的能力矩阵断言同步更新
+- [x] `docs/onebot-profiles.md` 补上两边的参数与桶差异
+- [x] 领域词汇核过一遍，确认「群系统消息」或等价术语的归属
+- [x] 既有的 `set_group_add_request`、`handleBotGroupRequest` 与申请审批测试一字不改地通过
+- [x] 完整测试、类型检查与构建通过
 
 ## Comments
+
+**字段清单按上游改了，正文那一行是两边的并集。** 逐条核对 `NapNeko/NapCatQQ@33546b9` 的 `system/GetSystemMsg.ts`（连同它引的 `OB11NotifySchema`）与 `LLOneBot/LuckyLilliaBot@d6e2f48` 的 `go-cqhttp/GetGroupSystemMsg.ts` 之后，真实形状是：
+
+- NapCat 两个桶共用同一份 schema，键是 `request_id`、`invitor_uin`、`invitor_nick`、`group_id`、`group_name`、`message`、`checked`、`actor`、`requester_nick`。**没有 `requester_uin`**，`requester_nick` 与 `invitor_nick` 取的是同一个人（`SSNotify.user1`），因此在沙盒里也给同一份值。
+- LLBot 两个桶各有自己的形状：入群申请是 `request_id`、`requester_uin`、`requester_nick`、`message`、`group_id`、`group_name`、`checked`、`actor`；群邀请是 `request_id`、`invitor_uin`、`invitor_nick`、`group_id`、`group_name`、`checked`、`actor`，**不带 `message`，也不带 `requester_*`**。
+
+正文那份清单（`requester_uin` + `requester_nick` + `message` 齐全）只在「LLBot 的入群申请」这一个桶上成立。按 spec 的「照抄不要合并」执行，因此四种组合各自按上游出键，验收项措辞跟着改成「按各自上游的键」。
+
+**`count` 实现成总量预算而不是按桶截断。** NapCat 上游把 `count` 交给 `getSingleScreenNotifies(false, +count)`，也就是「一次取多少条系统消息」，分桶发生在取回来之后。按桶各截一次会让插件在沙盒上看到上游给不出的组合（比如 `count: 1` 却拿到两桶各一条）。因此 `getBotGroupSystemMessages` 返回一条按场景顺序排列的平列，截断与分桶都在适配器里，顺序即 `scene.requests` 的既有顺序。
+
+**`actor` 恒为 `0`，这是场景事实而不是常量兜底。** `SandboxRelationshipRequest.status` 的类型只有 `'pending'`，审批过的申请由 `removeRelationshipRequest` 从场景里摘掉，因此场景里永远没有「已处理但还在」的申请，也就永远没有处理人——上游未处理时给的同样是 `0`。`checked` 仍然从 `status` 推出而不是写死 `false`，两者因此不会分头漂移；那条「已处理仍在场景里则为 `true`」的分支按当前领域模型走不到，要让它可达得先给申请加一个「已处理」状态，那是新建领域概念，不在本票范围内。
+
+**可见性判定没有走 `getVisibleSnapshot`。** 那个投影只裁剪会话与消息，`groups` 与 `requests` 是原样带出的，用它并不会过滤掉任何一条申请。这一票走的是「等价可见性判定」那一支：入群申请用关系规则模块导出的 `denyGroupAuthority`（与 `handleBotGroupRequest` 的入群分支同源），群邀请用 `targetId === botId`（与那条通道的邀请分支同源）。因此本票没有新写任何角色比较，架构守卫不需要新豁免。

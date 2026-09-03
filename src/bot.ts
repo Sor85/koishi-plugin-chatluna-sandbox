@@ -38,6 +38,7 @@ import {
   isSandboxGroupMemberMuted,
   type SandboxForwardNodeInput,
   type SandboxGroupMember,
+  type SandboxGroupSystemMessage,
   type SandboxImplementationProfile,
   type SandboxOneBotConversationObservation,
 } from './types'
@@ -200,8 +201,7 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           }
         }
         if (action === 'get_recent_contact') {
-          const count = Number(params.count)
-          const limit = Number.isFinite(count) && count > 0 ? Math.floor(count) : 10
+          const limit = this.resolveCountParam(params.count, 10)
           const snapshot = this.control.getVisibleSnapshot(this.selfId, 1)
           const participants = new Map(snapshot.participants.map((participant) => [participant.id, participant]))
           const groups = new Map(snapshot.groups.map((group) => [group.id, group]))
@@ -363,6 +363,71 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
           })
           return { status: 'ok', retcode: 0, data: null }
         }
+        if (action === 'get_group_notice') {
+          const announcements = this.control.listGroupAnnouncements({
+            operatorId: this.selfId,
+            groupId: this.normalizeOneBotGroupId(params.group_id),
+          })
+          return {
+            status: 'ok',
+            retcode: 0,
+            data: announcements.map(({ id, authorId, content, createdAt }) => ({
+              notice_id: id,
+              sender_id: Number(authorId),
+              // 上游是秒级时间戳；沙盒内部存 ISO 字符串，转换只在这里做一次。
+              publish_time: Math.floor(new Date(createdAt).getTime() / 1000),
+              message: {
+                text: content,
+                images: [],
+                // NapCat 的返回同时给 image 与 images，LLBot 只给 images；沙盒没有公告图片，
+                // 两个数组都是空的，但字段名按各自实现出现——这正是实现配置存在的意义。
+                ...(this.implementation === 'napcat' ? { image: [] } : {}),
+              },
+              // LLBot 的 settings 是必给的五个布尔，沙盒没有对应状态因此全给 false；
+              // NapCat 的 settings 与 read_num 是可选字段，不编造、直接不出现。
+              ...(this.implementation === 'llbot'
+                ? {
+                    settings: {
+                      is_show_edit_card: false,
+                      tip_window: false,
+                      confirm_required: false,
+                      pinned: false,
+                      send_new_member: false,
+                    },
+                  }
+                : {}),
+            })),
+          }
+        }
+        if (action === 'get_group_system_msg') {
+          const messages = this.control.getBotGroupSystemMessages(this.selfId)
+          // count 只有 NapCat 声明，且它限的是「一次取多少条系统消息」的总量，分桶发生在截断之后；
+          // LLBot 上游对没有 payloadSchema 的 action 一律不校验参数，传了要忽略而不是报错。
+          const visible = this.implementation === 'napcat'
+            ? messages.slice(0, this.resolveCountParam(params.count, 50))
+            : messages
+          const invited = visible.filter(({ kind }) => kind === 'invite')
+            .map((message) => this.toOneBotGroupInvitedRequest(message))
+          return {
+            status: 'ok',
+            retcode: 0,
+            data: {
+              invited_requests: invited,
+              // NapCat 额外给一个内容相同的兼容别名桶；LLBot 只有两个桶。
+              ...(this.implementation === 'napcat' ? { InvitedRequest: invited } : {}),
+              join_requests: visible.filter(({ kind }) => kind === 'join')
+                .map((message) => this.toOneBotGroupJoinRequest(message)),
+            },
+          }
+        }
+        if (action === 'set_friend_remark') {
+          return this.control.performBotFriendAction(this.selfId, {
+            action: 'set-remark',
+            targetId: String(params.user_id ?? ''),
+            // 两种实现的 remark 都默认空串，而空串表示清除备注。
+            remark: typeof params.remark === 'string' ? params.remark : '',
+          })
+        }
         if (action === 'set_qq_profile') {
           if (typeof params.nickname !== 'string' || !params.nickname.trim()) throw new Error('机器人昵称不能为空')
           // NapCat 接受 sex，LLOneBot 只允许 nickname/personal_note；不支持时必须明确失败。
@@ -473,6 +538,31 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
             enabled: params.set !== false,
           })
           return { status: 'ok', retcode: 0, data: null }
+        }
+        if (action === 'fetch_emoji_like') {
+          // 读取路径拒绝撤回原文：撤回的语义是原文不再可读，谁贴过表情同样不该还查得出。
+          const message = this.requireReadableMessage(String(params.message_id ?? ''))
+          const emojiId = this.resolveEmojiLikeEmojiId(capability.action, params)
+          const participantIds = message.reactions?.find((reaction) => reaction.emojiId === emojiId)?.participantIds ?? []
+          const page = participantIds.slice(0, this.resolveCountParam(params.count, 20))
+          const participants = new Map(this.control.getSnapshot().participants.map((participant) => [participant.id, participant]))
+          return {
+            status: 'ok',
+            retcode: 0,
+            data: {
+              emojiLikesList: page.map((participantId) => ({
+                tinyId: participantId,
+                // 刻意偏离 LLBot 上游写死的空串：沙盒有真实的参与者名字，测试者要能核对贴表情的是谁。
+                nickName: participants.get(participantId)?.name ?? participantId,
+                headUrl: participants.get(participantId)?.avatar ?? '',
+              })),
+              // 沙盒不分页：参与者列表是完整的内存数组，假游标只会多一处能漂移的状态。
+              cookie: '',
+              isLastPage: page.length === participantIds.length,
+              isFirstPage: true,
+              ...(this.implementation === 'napcat' ? { result: 0, errMsg: '' } : {}),
+            },
+          }
         }
         if (action === 'send_forward_msg') {
           // send_forward_msg / send_group_forward_msg / send_private_forward_msg
@@ -909,6 +999,78 @@ export class SandboxBot extends Bot<any, SandboxBot.Config> {
 
   private resolveGroupConversationId(groupId: string) {
     return resolveGroupConversationId(this.control.getSnapshot(), groupId)
+  }
+
+  /**
+   * OneBot 的条数参数：两种实现都收数字或字符串，非法取值退回各自的默认值而不是报错。
+   *
+   * 三处读取（最近会话、群系统消息、表情回应参与者）默认值各不相同，但归一化规则是同一条，
+   * 因此只写一份——上游对这个参数一律不校验，沙盒也不该在其中某一处忽然变严。
+   */
+  private resolveCountParam(value: unknown, fallback: number): number {
+    const count = Number(value ?? fallback)
+    return Number.isFinite(count) && count > 0 ? Math.floor(count) : fallback
+  }
+
+  /**
+   * 群邀请项：两种实现的这个桶都用 `invitor_*` 指邀请人，且都不带附言。
+   *
+   * `request_id` 就是审批时要传的 flag，因此列出来的每一条都能直接接上 `set_group_add_request`。
+   */
+  private toOneBotGroupInvitedRequest(message: SandboxGroupSystemMessage) {
+    return {
+      request_id: message.requestId,
+      invitor_uin: Number(message.initiatorId),
+      invitor_nick: message.initiatorName,
+      group_id: Number(message.groupId),
+      group_name: message.groupName,
+      checked: message.checked,
+      // 处理人：沙盒场景只保存待处理申请，因此永远没有处理人，与上游未处理时的 0 一致。
+      actor: 0,
+      // NapCat 的两个桶共用同一份 schema，因此邀请项也带附言与申请人昵称；LLBot 的邀请项没有这两个字段。
+      ...(this.implementation === 'napcat'
+        ? { message: message.comment, requester_nick: message.initiatorName }
+        : {}),
+    }
+  }
+
+  /** 入群申请项：LLBot 用 `requester_*`，NapCat 的共用 schema 里申请人落在 `invitor_*` 上。 */
+  private toOneBotGroupJoinRequest(message: SandboxGroupSystemMessage) {
+    const common = {
+      request_id: message.requestId,
+      group_id: Number(message.groupId),
+      group_name: message.groupName,
+      message: message.comment,
+      checked: message.checked,
+      actor: 0,
+    }
+    return this.implementation === 'napcat'
+      ? { ...common, invitor_uin: Number(message.initiatorId), invitor_nick: message.initiatorName, requester_nick: message.initiatorName }
+      : { ...common, requester_uin: Number(message.initiatorId), requester_nick: message.initiatorName }
+  }
+
+  /**
+   * 表情回应查询的 emoji 参数，按各自实现校验。
+   *
+   * NapCat 只认 camelCase 的 `emojiId`，且 `emojiType` 必填（上游是 `Value.Parse` 的 Assert 阶段
+   * 拒绝）；LLBot 收 `emoji_id` 或 `emojiId` 两种拼写择一、不要 `emojiType`。两边都接受所有拼写
+   * 会掩盖这处真实差异，插件在沙盒上能跑、换到 NapCat 上就崩。
+   *
+   * `emojiType` 只做必填校验、不参与查找：`participantIds` 按 emojiId 聚合，类型不影响命中；
+   * 类型与 emojiId 明显矛盾时上游也不校验，沙盒不该更严。
+   *
+   * 两边都对取值 trim：`applyMessageReaction` 存的就是 trim 过的 emojiId，读取不跟着归一化会让
+   * 「贴了带空白的表情、再按同一个参数查」查不到自己刚写的那条回应。
+   */
+  private resolveEmojiLikeEmojiId(actionName: string, params: Record<string, unknown>): string {
+    if (this.implementation === 'napcat') {
+      if (params.emojiId === undefined || params.emojiId === null) throw new Error(`${actionName} 缺少 emojiId`)
+      if (params.emojiType === undefined || params.emojiType === null) throw new Error(`${actionName} 缺少 emojiType`)
+      return String(params.emojiId).trim()
+    }
+    const emojiId = String(params.emoji_id ?? params.emojiId ?? '').trim()
+    if (!emojiId) throw new Error(`${actionName} 缺少 emoji_id`)
+    return emojiId
   }
 
   /**

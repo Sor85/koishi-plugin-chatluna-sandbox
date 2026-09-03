@@ -1,6 +1,6 @@
 # 四处只有单向入口的场景状态，补齐 OneBot 读写端
 
-Status: ready-for-agent
+Status: resolved
 
 来源：`koishi-plugin-onebot-webqq` 的开发者模拟环境改用沙盒的虚拟 OneBot 机器人当后端，核对它实际调用的 41 个 action 时暴露出来。价值判定站在沙盒自身，与那个消费者无关。
 

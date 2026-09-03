@@ -27,8 +27,20 @@ NapCat 与 LLBot 都提供 `send_poke`、`friend_poke` 和 `group_poke`。沙盒
 | 获取群禁言列表 | `get_group_shut_list` | `get_group_shut_list` |
 | 获取最近会话 | `get_recent_contact` | 不提供此 action |
 | 删除群公告 | `_del_group_notice` | `_delete_group_notice` |
+| 获取群公告 | `_get_group_notice`，`message` 同时给 `image` 与 `images`，不给 `settings` 与 `read_num` | `_get_group_notice`，`message` 只给 `images`，`settings` 五个布尔必给 |
+| 获取群系统消息 | `get_group_system_msg`，收 `count`，返回 `invited_requests` / `InvitedRequest` / `join_requests` 三个桶，两个桶共用同一份字段 | `get_group_system_msg`，无参，返回两个桶，入群申请用 `requester_*`、群邀请用 `invitor_*` |
+| 修改好友备注 | `set_friend_remark` | `set_friend_remark` |
+| 获取表情回应参与者 | `fetch_emoji_like`，要 `emojiId` 与 `emojiType`（均为 camelCase、均必填），额外返回 `result` 与 `errMsg` | `fetch_emoji_like`，收 `emoji_id` 或 `emojiId` 择一、不要 `emojiType`，不返回 `result` 与 `errMsg` |
 | 批量踢出群成员 | `set_group_kick_members`，参数 `user_id` | `batch_delete_group_member`，参数 `user_ids` |
 | 获取群相册列表（沙盒暂未实现） | `get_qun_album_list` | `get_group_album_list` |
+
+两边上游都不存在不带下划线的 `get_group_notice`，沙盒也不声明它。
+
+四项按调用方机器人的可见性过滤，不是全场景可读：群公告只返回机器人所在群的（不在群里时按 `_del_group_notice` 同一句拒绝，而不是返回空数组）；群系统消息只返回机器人有权审批的入群申请与发给它自己的群邀请，判据与 `set_group_add_request` 同源，因此列出来的 `request_id` 可以直接当审批 `flag` 用；表情回应只允许查机器人可读的消息，已撤回的消息按「消息已撤回」拒绝；好友备注只能改机器人自己的好友关系。
+
+沙盒没有公告图片、发布设置与阅读数，因此两种配置的图片数组都是空的，LLBot 必给的 `settings` 五项按 `false` 返回、NapCat 的可选 `settings` 与 `read_num` 直接不出现。`publish_time` 是秒级整数，顺序就是群公告的存储顺序（最新在前）。群系统消息的 `checked` 与 `actor` 由场景推出：沙盒只保存待处理申请，审批后那条申请随即消失，因此 `checked` 为 `false`、`actor` 为 `0`，与上游未处理时一致。NapCat 的 `count` 限的是一次取多少条系统消息的总量，分桶发生在截断之后；LLBot 上游对没有 `payloadSchema` 的 action 不校验参数，因此传了 `count` 会被忽略而不是报错。
+
+`fetch_emoji_like` 有两处刻意与上游不同，都写在能力作用说明里：`nickName` 返回参与者真名而不是复刻 LLBot 上游写死的空串（沙盒有真实名字，测试者要能核对贴表情的是谁）；沙盒不实现真正的游标，`cookie` 恒为空串、`isFirstPage` 恒为真，参与者多于 `count` 时按它截断并让 `isLastPage` 为 `false`。`emojiType` 只做必填校验、不参与查找——表情回应参与者按 emoji 聚合，类型不影响命中，上游也不校验类型与 `emojiId` 是否自洽。
 
 `get_friend_msg_history` 和 `get_group_msg_history` 复用沙盒逻辑会话的唯一消息历史，按当前机器人可见性过滤，并支持 `message_seq`、`count` 与反向排序参数。`message_seq` 游标在完整逻辑会话中解析，不使用 WebQQ 最近消息窗口；翻到最早一条之后返回空列表。历史消息与实时消息使用同一套 Koishi 元素到 OneBot 消息段转换，因此图片等媒体不会降级为 `<img>` 文本。
 
@@ -48,7 +60,8 @@ OneBot 协议层统一向插件返回数字 `message_id`：消息事件、`send_
 
 - `set_group_special_title` 写入群成员专属头衔，`get_group_member_info`、`get_group_member_list` 与群消息事件的 `sender.title` 返回同一份头衔；与真实 QQ 一致只有群主可以授予，传空字符串表示清除。
 - `set_group_ban` 写入群成员禁言到期时间，`get_group_shut_list` 返回当前仍在禁言中的成员，`get_group_member_info` 的 `shut_up_timestamp` 返回秒级到期时间戳；`duration` 为 0 表示解除禁言，禁言时长上限为 30 天。
-- `set_msg_emoji_like` 按 emoji 聚合表情回应参与者并写入消息，`set` 为 `false` 时移除当前机器人的回应。
+- `set_msg_emoji_like` 按 emoji 聚合表情回应参与者并写入消息，`set` 为 `false` 时移除当前机器人的回应；`fetch_emoji_like` 从同一份聚合结果读出参与者，因此贴表情、查参与者、撤回回应构成闭环。
+- `set_friend_remark` 写入机器人对该好友的备注，落到与 WebQQ 用户通道同一份规则上：前后空白被 trim，空串（含省略参数）表示删除备注而不是写入空串。`get_friend_list` 的 `remark` 与 `get_recent_contact` 的私聊 `remark` 立刻返回同一份值；不是好友按「好友关系不存在」拒绝，对自己调用按「不能对自己执行好友操作」拒绝，两句与用户通道逐字相同。
 - `set_qq_profile` 写入机器人账号资料：NapCat 与 LLOneBot 都支持 `nickname` 和 `personal_note`，只有 NapCat 接受 `sex`（`0/1/2` 或 `unknown/male/female`）；LLOneBot 传入性别时明确失败，不静默忽略。对应 `get_login_info`、`get_stranger_info`、`get_friend_list` 与 `get_group_member_info` 只返回已建模的类型化字段，不透传 raw JSON。
 - `send_forward_msg` / `send_group_forward_msg` / `send_private_forward_msg` 创建独立合并转发资源，并在目标会话写入外层 forward 卡片消息；响应同时返回 `message_id`、`res_id` 与 `forward_id`。节点支持 `{ data: { id } }` 引用已有可见消息，以及 `{ data: { user_id, nickname, content } }` 自定义内容，可混合使用。自定义节点内的媒体与普通 `send_msg` 一致，接受 `sandbox-media://`、`base64://`、Data URL 与 HTTP(S) 来源，落盘后再写入 node。
 - `get_forward_msg` 读取合并转发详情，接受转发资源 `id` 或外层消息 `message_id`；返回的 `messages` / `message` / `nodes` 为同一份 node 列表，节点正文复用现有 OneBot 消息段转换，并支持嵌套 forward。嵌套资源内的节点媒体只要父链对操作者可见即可读取。

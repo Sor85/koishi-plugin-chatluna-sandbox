@@ -84,6 +84,7 @@ import {
   type GetMediaContentInput,
   type GetSandboxBotDeliveriesInput,
   type GetMessageHistoryInput,
+  type ListGroupAnnouncementsInput,
   type PerformFriendActionInput,
   type PerformFriendActionResult,
   type PerformGroupActionInput,
@@ -104,7 +105,9 @@ import {
   type SandboxForwardNodeInput,
   type SandboxFriendship,
   type SandboxGroup,
+  type SandboxGroupAnnouncement,
   type SandboxGroupMember,
+  type SandboxGroupSystemMessage,
   type SandboxMedia,
   type SandboxMediaContent,
   type SandboxMessage,
@@ -1214,10 +1217,7 @@ export class SandboxControlService {
 
     if (!friendship) throw new SandboxDomainError('好友关系不存在')
     if (input.action === 'set-remark') {
-      const remark = input.remark.trim()
-      if (remark) friendship.remarks[input.operatorId] = remark
-      else delete friendship.remarks[input.operatorId]
-      this.commitSceneMutation()
+      this.applyFriendRemark(friendship, input.operatorId, input.remark)
       return { revision: this.scene.revision }
     }
 
@@ -1476,6 +1476,35 @@ export class SandboxControlService {
     const friendship = this.getFriendship(botId, userId)
     if (!friendship) throw new SandboxDomainError('好友关系不存在')
     this.scene.friendships = this.scene.friendships.filter(({ id }) => id !== friendship.id)
+    this.commitSceneMutation()
+  }
+
+  /**
+   * 机器人通道的好友动作，与 {@link performBotGroupAction} 对称。
+   *
+   * 备注写入落到与用户通道同一段规则上（{@link applyFriendRemark}）：仓库里只有一份「非空写入、
+   * 空串删除」的判定，两条通道因此不会漂移。拒绝的三句文案也与用户通道逐字相同。
+   */
+  performBotFriendAction(botId: string, input: { action: 'set-remark'; targetId: string; remark: string }) {
+    if (!this.isBot(botId)) throw new SandboxDomainError(`机器人不存在：${botId}`)
+    const target = this.getParticipant(input.targetId)
+    if (target.id === botId) throw new SandboxDomainError('不能对自己执行好友操作')
+    const friendship = this.getFriendship(botId, target.id)
+    if (!friendship) throw new SandboxDomainError('好友关系不存在')
+    this.applyFriendRemark(friendship, botId, input.remark)
+    return { status: 'ok', retcode: 0, data: null }
+  }
+
+  /**
+   * 好友备注的写入规则，两条通道唯一一份。
+   *
+   * 空串表示清除而不是写入空串：那是两种实现配置的真实语义（`set_friend_remark` 的 `remark`
+   * 默认空串），也是 `get_friend_list` 的 `nick` 能回落空串的前提。
+   */
+  private applyFriendRemark(friendship: SandboxFriendship, operatorId: string, remark: string): void {
+    const next = remark.trim()
+    if (next) friendship.remarks[operatorId] = next
+    else delete friendship.remarks[operatorId]
     this.commitSceneMutation()
   }
 
@@ -1978,18 +2007,13 @@ export class SandboxControlService {
   }
 
   setGroupAnnouncement(input: SetGroupAnnouncementInput): void {
-    const participant = this.getParticipant(input.operatorId)
-    const group = this.scene.groups.find(({ id }) => id === input.groupId)
-    if (!group) throw new SandboxDomainError(`群组不存在：${input.groupId}`)
-    if (!group.members.some(({ participantId }) => participantId === participant.id)) {
-      throw new SandboxDomainError(`参与者不在群组中：${input.operatorId}`)
-    }
+    const group = this.requireAnnouncementGroup(input.operatorId, input.groupId)
     const content = input.content.trim()
     if (!content) throw new SandboxDomainError('群公告不能为空')
 
     group.announcements.unshift({
       id: Random.id(),
-      authorId: participant.id,
+      authorId: input.operatorId,
       content,
       createdAt: new Date().toISOString(),
     })
@@ -1997,17 +2021,69 @@ export class SandboxControlService {
   }
 
   deleteGroupAnnouncement(input: DeleteGroupAnnouncementInput): void {
-    const participant = this.getParticipant(input.operatorId)
-    const group = this.scene.groups.find(({ id }) => id === input.groupId)
-    if (!group) throw new SandboxDomainError(`群组不存在：${input.groupId}`)
-    if (!group.members.some(({ participantId }) => participantId === participant.id)) {
-      throw new SandboxDomainError(`参与者不在群组中：${input.operatorId}`)
-    }
-
+    const group = this.requireAnnouncementGroup(input.operatorId, input.groupId)
     const index = group.announcements.findIndex(({ id }) => id === input.announcementId)
     if (index < 0) throw new SandboxDomainError(`群公告不存在：${input.announcementId}`)
     group.announcements.splice(index, 1)
     this.commitSceneMutation()
+  }
+
+  /**
+   * 读取一个群的全部公告，顺序就是存储顺序（`setGroupAnnouncement` 用 `unshift`，最新在前）。
+   *
+   * 与写入、删除同一道定位，因此机器人只读得到自己所在群的公告；不在群里时按同一句拒绝，
+   * 而不是返回空数组——空数组会让插件以为群里没有公告。读取不产生场景变更。
+   */
+  listGroupAnnouncements(input: ListGroupAnnouncementsInput): SandboxGroupAnnouncement[] {
+    return structuredClone(this.requireAnnouncementGroup(input.operatorId, input.groupId).announcements)
+  }
+
+  /** 群公告读写共用的定位：参与者与群都必须存在，且该参与者在群里。 */
+  private requireAnnouncementGroup(operatorId: string, groupId: string): SandboxGroup {
+    const participant = this.getParticipant(operatorId)
+    const group = this.scene.groups.find(({ id }) => id === groupId)
+    if (!group) throw new SandboxDomainError(`群组不存在：${groupId}`)
+    if (!group.members.some(({ participantId }) => participantId === participant.id)) {
+      throw new SandboxDomainError(`参与者不在群组中：${operatorId}`)
+    }
+    return group
+  }
+
+  /**
+   * 一个机器人此刻该看见的群系统消息，按场景里申请的既有顺序返回。
+   *
+   * 审批权限用关系规则模块那一份 `denyGroupAuthority`，与 `set_group_add_request` 的入群申请
+   * 分支同源；群邀请的判据同样与那条通道一致（`targetId === botId`）。因此列出来的每一条都能
+   * 直接接上审批，机器人看不见的群的申请一条都不出现。
+   *
+   * 返回一条平列而不是两个桶：上游的 `count` 限的是「一次取多少条系统消息」这个总量，取回来
+   * 之后才分桶，按桶各截一次会让插件在沙盒上看到上游给不出的组合。
+   */
+  getBotGroupSystemMessages(botId: string): SandboxGroupSystemMessage[] {
+    if (!this.isBot(botId)) throw new SandboxDomainError(`机器人不存在：${botId}`)
+    return this.scene.requests.flatMap((request) => {
+      if (request.type !== 'group') return []
+      const group = this.scene.groups.find(({ id }) => id === request.groupId)
+      if (!group) return []
+      const invite = (request.subType ?? 'add') === 'invite'
+      if (invite ? request.targetId !== botId : !this.canBotHandleJoinRequest(group, botId)) return []
+      return [{
+        kind: invite ? 'invite' as const : 'join' as const,
+        requestId: request.id,
+        groupId: group.id,
+        groupName: group.name,
+        initiatorId: request.requesterId,
+        initiatorName: this.getParticipant(request.requesterId).name,
+        comment: request.comment ?? '',
+        checked: request.status !== 'pending',
+      }]
+    })
+  }
+
+  /** 机器人在这个群里有没有审批入群申请的权限；不在群里也算没有，因为那个群对它不可见。 */
+  private canBotHandleJoinRequest(group: SandboxGroup, botId: string): boolean {
+    const member = group.members.find(({ participantId }) => participantId === botId)
+    return !!member && !denyGroupAuthority(member)
   }
 
   // 表情回应写入消息状态，使 get_msg、场景快照和消息历史都能读回同一份回应事实。

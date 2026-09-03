@@ -12,24 +12,30 @@
 
 **不做的事：** 不加 `_send_group_notice`（发公告是另一件事，沙盒的公告目前由环境管理页与测试控制器创建）；不加 `get_group_notice` 这个不带下划线的写法（两边上游都没有）；不动公告实体的字段，特别是不为了凑上游而加 `title`——上游的返回里本来就没有 title。
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `onebot-profiles.ts` 的 `nativeActions` 里声明 `group.notice.list`，两种配置的 `action` 都是 `_get_group_notice`，`handler` 与 `description` 按既有风格写
-- [ ] `bot.ts` 接上 handler，形状与 `delete_group_notice` 那一支对称
-- [ ] 返回 `notice_id`／`sender_id`／`publish_time`／`message.text` 四个字段，取值来自 `SandboxGroupAnnouncement` 的对应字段
-- [ ] `publish_time` 是秒级整数，不是毫秒也不是 ISO 字符串，有断言
-- [ ] NapCat 配置下 `message` 同时出现 `image` 与 `images`，LLBot 配置下只出现 `images`，两者都是空数组，有断言
-- [ ] LLBot 配置下 `settings` 五个布尔字段齐全且为 `false`；NapCat 配置下不出现 `settings` 与 `read_num`，有断言
-- [ ] 群里有多条公告时，返回顺序与 `group.announcements` 的既有存储顺序一致（`setGroupAnnouncement` 用 `unshift`，因此最新在前），handler 不重新排序，有断言
-- [ ] 群里没有公告时返回空数组，不是报错，有断言
-- [ ] 机器人不在群里时按既有群可见性文案拒绝，与 `_del_group_notice` 同一句，有断言
-- [ ] 读取不产生场景变更：调用前后场景 revision 与快照逐字节相同，有断言
-- [ ] 能力覆盖禁用 `group.notice.list` 后调用被拒，理由是既有的「能力已被禁用」，有断言
-- [ ] `_get_group_notice` 之外的名字（含 `get_group_notice`）仍按「基线不支持」拒绝，有断言
-- [ ] `tests/onebot-profiles.test.ts` 的能力矩阵断言同步更新
-- [ ] `docs/onebot-profiles.md` 的实现差异表按需补一行；`README.md` 的基线版本信息不需要动（不是快照升级）
-- [ ] 领域词汇核过一遍，确认「群公告」是否已在 `CONTEXT.md`，缺则补
-- [ ] 既有的 `_del_group_notice`、`setGroupAnnouncement`、`deleteGroupAnnouncement` 测试一字不改地通过
-- [ ] 完整测试、类型检查与构建通过
+- [x] `onebot-profiles.ts` 的 `nativeActions` 里声明 `group.notice.list`，两种配置的 `action` 都是 `_get_group_notice`，`handler` 与 `description` 按既有风格写
+- [x] `bot.ts` 接上 handler，形状与 `delete_group_notice` 那一支对称
+- [x] 返回 `notice_id`／`sender_id`／`publish_time`／`message.text` 四个字段，取值来自 `SandboxGroupAnnouncement` 的对应字段
+- [x] `publish_time` 是秒级整数，不是毫秒也不是 ISO 字符串，有断言
+- [x] NapCat 配置下 `message` 同时出现 `image` 与 `images`，LLBot 配置下只出现 `images`，两者都是空数组，有断言
+- [x] LLBot 配置下 `settings` 五个布尔字段齐全且为 `false`；NapCat 配置下不出现 `settings` 与 `read_num`，有断言
+- [x] 群里有多条公告时，返回顺序与 `group.announcements` 的既有存储顺序一致（`setGroupAnnouncement` 用 `unshift`，因此最新在前），handler 不重新排序，有断言
+- [x] 群里没有公告时返回空数组，不是报错，有断言
+- [x] 机器人不在群里时按既有群可见性文案拒绝，与 `_del_group_notice` 同一句，有断言
+- [x] 读取不产生场景变更：调用前后场景 revision 与快照逐字节相同，有断言
+- [x] 能力覆盖禁用 `group.notice.list` 后调用被拒，理由是既有的「能力已被禁用」，有断言
+- [x] `_get_group_notice` 之外的名字（含 `get_group_notice`）仍按「基线不支持」拒绝，有断言
+- [x] `tests/onebot-profiles.test.ts` 的能力矩阵断言同步更新
+- [x] `docs/onebot-profiles.md` 的实现差异表按需补一行；`README.md` 的基线版本信息不需要动（不是快照升级）
+- [x] 领域词汇核过一遍，确认「群公告」是否已在 `CONTEXT.md`，缺则补
+- [x] 既有的 `_del_group_notice`、`setGroupAnnouncement`、`deleteGroupAnnouncement` 测试一字不改地通过
+- [x] 完整测试、类型检查与构建通过
 
 ## Comments
+
+**LLBot 的五个布尔逐字取自上游，不是猜的。** `_get_group_notice` 在 `LLOneBot/LuckyLilliaBot@d6e2f48` 的 `go-cqhttp/GetGroupNotice.ts` 里给的是 `is_show_edit_card`、`tip_window`、`confirm_required`、`pinned`、`send_new_member`，五个都是必给的布尔。NapCat 那边 `settings` 声明成 `Type.Optional(Type.Any())`、`read_num` 是 `Type.Optional(Type.Number())`，因此沙盒直接不给这两个键。
+
+**三处成员判定收成了一份。** `setGroupAnnouncement`、`deleteGroupAnnouncement` 与新的 `listGroupAnnouncements` 原先要各写一遍「参与者存在 → 群存在 → 参与者在群里」，第三份就是漂移的开始。现在三条路都走 `requireAnnouncementGroup`，两句拒绝文案因此逐字相同，不是靠人工对齐维持的。
+
+**`message.text` 之外不给别的键。** 上游的 `message` 里只有 `text` 与图片数组；沙盒的公告实体没有标题，也没有为了凑上游而加。
