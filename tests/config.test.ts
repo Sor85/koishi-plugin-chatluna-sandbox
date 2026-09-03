@@ -108,7 +108,10 @@ describe('测试控制端点配置', () => {
       'readPerMinute', 'mutationPerMinute', 'waitPerMinute', 'uploadPerMinute',
       'maxConcurrentMutations', 'maxConcurrentWaits', 'maxConcurrentUploads',
     ])
-    expect(shared.allowedSources.meta.default).toEqual(['127.0.0.1', '::1'])
+    // 两份白名单都不预置：默认监听地址已经是`127.0.0.1`，再塞一份回环来源白名单只会让人以为
+    // 清空它就等于对外开放，实际可达范围始终由监听地址决定。
+    expect(shared.allowedSources.meta.default).toEqual([])
+    expect(shared.allowedOrigins.meta.default).toEqual([])
     // 端点分组里只留自己的开关与路径，不得各自再配一份监听、门禁或配额。
     for (const protocol of ['mcp', 'http'] as const) {
       expect(Object.keys(endpoint[protocol].dict ?? {}), protocol).toEqual(['enabled', 'path'])

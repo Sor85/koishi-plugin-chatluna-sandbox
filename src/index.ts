@@ -140,7 +140,7 @@ export const Config: Schema<Config> = Schema.object({
     shared: Schema.object({
       host: Schema.string().default('127.0.0.1').description('监听地址。`127.0.0.1`只允许本机访问，改成`0.0.0.0`可被局域网访问，此时建议填写 TLS 证书，否则测试凭证以明文传输'),
       port: Schema.number().min(1).max(65535).default(61901).description('监听端口。端口被占用时端点启动失败，沙盒工作台不受影响'),
-      allowedSources: Schema.array(String).default(['127.0.0.1', '::1']).description('只有以下来源 IP 能访问，支持 IPv4 CIDR 写法。留空表示不限制来源'),
+      allowedSources: Schema.array(String).default([]).description('来源 IP 白名单，在监听地址之上再筛一层，只有命中白名单的 IP 才放行。留空表示不筛，可达范围仍由上面的监听地址决定。支持精确 IP 与 CIDR 写法，例如`192.168.1.0/24`或`::1/128`'),
       allowedOrigins: Schema.array(String).default([]).description('只有以下浏览器 Origin 能访问，要写全协议与端口，例如`http://localhost:5173`。浏览器请求必带 Origin 头，留空表示一律拒绝；curl 与 AI 客户端不带 Origin，不受此项限制'),
       tlsCertPath: Schema.string().description('TLS 证书路径。监听地址不是本机时建议填写，留空则以明文 HTTP 传输测试凭证'),
       tlsKeyPath: Schema.string().description('TLS 私钥路径。监听地址不是本机时建议填写，留空则以明文 HTTP 传输测试凭证'),
