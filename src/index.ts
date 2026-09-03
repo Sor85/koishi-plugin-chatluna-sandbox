@@ -110,7 +110,7 @@ export const Config: Schema<Config> = Schema.object({
   persistenceMode: Schema.union([
     Schema.const('memory').description('服务端内存'),
     Schema.const('database').description('Koishi Database'),
-  ]).default('memory').role('radio').description('模拟 QQ 环境状态存储方式'),
+  ]).default('database').role('radio').description('模拟 QQ 环境状态存储方式'),
   enableSandboxFrostedGlass: Schema.boolean().default(true).description('启用 Sandbox 毛玻璃效果'),
   sandboxTimBubbleTail: Schema.boolean().default(true).description('显示气泡小尖角'),
   sandboxColorMode: Schema.union([
