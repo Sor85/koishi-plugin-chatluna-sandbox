@@ -573,7 +573,9 @@
   align-items: center;
   gap: 2px;
   margin: 0 1px;
-  padding: 1px 4px 1px 7px;
+  /* 胶囊内部只有一个 `@名称` 文本节点，左右内边距必须相等；早期从外部实现抄来的 7px/4px
+     不对称值是给带尾部图标的多子节点结构留的，这里没有那个图标，只会让 @ 一侧看起来更空。 */
+  padding: 1px 6px;
   border-radius: 999px;
   color: var(--webqq-accent);
   background: color-mix(in srgb, var(--webqq-accent) 14%, transparent);
