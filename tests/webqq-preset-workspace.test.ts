@@ -171,4 +171,20 @@ describe('WebQQ 预设工作台源码契约', () => {
       .split('}')[0]
     expect(trackRule).toContain('background: transparent')
   })
+
+  /**
+   * `.cm-scroller` 由 CodeMirror 自己创建，模板里没有这个节点，v- 指令无处可挂。漏掉命令式挂载
+   * 不会报错，只会让原生轨道从滚动容器顶缘起画——而那个顶缘在覆盖层顶栏背后，轨道会钻进顶栏。
+   */
+  it('CodeMirror 的滚动容器命令式挂上自定义轨道，并且不留原生轨道的位置', () => {
+    const editor = readFileSync(resolve('client/preset/source-editor.vue'), 'utf8')
+    expect(editor).toContain('attachWebqqScrollbar(view.scrollDOM)')
+    // 轨道元素挂在 body 上，销毁编辑器不会带走它。
+    expect(editor).toContain('scrollbar?.detach()')
+
+    // 原生轨道无法裁剪，滚动容器不得重新预留或恢复它的宽度。
+    const styles = readFileSync(resolve('client/preset/styles.css'), 'utf8')
+    const block = styles.slice(styles.indexOf('.webqq-preset-source-editor .cm-scroller'))
+    expect(block.slice(0, block.indexOf('}'))).not.toMatch(/scrollbar-gutter|scrollbar-width|::-webkit-scrollbar/)
+  })
 })
