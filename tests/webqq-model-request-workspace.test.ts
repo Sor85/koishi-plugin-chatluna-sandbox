@@ -47,7 +47,7 @@ describe('WebQQ 模型请求工作台', () => {
     expect(styles).toMatch(/\.webqq-model-request-item\.is-selected,\s*\n\.webqq-model-request-item\[aria-current="true"\]\s*\{[^}]*background:\s*var\(--webqq-hover\)/s)
     expect(styles).toMatch(/\.webqq-model-request-item:hover\s*\{[^}]*background:\s*var\(--webqq-hover\)/s)
     expect(styles).not.toContain('.webqq-model-request-item.is-active')
-    expect(workspaceSource).toContain('<WebqqAvatar')
+    expect(workspaceSource).toContain('<ModelRequestAvatar')
     expect(workspaceSource).toMatch(/webqq-model-request-bot-copy[\s\S]*webqq-model-request-bot-name[\s\S]*resolveRequestBot\(record\)\.name[\s\S]*statusLabel\(record\.status\)[\s\S]*formatModelRequestSource\(record\)[\s\S]*formatSandboxDateTime\(record\.createdAt\)[\s\S]*formatDuration\(record\.durationMs\)/)
     expect(workspaceSource).not.toMatch(/class="webqq-model-request-item"[\s\S]*record\.error\.message/)
     expect(workspaceSource).toContain("'未归属机器人'")
@@ -57,6 +57,55 @@ describe('WebQQ 模型请求工作台', () => {
     expect(workspaceSource).not.toMatch(/<Badge v-if="record\.provider" variant="outline" class="webqq-model-request-provider">/)
     expect(workspaceSource).not.toMatch(/<Badge v-if="detail\.provider" variant="outline" class="webqq-model-request-provider">/)
     expect(workspaceSource).toContain('确认清理')
+  })
+
+  it('未归属请求走专属头像：虚线圆里的单色机器人配一道斜线，而不是名称首字母', () => {
+    const avatarSource = readFileSync(resolve('client/model-request/request-avatar.vue'), 'utf8')
+    const workspaceSource = readFileSync(resolve('client/model-request/workspace.vue'), 'utf8')
+    const builtinSource = readFileSync(resolve('src/builtin-avatar-options.ts'), 'utf8')
+    const styles = readFileSync(resolve('client/model-request/styles.css'), 'utf8')
+
+    // 专属头像只在未归属时接管；有机器人可显示时仍走共享身份头像，圆形几何不复制一份。
+    expect(avatarSource).toContain('v-if="unattributed"')
+    expect(avatarSource).toContain('webqq-identity-avatar webqq-model-request-unattributed-avatar')
+    expect(avatarSource).toContain('<WebqqAvatar v-else kind="bot"')
+    // 单色描边：整枚图形只用 currentColor，不出现底板矩形，也不留名称首字母。
+    expect(avatarSource).toContain('stroke="currentColor"')
+    expect(avatarSource).toContain('fill="currentColor"')
+    expect(avatarSource).not.toMatch(/fill="#|rect width="128"/)
+    expect(avatarSource).not.toContain('{{ initial')
+    // 机头是描边：实底机头压同色斜线会糊成一片，只能靠底色垫白缝切开，那道缝比斜线还显眼。
+    expect(avatarSource).toContain('<rect x="24" y="32" width="80" height="68" rx="22" />')
+    expect(avatarSource).not.toContain('fill-rule="evenodd"')
+    expect(avatarSource).not.toContain('slash-gap')
+    expect(styles).not.toContain('slash-gap')
+    // 斜线只比机头轮廓多出一点、两端留空隙：不加垫缝，也不贴到虚线环上。
+    expect(avatarSource).toContain('<path d="M26 16L110 100" />')
+    // 形状与内置机器人头像同源。任一侧改了坐标，这里就要红一次，提醒同步另一侧。
+    expect(builtinSource).toContain('<rect x="24" y="32" width="80" height="68" rx="22"')
+    expect(builtinSource).toContain('<circle cx="49" cy="62" r="8"')
+    expect(builtinSource).toContain('<circle cx="79" cy="62" r="8"')
+    expect(builtinSource).toContain('M45 82h38')
+    expect(builtinSource).toContain('M64 32V16M55 12h18')
+    expect(avatarSource).toContain('M64 32V16M55 12h18')
+    expect(avatarSource).toContain('<circle cx="49" cy="62" r="8" />')
+    expect(avatarSource).toContain('<circle cx="79" cy="62" r="8" />')
+    expect(avatarSource).toContain('<path d="M45 82h38" />')
+    // 去掉底板后原坐标会明显偏上，靠 viewBox 下移一次补正，而不是逐条路径挪坐标。
+    expect(avatarSource).toContain('viewBox="0 -10 128 128"')
+    // 归属名称就在同一行的标题里，头像不得再声明一次可访问名，否则读屏念两遍。
+    expect(avatarSource).not.toContain('aria-label')
+    // 列表项与详情头部共用同一个头像组件，未归属判定由 resolveRequestBot 一处给出。
+    expect(workspaceSource).not.toContain('<WebqqAvatar')
+    expect(workspaceSource).toMatch(/<ModelRequestAvatar\s*\n\s*:unattributed="resolveRequestBot\(record\)\.unattributed"/)
+    expect(workspaceSource).toMatch(/<ModelRequestAvatar\s*\n\s*:unattributed="resolveRequestBot\(detail\)\.unattributed"/)
+    // 归属是记录事实：不能拿「有没有 botId」代替，多个机器人同时思考的归属记录也没有 botId。
+    expect(workspaceSource).toMatch(/function resolveRequestBot[\s\S]*?unattributed: record\.attribution === 'unattributed'/)
+    expect(workspaceSource).not.toMatch(/function resolveRequestBot[\s\S]*?unattributed: !botId/)
+    // 只覆盖描边与配色，色值取自令牌；机器人收一圈，机头与斜线两端都不顶到虚线环。
+    expect(styles).toMatch(/\.webqq-model-request-unattributed-avatar\s*\{[^}]*border:\s*1px dashed[^}]*color:\s*var\(--webqq-muted\)[^}]*background:\s*var\(--webqq-surface-muted\)/s)
+    expect(styles).toMatch(/\.webqq-model-request-unattributed-avatar\s*>\s*svg\s*\{[^}]*width:\s*calc\(var\(--webqq-avatar-size[^}]*height:\s*calc\(var\(--webqq-avatar-size/s)
+    expect(avatarSource).not.toContain('stroke="var(')
   })
 
   it('详情概览与元信息：详情头部的导航与视图切换、概览格、用量格、元信息列表与请求头树', () => {

@@ -79,6 +79,22 @@
   min-width: 0;
 }
 
+/* 未归属请求的专属头像：虚线圆里放一枚与真实机器人同形状的单色机器人，再压一道斜线。
+   圆形几何仍由 .webqq-identity-avatar 拥有，这里只覆盖它的描边与配色；色值全部取自
+   工作区令牌，深浅两套主题自动跟随，不为这一处新开色板。 */
+.webqq-model-request-unattributed-avatar {
+  border: 1px dashed color-mix(in srgb, var(--webqq-muted) 55%, transparent);
+  color: var(--webqq-muted);
+  background: var(--webqq-surface-muted);
+}
+
+/* 机器人按头像直径的 0.62 收一圈：机头与斜线两端都要和虚线环留出空隙，满幅时圆角会顶到环上。
+   公式必须写在使用点上——放进自定义属性会在声明它的元素上就完成替换。 */
+.webqq-model-request-unattributed-avatar > svg {
+  width: calc(var(--webqq-avatar-size, 38px) * 0.62);
+  height: calc(var(--webqq-avatar-size, 38px) * 0.62);
+}
+
 .webqq-model-request-bot-copy {
   display: grid;
   gap: 2px;

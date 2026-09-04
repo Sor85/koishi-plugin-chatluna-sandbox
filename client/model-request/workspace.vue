@@ -140,8 +140,8 @@
             <header>
               <div class="webqq-model-request-item-title">
                 <span class="webqq-model-request-bot">
-                  <WebqqAvatar
-                    kind="bot"
+                  <ModelRequestAvatar
+                    :unattributed="resolveRequestBot(record).unattributed"
                     :name="resolveRequestBot(record).name"
                     :avatar="resolveRequestBot(record).avatar"
                   />
@@ -185,8 +185,8 @@
           <header>
             <div class="webqq-model-request-item-title">
               <span class="webqq-model-request-bot">
-                <WebqqAvatar
-                  kind="bot"
+                <ModelRequestAvatar
+                  :unattributed="resolveRequestBot(detail).unattributed"
                   :name="resolveRequestBot(detail).name"
                   :avatar="resolveRequestBot(detail).avatar"
                 />
@@ -611,7 +611,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#
 import ModelRequestJsonTree from './json-tree.vue'
 import ModelRequestTrajectory from './trajectory.vue'
 import ModelResponseContentPreview from './response-content-preview.vue'
-import WebqqAvatar from '#client/shared/avatar.vue'
+import ModelRequestAvatar from './request-avatar.vue'
 import { CHATLUNA_ERROR_CODE_DOCUMENTATION_URL, getChatLunaErrorPossibleCauses } from '../../src/chatluna/error'
 import { formatDuration } from '#client/shared/format-duration'
 import { formatSandboxDateTime } from '#client/shared/format-time'
@@ -1080,11 +1080,17 @@ function resolveRecordScope(record: SandboxModelRequestListItem | SandboxModelRe
   return createSpaceModelRequestScope(MAIN_MODEL_REQUEST_SPACE_ID)
 }
 
-function resolveRequestBot(record: SandboxModelRequestListItem | SandboxModelRequestDetail): Pick<SandboxDirectoryBot, 'name' | 'avatar'> {
+/**
+ * 一条请求显示成谁：目录里找得到的机器人、只知道 ID 的机器人、以及无从归属的请求。
+ *
+ * `unattributed` 取记录的归属判定结果而不是「有没有 botId」：归属成功但同一空间里
+ * 多个机器人同时思考时同样拿不到 botId，那种记录仍然属于某个记录域，不能画成未归属。
+ */
+function resolveRequestBot(record: SandboxModelRequestListItem | SandboxModelRequestDetail): Pick<SandboxDirectoryBot, 'name' | 'avatar'> & { unattributed: boolean } {
   const botId = record.entities.botId
   const bot = botsByScope.value.get(`${record.entities.scopeId ?? ''}\u0000${botId ?? ''}`)
-  if (bot) return bot
-  return { name: botId ? `机器人 ${botId}` : '未归属机器人' }
+  if (bot) return { name: bot.name, avatar: bot.avatar, unattributed: false }
+  return { name: botId ? `机器人 ${botId}` : '未归属机器人', unattributed: record.attribution === 'unattributed' }
 }
 
 function statusLabel(status: SandboxModelRequestStatus) {
