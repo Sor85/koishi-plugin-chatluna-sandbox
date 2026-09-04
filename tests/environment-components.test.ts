@@ -22,7 +22,7 @@ describe('环境管理组件传输边界', () => {
 
     expect(page).toContain('<EnvironmentManager :directory="environmentDirectory" :port="mcpAdminPort" />')
     expect(source).toContain('<h1>环境管理</h1>')
-    expect(source).toContain('<p>查看模拟 QQ 环境中的普通用户、机器人、群组、MCP 凭证和能力</p>')
+    expect(source).toContain('<p>查看模拟 QQ 环境中的普通用户、机器人、群组、测试凭证和两种协议表述的能力</p>')
     expect(source).toContain('class="environment-split"')
     expect(source).toContain('class="environment-list-pane"')
     expect(source).toContain('class="environment-detail-pane"')
@@ -250,20 +250,45 @@ describe('环境管理组件传输边界', () => {
     expect(contract).toContain("'chatluna-sandbox/mcp-capabilities'")
   })
 
-  it('已创建的 MCP 凭证可以查看并修改名称和权限', () => {
+  it('已创建的测试凭证可以查看并修改名称和权限', () => {
     const source = readFileSync(resolve('client/mcp/credential-manager.vue'), 'utf8')
     const contract = readFileSync(resolve('src/console-contract.ts'), 'utf8')
 
     expect(source).toContain('openEdit(credential)')
-    expect(source).toContain('查看 MCP 凭证')
+    expect(source).toContain('查看测试凭证')
     expect(source).toContain('可查看 Token，并修改名称和权限范围。')
     expect(source).toContain('class="credential-token"')
     expect(source).toContain('editing.token')
-    expect(source).toContain('createMcpCredentialAdmin(props.port)')
+    expect(source).toContain('createTestCredentialAdmin(props.port)')
     expect(source).toContain('{{ editing ? \'保存\' : \'创建\' }}')
     expect(source).not.toContain('createOpen')
     expect(source).not.toContain('明文 Token 无法再次查看')
-    expect(contract).toContain("'chatluna-sandbox/update-mcp-credential'")
-    expect(contract).toContain("'chatluna-sandbox/rotate-mcp-credential-token'")
+    // 凭证由两种协议表述共用，因此文案与端点名都不带 MCP（CONTEXT.md 的「测试凭证」）。
+    expect(source).not.toContain('MCP 凭证')
+    expect(contract).toContain("'chatluna-sandbox/update-test-credential'")
+    expect(contract).toContain("'chatluna-sandbox/rotate-test-credential-token'")
+    expect(contract).not.toContain('-mcp-credential')
+  })
+
+  it('环境管理展示 HTTP 测试接口的路由、基址与状态码映射', () => {
+    const manager = readFileSync(resolve('client/environment/manager.vue'), 'utf8')
+    const catalog = readFileSync(resolve('client/mcp/http-capability-catalog.vue'), 'utf8')
+    const contract = readFileSync(resolve('src/console-contract.ts'), 'utf8')
+
+    expect(manager).toContain("'http-capabilities'")
+    expect(manager).toContain('createHttpApiCapabilityCatalogLoader(props.port)')
+    expect(manager).toContain('label: \'HTTP 能力\'')
+    expect(manager).toContain('<HttpCapabilityCatalog')
+    expect(catalog).not.toContain("from '@koishijs/client'")
+    expect(catalog).not.toContain('chatluna-sandbox/http-capabilities')
+    // 路由前缀由服务端自述给出，视图不得自己拼 basePath 与版本段，否则改路径后示例会静默过期。
+    expect(catalog).not.toContain('catalog.basePath }}/')
+    expect(catalog).not.toContain('${catalog.version}')
+    expect(catalog).toContain("route.kind === 'list-tools'")
+    expect(catalog).toContain('v-for="route in catalog.routes"')
+    expect(catalog).toContain('搜索错误码或状态码')
+    expect(catalog).toContain('Bearer &lt;测试凭证 Token&gt;')
+    expect(catalog).toContain('HTTP 测试接口不可用')
+    expect(contract).toContain("'chatluna-sandbox/http-capabilities'")
   })
 })

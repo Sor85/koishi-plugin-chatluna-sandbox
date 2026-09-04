@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { registerConsole, type SandboxConsoleRegistrar } from '../src/console'
+import { consoleTestEndpoint } from './helpers/console-test-endpoint'
 import { SandboxControlService, SandboxRuntimeBotRegistry } from '../src/control-service'
 import { SandboxMcpService } from '../src/mcp/service'
 import { SandboxTestSpaceService } from '../src/test-spaces'
@@ -42,7 +43,7 @@ describe('测试调用记录 Console 协议', () => {
       },
       broadcast() {},
     }
-    registerConsole(consoleRegistrar, control, appearance, mcp)
+    registerConsole(consoleRegistrar, control, appearance, consoleTestEndpoint(mcp))
 
     const listRecords = listeners.get('chatluna-sandbox/test-call-records')
     const getCapabilities = listeners.get('chatluna-sandbox/mcp-capabilities')
@@ -126,7 +127,7 @@ describe('测试调用记录 Console 协议', () => {
         broadcasts.push({ type, body })
       },
     }
-    registerConsole(consoleRegistrar, control, appearance, mcp, testSpaces)
+    registerConsole(consoleRegistrar, control, appearance, consoleTestEndpoint(mcp), testSpaces)
 
     const getActivity = listeners.get('chatluna-sandbox/mcp-activity')
     expect(getActivity).toBeTypeOf('function')

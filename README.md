@@ -15,7 +15,7 @@
 
 WebQQ 顶部主导航提供测试空间总览：主环境固定在首位，AI 空间按创建时间从旧到新排列。用户可以实时观察空间、接管或归还控制权、复盘已完成空间，以及按需重新激活或删除。数据库持久化模式会同时保存主环境和测试空间场景。
 
-完整权限的 MCP 凭证可发现 41 个工具和 6 个只读资源，其中包括用于构造和按权限读取合并转发的 `send_forward_message`、`get_forward_message`，以及 7 个测试空间生命周期工具：`list_test_spaces`、`get_test_space`、`create_test_space`、`complete_test_space`、`fail_test_space`、`reactivate_test_space` 和 `delete_test_space`。环境管理页会直接展示由服务端权威定义生成的 MCP 工具、资源、权限范围和协议能力目录。
+完整权限的测试凭证可发现 41 个工具和 6 个只读资源，其中包括用于构造和按权限读取合并转发的 `send_forward_message`、`get_forward_message`，以及 7 个测试空间生命周期工具：`list_test_spaces`、`get_test_space`、`create_test_space`、`complete_test_space`、`fail_test_space`、`reactivate_test_space` 和 `delete_test_space`。环境管理页的「MCP 能力」会直接展示由服务端权威定义生成的工具、资源、权限范围和协议能力目录。
 
 被测机器人只在唤醒条件成立时回复，而条件由当前装着的 ChatLuna 响应插件决定：ChatLuna 主功能与 chatluna-character 的判定口径完全不同，两者同时装上时默认只有 chatluna-character 回复，而它的白名单默认为空。`get_wakeup_rules` 按会话答出谁在响应、消息要怎么写才能唤醒它（@、引用、昵称开头、昵称任意位置、命令）、哪些触发不由消息决定（累计条数、发言等待、群活跃度、随机概率），以及哪些陷阱会让唤醒落空。同一份答案还会跟着 `send_message` 的参数说明与 `chatluna-sandbox://guide` 一起发布，因此 AI 客户端连上端点就能读到，不必先想到要问。
 
@@ -50,6 +50,8 @@ curl -s -H "authorization: Bearer $TOKEN" --get --data-urlencode 'uri=chatluna-s
 ```
 
 状态码按稳定错误码映射：参数与契约类为 `400`，凭证缺失为 `401`，权限不足为 `403`，实体或路径不存在为 `404`，动词不符为 `405`，乐观并发与空间状态冲突为 `409`，游标过期为 `410`，需要确认令牌为 `428`，请求体超限为 `413`，限流与并发超限为 `429`（带 `Retry-After`），领域主动拒绝为 `422`，未预期异常为 `500`。完整错误码清单从 `chatluna-sandbox://errors` 资源读取。
+
+环境管理页的「HTTP 能力」把这套翻译规则按当前配置展示出来：生效中的路径前缀与版本段、可直接拨通的基址、四条路由各自的动词与请求目标、请求体上限，以及按状态码归并的完整错误码映射。这份自述与解析请求的实现同源，改了端点路径或版本段，页面上的示例跟着变。
 
 失败响应里的 `traceId` 就是那次失败写下的测试调用记录 ID，可用 `get_test_call_record` 取回完整参数与错误。WebQQ 的测试调用工作台会标注每条记录的来路，并支持按 `MCP 客户端` / `HTTP 接口` 筛选。
 

@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path'
 import { App } from '@koishijs/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { registerConsole, type SandboxConsoleRegistrar } from '../src/console'
+import { consoleTestEndpoint } from './helpers/console-test-endpoint'
 import { SandboxControlService, SandboxRuntimeBotRegistry } from '../src/control-service'
 import { SandboxMcpService } from '../src/mcp/service'
 import { SandboxPresetService } from '../src/presets'
@@ -162,7 +163,7 @@ async function collectRegisteredEndpoints(): Promise<string[]> {
     broadcast() {},
   }
 
-  registerConsole(registrar, control, appearance, mcp, testSpaces, undefined, undefined, presets)
+  registerConsole(registrar, control, appearance, consoleTestEndpoint(mcp), testSpaces, undefined, undefined, presets)
 
   return registered
 }

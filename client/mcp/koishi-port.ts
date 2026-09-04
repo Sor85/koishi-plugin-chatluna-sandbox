@@ -29,13 +29,14 @@ export function installContextMcpActivityReceiver(ctx: unknown) {
 
 export function createKoishiMcpAdminPort(): McpAdminPort {
   return {
-    listMcpCredentials: () => send('chatluna-sandbox/mcp-credentials'),
-    createMcpCredential: (input) => send('chatluna-sandbox/create-mcp-credential', input),
-    updateMcpCredential: (input) => send('chatluna-sandbox/update-mcp-credential', input),
-    rotateMcpCredentialToken: (input) => send('chatluna-sandbox/rotate-mcp-credential-token', input),
-    setMcpCredentialEnabled: (input) => send('chatluna-sandbox/set-mcp-credential-enabled', input),
-    revokeMcpCredential: (input) => send('chatluna-sandbox/revoke-mcp-credential', input),
+    listTestCredentials: () => send('chatluna-sandbox/test-credentials'),
+    createTestCredential: (input) => send('chatluna-sandbox/create-test-credential', input),
+    updateTestCredential: (input) => send('chatluna-sandbox/update-test-credential', input),
+    rotateTestCredentialToken: (input) => send('chatluna-sandbox/rotate-test-credential-token', input),
+    setTestCredentialEnabled: (input) => send('chatluna-sandbox/set-test-credential-enabled', input),
+    revokeTestCredential: (input) => send('chatluna-sandbox/revoke-test-credential', input),
     getMcpCapabilities: () => send('chatluna-sandbox/mcp-capabilities'),
+    getHttpApiCapabilities: () => send('chatluna-sandbox/http-capabilities'),
     getMcpActivity: () => send('chatluna-sandbox/mcp-activity'),
     subscribeMcpActivity: (listener) => {
       installActivityReceiver()

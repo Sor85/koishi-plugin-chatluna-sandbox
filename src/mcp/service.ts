@@ -38,9 +38,9 @@ import {
   SandboxMcpError,
   type SandboxTestCallRecord,
   type SandboxTestCallTransport,
+  type SandboxTestCreatedCredential,
+  type SandboxTestCredential,
   type SandboxMcpCapabilityCatalog,
-  type SandboxMcpCreatedCredential,
-  type SandboxMcpCredential,
   type SandboxMcpEvent,
   type SandboxMcpEventCursor,
   type SandboxMcpScope,
@@ -165,12 +165,12 @@ function normalizeScopes(scopes: unknown, fallback?: SandboxMcpScope[]): Sandbox
   throw new SandboxMcpError('invalid_arguments', '至少选择一项有效权限')
 }
 
-function toPublicCredential(credential: SandboxMcpCredential): Omit<SandboxMcpCredential, 'tokenDigest'> {
+function toPublicCredential(credential: SandboxTestCredential): Omit<SandboxTestCredential, 'tokenDigest'> {
   const { tokenDigest: _tokenDigest, ...publicCredential } = credential
   return structuredClone(publicCredential)
 }
 
-function toCreatedCredential(credential: SandboxMcpCredential): SandboxMcpCreatedCredential {
+function toCreatedCredential(credential: SandboxTestCredential): SandboxTestCreatedCredential {
   if (!credential.token) throw new SandboxMcpError('internal_error', '凭证缺少明文 Token')
   return { ...toPublicCredential(credential), token: credential.token }
 }
@@ -183,7 +183,7 @@ function isTokenDigest(value: unknown): value is string {
   return typeof value === 'string' && TOKEN_DIGEST_PATTERN.test(value)
 }
 
-function normalizeStoredCredential(value: unknown): SandboxMcpCredential | undefined {
+function normalizeStoredCredential(value: unknown): SandboxTestCredential | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
   const record = value as Record<string, unknown>
   if (typeof record.id !== 'string' || typeof record.name !== 'string' || !isTokenDigest(record.tokenDigest) || typeof record.createdAt !== 'string') return undefined
@@ -201,7 +201,7 @@ function normalizeStoredCredential(value: unknown): SandboxMcpCredential | undef
 }
 
 export class SandboxMcpService {
-  private credentials: SandboxMcpCredential[] = []
+  private credentials: SandboxTestCredential[] = []
   private events: SandboxMcpEvent[] = []
   private callRecords: SandboxTestCallRecord[] = []
   private epoch = randomUUID()
@@ -251,7 +251,7 @@ export class SandboxMcpService {
       unattributedModelRequests: options.unattributedModelRequests,
     })
     mkdirSync(options.dataDirectory, { recursive: true })
-    this.credentialFile = join(options.dataDirectory, 'mcp-credentials.json')
+    this.credentialFile = join(options.dataDirectory, 'test-credentials.json')
     this.eventLimit = options.eventLimit ?? 1000
     this.callRecordLimit = options.callRecordLimit ?? 500
     this.uploadedMediaLimit = options.uploadedMediaLimit ?? 256
@@ -323,10 +323,10 @@ export class SandboxMcpService {
     control.onOneBotDebugRecord((record) => this.appendEvent(`onebot.${record.direction}`, record, spaceId))
   }
 
-  createCredential(name: string, scopes: SandboxMcpScope[] = ['read']): SandboxMcpCreatedCredential {
+  createCredential(name: string, scopes: SandboxMcpScope[] = ['read']): SandboxTestCreatedCredential {
     const normalizedName = requireString(name, '凭证名称')
     const token = randomBytes(32).toString('base64url')
-    const credential: SandboxMcpCredential = {
+    const credential: SandboxTestCredential = {
       id: randomUUID(),
       name: normalizedName,
       scopes: normalizeScopes(scopes, ['read']),
@@ -340,15 +340,15 @@ export class SandboxMcpService {
     return toCreatedCredential(credential)
   }
 
-  listCredentials(): Array<Omit<SandboxMcpCredential, 'tokenDigest'>> {
+  listCredentials(): Array<Omit<SandboxTestCredential, 'tokenDigest'>> {
     return this.credentials.map((credential) => toPublicCredential(credential))
   }
 
-  getCredential(id: string): Omit<SandboxMcpCredential, 'tokenDigest'> {
+  getCredential(id: string): Omit<SandboxTestCredential, 'tokenDigest'> {
     return toPublicCredential(this.requireStoredCredential(id))
   }
 
-  updateCredential(id: string, input: { name?: string; scopes?: SandboxMcpScope[] }): Omit<SandboxMcpCredential, 'tokenDigest'> {
+  updateCredential(id: string, input: { name?: string; scopes?: SandboxMcpScope[] }): Omit<SandboxTestCredential, 'tokenDigest'> {
     const credential = this.requireStoredCredential(id)
     if (input.name !== undefined) credential.name = requireString(input.name, '凭证名称')
     if (input.scopes !== undefined) credential.scopes = normalizeScopes(input.scopes)
@@ -356,7 +356,7 @@ export class SandboxMcpService {
     return toPublicCredential(credential)
   }
 
-  rotateCredentialToken(id: string): SandboxMcpCreatedCredential {
+  rotateCredentialToken(id: string): SandboxTestCreatedCredential {
     const credential = this.requireStoredCredential(id)
     const token = randomBytes(32).toString('base64url')
     credential.token = token
@@ -382,7 +382,7 @@ export class SandboxMcpService {
     this.saveCredentials()
   }
 
-  authenticate(token: string): SandboxMcpCredential | undefined {
+  authenticate(token: string): SandboxTestCredential | undefined {
     const digest = Buffer.from(digestToken(token), 'hex')
     // 长度不合规的摘要一律视为不匹配。timingSafeEqual 在长度不等时会抛异常，而这里的调用点在
     // 传输层的 try 之外，抛出会变成 unhandled rejection 加请求挂死；存储侧已经拦掉这类条目，
@@ -601,7 +601,7 @@ export class SandboxMcpService {
    * 真出现同时命中的工具时改这一处即可。不合成三态枚举去表达一种不存在的状态。
    */
   private async executeTool(
-    credential: SandboxMcpCredential,
+    credential: SandboxTestCredential,
     entry: SandboxMcpToolEntry,
     args: Record<string, unknown>,
     transport: SandboxTestCallTransport,
@@ -614,7 +614,7 @@ export class SandboxMcpService {
 
   /** 把服务实例的能力收成执行体看得见的那一份窄运行时。 */
   private createToolRuntime(
-    credential: SandboxMcpCredential,
+    credential: SandboxTestCredential,
     entry: SandboxMcpToolEntry,
     args: Record<string, unknown>,
     transport: SandboxTestCallTransport,
@@ -852,7 +852,7 @@ export class SandboxMcpService {
     this.confirmations.clear()
   }
 
-  private requireStoredCredential(id: string): SandboxMcpCredential {
+  private requireStoredCredential(id: string): SandboxTestCredential {
     const credential = this.credentials.find((item) => item.id === id)
     if (!credential) throw new SandboxMcpError('credential_not_found', `凭证不存在：${id}`)
     return credential
@@ -864,12 +864,12 @@ export class SandboxMcpService {
     return credential
   }
 
-  private requireScope(credential: SandboxMcpCredential, scope: SandboxMcpScope) {
+  private requireScope(credential: SandboxTestCredential, scope: SandboxMcpScope) {
     if (!credential.scopes.includes(scope)) throw new SandboxMcpError('permission_denied', `凭证缺少 ${scope} 权限`)
   }
 
   private appendCallRecord(
-    credential: SandboxMcpCredential,
+    credential: SandboxTestCredential,
     tool: string,
     args: Record<string, unknown>,
     sourceIp: string | undefined,
@@ -958,7 +958,7 @@ export class SandboxMcpService {
       // 只记文件路径与失败原因，不记文件内容——内容里带明文 Token（ADR-0058）。
       this.credentials = []
       if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') {
-        this.ctx.logger('chatluna-sandbox').warn(`MCP 凭证文件读取失败，已回到无有效凭证：${this.credentialFile}`, error)
+        this.ctx.logger('chatluna-sandbox').warn(`测试凭证文件读取失败，已回到无有效凭证：${this.credentialFile}`, error)
       }
     }
   }

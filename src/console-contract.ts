@@ -52,11 +52,12 @@ import type {
   SavePresetInput,
 } from './presets'
 import type { ListSandboxTestCallRecordsInput, SandboxTestCallRecordsPage } from './mcp/call-records'
+import type { SandboxHttpApiCapabilityCatalog } from './mcp/http-api'
 import type {
   SandboxTestCallRecord,
   SandboxMcpCapabilityCatalog,
-  SandboxMcpCreatedCredential,
-  SandboxMcpPublicCredential,
+  SandboxTestCreatedCredential,
+  SandboxTestPublicCredential,
   SandboxMcpScope,
 } from './mcp/types'
 import type { SandboxTestSpaceSummary } from './test-spaces'
@@ -130,26 +131,28 @@ export interface SandboxPresetConsoleEvents {
 }
 
 /**
- * 测试端点管理：测试调用记录、能力目录、凭证与服务器活动。
+ * 测试端点管理：测试调用记录、测试凭证、两种协议表述各自的能力目录与服务器活动。
  *
- * 前三个端点不带 `mcp` 前缀：HTTP 测试接口的调用写进同一批记录，用 MCP 命名会把「只记
- * 得下 MCP 那一种表述」写进契约。
+ * 只有 MCP 表述独有的东西才带 `mcp` 前缀——协议能力目录（工具、资源、`serverCapabilities`）
+ * 与服务器活动。测试调用记录与测试凭证由两种表述共用同一份，用 MCP 命名会把「只有 MCP 那
+ * 一种表述用得上」写进契约；`http-capabilities` 对称地只描述 HTTP 表述的协议翻译事实。
  *
  * `mcp-activity` 同时是请求端点与广播频道，这不是重复：一个回答「现在跑着吗」，
  * 一个通知「状态变了」，因此两者各自登记。
  */
-export interface SandboxMcpConsoleEvents {
+export interface SandboxTestEndpointConsoleEvents {
   'chatluna-sandbox/test-call-records': (input?: ListSandboxTestCallRecordsInput) => SandboxTestCallRecordsPage
   'chatluna-sandbox/test-call-record': (input: { recordId: string }) => SandboxTestCallRecord
   'chatluna-sandbox/clear-test-call-records': () => { cleared: number }
   'chatluna-sandbox/mcp-activity': () => SandboxMcpActivityPayload
   'chatluna-sandbox/mcp-capabilities': () => SandboxMcpCapabilityCatalog
-  'chatluna-sandbox/mcp-credentials': () => SandboxMcpPublicCredential[]
-  'chatluna-sandbox/create-mcp-credential': (input: { name: string; scopes: SandboxMcpScope[] }) => SandboxMcpCreatedCredential
-  'chatluna-sandbox/update-mcp-credential': (input: { id: string; name?: string; scopes?: SandboxMcpScope[] }) => SandboxMcpPublicCredential
-  'chatluna-sandbox/rotate-mcp-credential-token': (input: { id: string }) => SandboxMcpCreatedCredential
-  'chatluna-sandbox/set-mcp-credential-enabled': (input: { id: string; enabled: boolean }) => void
-  'chatluna-sandbox/revoke-mcp-credential': (input: { id: string }) => void
+  'chatluna-sandbox/http-capabilities': () => SandboxHttpApiCapabilityCatalog
+  'chatluna-sandbox/test-credentials': () => SandboxTestPublicCredential[]
+  'chatluna-sandbox/create-test-credential': (input: { name: string; scopes: SandboxMcpScope[] }) => SandboxTestCreatedCredential
+  'chatluna-sandbox/update-test-credential': (input: { id: string; name?: string; scopes?: SandboxMcpScope[] }) => SandboxTestPublicCredential
+  'chatluna-sandbox/rotate-test-credential-token': (input: { id: string }) => SandboxTestCreatedCredential
+  'chatluna-sandbox/set-test-credential-enabled': (input: { id: string; enabled: boolean }) => void
+  'chatluna-sandbox/revoke-test-credential': (input: { id: string }) => void
 }
 
 /** 测试空间：AI 测试空间自身的存在与归属。 */
@@ -170,7 +173,7 @@ export interface SandboxConsoleEvents extends
   SandboxDebugRecordConsoleEvents,
   SandboxModelRequestConsoleEvents,
   SandboxPresetConsoleEvents,
-  SandboxMcpConsoleEvents,
+  SandboxTestEndpointConsoleEvents,
   SandboxTestSpaceConsoleEvents {}
 
 export type SandboxConsoleEndpoint = keyof SandboxConsoleEvents

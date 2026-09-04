@@ -10,6 +10,7 @@ import type {
   SpaceScoped,
 } from './console-contract'
 import type { SandboxControlService } from './control-service'
+import type { SandboxHttpApiCapabilityCatalog } from './mcp/http-api'
 import type { SandboxMcpService } from './mcp/service'
 import type { SandboxPresetService } from './presets'
 import { trimSnapshotMessages, type SandboxTestSpaceService } from './test-spaces'
@@ -119,11 +120,26 @@ export interface SandboxConsoleRegistrar {
   ): unknown
 }
 
+/**
+ * 测试控制端点在 Console 侧的两半：测试控制服务与 HTTP 表述的自述。
+ *
+ * 合成一个可空值而不是两个各自可空的参数：两者都出自插件入口的同一次端点构造，拆开会让
+ * 「有测试控制服务却没有 HTTP 表述自述」这个不存在的状态变得可表达，而那正好是
+ * `http-capabilities` 端点漏注册、契约守卫报「声明了却没有注册监听器」的形态。
+ *
+ * 自述以数据形式传入而不是在这里现算：路由与状态码映射归 `src/mcp/http-api.ts` 所有，
+ * 监听地址与路径归插件配置所有，本模块两者都不该知道。
+ */
+export interface SandboxConsoleTestEndpoint {
+  mcp: SandboxMcpService
+  httpApi: SandboxHttpApiCapabilityCatalog
+}
+
 export function registerConsole(
   console: SandboxConsoleRegistrar,
   control: SandboxControlService,
   appearance: SandboxAppearance,
-  mcp?: SandboxMcpService,
+  endpoint?: SandboxConsoleTestEndpoint,
   testSpaces?: SandboxTestSpaceService,
   unattributedModelRequests?: SandboxModelRequestStore,
   chatlunaUsage?: ChatLunaUsageSource,
@@ -486,21 +502,23 @@ export function registerConsole(
     registerListener('chatluna-sandbox/preset-delete', (input) => presets.delete(input), { authority: 4 })
     registerListener('chatluna-sandbox/preset-locate-expression', (input) => presets.locateExpression(input), { authority: 4 })
   }
-  if (mcp) {
+  if (endpoint) {
+    const { mcp, httpApi } = endpoint
     mcp.onActivity((running) => {
       void console.broadcast('chatluna-sandbox/mcp-activity', { running })
     })
     registerListener('chatluna-sandbox/mcp-activity', () => ({ running: mcp.isActivityRunning() }), { authority: 4 })
     registerListener('chatluna-sandbox/mcp-capabilities', () => mcp.getCapabilityCatalog(), { authority: 4 })
+    registerListener('chatluna-sandbox/http-capabilities', () => httpApi, { authority: 4 })
     registerListener('chatluna-sandbox/test-call-records', (input = {}) => mcp.listCallRecords(input), { authority: 4 })
     registerListener('chatluna-sandbox/test-call-record', (input) => mcp.getCallRecord(input.recordId), { authority: 4 })
     registerListener('chatluna-sandbox/clear-test-call-records', () => mcp.clearCallRecords(), { authority: 4 })
-    registerListener('chatluna-sandbox/mcp-credentials', () => mcp.listCredentials(), { authority: 4 })
-    registerListener('chatluna-sandbox/create-mcp-credential', (input) => mcp.createCredential(input.name, input.scopes), { authority: 4 })
-    registerListener('chatluna-sandbox/update-mcp-credential', (input) => mcp.updateCredential(input.id, input), { authority: 4 })
-    registerListener('chatluna-sandbox/rotate-mcp-credential-token', (input) => mcp.rotateCredentialToken(input.id), { authority: 4 })
-    registerListener('chatluna-sandbox/set-mcp-credential-enabled', (input) => mcp.setCredentialEnabled(input.id, input.enabled), { authority: 4 })
-    registerListener('chatluna-sandbox/revoke-mcp-credential', (input) => mcp.revokeCredential(input.id), { authority: 4 })
+    registerListener('chatluna-sandbox/test-credentials', () => mcp.listCredentials(), { authority: 4 })
+    registerListener('chatluna-sandbox/create-test-credential', (input) => mcp.createCredential(input.name, input.scopes), { authority: 4 })
+    registerListener('chatluna-sandbox/update-test-credential', (input) => mcp.updateCredential(input.id, input), { authority: 4 })
+    registerListener('chatluna-sandbox/rotate-test-credential-token', (input) => mcp.rotateCredentialToken(input.id), { authority: 4 })
+    registerListener('chatluna-sandbox/set-test-credential-enabled', (input) => mcp.setCredentialEnabled(input.id, input.enabled), { authority: 4 })
+    registerListener('chatluna-sandbox/revoke-test-credential', (input) => mcp.revokeCredential(input.id), { authority: 4 })
   }
   if (testSpaces) {
     registerListener('chatluna-sandbox/test-spaces', () => testSpaces.listSpaces()

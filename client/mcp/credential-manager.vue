@@ -1,7 +1,7 @@
 <template>
   <section v-webqq-scrollbar class="credential-list">
     <header class="credential-toolbar">
-      <p>已创建的凭证可以再次查看 Token，并修改名称和权限。调用记录和日志不会输出明文。</p>
+      <p>同一个凭证同时用于 MCP 客户端与 HTTP 脚本。已创建的凭证可以再次查看 Token，并修改名称和权限；调用记录和日志不会输出明文。</p>
       <Button size="sm" @click="openCreate"><IconPlus />创建凭证</Button>
     </header>
     <article v-for="credential in credentials" :key="credential.id" class="credential-card">
@@ -15,17 +15,17 @@
         <Button size="sm" variant="destructive" @click="revokeCredential(credential.id)">撤销</Button>
       </div>
     </article>
-    <p v-if="!credentials.length" class="credential-empty">尚未创建 MCP 测试凭证。</p>
+    <p v-if="!credentials.length" class="credential-empty">尚未创建测试凭证。</p>
   </section>
 
   <Dialog v-model:open="formOpen">
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>{{ editing ? '查看 MCP 凭证' : '创建 MCP 凭证' }}</DialogTitle>
+        <DialogTitle>{{ editing ? '查看测试凭证' : '创建测试凭证' }}</DialogTitle>
         <DialogDescription>{{ editing ? '可查看 Token，并修改名称和权限范围。' : '选择最小必要权限。创建后仍可再次查看 Token。' }}</DialogDescription>
       </DialogHeader>
-      <Label for="mcp-credential-name">凭证名称</Label>
-      <Input id="mcp-credential-name" v-model="name" autocomplete="off" />
+      <Label for="test-credential-name">凭证名称</Label>
+      <Input id="test-credential-name" v-model="name" autocomplete="off" />
       <fieldset class="scope-grid">
         <legend>权限范围</legend>
         <label v-for="scope in allScopes" :key="scope.value"><Checkbox :model-value="scopes.includes(scope.value)" @update:model-value="toggleScope(scope.value, $event === true)" />{{ scope.label }}</label>
@@ -49,7 +49,7 @@
 
   <Dialog v-model:open="tokenOpen">
     <DialogContent>
-      <DialogHeader><DialogTitle>保存 MCP Token</DialogTitle><DialogDescription>请复制到测试控制器。之后仍可在凭证详情中再次查看。</DialogDescription></DialogHeader>
+      <DialogHeader><DialogTitle>保存测试凭证 Token</DialogTitle><DialogDescription>请复制到测试控制器。MCP 客户端与 HTTP 脚本都用这一个 Token；之后仍可在凭证详情中再次查看。</DialogDescription></DialogHeader>
       <Input :model-value="createdToken" readonly />
       <DialogFooter><Button @click="tokenOpen = false">我已保存</Button></DialogFooter>
     </DialogContent>
@@ -64,7 +64,7 @@ import { Checkbox } from '#client/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '#client/components/ui/dialog'
 import { Input } from '#client/components/ui/input'
 import { Label } from '#client/components/ui/label'
-import { createMcpCredentialAdmin, formatMcpScopes, MCP_SCOPE_OPTIONS } from './shell'
+import { createTestCredentialAdmin, formatMcpScopes, MCP_SCOPE_OPTIONS } from './shell'
 import type { McpAdminPort } from './port'
 import { vWebqqScrollbar } from '#client/shared/scrollbar'
 
@@ -89,7 +89,7 @@ const {
   toggleCredential,
   toggleScope,
   tokenOpen,
-} = createMcpCredentialAdmin(props.port)
+} = createTestCredentialAdmin(props.port)
 
 function formatTime(value: string) {
   return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(value))

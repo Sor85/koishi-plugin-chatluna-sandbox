@@ -58,23 +58,25 @@ describe('Koishi MCP 管理端口适配器', () => {
   it('把每个凭证与能力目录操作映射到对应的 Console 端点', async () => {
     const port = createKoishiMcpAdminPort()
 
-    await port.listMcpCredentials()
-    await port.createMcpCredential({ name: '控制器', scopes: ['read'] })
-    await port.updateMcpCredential({ id: 'c1', name: '改名' })
-    await port.rotateMcpCredentialToken({ id: 'c1' })
-    await port.setMcpCredentialEnabled({ id: 'c1', enabled: false })
-    await port.revokeMcpCredential({ id: 'c1' })
+    await port.listTestCredentials()
+    await port.createTestCredential({ name: '控制器', scopes: ['read'] })
+    await port.updateTestCredential({ id: 'c1', name: '改名' })
+    await port.rotateTestCredentialToken({ id: 'c1' })
+    await port.setTestCredentialEnabled({ id: 'c1', enabled: false })
+    await port.revokeTestCredential({ id: 'c1' })
     await port.getMcpCapabilities()
+    await port.getHttpApiCapabilities()
     await port.getMcpActivity()
 
     expect(clientMocks.send.mock.calls).toEqual([
-      ['chatluna-sandbox/mcp-credentials'],
-      ['chatluna-sandbox/create-mcp-credential', { name: '控制器', scopes: ['read'] }],
-      ['chatluna-sandbox/update-mcp-credential', { id: 'c1', name: '改名' }],
-      ['chatluna-sandbox/rotate-mcp-credential-token', { id: 'c1' }],
-      ['chatluna-sandbox/set-mcp-credential-enabled', { id: 'c1', enabled: false }],
-      ['chatluna-sandbox/revoke-mcp-credential', { id: 'c1' }],
+      ['chatluna-sandbox/test-credentials'],
+      ['chatluna-sandbox/create-test-credential', { name: '控制器', scopes: ['read'] }],
+      ['chatluna-sandbox/update-test-credential', { id: 'c1', name: '改名' }],
+      ['chatluna-sandbox/rotate-test-credential-token', { id: 'c1' }],
+      ['chatluna-sandbox/set-test-credential-enabled', { id: 'c1', enabled: false }],
+      ['chatluna-sandbox/revoke-test-credential', { id: 'c1' }],
       ['chatluna-sandbox/mcp-capabilities'],
+      ['chatluna-sandbox/http-capabilities'],
       ['chatluna-sandbox/mcp-activity'],
     ])
   })

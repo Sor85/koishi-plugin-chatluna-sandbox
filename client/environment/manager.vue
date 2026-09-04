@@ -3,7 +3,7 @@
     <header class="environment-header">
       <div>
         <h1>环境管理</h1>
-        <p>查看模拟 QQ 环境中的普通用户、机器人、群组、MCP 凭证和能力</p>
+        <p>查看模拟 QQ 环境中的普通用户、机器人、群组、测试凭证和两种协议表述的能力</p>
       </div>
     </header>
 
@@ -56,7 +56,7 @@
           <p v-if="!bots.length" class="environment-empty">当前环境没有机器人</p>
         </div>
 
-        <McpCredentialManager v-else-if="section === 'credentials'" :port="port" />
+        <TestCredentialManager v-else-if="section === 'credentials'" :port="port" />
 
         <McpCapabilityCatalog
           v-else-if="section === 'mcp-capabilities'"
@@ -64,6 +64,14 @@
           :loading="mcpCapabilitiesLoading"
           :error="mcpCapabilitiesError"
           @retry="loadMcpCapabilities"
+        />
+
+        <HttpCapabilityCatalog
+          v-else-if="section === 'http-capabilities'"
+          :catalog="httpCapabilities"
+          :loading="httpCapabilitiesLoading"
+          :error="httpCapabilitiesError"
+          @retry="loadHttpCapabilities"
         />
 
         <div v-else v-webqq-scrollbar class="directory-list">
@@ -79,16 +87,17 @@
 </template>
 
 <script setup lang="ts">
-import { IconKey, IconRobot, IconServerCog, IconUser, IconUsers } from '@tabler/icons-vue'
+import { IconApi, IconKey, IconRobot, IconServerCog, IconUser, IconUsers } from '@tabler/icons-vue'
 import { computed, onMounted, ref } from 'vue'
 import { Badge } from '#client/components/ui/badge'
 import { Button } from '#client/components/ui/button'
+import HttpCapabilityCatalog from '#client/mcp/http-capability-catalog.vue'
 import McpCapabilityCatalog from '#client/mcp/capability-catalog.vue'
-import McpCredentialManager from '#client/mcp/credential-manager.vue'
+import TestCredentialManager from '#client/mcp/credential-manager.vue'
 import WebqqAvatar from '#client/shared/avatar.vue'
 import type { EnvironmentDirectoryModel } from './directory-model'
 import type { McpAdminPort } from '#client/mcp/port'
-import { createMcpCapabilityCatalogLoader } from '#client/mcp/shell'
+import { createHttpApiCapabilityCatalogLoader, createMcpCapabilityCatalogLoader } from '#client/mcp/shell'
 import { vWebqqScrollbar } from '#client/shared/scrollbar'
 import type { SandboxDirectoryBot } from '../../src/types'
 
@@ -100,7 +109,7 @@ const users = computed(() => props.directory.users)
 const bots = computed(() => props.directory.bots)
 const groups = computed(() => props.directory.groups)
 
-type EnvironmentSection = 'users' | 'bots' | 'groups' | 'credentials' | 'mcp-capabilities'
+type EnvironmentSection = 'users' | 'bots' | 'groups' | 'credentials' | 'mcp-capabilities' | 'http-capabilities'
 const section = ref<EnvironmentSection>('users')
 const {
   catalog: mcpCapabilities,
@@ -108,13 +117,20 @@ const {
   load: loadMcpCapabilities,
   loading: mcpCapabilitiesLoading,
 } = createMcpCapabilityCatalogLoader(props.port)
+const {
+  catalog: httpCapabilities,
+  error: httpCapabilitiesError,
+  load: loadHttpCapabilities,
+  loading: httpCapabilitiesLoading,
+} = createHttpApiCapabilityCatalogLoader(props.port)
 
 const sections = computed(() => [
   { id: 'users' as const, label: '普通用户', description: '主环境中的普通 QQ 用户', icon: IconUser, count: users.value.length },
   { id: 'bots' as const, label: '机器人', description: '主环境和 AI 测试空间中的 OneBot 机器人', icon: IconRobot, count: bots.value.length },
   { id: 'groups' as const, label: '群组', description: '主环境中的 QQ 群组及成员数量', icon: IconUsers, count: groups.value.length },
-  { id: 'credentials' as const, label: 'MCP 凭证', description: '管理 MCP 测试控制器的访问凭证', icon: IconKey, count: undefined },
+  { id: 'credentials' as const, label: '测试凭证', description: '管理测试控制端点的访问凭证，MCP 客户端与 HTTP 脚本通用', icon: IconKey, count: undefined },
   { id: 'mcp-capabilities' as const, label: 'MCP 能力', description: '查看服务器提供的工具、资源和协议能力', icon: IconServerCog, count: mcpCapabilities.value?.tools.length },
+  { id: 'http-capabilities' as const, label: 'HTTP 能力', description: '查看 HTTP 测试接口的路由、基址与错误码到状态码的映射', icon: IconApi, count: httpCapabilities.value?.routes.length },
 ])
 const activeSection = computed(() => sections.value.find(({ id }) => id === section.value) ?? sections.value[0])
 
@@ -122,7 +138,10 @@ function getBotKey(bot: SandboxDirectoryBot) {
   return bot.source.type === 'main' ? `main:${bot.id}` : `space:${bot.source.spaceId}:${bot.id}`
 }
 
-onMounted(() => void loadMcpCapabilities())
+onMounted(() => {
+  void loadMcpCapabilities()
+  void loadHttpCapabilities()
+})
 </script>
 
 <style scoped>

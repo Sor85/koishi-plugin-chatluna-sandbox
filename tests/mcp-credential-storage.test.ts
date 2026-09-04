@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { SandboxControlService } from '../src/control-service'
 import { SandboxTestEndpointServer } from '../src/mcp/server'
 import { SandboxMcpService } from '../src/mcp/service'
-import type { SandboxMcpCredential } from '../src/mcp/types'
+import type { SandboxTestCredential } from '../src/mcp/types'
 
 /**
  * 凭证存储的健壮性。
@@ -23,7 +23,7 @@ afterEach(async () => {
   await Promise.all(cleanups.splice(0).map((cleanup) => cleanup()))
 })
 
-const CREDENTIAL_FILE = 'mcp-credentials.json'
+const CREDENTIAL_FILE = 'test-credentials.json'
 
 function digestToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
@@ -67,7 +67,7 @@ const goodCredential = {
   createdAt: '2026-08-29T09:00:00.000Z',
 }
 
-describe('MCP 凭证存储的健壮性', () => {
+describe('测试凭证存储的健壮性', () => {
   it('丢弃长度不合规的 tokenDigest 条目，同文件里的合规凭证仍能认证', () => {
     const directory = seedCredentialFile([
       { ...goodCredential, id: 'short-digest', name: '坏摘要凭证', tokenDigest: 'deadbeef' },
@@ -86,11 +86,11 @@ describe('MCP 凭证存储的健壮性', () => {
     const { service } = createService(mkdtempSync(join(tmpdir(), 'chatluna-sandbox-credential-')))
     // 三层防护缺一层都留着同类风险：这里绕过 normalizeStoredCredential 直接注入，
     // 断言 authenticate 自己也会先比长度。断言对象就是那份内存凭证列表。
-    ;(service as unknown as { credentials: SandboxMcpCredential[] }).credentials.push({
+    ;(service as unknown as { credentials: SandboxTestCredential[] }).credentials.push({
       ...goodCredential,
       id: 'in-memory-bad-digest',
       tokenDigest: 'deadbeef',
-    } as SandboxMcpCredential)
+    } as SandboxTestCredential)
 
     expect(() => service.authenticate(goodToken)).not.toThrow()
     expect(service.authenticate(goodToken)).toBeUndefined()

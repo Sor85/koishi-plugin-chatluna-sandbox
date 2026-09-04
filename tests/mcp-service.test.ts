@@ -26,7 +26,7 @@ describe('SandboxMcpService', () => {
     expect(service.getCredential(credential.id).token).toBe(credential.token)
     // 只读凭证发现的工具必须与完整清单里 read 能力范围的条目逐条一致：既抓改名，也抓能力范围写错。
     expect(toMcpToolCatalogue(service.listTools(credential.token))).toEqual(mcpToolCatalogueForScopes(['read']))
-    expect(readFileSync(join(directory, 'mcp-credentials.json'), 'utf8')).toContain(credential.token)
+    expect(readFileSync(join(directory, 'test-credentials.json'), 'utf8')).toContain(credential.token)
     expect(service.listCredentials()[0]).not.toHaveProperty('tokenDigest')
   })
 
@@ -74,7 +74,7 @@ describe('SandboxMcpService', () => {
 
     const reloaded = new SandboxMcpService(app, control, { dataDirectory: directory })
     expect(reloaded.getCredential(credential.id)).toMatchObject({ name: '联调凭证', scopes: ['read', 'debug'], token: credential.token })
-    expect(readFileSync(join(directory, 'mcp-credentials.json'), 'utf8')).toContain(credential.token)
+    expect(readFileSync(join(directory, 'test-credentials.json'), 'utf8')).toContain(credential.token)
     expect(() => service.updateCredential('missing', { name: 'x' })).toThrow(/凭证不存在/)
     expect(() => service.updateCredential(credential.id, { name: '  ' })).toThrow(/凭证名称/)
     expect(() => service.updateCredential(credential.id, { scopes: [] })).toThrow(/至少选择一项有效权限/)
@@ -82,7 +82,7 @@ describe('SandboxMcpService', () => {
 
   it('保留只有摘要的旧凭证，并允许重新生成可查看的 Token', () => {
     const { app, directory, control, service, credential } = createService(['read'])
-    writeFileSync(join(directory, 'mcp-credentials.json'), `${JSON.stringify([{
+    writeFileSync(join(directory, 'test-credentials.json'), `${JSON.stringify([{
       id: 'legacy-credential',
       name: '旧摘要凭证',
       scopes: ['read'],

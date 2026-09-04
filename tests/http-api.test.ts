@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SandboxControlService, SandboxRuntimeBotRegistry } from '../src/control-service'
-import { HTTP_API_ERROR_STATUS, isHttpApiPath, normalizeBasePath, parseHttpApiArguments, resolveHttpApiRoute } from '../src/mcp/http-api'
+import { HTTP_API_ERROR_STATUS, HTTP_API_MAX_BODY_BYTES, HTTP_API_VERSION, describeHttpApiCapabilities, isHttpApiPath, normalizeBasePath, parseHttpApiArguments, resolveHttpApiRoute } from '../src/mcp/http-api'
 import { SandboxTestEndpointServer } from '../src/mcp/server'
 import { STABLE_ERROR_CODES, SandboxMcpService, type SandboxMcpQuotaConfig } from '../src/mcp/service'
 import type { SandboxMcpScope } from '../src/mcp/types'
@@ -108,6 +108,70 @@ describe('HTTP 测试接口路由', () => {
       expect(status, code).toBeGreaterThanOrEqual(400)
       expect(status, code).toBeLessThan(600)
     }
+  })
+})
+
+describe('HTTP 测试接口自述', () => {
+  const endpoint = { enabled: true, path: '/api', host: '127.0.0.1', port: 61901, tls: false }
+  /** 自述里的占位符换成真实值，才能拿去过解析器。 */
+  const fill = (target: string) => target
+    .replace('<工具名>', 'send_message')
+    .replace('<资源 URI>', 'chatluna-sandbox://guide')
+
+  /**
+   * 自述与解析器双向钉住。
+   *
+   * 这条不是「实现等于自己」：自述给出的是请求目标字符串，解析器吃的是拆开的 pathname 与查询参数，
+   * 两侧各自书写。真正被证明的是「控制台上照抄的那一行请求，端点真的认」——路由改了却忘记改自述，
+   * 或自述里的动词写反，都会在这里变红，而不是等到有人照着页面发请求发现 404 或 405。
+   */
+  it('自述的每条路由都能被解析器按声明的动词与目标解析回同一种路由', () => {
+    const catalog = describeHttpApiCapabilities(endpoint)
+
+    expect(catalog.routes.map(({ kind }) => kind)).toEqual(['list-tools', 'call-tool', 'list-resources', 'read-resource'])
+    for (const route of catalog.routes) {
+      const [pathname, query = ''] = fill(route.target).split('?')
+      const resolved = resolveHttpApiRoute(
+        { method: route.method, pathname: pathname!, searchParams: new URLSearchParams(query), body: '' },
+        endpoint.path,
+      )
+      expect(resolved.kind, route.target).toBe(route.kind)
+      expect(route.summary.trim(), route.target).not.toBe('')
+    }
+  })
+
+  it('路由前缀跟随端点路径与版本段，请求体上限与状态码映射直接取本模块的常量', () => {
+    const catalog = describeHttpApiCapabilities({ ...endpoint, path: 'test-api/' })
+
+    expect(catalog.basePath).toBe('/test-api')
+    expect(catalog.version).toBe(HTTP_API_VERSION)
+    expect(catalog.routes.map(({ target }) => target)).toEqual([
+      '/test-api/v1/tools',
+      '/test-api/v1/tools/<工具名>',
+      '/test-api/v1/resources',
+      '/test-api/v1/resources?uri=<资源 URI>',
+    ])
+    expect(catalog.maxBodyBytes).toBe(HTTP_API_MAX_BODY_BYTES)
+    expect(catalog.errorStatuses.map(({ code }) => code)).toEqual([...STABLE_ERROR_CODES])
+    expect(catalog.errorStatuses.find(({ code }) => code === 'rate_limited')?.status).toBe(429)
+  })
+
+  /** 通配监听地址不是目的地：原样写进基址会给出一个看着像地址、却未必连得上的示例。 */
+  it('基址按 TLS 选协议，并把通配监听地址换成回环地址', () => {
+    expect(describeHttpApiCapabilities(endpoint).baseUrl).toBe('http://127.0.0.1:61901')
+    expect(describeHttpApiCapabilities({ ...endpoint, tls: true }).baseUrl).toBe('https://127.0.0.1:61901')
+    expect(describeHttpApiCapabilities({ ...endpoint, host: '0.0.0.0' }).baseUrl).toBe('http://127.0.0.1:61901')
+    expect(describeHttpApiCapabilities({ ...endpoint, host: '' }).baseUrl).toBe('http://127.0.0.1:61901')
+    // IPv6 字面量必须加方括号，否则冒号会被当成端口分隔符。
+    expect(describeHttpApiCapabilities({ ...endpoint, host: '::' }).baseUrl).toBe('http://[::1]:61901')
+    expect(describeHttpApiCapabilities({ ...endpoint, host: 'fd00::1' }).baseUrl).toBe('http://[fd00::1]:61901')
+  })
+
+  it('总开关关闭时照样自述，只把 enabled 报成 false', () => {
+    const catalog = describeHttpApiCapabilities({ ...endpoint, enabled: false })
+
+    expect(catalog.enabled).toBe(false)
+    expect(catalog.routes).toHaveLength(4)
   })
 })
 

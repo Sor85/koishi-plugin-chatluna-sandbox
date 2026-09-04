@@ -27,7 +27,13 @@ export interface SandboxMcpCapabilityCatalog {
   resources: SandboxMcpResourceCapability[]
 }
 
-export interface SandboxMcpCredential {
+/**
+ * 测试凭证：测试控制端点的具名 Bearer 凭证。
+ *
+ * 名字里不带 MCP。同一个凭证在 MCP Streamable HTTP 与 HTTP 测试接口两种协议表述下都能用，
+ * 权限、配额与调用记录也是同一份；叫「MCP 凭证」会把「只有 MCP 那一种表述用得上」写进领域模型。
+ */
+export interface SandboxTestCredential {
   id: string
   name: string
   scopes: SandboxMcpScope[]
@@ -37,9 +43,9 @@ export interface SandboxMcpCredential {
   createdAt: string
 }
 
-export type SandboxMcpPublicCredential = Omit<SandboxMcpCredential, 'tokenDigest'>
+export type SandboxTestPublicCredential = Omit<SandboxTestCredential, 'tokenDigest'>
 
-export interface SandboxMcpCreatedCredential extends SandboxMcpPublicCredential {
+export interface SandboxTestCreatedCredential extends SandboxTestPublicCredential {
   token: string
 }
 

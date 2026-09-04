@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { FakeMcpAdminPort } from '../client/mcp/fake-port'
-import { createMcpCapabilityCatalogLoader, createMcpCredentialAdmin, formatMcpScopes } from '../client/mcp/shell'
-import type { SandboxMcpPublicCredential } from '../src/mcp/types'
+import { createHttpApiCapabilityCatalogLoader, createMcpCapabilityCatalogLoader, createTestCredentialAdmin, formatMcpScopes } from '../client/mcp/shell'
+import type { SandboxTestPublicCredential } from '../src/mcp/types'
 
-function credential(overrides: Partial<SandboxMcpPublicCredential> = {}): SandboxMcpPublicCredential {
+function credential(overrides: Partial<SandboxTestPublicCredential> = {}): SandboxTestPublicCredential {
   return {
     id: 'credential-0',
     name: '控制器',
@@ -14,11 +14,11 @@ function credential(overrides: Partial<SandboxMcpPublicCredential> = {}): Sandbo
   }
 }
 
-describe('MCP 凭证管理', () => {
+describe('测试凭证管理', () => {
   it('刷新后按服务端返回的顺序列出凭证', async () => {
     const port = new FakeMcpAdminPort()
     port.credentials = [credential({ id: 'a', name: '甲' }), credential({ id: 'b', name: '乙' })]
-    const admin = createMcpCredentialAdmin(port)
+    const admin = createTestCredentialAdmin(port)
 
     await admin.refresh()
 
@@ -27,7 +27,7 @@ describe('MCP 凭证管理', () => {
 
   it('创建成功后展示 Token 弹窗、关闭表单、重置为默认权限并重新列举', async () => {
     const port = new FakeMcpAdminPort()
-    const admin = createMcpCredentialAdmin(port)
+    const admin = createTestCredentialAdmin(port)
 
     admin.openCreate()
     admin.name.value = '新控制器'
@@ -39,12 +39,12 @@ describe('MCP 凭证管理', () => {
     expect(admin.formOpen.value).toBe(false)
     expect(admin.scopes.value).toEqual(['read'])
     expect(admin.credentials.value.map(({ name }) => name)).toEqual(['新控制器'])
-    expect(port.calls.map(({ operation }) => operation)).toEqual(['createMcpCredential', 'listMcpCredentials'])
+    expect(port.calls.map(({ operation }) => operation)).toEqual(['createTestCredential', 'listTestCredentials'])
   })
 
   it('名称为空或权限为空时不发请求，只给出提示', async () => {
     const port = new FakeMcpAdminPort()
-    const admin = createMcpCredentialAdmin(port)
+    const admin = createTestCredentialAdmin(port)
 
     admin.openCreate()
     admin.name.value = '   '
@@ -60,8 +60,8 @@ describe('MCP 凭证管理', () => {
 
   it('创建失败时保留表单并显示服务端错误，saving 复位', async () => {
     const port = new FakeMcpAdminPort()
-    port.rejectNext('createMcpCredential', new Error('名称重复'))
-    const admin = createMcpCredentialAdmin(port)
+    port.rejectNext('createTestCredential', new Error('名称重复'))
+    const admin = createTestCredentialAdmin(port)
 
     admin.openCreate()
     admin.name.value = '控制器'
@@ -76,7 +76,7 @@ describe('MCP 凭证管理', () => {
   it('打开已有凭证时载入它的名称与权限，保存后关闭表单并重新列举', async () => {
     const port = new FakeMcpAdminPort()
     port.credentials = [credential({ id: 'a', name: '甲', scopes: ['read', 'debug'] })]
-    const admin = createMcpCredentialAdmin(port)
+    const admin = createTestCredentialAdmin(port)
     await admin.refresh()
 
     admin.openEdit(admin.credentials.value[0]!)
@@ -93,7 +93,7 @@ describe('MCP 凭证管理', () => {
 
   it('权限开关按勾选状态增删，且同一权限不会重复', () => {
     const port = new FakeMcpAdminPort()
-    const admin = createMcpCredentialAdmin(port)
+    const admin = createTestCredentialAdmin(port)
 
     admin.toggleScope('read', true)
     admin.toggleScope('interact', true)
@@ -106,7 +106,7 @@ describe('MCP 凭证管理', () => {
   it('轮换 Token 后详情换成新凭证并暴露新 Token', async () => {
     const port = new FakeMcpAdminPort()
     port.credentials = [credential({ id: 'a' })]
-    const admin = createMcpCredentialAdmin(port)
+    const admin = createTestCredentialAdmin(port)
     await admin.refresh()
     admin.openEdit(admin.credentials.value[0]!)
 
@@ -119,11 +119,11 @@ describe('MCP 凭证管理', () => {
   it('启停按当前状态取反，撤销后凭证从列表消失', async () => {
     const port = new FakeMcpAdminPort()
     port.credentials = [credential({ id: 'a', enabled: true })]
-    const admin = createMcpCredentialAdmin(port)
+    const admin = createTestCredentialAdmin(port)
     await admin.refresh()
 
     await admin.toggleCredential(admin.credentials.value[0]!)
-    expect(port.calls.at(-2)).toEqual({ operation: 'setMcpCredentialEnabled', input: { id: 'a', enabled: false } })
+    expect(port.calls.at(-2)).toEqual({ operation: 'setTestCredentialEnabled', input: { id: 'a', enabled: false } })
     expect(admin.credentials.value[0]?.enabled).toBe(false)
 
     await admin.revokeCredential('a')
@@ -176,5 +176,44 @@ describe('MCP 能力目录读取', () => {
 
     expect(loader.error.value).toBe('')
     expect(loader.catalog.value).toBeDefined()
+  })
+})
+
+describe('HTTP 能力目录读取', () => {
+  it('读取成功后交出自述并清空失败态', async () => {
+    const port = new FakeMcpAdminPort()
+    port.httpApiCapabilities = {
+      ...port.httpApiCapabilities,
+      enabled: true,
+      routes: [{ kind: 'list-tools', method: 'GET', target: '/api/v1/tools', summary: '列出工具' }],
+    }
+    const loader = createHttpApiCapabilityCatalogLoader(port)
+
+    await loader.load()
+
+    expect(loader.catalog.value?.enabled).toBe(true)
+    expect(loader.catalog.value?.routes).toHaveLength(1)
+    expect(loader.error.value).toBe('')
+    expect(loader.loading.value).toBe(false)
+  })
+
+  /** 两种表述各有一份加载状态：HTTP 读失败不得把 MCP 能力页也拖成失败态。 */
+  it('与 MCP 能力目录互不影响，各自失败各自重试', async () => {
+    const port = new FakeMcpAdminPort()
+    port.rejectNext('getHttpApiCapabilities', new Error('HTTP 表述未启用'))
+    const httpLoader = createHttpApiCapabilityCatalogLoader(port)
+    const mcpLoader = createMcpCapabilityCatalogLoader(port)
+
+    await httpLoader.load()
+    await mcpLoader.load()
+
+    expect(httpLoader.error.value).toBe('HTTP 表述未启用')
+    expect(httpLoader.catalog.value).toBeUndefined()
+    expect(mcpLoader.error.value).toBe('')
+    expect(mcpLoader.catalog.value).toBeDefined()
+
+    await httpLoader.load()
+    expect(httpLoader.error.value).toBe('')
+    expect(httpLoader.catalog.value).toBeDefined()
   })
 })

@@ -156,6 +156,88 @@ function requireMethod(request: HttpApiRequest, method: string, route: HttpApiRo
 }
 
 /**
+ * HTTP 测试接口的一条路由。
+ *
+ * `kind` 与 `resolveHttpApiRoute` 解析出的路由种类同名：自述与解析器共用一套路由词汇，
+ * 因此「解析器新认了一条路由，自述里却没有它」是可被测试直接比对出来的，而不是靠人眼。
+ *
+ * `target` 是 origin-form 的请求目标（路径加可选查询串）而不是纯路径：列出只读资源与读取
+ * 单个资源共用同一条路径，只靠有没有 `uri` 查询参数区分，拆成两个字段只会让每个消费者
+ * 自己再拼一次。
+ */
+export interface SandboxHttpApiRoute {
+  kind: HttpApiRoute['kind']
+  method: 'GET' | 'POST'
+  target: string
+  summary: string
+}
+
+/** 一个稳定错误码在 HTTP 表述下的状态码。按 `STABLE_ERROR_CODES` 的声明顺序给出。 */
+export interface SandboxHttpApiErrorStatus {
+  code: string
+  status: number
+}
+
+/** HTTP 表述的自述：开关、基址、路由、请求体上限与错误码映射。 */
+export interface SandboxHttpApiCapabilityCatalog {
+  enabled: boolean
+  basePath: string
+  version: string
+  /** 可直接拼上路由请求目标的基址，例如 `http://127.0.0.1:61901`。 */
+  baseUrl: string
+  maxBodyBytes: number
+  routes: SandboxHttpApiRoute[]
+  errorStatuses: SandboxHttpApiErrorStatus[]
+}
+
+export interface SandboxHttpApiEndpoint {
+  enabled: boolean
+  path: string
+  host: string
+  port: number
+  tls: boolean
+}
+
+/**
+ * 把通配监听地址换成能真正拨通的地址。
+ *
+ * `0.0.0.0` 与 `::` 表示「监听所有网卡」，不是目的地；原样写进示例会给出一个看着像地址、
+ * 在部分环境里连不上的基址。在 Koishi 主机上等价的目的地是回环地址，从别的机器访问时要
+ * 换成这台机器的实际 IP——那个值只有部署者知道，因此这里只保证本机可用。
+ */
+function toHttpApiBaseUrl({ host, port, tls }: Pick<SandboxHttpApiEndpoint, 'host' | 'port' | 'tls'>): string {
+  const address = !host || host === '0.0.0.0' ? '127.0.0.1' : host === '::' ? '::1' : host
+  // IPv6 字面量在 URL 里必须加方括号，否则冒号会被当成端口分隔符。
+  return `${tls ? 'https' : 'http'}://${address.includes(':') ? `[${address}]` : address}:${port}`
+}
+
+/**
+ * HTTP 表述的自述，与 `resolveHttpApiRoute` 同处一个模块。
+ *
+ * 「路径怎么解析」与「端点上有哪些路由」必须由同一份代码回答：分开写的话，下一次改路由会让
+ * 控制台上的路由表静默变成过期文档，而没有任何测试会红。请求体上限与错误码映射同理，直接读
+ * 本模块的那两个常量，而不是在别处抄一份数值。
+ */
+export function describeHttpApiCapabilities(endpoint: SandboxHttpApiEndpoint): SandboxHttpApiCapabilityCatalog {
+  const base = normalizeBasePath(endpoint.path)
+  const prefix = `${base === '/' ? '' : base}/${HTTP_API_VERSION}`
+  return {
+    enabled: endpoint.enabled,
+    basePath: base,
+    version: HTTP_API_VERSION,
+    baseUrl: toHttpApiBaseUrl(endpoint),
+    maxBodyBytes: HTTP_API_MAX_BODY_BYTES,
+    routes: [
+      { kind: 'list-tools', method: 'GET', target: `${prefix}/tools`, summary: '列出当前凭证权限范围内的工具及其参数 Schema' },
+      { kind: 'call-tool', method: 'POST', target: `${prefix}/tools/<工具名>`, summary: '调用一个工具，请求体直接就是工具参数；无参工具可以不带请求体' },
+      { kind: 'list-resources', method: 'GET', target: `${prefix}/resources`, summary: '列出全部只读资源' },
+      { kind: 'read-resource', method: 'GET', target: `${prefix}/resources?uri=<资源 URI>`, summary: '读取一个只读资源，例如 chatluna-sandbox://guide' },
+    ],
+    errorStatuses: Object.entries(HTTP_API_ERROR_STATUS).map(([code, status]) => ({ code, status })),
+  }
+}
+
+/**
  * 解析工具参数。
  *
  * 空请求体等价于 `{}`：无参工具用 `curl -X POST` 不带 `-d` 是最自然的写法，逼消费者写 `-d '{}'`

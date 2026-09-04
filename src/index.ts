@@ -25,6 +25,7 @@ import { installModelRequestCollector, resolveChatLunaPluginClass } from './mode
 import { seedDevelopmentModelRequestErrors } from './model-request-error-preview'
 import { MAIN_MODEL_REQUEST_SCOPE_ID, SandboxModelRequestStore, UNATTRIBUTED_MODEL_REQUEST_SCOPE_ID, type SandboxModelRequestPersistence } from './model-request'
 import { SandboxTestEndpointServer, type SandboxTestEndpointProtocolConfig, type SandboxTestEndpointServerConfig } from './mcp/server'
+import { describeHttpApiCapabilities, type SandboxHttpApiCapabilityCatalog } from './mcp/http-api'
 import { SandboxMcpService, type SandboxMcpQuotaConfig } from './mcp/service'
 import { SandboxTestSpaceService } from './test-spaces'
 import { createScopeDirectory } from './scope-directory'
@@ -307,12 +308,16 @@ export function apply(ctx: Context, config: Config) {
     /**
      * 端点可用性是一个可空值，而不是两条各自装配一遍的代码路径。
      *
-     * MCP 服务与监听器要么一起有要么一起没有，因此装在同一个值里：拆成两个各自可空的字段会让
-     * 「只有 MCP 服务、没有监听器」这个不可能的状态变得可表达。`try` 只包住两次构造——构造失败的
+     * MCP 服务、监听器与 HTTP 表述自述要么一起有要么一起没有，因此装在同一个值里：拆成各自可空的
+     * 字段会让「只有 MCP 服务、没有监听器」这个不可能的状态变得可表达。`try` 只包住两次构造——构造失败的
      * 唯一实际来源是建数据目录或读凭证文件，而后面的 Console 注册与两个钩子注册在两条路上完全相同，
      * 留在 `try` 里只会让它们抛出时被记成与事实不符的文案并再注册一遍。
      */
-    let endpoint: { mcp: SandboxMcpService; server: SandboxTestEndpointServer } | undefined
+    let endpoint: {
+      mcp: SandboxMcpService
+      server: SandboxTestEndpointServer
+      httpApi: SandboxHttpApiCapabilityCatalog
+    } | undefined
     try {
       const mcp = new SandboxMcpService(inner, control, {
         dataDirectory: resolve(inner.baseDir, 'data/chatluna-sandbox'),
@@ -338,13 +343,25 @@ export function apply(ctx: Context, config: Config) {
         mcp: config.testEndpoint.mcp,
         http: config.testEndpoint.http,
       })
-      endpoint = { mcp, server }
+      endpoint = {
+        mcp,
+        server,
+        // 自述与监听器读同一份配置：环境管理里的 HTTP 能力页因此不可能与实际生效的路径、
+        // 基址和开关漂移。TLS 只在证书与私钥都填了时才真的生效，判定与监听器一致。
+        httpApi: describeHttpApiCapabilities({
+          enabled: config.testEndpoint.http.enabled,
+          path: config.testEndpoint.http.path,
+          host: config.testEndpoint.shared.host,
+          port: config.testEndpoint.shared.port,
+          tls: Boolean(config.testEndpoint.shared.tlsCertPath && config.testEndpoint.shared.tlsKeyPath),
+        }),
+      }
     } catch (error) {
       inner.logger('chatluna-sandbox').error('测试控制端点初始化失败；WebQQ 仍可继续使用。', error)
     }
     // chatluna-usage 位于另一个 loader group，Cordis 会为服务建立隔离映射；复用 usage 插件的 Context 才能解析到同一实例。
     const getChatLunaUsage = () => findChatLunaUsage(inner)
-    registerConsole(inner.console, control, config, endpoint?.mcp, testSpaces, unattributedModelRequests, getChatLunaUsage, presetService)
+    registerConsole(inner.console, control, config, endpoint, testSpaces, unattributedModelRequests, getChatLunaUsage, presetService)
     inner.on('ready', async () => {
       await control.waitForSceneReady()
       const seeded = await seedDevelopmentModelRequestErrors(control.getModelRequestStore())
