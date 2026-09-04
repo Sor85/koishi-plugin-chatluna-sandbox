@@ -28,6 +28,14 @@ describe('WebQQ 共享样式', () => {
     expect(scrollbarRule).toContain('z-index: 100')
     expect(scrollbarRule).not.toContain('z-index: 10001')
     expect(primitives).toContain('.chatluna-sandbox-workspace-zooming .chatluna-sandbox-scrollbar-overlay')
+    // 隐藏态的滑块必须一并退出命中测试：opacity 归零不影响 hit test，留着 pointer-events: auto
+    // 会在滚动区右缘和视口左上角留下看不见的热区，把轨道钉成常显并吞掉底下的点击。
+    const hiddenThumbRule = primitives
+      .slice(primitives.indexOf('.chatluna-sandbox-scrollbar-overlay:not(.is-visible) .chatluna-sandbox-scrollbar-thumb'))
+      .split('}')[0]
+    expect(hiddenThumbRule).toContain('.chatluna-sandbox-workspace-zooming .chatluna-sandbox-scrollbar-thumb')
+    expect(hiddenThumbRule).toContain('pointer-events: none')
+
     // 自定义滚动条的边界由 TS 统一按表头裁剪，不在各区域 CSS 中重复实现。
     expect(primitives).toContain('.chatluna-sandbox-scrollbar-overlay')
     expect(primitives).toContain('position: fixed')

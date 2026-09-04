@@ -48,7 +48,7 @@ describe('AI 测试空间总览', () => {
     expect(zoom).toContain('document.documentElement.classList.remove(ZOOMING_CLASS)')
     const scrollbar = readFileSync(resolve('client/shared/scrollbar.ts'), 'utf8')
     expect(scrollbar).toContain("classList.contains('chatluna-sandbox-workspace-zooming')")
-    expect(scrollbar).toContain('visible && state.showOverlay && !workspaceZooming')
+    expect(scrollbar).toContain('state.visibility.revealed && state.showOverlay && !workspaceZooming')
     expect(zoom).toContain('prefers-reduced-motion')
   })
 
