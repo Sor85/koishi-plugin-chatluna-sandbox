@@ -487,6 +487,24 @@ describe('模型请求分析展示模型', () => {
     expect(stickyDividerRule).not.toContain('box-shadow:')
     expect(styles).toContain('.webqq-workspace.is-frosted .webqq-model-trajectory-header :is(')
     expect(styles).toMatch(/\.webqq-workspace\.is-frosted \.webqq-model-trajectory-header :is\([\s\S]*?\.webqq-model-trajectory-scope,[\s\S]*?\.webqq-model-trajectory-controls,[\s\S]*?\.webqq-model-trajectory-composition-shell/)
+    // ADR 0094：吸顶头部的毛玻璃必须保留——顶边那条接缝由 pane 上的遮盖条负责，
+    // 不得为了压接缝把这一层改成实心。
+    expect(styles).not.toContain('.webqq-workspace.is-frosted .webqq-model-trajectory-header::before')
+  })
+
+  it('详情外壳的滚动视口顶边由 pane 上的遮盖条压住子像素接缝', () => {
+    const styles = readFileSync(resolve('client/model-request/styles.css'), 'utf8')
+
+    // ADR 0094：遮盖条必须挂在滚动容器之外的 pane 上——挂进详情外壳就会跟着进同一个滚动层，
+    // 与接缝一起取整，压不住。左右让出 17px 才不会在面板边框上切出缺口。
+    expect(styles).toMatch(/\.webqq-model-request-detail-pane \{\s*position: relative;\s*\}/)
+    const seamRule = styles.slice(styles.indexOf('.webqq-model-request-detail-pane::after {')).split('}')[0]
+    expect(seamRule).toContain('position: absolute')
+    expect(seamRule).toContain('inset: 0 17px auto')
+    expect(seamRule).toContain('background: var(--webqq-surface)')
+    expect(seamRule).toContain('pointer-events: none')
+    expect(seamRule).toMatch(/height: [1-9]px/)
+    expect(styles).not.toContain('.webqq-model-request-detail::after')
   })
 
   it('滚动阅读右侧时只跟随当前条目，不自动改变左侧分类折叠状态', () => {
