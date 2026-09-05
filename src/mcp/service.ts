@@ -506,28 +506,26 @@ export class SandboxMcpService {
         },
       },
       等待机器人回复: {
-        说明: 'send_message 与 send_forward_message 都会等待被测机器人的同步处理完成才返回，回复可能在返回前已进入事件流；必须用发送前的 cursor 加 authorId 过滤等待，用发送工具返回的 cursor 会错过同步回复。',
+        说明: '发送与关系操作类工具都会等待被测机器人的同步处理完成才返回，回复可能在返回前已进入事件流。把它们返回的 cursorBefore 传给等待类工具即可，不必自己先取一次游标；用它们返回的 cursor 会错过同步回复。',
         步骤: [
-          { tool: 'get_server_info', 得到: 'cursor（发送前）' },
-          { tool: 'send_message', arguments: { spaceId: '<spaceId>', operatorId: '10001', conversationId: 'private:10001:20002', content: 'help', idempotencyKey: 'example-message-2' } },
-          { tool: 'wait_for_message', arguments: { spaceId: '<spaceId>', cursor: '<发送前 cursor>', conversationId: 'private:10001:20002', authorId: '20002', timeoutSeconds: 30 } },
+          { tool: 'send_message', arguments: { spaceId: '<spaceId>', operatorId: '10001', conversationId: 'private:10001:20002', content: 'help', idempotencyKey: 'example-message-2' }, 得到: 'cursorBefore' },
+          { tool: 'wait_for_message', arguments: { spaceId: '<spaceId>', cursor: '<send_message.cursorBefore>', conversationId: 'private:10001:20002', authorId: '20002', timeoutSeconds: 30 } },
         ],
       },
       等待ChatLuna思考状态: {
-        说明: 'thinking=true 是瞬时状态，但状态变更会进入事件流，因此只要用发送前的 cursor 就能在 send_message 返回后补等到它，不必并发启动等待。用发送前 cursor 等待可避免匹配到上一轮已经结束的状态。',
+        说明: 'thinking=true 是瞬时状态，但状态变更会进入事件流，因此用 send_message 返回的 cursorBefore 就能在它返回后补等到，不必并发启动等待，也不会匹配到上一轮已经结束的状态。',
         步骤: [
-          { tool: 'get_server_info', 得到: 'cursor（发送前）' },
-          { tool: 'send_message', arguments: { spaceId: '<spaceId>', operatorId: '10001', conversationId: 'private:10001:20002', content: 'chatluna.chat 你好', idempotencyKey: 'example-chatluna-1' } },
-          { tool: 'wait_for_chatluna_state', arguments: { spaceId: '<spaceId>', cursor: '<发送前 cursor>', botParticipantId: '20002', conversationId: 'private:10001:20002', thinking: false, timeoutSeconds: 30 } },
+          { tool: 'send_message', arguments: { spaceId: '<spaceId>', operatorId: '10001', conversationId: 'private:10001:20002', content: 'chatluna.chat 你好', idempotencyKey: 'example-chatluna-1' }, 得到: 'cursorBefore' },
+          { tool: 'wait_for_chatluna_state', arguments: { spaceId: '<spaceId>', cursor: '<send_message.cursorBefore>', botParticipantId: '20002', conversationId: 'private:10001:20002', thinking: false, timeoutSeconds: 30 } },
         ],
       },
       等待机器人最终回复: {
         说明: '机器人常先回一条「稍等」再给最终结果。传 settleSeconds 后会持续收集同条件消息，直到静默期内不再出现新消息；返回的 event 是最后一条，events 是完整序列。',
-        wait_for_message: { spaceId: '<spaceId>', cursor: '<发送前 cursor>', conversationId: 'private:10001:20002', authorId: '20002', settleSeconds: 5, timeoutSeconds: 60 },
+        wait_for_message: { spaceId: '<spaceId>', cursor: '<send_message.cursorBefore>', conversationId: 'private:10001:20002', authorId: '20002', settleSeconds: 5, timeoutSeconds: 60 },
       },
       断言插件发起的_OneBot_action: {
-        说明: '机器人回复文本可能与实际执行结果不一致；要确认某次交互是否真的调用了 action 及其成败，用发送前 cursor 等待 onebot.action 事件。',
-        wait_for_onebot_action: { spaceId: '<spaceId>', cursor: '<发送前 cursor>', botId: '20002', action: 'set_group_kick', timeoutSeconds: 30 },
+        说明: '机器人回复文本可能与实际执行结果不一致；要确认某次交互是否真的调用了 action 及其成败，用那次操作返回的 cursorBefore 等待 onebot.action 事件。',
+        wait_for_onebot_action: { spaceId: '<spaceId>', cursor: '<perform_group_action.cursorBefore>', botId: '20002', action: 'set_group_kick', timeoutSeconds: 30 },
       },
       群聊触发命令: {
         说明: '群聊中触发 Koishi 命令通常需要 at 机器人；content 支持 <at id="参与者ID"/> 元素。',

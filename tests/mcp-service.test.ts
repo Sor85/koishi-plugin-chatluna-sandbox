@@ -398,8 +398,8 @@ describe('SandboxMcpService', () => {
       },
       等待机器人回复: {
         步骤: [
-          expect.objectContaining({ tool: 'get_server_info' }),
-          expect.objectContaining({ tool: 'send_message' }),
+          // 不再需要先取一次游标：发送工具返回的 cursorBefore 就是发送前的位置。
+          expect.objectContaining({ tool: 'send_message', 得到: 'cursorBefore' }),
           expect.objectContaining({ tool: 'wait_for_message' }),
         ],
       },
@@ -581,6 +581,37 @@ describe('SandboxMcpService', () => {
     expect(updateBot.properties.action).toEqual({ const: 'update-bot' })
     expect(updateBot.properties.data).toMatchObject({ required: ['id'] })
     expect(variants.find(({ title }) => title === 'create-bot')!.properties.data).toMatchObject({ required: ['id', 'name'] })
+  })
+
+  it('发送工具返回发送前游标，用它能等到调用返回前就已发生的同步回复', async () => {
+    const { app, service, credential, testSpaces } = createService(['read', 'interact', 'manage'], true)
+    // 同步回复：中间件在 send_message 返回之前就把回复送进事件流。
+    app.middleware(async (session, next) => {
+      if (session.userId !== '11001') return next()
+      await session.send('同步回复')
+    })
+    await app.start()
+    const created = await service.callTool(credential.token, 'create_test_space', { idempotencyKey: 'space-cursor-1' }) as { spaceId: string }
+    const control = testSpaces.getControl(created.spaceId)
+    control.createUser({ id: '11001', name: '测试成员' })
+    control.createBot({ id: '21001', name: '测试机器人', implementation: 'napcat', enabled: true })
+
+    const sent = await service.callTool(credential.token, 'send_message', {
+      spaceId: created.spaceId,
+      operatorId: '11001',
+      conversationId: 'private:11001:21001',
+      content: '触发同步回复',
+      idempotencyKey: 'space-cursor-send-1',
+    }) as { cursorBefore: { epoch: string, sequence: number }, cursor: { epoch: string, sequence: number } }
+
+    // 两个游标必须是不同位置，否则「发送前」这个说法本身就不成立。
+    expect(sent.cursorBefore.sequence).toBeLessThan(sent.cursor.sequence)
+    const waitArgs = { spaceId: created.spaceId, conversationId: 'private:11001:21001', authorId: '21001', timeoutSeconds: 1 }
+    await expect(service.callTool(credential.token, 'wait_for_message', { ...waitArgs, cursor: sent.cursorBefore }))
+      .resolves.toMatchObject({ matched: true, event: { data: { content: '同步回复' } } })
+    // 用发送后的游标等同一条回复必然错过：这正是 cursorBefore 存在的理由。
+    await expect(service.callTool(credential.token, 'wait_for_message', { ...waitArgs, cursor: sent.cursor }))
+      .resolves.toMatchObject({ matched: false, reason: 'timeout' })
   })
 
   it('静默期等待收集完整回复序列并返回最终消息', async () => {

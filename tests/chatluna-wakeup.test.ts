@@ -430,7 +430,7 @@ describe('唤醒规则在测试控制端点上的出口', () => {
     const tools = service.getCapabilityCatalog().tools
     const sendMessage = tools.find(({ name }) => name === 'send_message')?.inputSchema as { description?: string }
     // 既保留原有的等待模式说明，也带上唤醒指引：AI 客户端只从 tools/list 学这两件事。
-    expect(sendMessage.description).toContain('等待机器人回复的正确模式')
+    expect(sendMessage.description).toContain('cursorBefore')
     expect(sendMessage.description).toContain(guidance)
     expect(sendMessage.description).toContain('消息任意位置包含昵称')
     // 注入按参数形状选点，因此不带消息正文的工具不会被塞进这段指引。

@@ -168,7 +168,10 @@ const CURSOR = {
   type: 'object',
   properties: { epoch: { type: 'string' }, sequence: { type: 'number' } },
   required: ['epoch', 'sequence'],
-  description: '事件游标，取自 get_server_info 或先前调用返回的 cursor；破坏性操作后游标失效需重新获取',
+  // 等待机器人对某次操作的反应时要传那次操作返回的 cursorBefore，不是它返回的 cursor：同步回复在
+  // 操作返回之前就已经进入事件流，用操作后的游标会把它漏掉。这条口径写在参数上，因此每个等待类
+  // 工具都读得到，不必在每个发送类工具的描述里重复一遍。
+  description: '事件游标。等待某次操作引发的事件时传那次操作返回的 cursorBefore；从当前位置开始等待时传 get_server_info 返回的 cursor。破坏性操作后游标失效需重新获取',
 }
 const TIMEOUT_SECONDS = { type: 'number', minimum: 1, maximum: 120, description: '等待超时秒数，默认 30' }
 const OPERATOR_ID = { type: 'string', description: '操作者参与者 ID（十进制数字字符串）' }
@@ -636,6 +639,7 @@ function requireUploadedMedia(runtime: SandboxMcpToolRuntime, mediaId: string): 
 
 async function sendMessage(runtime: SandboxMcpToolRuntime, args: Record<string, unknown>) {
   const control = runtime.control
+  const cursorBefore = runtime.currentCursor()
   const operatorId = requireString(args.operatorId, 'operatorId')
   const conversationId = requireString(args.conversationId, 'conversationId')
   const mediaIds = Array.isArray(args.mediaIds) ? args.mediaIds.map(String) : []
@@ -651,7 +655,7 @@ async function sendMessage(runtime: SandboxMcpToolRuntime, args: Record<string, 
   // 消息创建事件已由场景变更监听统一产生；此处只补发投递完成事件（带 recipientBotId），
   // 供 wait_for_message 按接收机器人过滤。
   appendDeliveryEvents(runtime, previousMessageIds)
-  return { ...result, cursor: runtime.currentCursor() }
+  return { ...result, cursorBefore, cursor: runtime.currentCursor() }
 }
 
 /** 补发带接收机器人的投递事件。三条发送路径共用，避免只给一条路加能力。 */
@@ -665,6 +669,7 @@ function appendDeliveryEvents(runtime: SandboxMcpToolRuntime, previousMessageIds
 
 async function sendForwardMessage(runtime: SandboxMcpToolRuntime, args: Record<string, unknown>) {
   const control = runtime.control
+  const cursorBefore = runtime.currentCursor()
   const operatorId = requireString(args.operatorId, 'operatorId')
   const conversationId = requireString(args.conversationId, 'conversationId')
   const operator = control.getSnapshot().participants.find(({ id }) => id === operatorId)
@@ -687,7 +692,7 @@ async function sendForwardMessage(runtime: SandboxMcpToolRuntime, args: Record<s
   await delivery
   // 场景监听已产生外层消息事件；这里只补齐按接收机器人过滤所需的投递事件。
   appendDeliveryEvents(runtime, previousMessageIds)
-  return { ...result, cursor: runtime.currentCursor() }
+  return { ...result, cursorBefore, cursor: runtime.currentCursor() }
 }
 
 function resolveForwardNodes(runtime: SandboxMcpToolRuntime, rawNodes: unknown[]): SandboxForwardNodeInput[] {
@@ -717,9 +722,11 @@ function resolveForwardNodes(runtime: SandboxMcpToolRuntime, rawNodes: unknown[]
 
 async function performFriendAction(runtime: SandboxMcpToolRuntime, args: Record<string, unknown>) {
   const { idempotencyKey: _key, testRunId: _run, spaceId: _spaceId, ...input } = args
+  const cursorBefore = runtime.currentCursor()
   const result = await runtime.control.performFriendAction(input as never)
   return {
     ...result,
+    cursorBefore,
     cursor: runtime.appendEvent('friend.action', input),
     affected: [String(input.operatorId), String(input.targetId ?? input.requestId)],
   }
@@ -727,9 +734,11 @@ async function performFriendAction(runtime: SandboxMcpToolRuntime, args: Record<
 
 async function performGroupAction(runtime: SandboxMcpToolRuntime, args: Record<string, unknown>) {
   const { idempotencyKey: _key, testRunId: _run, spaceId: _spaceId, ...input } = args
+  const cursorBefore = runtime.currentCursor()
   const result = await runtime.control.performGroupAction(input as never)
   return {
     ...result,
+    cursorBefore,
     cursor: runtime.appendEvent('group.action', input),
     affected: [String(input.groupId ?? input.requestId), String(input.targetId ?? input.operatorId)],
   }
@@ -1352,7 +1361,7 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
         idempotencyKey: IDEMPOTENCY_KEY,
       },
       required: ['spaceId', 'operatorId', 'conversationId', 'idempotencyKey'],
-      description: '等待机器人回复的正确模式：先记录发送前 cursor，发送后用 wait_for_message({ cursor: 发送前游标, authorId: 机器人ID }) 等待；同步回复在本调用返回前即已进入事件流，用返回的 cursor 会错过。',
+      description: '返回值里的 cursorBefore 是发送前的事件游标：等待机器人回复时把它传给 wait_for_message，例如 wait_for_message({ cursor: cursorBefore, authorId: 机器人ID })。',
     },
     quota: 'mutation', spaceResolution: 'mutation', idempotent: true, requiresConfirmation: false,
     run: sendMessage,
@@ -1403,7 +1412,7 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
         { title: '引用已有消息', required: ['messageIds'] },
         { title: '显式节点', required: ['nodes'] },
       ],
-      description: '等待机器人回复时应先记录发送前 cursor，再用 wait_for_message 等待。',
+      description: '返回值里的 cursorBefore 是发送前的事件游标：等待机器人回复时把它传给 wait_for_message。',
     },
     quota: 'mutation', spaceResolution: 'mutation', idempotent: true, requiresConfirmation: false,
     run: sendForwardMessage,
