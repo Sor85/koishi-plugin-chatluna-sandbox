@@ -1012,14 +1012,10 @@
   overflow: hidden;
 }
 
-.webqq-model-trajectory-composition-labels,
-.webqq-model-trajectory-composition-tracks {
+.webqq-model-trajectory-composition-labels {
   display: grid;
   grid-auto-rows: 14px;
   align-content: center;
-}
-
-.webqq-model-trajectory-composition-labels {
   padding-right: 6px;
   color: var(--webqq-muted);
   font-size: var(--webqq-font-3xs);
@@ -1040,13 +1036,30 @@
   user-select: none;
 }
 
+/* overflow: clip 是焦点层缩放动画的必要条件：被变换放大的后代会算进滚动容器的滚动范围，
+   缩小动画期间视图口会因此长出一条横向滚动条并抖一下。裁到轨道自身的盒子上之后，滚动范围
+   仍然只由轨道宽度（缩放倍率）决定。用 clip 而不是 hidden：后者会把轨道变成滚动容器，
+   横向拖动写的 scrollLeft 会落到它身上而不是视图口。 */
 .webqq-model-trajectory-composition-tracks {
   position: relative;
   box-sizing: border-box;
   min-width: 100%;
   height: 100%;
   padding-right: 6px;
+  overflow: clip;
   border-left: 1px solid var(--webqq-border);
+}
+
+/* 焦点层：轨道横轴只铺展开中的那几条请求（判据见 composition-focus.ts）。
+   变换原点必须落在左边缘——scaleX 默认绕中心缩放，那会让窗口两端各偏出半个视图口。
+   轨道的行栅格住在这一层而不是外层：外层要保持「一格 = 整条轨道宽」的滚动内容盒。 */
+.webqq-model-trajectory-composition-focus {
+  position: relative;
+  display: grid;
+  grid-auto-rows: 14px;
+  align-content: center;
+  height: 100%;
+  transform-origin: 0 0;
 }
 
 .webqq-model-trajectory-composition-track {

@@ -40,6 +40,15 @@ export const MODEL_REQUEST_COMPOSITION_KINDS: readonly SandboxModelRequestPrompt
  */
 export const MODEL_REQUEST_COMPOSITION_MIN_SEGMENT_WIDTH = 0.35
 
+/**
+ * 一条请求的时间槽至少多宽，单位同样是占整条轴的百分比。
+ *
+ * 只按真实耗时铺开时，一次十秒的请求在跨越二十小时的会话里不到千分之一，连一个像素都画不出，
+ * 那一格里的组成因此完全读不到。这个下限保证每条请求都还留有一格可读的位置；代价是宽度在
+ * 下限处不再等于真实耗时，位置仍然是真实的。
+ */
+export const MODEL_REQUEST_COMPOSITION_MIN_SLOT_WIDTH = 0.75
+
 /** 轨道横向缩放的上下界与步长。粒度判据要按最大倍率算，因此上界与判据同住一处。 */
 export const MODEL_REQUEST_COMPOSITION_ZOOM_MIN = 1
 export const MODEL_REQUEST_COMPOSITION_ZOOM_MAX = 10
@@ -51,6 +60,54 @@ export interface ModelRequestCompositionSlot {
   timeShare: number
   /** 逐段粒度下该请求会画出的分段数。 */
   segmentCount: number
+}
+
+/** 一条请求在时间轴上的自然位置，两项都是占整条轴的百分比。 */
+export interface ModelRequestCompositionSlotSpan {
+  /** 自然起点：按实际耗时布局时由开始时刻求得，按次序均分时由序号求得。 */
+  start: number
+  /** 自然宽度。进行中的请求跨度未知，取 0——它只在轴上标出起点，不占可读的宽度。 */
+  span: number
+}
+
+/** 一条请求实际铺到的那一格。 */
+export interface ModelRequestCompositionSlotBox {
+  left: number
+  width: number
+}
+
+/**
+ * 把每条请求的自然位置铺成互不重叠的时间槽。
+ *
+ * 最小宽度必然带来重叠：两条相隔九秒的请求在跨越二十小时的会话里自然起点只差万分之一，
+ * 而各自都要占到下限那么宽，于是两格画在同一段横轴上。默认倍率下它只是一条 0.75% 宽的糊涂
+ * 细线，看不出问题；一旦放大到那一格，两三条请求的组成就完整地叠在一起——一条请求的 Tool Defs
+ * 横穿另一条请求的 Assistant，读出来的占比毫无意义。轨道支持放大到单条请求之后，这个重叠
+ * 从看不见的糊涂变成了首屏就能看到的错。
+ *
+ * 因此这里做一次单向扫描：每格的起点不早于前一格的终点，并为后面每一格各留出一份下限宽度，
+ * 否则末尾几格会被挤到轴外。挤不开时下限自己让步（退到均分宽），因此无论多少条请求，结果都是
+ * 一份落在 [0, 100] 内、按输入顺序单调递增且互不重叠的划分。
+ *
+ * 输入按时间先后给出，扫描因此不改变请求的先后；跨度为 0 的请求不占位也不推进扫描位置。
+ */
+export function layoutModelRequestCompositionSlots(
+  spans: readonly ModelRequestCompositionSlotSpan[],
+  minWidth: number = MODEL_REQUEST_COMPOSITION_MIN_SLOT_WIDTH,
+): ModelRequestCompositionSlotBox[] {
+  const sizable = spans.reduce((count, { span }) => span > 0 ? count + 1 : count, 0)
+  const floor = sizable ? Math.min(minWidth, 100 / sizable) : minWidth
+  let pendingFloors = sizable
+  let cursor = 0
+  return spans.map(({ start, span }) => {
+    if (span <= 0) return { left: Math.min(Math.max(start, cursor), 100), width: 0 }
+    pendingFloors -= 1
+    const reserved = pendingFloors * floor
+    const left = Math.min(Math.max(start, cursor), Math.max(100 - reserved - floor, 0))
+    const width = Math.min(Math.max(span, floor), Math.max(100 - reserved - left, 0))
+    cursor = left + width
+    return { left, width }
+  })
 }
 
 /**

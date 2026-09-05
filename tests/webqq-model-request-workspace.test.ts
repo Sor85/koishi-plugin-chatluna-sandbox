@@ -268,6 +268,15 @@ describe('WebQQ 模型请求工作台', () => {
     expect(styles).not.toMatch(/\.webqq-model-trajectory-composition-zoom\s*\{[^}]*backdrop-filter:/s)
     expect(styles).not.toMatch(/\.webqq-model-trajectory-composition-zoom\s*\{[^}]*box-shadow:/s)
     expect(styles).toMatch(/\.webqq-model-trajectory-composition-tracks\s*\{[^}]*min-width:\s*100%/s)
+    // 焦点层必须同时包住请求边界线与分段：变换只写在这一个元素上，落在它外面的边界线不会
+    // 跟着缩放，表现为放大后边界线仍停在整段会话的位置上。
+    expect(trajectorySource).toMatch(/webqq-model-trajectory-composition-focus[\s\S]*webqq-model-trajectory-boundary[\s\S]*webqq-model-trajectory-composition-track"/)
+    // scaleX 默认绕中心缩放，原点不在左边缘会让焦点窗口两端各偏出半个视图口。
+    expect(styles).toMatch(/\.webqq-model-trajectory-composition-focus\s*\{[^}]*transform-origin:\s*0 0/s)
+    expect(styles).toMatch(/\.webqq-model-trajectory-composition-focus\s*\{[^}]*grid-auto-rows:\s*14px/s)
+    // 被变换放大的后代会算进滚动容器的滚动范围；不裁掉它，缩小动画期间视图口会长出一条横向滚动条。
+    expect(styles).toMatch(/\.webqq-model-trajectory-composition-tracks\s*\{[^}]*overflow:\s*clip/s)
+    expect(styles).not.toMatch(/\.webqq-model-trajectory-composition-tracks\s*\{[^}]*overflow:\s*hidden/s)
     expect(styles).toMatch(/\.webqq-model-trajectory-composition-bar\.is-variable\s*\{[^}]*background:\s*var\(--webqq-role-variable\)/s)
     expect(styles).toMatch(/\.webqq-model-trajectory-composition-bar\.is-selected\s*\{[^}]*z-index:\s*1[^}]*0 0 0 1px var\(--webqq-trajectory-layer\)[^}]*0 0 0 2px var\(--webqq-accent\)/s)
     expect(styles).not.toMatch(/\.webqq-model-trajectory-composition-bar\.is-selected\s*\{[^}]*outline:/s)

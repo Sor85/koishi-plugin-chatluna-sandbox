@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   MODEL_REQUEST_COMPOSITION_KINDS,
   MODEL_REQUEST_COMPOSITION_MIN_SEGMENT_WIDTH,
+  MODEL_REQUEST_COMPOSITION_MIN_SLOT_WIDTH,
   MODEL_REQUEST_COMPOSITION_ZOOM_MAX,
   aggregateModelRequestComposition,
+  layoutModelRequestCompositionSlots,
   modelRequestCompositionKindOf,
   resolveModelRequestCompositionGranularity,
   type ModelRequestCompositionSlot,
@@ -132,5 +134,91 @@ describe('轨迹行落在哪条组成轨道', () => {
   it('请求边界与模型响应不进请求体统计，因此没有轨道', () => {
     expect(modelRequestCompositionKindOf('request')).toBeUndefined()
     expect(modelRequestCompositionKindOf('response')).toBeUndefined()
+  })
+})
+
+describe('请求时间槽铺位', () => {
+  /** 相邻两格是否有重合；重合意味着两条请求的组成会画在同一段横轴上。 */
+  function overlaps(boxes: readonly { left: number, width: number }[]) {
+    return boxes.slice(1).filter((box, index) => {
+      const previous = boxes[index]!
+      return box.width > 0 && previous.width > 0 && box.left < previous.left + previous.width - 1e-9
+    }).length
+  }
+
+  it('按次序均分时每格恰好一份均分宽，首尾贴住两端', () => {
+    const boxes = layoutModelRequestCompositionSlots(
+      Array.from({ length: 4 }, (_, index) => ({ start: index * 25, span: 25 })),
+    )
+
+    expect(boxes).toEqual([
+      { left: 0, width: 25 },
+      { left: 25, width: 25 },
+      { left: 50, width: 25 },
+      { left: 75, width: 25 },
+    ])
+  })
+
+  it('跨度不足下限时补到下限，位置照旧按真实时刻', () => {
+    const boxes = layoutModelRequestCompositionSlots([
+      { start: 0, span: 0.01 },
+      { start: 40, span: 0.01 },
+    ])
+
+    expect(boxes[0]).toEqual({ left: 0, width: MODEL_REQUEST_COMPOSITION_MIN_SLOT_WIDTH })
+    expect(boxes[1]).toEqual({ left: 40, width: MODEL_REQUEST_COMPOSITION_MIN_SLOT_WIDTH })
+  })
+
+  it('时间上挤在一起的几条请求各自分到一格，不再互相重合', () => {
+    // 二十小时的会话里连着发了四次十秒请求：自然起点只差万分之几，各自都要占到下限那么宽。
+    const boxes = layoutModelRequestCompositionSlots([
+      { start: 99.9, span: 0.014 },
+      { start: 99.92, span: 0.014 },
+      { start: 99.94, span: 0.014 },
+      { start: 99.96, span: 0.014 },
+    ])
+
+    expect(overlaps(boxes)).toBe(0)
+    // 四格各 0.75% 宽，末格右边界正好贴住轴的终点：起点被「后面还要留几格」逐格顶回来。
+    expect(boxes.map(({ left }) => Math.round(left * 100) / 100)).toEqual([97, 97.75, 98.5, 99.25])
+    expect(boxes.at(-1)).toEqual({ left: 99.25, width: MODEL_REQUEST_COMPOSITION_MIN_SLOT_WIDTH })
+  })
+
+  it('末尾几格不会被挤出轴外：每格都为后面的请求留出下限宽度', () => {
+    const boxes = layoutModelRequestCompositionSlots([
+      { start: 0, span: 99 },
+      { start: 99, span: 1 },
+      { start: 99.5, span: 0.5 },
+    ])
+
+    expect(overlaps(boxes)).toBe(0)
+    expect(boxes.every(({ left, width }) => left >= 0 && left + width <= 100 + 1e-9)).toBe(true)
+    expect(boxes[0]!.width).toBeCloseTo(98.5)
+  })
+
+  it('请求多到均分宽小于下限时下限让步，总宽仍然铺不出轴外', () => {
+    const boxes = layoutModelRequestCompositionSlots(
+      Array.from({ length: 400 }, () => ({ start: 100, span: 0.001 })),
+    )
+
+    expect(overlaps(boxes)).toBe(0)
+    expect(boxes.every(({ width }) => width === 0.25)).toBe(true)
+    expect(boxes.at(-1)!.left + boxes.at(-1)!.width).toBeCloseTo(100)
+  })
+
+  it('进行中的请求只标起点：不占宽度，也不推开后面的请求', () => {
+    const boxes = layoutModelRequestCompositionSlots([
+      { start: 0, span: 30 },
+      { start: 30, span: 0 },
+      { start: 30, span: 20 },
+    ])
+
+    expect(boxes[1]).toEqual({ left: 30, width: 0 })
+    expect(boxes[2]).toEqual({ left: 30, width: 20 })
+  })
+
+  it('没有请求或全部进行中时不产出任何宽度', () => {
+    expect(layoutModelRequestCompositionSlots([])).toEqual([])
+    expect(layoutModelRequestCompositionSlots([{ start: 0, span: 0 }])).toEqual([{ left: 0, width: 0 }])
   })
 })
