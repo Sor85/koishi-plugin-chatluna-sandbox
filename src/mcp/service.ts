@@ -13,7 +13,7 @@ import { createScopeDirectory, type ScopeDirectory } from '../scope-directory'
 import type { SandboxTestSpaceService } from '../test-spaces'
 import type { SandboxMedia } from '../types'
 import { isRecalledMessage, SandboxDomainError } from '../types'
-import { asRecord, readSpaceId, requireString, stableValue } from './arguments'
+import { argumentsFingerprint, asRecord, readSpaceId, requireNumber, requireString, stableValue } from './arguments'
 import {
   matchesTestCallRecordFilter,
   presentTestCallRecord,
@@ -659,8 +659,9 @@ export class SandboxMcpService {
     const token = requireString(args.confirmationToken, 'confirmationToken')
     const confirmation = this.confirmations.get(token)
     this.confirmations.delete(token)
-    const actionArgs = { ...args }; delete actionArgs.confirmationToken
-    if (!confirmation || confirmation.expiresAt < Date.now() || confirmation.credentialId !== runtime.credentialId || confirmation.tool !== entry.name || confirmation.revision !== runtime.control.getSnapshot().revision || confirmation.argumentsHash !== createHash('sha256').update(stableValue(actionArgs)).digest('hex')) {
+    // 参数绑定取业务参数指纹：令牌自身与调用标注参数都不参与，因此签发时的 `arguments` 只需逐字段
+    // 写出这次操作要做什么，不必连带复述编排标注（ADR-0097）。
+    if (!confirmation || confirmation.expiresAt < Date.now() || confirmation.credentialId !== runtime.credentialId || confirmation.tool !== entry.name || confirmation.revision !== runtime.control.getSnapshot().revision || confirmation.argumentsHash !== argumentsFingerprint(args)) {
       throw new SandboxMcpError('confirmation_required', '破坏性操作需要有效的一次性确认令牌')
     }
     await entry.run(runtime, args)
@@ -737,9 +738,12 @@ export class SandboxMcpService {
   private async waitFor(args: Record<string, unknown>, predicate: (event: SandboxMcpEvent) => boolean): Promise<SandboxMcpWaitResult> {
     const cursor = asRecord(args.cursor)
     if (cursor.epoch !== this.epoch) throw new SandboxMcpError('cursor_expired', '事件游标已过期', false, '请重新读取当前游标。')
-    const sequence = Number(cursor.sequence)
+    // 游标序号与超时秒数都必须先判类型：非数值经 `Number(...)` 会变成 NaN，而 NaN 参与的比较全为
+    // false，于是坏序号让每个事件都匹配不上、坏超时让 setTimeout 立刻触发。两者都表现为「等到超时
+    // 也没有事件」，与真的没等到完全一样，消费者据此得出的是错的结论而不是一次可重试的失败。
+    const sequence = requireNumber(cursor.sequence, 'cursor.sequence')
     if (this.events.length && sequence < this.events[0].cursor.sequence - 1) throw new SandboxMcpError('cursor_expired', '事件游标已离开缓冲区')
-    const timeoutMs = Math.min(Math.max(Number(args.timeoutSeconds ?? 30), 1), 120) * 1000
+    const timeoutMs = requireNumber(args.timeoutSeconds, 'timeoutSeconds', { fallback: 30, min: 1, max: 120 }) * 1000
     const spaceId = readSpaceId(args)
     const matches = () => this.events.find((event) => event.cursor.sequence > sequence && event.spaceId === spaceId && predicate(event))
     const existing = matches()
@@ -762,7 +766,7 @@ export class SandboxMcpService {
   private async withIdempotency(credentialId: string, tool: string, args: Record<string, unknown>, action: () => Promise<unknown>) {
     const key = requireString(args.idempotencyKey, 'idempotencyKey')
     const cacheKey = `${credentialId}:${this.epoch}:${tool}:${key}`
-    const argumentsHash = createHash('sha256').update(stableValue(args)).digest('hex')
+    const argumentsHash = argumentsFingerprint(args)
     const cached = this.idempotency.get(cacheKey)
     if (cached && cached.expiresAt > Date.now()) {
       if (cached.argumentsHash !== argumentsHash) throw new SandboxMcpError('idempotency_conflict', '幂等 Key 已被不同参数使用')

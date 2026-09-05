@@ -32,7 +32,7 @@ import type {
   SandboxSnapshot,
 } from '../types'
 import { SandboxModelRequestCursorExpiredError, SandboxOneBotDebugCursorExpiredError } from '../types'
-import { asRecord, readSpaceId, requireString, stableValue } from './arguments'
+import { asRecord, argumentsFingerprint, optionalNumber, readSpaceId, requireNumber, requireString } from './arguments'
 import type { ListSandboxTestCallRecordsInput, SandboxTestCallRecordsPage } from './call-records'
 import {
   SandboxMcpError,
@@ -354,7 +354,11 @@ function requireCapabilityList(value: unknown): string[] | undefined {
 }
 
 function assertRevision(control: SandboxControlService, value: unknown) {
-  if (Number(value) !== control.getSnapshot().revision) throw new SandboxMcpError('revision_conflict', '场景版本已变化，请重新读取快照')
+  // 先判类型：非数值经 `Number(...)` 会变成 NaN 并与任何版本都不相等，于是一次拼错的参数会报成
+  // 「场景版本已变化」，把调用方推向「重读快照再重试」这条永远走不通的路。
+  if (requireNumber(value, 'expectedRevision') !== control.getSnapshot().revision) {
+    throw new SandboxMcpError('revision_conflict', '场景版本已变化，请重新读取快照')
+  }
 }
 
 /**
@@ -468,8 +472,8 @@ function listConversations(runtime: SandboxMcpToolRuntime, args: Record<string, 
   const operatorId = requireString(args.operatorId, 'operatorId')
   // control 层消息分页上限为 100（control-service.ts assertMessageLimit），超出会直接抛错。
   const snapshot = runtime.control.getVisibleSnapshot(operatorId, 100)
-  const limit = Math.min(Math.max(Number(args.limit ?? 50), 1), 200)
-  const offset = Math.max(Number(args.offset ?? 0), 0)
+  const limit = requireNumber(args.limit, 'limit', { fallback: 50, min: 1, max: 200 })
+  const offset = requireNumber(args.offset, 'offset', { fallback: 0, min: 0 })
   const items = listConversationItems(snapshot, args).map((conversation) => toMcpConversation(snapshot, conversation))
   return { items: items.slice(offset, offset + limit), nextOffset: offset + limit < items.length ? offset + limit : undefined }
 }
@@ -497,7 +501,7 @@ function listConversationItems(snapshot: SandboxSnapshot, args: Record<string, u
 function getConversation(runtime: SandboxMcpToolRuntime, args: Record<string, unknown>) {
   const operatorId = requireString(args.operatorId, 'operatorId')
   const conversationId = requireString(args.conversationId, 'conversationId')
-  const snapshot = runtime.control.getVisibleSnapshot(operatorId, Math.min(Math.max(Number(args.messageLimit ?? 50), 1), 100))
+  const snapshot = runtime.control.getVisibleSnapshot(operatorId, requireNumber(args.messageLimit, 'messageLimit', { fallback: 50, min: 1, max: 100 }))
   const resolved = resolveConversation(snapshot, conversationId)
   if (!resolved) throw new SandboxMcpError('conversation_not_found', `会话不存在或不可见：${conversationId}`)
   const conversation = toMcpConversation(snapshot, resolved)
@@ -680,8 +684,9 @@ async function waitForSettledMessages(
   args: Record<string, unknown>,
   predicate: (event: SandboxMcpEvent) => boolean,
 ) {
+  // 静默期先取值再开始等待：放在等待之后，一个拼错的 settleSeconds 要先挂满一整个等待超时才报错。
+  const settleSeconds = requireNumber(args.settleSeconds, 'settleSeconds', { fallback: 0, min: 0, max: 30 })
   const first = await runtime.waitFor(args, predicate)
-  const settleSeconds = Math.min(Math.max(Number(args.settleSeconds ?? 0), 0), 30)
   if (settleSeconds < 1 || !first.matched || !first.event) return first
   const events = [first.event]
   let cursor = first.cursor
@@ -859,7 +864,7 @@ function prepareDestructiveAction(runtime: SandboxMcpToolRuntime, args: Record<s
   runtime.rememberConfirmation(token, {
     credentialId: runtime.credentialId,
     tool: requestedTool,
-    argumentsHash: createHash('sha256').update(stableValue(toolArguments)).digest('hex'),
+    argumentsHash: argumentsFingerprint(toolArguments),
     revision: runtime.control.getSnapshot().revision,
     expiresAt: Date.now() + 60_000,
   })
@@ -910,8 +915,8 @@ async function listOneBotDebugRecords(runtime: SandboxMcpToolRuntime, args: Reco
       requestedAction: typeof args.requestedAction === 'string' ? args.requestedAction : undefined,
       errorsOnly: args.errorsOnly === true ? true : undefined,
       order: args.order === 'asc' ? 'asc' : args.order === 'desc' ? 'desc' : undefined,
-      limit: typeof args.limit === 'number' ? args.limit : undefined,
-      beforeSequence: typeof args.beforeSequence === 'number' ? args.beforeSequence : undefined,
+      limit: optionalNumber(args.limit, 'limit'),
+      beforeSequence: optionalNumber(args.beforeSequence, 'beforeSequence'),
     })
   } catch (error) {
     if (error instanceof SandboxOneBotDebugCursorExpiredError) {
@@ -969,8 +974,8 @@ async function listModelRequestRecords(runtime: SandboxMcpToolRuntime, args: Rec
     model: typeof args.model === 'string' ? args.model : undefined,
     errorsOnly: args.errorsOnly === true ? true : undefined,
     order: args.order === 'asc' ? 'asc' : args.order === 'desc' ? 'desc' : undefined,
-    limit: typeof args.limit === 'number' ? args.limit : undefined,
-    beforeSequence: typeof args.beforeSequence === 'number' ? args.beforeSequence : undefined,
+    limit: optionalNumber(args.limit, 'limit'),
+    beforeSequence: optionalNumber(args.beforeSequence, 'beforeSequence'),
     beforeCreatedAt: typeof args.beforeCreatedAt === 'string' ? args.beforeCreatedAt : undefined,
     beforeId: typeof args.beforeId === 'string' ? args.beforeId : undefined,
   }
@@ -982,7 +987,7 @@ async function listModelRequestRecords(runtime: SandboxMcpToolRuntime, args: Rec
       const { next, ...page } = await runtime.scopes.federate(
         (recordScope) => recordScope.records.getRecords(federatedQuery),
         {
-          limit: Math.min(Math.max(Number(query.limit ?? DEFAULT_MODEL_REQUEST_PAGE_SIZE) || DEFAULT_MODEL_REQUEST_PAGE_SIZE, 1), MAX_MODEL_REQUEST_PAGE_SIZE),
+          limit: requireNumber(query.limit, 'limit', { fallback: DEFAULT_MODEL_REQUEST_PAGE_SIZE, min: 1, max: MAX_MODEL_REQUEST_PAGE_SIZE }),
           order: query.order === 'asc' ? 'asc' : 'desc',
           tieBreak: ({ id }) => id,
           nextCursor: ({ createdAt, id }) => ({ nextCreatedAt: createdAt, nextId: id }),
