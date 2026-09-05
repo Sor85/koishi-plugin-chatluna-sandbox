@@ -6,14 +6,14 @@ import type {
 } from './types'
 
 /**
- * 请求组成图的轨道顺序、分段可辨识度判定与按请求聚合。
+ * 请求组成图的轨道顺序、分段可辨识度判定、按请求聚合与分段身份。
  *
  * 与证据种类 module 同一形状的浏览器安全纯 module：不依赖 Node、Koishi、Vue 或 DOM，
  * 因此服务端派生组成项与客户端铺轨道共用同一份顺序、同一个最小宽度和同一条粒度判据。
  * 三者任意一侧自己留一份，都会表现为「服务端按聚合下发、客户端仍按逐段量宽度」这类无声错位。
  *
- * 它只描述组成图的几何与粒度，不描述字符怎么数（那是模型证据投影的度量）、
- * 也不描述账本行怎么展开（那是轨迹派生的事）。
+ * 它只描述组成图的几何、粒度与「哪一块是选中的那一条」，不描述字符怎么数（那是模型证据投影的
+ * 度量）、也不描述账本行怎么展开（那是轨迹派生的事）。
  */
 
 /**
@@ -300,7 +300,7 @@ export function aggregateModelRequestComposition(
 /**
  * 某种轨迹行落在组成图的哪条轨道上。
  *
- * 聚合分段没有单一证据身份，因此「当前选中的行属不属于这一段」只能按请求加轨道判断。
+ * 服务端聚合段没有单一证据身份，因此「当前选中的行属不属于这一段」只能按请求加轨道判断。
  * 请求边界与模型响应不进请求体统计，两者都返回缺省。
  */
 export function modelRequestCompositionKindOf(
@@ -311,4 +311,55 @@ export function modelRequestCompositionKindOf(
   if (kind === 'user' || kind === 'variable') return 'user'
   if (kind === 'tool-call' || kind === 'tool-result') return 'tool-interaction'
   return undefined
+}
+
+/**
+ * 画出来的一块分段的身份：它落在哪条轨道、属于哪条请求、覆盖了哪几条证据。
+ *
+ * 三种块的证据身份各不相同。逐段分段就是那一条证据；几何合成块是按当前像素并起来的，
+ * 合了哪几条是已知的，因此列出清单；服务端聚合段在下发之前就把身份折掉了，两项都缺省。
+ */
+export interface ModelRequestCompositionSegmentIdentity {
+  kind: SandboxModelRequestPromptKind
+  requestId?: string
+  /** 这一块自己就是那一条证据。 */
+  evidenceId?: string
+  /** 这一块合了哪几条证据；给出时以它为准，`evidenceId` 只是其中的落点。 */
+  evidenceIds?: readonly string[]
+}
+
+/** 组成图当前的选中态：账本里选中的那一行，或分析视图里的一次定位信号。 */
+export interface ModelRequestCompositionSelection {
+  /** 选中的那条证据。请求边界行没有模型证据，回落到第一条卡片的定位信号也没有。 */
+  evidenceId?: string
+  requestId?: string
+  /** 选中行的种类，`request` 表示选中的是整条请求。定位信号不带种类。 */
+  kind?: SandboxModelRequestTrajectoryKind
+}
+
+/**
+ * 一块分段要不要画成选中。
+ *
+ * 有证据身份的块按成员判定，合成块也走这一条：合并只是把挤不开的相邻分段画成一块，
+ * 「选中的那条证据在不在这一块里」仍然回答得出来。借用聚合段的「请求 + 轨道」判据会让点中
+ * 一条证据把同一轨道上所有合成块一起描边——它们各自只覆盖这一档里的几条，不是整档。
+ *
+ * 只有服务端聚合段无从按身份判：它覆盖那条请求那一档的全部证据，因此按请求加轨道判，
+ * 选中请求边界行时整条请求的各档一起亮起——点聚合段选中的正是这一行，只按轨道判会让刚点过的
+ * 那一块没有任何反馈。
+ *
+ * 请求身份必须先对上：一次会话里第 N 条请求的请求体含前 N 轮历史，同一条证据身份会在每条请求
+ * 里各出现一次，不比请求就会让一次选中点亮整段会话里的同名分段。
+ */
+export function isModelRequestCompositionSegmentSelected(
+  segment: ModelRequestCompositionSegmentIdentity,
+  selection: ModelRequestCompositionSelection | undefined,
+): boolean {
+  if (!selection) return false
+  if (segment.requestId && selection.requestId !== segment.requestId) return false
+  const covered = segment.evidenceIds ?? (segment.evidenceId ? [segment.evidenceId] : undefined)
+  if (covered) return selection.evidenceId ? covered.includes(selection.evidenceId) : false
+  if (!segment.requestId) return false
+  if (selection.kind === 'request') return true
+  return selection.kind !== undefined && modelRequestCompositionKindOf(selection.kind) === segment.kind
 }

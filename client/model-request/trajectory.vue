@@ -381,9 +381,9 @@ import {
   MODEL_REQUEST_COMPOSITION_KINDS,
   MODEL_REQUEST_COMPOSITION_MIN_SEGMENT_PIXELS,
   groupModelRequestCompositionSegments,
+  isModelRequestCompositionSegmentSelected,
   layoutModelRequestCompositionSegment,
   layoutModelRequestCompositionSlots,
-  modelRequestCompositionKindOf,
 } from '../../src/model-request-composition'
 import {
   createCompositionHoverIntent,
@@ -550,8 +550,10 @@ const COMPOSITION_KINDS = MODEL_REQUEST_COMPOSITION_KINDS
 interface CompositionSegment {
   /** 渲染键。一条消息被变量切开后会产出多段同 evidenceId 的分段，键必须自带序号才唯一。 */
   id: string
-  /** 聚合粒度下一段覆盖一整档证据，没有单一身份，因此可缺省。 */
+  /** 服务端聚合粒度下一段覆盖一整档证据，没有单一身份，因此可缺省。 */
   evidenceId?: string
+  /** 合成块合了哪几条证据。逐段分段只有自己那一条，因此不带这一项。 */
+  evidenceIds?: readonly string[]
   kind: SandboxModelRequestPromptKind
   characters: number
   percentage: number
@@ -621,14 +623,17 @@ function mergeCompositionSegments(segments: readonly CompositionSegment[], minWi
     const first = segments[from]!
     if (to - from === 1) return { ...first, left, width }
     const merged = segments.slice(from, to)
+    // 合成块记得自己合了哪几条证据：这一步是按当前像素做的几何合并，不是身份聚合，合了哪几条
+    // 始终是已知的。少了这份清单，选中判定只能退回服务端聚合段的「请求 + 轨道」，于是点中一条
+    // 证据会把同一轨道上所有合成块一起描边——它们各自只覆盖这一档里的几条，不是整档。
+    const evidenceIds = merged.flatMap(segment => segment.evidenceId ? [segment.evidenceId] : [])
     // 变量身份要留住：合并不跨变量档的边界，整块因此同在变量档或同在非变量档，丢掉它会让
     // User 轨道上那一档颜色凭空消失。具体是哪个变量只有整块同名时才成立——相邻的不同变量会
     // 并成一块，那一块属于变量档但没有单一变量身份。
     const named = merged.every(segment => segment.variableId === first.variableId)
     return {
-      // 合成块没有单一证据身份，这一点与服务端聚合粒度下的分段一致，因此选中判定、点击落点
-      // 与浮层文案都不需要第二套分支。
       id: `${first.id}+${to - from}`,
+      ...(evidenceIds.length ? { evidenceIds } : {}),
       kind: first.kind,
       characters: merged.reduce((sum, segment) => sum + segment.characters, 0),
       percentage: merged.reduce((sum, segment) => sum + segment.percentage, 0),
@@ -960,42 +965,63 @@ function placeCompositionTooltip(bar: HTMLElement) {
 }
 
 function selectPromptSegment(segment: CompositionSegment) {
-  // 聚合分段覆盖某条请求里一整档证据，没有单一证据身份；它的落点是那条请求本身：
-  // 展开它并选中请求边界行，逐条证据随展开后的账本一起出现。
-  if (!segment.evidenceId) {
-    if (!segment.requestId) return
-    expandRequest(segment.requestId)
-    const boundary = (props.trajectory?.rows ?? []).find(row => row.kind === 'request' && row.requestId === segment.requestId)
-    if (boundary) selectedRowId.value = boundary.id
-    return
+  const evidenceId = compositionSegmentLanding(segment)
+  if (evidenceId) {
+    if (props.analysis) {
+      internalAnalysisLocateRequest.value = props.navigation.locateEvidence(evidenceId)
+      return
+    }
+    // 组成分段与账本行共享模型证据身份；同一条证据在两个入口一定选中同一行。
+    const row = (props.trajectory?.rows ?? []).find(candidate => (
+      candidate.evidenceId === evidenceId
+      && (!segment.requestId || candidate.requestId === segment.requestId)
+    ))
+    if (row) {
+      selectedRowId.value = row.id
+      return
+    }
   }
-  if (props.analysis) {
-    internalAnalysisLocateRequest.value = props.navigation.locateEvidence(segment.evidenceId)
-    return
-  }
-  // 组成分段与账本行共享模型证据身份；同一条证据在两个入口一定选中同一行。
-  const row = (props.trajectory?.rows ?? []).find(candidate => (
-    candidate.evidenceId === segment.evidenceId
-    && (!segment.requestId || candidate.requestId === segment.requestId)
-  ))
-  if (row) selectedRowId.value = row.id
+  // 剩下两种块的落点都是那条请求本身：服务端聚合段没有证据身份，而会话模式只给展开的请求下发
+  // 事件行，折叠中的请求即使分段自带身份也还没有行可选。展开它并选中请求边界行，逐条证据随
+  // 展开后的账本一起出现。
+  if (!segment.requestId) return
+  expandRequest(segment.requestId)
+  const boundary = (props.trajectory?.rows ?? []).find(row => row.kind === 'request' && row.requestId === segment.requestId)
+  if (boundary) selectedRowId.value = boundary.id
 }
 
-function isCompositionSegmentSelected(segment: CompositionSegment) {
-  if (!segment.evidenceId) {
-    // 聚合分段按「请求 + 轨道」判定：选中行落在这条请求的这一档里就算命中。
-    // 选中的是请求边界行时整条请求的各档一起亮起——点聚合分段选中的正是这一行，
-    // 只按轨道判会让刚点过的那一段没有任何反馈。
-    const selected = selectedRow.value
-    if (!selected || !segment.requestId || selected.requestId !== segment.requestId) return false
-    if (selected.kind === 'request') return true
-    return modelRequestCompositionKindOf(selected.kind) === segment.kind
+/**
+ * 点这一块会落到哪一条证据上。
+ *
+ * 合成块取它合进去的第一条：整块画在一起是因为在当前像素下挤不开，不是因为身份不明，
+ * 因此落点仍然精确到单条证据，而不是退回整条请求。服务端聚合段没有证据身份，因此没有落点。
+ */
+function compositionSegmentLanding(segment: CompositionSegment) {
+  return segment.evidenceId ?? segment.evidenceIds?.[0]
+}
+
+/**
+ * 点这一块会不会落到一条具体的证据上。
+ *
+ * 与落点解析同源，但只问「有没有证据身份、那条请求的事件行下发了吗」这两件事：无障碍名要给每一
+ * 块各求一次，逐块回账本里找行会让一屏上千块各扫一遍上万行的账本。
+ */
+function compositionSegmentLandsOnEvidence(segment: CompositionSegment) {
+  if (!compositionSegmentLanding(segment)) return false
+  return props.mode !== 'conversation' || !segment.requestId || expandedRequestIds.value.has(segment.requestId)
+}
+
+/** 组成图当前的选中态：分析视图按定位信号，账本按选中行。判定本身由请求组成 module 独占。 */
+const compositionSelection = computed(() => {
+  if (props.analysis) {
+    const evidenceId = analysisLocateRequest.value?.evidenceId
+    return evidenceId ? { evidenceId } : undefined
   }
-  if (props.analysis) return analysisLocateRequest.value?.evidenceId === segment.evidenceId
-  const selected = selectedRow.value
-  if (!selected) return false
-  return selected.evidenceId === segment.evidenceId
-    && (!segment.requestId || selected.requestId === segment.requestId)
+  return selectedRow.value
+})
+
+function isCompositionSegmentSelected(segment: CompositionSegment) {
+  return isModelRequestCompositionSegmentSelected(segment, compositionSelection.value)
 }
 
 /**
@@ -1014,13 +1040,15 @@ function compositionSegmentTitle(segment: CompositionSegment) {
 function compositionSegmentLabel(segment: CompositionSegment) {
   const share = `占请求体提示内容的 ${formatPercentage(segment.percentage)}`
   const title = compositionSegmentTitle(segment)
-  if (!segment.evidenceId && segment.requestId) {
-    return `${requestOrdinal(segment.requestId)} 的 ${title} ${share}，点击展开这条请求`
+  // 合成块与聚合段都覆盖多条证据，无障碍名要说出这一层：浮层里的那句只有指针能读到。
+  const scope = segment.segmentCount ? `，${compositionSegmentScope(segment)}` : ''
+  if (segment.requestId && !compositionSegmentLandsOnEvidence(segment)) {
+    return `${requestOrdinal(segment.requestId)} 的 ${title} ${share}${scope}，点击展开这条请求`
   }
-  return `${title} ${share}`
+  return `${title} ${share}${scope}`
 }
 
-/** 聚合分段的补充说明：它把这条请求里多少条证据合成了一段。 */
+/** 聚合段与合成块的补充说明：这一块把多少条证据画成了一段。 */
 function compositionSegmentScope(segment: CompositionSegment) {
   return `合并 ${segment.segmentCount} 条证据`
 }

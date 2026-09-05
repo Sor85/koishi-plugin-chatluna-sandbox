@@ -307,6 +307,14 @@ describe('WebQQ 模型请求工作台', () => {
     // 视图口宽度必须跟着窗口与侧栏变；量一次就存下来会让缩放后的判定停在旧宽度上。
     expect(trajectorySource).toMatch(/watch\(compositionViewport,[\s\S]{0,400}?new ResizeObserver/)
     expect(trajectorySource).toContain('compositionViewportResizeObserver?.disconnect()')
+    // 合成块必须记得自己合了哪几条证据。少了这份清单，选中判定只能退回服务端聚合段的
+    // 「请求 + 轨道」，于是点中一个工具声明会把同一轨道上所有合成块一起描边（实测点一块、亮四块）。
+    expect(trajectorySource).toContain('const evidenceIds = merged.flatMap(segment => segment.evidenceId ? [segment.evidenceId] : [])')
+    // 选中判定归请求组成 module 独占：视图自己按轨道判就是上面那个形态的来源。
+    expect(trajectorySource).toContain('isModelRequestCompositionSegmentSelected(segment, compositionSelection.value)')
+    expect(trajectorySource).not.toContain('modelRequestCompositionKindOf')
+    // 合成块的落点仍然精确到单条证据：退回「展开这条请求」会让已经展开的那条请求点不出任何变化。
+    expect(trajectorySource).toContain('return segment.evidenceId ?? segment.evidenceIds?.[0]')
   })
 
   it('轨迹账本与检查器：模式切换、账本列与种类标签、请求折叠、检查器容器与工具栏折叠', () => {

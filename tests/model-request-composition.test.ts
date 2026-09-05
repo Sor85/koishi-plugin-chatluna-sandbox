@@ -8,6 +8,7 @@ import {
   MODEL_REQUEST_COMPOSITION_ZOOM_MAX,
   aggregateModelRequestComposition,
   groupModelRequestCompositionSegments,
+  isModelRequestCompositionSegmentSelected,
   layoutModelRequestCompositionSegment,
   layoutModelRequestCompositionSlots,
   modelRequestCompositionKindOf,
@@ -138,6 +139,78 @@ describe('轨迹行落在哪条组成轨道', () => {
   it('请求边界与模型响应不进请求体统计，因此没有轨道', () => {
     expect(modelRequestCompositionKindOf('request')).toBeUndefined()
     expect(modelRequestCompositionKindOf('response')).toBeUndefined()
+  })
+})
+
+describe('哪一块分段是选中的那一条', () => {
+  /** 一条请求的工具声明轨道：合成块与逐段分段都落在这一档。 */
+  const TOOL_DEFS = { kind: 'tool-definition', requestId: 'r1' } as const
+  /** 账本里选中了这条请求的第三个工具声明。 */
+  const SELECTED_TOOL = { kind: 'tool-definition', requestId: 'r1', evidenceId: 'req:tool-definition:tools.2' } as const
+
+  it('逐段分段按证据身份判：同一轨道上的其余分段不受影响', () => {
+    expect(isModelRequestCompositionSegmentSelected(
+      { ...TOOL_DEFS, evidenceId: 'req:tool-definition:tools.2' },
+      SELECTED_TOOL,
+    )).toBe(true)
+    expect(isModelRequestCompositionSegmentSelected(
+      { ...TOOL_DEFS, evidenceId: 'req:tool-definition:tools.3' },
+      SELECTED_TOOL,
+    )).toBe(false)
+  })
+
+  it('合成块按它合了哪几条判：合进去的任意一条被选中都算命中', () => {
+    // 合成块曾借用聚合段的「请求 + 轨道」判据，于是点中一个工具声明会把同一轨道上所有合成块
+    // 一起描边——实测一条请求里点一块、亮四块。它们各自只覆盖这一档里的几条，不是整档。
+    expect(isModelRequestCompositionSegmentSelected(
+      { ...TOOL_DEFS, evidenceIds: ['req:tool-definition:tools.1', 'req:tool-definition:tools.2'] },
+      SELECTED_TOOL,
+    )).toBe(true)
+    expect(isModelRequestCompositionSegmentSelected(
+      { ...TOOL_DEFS, evidenceIds: ['req:tool-definition:tools.7', 'req:tool-definition:tools.8'] },
+      SELECTED_TOOL,
+    )).toBe(false)
+  })
+
+  it('有证据身份的块不因为选中请求边界行而整轨道亮起', () => {
+    const boundary = { kind: 'request', requestId: 'r1' } as const
+
+    expect(isModelRequestCompositionSegmentSelected({ ...TOOL_DEFS, evidenceId: 'req:tool-definition:tools.0' }, boundary)).toBe(false)
+    expect(isModelRequestCompositionSegmentSelected({ ...TOOL_DEFS, evidenceIds: ['req:tool-definition:tools.0'] }, boundary)).toBe(false)
+  })
+
+  it('聚合段按请求加轨道判：选中请求边界行时整条请求的各档一起亮', () => {
+    const aggregated = { kind: 'user', requestId: 'r1' } as const
+
+    expect(isModelRequestCompositionSegmentSelected(aggregated, { kind: 'request', requestId: 'r1' })).toBe(true)
+    // 变量行落在 User 轨道，工具调用落在工具交互轨道。
+    expect(isModelRequestCompositionSegmentSelected(aggregated, { kind: 'variable', requestId: 'r1', evidenceId: 'variable:v1' })).toBe(true)
+    expect(isModelRequestCompositionSegmentSelected(aggregated, { kind: 'tool-call', requestId: 'r1', evidenceId: 'req:tool-call:messages.2.tool_calls.0' })).toBe(false)
+    expect(isModelRequestCompositionSegmentSelected(aggregated, { kind: 'request', requestId: 'r2' })).toBe(false)
+  })
+
+  it('请求身份先对上：同一条证据身份在每条请求里各出现一次', () => {
+    // 第 N 条请求的请求体含前 N 轮历史，不比请求会让一次选中点亮整段会话里的同名分段。
+    const selected = { kind: 'system', requestId: 'r2', evidenceId: 'req:message:messages.0' } as const
+
+    expect(isModelRequestCompositionSegmentSelected({ kind: 'system', requestId: 'r1', evidenceId: 'req:message:messages.0' }, selected)).toBe(false)
+    expect(isModelRequestCompositionSegmentSelected({ kind: 'system', requestId: 'r1', evidenceIds: ['req:message:messages.0'] }, selected)).toBe(false)
+    expect(isModelRequestCompositionSegmentSelected({ kind: 'system', requestId: 'r2', evidenceId: 'req:message:messages.0' }, selected)).toBe(true)
+  })
+
+  it('单请求视图的分段没有请求身份，只按定位信号的证据身份判', () => {
+    const segment = { kind: 'user', evidenceId: 'req:message:messages.1' } as const
+
+    expect(isModelRequestCompositionSegmentSelected(segment, { evidenceId: 'req:message:messages.1' })).toBe(true)
+    expect(isModelRequestCompositionSegmentSelected(segment, { evidenceId: 'req:message:messages.2' })).toBe(false)
+    // 空证据身份表示定位信号来自没有模型证据的行，此时一块都不亮。
+    expect(isModelRequestCompositionSegmentSelected(segment, { evidenceId: '' })).toBe(false)
+  })
+
+  it('没有选中态时一块都不亮', () => {
+    expect(isModelRequestCompositionSegmentSelected({ ...TOOL_DEFS, evidenceId: 'req:tool-definition:tools.0' }, undefined)).toBe(false)
+    expect(isModelRequestCompositionSegmentSelected({ ...TOOL_DEFS, evidenceIds: ['req:tool-definition:tools.0'] }, undefined)).toBe(false)
+    expect(isModelRequestCompositionSegmentSelected({ kind: 'user', requestId: 'r1' }, undefined)).toBe(false)
   })
 })
 
