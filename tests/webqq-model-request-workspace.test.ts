@@ -226,15 +226,26 @@ describe('WebQQ 模型请求工作台', () => {
     expect(trajectorySource).not.toContain('Ctrl + 滚轮')
     expect(trajectorySource).not.toContain("'is-expanded': compositionZoom > COMPOSITION_ZOOM_MIN")
     expect(trajectorySource).toContain("'is-variable': segment.variableId")
-    // 一条消息被变量切开后会产出多段同 evidenceId 的分段，渲染键必须自带序号，否则同一轨道内撞键。
-    expect(trajectorySource).toContain('id: `${index}:${item.evidenceId}`')
-    expect(trajectorySource).toContain('id: `${slot.id}:${index}:${item.evidenceId}`')
+    // 一条消息被变量切开后会产出多段同 evidenceId 的分段，渲染键必须自带序号，否则同一轨道内撞键；
+    // 聚合粒度的分段没有证据身份，键退回种类，因此两种粒度都不会撞键。
+    expect(trajectorySource).toContain('id: `${index}:${item.evidenceId ?? item.kind}`')
+    expect(trajectorySource).toContain('id: `${slot.id}:${index}:${item.evidenceId ?? item.kind}`')
     // 变量分段的标题标签同样来自证据种类 module，不在视图里硬编码一份。
-    expect(trajectorySource).toContain("`${evidenceTitleLabel('variable')} · ${segment.variableName}`")
+    expect(trajectorySource).toContain("`${evidenceTitleLabel('variable')} · ${hoveredSegment.variableName}`")
+    // 整条轨道共用一个浮层：逐段各挂一个 Tooltip 组件时，一次会话的上千条分段会让每次重新
+    // 取回轨迹都重渲染上千个组件，实测点击展开的 269 ms 延迟里有 224 ms 花在那里。
+    expect(trajectorySource).not.toContain('<Tooltip v-for')
+    expect(trajectorySource).not.toContain('<TooltipTrigger')
+    expect(trajectorySource).toContain('webqq-model-trajectory-composition-tip')
+    expect(trajectorySource).toContain('@pointerenter="enterCompositionSegment(segment, $event)"')
+    expect(trajectorySource).toContain('@focus="enterCompositionSegment(segment, $event)"')
+    expect(styles).toMatch(/\.webqq-model-trajectory-composition-tip\s*\{[^}]*position:\s*absolute/s)
     expect(trajectorySource).toContain('当前会话没有可投影的请求组成')
-    // 单请求与完整会话共用一份轨道清单：各留一份会让同一条会话在切换模式时凭空多出或少掉轨道。
-    expect(trajectorySource).toContain("const COMPOSITION_KINDS = ['system', 'user', 'tool-definition', 'assistant', 'tool-interaction'] as const")
-    expect(trajectorySource).not.toContain('REQUEST_COMPOSITION_KINDS')
+    // 单请求与完整会话共用一份轨道清单，且这份清单由请求组成 module 独占：
+    // 视图自己留一份会让同一条会话在切换模式或粒度时凭空多出或少掉轨道。
+    expect(trajectorySource).toContain('const COMPOSITION_KINDS = MODEL_REQUEST_COMPOSITION_KINDS')
+    expect(trajectorySource).not.toContain("['system', 'user', 'tool-definition', 'assistant', 'tool-interaction']")
+    expect(trajectorySource).not.toContain('REQUEST_COMPOSITION_KINDS = [')
     expect(trajectorySource).not.toContain('CONVERSATION_COMPOSITION_KINDS')
     expect(trajectorySource.match(/groupCompositionTracks\(COMPOSITION_KINDS, segments\)/g)).toHaveLength(2)
     // 完整会话只排除没有请求身份的组成项——它落不到时间轴的任何一格；种类不再筛第二遍。

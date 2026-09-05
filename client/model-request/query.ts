@@ -15,7 +15,11 @@ export const MAIN_MODEL_REQUEST_SPACE_ID = 'main'
 
 export type ModelRequestRecordsQuery = GetSandboxModelRequestRecordsInput & SandboxModelRequestScope
 export type ModelRequestRecordQuery = GetSandboxModelRequestRecordInput & SandboxModelRequestScope
-export type ModelRequestTrajectoryQuery = GetSandboxModelRequestRecordInput & SandboxModelRequestScope & { mode: 'request' | 'conversation' }
+export type ModelRequestTrajectoryQuery = GetSandboxModelRequestRecordInput & SandboxModelRequestScope & {
+  mode: 'request' | 'conversation'
+  /** 会话账本按请求按需展开：只有这些请求要事件行，其余只取请求边界行。 */
+  expandedRequestIds?: readonly string[]
+}
 export type ClearModelRequestRecordsQuery = SandboxModelRequestScope
 
 export interface ModelRequestRecordsPageState {

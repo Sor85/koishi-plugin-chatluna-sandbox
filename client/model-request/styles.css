@@ -1092,6 +1092,35 @@
     0 0 0 2px var(--webqq-accent);
 }
 
+/*
+ * 分段浮层。整条轨道共用一个，因此它挂在组成图容器上而不是每条分段里：
+ * 轨道视口纵向裁切（overflow-y: hidden 是横向滚动的必然结果），挂在视口内的浮层会被裁掉。
+ * 落点由脚本按分段与容器的相对位置写入，这里只负责脱离文档流与外观。
+ */
+.webqq-model-trajectory-composition-tip {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  gap: 2px;
+  max-width: 280px;
+  padding: 6px 10px;
+  border: 1px solid var(--webqq-border);
+  border-radius: 6px;
+  color: var(--webqq-text);
+  background: var(--webqq-surface);
+  box-shadow: 0 4px 12px rgb(15 23 42 / 12%);
+  font-size: var(--webqq-font-sm);
+  line-height: 1.5;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-50%, -100%);
+}
+
+.webqq-model-trajectory-composition-tip span {
+  color: color-mix(in srgb, currentColor 78%, transparent);
+  font-size: var(--webqq-font-2xs);
+}
+
 .webqq-model-trajectory-composition-empty {
   min-height: 50px;
   padding: 18px 12px;

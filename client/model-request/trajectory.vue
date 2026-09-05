@@ -28,7 +28,7 @@
       </div>
       <div class="webqq-model-trajectory-summary">
         <span>{{ trajectory?.records.length ?? 0 }} 次请求</span>
-        <span>{{ trajectory?.rows.length ?? 0 }} 条事件</span>
+        <span>{{ trajectory?.eventTotal ?? 0 }} 条事件</span>
       </div>
         </header>
 
@@ -58,8 +58,10 @@
             <IconSortAscending v-else data-icon="inline-start" aria-hidden="true" />
             {{ trajectorySortOrder === 'desc' ? '倒序' : '正序' }}
           </Button>
+          <!-- 会话模式的事件行按请求向服务端取，「全部展开」等于把整段会话重新拉回来；
+               默认全折叠之后这个总开关不再成立，展开与折叠一律走每条请求自己的箭头。 -->
           <Button
-            v-if="!analysis"
+            v-if="!analysis && mode !== 'conversation'"
             size="sm"
             variant="ghost"
             :aria-pressed="requestsCollapsed"
@@ -162,8 +164,7 @@
         </div>
       </div>
 
-      <TooltipProvider :delay-duration="500">
-        <div v-if="compositionTracks.length" class="webqq-model-trajectory-composition-shell">
+      <div v-if="compositionTracks.length" ref="compositionShell" class="webqq-model-trajectory-composition-shell">
           <section
             class="webqq-model-trajectory-composition"
             :style="{ minHeight: `${Math.max(50, compositionTracks.length * 14 + 8)}px` }"
@@ -182,6 +183,7 @@
               @pointerup="finishCompositionDrag"
               @pointercancel="finishCompositionDrag"
               @click.capture="handleCompositionClickCapture"
+              @scroll="hideCompositionTooltip"
             >
               <div
                 class="webqq-model-trajectory-composition-tracks"
@@ -195,36 +197,46 @@
                   aria-hidden="true"
                 />
                 <div v-for="track in compositionTracks" :key="track.kind" class="webqq-model-trajectory-composition-track">
-                  <Tooltip v-for="segment in track.segments" :key="segment.id">
-                    <TooltipTrigger as-child>
-                      <button
-                        type="button"
-                        class="webqq-model-trajectory-composition-bar"
-                        :class="[
-                          `is-${segment.kind}`,
-                          { 'is-variable': segment.variableId, 'is-selected': isCompositionSegmentSelected(segment) },
-                        ]"
-                        :style="{ left: `${segment.left}%`, width: `${segment.width}%` }"
-                        :aria-label="segment.variableName
-                          ? `变量 ${segment.variableName} 占请求体提示内容的 ${formatPercentage(segment.percentage)}`
-                          : `${evidenceTitleLabel(segment.kind)} 占请求体提示内容的 ${formatPercentage(segment.percentage)}`"
-                        @click="selectPromptSegment(segment)"
-                      />
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      <strong>{{ segment.variableName ? `${evidenceTitleLabel('variable')} · ${segment.variableName}` : evidenceTitleLabel(segment.kind) }} · {{ formatPercentage(segment.percentage) }}</strong>
-                      <span>{{ segment.characters.toLocaleString('zh-CN') }} 个字符</span>
-                    </TooltipContent>
-                  </Tooltip>
+                  <!-- 整条轨道共用一个浮层：每段各挂一个 Tooltip 组件时，一次会话的上千条分段
+                       会让每次重新取回轨迹都重渲染上千个组件，点击展开的延迟绝大部分花在那里。 -->
+                  <button
+                    v-for="segment in track.segments"
+                    :key="segment.id"
+                    type="button"
+                    class="webqq-model-trajectory-composition-bar"
+                    :class="[
+                      `is-${segment.kind}`,
+                      { 'is-variable': segment.variableId, 'is-selected': isCompositionSegmentSelected(segment) },
+                    ]"
+                    :style="{ left: `${segment.left}%`, width: `${segment.width}%` }"
+                    :aria-label="compositionSegmentLabel(segment)"
+                    :aria-describedby="hoveredSegment?.id === segment.id ? compositionTooltipId : undefined"
+                    @click="selectPromptSegment(segment)"
+                    @pointerenter="enterCompositionSegment(segment, $event)"
+                    @pointerleave="hideCompositionTooltip"
+                    @focus="enterCompositionSegment(segment, $event)"
+                    @blur="hideCompositionTooltip"
+                  />
                 </div>
               </div>
             </div>
           </section>
+          <div
+            v-if="hoveredSegment"
+            :id="compositionTooltipId"
+            ref="compositionTooltip"
+            class="webqq-model-trajectory-composition-tip"
+            role="tooltip"
+            :style="{ left: `${compositionTooltipPosition.left}px`, top: `${compositionTooltipPosition.top}px` }"
+          >
+            <strong>{{ hoveredSegment.variableName ? `${evidenceTitleLabel('variable')} · ${hoveredSegment.variableName}` : evidenceTitleLabel(hoveredSegment.kind) }} · {{ formatPercentage(hoveredSegment.percentage) }}</strong>
+            <span>{{ hoveredSegment.characters.toLocaleString('zh-CN') }} 个字符</span>
+            <span v-if="hoveredSegment.segmentCount">{{ compositionSegmentScope(hoveredSegment) }}</span>
+          </div>
         </div>
         <div v-else class="webqq-model-trajectory-composition-empty">
           {{ mode === 'conversation' ? '当前会话没有可投影的请求组成' : '当前请求体没有可统计的提示词内容' }}
         </div>
-        </TooltipProvider>
       </div>
         <p v-if="mode === 'conversation' && hasUnknownTiming" class="webqq-model-trajectory-timing-note">
           进行中的请求仅标记开始位置；TTFT 与解码阶段尚无独立时间证据
@@ -333,7 +345,6 @@ import {
 import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
 import { Button } from '#client/components/ui/button'
 import { Input } from '#client/components/ui/input'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#client/components/ui/tooltip'
 import ModelRequestConversationAnalysis from './analysis-view.vue'
 import type { EvidenceNavigation, EvidenceViewRestore } from '#client/shared/evidence-navigation'
 import type { LocateRequest } from '#client/shared/evidence-locator'
@@ -352,6 +363,15 @@ import {
   COMPOSITION_ZOOM_STEP,
   createCompositionZoomPan,
 } from './composition-zoom-pan'
+import {
+  MODEL_REQUEST_COMPOSITION_KINDS,
+  MODEL_REQUEST_COMPOSITION_MIN_SEGMENT_WIDTH,
+  modelRequestCompositionKindOf,
+} from '../../src/model-request-composition'
+import {
+  createCompositionHoverIntent,
+  resolveCompositionTooltipPosition,
+} from './composition-tooltip'
 import {
   formatModelRequestLabel,
   formatModelRequestOrdinal,
@@ -392,6 +412,8 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   'update:mode': [mode: 'request' | 'conversation']
+  /** 会话账本展开哪几条请求。事件行由服务端按这份清单下发，因此展开是一次读取而不是纯显示。 */
+  'update:expandedRequestIds': [requestIds: string[]]
   'open-request': [payload: {
     recordId: string
     returnState: {
@@ -425,6 +447,12 @@ const ledgerScrollRestore = createScrollRestore({
 const selectedRowId = ref('')
 const actualDuration = ref(true)
 const compositionViewport = ref<HTMLElement>()
+const compositionShell = ref<HTMLElement>()
+const compositionTooltip = ref<HTMLElement>()
+const compositionTooltipId = useId()
+const hoveredSegment = ref<CompositionSegment>()
+const compositionTooltipPosition = ref({ left: 0, top: 0 })
+const compositionHover = createCompositionHoverIntent()
 const {
   zoom: compositionZoom,
   dragging: compositionDragging,
@@ -441,7 +469,18 @@ const {
 })
 const requestsCollapsed = ref(false)
 const trajectorySortOrder = ref<ModelRequestTrajectorySortOrder>('desc')
-const collapsedRequestIds = ref<ReadonlySet<string>>(new Set())
+/**
+ * 单请求模式的折叠集合。会话模式不用它：那边的事件行由服务端按已展开清单下发，
+ * 折叠态因此是「轨迹里没有这一条的行」而不是「有行但藏起来」，两种模式合用一个集合
+ * 会让会话模式在取回新行之前把它们又藏一遍。
+ */
+const localCollapsedRequestIds = ref<ReadonlySet<string>>(new Set())
+const expandedRequestIds = computed(() => new Set(props.trajectory?.expandedRequestIds ?? []))
+const collapsedRequestIds = computed<ReadonlySet<string>>(() => {
+  if (props.mode !== 'conversation') return localCollapsedRequestIds.value
+  const expanded = expandedRequestIds.value
+  return new Set((props.trajectory?.records ?? []).flatMap(({ id }) => expanded.has(id) ? [] : [id]))
+})
 const hiddenKinds = ref<ReadonlySet<SandboxEvidenceKind>>(new Set())
 const filtersExpanded = ref(false)
 // 常用证据种类和「耗时」「请求」一起留在工具栏外层；VARIABLE 紧邻 TOOL DEFS 左侧。
@@ -481,24 +520,23 @@ const promptComposition = computed(() => {
   }))
 })
 /**
- * 请求组成图的轨道顺序，按证据在请求体里出现的先后排列：
- * 系统前缀 → 用户消息 → 能力目录 → 模型自己的发言 → 工具往返。
- * Assistant 紧贴 Tool I/O，两者的分段都落在请求尾部，同屏才能看出一次工具往返由哪条发言发起。
- *
- * 单请求与完整会话共用这一份顺序：两种模式的分段来自同一份组成投影，只是横轴一个按占比、
- * 一个按时间铺开；各自留一份种类清单会让同一条会话在切换模式时凭空多出或少掉几条轨道。
+ * 请求组成图的轨道顺序由请求组成 module 独占，服务端聚合每个请求内部的先后也按它排；
+ * 视图再留一份会让同一条会话在切换粒度时凭空多出或少掉几条轨道。
  */
-const COMPOSITION_KINDS = ['system', 'user', 'tool-definition', 'assistant', 'tool-interaction'] as const
+const COMPOSITION_KINDS = MODEL_REQUEST_COMPOSITION_KINDS
 
 interface CompositionSegment {
   /** 渲染键。一条消息被变量切开后会产出多段同 evidenceId 的分段，键必须自带序号才唯一。 */
   id: string
-  evidenceId: string
+  /** 聚合粒度下一段覆盖一整档证据，没有单一身份，因此可缺省。 */
+  evidenceId?: string
   kind: SandboxModelRequestPromptKind
   characters: number
   percentage: number
   left: number
   width: number
+  /** 聚合粒度下这一段合并了多少条逐段证据。 */
+  segmentCount?: number
   variableId?: string
   variableName?: string
   requestId?: string
@@ -514,15 +552,16 @@ const requestCompositionTracks = computed(() => {
     offset += item.percentage
     const gap = index < promptComposition.value.length - 1 ? 0.35 : 0
     return {
-      id: `${index}:${item.evidenceId}`,
-      evidenceId: item.evidenceId,
+      id: `${index}:${item.evidenceId ?? item.kind}`,
+      ...(item.evidenceId ? { evidenceId: item.evidenceId } : {}),
       kind: item.kind,
       characters: item.characters,
       percentage: item.percentage,
+      ...(item.segmentCount ? { segmentCount: item.segmentCount } : {}),
       ...(item.variableId ? { variableId: item.variableId } : {}),
       ...(item.variableName ? { variableName: item.variableName } : {}),
       left,
-      width: Math.min(Math.max(item.percentage - gap, 0.35), Math.max(100 - left, 0.35)),
+      width: clampSegmentWidth(item.percentage, gap, Math.max(100 - left, 0)),
     }
   })
   return groupCompositionTracks(COMPOSITION_KINDS, segments)
@@ -551,15 +590,16 @@ const conversationCompositionTracks = computed(() => {
       const gap = index < items.length - 1 ? Math.min(0.25, rawWidth / 4) : 0
       used += percentage
       segments.push({
-        id: `${slot.id}:${index}:${item.evidenceId}`,
-        evidenceId: item.evidenceId,
+        id: `${slot.id}:${index}:${item.evidenceId ?? item.kind}`,
+        ...(item.evidenceId ? { evidenceId: item.evidenceId } : {}),
         kind: item.kind,
         characters: item.characters,
         percentage,
+        ...(item.segmentCount ? { segmentCount: item.segmentCount } : {}),
         ...(item.variableId ? { variableId: item.variableId } : {}),
         ...(item.variableName ? { variableName: item.variableName } : {}),
         left,
-        width: Math.min(Math.max(rawWidth - gap, 0.35), Math.max(slot.left + slot.width - left, 0.35)),
+        width: clampSegmentWidth(rawWidth, gap, Math.max(slot.left + slot.width - left, 0)),
         requestId: slot.id,
       })
     })
@@ -567,13 +607,32 @@ const conversationCompositionTracks = computed(() => {
   return groupCompositionTracks(COMPOSITION_KINDS, segments)
 })
 
+/**
+ * 分段实际画多宽。
+ *
+ * 最小宽度只用来兜住「有内容却薄到看不见」，绝不把分段撑得比真实占比还宽：撑宽会让同一条
+ * 时间槽里的分段互相压住，读出来的厚度比真实占比大出好几倍。真实占比已经低于最小宽度时
+ * 按真实占比画成发丝线——看不清是事实本身，粒度判据会在挤不开时改成聚合粒度。
+ */
+function clampSegmentWidth(rawWidth: number, gap: number, available: number) {
+  const floor = Math.min(rawWidth, MODEL_REQUEST_COMPOSITION_MIN_SEGMENT_WIDTH)
+  return Math.min(Math.max(rawWidth - gap, floor), Math.max(available, floor))
+}
+
+/** 一趟分桶而不是每档筛一遍：聚合前的会话分段可以有上万条，逐档 filter 等于把它们扫五遍。 */
 function groupCompositionTracks(
   kinds: readonly SandboxModelRequestPromptKind[],
   segments: readonly CompositionSegment[],
 ) {
+  const byKind = new Map<SandboxModelRequestPromptKind, CompositionSegment[]>()
+  for (const segment of segments) {
+    const bucket = byKind.get(segment.kind)
+    if (bucket) bucket.push(segment)
+    else byKind.set(segment.kind, [segment])
+  }
   return kinds.flatMap((kind) => {
-    const kindSegments = segments.filter(segment => segment.kind === kind)
-    return kindSegments.length ? [{ kind, segments: kindSegments }] : []
+    const kindSegments = byKind.get(kind)
+    return kindSegments?.length ? [{ kind, segments: kindSegments }] : []
   })
 }
 const evidenceFilter = computed(() => ({
@@ -632,7 +691,10 @@ watch(stickyHeaderElement, (header) => {
   stickyHeaderResizeObserver.observe(header)
 }, { flush: 'post' })
 
-onBeforeUnmount(() => stickyHeaderResizeObserver?.disconnect())
+onBeforeUnmount(() => {
+  stickyHeaderResizeObserver?.disconnect()
+  compositionHover.dispose()
+})
 
 function restoreTrajectoryPosition() {
   const state = props.restoreState
@@ -690,7 +752,17 @@ function isRequestRowCollapsed(row: SandboxModelRequestTrajectoryRow) {
 }
 
 function toggleRequestCollapsed(row: SandboxModelRequestTrajectoryRow) {
-  collapsedRequestIds.value = toggleModelRequestTrajectoryCollapse(collapsedRequestIds.value, row.requestId)
+  if (props.mode !== 'conversation') {
+    localCollapsedRequestIds.value = toggleModelRequestTrajectoryCollapse(localCollapsedRequestIds.value, row.requestId)
+    return
+  }
+  if (!row.requestId) return
+  emit('update:expandedRequestIds', [...toggleFilterMember(expandedRequestIds.value, row.requestId)])
+}
+
+function expandRequest(requestId: string) {
+  if (props.mode !== 'conversation' || expandedRequestIds.value.has(requestId)) return
+  emit('update:expandedRequestIds', [...expandedRequestIds.value, requestId])
 }
 
 function handleCompositionClickCapture(event: MouseEvent) {
@@ -699,7 +771,49 @@ function handleCompositionClickCapture(event: MouseEvent) {
   event.stopPropagation()
 }
 
+/** 最近一次量到的浮层尺寸。首帧还没渲染出来时用它先落位，避免浮层在上一个分段的位置闪一下。 */
+let compositionTooltipSize = { width: 168, height: 46 }
+
+function enterCompositionSegment(segment: CompositionSegment, event: Event) {
+  const bar = event.currentTarget
+  if (!(bar instanceof HTMLElement)) return
+  compositionHover.enter(() => {
+    hoveredSegment.value = segment
+    placeCompositionTooltip(bar)
+    void nextTick(() => placeCompositionTooltip(bar))
+  })
+}
+
+function hideCompositionTooltip() {
+  compositionHover.leave(() => {
+    hoveredSegment.value = undefined
+  })
+}
+
+function placeCompositionTooltip(bar: HTMLElement) {
+  const shell = compositionShell.value
+  if (!shell) return
+  const tip = compositionTooltip.value
+  if (tip) compositionTooltipSize = { width: tip.offsetWidth, height: tip.offsetHeight }
+  compositionTooltipPosition.value = resolveCompositionTooltipPosition({
+    bar: bar.getBoundingClientRect(),
+    shell: shell.getBoundingClientRect(),
+    // 表头声明了 overflow: clip，浮层顶到它的上边缘就会被切掉。
+    clip: (stickyHeaderElement.value ?? shell).getBoundingClientRect(),
+    tooltip: compositionTooltipSize,
+  })
+}
+
 function selectPromptSegment(segment: CompositionSegment) {
+  // 聚合分段覆盖某条请求里一整档证据，没有单一证据身份；它的落点是那条请求本身：
+  // 展开它并选中请求边界行，逐条证据随展开后的账本一起出现。
+  if (!segment.evidenceId) {
+    if (!segment.requestId) return
+    expandRequest(segment.requestId)
+    const boundary = (props.trajectory?.rows ?? []).find(row => row.kind === 'request' && row.requestId === segment.requestId)
+    if (boundary) selectedRowId.value = boundary.id
+    return
+  }
   if (props.analysis) {
     internalAnalysisLocateRequest.value = props.navigation.locateEvidence(segment.evidenceId)
     return
@@ -713,11 +827,34 @@ function selectPromptSegment(segment: CompositionSegment) {
 }
 
 function isCompositionSegmentSelected(segment: CompositionSegment) {
+  if (!segment.evidenceId) {
+    // 聚合分段按「请求 + 轨道」判定：选中行落在这条请求的这一档里就算命中。
+    // 选中的是请求边界行时整条请求的各档一起亮起——点聚合分段选中的正是这一行，
+    // 只按轨道判会让刚点过的那一段没有任何反馈。
+    const selected = selectedRow.value
+    if (!selected || !segment.requestId || selected.requestId !== segment.requestId) return false
+    if (selected.kind === 'request') return true
+    return modelRequestCompositionKindOf(selected.kind) === segment.kind
+  }
   if (props.analysis) return analysisLocateRequest.value?.evidenceId === segment.evidenceId
   const selected = selectedRow.value
   if (!selected) return false
   return selected.evidenceId === segment.evidenceId
     && (!segment.requestId || selected.requestId === segment.requestId)
+}
+
+function compositionSegmentLabel(segment: CompositionSegment) {
+  const share = `占请求体提示内容的 ${formatPercentage(segment.percentage)}`
+  if (segment.variableName) return `变量 ${segment.variableName} ${share}`
+  if (!segment.evidenceId && segment.requestId) {
+    return `${requestOrdinal(segment.requestId)} 的 ${evidenceTitleLabel(segment.kind)} ${share}，点击展开这条请求`
+  }
+  return `${evidenceTitleLabel(segment.kind)} ${share}`
+}
+
+/** 聚合分段的补充说明：它把这条请求里多少条证据合成了一段。 */
+function compositionSegmentScope(segment: CompositionSegment) {
+  return `合并 ${segment.segmentCount} 条证据`
 }
 
 function openSelectedRequest() {

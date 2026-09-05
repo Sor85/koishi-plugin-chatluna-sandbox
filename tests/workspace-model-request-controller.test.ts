@@ -48,6 +48,9 @@ describe('WebQQ 模型请求控制器', () => {
       rows: [{ id: 'record-1:request', index: 1, kind: 'request', preview: 'openai / gpt-4.1', requestId: 'record-1' }],
       promptComposition: [],
       complete: true,
+      granularity: 'evidence',
+      eventTotal: 0,
+      expandedRequestIds: ['record-1'],
     }
     const controller = createTestWorkspaceController({ modelRequest: port })
 

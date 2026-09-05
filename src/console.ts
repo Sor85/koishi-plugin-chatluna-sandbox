@@ -478,7 +478,12 @@ export function registerConsole(
     // 来源标注已经说明这条记录属于哪个记录域，因此记录库按同一个标识取一次就够，
     // 不必再按「全部空间 / 未归属 / 单空间」三种来路各挑一遍。
     const store = scopes.getModelRequests(modelRequestScopeId(detail.source))
-    return buildSandboxModelRequestTrajectoryFromStore({ record: detail, mode: input.mode, store })
+    return buildSandboxModelRequestTrajectoryFromStore({
+      record: detail,
+      mode: input.mode,
+      store,
+      ...(input.expandedRequestIds ? { expandedRequestIds: input.expandedRequestIds } : {}),
+    })
   }
   const clearModelRequestRecords = async (input: SandboxModelRequestScope): Promise<ClearSandboxModelRequestRecordsResult> => {
     if (input.scope === 'all') throw new Error('全部空间视图不支持一次性清理')

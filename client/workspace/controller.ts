@@ -1,4 +1,4 @@
-import { computed, readonly, ref, type DeepReadonly } from 'vue'
+import { computed, markRaw, readonly, ref, shallowRef, type DeepReadonly } from 'vue'
 import type {
   DeleteGroupAnnouncementInput,
   GetForwardMessageInput,
@@ -188,7 +188,14 @@ export function createWorkspaceController(ports: WorkspaceControllerPorts, stora
   const oneBotDebugRecordState = ref<SandboxConsoleOneBotDebugRecord>()
   const modelRequestRecordsState = ref<SandboxModelRequestListItem[]>([])
   const modelRequestRecordState = ref<SandboxModelRequestDetail>()
-  const modelRequestTrajectoryState = ref<SandboxModelRequestTrajectory>()
+  /**
+   * 轨迹载荷整份替换、从不原地改，因此不进深响应式。
+   *
+   * 一条会话轨迹带着上千条组成分段与上百条账本行；用 `ref` 的话每个被读到的分段和行都要各建
+   * 一个只读代理，而这份数据的唯一变化方式就是被下一次读取整份换掉。浅引用加 `markRaw`
+   * 让「换了一份」照样触发重算，省掉的是那上千个代理。
+   */
+  const modelRequestTrajectoryState = shallowRef<SandboxModelRequestTrajectory>()
   const presetCatalogState = ref<SandboxPresetDocument[]>([])
   const presetDocumentState = ref<SandboxPresetDocument>()
   const presetLocateResultState = ref<LocateSandboxPresetExpressionResult>()
@@ -660,7 +667,8 @@ export function createWorkspaceController(ports: WorkspaceControllerPorts, stora
 
   async function loadModelRequestTrajectory(input: ModelRequestTrajectoryQuery) {
     try {
-      modelRequestTrajectoryState.value = await modelRequestPort.getModelRequestTrajectory(input)
+      // markRaw：这份载荷只被整份替换，代理它等于为上千条分段各建一个代理却没有任何一次写入。
+      modelRequestTrajectoryState.value = markRaw(await modelRequestPort.getModelRequestTrajectory(input))
     } catch (error) {
       throw normalizeWorkspaceError(error, '读取模型请求轨迹失败')
     }
