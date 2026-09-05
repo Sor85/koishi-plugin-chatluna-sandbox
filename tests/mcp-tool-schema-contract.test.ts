@@ -22,7 +22,7 @@ const TOOL_PARAMETERS: Record<string, string[]> = {
   list_test_spaces: ['testRunId'],
   get_test_space: ['spaceId', 'testRunId'],
   get_scene_snapshot: ['spaceId', 'testRunId'],
-  list_conversations: ['spaceId', 'operatorId', 'rootConversationId', 'limit', 'offset', 'testRunId'],
+  list_conversations: ['spaceId', 'operatorId', 'rootConversationId', 'limit', 'pageCursor', 'testRunId'],
   get_conversation: ['spaceId', 'operatorId', 'conversationId', 'messageLimit', 'testRunId'],
   get_forward_message: ['spaceId', 'operatorId', 'forwardId', 'messageId', 'testRunId'],
   list_pending_requests: ['spaceId', 'testRunId'],
@@ -50,16 +50,32 @@ const TOOL_PARAMETERS: Record<string, string[]> = {
   reset_scene: ['spaceId', 'confirmationToken', 'testRunId'],
   clear_scene: ['spaceId', 'confirmationToken', 'testRunId'],
   import_scene: ['spaceId', 'document', 'confirmationToken', 'testRunId'],
-  list_onebot_debug_records: ['spaceId', 'botId', 'direction', 'action', 'requestedAction', 'status', 'order', 'limit', 'beforeSequence', 'testRunId'],
+  list_onebot_debug_records: ['spaceId', 'botId', 'direction', 'action', 'requestedAction', 'status', 'order', 'limit', 'pageCursor', 'testRunId'],
   get_onebot_debug_record: ['spaceId', 'recordId', 'includeLargeValues', 'testRunId'],
   clear_onebot_debug_records: ['spaceId', 'testRunId'],
-  list_model_request_records: ['scope', 'spaceId', 'botId', 'conversationId', 'interactionId', 'model', 'status', 'order', 'limit', 'beforeSequence', 'beforeCreatedAt', 'beforeId', 'testRunId'],
+  list_model_request_records: ['scope', 'spaceId', 'botId', 'conversationId', 'interactionId', 'model', 'status', 'order', 'limit', 'pageCursor', 'testRunId'],
   get_model_request_record: ['scope', 'spaceId', 'recordId', 'testRunId'],
   clear_model_request_records: ['spaceId', 'testRunId'],
-  list_test_call_records: ['tool', 'credentialName', 'transport', 'spaceId', 'testRunId', 'status', 'order'],
+  list_test_call_records: ['tool', 'credentialName', 'transport', 'spaceId', 'testRunId', 'status', 'order', 'limit', 'pageCursor'],
   get_test_call_record: ['recordId', 'testRunId'],
   clear_test_call_records: ['testRunId'],
 }
+
+/**
+ * 分页参数的契约：四个 list 工具各自的分页参数集合。
+ *
+ * 顶层参数名清单抓不到「哪些名字必须消失」——`beforeSequence` 换成 `pageCursor` 之后，清单里少一个
+ * 名字与多一个名字看着一样。这份清单单独书写分页维度，同时把退役的四个名字逐条列出来：它们中的
+ * `beforeSequence` 此前在 `scope: 'all'` 下被静默置空，翻页翻不动却不报错。
+ */
+const PAGINATION_PARAMETERS = ['limit', 'pageCursor']
+const RETIRED_PAGINATION_PARAMETERS = ['offset', 'beforeSequence', 'beforeCreatedAt', 'beforeId', 'nextOffset', 'nextCursor']
+const PAGINATED_TOOLS = [
+  'list_conversations',
+  'list_onebot_debug_records',
+  'list_model_request_records',
+  'list_test_call_records',
+]
 
 /** 每种环境变更声明的 `data` 字段集合。`profile` 与 `remarks` 是实现一直在读却没有声明的两处。 */
 const ENVIRONMENT_CHANGE_DATA_FIELDS: Record<string, string[]> = {
@@ -153,6 +169,8 @@ type SchemaNode = {
   oneOf?: Array<SchemaNode & { title?: string }>
   anyOf?: Array<SchemaNode & { title?: string }>
   const?: string
+  minimum?: number
+  maximum?: number
 }
 
 function propertyNames(schema: SchemaNode | undefined): string[] {
@@ -276,5 +294,20 @@ describe('MCP 工具参数契约', () => {
     const forward = toolSchemas().get_forward_message
 
     expect(forward?.anyOf).toEqual([{ required: ['forwardId'] }, { required: ['messageId'] }])
+  })
+
+  it('四个 list 工具的分页参数只有 limit 与 pageCursor，退役的游标参数不再出现', () => {
+    const schemas = toolSchemas()
+
+    for (const tool of PAGINATED_TOOLS) {
+      const parameters = propertyNames(schemas[tool])
+      expect({ tool, pagination: parameters.filter((name) => PAGINATION_PARAMETERS.includes(name)) })
+        .toEqual({ tool, pagination: [...PAGINATION_PARAMETERS].sort() })
+      expect({ tool, retired: parameters.filter((name) => RETIRED_PAGINATION_PARAMETERS.includes(name)) })
+        .toEqual({ tool, retired: [] })
+      // 上下限写在声明里，越界才谈得上「按声明收敛」（ADR-0098）。
+      expect({ tool, limit: schemas[tool]?.properties?.limit })
+        .toEqual({ tool, limit: expect.objectContaining({ minimum: 1, maximum: 200 }) })
+    }
   })
 })

@@ -6,7 +6,7 @@ import { createMcpTestService, stopMcpTestApps } from './helpers/mcp-service-har
  * 事件类型是封闭词汇，与稳定错误码同一个形状：消费者只能从对外声明学到全集。
  *
  * 此前 `wait_for_event` 的 `type` 是自由字符串，只在描述里举了三个例子。写错一个名字既不报错也
- * 匹配不上，只能等到超时返回 `matched: false`——那与「游标之后真的没有这个事件」的观察结果完全
+ * 匹配不上，只能等到超时返回 `outcome: 'timeout'`——那与「游标之后真的没有这个事件」的观察结果完全
  * 一样，消费者据此得出的是错的结论。
  *
  * 声明侧三处必须同源：`wait_for_event` 的 enum、只读资源、以及事件类型常量本身。实现侧不必再靠
@@ -49,7 +49,7 @@ describe('事件类型封闭词汇', () => {
       cursor,
       type: 'scene.changed',
       timeoutSeconds: 1,
-    })).resolves.toMatchObject({ matched: true, event: { type: 'scene.changed' } })
+    })).resolves.toMatchObject({ outcome: 'matched', event: { type: 'scene.changed' } })
   })
 })
 
@@ -67,9 +67,9 @@ describe('按调用结果筛选记录', () => {
 
     const read = async (status?: string) => {
       const page = await service.callTool(credential.token, 'list_onebot_debug_records', status ? { status } : {}) as {
-        records: Array<{ requestedAction: string }>
+        items: Array<{ requestedAction: string }>
       }
-      return page.records.map(({ requestedAction }) => requestedAction).sort()
+      return page.items.map(({ requestedAction }) => requestedAction).sort()
     }
 
     // 「只看成功的」是布尔参数表达不了的那一半，也是这次换成状态枚举的理由。
@@ -85,9 +85,9 @@ describe('按调用结果筛选记录', () => {
     store.append({ status: 'success', durationMs: 1, model: 'landed', attribution: 'attributed', entities: { scopeId: 'main' }, requestBodyAvailable: false })
 
     const page = await service.callTool(credential.token, 'list_model_request_records', { scope: 'main', status: 'pending' }) as {
-      records: Array<{ model: string }>
+      items: Array<{ model: string }>
     }
-    expect(page.records.map(({ model }) => model)).toEqual(['flying'])
+    expect(page.items.map(({ model }) => model)).toEqual(['flying'])
   })
 
   it('取值集合之外的筛选值与排序值都显式失败，不当成不筛选', async () => {

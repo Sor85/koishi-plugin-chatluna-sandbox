@@ -2,7 +2,7 @@
 
 **What to build:** `list_test_spaces`、`list_pending_requests`、`get_capability_matrix` 三个工具的结果从裸数组改成 `{ items: [...] }`。
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Blocked by:** 01（集合键统一成 `items` 在那一票里定下）
 
@@ -18,9 +18,13 @@
 
 **不做的事：** 不给这三个工具加分页；不改两条能力基线资源；不改 `jsonContent` 的判定（它对 MCP 协议的理解是对的，问题在结果形状而不在它）。
 
-- [ ] 三个工具的结果都是 `{ items: [...] }`，有断言
-- [ ] MCP 表述下三个工具都带上 `structuredContent`，有断言（今天这三处只有 `content[0].text`）
-- [ ] HTTP 表述返回同一份对象，与 MCP 表述逐字段一致，有断言
-- [ ] 两条能力基线资源仍返回裸数组，有断言
-- [ ] 受影响的既有断言逐处改成读 `items`，没有兼容层
-- [ ] 完整测试、类型检查与构建通过
+- [x] 三个工具的结果都是 `{ items: [...] }`，有断言
+- [x] MCP 表述下三个工具都带上 `structuredContent`，有断言（今天这三处只有 `content[0].text`）
+- [x] HTTP 表述返回同一份对象，与 MCP 表述逐字段一致，有断言
+- [x] 两条能力基线资源仍返回裸数组，有断言
+- [x] 受影响的既有断言逐处改成读 `items`，没有兼容层
+- [x] 完整测试、类型检查与构建通过
+
+## Comments
+
+已落地，见 ADR-0104。两条能力基线资源仍返回裸数组，断言在 `tests/mcp-tool-coverage.test.ts`；两种表述逐字段一致与 MCP 侧 `structuredContent` 的断言在 `tests/http-api.test.ts`。

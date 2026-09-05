@@ -7,6 +7,14 @@ export interface SandboxMcpToolCapability {
   scope: SandboxMcpScope
   description: string
   inputSchema: Record<string, unknown>
+  /**
+   * 返回值的 JSON Schema，可选。
+   *
+   * 按 MCP 规范，声明了它的工具必须返回符合它的 `structuredContent`，因此只给结果是对象的工具
+   * 声明；返回形状能从工具名与参数推断出来的工具（`get_scene_snapshot` 这类）不声明，也不给一个
+   * 空对象——空声明与「没有声明」对消费者是两件事。
+   */
+  outputSchema?: Record<string, unknown>
 }
 
 export interface SandboxMcpResourceCapability {

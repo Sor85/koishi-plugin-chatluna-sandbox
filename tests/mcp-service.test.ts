@@ -136,7 +136,7 @@ describe('SandboxMcpService', () => {
     const replay = await service.callTool(credential.token, 'send_message', input)
     expect(replay).toEqual(first)
     await expect(service.callTool(credential.token, 'send_message', { ...input, content: '不同消息' })).rejects.toMatchObject({ code: 'idempotency_conflict' })
-    await expect(service.callTool(credential.token, 'wait_for_message', { cursor, timeoutSeconds: 1 })).resolves.toMatchObject({ matched: true })
+    await expect(service.callTool(credential.token, 'wait_for_message', { cursor, timeoutSeconds: 1 })).resolves.toMatchObject({ outcome: 'matched' })
   })
 
   it('机器人图片回复通过 MCP 消息事件暴露结构化媒体', async () => {
@@ -162,7 +162,7 @@ describe('SandboxMcpService', () => {
       authorId: '20001',
       timeoutSeconds: 1,
     })).resolves.toMatchObject({
-      matched: true,
+      outcome: 'matched',
       event: {
         data: {
           authorId: '20001',
@@ -242,10 +242,10 @@ describe('SandboxMcpService', () => {
 
     await expect(service.callTool(credential.token, 'wait_for_message', {
       cursor, conversationId: 'private:10001:20001', authorId: '20001', timeoutSeconds: 1,
-    })).resolves.toMatchObject({ matched: true, event: { data: { content: '收到合并转发', authorId: '20001' } } })
+    })).resolves.toMatchObject({ outcome: 'matched', event: { data: { content: '收到合并转发', authorId: '20001' } } })
     await expect(service.callTool(credential.token, 'wait_for_message', {
       cursor, conversationId: 'private:10001:20001', authorId: '10001', recipientBotId: '20001', timeoutSeconds: 1,
-    })).resolves.toMatchObject({ matched: true, event: { data: { recipientBotId: '20001', forwardId: expect.any(String) } } })
+    })).resolves.toMatchObject({ outcome: 'matched', event: { data: { recipientBotId: '20001', forwardId: expect.any(String) } } })
   })
 
   it('领域交互复用真实权限并禁止代机器人审批', async () => {
@@ -437,8 +437,8 @@ describe('SandboxMcpService', () => {
       spaceId: created.spaceId,
       idempotencyKey: 'space-complete-1',
     })
-    const spaces = await service.callTool(credential.token, 'list_test_spaces', {}) as Array<{ id: string; status: string; snapshot: { participants: unknown[] } }>
-    expect(spaces).toMatchObject([{ id: created.spaceId, status: 'completed', snapshot: { participants: [{ id: '11001' }] } }])
+    const spaces = await service.callTool(credential.token, 'list_test_spaces', {}) as { items: Array<{ id: string; status: string; snapshot: { participants: unknown[] } }> }
+    expect(spaces.items).toMatchObject([{ id: created.spaceId, status: 'completed', snapshot: { participants: [{ id: '11001' }] } }])
   })
 
   it('让所有有效凭证共享测试空间，同时保留 Scope 与接管限制', async () => {
@@ -450,9 +450,9 @@ describe('SandboxMcpService', () => {
       idempotencyKey: 'shared-space-create-1',
     }) as { spaceId: string; revision: number }
 
-    await expect(service.callTool(rotated.token, 'list_test_spaces', {})).resolves.toMatchObject([
-      { id: created.spaceId, name: '跨凭证空间', status: 'running' },
-    ])
+    await expect(service.callTool(rotated.token, 'list_test_spaces', {})).resolves.toMatchObject({
+      items: [{ id: created.spaceId, name: '跨凭证空间', status: 'running' }],
+    })
     await expect(service.callTool(rotated.token, 'get_test_space', { spaceId: created.spaceId })).resolves.toMatchObject({
       id: created.spaceId,
       name: '跨凭证空间',
@@ -508,7 +508,7 @@ describe('SandboxMcpService', () => {
       cursor,
       timeoutSeconds: 1,
     })).resolves.toMatchObject({
-      matched: true,
+      outcome: 'matched',
       event: {
         spaceId: created.spaceId,
         data: { recipientBotId: '21001' },
@@ -608,10 +608,10 @@ describe('SandboxMcpService', () => {
     expect(sent.cursorBefore.sequence).toBeLessThan(sent.cursor.sequence)
     const waitArgs = { spaceId: created.spaceId, conversationId: 'private:11001:21001', authorId: '21001', timeoutSeconds: 1 }
     await expect(service.callTool(credential.token, 'wait_for_message', { ...waitArgs, cursor: sent.cursorBefore }))
-      .resolves.toMatchObject({ matched: true, event: { data: { content: '同步回复' } } })
+      .resolves.toMatchObject({ outcome: 'matched', event: { data: { content: '同步回复' } } })
     // 用发送后的游标等同一条回复必然错过：这正是 cursorBefore 存在的理由。
     await expect(service.callTool(credential.token, 'wait_for_message', { ...waitArgs, cursor: sent.cursor }))
-      .resolves.toMatchObject({ matched: false, reason: 'timeout' })
+      .resolves.toMatchObject({ outcome: 'timeout', reason: 'timeout' })
   })
 
   it('静默期等待收集完整回复序列并返回最终消息', async () => {
@@ -645,9 +645,9 @@ describe('SandboxMcpService', () => {
       authorId: '21001',
       settleSeconds: 1,
       timeoutSeconds: 5,
-    }) as { matched: boolean; event: { data: { content: string } }; events: Array<{ data: { content: string } }> }
+    }) as { outcome: string; event: { data: { content: string } }; events: Array<{ data: { content: string } }> }
 
-    expect(settled.matched).toBe(true)
+    expect(settled.outcome).toBe('matched')
     expect(settled.events.map(({ data }) => data.content)).toEqual(['稍等，正在处理', '最终结果'])
     expect(settled.event.data.content).toBe('最终结果')
   })
@@ -690,7 +690,7 @@ describe('SandboxMcpService', () => {
       action: 'set_group_kick',
       timeoutSeconds: 5,
     })).resolves.toMatchObject({
-      matched: true,
+      outcome: 'matched',
       record: {
         botId: '21001',
         requestedAction: 'set_group_kick',
@@ -711,7 +711,7 @@ describe('SandboxMcpService', () => {
       action: 'set_group_kick',
       status: 'success',
       timeoutSeconds: 1,
-    })).resolves.toMatchObject({ matched: false, reason: 'timeout' })
+    })).resolves.toMatchObject({ outcome: 'timeout', reason: 'timeout' })
   })
 
   it('AI 测试空间占用期间报告 MCP 活动，结束后清除', async () => {

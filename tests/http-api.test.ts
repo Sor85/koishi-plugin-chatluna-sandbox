@@ -1,4 +1,6 @@
 import { App } from '@koishijs/core'
+import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -181,11 +183,19 @@ describe('HTTP 测试接口端到端', () => {
 
     const tools = await call('/v1/tools')
     expect(tools.status).toBe(200)
-    const catalogue = await tools.json() as { testApiVersion: number; tools: Array<{ name: string; scope: string; inputSchema: unknown }> }
+    const catalogue = await tools.json() as {
+      testApiVersion: number
+      tools: Array<{ name: string; scope: string; inputSchema: unknown; outputSchema?: unknown }>
+    }
     expect(catalogue.testApiVersion).toBe(1)
     expect(catalogue.tools.map(({ name }) => name)).toContain('get_server_info')
     // inputSchema 必须随清单一起给出：脚本除此之外没有别的地方能学到参数契约。
     expect(catalogue.tools.find(({ name }) => name === 'send_message')?.inputSchema).toBeTruthy()
+    // 返回声明同理，且两种表述读的是同一份 service.listTools，因此这里守的是「下一次改动只顾 MCP
+    // 那一侧」不会静默让 HTTP 表述少一份声明。
+    expect(catalogue.tools.find(({ name }) => name === 'wait_for_message')?.outputSchema)
+      .toMatchObject({ type: 'object', required: ['outcome', 'cursor'] })
+    expect(catalogue.tools.find(({ name }) => name === 'get_scene_snapshot')).not.toHaveProperty('outputSchema')
 
     // 无参工具不带请求体也能调；不必为了凑 JSON-RPC 的仪式感写 -d '{}'。
     const info = await call('/v1/tools/get_server_info', { method: 'POST' })
@@ -201,12 +211,55 @@ describe('HTTP 测试接口端到端', () => {
     expect(await guide.json()).toMatchObject({ testApiVersion: 1 })
   })
 
-  it('返回数组的工具直接就是 JSON 数组，不受 MCP 的 structuredContent 对象约束', async () => {
-    const { call } = await startEndpoint(['read'])
+  it('曾经返回裸数组的三个工具在两种表述下都是同一份带 items 的对象', async () => {
+    const { call, credential, origin } = await startEndpoint(['read'])
+    const client = new Client({ name: 'chatluna-sandbox-representation-test', version: '1.0' })
+    await client.connect(new StreamableHTTPClientTransport(new URL(`${origin}/mcp`), {
+      requestInit: { headers: { authorization: `Bearer ${credential.token}` } },
+    }))
 
-    const spaces = await call('/v1/tools/list_test_spaces', { method: 'POST' })
-    expect(spaces.status).toBe(200)
-    expect(Array.isArray(await spaces.json())).toBe(true)
+    try {
+      for (const tool of ['list_test_spaces', 'list_pending_requests', 'get_capability_matrix']) {
+        const http = await (await call(`/v1/tools/${tool}`, { method: 'POST' })).json()
+        expect(http, tool).toEqual({ items: expect.any(Array) })
+
+        const mcp = await client.callTool({ name: tool, arguments: {} }) as {
+          structuredContent?: Record<string, unknown>
+          content: Array<{ text: string }>
+        }
+        // MCP 协议要求 structuredContent 必须是对象：这三个工具返回裸数组时只有 content[0].text，
+        // 消费者对它们必须改走「解析文本」的路径，而对其余三十八个工具可以直接读结构化内容。
+        expect(mcp.structuredContent, tool).toEqual(http)
+        expect(JSON.parse(mcp.content[0]!.text), tool).toEqual(http)
+      }
+    } finally {
+      await client.close()
+    }
+  })
+
+  it('分页结果在两种表述下逐字段一致，游标跨表述可用', async () => {
+    const { call, service, credential } = await startEndpoint(['read', 'debug'])
+    // 三次读取各留一条测试调用记录，够翻两页。
+    for (let index = 0; index < 3; index += 1) await call('/v1/tools/get_server_info', { method: 'POST' })
+
+    const args = { tool: 'get_server_info', limit: 2 }
+    const httpPage = await (await call('/v1/tools/list_test_call_records', { method: 'POST', body: JSON.stringify(args) })).json() as {
+      items: Array<{ id: string }>
+      nextPageCursor: string
+    }
+    expect(httpPage.items).toHaveLength(2)
+    expect(httpPage.nextPageCursor).toEqual(expect.any(String))
+
+    // 同一次分页经服务层直调（MCP 表述那条路径）拿到的是同一份对象：这三票都不允许出现
+    // 「一种表述有、另一种没有」的字段。
+    const mcpPage = await service.callTool(credential.token, 'list_test_call_records', args, { transport: 'mcp' })
+    expect(mcpPage).toEqual(httpPage)
+
+    // 一种表述给出的游标在另一种表述下照样能续页：游标属于工具而不属于表述。
+    const nextViaMcp = await service.callTool(credential.token, 'list_test_call_records', {
+      ...args, pageCursor: httpPage.nextPageCursor,
+    }, { transport: 'mcp' }) as { items: Array<{ id: string }> }
+    expect(nextViaMcp.items.map(({ id }) => id)).not.toEqual(httpPage.items.map(({ id }) => id))
   })
 
   it('工具错误映射成真实状态码，信封字段与 MCP 表述逐字一致', async () => {
@@ -329,7 +382,7 @@ describe('测试调用记录的协议表述标注', () => {
 
     // 同一份筛选维度也从工具侧可用，外部测试控制器不必只能靠 Console 面板区分来路。
     const listed = await call('/v1/tools/list_test_call_records', { method: 'POST', body: JSON.stringify({ transport: 'http', tool: 'get_server_info' }) })
-    expect((await listed.json() as { records: Array<{ transport: string }> }).records.every(({ transport }) => transport === 'http')).toBe(true)
+    expect((await listed.json() as { items: Array<{ transport: string }> }).items.every(({ transport }) => transport === 'http')).toBe(true)
   })
 
   it('记录里带上真实来源 IP，与凭证名一起构成复盘线索', async () => {

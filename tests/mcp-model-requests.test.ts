@@ -67,21 +67,21 @@ describe('模型请求 MCP 工具', () => {
       attribution: 'unattributed', entities: {}, requestBodyAvailable: false,
     })
 
-    const mainPage = await service.callTool(credential.token, 'list_model_request_records', { scope: 'main' }) as { records: Array<{ model: string }> }
-    expect(mainPage.records.map(({ model }) => model)).toEqual(['main-model'])
+    const mainPage = await service.callTool(credential.token, 'list_model_request_records', { scope: 'main' }) as { items: Array<{ model: string }> }
+    expect(mainPage.items.map(({ model }) => model)).toEqual(['main-model'])
     // scope=space 缺 spaceId 此前静默读主环境；那会让消费者拿着主环境的记录断言某个空间。
     await expect(service.callTool(credential.token, 'list_model_request_records', { scope: 'space' }))
       .rejects.toMatchObject({ code: 'invalid_arguments' })
-    const allPage = await service.callTool(credential.token, 'list_model_request_records', { scope: 'all' }) as { records: Array<{ model: string }> }
-    expect(allPage.records.map(({ model }) => model).sort()).toEqual(['main-model', 'space-model'])
-    expect(allPage.records.some(({ model }) => model === 'lost-model')).toBe(false)
+    const allPage = await service.callTool(credential.token, 'list_model_request_records', { scope: 'all' }) as { items: Array<{ model: string }> }
+    expect(allPage.items.map(({ model }) => model).sort()).toEqual(['main-model', 'space-model'])
+    expect(allPage.items.some(({ model }) => model === 'lost-model')).toBe(false)
     const spacePage = await service.callTool(credential.token, 'list_model_request_records', {
       scope: 'space',
       spaceId: created.spaceId,
-    }) as { records: Array<{ id: string, model: string }> }
-    expect(spacePage.records).toEqual([expect.objectContaining({ id: spaceRecord.id, model: 'space-model' })])
-    expect(spacePage.records[0]).not.toHaveProperty('requestBody')
-    expect(spacePage.records[0]).not.toHaveProperty('responseBodyRaw')
+    }) as { items: Array<{ id: string, model: string }> }
+    expect(spacePage.items).toEqual([expect.objectContaining({ id: spaceRecord.id, model: 'space-model' })])
+    expect(spacePage.items[0]).not.toHaveProperty('requestBody')
+    expect(spacePage.items[0]).not.toHaveProperty('responseBodyRaw')
     expect(await service.callTool(credential.token, 'get_model_request_record', {
       scope: 'space',
       spaceId: created.spaceId,
@@ -95,7 +95,7 @@ describe('模型请求 MCP 工具', () => {
       responseBodyRaw: JSON.stringify({ content: 'hello' }),
     })
     expect(await service.callTool(credential.token, 'list_model_request_records', { scope: 'unattributed' })).toMatchObject({
-      records: [expect.objectContaining({ id: lost.id, model: 'lost-model' })],
+      items: [expect.objectContaining({ id: lost.id, model: 'lost-model' })],
     })
 
     // 清理工具不再接受 scope：目标由 spaceId 决定，显式传了要拒绝而不是无声忽略。
@@ -194,7 +194,7 @@ describe('模型请求 MCP 工具', () => {
     await expect(call(harness, 'clear_model_request_records', {})).rejects.toMatchObject({ code: 'space_id_required' })
     // 调试记录的联邦列表同样不补：省略 spaceId 仍然只读主环境。
     expect(await call(harness, 'list_onebot_debug_records', {})).toMatchObject({
-      records: [expect.objectContaining({ requestedAction: 'main-action' })],
+      items: [expect.objectContaining({ requestedAction: 'main-action' })],
     })
   })
 })

@@ -2,7 +2,7 @@
 
 **What to build:** 给注册表条目加可选 `outputSchema`，先覆盖四个 `wait_for_*`、两个发送工具、四个破坏性工具与 `get_server_info`；同时把等待类结果里的 `matched: boolean` 换成 `outcome: 'matched' | 'timeout'`。
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Blocked by:** 01、02（输出声明描述的是最终形状，前两票都在改形状；`list_*` 的声明还依赖 02 把裸数组包成对象）
 
@@ -22,17 +22,21 @@
 
 **不做的事：** 不给全部四十一个工具声明；不改 `jsonContent` 的 `structuredContent` 判定；不引入运行时校验（协议不要求服务端自校，加了反而多一条失败路径）。
 
-- [ ] `SandboxMcpToolEntry` 上新增可选 `outputSchema`，工具清单投影与 `SandboxMcpToolCapability` 一并带上它
-- [ ] `tools/list`（MCP）与 `GET /v1/tools`（HTTP）都返回 `outputSchema`，各有断言
-- [ ] 测试侧独立书写「声明了 outputSchema 的工具及其顶层字段」清单，先改测试再改实现
-- [ ] 每个声明了 outputSchema 的工具都有用例把真实返回值与声明比对，字段齐全且没有多余字段
-- [ ] 四个 `wait_for_*` 的结果用 `outcome: 'matched' | 'timeout'`，`matched` 从返回值消失，有断言
-- [ ] `matched` 分支必带该工具自己的载荷键（`event`／`record`／`state`），`timeout` 分支必带 `reason`，有断言
-- [ ] `wait_for_message` 传 `settleSeconds` 时的 `events` 在声明里出现，且与不传时的形状差异写清楚
-- [ ] 三处 `!matched || !event` 防守退成一次判别，有断言覆盖原先那条防守拦住的情形
-- [ ] 两个发送工具的 `cursorBefore` 与 `cursor` 都在声明里，描述说明各自用途
-- [ ] 四个破坏性工具共用一份 `{ revision, cursor }` 声明，有断言
-- [ ] `get_server_info` 的声明覆盖 `name`／`testApiVersion`／`transport`／`stateless`／`cursor`
-- [ ] 未覆盖的工具没有 `outputSchema` 字段，不给空对象，有断言
-- [ ] 测试指南资源里的等待示例跟着改成 `outcome`
-- [ ] 完整测试、类型检查与构建通过
+- [x] `SandboxMcpToolEntry` 上新增可选 `outputSchema`，工具清单投影与 `SandboxMcpToolCapability` 一并带上它
+- [x] `tools/list`（MCP）与 `GET /v1/tools`（HTTP）都返回 `outputSchema`，各有断言
+- [x] 测试侧独立书写「声明了 outputSchema 的工具及其顶层字段」清单，先改测试再改实现
+- [x] 每个声明了 outputSchema 的工具都有用例把真实返回值与声明比对，字段齐全且没有多余字段
+- [x] 四个 `wait_for_*` 的结果用 `outcome: 'matched' | 'timeout'`，`matched` 从返回值消失，有断言
+- [x] `matched` 分支必带该工具自己的载荷键（`event`／`record`／`state`），`timeout` 分支必带 `reason`，有断言
+- [x] `wait_for_message` 传 `settleSeconds` 时的 `events` 在声明里出现，且与不传时的形状差异写清楚
+- [x] 三处 `!matched || !event` 防守退成一次判别，有断言覆盖原先那条防守拦住的情形
+- [x] 两个发送工具的 `cursorBefore` 与 `cursor` 都在声明里，描述说明各自用途
+- [x] 四个破坏性工具共用一份 `{ revision, cursor }` 声明，有断言
+- [x] `get_server_info` 的声明覆盖 `name`／`testApiVersion`／`transport`／`stateless`／`cursor`
+- [x] 未覆盖的工具没有 `outputSchema` 字段，不给空对象，有断言
+- [x] 测试指南资源里的等待示例跟着改成 `outcome`
+- [x] 完整测试、类型检查与构建通过
+
+## Comments
+
+已落地，见 ADR-0105。声明清单与返回值比对在 `tests/mcp-tool-output-contract.test.ts`；`tools/list` 与 `GET /v1/tools` 各自带出声明的断言分别在 `tests/mcp-http.test.ts` 与 `tests/http-api.test.ts`。

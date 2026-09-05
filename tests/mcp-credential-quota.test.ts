@@ -103,7 +103,7 @@ describe('测试凭证调用频率上限', () => {
     const cursor = service.currentCursor()
     control.createUser({ id: '10503', name: '事件用户' })
 
-    await expect(callSettledWait(service, credential.token, cursor)).resolves.toMatchObject({ matched: true })
+    await expect(callSettledWait(service, credential.token, cursor)).resolves.toMatchObject({ outcome: 'matched' })
     expect(await rejection(callSettledWait(service, credential.token, cursor))).toMatchObject({ code: 'rate_limited' })
   })
 
@@ -139,7 +139,7 @@ describe('测试凭证调用频率上限', () => {
     expect(await rejection(callQuery(service, credential.token))).toMatchObject({ code: 'rate_limited' })
 
     await expect(callMutation(service, control, credential.token, '10505')).resolves.toMatchObject({ affected: ['create-user'] })
-    await expect(callSettledWait(service, credential.token, cursor)).resolves.toMatchObject({ matched: true })
+    await expect(callSettledWait(service, credential.token, cursor)).resolves.toMatchObject({ outcome: 'matched' })
     await expect(callUpload(service, credential.token, 'cross')).resolves.toMatchObject({ mediaId: expect.any(String) })
   })
 
@@ -194,7 +194,7 @@ describe('测试凭证并发上限', () => {
 
     expect(error.code).toBe('concurrency_limited')
     vi.advanceTimersByTime(1_000)
-    await expect(inFlight).resolves.toMatchObject({ matched: false, reason: 'timeout' })
+    await expect(inFlight).resolves.toMatchObject({ outcome: 'timeout', reason: 'timeout' })
   })
 
   it('并发上传超出上限时被拒绝', async () => {

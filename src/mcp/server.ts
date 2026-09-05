@@ -86,8 +86,9 @@ function sourceMatches(address: string, rule: string): boolean {
 }
 
 function jsonContent(value: unknown) {
-  // MCP 协议要求 structuredContent 必须是 object；数组或原始值会被 SDK 以
-  // -32602 拒绝（表现为 list_* 等返回数组的工具无法调用），因此仅对普通对象附带。
+  // MCP 协议要求 structuredContent 必须是 object；数组或原始值会被 SDK 以 -32602 拒绝，因此仅对
+  // 普通对象附带。工具结果今天全部是对象（返回裸数组的三个已经包了一层），这条判定因此不再挑掉
+  // 任何工具；它留着是因为判定本身对协议的理解是对的，而不是因为还有工具要走 else 分支。
   const structured = value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : undefined
   return { content: [{ type: 'text' as const, text: JSON.stringify(value) }], ...(structured ? { structuredContent: structured } : {}) }
 }
@@ -250,7 +251,14 @@ export class SandboxTestEndpointServer {
   private createMcpServer(token: string, sourceIp: string): Server {
     const server = new Server({ name: 'koishi-plugin-chatluna-sandbox', version: '0.0.1' }, { capabilities: { tools: {}, resources: {} } })
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: this.service.listTools(token).map(({ name, description, inputSchema }) => ({ name, description, inputSchema })),
+      // outputSchema 只在条目声明了它时映射出去：给未覆盖的工具补一个空对象等于向客户端承诺一份
+      // 它兑现不了的 structuredContent 契约。
+      tools: this.service.listTools(token).map(({ name, description, inputSchema, outputSchema }) => ({
+        name,
+        description,
+        inputSchema,
+        ...(outputSchema ? { outputSchema } : {}),
+      })),
     }))
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
       try {

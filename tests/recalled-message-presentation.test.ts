@@ -189,8 +189,8 @@ describe('撤回消息生命周期与呈现', () => {
       cursor,
       type: 'message.recalled',
       timeoutSeconds: 1,
-    }) as { matched: boolean; event: { type: string; data: { id: string; content: string; lifecycle: { status: string; operatorId: string } } } }
-    expect(recalled.matched).toBe(true)
+    }) as { outcome: string; event: { type: string; data: { id: string; content: string; lifecycle: { status: string; operatorId: string } } } }
+    expect(recalled.outcome).toBe('matched')
     expect(recalled.event).toEqual(expect.objectContaining({
       type: 'message.recalled',
       data: expect.objectContaining({
@@ -204,8 +204,8 @@ describe('撤回消息生命周期与呈现', () => {
       cursor,
       type: 'scene.changed',
       timeoutSeconds: 1,
-    }) as { matched: boolean }
-    expect(scene.matched).toBe(true)
+    }) as { outcome: string }
+    expect(scene.outcome).toBe('matched')
     expect(control.getSnapshot().messages.find(({ id }) => id === sent.messageId)?.content)
       .toBe('可恢复原文')
   })

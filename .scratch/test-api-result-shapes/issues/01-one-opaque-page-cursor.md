@@ -2,7 +2,7 @@
 
 **What to build:** 四个 list 工具对外只保留 `limit` 与 `pageCursor` 两个分页参数，返回 `items` 与 `nextPageCursor`。游标是服务端编码的不透明字符串，消费者原样传回即可续页；没有更多页时 `nextPageCursor` 不出现。
 
-**Status:** ready-for-agent
+**Status:** done
 
 **为什么是不透明游标，而不是把四套协议改成一套。** 三族记录的排序键真的不一样：OneBot 调试记录只有每个记录域各自独立的 `sequence`，模型请求记录在单域用 `sequence`、跨域用 `createdAt` + `id`，会话列表根本没有游标只有 `offset`。把差异写进对外声明就一定会出现「哪个参数有效取决于另一个参数」，而那是今天最坏的一处：`list_model_request_records` 在 `scope: 'all'` 时把 `beforeSequence` 静默置空（见 `src/mcp/tool-registry.ts` 的 `listModelRequestRecords`，`federatedQuery` 那一行），此时只有 `beforeCreatedAt` + `beforeId` 有效，而三个游标在声明里并列、都不标条件。翻页翻不动不报错，只会一直拿到同一页。
 
@@ -20,20 +20,24 @@
 
 **不做的事：** 不改 Console 契约与三个记录页；不改会话消息分页（`get_conversation` 的 `messageLimit` 不是翻页）；不给 `list_pending_requests`、`list_test_spaces`、`get_capability_matrix` 加分页（它们的集合天然有界，包一层是 02 的事）。
 
-- [ ] 四个 list 工具的声明里只剩 `limit` 与 `pageCursor` 两个分页参数，`beforeSequence`／`beforeCreatedAt`／`beforeId`／`offset` 从对外声明消失
-- [ ] `tests/mcp-tool-schema-contract.test.ts` 的参数清单先改后实现，四个工具逐条一致
-- [ ] 四个工具的结果集合键都是 `items`，续页字段都是 `nextPageCursor`，有断言
-- [ ] 单域模型请求记录按序号续页，翻到底后 `nextPageCursor` 不出现，有断言
-- [ ] `scope: 'all'` 的模型请求记录按时间与记录标识续页，且真的能翻到第二页，有断言（今天这条路径静默翻不动）
-- [ ] 调试记录按序号续页，正序与倒序各有断言
-- [ ] 会话列表按偏移续页，有断言
-- [ ] 测试调用记录补上 `limit` 与续页，默认条数与另外三个一致，有断言
-- [ ] 把一种记录的游标传给另一种记录的工具时报 `invalid_arguments`，有断言
-- [ ] 伪造或截断的游标报 `invalid_arguments`，不当成「从头开始」，有断言
-- [ ] 游标过期时的 recovery 里给出可直接使用的 `pageCursor`，有断言
-- [ ] `capacity` 与 `earliestCursor` 在结果里保留，有断言
-- [ ] `hasMore: true` 但不给续页游标的联邦情形有断言
-- [ ] HTTP 表述与 MCP 表述返回同一份分页结果，有断言
-- [ ] Console 契约、三个记录页与它们的既有测试一字不改地通过
-- [ ] 领域词汇核过一遍：「调试记录游标」的定义是否要跟着改写
-- [ ] 完整测试、类型检查与构建通过
+- [x] 四个 list 工具的声明里只剩 `limit` 与 `pageCursor` 两个分页参数，`beforeSequence`／`beforeCreatedAt`／`beforeId`／`offset` 从对外声明消失
+- [x] `tests/mcp-tool-schema-contract.test.ts` 的参数清单先改后实现，四个工具逐条一致
+- [x] 四个工具的结果集合键都是 `items`，续页字段都是 `nextPageCursor`，有断言
+- [x] 单域模型请求记录按序号续页，翻到底后 `nextPageCursor` 不出现，有断言
+- [x] `scope: 'all'` 的模型请求记录按时间与记录标识续页，且真的能翻到第二页，有断言（今天这条路径静默翻不动）
+- [x] 调试记录按序号续页，正序与倒序各有断言
+- [x] 会话列表按偏移续页，有断言
+- [x] 测试调用记录补上 `limit` 与续页，默认条数与另外三个一致，有断言
+- [x] 把一种记录的游标传给另一种记录的工具时报 `invalid_arguments`，有断言
+- [x] 伪造或截断的游标报 `invalid_arguments`，不当成「从头开始」，有断言
+- [x] 游标过期时的 recovery 里给出可直接使用的 `pageCursor`，有断言
+- [x] `capacity` 与 `earliestCursor` 在结果里保留，有断言
+- [x] `hasMore: true` 但不给续页游标的联邦情形有断言
+- [x] HTTP 表述与 MCP 表述返回同一份分页结果，有断言
+- [x] Console 契约、三个记录页与它们的既有测试一字不改地通过
+- [x] 领域词汇核过一遍：「调试记录游标」的定义是否要跟着改写
+- [x] 完整测试、类型检查与构建通过
+
+## Comments
+
+已落地，见 ADR-0103。`src/mcp/page-cursor.ts` 拥有游标的编码、解码与记录种类判定；四个 list 工具的翻译写在 `src/mcp/tool-registry.ts` 的执行体里，记录页共享类型一字未改。断言在 `tests/mcp-page-cursor.test.ts` 与 `tests/mcp-tool-schema-contract.test.ts`，两种表述给出同一份分页结果的断言在 `tests/http-api.test.ts`。领域词汇里「调试记录游标」改写成「分页游标」（`CONTEXT.md`）。

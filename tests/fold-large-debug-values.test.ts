@@ -191,21 +191,21 @@ describe('MCP 折叠大型调试值', () => {
     const page = await service.callTool(credential.token, 'list_onebot_debug_records', {
       limit: 5,
     }) as {
-      records: Array<{ id: string, payload: unknown, result: unknown }>
+      items: Array<{ id: string, payload: unknown, result: unknown }>
       capacity: { totalBytes: number, recordCount: number }
     }
-    expect(page.records[0]?.id).toBe(projected.id)
-    expect(page.records[0]?.payload).toEqual(expect.objectContaining({
+    expect(page.items[0]?.id).toBe(projected.id)
+    expect(page.items[0]?.payload).toEqual(expect.objectContaining({
       file: expect.objectContaining({ kind: 'large-value', encoding: 'base64', mimeType: 'image/png' }),
     }))
-    expect(JSON.stringify(page.records[0])).not.toContain(body.slice(0, 48))
+    expect(JSON.stringify(page.items[0])).not.toContain(body.slice(0, 48))
     expect(page.capacity.recordCount).toBe(1)
     expect(page.capacity.totalBytes).toBeGreaterThan(body.length)
 
     const folded = await service.callTool(credential.token, 'get_onebot_debug_record', {
       recordId: projected.id,
     }) as { payload: unknown }
-    expect(folded.payload).toEqual(page.records[0]?.payload)
+    expect(folded.payload).toEqual(page.items[0]?.payload)
 
     const expanded = await service.callTool(credential.token, 'get_onebot_debug_record', {
       recordId: projected.id,
@@ -219,7 +219,7 @@ describe('MCP 折叠大型调试值', () => {
       action: 'set_qq_avatar',
       timeoutSeconds: 1,
     })).resolves.toMatchObject({
-      matched: true,
+      outcome: 'matched',
       record: {
         id: projected.id,
         payload: expect.objectContaining({

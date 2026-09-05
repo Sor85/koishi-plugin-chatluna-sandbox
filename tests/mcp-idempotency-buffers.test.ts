@@ -35,7 +35,7 @@ describe('MCP 幂等缓存的上限与有效期', () => {
     const replayed = await createSpace(service, credential.token, 'window-replay')
 
     expect(replayed.spaceId).toBe(first.spaceId)
-    expect(await service.callTool(credential.token, 'list_test_spaces', {})).toHaveLength(1)
+    expect((await service.callTool(credential.token, 'list_test_spaces', {}) as { items: unknown[] }).items).toHaveLength(1)
   })
 
   it('同键不同参数仍返回 idempotency_conflict', async () => {
@@ -57,7 +57,7 @@ describe('MCP 幂等缓存的上限与有效期', () => {
 
     // 这是 ADR-0021 的行为变更：超出窗口的重放不再返回首次结果，而是真的再执行一次。
     expect(replayed.spaceId).not.toBe(first.spaceId)
-    expect(await service.callTool(credential.token, 'list_test_spaces', {})).toHaveLength(2)
+    expect((await service.callTool(credential.token, 'list_test_spaces', {}) as { items: unknown[] }).items).toHaveLength(2)
   })
 
   it('超出条数上限后最旧的幂等记录被淘汰，上限与有效期由服务选项覆盖', async () => {

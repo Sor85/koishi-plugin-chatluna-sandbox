@@ -76,7 +76,13 @@ describe('MCP Streamable HTTP', () => {
 
     const client = await connectClient(url, credential.token, 'https://allowed.example')
     // tools/list 不携带能力范围，因此在传输层按名字与顺序整体比对完整清单；能力范围由服务层断言覆盖。
-    expect((await client.listTools()).tools.map(({ name }) => name)).toEqual(MCP_TOOL_NAMES)
+    const tools = (await client.listTools()).tools
+    expect(tools.map(({ name }) => name)).toEqual(MCP_TOOL_NAMES)
+    // 返回声明也必须随清单一起带出去：消费者从 tools/list 就该知道等待类工具返回什么，而不必先试调
+    // 一次。清单本身由 tests/mcp-tool-output-contract.test.ts 逐条守卫，这里守住传输层没有把它丢掉。
+    expect(tools.find(({ name }) => name === 'wait_for_message')?.outputSchema)
+      .toMatchObject({ type: 'object', properties: expect.objectContaining({ outcome: expect.anything() }) })
+    expect(tools.find(({ name }) => name === 'get_scene_snapshot')).not.toHaveProperty('outputSchema')
     expect((await client.listResources()).resources.map(({ uri }) => uri)).toEqual(MCP_RESOURCE_URIS)
     await client.close()
   })

@@ -12,8 +12,8 @@ import { SandboxMcpError } from './types'
  * 2. 把错误码映射成真实 HTTP 状态码，而不是恒定 200 + 正文里的 `isError`。
  * 3. 把错误信封平铺到响应体顶层，而不是塞进 `content[0].text` 里的二层 JSON。
  *
- * 成功响应直接就是工具结果，且不受 MCP `structuredContent` 必须为对象的限制——`list_*` 这类
- * 返回数组的工具在这里就是一个 JSON 数组。
+ * 成功响应直接就是工具结果。工具结果全部是对象，因此两种表述的结果保真度一致：MCP 表述下每个工具
+ * 都拿得到 `structuredContent`，不存在「某几个工具要改走解析文本」这条例外路径。
  */
 
 /** 路径版本段。与 ADR-0028 的 `testApiVersion` 同步推进：破坏性变更走新的版本段而不是原地改。 */
@@ -278,7 +278,7 @@ export async function handleHttpApiRequest(
     if (route.kind === 'read-resource') return { status: 200, body: service.readResource(token, route.uri) }
     const args = parseHttpApiArguments(request.body)
     const result = await service.callTool(token, route.tool, args, { sourceIp: options.sourceIp, transport: 'http' })
-    // 工具结果原样返回：普通 HTTP 没有 structuredContent 的对象约束，数组与标量都可以直接是响应体。
+    // 工具结果原样返回：两种表述给出的是同一份对象，不存在「一种表述有、另一种没有」的字段。
     return { status: 200, body: result === undefined ? null : result }
   } catch (error) {
     return toHttpApiErrorResponse(service, error)

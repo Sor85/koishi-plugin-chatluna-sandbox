@@ -62,7 +62,7 @@ describe('MCP 空间作用域', () => {
       type: 'friend.action',
       timeoutSeconds: 1,
     })).resolves.toMatchObject({
-      matched: true,
+      outcome: 'matched',
       event: { spaceId, type: 'friend.action', data: { action: 'handle-request', approve: true } },
     })
   })
@@ -92,7 +92,7 @@ describe('MCP 空间作用域', () => {
       type: 'group.action',
       timeoutSeconds: 1,
     })).resolves.toMatchObject({
-      matched: true,
+      outcome: 'matched',
       event: { spaceId, type: 'group.action', data: { action: 'handle-request', approve: true } },
     })
   })

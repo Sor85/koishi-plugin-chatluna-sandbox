@@ -76,7 +76,7 @@ describe('调用标注参数不参与业务参数指纹', () => {
     }) as { spaceId: string }
 
     expect(replayed.spaceId).toBe(first.spaceId)
-    expect(await service.callTool(credential.token, 'list_test_spaces', {})).toHaveLength(1)
+    expect(await service.callTool(credential.token, 'list_test_spaces', {})).toMatchObject({ items: [expect.anything()] })
   })
 
   it('业务参数真的不同时幂等冲突照旧报出', async () => {
@@ -147,10 +147,11 @@ describe('数值参数类型不对时显式失败', () => {
     })).rejects.toMatchObject({ code: 'invalid_arguments' })
   })
 
-  it('调试记录与模型请求记录的分页游标传字符串时同样报参数错误', async () => {
+  it('调试记录与模型请求记录的每页条数传字符串时同样报参数错误', async () => {
     const { service, credential } = createMcpTestService(['read', 'debug'])
 
-    await expect(service.callTool(credential.token, 'list_onebot_debug_records', { beforeSequence: '第三条' }))
+    // 分页游标本身是字符串，不再有可拼错成非数值的分页参数；两族记录页剩下的数值参数就是每页条数。
+    await expect(service.callTool(credential.token, 'list_onebot_debug_records', { limit: '第三条' }))
       .rejects.toMatchObject({ code: 'invalid_arguments' })
     await expect(service.callTool(credential.token, 'list_model_request_records', { scope: 'main', limit: '五十' }))
       .rejects.toMatchObject({ code: 'invalid_arguments' })

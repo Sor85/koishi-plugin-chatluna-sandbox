@@ -67,9 +67,9 @@ describe('MCP 测试调用记录', () => {
     }, { sourceIp: '10.0.0.8' })
 
     const page = await service.callTool(debugCredential.token, 'list_test_call_records', {}) as {
-      records: Array<Record<string, unknown>>
+      items: Array<Record<string, unknown>>
     }
-    const sendRecord = page.records.find((item) => item.tool === 'send_message')
+    const sendRecord = page.items.find((item) => item.tool === 'send_message')
     expect(sendRecord).toMatchObject({
       credentialName: '测试凭证',
       sourceIp: '10.0.0.8',
@@ -79,7 +79,7 @@ describe('MCP 测试调用记录', () => {
     })
     expect(sendRecord).not.toHaveProperty('arguments')
     expect(sendRecord).not.toHaveProperty('result')
-    expect(JSON.stringify(page.records)).not.toContain(credential.token)
+    expect(JSON.stringify(page.items)).not.toContain(credential.token)
 
     const detail = await service.callTool(debugCredential.token, 'get_test_call_record', {
       recordId: sendRecord!.id,
@@ -156,8 +156,8 @@ describe('MCP 测试调用记录', () => {
     expect(filtered.records).toEqual([
       expect.objectContaining({ tool: 'get_scene_snapshot', spaceId: created.spaceId }),
     ])
-    const listed = await service.callTool(credential.token, 'list_test_call_records', {}) as { records: Array<Record<string, unknown>> }
-    expect(listed.records).toEqual(expect.arrayContaining([
+    const listed = await service.callTool(credential.token, 'list_test_call_records', {}) as { items: Array<Record<string, unknown>> }
+    expect(listed.items).toEqual(expect.arrayContaining([
       expect.objectContaining({ tool: 'create_test_space', spaceId: created.spaceId }),
       expect.objectContaining({ tool: 'get_server_info' }),
     ]))
@@ -179,9 +179,9 @@ describe('MCP 测试调用记录', () => {
       'get_server_info',
     ])
     const listed = await service.callTool(credential.token, 'list_test_call_records', { order: 'asc' }) as {
-      records: Array<{ tool: string }>
+      items: Array<{ tool: string }>
     }
-    expect(listed.records.map(({ tool }) => tool)).toEqual([
+    expect(listed.items.map(({ tool }) => tool)).toEqual([
       'get_server_info',
       'get_scene_snapshot',
     ])

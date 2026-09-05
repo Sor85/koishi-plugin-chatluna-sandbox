@@ -506,26 +506,33 @@ export class SandboxMcpService {
         },
       },
       等待机器人回复: {
-        说明: '发送与关系操作类工具都会等待被测机器人的同步处理完成才返回，回复可能在返回前已进入事件流。把它们返回的 cursorBefore 传给等待类工具即可，不必自己先取一次游标；用它们返回的 cursor 会错过同步回复。',
+        说明: '发送与关系操作类工具都会等待被测机器人的同步处理完成才返回，回复可能在返回前已进入事件流。把它们返回的 cursorBefore 传给等待类工具即可，不必自己先取一次游标；用它们返回的 cursor 会错过同步回复。等待结果用 outcome 区分：matched 时带载荷，timeout 时带 reason。',
         步骤: [
           { tool: 'send_message', arguments: { spaceId: '<spaceId>', operatorId: '10001', conversationId: 'private:10001:20002', content: 'help', idempotencyKey: 'example-message-2' }, 得到: 'cursorBefore' },
-          { tool: 'wait_for_message', arguments: { spaceId: '<spaceId>', cursor: '<send_message.cursorBefore>', conversationId: 'private:10001:20002', authorId: '20002', timeoutSeconds: 30 } },
+          { tool: 'wait_for_message', arguments: { spaceId: '<spaceId>', cursor: '<send_message.cursorBefore>', conversationId: 'private:10001:20002', authorId: '20002', timeoutSeconds: 30 }, 得到: 'outcome=matched 时的 event' },
         ],
       },
       等待ChatLuna思考状态: {
-        说明: 'thinking=true 是瞬时状态，但状态变更会进入事件流，因此用 send_message 返回的 cursorBefore 就能在它返回后补等到，不必并发启动等待，也不会匹配到上一轮已经结束的状态。',
+        说明: 'thinking=true 是瞬时状态，但状态变更会进入事件流，因此用 send_message 返回的 cursorBefore 就能在它返回后补等到，不必并发启动等待，也不会匹配到上一轮已经结束的状态。outcome=matched 时结果带 state。',
         步骤: [
           { tool: 'send_message', arguments: { spaceId: '<spaceId>', operatorId: '10001', conversationId: 'private:10001:20002', content: 'chatluna.chat 你好', idempotencyKey: 'example-chatluna-1' }, 得到: 'cursorBefore' },
           { tool: 'wait_for_chatluna_state', arguments: { spaceId: '<spaceId>', cursor: '<send_message.cursorBefore>', botParticipantId: '20002', conversationId: 'private:10001:20002', thinking: false, timeoutSeconds: 30 } },
         ],
       },
       等待机器人最终回复: {
-        说明: '机器人常先回一条「稍等」再给最终结果。传 settleSeconds 后会持续收集同条件消息，直到静默期内不再出现新消息；返回的 event 是最后一条，events 是完整序列。',
+        说明: '机器人常先回一条「稍等」再给最终结果。传 settleSeconds 后会持续收集同条件消息，直到静默期内不再出现新消息；outcome=matched 时 event 是最后一条，events 是完整序列。不传 settleSeconds 时结果里没有 events。',
         wait_for_message: { spaceId: '<spaceId>', cursor: '<send_message.cursorBefore>', conversationId: 'private:10001:20002', authorId: '20002', settleSeconds: 5, timeoutSeconds: 60 },
       },
       断言插件发起的_OneBot_action: {
-        说明: '机器人回复文本可能与实际执行结果不一致；要确认某次交互是否真的调用了 action 及其成败，用那次操作返回的 cursorBefore 等待 onebot.action 事件。',
+        说明: '机器人回复文本可能与实际执行结果不一致；要确认某次交互是否真的调用了 action 及其成败，用那次操作返回的 cursorBefore 等待 onebot.action 事件。outcome=matched 时结果直接带调试记录 record。',
         wait_for_onebot_action: { spaceId: '<spaceId>', cursor: '<perform_group_action.cursorBefore>', botId: '20002', action: 'set_group_kick', timeoutSeconds: 30 },
+      },
+      翻页读记录: {
+        说明: '四个 list 工具用同一套分页：只有 limit 与 pageCursor，结果给 items 与 nextPageCursor。游标是服务端编码的不透明字符串，原样传回即可续页；结果里没有 nextPageCursor 就是到底了。它带记录种类标记，跨族传递会被判为参数错误。',
+        步骤: [
+          { tool: 'list_model_request_records', arguments: { scope: 'all', limit: 20 }, 得到: 'nextPageCursor' },
+          { tool: 'list_model_request_records', arguments: { scope: 'all', limit: 20, pageCursor: '<上一页的 nextPageCursor>' } },
+        ],
       },
       群聊触发命令: {
         说明: '群聊中触发 Koishi 命令通常需要 at 机器人；content 支持 <at id="参与者ID"/> 元素。',
@@ -750,18 +757,18 @@ export class SandboxMcpService {
     const spaceId = readSpaceId(args)
     const matches = () => this.events.find((event) => event.cursor.sequence > sequence && event.spaceId === spaceId && predicate(event))
     const existing = matches()
-    if (existing) return { matched: true, event: existing, cursor: existing.cursor }
+    if (existing) return { outcome: 'matched', event: existing, cursor: existing.cursor }
     return new Promise((resolve) => {
       const timer = setInterval(() => {
         const event = matches()
         if (!event) return
         clearInterval(timer)
         clearTimeout(timeout)
-        resolve({ matched: true, event, cursor: event.cursor })
+        resolve({ outcome: 'matched', event, cursor: event.cursor })
       }, 20)
       const timeout = setTimeout(() => {
         clearInterval(timer)
-        resolve({ matched: false, reason: 'timeout', cursor: this.currentCursor() })
+        resolve({ outcome: 'timeout', reason: 'timeout', cursor: this.currentCursor() })
       }, timeoutMs)
     })
   }

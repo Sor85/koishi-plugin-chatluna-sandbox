@@ -20,31 +20,25 @@ afterEach(async () => {
 describe('MCP 读取类工具', () => {
   it('分页列出当前操作者可见会话', async () => {
     const { service, credential } = createMcpTestService(['read'])
+    type Page = { items: Array<{ id: string }>; nextPageCursor?: string }
 
-    const all = await service.callTool(credential.token, 'list_conversations', { operatorId: '10001' }) as {
-      items: Array<{ id: string }>
-      nextOffset?: number
-    }
+    const all = await service.callTool(credential.token, 'list_conversations', { operatorId: '10001' }) as Page
     // 默认场景里 10001 只与机器人有私聊，另两位用户的私聊对它不可见。
     expect(all.items.map(({ id }) => id)).toEqual(['private:10001:20001', 'group:30001'])
-    expect(all.nextOffset).toBeUndefined()
+    expect(all.nextPageCursor).toBeUndefined()
 
-    const firstPage = await service.callTool(credential.token, 'list_conversations', { operatorId: '10001', limit: 1 }) as {
-      items: Array<{ id: string }>
-      nextOffset?: number
-    }
+    const firstPage = await service.callTool(credential.token, 'list_conversations', { operatorId: '10001', limit: 1 }) as Page
     expect(firstPage.items.map(({ id }) => id)).toEqual(['private:10001:20001'])
-    expect(firstPage.nextOffset).toBe(1)
+    expect(firstPage.nextPageCursor).toEqual(expect.any(String))
 
-    const secondPage = await service.callTool(credential.token, 'list_conversations', { operatorId: '10001', limit: 1, offset: 1 }) as {
-      items: Array<{ id: string }>
-      nextOffset?: number
-    }
+    const secondPage = await service.callTool(credential.token, 'list_conversations', {
+      operatorId: '10001', limit: 1, pageCursor: firstPage.nextPageCursor,
+    }) as Page
     expect(secondPage.items.map(({ id }) => id)).toEqual(['group:30001'])
-    expect(secondPage.nextOffset).toBeUndefined()
+    expect(secondPage.nextPageCursor).toBeUndefined()
 
     // 另一位操作者看到的是自己的私聊，可见性随操作者变化而不是返回全量会话。
-    const other = await service.callTool(credential.token, 'list_conversations', { operatorId: '10002' }) as { items: Array<{ id: string }> }
+    const other = await service.callTool(credential.token, 'list_conversations', { operatorId: '10002' }) as Page
     expect(other.items.map(({ id }) => id)).toEqual(['private:10002:20001', 'group:30001'])
   })
 
@@ -54,7 +48,7 @@ describe('MCP 读取类工具', () => {
     await expect(service.callTool(credential.token, 'list_conversations', {
       operatorId: '10001',
       rootConversationId: 'private:10001:20001',
-    })).resolves.toEqual({ items: [], nextOffset: undefined })
+    })).resolves.toEqual({ items: [] })
 
     const first = control.createConversationInstance({ operatorId: '10001', rootConversationId: 'private:10001:20001', title: '第一条对话线' })
     const second = control.createConversationInstance({ operatorId: '10001', rootConversationId: 'private:10001:20001', title: '第二条对话线' })
@@ -79,12 +73,13 @@ describe('MCP 读取类工具', () => {
     })).toMatchObject({ items: [expect.objectContaining({ id: grouped.conversationId, type: 'group', groupId: '30001' })] })
 
     // 分页对实例列表同样生效。
-    expect(await service.callTool(credential.token, 'list_conversations', {
+    const instanceFirstPage = await service.callTool(credential.token, 'list_conversations', {
       operatorId: '10001', rootConversationId: 'private:10001:20001', limit: 1,
-    })).toMatchObject({ items: [expect.objectContaining({ id: first.conversationId })], nextOffset: 1 })
+    }) as { items: Array<{ id: string }>; nextPageCursor?: string }
+    expect(instanceFirstPage).toMatchObject({ items: [expect.objectContaining({ id: first.conversationId })], nextPageCursor: expect.any(String) })
     expect(await service.callTool(credential.token, 'list_conversations', {
-      operatorId: '10001', rootConversationId: 'private:10001:20001', limit: 1, offset: 1,
-    })).toEqual({ items: [expect.objectContaining({ id: second.conversationId })], nextOffset: undefined })
+      operatorId: '10001', rootConversationId: 'private:10001:20001', limit: 1, pageCursor: instanceFirstPage.nextPageCursor,
+    })).toEqual({ items: [expect.objectContaining({ id: second.conversationId })] })
 
     // 传入实例 ID 时归一化到它的根会话：层级严格两层，不存在第三层可问。
     expect(await service.callTool(credential.token, 'list_conversations', {
@@ -155,7 +150,8 @@ describe('MCP 读取类工具', () => {
     const { service, credential, control } = createMcpTestService(['read', 'interact'])
     control.createUser({ id: '10004', name: '申请人' })
 
-    await expect(service.callTool(credential.token, 'list_pending_requests', {})).resolves.toEqual([])
+    // 结果包一层：裸数组在 MCP 表述下拿不到 structuredContent，而集合键与另外三个 list 同名。
+    await expect(service.callTool(credential.token, 'list_pending_requests', {})).resolves.toEqual({ items: [] })
 
     const friend = await service.callTool(credential.token, 'perform_friend_action', {
       operatorId: '10004',
@@ -170,10 +166,12 @@ describe('MCP 读取类工具', () => {
       idempotencyKey: 'pending-group-1',
     }) as { requestId: string }
 
-    expect(await service.callTool(credential.token, 'list_pending_requests', {})).toEqual([
-      expect.objectContaining({ id: friend.requestId, type: 'friend', requesterId: '10004', targetId: '10001', status: 'pending' }),
-      expect.objectContaining({ id: group.requestId, type: 'group', subType: 'add', requesterId: '10004', groupId: '30001', status: 'pending' }),
-    ])
+    expect(await service.callTool(credential.token, 'list_pending_requests', {})).toEqual({
+      items: [
+        expect.objectContaining({ id: friend.requestId, type: 'friend', requesterId: '10004', targetId: '10001', status: 'pending' }),
+        expect.objectContaining({ id: group.requestId, type: 'group', subType: 'add', requesterId: '10004', groupId: '30001', status: 'pending' }),
+      ],
+    })
 
     // 申请被处理后不再出现在待处理列表里。
     await service.callTool(credential.token, 'handle_request', {
@@ -182,22 +180,25 @@ describe('MCP 读取类工具', () => {
       approve: true,
       idempotencyKey: 'pending-friend-handle-1',
     })
-    expect(await service.callTool(credential.token, 'list_pending_requests', {})).toEqual([
-      expect.objectContaining({ id: group.requestId }),
-    ])
+    expect(await service.callTool(credential.token, 'list_pending_requests', {})).toEqual({
+      items: [expect.objectContaining({ id: group.requestId })],
+    })
   })
 
   it('读取能力覆盖矩阵，结果随实现配置与能力覆盖变化', async () => {
     const { service, credential, control } = createMcpTestService(['read', 'manage'])
     type Capability = { id: string; action: string; supported: boolean; reason?: string }
+    const matrix = async (args: Record<string, unknown>) => (
+      await service.callTool(credential.token, 'get_capability_matrix', args) as { items: Capability[] }
+    ).items
 
-    const napcat = await service.callTool(credential.token, 'get_capability_matrix', { implementation: 'napcat' }) as Capability[]
-    const llbot = await service.callTool(credential.token, 'get_capability_matrix', { implementation: 'llbot' }) as Capability[]
+    const napcat = await matrix({ implementation: 'napcat' })
+    const llbot = await matrix({ implementation: 'llbot' })
     expect(napcat.length).toBeGreaterThan(0)
     // 两套实现基线不同，因此矩阵随 implementation 变化而不是返回同一份清单。
     expect(llbot.map(({ id }) => id)).not.toEqual(napcat.map(({ id }) => id))
     // 省略 implementation 时按 napcat 解析。
-    expect(await service.callTool(credential.token, 'get_capability_matrix', {})).toEqual(napcat)
+    expect(await matrix({})).toEqual(napcat)
     // 非法值必须显式失败：静默回落到 napcat 会让测试控制器以为自己在测另一个协议，而它拿到的
     // 矩阵与 napcat 逐字节相同，没有任何可察觉的迹象。
     for (const implementation of ['bogus', 'NapCat', 'napcat ', '', null, 42]) {
@@ -213,7 +214,7 @@ describe('MCP 读取类工具', () => {
       changes: [{ action: 'set-capabilities', data: { id: '20001', disabledCapabilities: [target.id] } }],
     })
 
-    const overridden = await service.callTool(credential.token, 'get_capability_matrix', { implementation: 'napcat' }) as Capability[]
+    const overridden = await matrix({ implementation: 'napcat' })
     expect(overridden).toContainEqual(expect.objectContaining({
       id: target.id,
       supported: false,
@@ -221,6 +222,9 @@ describe('MCP 读取类工具', () => {
     }))
     // 只有被覆盖的那一项变化，其余条目保持基线取值。
     expect(overridden.filter(({ id }) => id !== target.id)).toEqual(napcat.filter(({ id }) => id !== target.id))
+    // 两条能力基线资源仍返回裸数组：它们的正文本来就是文本序列化，跟着包会让已在读资源的消费者白改一次。
+    expect(service.readResource(credential.token, 'chatluna-sandbox://capabilities/napcat')).toEqual(overridden)
+    expect(Array.isArray(service.readResource(credential.token, 'chatluna-sandbox://capabilities/llbot'))).toBe(true)
   })
 
   it('导出版本化场景，导出内容与当前快照一致', async () => {
@@ -276,11 +280,11 @@ describe('MCP 清理类工具', () => {
     await control.bot.internal._request('get_login_info', {})
     await control.bot.internal._request('get_friend_list', {})
 
-    const before = await service.callTool(credential.token, 'list_onebot_debug_records', {}) as { records: unknown[] }
-    expect(before.records).toHaveLength(2)
+    const before = await service.callTool(credential.token, 'list_onebot_debug_records', {}) as { items: unknown[] }
+    expect(before.items).toHaveLength(2)
 
     expect(await service.callTool(credential.token, 'clear_onebot_debug_records', {})).toEqual({ cleared: 2 })
-    expect(await service.callTool(credential.token, 'list_onebot_debug_records', {})).toMatchObject({ records: [] })
+    expect(await service.callTool(credential.token, 'list_onebot_debug_records', {})).toMatchObject({ items: [] })
   })
 
   it('清理测试调用记录后只留下清理调用自身的记录', async () => {
@@ -289,14 +293,14 @@ describe('MCP 清理类工具', () => {
     await service.callTool(credential.token, 'get_scene_snapshot', {})
     await service.callTool(credential.token, 'export_scene', {})
 
-    const before = await service.callTool(credential.token, 'list_test_call_records', {}) as { records: Array<{ tool: string }> }
+    const before = await service.callTool(credential.token, 'list_test_call_records', {}) as { items: Array<{ tool: string }> }
     // 调用记录在工具执行完成之后写入，因此读取自身不出现在它返回的页里。
-    expect(before.records.map(({ tool }) => tool)).toEqual(['export_scene', 'get_scene_snapshot', 'get_server_info'])
+    expect(before.items.map(({ tool }) => tool)).toEqual(['export_scene', 'get_scene_snapshot', 'get_server_info'])
 
     // 同理，cleared 覆盖清理调用之前的全部记录，包括上一次读取自身留下的那条。
-    expect(await service.callTool(credential.token, 'clear_test_call_records', {})).toEqual({ cleared: before.records.length + 1 })
-    const after = await service.callTool(credential.token, 'list_test_call_records', {}) as { records: Array<{ tool: string }> }
-    expect(after.records.map(({ tool }) => tool)).toEqual(['clear_test_call_records'])
+    expect(await service.callTool(credential.token, 'clear_test_call_records', {})).toEqual({ cleared: before.items.length + 1 })
+    const after = await service.callTool(credential.token, 'list_test_call_records', {}) as { items: Array<{ tool: string }> }
+    expect(after.items.map(({ tool }) => tool)).toEqual(['clear_test_call_records'])
   })
 })
 
@@ -354,7 +358,7 @@ describe('MCP 交互类工具', () => {
     const { app, service, credential, control } = await createStartedMcpTestService(['interact'])
     const session = createDirectSession(control, '20001')
     type WaitResult = {
-      matched: boolean
+      outcome: 'matched' | 'timeout'
       reason?: string
       state?: { botParticipantId: string; conversationId: string; thinking: boolean }
     }
@@ -366,29 +370,29 @@ describe('MCP 交互类工具', () => {
     }) as Promise<WaitResult>
     await emitChatLunaEvent(app, 'chatluna/before-chat', 'chatluna:direct', {}, {}, {}, session)
     expect(await pending).toMatchObject({
-      matched: true,
+      outcome: 'matched',
       state: { botParticipantId: '20001', conversationId: 'private:10001:20001', thinking: true },
     })
 
     await emitChatLunaEvent(app, 'chatluna/after-chat', 'chatluna:direct', {}, {}, {}, {}, session)
     await expect(service.callTool(credential.token, 'wait_for_chatluna_state', {
       cursor, botParticipantId: '20001', thinking: false, timeoutSeconds: 5,
-    })).resolves.toMatchObject({ matched: true, state: { thinking: false } })
+    })).resolves.toMatchObject({ outcome: 'matched', state: { thinking: false } })
 
     // 本轮已经结束：用结束之后取的新游标等待时，两种状态都必须超时。thinking=false 这条是关键——
     // 直接读当前状态的实现会立刻匹配到上一轮留下的已结束状态，把它当成本轮结果。
     const afterRound = service.currentCursor()
     expect(await service.callTool(credential.token, 'wait_for_chatluna_state', {
       cursor: afterRound, botParticipantId: '20001', thinking: false, timeoutSeconds: 1,
-    })).toMatchObject({ matched: false, reason: 'timeout' })
+    })).toEqual({ outcome: 'timeout', reason: 'timeout', cursor: expect.objectContaining({ sequence: expect.any(Number) }) })
     expect(await service.callTool(credential.token, 'wait_for_chatluna_state', {
       cursor: afterRound, botParticipantId: '20001', thinking: true, timeoutSeconds: 1,
-    })).toMatchObject({ matched: false, reason: 'timeout' })
+    })).toMatchObject({ outcome: 'timeout', reason: 'timeout' })
 
     // 会话过滤同样生效：状态只存在于私聊，按群会话等待不会命中。
     expect(await service.callTool(credential.token, 'wait_for_chatluna_state', {
       cursor, conversationId: 'group:30001', timeoutSeconds: 1,
-    })).toMatchObject({ matched: false, reason: 'timeout' })
+    })).toMatchObject({ outcome: 'timeout', reason: 'timeout' })
 
     await expect(service.callTool(credential.token, 'wait_for_chatluna_state', {
       cursor: { epoch: 'stale-epoch', sequence: 0 }, timeoutSeconds: 1,
@@ -481,8 +485,8 @@ describe('MCP 空间生命周期工具', () => {
       spaceId: removed.spaceId, idempotencyKey: 'delete-1',
     })).resolves.toMatchObject({ spaceId: removed.spaceId, deleted: true })
 
-    const spaces = await service.callTool(credential.token, 'list_test_spaces', {}) as Array<{ id: string }>
-    expect(spaces.map(({ id }) => id)).toEqual([kept.spaceId])
+    const spaces = await service.callTool(credential.token, 'list_test_spaces', {}) as { items: Array<{ id: string }> }
+    expect(spaces.items.map(({ id }) => id)).toEqual([kept.spaceId])
     await expect(service.callTool(credential.token, 'get_test_space', { spaceId: removed.spaceId }))
       .rejects.toMatchObject({ code: 'domain_error' })
   })

@@ -22,6 +22,7 @@ import {
   type SandboxModelRequestStore,
 } from '../model-request'
 import { getOneBotCapabilityMatrix } from '../onebot-profiles'
+import { DEFAULT_DEBUG_PAGE_SIZE, MAX_DEBUG_PAGE_SIZE } from '../onebot-debug'
 import type { ScopeDirectory, SceneScope } from '../scope-directory'
 import type { SandboxTestSpaceService } from '../test-spaces'
 import type {
@@ -29,14 +30,27 @@ import type {
   SandboxForwardNodeInput,
   SandboxImplementationProfile,
   SandboxMedia,
+  SandboxModelRequestRecordsPage,
   SandboxModelRequestStatus,
   SandboxOneBotDebugDirection,
+  SandboxOneBotDebugRecordsPage,
   SandboxOneBotDebugStatus,
   SandboxSnapshot,
 } from '../types'
 import { SandboxModelRequestCursorExpiredError, SandboxOneBotDebugCursorExpiredError } from '../types'
 import { argumentsFingerprint, asRecord, optionalBoolean, optionalEnum, optionalNumber, readSpaceId, requireNumber, requireString } from './arguments'
-import type { ListSandboxTestCallRecordsInput, SandboxTestCallRecordsPage } from './call-records'
+import {
+  DEFAULT_TEST_CALL_PAGE_SIZE,
+  MAX_TEST_CALL_PAGE_SIZE,
+  type ListSandboxTestCallRecordsInput,
+  type SandboxTestCallRecordsPage,
+} from './call-records'
+import {
+  encodePageCursor,
+  isSequencePageCursor,
+  readPageCursor,
+  type SandboxPageCursorPayloads,
+} from './page-cursor'
 import {
   SandboxMcpError,
   SANDBOX_MCP_EVENT_TYPES,
@@ -69,13 +83,16 @@ export type SandboxMcpToolQuota = 'read' | 'mutation' | 'wait' | 'upload'
  */
 export type SandboxMcpSpaceResolution = 'none' | 'read' | 'mutation'
 
-/** 等待类工具的返回形状。 */
-export interface SandboxMcpWaitResult {
-  matched: boolean
-  reason?: string
-  event?: SandboxMcpEvent
-  cursor: SandboxMcpEventCursor
-}
+/**
+ * 等待类工具的返回形状：等到与超时是两个互斥分支。
+ *
+ * 此前是 `matched: boolean` 加可选载荷，于是「匹配到了但没有事件」在类型上合法，三处执行体各写
+ * 一句 `!matched || !event` 防守一个不该存在的状态。换成判别式之后 `matched` 分支必带事件、
+ * `timeout` 分支必带原因，防守退成一次判别。
+ */
+export type SandboxMcpWaitResult =
+  | { outcome: 'matched'; event: SandboxMcpEvent; cursor: SandboxMcpEventCursor }
+  | { outcome: 'timeout'; reason: 'timeout'; cursor: SandboxMcpEventCursor }
 
 /** 一次性破坏性操作确认令牌的登记内容。 */
 export interface SandboxMcpConfirmation {
@@ -174,6 +191,32 @@ const CURSOR = {
   description: '事件游标。等待某次操作引发的事件时传那次操作返回的 cursorBefore；从当前位置开始等待时传 get_server_info 返回的 cursor。破坏性操作后游标失效需重新获取',
 }
 const TIMEOUT_SECONDS = { type: 'number', minimum: 1, maximum: 120, description: '等待超时秒数，默认 30' }
+
+/**
+ * 分页参数：四个 list 工具对外只有这两个。
+ *
+ * 游标是服务端编码的不透明字符串，因此「哪个游标在哪种取值下有效」不再是消费者要判断的事——
+ * 序号、时间戳与破平键怎么编码归服务端。`limit` 沿用既有口径：类型不对显式失败、越界按声明的
+ * 上下限收敛（ADR-0098）。
+ */
+const PAGE_CURSOR = {
+  type: 'string',
+  description: '分页游标：原样传回上一页结果里的 nextPageCursor 即可续页，省略时从第一页开始。它是服务端编码的不透明字符串，不要自己拼，也不要传给另一族记录的工具',
+}
+
+function pageLimit(defaultSize: number, maxSize: number) {
+  return { type: 'number', minimum: 1, maximum: maxSize, description: `每页条数，默认 ${defaultSize}，最大 ${maxSize}` }
+}
+
+/**
+ * 会话列表的每页条数。
+ *
+ * 两族记录页各自的数值由它们的记录库导出，会话列表没有记录库，因此在这里声明一次——声明与执行体
+ * 读同一对常量，不会出现「schema 写着 200、执行体夹到 100」这种只能靠调用发现的漂移。
+ */
+const DEFAULT_CONVERSATION_PAGE_SIZE = 50
+const MAX_CONVERSATION_PAGE_SIZE = 200
+
 const OPERATOR_ID = { type: 'string', description: '操作者参与者 ID（十进制数字字符串）' }
 const PARTICIPANT_ID = { type: 'string', description: '参与者 ID（十进制数字字符串）' }
 const IMPLEMENTATION = { type: 'string', enum: ['napcat', 'llbot'] }
@@ -425,6 +468,147 @@ const ENVIRONMENT_CHANGE_SCHEMAS = [
   },
 ].map((schema) => ({ type: 'object', ...schema, required: ['action', 'data'] }))
 
+// —— 工具返回 JSON Schema ——
+// 消费者对返回值的了解此前全靠「调一次看看」：等待类最需要声明，因为四个 `wait_for_*` 的成功载荷键
+// 各不相同，而它们是编排里调用最频繁的一族。按 MCP 规范，声明了 outputSchema 的工具必须返回符合它的
+// `structuredContent`，因此只给结果是对象的工具声明。SDK 用的是低层 `Server` 而不是
+// `McpServer.registerTool`，不会自动校验，声明与实际返回是否一致由测试钉住。
+//
+// 覆盖范围先小后大，判据是「返回形状能不能从工具名与参数推断出来」：`get_scene_snapshot` 能，
+// `wait_for_message` 不能。其余工具留待后续，不给它们空声明。
+
+/** 结果里的事件游标。与入参那个 `CURSOR` 分开：描述要答的是「这个游标能拿去做什么」。 */
+const EVENT_CURSOR_RESULT = {
+  type: 'object',
+  properties: { epoch: { type: 'string' }, sequence: { type: 'number' } },
+  required: ['epoch', 'sequence'],
+  description: '本次调用结束时的事件游标；破坏性操作会轮转纪元，此前取得的游标随之失效',
+}
+
+const EVENT_RESULT = {
+  type: 'object',
+  properties: {
+    cursor: EVENT_CURSOR_RESULT,
+    spaceId: { type: 'string', description: '事件归属的 AI 测试空间；主场景事件不带此字段' },
+    type: { type: 'string', enum: [...SANDBOX_MCP_EVENT_TYPES] },
+    createdAt: { type: 'string', description: 'ISO 8601 时间' },
+    data: { description: '事件载荷，形状随事件类型变化' },
+  },
+  required: ['cursor', 'type', 'createdAt', 'data'],
+}
+
+/**
+ * 等待类结果的判别式声明。
+ *
+ * 扁平 `properties` 加两个 `oneOf` 分支，与参数侧的取值组合同一个写法：只读 `properties` 的客户端
+ * 看得见全部字段，读得懂 `oneOf` 的客户端多知道哪个分支带哪个字段。分支各自用 `const` 钉住
+ * `outcome`，因此一次返回恰好匹配一个分支。
+ */
+function waitOutputSchema(
+  matchedPayload: Record<string, Record<string, unknown>>,
+  description: string,
+  optionalPayload: Record<string, Record<string, unknown>> = {},
+) {
+  return {
+    type: 'object',
+    description,
+    properties: {
+      outcome: { type: 'string', enum: ['matched', 'timeout'], description: 'matched 等到了匹配项，timeout 到超时都没等到' },
+      ...matchedPayload,
+      ...optionalPayload,
+      reason: { type: 'string', enum: ['timeout'], description: '仅 timeout 分支出现' },
+      cursor: EVENT_CURSOR_RESULT,
+    },
+    required: ['outcome', 'cursor'],
+    oneOf: [
+      { title: 'matched', properties: { outcome: { const: 'matched' } }, required: Object.keys(matchedPayload) },
+      { title: 'timeout', properties: { outcome: { const: 'timeout' } }, required: ['reason'] },
+    ],
+  }
+}
+
+const WAIT_EVENT_OUTPUT = waitOutputSchema(
+  { event: EVENT_RESULT },
+  '等到匹配事件时带 event，到超时都没等到时带 reason；两种结果都带 cursor。',
+)
+
+const WAIT_MESSAGE_OUTPUT = waitOutputSchema(
+  { event: EVENT_RESULT },
+  '等到消息时带 event（传了 settleSeconds 时另带 events），到超时都没等到时带 reason。',
+  {
+    events: {
+      type: 'array',
+      items: EVENT_RESULT,
+      description: '仅在传了 settleSeconds 时出现：静默期内收集到的完整消息序列，event 是其中最后一条。不传 settleSeconds 时匹配到第一条即返回，结果里没有本字段',
+    },
+  },
+)
+
+const WAIT_ONEBOT_ACTION_OUTPUT = waitOutputSchema(
+  { record: { type: 'object', description: 'OneBot 调试记录，字段与 get_onebot_debug_record 返回的单条记录一致' } },
+  '等到调用时直接带匹配到的调试记录，不必再从通用事件载荷里解包；到超时都没等到时带 reason。',
+)
+
+const WAIT_CHATLUNA_STATE_OUTPUT = waitOutputSchema(
+  { state: { type: 'object', description: 'ChatLuna 对话状态，字段与 chatluna.state 事件的载荷一致' } },
+  '等到状态变更时带 state，到超时都没等到时带 reason。',
+)
+
+/**
+ * 发送类结果的两个游标。
+ *
+ * `cursorBefore` 是发送前的位置、`cursor` 是发送后的位置，两者最容易被搞混（ADR-0102）：等待机器人
+ * 对本次发送的反应必须用 `cursorBefore`，同步回复在调用返回之前就已经进入事件流。
+ */
+const SEND_CURSORS = {
+  cursorBefore: { ...EVENT_CURSOR_RESULT, description: '发送前的事件游标：等待被测机器人对本次发送的反应时传它，同步回复在本次调用返回之前就已进入事件流' },
+  cursor: { ...EVENT_CURSOR_RESULT, description: '发送后的事件游标：只用于「从这里开始等下一件事」，用它等本次发送引发的回复会漏掉同步回复' },
+}
+
+const SEND_MESSAGE_OUTPUT = {
+  type: 'object',
+  properties: {
+    messageId: { type: 'string' },
+    revision: { type: 'number', description: '发送后的场景版本' },
+    ...SEND_CURSORS,
+  },
+  required: ['messageId', 'revision', 'cursorBefore', 'cursor'],
+}
+
+const SEND_FORWARD_MESSAGE_OUTPUT = {
+  type: 'object',
+  properties: {
+    messageId: { type: 'string', description: '外层合并转发消息 ID' },
+    forwardId: { type: 'string', description: '合并转发资源 ID，可直接传给 get_forward_message' },
+    revision: { type: 'number', description: '发送后的场景版本' },
+    ...SEND_CURSORS,
+  },
+  required: ['messageId', 'forwardId', 'revision', 'cursorBefore', 'cursor'],
+}
+
+/** 四个破坏性工具共用一份声明：它们对外都只答新版本与新游标，执行体只负责改场景。 */
+const DESTRUCTIVE_OUTPUT = {
+  type: 'object',
+  description: '破坏性操作完成后事件纪元轮转，此前取得的事件游标与幂等键全部失效；结果只给新的场景版本与新纪元下的游标。',
+  properties: {
+    revision: { type: 'number', description: '操作后的场景版本' },
+    cursor: EVENT_CURSOR_RESULT,
+  },
+  required: ['revision', 'cursor'],
+}
+
+const SERVER_INFO_OUTPUT = {
+  type: 'object',
+  properties: {
+    name: { type: 'string' },
+    testApiVersion: { type: 'number', description: '测试 API 版本；破坏性变更走新版本而不是原地改' },
+    transport: { type: 'string', enum: ['streamable-http', 'http'], description: '承载本次调用的协议表述：streamable-http 是 MCP，http 是 HTTP 测试接口。据此决定错误信封按 JSON-RPC 还是按 HTTP 状态码解析' },
+    stateless: { type: 'boolean' },
+    cursor: { ...EVENT_CURSOR_RESULT, description: '当前事件游标：从当前位置开始等待时传它' },
+  },
+  required: ['name', 'testApiVersion', 'transport', 'stateless', 'cursor'],
+}
+
 // —— 参数与领域助手 ——
 
 function requireImplementation(value: unknown): SandboxImplementationProfile {
@@ -561,14 +745,71 @@ function deleteTestSpace(runtime: SandboxMcpToolRuntime, args: Record<string, un
 
 // —— 执行体：场景与会话读取 ——
 
+/**
+ * 已从对外声明消失的分页参数。
+ *
+ * 显式传了要拒绝而不是无声忽略：被忽略的游标参数会让调用方以为自己在续页，实际每次都拿到第一页，
+ * 与收敛前 `scope: 'all'` 静默置空 `beforeSequence` 的失败形态完全相同——翻页翻不动不报错，只会
+ * 一直拿到同一页。照着旧契约写的调用是最可能发生的事，因此这里显式失败。
+ */
+const RETIRED_PAGE_PARAMETERS: readonly string[] = ['offset', 'beforeSequence', 'beforeCreatedAt', 'beforeId']
+
+function assertPageCursorOnly(args: Record<string, unknown>): void {
+  const retired = RETIRED_PAGE_PARAMETERS.filter((name) => name in args)
+  if (!retired.length) return
+  throw new SandboxMcpError(
+    'invalid_arguments',
+    `分页参数已收敛成 pageCursor，不再受理：${retired.join('、')}`,
+    false,
+    '请改传上一页结果里的 nextPageCursor。',
+  )
+}
+
+/**
+ * 整份可见的集合按分页游标切一页。
+ *
+ * 会话列表与测试调用记录共用它：两者都不下推到记录库（前者的可见性投影、后者的内存记录都已经在
+ * 手上），因此切页的边界判定只该有一处——`nextPageCursor` 的有无就是「切完还有剩」这一个条件，
+ * 两处各写一遍等于给同一个差一错误留两个落点。
+ */
+function toPagedItems<T>(
+  kind: 'conversations' | 'test-call-records',
+  items: readonly T[],
+  args: Record<string, unknown>,
+  defaultLimit: number,
+  maxLimit: number,
+) {
+  const limit = requireNumber(args.limit, 'limit', { fallback: defaultLimit, min: 1, max: maxLimit })
+  const offset = readPageCursor(args, kind)?.offset ?? 0
+  const nextOffset = offset + limit
+  return {
+    items: items.slice(offset, nextOffset),
+    ...(nextOffset < items.length ? { nextPageCursor: encodePageCursor(kind, { offset: nextOffset }) } : {}),
+  }
+}
+
+/**
+ * 把记录库的游标过期翻译成带可用游标的恢复建议。
+ *
+ * 两族记录共用：恢复建议此前是「请使用 `earliestCursor=123` 恢复分页」，让消费者自己把数值拼回
+ * 参数名。给出编码好的 `pageCursor` 之后它是一个能直接传回来的输入，而这条口径只该有一处。
+ */
+function toCursorExpiredError(
+  kind: 'onebot-debug-records' | 'model-request-records',
+  error: { message: string; earliestCursor?: number },
+): SandboxMcpError {
+  return new SandboxMcpError('cursor_expired', error.message, false, error.earliestCursor === undefined
+    ? '请重新从最新页开始读取。'
+    : `请使用 pageCursor=${encodePageCursor(kind, { sequence: error.earliestCursor })} 恢复分页。`)
+}
+
 function listConversations(runtime: SandboxMcpToolRuntime, args: Record<string, unknown>) {
+  assertPageCursorOnly(args)
   const operatorId = requireString(args.operatorId, 'operatorId')
   // control 层消息分页上限为 100（control-service.ts assertMessageLimit），超出会直接抛错。
   const snapshot = runtime.control.getVisibleSnapshot(operatorId, 100)
-  const limit = requireNumber(args.limit, 'limit', { fallback: 50, min: 1, max: 200 })
-  const offset = requireNumber(args.offset, 'offset', { fallback: 0, min: 0 })
   const items = listConversationItems(snapshot, args).map((conversation) => toMcpConversation(snapshot, conversation))
-  return { items: items.slice(offset, offset + limit), nextOffset: offset + limit < items.length ? offset + limit : undefined }
+  return toPagedItems('conversations', items, args, DEFAULT_CONVERSATION_PAGE_SIZE, MAX_CONVERSATION_PAGE_SIZE)
 }
 
 /**
@@ -787,16 +1028,17 @@ async function waitForSettledMessages(
   // 静默期先取值再开始等待：放在等待之后，一个拼错的 settleSeconds 要先挂满一整个等待超时才报错。
   const settleSeconds = requireNumber(args.settleSeconds, 'settleSeconds', { fallback: 0, min: 0, max: 30 })
   const first = await runtime.waitFor(args, predicate)
-  if (settleSeconds < 1 || !first.matched || !first.event) return first
+  if (settleSeconds < 1 || first.outcome !== 'matched') return first
   const events = [first.event]
   let cursor = first.cursor
   for (;;) {
     const next = await runtime.waitFor({ ...args, cursor, timeoutSeconds: settleSeconds }, predicate)
-    if (!next.matched || !next.event) break
+    // 静默期内不再出现同条件消息即收束，因此这里等到的超时是正常终止而不是失败。
+    if (next.outcome !== 'matched') break
     events.push(next.event)
     cursor = next.cursor
   }
-  return { matched: true, event: events[events.length - 1], events, cursor }
+  return { outcome: 'matched' as const, event: events[events.length - 1]!, events, cursor }
 }
 
 async function waitForOneBotAction(runtime: SandboxMcpToolRuntime, args: Record<string, unknown>) {
@@ -820,9 +1062,9 @@ async function waitForOneBotAction(runtime: SandboxMcpToolRuntime, args: Record<
     }
     return true
   })
-  if (!waited.matched || !waited.event) return waited
+  if (waited.outcome !== 'matched') return waited
   // 成功时直接返回匹配记录，避免消费者再从通用 event.data 中解包旧 type 字段。
-  return { matched: true, record: waited.event.data, cursor: waited.cursor }
+  return { outcome: waited.outcome, record: waited.event.data, cursor: waited.cursor }
 }
 
 // 按 cursor.sequence 真正定位：匹配的是游标之后发生的状态变更事件，而不是「当前状态」。
@@ -840,8 +1082,8 @@ async function waitForChatLunaState(runtime: SandboxMcpToolRuntime, args: Record
     if (thinking !== undefined && state.thinking !== thinking) return false
     return true
   })
-  if (!waited.matched || !waited.event) return waited
-  return { matched: true, state: waited.event.data, cursor: waited.cursor }
+  if (waited.outcome !== 'matched') return waited
+  return { outcome: waited.outcome, state: waited.event.data, cursor: waited.cursor }
 }
 
 // —— 执行体：环境变更 ——
@@ -1007,28 +1249,43 @@ function importScene(runtime: SandboxMcpToolRuntime, args: Record<string, unknow
 
 // —— 执行体：OneBot 调试记录 ——
 
+/**
+ * 调试记录页在测试控制端点这一侧的形状。
+ *
+ * 翻译写在这里而不是改记录页类型：`SandboxOneBotDebugRecordsPage` 同时被 Console 契约与 WebQQ 的
+ * 记录页读取，那两处直接读 `records`／`nextCursor`（ADR-0095 的口径是由翻译它的模块自述）。
+ * `capacity` 与 `earliestCursor` 原样带出：前者是容量摘要，后者是游标过期恢复用的最早位置，
+ * 不透明游标只替换「消费者自己拼参数」这一段，不减少信息量。
+ */
+function toOneBotDebugPage({ records, nextCursor, ...page }: SandboxOneBotDebugRecordsPage) {
+  return {
+    items: records,
+    ...(nextCursor === undefined ? {} : { nextPageCursor: encodePageCursor('onebot-debug-records', { sequence: nextCursor }) }),
+    ...page,
+  }
+}
+
 async function listOneBotDebugRecords(runtime: SandboxMcpToolRuntime, args: Record<string, unknown>) {
   if ('includeLargeValues' in args) {
     throw new SandboxMcpError('invalid_arguments', '列表接口不允许 includeLargeValues；请使用 get_onebot_debug_record 展开单条记录。')
   }
+  assertPageCursorOnly(args)
+  const pageCursor = readPageCursor(args, 'onebot-debug-records')
   try {
     await runtime.control.waitForPersistence()
-    return await runtime.control.getOneBotDebugStore().getRecords({
+    return toOneBotDebugPage(await runtime.control.getOneBotDebugStore().getRecords({
       botId: typeof args.botId === 'string' ? args.botId : undefined,
       direction: optionalEnum(args.direction, 'direction', ONEBOT_DEBUG_DIRECTIONS),
       action: typeof args.action === 'string' ? args.action : undefined,
       requestedAction: typeof args.requestedAction === 'string' ? args.requestedAction : undefined,
       status: optionalEnum(args.status, 'status', ONEBOT_DEBUG_STATUSES),
       order: optionalEnum(args.order, 'order', RECORD_ORDERS),
-      limit: optionalNumber(args.limit, 'limit'),
-      beforeSequence: optionalNumber(args.beforeSequence, 'beforeSequence'),
-    })
+      limit: optionalNumber(args.limit, 'limit', { min: 1, max: MAX_DEBUG_PAGE_SIZE }),
+      beforeSequence: pageCursor?.sequence,
+    }))
   } catch (error) {
-    if (error instanceof SandboxOneBotDebugCursorExpiredError) {
-      throw new SandboxMcpError('cursor_expired', error.message, false, error.earliestCursor === undefined
-        ? '请重新从最新页开始读取。'
-        : `请使用 earliestCursor=${error.earliestCursor} 恢复分页。`)
-    }
+    // 恢复建议给出一个可直接使用的游标值，而不是让消费者把数值拼回参数名。
+    if (error instanceof SandboxOneBotDebugCursorExpiredError) throw toCursorExpiredError('onebot-debug-records', error)
     throw error
   }
 }
@@ -1080,7 +1337,49 @@ function describeRecordScope(scope: SceneScope) {
     : { scope: 'space' as const, spaceId: scope.id, name: scope.name }
 }
 
+/**
+ * 分页游标与记录域的搭配。
+ *
+ * 单记录域按序号续页，`scope: 'all'` 按时间加记录标识续页——序号是每个记录域各自独立的计数，跨记录域
+ * 比较没有意义。收敛前三个游标参数在声明里并列、都不标条件，而执行体在 `scope: 'all'` 时把
+ * `beforeSequence` 静默置空，于是翻页翻不动也不报错，只会一直拿到同一页。现在游标由服务端编码，
+ * 搭配不上就显式失败：那是调用方拿了另一条读取路径的游标，继续按它翻只会给出错的结论。
+ */
+function toModelRequestPageQuery(
+  pageCursor: SandboxPageCursorPayloads['model-request-records'] | undefined,
+  federated: boolean,
+): Pick<GetSandboxModelRequestRecordsInput, 'beforeSequence' | 'beforeCreatedAt' | 'beforeId'> {
+  if (!pageCursor) return {}
+  const recovery = '请传回同一种 scope 上一页返回的 nextPageCursor。'
+  if (federated) {
+    if (isSequencePageCursor(pageCursor)) {
+      throw new SandboxMcpError('invalid_arguments', 'pageCursor 是单个记录域的分页位置，不能用于 scope=all', false, recovery)
+    }
+    return { beforeCreatedAt: pageCursor.createdAt, beforeId: pageCursor.id }
+  }
+  if (!isSequencePageCursor(pageCursor)) {
+    throw new SandboxMcpError('invalid_arguments', 'pageCursor 是 scope=all 的分页位置，不能用于单个记录域', false, recovery)
+  }
+  return { beforeSequence: pageCursor.sequence }
+}
+
+/**
+ * 单记录域的模型请求记录页在测试控制端点这一侧的形状。
+ *
+ * `nextCreatedAt` 与 `nextId` 不带出去：它们是联邦读取的续页键，单记录域按序号续页，同时给三个
+ * 续页字段正是「哪个游标有效取决于另一个参数」的来源。翻译与调试记录那一份同理，见 ADR-0095。
+ */
+function toModelRequestPage({ records, nextCursor, nextCreatedAt: _createdAt, nextId: _id, ...page }: SandboxModelRequestRecordsPage) {
+  return {
+    items: records,
+    ...(nextCursor === undefined ? {} : { nextPageCursor: encodePageCursor('model-request-records', { sequence: nextCursor }) }),
+    ...page,
+  }
+}
+
 async function listModelRequestRecords(runtime: SandboxMcpToolRuntime, args: Record<string, unknown>) {
+  assertPageCursorOnly(args)
+  const pageCursor = readPageCursor(args, 'model-request-records')
   const query: GetSandboxModelRequestRecordsInput = {
     botId: typeof args.botId === 'string' ? args.botId : undefined,
     conversationId: typeof args.conversationId === 'string' ? args.conversationId : undefined,
@@ -1088,35 +1387,32 @@ async function listModelRequestRecords(runtime: SandboxMcpToolRuntime, args: Rec
     model: typeof args.model === 'string' ? args.model : undefined,
     status: optionalEnum(args.status, 'status', MODEL_REQUEST_STATUSES),
     order: optionalEnum(args.order, 'order', RECORD_ORDERS),
-    limit: optionalNumber(args.limit, 'limit'),
-    beforeSequence: optionalNumber(args.beforeSequence, 'beforeSequence'),
-    beforeCreatedAt: typeof args.beforeCreatedAt === 'string' ? args.beforeCreatedAt : undefined,
-    beforeId: typeof args.beforeId === 'string' ? args.beforeId : undefined,
+    limit: optionalNumber(args.limit, 'limit', { min: 1, max: MAX_MODEL_REQUEST_PAGE_SIZE }),
   }
   try {
     const scope = resolveModelRequestScope(args)
-    if (scope.kind === 'unattributed') return await runtime.requireUnattributedModelRequests().getRecords(query)
     if (scope.kind === 'all') {
-      const federatedQuery = { ...query, beforeSequence: undefined }
-      const { next, ...page } = await runtime.scopes.federate(
+      const federatedQuery = { ...query, ...toModelRequestPageQuery(pageCursor, true) }
+      const { next, records, ...page } = await runtime.scopes.federate(
         (recordScope) => recordScope.records.getRecords(federatedQuery),
         {
           limit: requireNumber(query.limit, 'limit', { fallback: DEFAULT_MODEL_REQUEST_PAGE_SIZE, min: 1, max: MAX_MODEL_REQUEST_PAGE_SIZE }),
           order: query.order === 'asc' ? 'asc' : 'desc',
           tieBreak: ({ id }) => id,
-          nextCursor: ({ createdAt, id }) => ({ nextCreatedAt: createdAt, nextId: id }),
+          nextCursor: ({ createdAt, id }) => encodePageCursor('model-request-records', { createdAt, id }),
         },
       )
-      return { ...page, ...next }
+      // 联邦页的续页游标只在第二排序键跨记录域可比时给得出来，因此 `hasMore` 与它不是同一件事：
+      // 「还有更多但翻不过去」是一种真实状态，必须能看出来，而不是让消费者以为到底了。
+      return { items: records, ...(next === undefined ? {} : { nextPageCursor: next }), ...page }
     }
-    if (scope.kind === 'main') return await runtime.control.getModelRequestStore().getRecords(query)
-    return await runtime.resolveControl(scope.spaceId, false).getModelRequestStore().getRecords(query)
+    const scoped = { ...query, ...toModelRequestPageQuery(pageCursor, false) }
+    if (scope.kind === 'unattributed') return toModelRequestPage(await runtime.requireUnattributedModelRequests().getRecords(scoped))
+    if (scope.kind === 'main') return toModelRequestPage(await runtime.control.getModelRequestStore().getRecords(scoped))
+    return toModelRequestPage(await runtime.resolveControl(scope.spaceId, false).getModelRequestStore().getRecords(scoped))
   } catch (error) {
-    if (error instanceof SandboxModelRequestCursorExpiredError) {
-      throw new SandboxMcpError('cursor_expired', error.message, false, error.earliestCursor === undefined
-        ? '请重新从最新页开始读取。'
-        : `请使用 earliestCursor=${error.earliestCursor} 恢复分页。`)
-    }
+    // 序号游标才会过期（联邦读取不按序号翻页），因此恢复建议给的是编码好的序号游标。
+    if (error instanceof SandboxModelRequestCursorExpiredError) throw toCursorExpiredError('model-request-records', error)
     throw error
   }
 }
@@ -1169,8 +1465,16 @@ async function clearModelRequestRecords(runtime: SandboxMcpToolRuntime, args: Re
 
 // —— 执行体：测试调用记录 ——
 
+/**
+ * 测试调用记录的分页在这里切，而不是下推到记录库。
+ *
+ * 记录页类型由 Console 契约与 WebQQ 的测试调用记录页共用，按 ADR-0095 翻译归翻译它的模块；记录
+ * 本身整份在内存里，因此按偏移切页不多读一次。补上 `limit` 之前它是唯一没有上限的 list：保留
+ * 500 条时一次全返回。
+ */
 function listTestCallRecords(runtime: SandboxMcpToolRuntime, args: Record<string, unknown>) {
-  return runtime.listCallRecords({
+  assertPageCursorOnly(args)
+  const { records } = runtime.listCallRecords({
     tool: typeof args.tool === 'string' ? args.tool : undefined,
     credentialName: typeof args.credentialName === 'string' ? args.credentialName : undefined,
     transport: optionalEnum(args.transport, 'transport', TEST_CALL_TRANSPORTS),
@@ -1179,6 +1483,7 @@ function listTestCallRecords(runtime: SandboxMcpToolRuntime, args: Record<string
     status: optionalEnum(args.status, 'status', TEST_CALL_STATUSES),
     order: optionalEnum(args.order, 'order', RECORD_ORDERS),
   })
+  return toPagedItems('test-call-records', records, args, DEFAULT_TEST_CALL_PAGE_SIZE, MAX_TEST_CALL_PAGE_SIZE)
 }
 
 /**
@@ -1193,6 +1498,7 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
     scope: 'read',
     description: '获取沙盒服务、测试 API 和 MCP 状态',
     inputSchema: { type: 'object', properties: {} },
+    outputSchema: SERVER_INFO_OUTPUT,
     quota: 'read', spaceResolution: 'none', idempotent: false, requiresConfirmation: false,
     run: (runtime) => getServerInfo(runtime),
   },
@@ -1202,7 +1508,10 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
     description: '列出当前 Sandbox 实例的全部 AI 测试空间',
     inputSchema: { type: 'object', properties: {} },
     quota: 'read', spaceResolution: 'none', idempotent: false, requiresConfirmation: false,
-    run: (runtime) => runtime.requireTestSpaces().listSpaces(),
+    // 结果包一层：裸数组在 MCP 表述下拿不到 structuredContent（协议要求它是对象），而同一个工具在
+    // HTTP 表述下返回的是真正的数组，消费者要为「换一种表述」多写一条解析路径。包一层之后往结果里
+    // 加容量摘要或续页信息也不再是破坏性变更。
+    run: (runtime) => ({ items: runtime.requireTestSpaces().listSpaces() }),
   },
   {
     name: 'get_test_space',
@@ -1233,8 +1542,8 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
           type: 'string',
           description: '列出该根会话下的会话实例；省略时只返回根会话。传入会话实例 ID 时归一化到它所属的根会话',
         },
-        limit: { type: 'number', minimum: 1, maximum: 200, description: '返回条数，默认 50' },
-        offset: { type: 'number', minimum: 0 },
+        limit: pageLimit(DEFAULT_CONVERSATION_PAGE_SIZE, MAX_CONVERSATION_PAGE_SIZE),
+        pageCursor: PAGE_CURSOR,
       },
       required: ['operatorId'],
     },
@@ -1283,7 +1592,7 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
     description: '列出当前待处理好友和群申请',
     inputSchema: { type: 'object', properties: { spaceId: SPACE_OPTIONAL } },
     quota: 'read', spaceResolution: 'read', idempotent: false, requiresConfirmation: false,
-    run: (runtime) => runtime.control.getSnapshot().requests,
+    run: (runtime) => ({ items: runtime.control.getSnapshot().requests }),
   },
   {
     name: 'get_capability_matrix',
@@ -1297,7 +1606,9 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
       },
     },
     quota: 'read', spaceResolution: 'read', idempotent: false, requiresConfirmation: false,
-    run: (runtime, args) => readCapabilityMatrix(runtime.control, args.implementation),
+    // 包一层只加在工具这一侧：`chatluna-sandbox://capabilities/*` 两条只读资源复用同一份矩阵，而
+    // 资源正文本来就是文本序列化、不受 structuredContent 的约束，跟着包会让已经在读资源的消费者白改一次。
+    run: (runtime, args) => ({ items: readCapabilityMatrix(runtime.control, args.implementation) }),
   },
   {
     name: 'export_scene',
@@ -1363,6 +1674,7 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
       required: ['spaceId', 'operatorId', 'conversationId', 'idempotencyKey'],
       description: '返回值里的 cursorBefore 是发送前的事件游标：等待机器人回复时把它传给 wait_for_message，例如 wait_for_message({ cursor: cursorBefore, authorId: 机器人ID })。',
     },
+    outputSchema: SEND_MESSAGE_OUTPUT,
     quota: 'mutation', spaceResolution: 'mutation', idempotent: true, requiresConfirmation: false,
     run: sendMessage,
   },
@@ -1414,6 +1726,7 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
       ],
       description: '返回值里的 cursorBefore 是发送前的事件游标：等待机器人回复时把它传给 wait_for_message。',
     },
+    outputSchema: SEND_FORWARD_MESSAGE_OUTPUT,
     quota: 'mutation', spaceResolution: 'mutation', idempotent: true, requiresConfirmation: false,
     run: sendForwardMessage,
   },
@@ -1501,6 +1814,7 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
       },
       required: ['spaceId', 'cursor'],
     },
+    outputSchema: WAIT_EVENT_OUTPUT,
     // 等待自成一档：长等待不占用读取额度，也不与状态修改抢并发闸门。
     quota: 'wait', spaceResolution: 'mutation', idempotent: false, requiresConfirmation: false,
     run: waitForEvent,
@@ -1522,12 +1836,13 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
           type: 'number',
           minimum: 1,
           maximum: 30,
-          description: '静默期秒数；匹配到消息后继续收集同条件消息，直到静默期内不再出现新消息。返回 event 为最后一条，events 为完整序列。省略则匹配到第一条即返回',
+          description: '静默期秒数；匹配到消息后继续收集同条件消息，直到静默期内不再出现新消息。返回 event 为最后一条，events 为完整序列。省略则匹配到第一条即返回，结果里没有 events',
         },
         timeoutSeconds: TIMEOUT_SECONDS,
       },
       required: ['spaceId', 'cursor'],
     },
+    outputSchema: WAIT_MESSAGE_OUTPUT,
     quota: 'wait', spaceResolution: 'mutation', idempotent: false, requiresConfirmation: false,
     run: waitForMessageEvent,
   },
@@ -1548,6 +1863,7 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
       },
       required: ['spaceId', 'cursor'],
     },
+    outputSchema: WAIT_CHATLUNA_STATE_OUTPUT,
     quota: 'wait', spaceResolution: 'mutation', idempotent: false, requiresConfirmation: false,
     run: waitForChatLunaState,
   },
@@ -1569,6 +1885,7 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
       },
       required: ['spaceId', 'cursor'],
     },
+    outputSchema: WAIT_ONEBOT_ACTION_OUTPUT,
     // 能力范围是调试类，配额档却是等待类：等待档按「这次调用会挂多久」分，不按能力范围分。
     quota: 'wait', spaceResolution: 'mutation', idempotent: false, requiresConfirmation: false,
     run: waitForOneBotAction,
@@ -1673,6 +1990,7 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
       },
       required: ['spaceId', 'kind', 'id', 'confirmationToken'],
     },
+    outputSchema: DESTRUCTIVE_OUTPUT,
     quota: 'mutation', spaceResolution: 'mutation', idempotent: false, requiresConfirmation: true,
     run: deleteEnvironmentEntity,
   },
@@ -1681,6 +1999,7 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
     scope: 'manage',
     description: '恢复初始场景（主场景为默认场景，测试空间为创建时的空白场景）',
     inputSchema: { type: 'object', properties: { spaceId: SPACE_REQUIRED, confirmationToken: { type: 'string' } }, required: ['spaceId', 'confirmationToken'] },
+    outputSchema: DESTRUCTIVE_OUTPUT,
     quota: 'mutation', spaceResolution: 'mutation', idempotent: false, requiresConfirmation: true,
     run: (runtime) => runtime.control.resetScene(),
   },
@@ -1689,6 +2008,7 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
     scope: 'manage',
     description: '清空当前场景',
     inputSchema: { type: 'object', properties: { spaceId: SPACE_REQUIRED, confirmationToken: { type: 'string' } }, required: ['spaceId', 'confirmationToken'] },
+    outputSchema: DESTRUCTIVE_OUTPUT,
     quota: 'mutation', spaceResolution: 'mutation', idempotent: false, requiresConfirmation: true,
     run: clearScene,
   },
@@ -1710,6 +2030,7 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
       },
       required: ['spaceId', 'document', 'confirmationToken'],
     },
+    outputSchema: DESTRUCTIVE_OUTPUT,
     quota: 'mutation', spaceResolution: 'mutation', idempotent: false, requiresConfirmation: true,
     run: importScene,
   },
@@ -1727,8 +2048,8 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
         requestedAction: { type: 'string', description: '仅精确匹配插件实际请求名' },
         status: { type: 'string', enum: [...ONEBOT_DEBUG_STATUSES], description: '按调用结果筛选；省略时两种结果都返回' },
         order: { type: 'string', enum: [...RECORD_ORDERS], description: '按创建时间正序或倒序，默认倒序' },
-        limit: { type: 'number', description: '每页条数，默认 50，最大 200' },
-        beforeSequence: { type: 'number', description: '分页游标：倒序仅返回 sequence 更小的记录，正序仅返回 sequence 更大的记录' },
+        limit: pageLimit(DEFAULT_DEBUG_PAGE_SIZE, MAX_DEBUG_PAGE_SIZE),
+        pageCursor: PAGE_CURSOR,
       },
     },
     quota: 'read', spaceResolution: 'read', idempotent: false, requiresConfirmation: false,
@@ -1776,10 +2097,8 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
         model: { type: 'string' },
         status: { type: 'string', enum: [...MODEL_REQUEST_STATUSES], description: '按请求结果筛选；省略时全部返回。pending 是还没收到响应的请求' },
         order: { type: 'string', enum: [...RECORD_ORDERS], description: '按创建时间正序或倒序，默认倒序' },
-        limit: { type: 'number', description: '每页条数，默认 50，最大 200' },
-        beforeSequence: { type: 'number', description: '新到旧分页游标：仅返回 sequence 更小的记录' },
-        beforeCreatedAt: { type: 'string', description: '全部空间视图的时间游标：仅返回更早的记录' },
-        beforeId: { type: 'string', description: '与 beforeCreatedAt 一起用于稳定分页' },
+        limit: pageLimit(DEFAULT_MODEL_REQUEST_PAGE_SIZE, MAX_MODEL_REQUEST_PAGE_SIZE),
+        pageCursor: PAGE_CURSOR,
       },
       required: ['scope'],
       oneOf: RECORD_SCOPE_VARIANTS,
@@ -1832,6 +2151,8 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
         testRunId: { type: 'string' },
         status: { type: 'string', enum: [...TEST_CALL_STATUSES], description: '按调用结果筛选；省略时两种结果都返回' },
         order: { type: 'string', enum: [...RECORD_ORDERS], description: '按创建时间正序或倒序，默认倒序' },
+        limit: pageLimit(DEFAULT_TEST_CALL_PAGE_SIZE, MAX_TEST_CALL_PAGE_SIZE),
+        pageCursor: PAGE_CURSOR,
       },
     },
     quota: 'read', spaceResolution: 'none', idempotent: false, requiresConfirmation: false,
@@ -1883,9 +2204,20 @@ function withTestRunId(schema: Record<string, unknown>): Record<string, unknown>
 const TOOL_REGISTRY: readonly SandboxMcpToolEntry[] = TOOL_ENTRIES
   .map((entry) => ({ ...entry, inputSchema: withTestRunId(entry.inputSchema) }))
 
-/** 工具清单的对外自述，是注册表条目的投影而不是第二份声明。 */
+/**
+ * 工具清单的对外自述，是注册表条目的投影而不是第二份声明。
+ *
+ * `outputSchema` 只在条目声明了它时出现，不给未覆盖的工具补一个空对象：空声明按 MCP 规范同样要求
+ * 返回符合它的 `structuredContent`，而「没有声明」才是那些工具当前的真实状态。
+ */
 export const SANDBOX_MCP_TOOL_DECLARATIONS: readonly SandboxMcpToolCapability[] = TOOL_REGISTRY
-  .map(({ name, scope, description, inputSchema }) => ({ name, scope, description, inputSchema }))
+  .map(({ name, scope, description, inputSchema, outputSchema }) => ({
+    name,
+    scope,
+    description,
+    inputSchema,
+    ...(outputSchema ? { outputSchema } : {}),
+  }))
 
 const TOOLS_BY_NAME = new Map(TOOL_REGISTRY.map((entry) => [entry.name, entry]))
 

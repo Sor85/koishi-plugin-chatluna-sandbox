@@ -5,6 +5,16 @@ import type { SandboxTestCallRecord, SandboxTestCallRecordListItem, SandboxTestC
 const SENSITIVE_KEY_PATTERN = /authorization|access[_-]?token|(?:^|_)token$|secret|password|cookie|private[_-]?key|confirmation[_-]?token|data[_-]?base64/i
 const BASE64_BODY_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
 
+/**
+ * 测试调用记录的每页条数，与另外三个 list 工具取同一组数值。
+ *
+ * 记录页本身是共享类型（Console 与 WebQQ 的测试调用记录页读它），因此分页发生在测试控制端点
+ * 自己那一侧：本模块只声明数值，切页由工具执行体做。保留上限 500 条时一次全返回的旧行为随
+ * 分页一起消失，那正是补上限的理由。
+ */
+export const DEFAULT_TEST_CALL_PAGE_SIZE = 50
+export const MAX_TEST_CALL_PAGE_SIZE = 200
+
 export interface ListSandboxTestCallRecordsInput {
   tool?: string
   credentialName?: string
