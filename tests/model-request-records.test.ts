@@ -177,7 +177,7 @@ describe('模型请求记录库', () => {
       status: 'error',
       error: { code: 'transient_error', retryable: true, message: 'timeout' },
     })
-    expect((await store.getRecords({ errorsOnly: true })).records.map(({ id }) => id)).toEqual([failed.id])
+    expect((await store.getRecords({ status: 'error' })).records.map(({ id }) => id)).toEqual([failed.id])
   })
 
   it('按稳定序号新到旧分页，回收后的游标返回 cursor_expired', async () => {

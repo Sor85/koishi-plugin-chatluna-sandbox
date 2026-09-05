@@ -50,13 +50,13 @@ const TOOL_PARAMETERS: Record<string, string[]> = {
   reset_scene: ['spaceId', 'confirmationToken', 'testRunId'],
   clear_scene: ['spaceId', 'confirmationToken', 'testRunId'],
   import_scene: ['spaceId', 'document', 'confirmationToken', 'testRunId'],
-  list_onebot_debug_records: ['spaceId', 'botId', 'direction', 'action', 'requestedAction', 'errorsOnly', 'order', 'limit', 'beforeSequence', 'testRunId'],
+  list_onebot_debug_records: ['spaceId', 'botId', 'direction', 'action', 'requestedAction', 'status', 'order', 'limit', 'beforeSequence', 'testRunId'],
   get_onebot_debug_record: ['spaceId', 'recordId', 'includeLargeValues', 'testRunId'],
   clear_onebot_debug_records: ['spaceId', 'testRunId'],
-  list_model_request_records: ['scope', 'spaceId', 'botId', 'conversationId', 'interactionId', 'model', 'errorsOnly', 'order', 'limit', 'beforeSequence', 'beforeCreatedAt', 'beforeId', 'testRunId'],
+  list_model_request_records: ['scope', 'spaceId', 'botId', 'conversationId', 'interactionId', 'model', 'status', 'order', 'limit', 'beforeSequence', 'beforeCreatedAt', 'beforeId', 'testRunId'],
   get_model_request_record: ['scope', 'spaceId', 'recordId', 'testRunId'],
-  clear_model_request_records: ['scope', 'spaceId', 'testRunId'],
-  list_test_call_records: ['tool', 'credentialName', 'transport', 'spaceId', 'testRunId', 'errorsOnly', 'order'],
+  clear_model_request_records: ['spaceId', 'testRunId'],
+  list_test_call_records: ['tool', 'credentialName', 'transport', 'spaceId', 'testRunId', 'status', 'order'],
   get_test_call_record: ['recordId', 'testRunId'],
   clear_test_call_records: ['testRunId'],
 }
@@ -112,10 +112,47 @@ const ACCOUNT_PROFILE_FIELDS = [
   'vipLevel',
 ]
 
+/**
+ * 参数取值组合的契约：每个工具的 `oneOf`／`anyOf` 分支各自要求哪些参数。
+ *
+ * 顶层参数名清单抓不到这一层——`set-card` 要带 `card` 此前只写在 `card` 的描述里，消费者得读完每条
+ * 描述才拼得出一次合法调用。分支清单由测试侧独立书写，键是分支标题、值是该分支追加的必填参数。
+ */
+const TOOL_VARIANTS: Record<string, Record<string, string[]>> = {
+  perform_friend_action: {
+    request: ['targetId'],
+    'handle-request': ['requestId', 'approve'],
+    delete: ['targetId'],
+    'set-remark': ['targetId', 'remark'],
+    poke: ['targetId'],
+  },
+  perform_group_action: {
+    'request-join': ['groupId'],
+    invite: ['groupId', 'targetId'],
+    'handle-request': ['requestId', 'approve'],
+    leave: ['groupId'],
+    kick: ['groupId', 'targetId'],
+    'set-admin': ['groupId', 'targetId', 'enabled'],
+    'transfer-owner': ['groupId', 'targetId'],
+    'set-card': ['groupId', 'targetId', 'card'],
+    'set-title': ['groupId', 'targetId', 'title'],
+    'set-name': ['groupId', 'name'],
+    poke: ['groupId', 'targetId'],
+  },
+  // 记录域：只有 space 分支需要空间标识，其余三种取值不带。
+  list_model_request_records: { all: [], main: [], space: ['spaceId'], unattributed: [] },
+  get_model_request_record: { all: [], main: [], space: ['spaceId'], unattributed: [] },
+  send_forward_message: { 引用已有消息: ['messageIds'], 显式节点: ['nodes'] },
+}
+
 type SchemaNode = {
   properties?: Record<string, SchemaNode>
   items?: SchemaNode & { oneOf?: Array<SchemaNode & { title?: string }> }
   title?: string
+  required?: string[]
+  oneOf?: Array<SchemaNode & { title?: string }>
+  anyOf?: Array<SchemaNode & { title?: string }>
+  const?: string
 }
 
 function propertyNames(schema: SchemaNode | undefined): string[] {
@@ -197,5 +234,47 @@ describe('MCP 工具参数契约', () => {
     for (const change of ['create-user', 'create-bot']) {
       expect({ change, type: profileOf(change)?.type }).toEqual({ change, type: 'object' })
     }
+  })
+
+  it('每个判别联合分支声明的追加必填参数与契约清单逐条一致', () => {
+    const schemas = toolSchemas()
+
+    for (const [tool, variants] of Object.entries(TOOL_VARIANTS)) {
+      const branches = schemas[tool]?.oneOf ?? []
+      expect({ tool, variants: branches.map(({ title }) => title) }).toEqual({ tool, variants: Object.keys(variants) })
+      for (const branch of branches) {
+        expect({ tool, variant: branch.title, required: [...(branch.required ?? [])].sort() })
+          .toEqual({ tool, variant: branch.title, required: [...variants[branch.title!]!].sort() })
+      }
+    }
+  })
+
+  it('判别式取值由分支自己钉住，因此一次调用恰好匹配一个分支', () => {
+    const schemas = toolSchemas()
+
+    // 分支不钉判别式时 oneOf 会退化成「随便满足一个」，一次缺参数的调用可能匹配到另一个分支。
+    for (const tool of ['perform_friend_action', 'perform_group_action']) {
+      for (const branch of schemas[tool]?.oneOf ?? []) {
+        expect({ tool, variant: branch.title, discriminator: branch.properties?.action?.const })
+          .toEqual({ tool, variant: branch.title, discriminator: branch.title })
+      }
+    }
+    for (const tool of ['list_model_request_records', 'get_model_request_record']) {
+      for (const branch of schemas[tool]?.oneOf ?? []) {
+        expect({ tool, variant: branch.title, discriminator: branch.properties?.scope?.const })
+          .toEqual({ tool, variant: branch.title, discriminator: branch.title })
+      }
+    }
+    // 动作枚举与分支清单同源：声明里能选的动作必须都有一个分支说明它要带什么。
+    for (const tool of ['perform_friend_action', 'perform_group_action']) {
+      expect({ tool, actions: (schemas[tool]?.properties?.action as { enum?: string[] } | undefined)?.enum })
+        .toEqual({ tool, actions: (schemas[tool]?.oneOf ?? []).map(({ title }) => title) })
+    }
+  })
+
+  it('合并转发资源的「至少提供一项」写进声明而不是只写在描述里', () => {
+    const forward = toolSchemas().get_forward_message
+
+    expect(forward?.anyOf).toEqual([{ required: ['forwardId'] }, { required: ['messageId'] }])
   })
 })

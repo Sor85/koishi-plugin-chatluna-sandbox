@@ -108,7 +108,7 @@ describe.each(modelRequestAdapters)('模型请求记录库按行持久化（$nam
     expect(capacity.totalBytes).toBe(raw.reduce((sum, record) => sum + estimateModelRequestRecordBytes(record), 0))
   })
 
-  it('按 botId、conversationId、interactionId、model 与 errorsOnly 过滤', async () => {
+  it('按 botId、conversationId、interactionId、model 与 status 过滤', async () => {
     store.append(modelRequestInput({
       model: 'alpha',
       interactionId: 'interaction-a',
@@ -127,7 +127,7 @@ describe.each(modelRequestAdapters)('模型请求记录库按行持久化（$nam
     expect((await store.getRecords({ conversationId: 'group:30001' })).records.map(({ model }) => model)).toEqual(['beta'])
     expect((await store.getRecords({ interactionId: 'interaction-a' })).records.map(({ model }) => model)).toEqual(['alpha'])
     expect((await store.getRecords({ model: 'beta' })).records.map(({ model }) => model)).toEqual(['beta'])
-    expect((await store.getRecords({ errorsOnly: true })).records.map(({ model }) => model)).toEqual(['beta'])
+    expect((await store.getRecords({ status: 'error' })).records.map(({ model }) => model)).toEqual(['beta'])
     // 过滤字段缺省的记录不应被显式条件命中。
     expect((await store.getRecords({ botId: '29999' })).records).toEqual([])
   })
@@ -225,7 +225,7 @@ describe.each(debugAdapters)('OneBot 调试记录库按行持久化（$name）',
     await store.waitForReady()
   })
 
-  it('按 botId、direction、requestedAction 与 errorsOnly 过滤', async () => {
+  it('按 botId、direction、requestedAction 与 status 过滤', async () => {
     store.append({
       botId: '20001', implementation: 'napcat', direction: 'action',
       requestedAction: 'get_status', action: 'get_status', status: 'success', durationMs: 1,
@@ -240,7 +240,7 @@ describe.each(debugAdapters)('OneBot 调试记录库按行持久化（$name）',
     expect((await store.getRecords({ botId: '20001' })).records.map(({ action }) => action)).toEqual(['get_status'])
     expect((await store.getRecords({ direction: 'event' })).records.map(({ action }) => action)).toEqual(['message'])
     expect((await store.getRecords({ requestedAction: 'get_status' })).records.map(({ action }) => action)).toEqual(['get_status'])
-    expect((await store.getRecords({ errorsOnly: true })).records.map(({ action }) => action)).toEqual(['message'])
+    expect((await store.getRecords({ status: 'error' })).records.map(({ action }) => action)).toEqual(['message'])
   })
 
   it('action 过滤覆盖能力矩阵声明的别名', async () => {

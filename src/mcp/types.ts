@@ -54,10 +54,39 @@ export interface SandboxMcpEventCursor {
   sequence: number
 }
 
+/**
+ * 事件流上可能出现的全部事件类型，也是 `wait_for_event` 的取值集合。
+ *
+ * 收成封闭词汇而不是自由字符串：写错一个名字此前只能等到超时，而「等到超时也没有事件」与真的
+ * 没等到完全一样，消费者据此得出的是错的结论。类型本身就是守卫——追加事件类型必须先登记在这里，
+ * 否则 `appendEvent` 那一处过不了类型检查。
+ *
+ * 顺序按语义分组：场景与消息、ChatLuna 状态、被测插件发起的 OneBot 调用、关系操作、测试空间
+ * 生命周期。它是对外声明的顺序（`wait_for_event` 的 enum 与只读资源都按它给出），因此新增类型
+ * 要放进它所属的那一组，而不是数组末尾。
+ */
+export const SANDBOX_MCP_EVENT_TYPES = [
+  'scene.changed',
+  'message.created',
+  'message.recalled',
+  'chatluna.state',
+  'onebot.action',
+  'onebot.event',
+  'friend.action',
+  'group.action',
+  'test-space.created',
+  'test-space.completed',
+  'test-space.failed',
+  'test-space.reactivated',
+  'test-space.deleted',
+] as const
+
+export type SandboxMcpEventType = typeof SANDBOX_MCP_EVENT_TYPES[number]
+
 export interface SandboxMcpEvent {
   cursor: SandboxMcpEventCursor
   spaceId?: string
-  type: string
+  type: SandboxMcpEventType
   createdAt: string
   data: unknown
 }

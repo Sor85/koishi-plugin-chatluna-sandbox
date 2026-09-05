@@ -160,7 +160,7 @@ export function matchesOneBotDebugQuery(record: SandboxOneBotDebugRecord, query:
   if (query.direction && record.direction !== query.direction) return false
   if (query.action && !matchesResolvedActionFilter(record, query.action)) return false
   if (query.requestedAction && record.requestedAction !== query.requestedAction) return false
-  if (query.errorsOnly && record.status !== 'error') return false
+  if (query.status && record.status !== query.status) return false
   if (query.beforeSequence !== undefined) {
     return query.order === 'asc' ? record.sequence > query.beforeSequence : record.sequence < query.beforeSequence
   }
@@ -205,7 +205,7 @@ export interface SandboxOneBotDebugPersistenceQuery {
   direction?: SandboxOneBotDebugDirection
   action?: SandboxOneBotDebugActionFilter
   requestedAction?: string
-  errorsOnly?: boolean
+  status?: SandboxOneBotDebugStatus
   order: 'asc' | 'desc'
   beforeSequence?: number
   /** 调用方会多取一条用于判断 hasMore。 */
@@ -375,7 +375,7 @@ export class SandboxOneBotDebugStore {
       ...(input.direction ? { direction: input.direction } : {}),
       ...(input.action ? { action: resolveOneBotDebugActionFilter(input.action) } : {}),
       ...(input.requestedAction ? { requestedAction: input.requestedAction } : {}),
-      ...(input.errorsOnly ? { errorsOnly: true } : {}),
+      ...(input.status ? { status: input.status } : {}),
       order: resolveOneBotDebugOrder(input),
       ...(input.beforeSequence !== undefined ? { beforeSequence: input.beforeSequence } : {}),
       limit: limit + 1,

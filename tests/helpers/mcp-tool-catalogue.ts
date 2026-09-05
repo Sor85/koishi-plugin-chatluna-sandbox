@@ -68,3 +68,19 @@ export function toMcpToolCatalogue(tools: readonly { name: string; scope: string
 
 /** 完整工具名清单，供不携带能力范围的传输层 `tools/list` 断言使用。 */
 export const MCP_TOOL_NAMES: string[] = MCP_TOOL_CATALOGUE.map(({ name }) => name)
+
+/**
+ * 只读资源的完整 URI 清单，按 `resources/list` 的返回顺序列出。
+ *
+ * 与工具清单同一个道理：三处此前只断言资源条数，而条数抓不到 URI 改名——资源 URI 是消费者唯一的
+ * 寻址方式，改掉一个字就是断了一条对外契约。清单由测试侧独立书写，先改这里再改实现。
+ */
+export const MCP_RESOURCE_URIS: string[] = [
+  'chatluna-sandbox://guide',
+  'chatluna-sandbox://scene-schema',
+  'chatluna-sandbox://capabilities/napcat',
+  'chatluna-sandbox://capabilities/llbot',
+  'chatluna-sandbox://errors',
+  'chatluna-sandbox://events',
+  'chatluna-sandbox://examples',
+]

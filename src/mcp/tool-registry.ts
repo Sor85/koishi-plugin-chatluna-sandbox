@@ -29,17 +29,22 @@ import type {
   SandboxForwardNodeInput,
   SandboxImplementationProfile,
   SandboxMedia,
+  SandboxModelRequestStatus,
+  SandboxOneBotDebugDirection,
+  SandboxOneBotDebugStatus,
   SandboxSnapshot,
 } from '../types'
 import { SandboxModelRequestCursorExpiredError, SandboxOneBotDebugCursorExpiredError } from '../types'
-import { asRecord, argumentsFingerprint, optionalNumber, readSpaceId, requireNumber, requireString } from './arguments'
+import { argumentsFingerprint, asRecord, optionalBoolean, optionalEnum, optionalNumber, readSpaceId, requireNumber, requireString } from './arguments'
 import type { ListSandboxTestCallRecordsInput, SandboxTestCallRecordsPage } from './call-records'
 import {
   SandboxMcpError,
+  SANDBOX_MCP_EVENT_TYPES,
   type SandboxTestCallRecord,
   type SandboxTestCallTransport,
   type SandboxMcpEvent,
   type SandboxMcpEventCursor,
+  type SandboxMcpEventType,
   type SandboxMcpExport,
   type SandboxMcpToolCapability,
 } from './types'
@@ -100,7 +105,7 @@ export interface SandboxMcpToolRuntime {
   readonly scopes: ScopeDirectory
   currentCursor(): SandboxMcpEventCursor
   /** 追加一条事件；省略 `spaceId` 时按本次调用的空间归属写入。 */
-  appendEvent(type: string, data: unknown, spaceId?: string): SandboxMcpEventCursor
+  appendEvent(type: SandboxMcpEventType, data: unknown, spaceId?: string): SandboxMcpEventCursor
   waitFor(args: Record<string, unknown>, predicate: (event: SandboxMcpEvent) => boolean): Promise<SandboxMcpWaitResult>
   /** 被测机器人当前的唤醒规则；省略 `target` 时同时给出私聊与群聊两份通用规则。 */
   readWakeupRules(target?: SandboxWakeupTarget): SandboxWakeupRules
@@ -138,6 +143,22 @@ export interface SandboxMcpToolEntry extends SandboxMcpToolCapability {
 // 的 schema 是给 AI 消费者的文档，必须与实现保持一致。它内联在条目上而不是另立一张按名字连接的
 // 表：那种连接写法「按名字取，取不到就给一个空 schema」会让一个打错的键静默产出空 schema，而
 // schema 是 AI 消费者唯一能学到参数契约的地方。
+/**
+ * 枚举参数的取值集合。
+ *
+ * 对外声明的 `enum` 与执行体的取值校验读同一个数组，因此「声明里写了但实现不认」或反过来都不可
+ * 表达。带上领域类型注解而不是 `as const`：写错一个字面量在类型检查阶段就会红，而不是等到某次
+ * 调用被判成非法。
+ */
+const RECORD_ORDERS: readonly ('asc' | 'desc')[] = ['asc', 'desc']
+const ONEBOT_DEBUG_DIRECTIONS: readonly SandboxOneBotDebugDirection[] = ['event', 'action']
+const ONEBOT_DEBUG_STATUSES: readonly SandboxOneBotDebugStatus[] = ['success', 'error']
+// 模型请求多一个「还在飞」的状态，因此它的筛选集合比另外两族记录宽一项，不合并成一份。
+const MODEL_REQUEST_STATUSES: readonly SandboxModelRequestStatus[] = ['pending', 'success', 'error']
+const TEST_CALL_STATUSES: readonly SandboxTestCallRecord['status'][] = ['success', 'error']
+const TEST_CALL_TRANSPORTS: readonly SandboxTestCallTransport[] = ['mcp', 'http']
+const MODEL_REQUEST_SCOPES: readonly ('all' | 'main' | 'space' | 'unattributed')[] = ['all', 'main', 'space', 'unattributed']
+
 const SPACE_REQUIRED = { type: 'string', description: 'AI 测试空间 ID，由 create_test_space 返回；修改与等待类操作必填' }
 const SPACE_OPTIONAL = { type: 'string', description: 'AI 测试空间 ID；省略时读取主场景' }
 // 幂等窗口的具体数值由服务实例的配置决定，不能写死在这里：读取工具声明的那一处会按实际配置改写
@@ -156,6 +177,68 @@ const IMPLEMENTATION = { type: 'string', enum: ['napcat', 'llbot'] }
 // 调用标注参数：每次调用都被写进测试调用记录，也是 list_test_call_records 的筛选维度。它对全部
 // 工具生效而非某个工具的业务参数，因此由 withTestRunId 统一注入，不逐个工具书写。
 const TEST_RUN_ID = { type: 'string', description: '本次测试编排的标识；写入测试调用记录，可用 list_test_call_records 按它回溯同一轮编排的全部调用' }
+
+/**
+ * 记录域的两个参数与它们的取值组合。
+ *
+ * `scope` 是判别式，`spaceId` 只在 `space` 分支有意义且必填。组合写成 `oneOf` 而不是留在散文里：
+ * 缺 `spaceId` 此前静默读主环境，而「读到了另一个记录域的记录」不报错，消费者据此得出的是错的结论。
+ *
+ * 扁平 `properties` 保留不动：只读 `properties` 的客户端仍然看得见全部参数，读得懂 `oneOf` 的客户端
+ * 多知道每种取值各自要带什么。每个分支只用 `const` 钉住 `scope`，因此任何一次调用恰好匹配一个分支。
+ */
+const RECORD_SCOPE = {
+  type: 'string',
+  enum: [...MODEL_REQUEST_SCOPES],
+  description: 'all 读取全部已归属记录域，main 读取主环境，space 读取指定 AI 测试空间，unattributed 读取无法安全归属的记录',
+}
+const RECORD_SCOPE_SPACE = { type: 'string', description: 'AI 测试空间 ID，scope=space 时必填；写成 main 时解析成主环境' }
+const RECORD_SCOPE_VARIANTS = MODEL_REQUEST_SCOPES.map((scope) => ({
+  title: scope,
+  properties: { scope: { const: scope } },
+  ...(scope === 'space' ? { required: ['spaceId'] } : {}),
+}))
+
+/**
+ * 关系操作的取值组合：每种动作各自声明必填参数。
+ *
+ * 领域层的好友动作与群动作本来就是判别联合（`SandboxFriendAction`、`SandboxGroupAction`），对外
+ * 声明此前把它拍平成一袋可选参数，哪个动作要哪些参数只写在每个参数的描述里——消费者得先读完九条
+ * 散文才知道 `set-card` 要带 `card`。这里把同一个判别联合还原成 `oneOf`，与环境变更那族的写法一致。
+ *
+ * 扁平 `properties` 与基础 `required` 都保留：只读 `properties` 的客户端看得见全部参数，读得懂
+ * `oneOf` 的客户端多知道每种动作各自的必填项。分支只用 `const` 钉住 `action` 并补 `required`，因此
+ * 任何一次调用恰好匹配一个分支。
+ */
+function actionVariants(variants: Readonly<Record<string, readonly string[]>>) {
+  return Object.entries(variants).map(([action, required]) => ({
+    title: action,
+    properties: { action: { const: action } },
+    ...(required.length ? { required: [...required] } : {}),
+  }))
+}
+
+const FRIEND_ACTION_VARIANTS = {
+  request: ['targetId'],
+  'handle-request': ['requestId', 'approve'],
+  delete: ['targetId'],
+  'set-remark': ['targetId', 'remark'],
+  poke: ['targetId'],
+} as const
+
+const GROUP_ACTION_VARIANTS = {
+  'request-join': ['groupId'],
+  invite: ['groupId', 'targetId'],
+  'handle-request': ['requestId', 'approve'],
+  leave: ['groupId'],
+  kick: ['groupId', 'targetId'],
+  'set-admin': ['groupId', 'targetId', 'enabled'],
+  'transfer-owner': ['groupId', 'targetId'],
+  'set-card': ['groupId', 'targetId', 'card'],
+  'set-title': ['groupId', 'targetId', 'title'],
+  'set-name': ['groupId', 'name'],
+  poke: ['groupId', 'targetId'],
+} as const
 const ACCOUNT_PROFILE_PROPERTIES = {
   personalNote: { type: 'string', description: '个性签名' },
   sex: { type: 'string', enum: ['unknown', 'male', 'female'], description: '也接受 OneBot 的 0、1、2' },
@@ -450,7 +533,14 @@ function completeTestSpace(runtime: SandboxMcpToolRuntime, args: Record<string, 
   const space = failed
     ? runtime.requireTestSpaces().failSpace(spaceId)
     : runtime.requireTestSpaces().completeSpace(spaceId)
-  return { spaceId, status: space.status, revision: space.snapshot.revision, cursor: runtime.appendEvent(`test-space.${space.status}`, { spaceId }, spaceId) }
+  // 事件类型按本次调用的意图给出，不从 `space.status` 拼：空间状态还有另外两个取值（运行中、
+  // 用户接管），拼出来的名字落在事件词汇之外，而事件类型是封闭词汇。
+  return {
+    spaceId,
+    status: space.status,
+    revision: space.snapshot.revision,
+    cursor: runtime.appendEvent(failed ? 'test-space.failed' : 'test-space.completed', { spaceId }, spaceId),
+  }
 }
 
 function reactivateTestSpace(runtime: SandboxMcpToolRuntime, args: Record<string, unknown>) {
@@ -664,7 +754,8 @@ async function handleRequest(runtime: SandboxMcpToolRuntime, args: Record<string
 // —— 执行体：等待类 ——
 
 function waitForEvent(runtime: SandboxMcpToolRuntime, args: Record<string, unknown>) {
-  return runtime.waitFor(args, (event) => !args.type || event.type === args.type)
+  const type = optionalEnum(args.type, 'type', SANDBOX_MCP_EVENT_TYPES)
+  return runtime.waitFor(args, (event) => !type || event.type === type)
 }
 
 // authorId 过滤是「等待机器人回复」的关键：沙盒 send_message 会等待 middleware 完成才返回，
@@ -700,6 +791,8 @@ async function waitForSettledMessages(
 }
 
 async function waitForOneBotAction(runtime: SandboxMcpToolRuntime, args: Record<string, unknown>) {
+  // 筛选值先取完再开始等待：拼错的取值此前静默变成「不筛选」，等到的是别的 action 调用。
+  const status = optionalEnum(args.status, 'status', ONEBOT_DEBUG_STATUSES)
   const waited = await runtime.waitFor(args, (event) => {
     if (event.type !== 'onebot.action') return false
     const data = event.data as {
@@ -710,7 +803,7 @@ async function waitForOneBotAction(runtime: SandboxMcpToolRuntime, args: Record<
       matchedAlias?: string
     }
     if (args.botId && data.botId !== args.botId) return false
-    if (args.status && data.status !== args.status) return false
+    if (status && data.status !== status) return false
     if (args.requestedAction && data.requestedAction !== args.requestedAction) return false
     if (args.action) {
       const action = String(args.action)
@@ -727,12 +820,15 @@ async function waitForOneBotAction(runtime: SandboxMcpToolRuntime, args: Record<
 // 直接读 getChatLunaStates() 会把上一轮已经结束的 thinking=false 状态当成本轮结果——那是
 // 一个真实的假阳性，而不只是文档问题，因为该方法保留已结束的状态。
 async function waitForChatLunaState(runtime: SandboxMcpToolRuntime, args: Record<string, unknown>) {
+  // 非布尔的 thinking 与任何状态都不相等，此前会一直等到超时；那与「机器人没有进入过这个状态」
+  // 的观察结果完全一样。
+  const thinking = optionalBoolean(args.thinking, 'thinking')
   const waited = await runtime.waitFor(args, (event) => {
     if (event.type !== 'chatluna.state') return false
     const state = event.data as { botParticipantId?: string; conversationId?: string; thinking?: boolean }
     if (args.botParticipantId && state.botParticipantId !== args.botParticipantId) return false
     if (args.conversationId && state.conversationId !== args.conversationId) return false
-    if (args.thinking !== undefined && state.thinking !== args.thinking) return false
+    if (thinking !== undefined && state.thinking !== thinking) return false
     return true
   })
   if (!waited.matched || !waited.event) return waited
@@ -910,11 +1006,11 @@ async function listOneBotDebugRecords(runtime: SandboxMcpToolRuntime, args: Reco
     await runtime.control.waitForPersistence()
     return await runtime.control.getOneBotDebugStore().getRecords({
       botId: typeof args.botId === 'string' ? args.botId : undefined,
-      direction: args.direction === 'action' || args.direction === 'event' ? args.direction : undefined,
+      direction: optionalEnum(args.direction, 'direction', ONEBOT_DEBUG_DIRECTIONS),
       action: typeof args.action === 'string' ? args.action : undefined,
       requestedAction: typeof args.requestedAction === 'string' ? args.requestedAction : undefined,
-      errorsOnly: args.errorsOnly === true ? true : undefined,
-      order: args.order === 'asc' ? 'asc' : args.order === 'desc' ? 'desc' : undefined,
+      status: optionalEnum(args.status, 'status', ONEBOT_DEBUG_STATUSES),
+      order: optionalEnum(args.order, 'order', RECORD_ORDERS),
       limit: optionalNumber(args.limit, 'limit'),
       beforeSequence: optionalNumber(args.beforeSequence, 'beforeSequence'),
     })
@@ -946,12 +1042,21 @@ async function clearOneBotDebugRecords(runtime: SandboxMcpToolRuntime) {
 
 // —— 执行体：模型请求记录 ——
 
+/**
+ * 记录域按 `scope` 判别，`space` 分支必须显式带 `spaceId`。
+ *
+ * 缺 `spaceId` 时刻意不回落到主环境：那条回落读到的是另一个记录域的记录，而调用不报错，消费者
+ * 拿着主环境的记录去断言某个测试空间里发生了什么，得出的是错的结论。对外声明用判别联合表达同一
+ * 件事（`space` 分支的 `required` 里有 `spaceId`），因此这里的失败是声明的兑现而不是额外规则。
+ *
+ * `spaceId` 写成主环境标识仍解析成主环境：那是 `describeRecordScope` 给出的来源标注原样传回来的
+ * 形态，不是省略。
+ */
 function resolveModelRequestScope(args: Record<string, unknown>) {
-  if (args.scope === 'unattributed') return { kind: 'unattributed' as const }
-  if (args.scope === 'all') return { kind: 'all' as const }
-  if (args.scope === 'main') return { kind: 'main' as const }
-  if (args.scope !== 'space') throw new SandboxMcpError('invalid_arguments', 'scope 必须是 all、main、space 或 unattributed')
-  const spaceId = typeof args.spaceId === 'string' && args.spaceId.trim() ? args.spaceId.trim() : MAIN_MODEL_REQUEST_SCOPE_ID
+  const scope = optionalEnum(args.scope, 'scope', MODEL_REQUEST_SCOPES)
+  if (scope === undefined) throw new SandboxMcpError('invalid_arguments', 'scope 不能为空')
+  if (scope !== 'space') return { kind: scope }
+  const spaceId = requireString(args.spaceId, 'spaceId')
   if (spaceId === MAIN_MODEL_REQUEST_SCOPE_ID) return { kind: 'main' as const }
   return { kind: 'space' as const, spaceId }
 }
@@ -972,8 +1077,8 @@ async function listModelRequestRecords(runtime: SandboxMcpToolRuntime, args: Rec
     conversationId: typeof args.conversationId === 'string' ? args.conversationId : undefined,
     interactionId: typeof args.interactionId === 'string' ? args.interactionId : undefined,
     model: typeof args.model === 'string' ? args.model : undefined,
-    errorsOnly: args.errorsOnly === true ? true : undefined,
-    order: args.order === 'asc' ? 'asc' : args.order === 'desc' ? 'desc' : undefined,
+    status: optionalEnum(args.status, 'status', MODEL_REQUEST_STATUSES),
+    order: optionalEnum(args.order, 'order', RECORD_ORDERS),
     limit: optionalNumber(args.limit, 'limit'),
     beforeSequence: optionalNumber(args.beforeSequence, 'beforeSequence'),
     beforeCreatedAt: typeof args.beforeCreatedAt === 'string' ? args.beforeCreatedAt : undefined,
@@ -1036,15 +1141,20 @@ async function getModelRequestRecord(runtime: SandboxMcpToolRuntime, args: Recor
 /**
  * 清理指定 AI 测试空间的模型请求记录。
  *
- * 未归属分类必须在解析空间之前被拒绝：本工具的空间解析按写操作进行，若先解析，一次
- * `{ scope: 'unattributed' }` 调用会因为没带 spaceId 而报成「必须显式指定空间」，而真正的原因是
- * 这个分类根本不允许经测试控制端点清理（未归属只能在 WebQQ 清理）。因此条目上它的空间解析记为
- * `none`，由这里自己解析。
+ * 清理目标只由 `spaceId` 决定，本工具不接受 `scope`。三个记录域里只有 AI 测试空间允许经测试控制
+ * 端点清理，而未归属记录域根本没有空间标识，于是「清理未归属」在参数层面就不可表达——那比声明一个
+ * 单成员枚举再在执行体里挑出一个非法取值来拒绝更清楚。读取侧允许跨记录域、清理侧不允许，这处能力
+ * 不对等见 ADR-0083。
+ *
+ * 显式传了 `scope` 仍要拒绝而不是无声忽略：另外两个模型请求记录工具都以 `scope` 为必填判别式，
+ * 照着它们的形状调用本工具是最可能发生的事，而被忽略的那个参数会让调用方以为自己指定了范围。
  */
 async function clearModelRequestRecords(runtime: SandboxMcpToolRuntime, args: Record<string, unknown>) {
-  if (args.scope === 'unattributed') {
-    throw new SandboxMcpError('invalid_arguments', '测试控制端点不能清理未归属模型请求记录')
+  if ('scope' in args) {
+    throw new SandboxMcpError('invalid_arguments', '本工具不接受 scope：清理目标由 spaceId 决定，未归属模型请求记录只能在 WebQQ 清理。')
   }
+  // 缺 spaceId 交给空间解析报 `space_id_required`，与清理调试记录那一个同一个错误码与同一句恢复
+  // 建议；在这里自己抛 `invalid_arguments` 会让同一件事在两个清理工具上有两种说法。
   return { cleared: await runtime.resolveControl(readSpaceId(args), true).getModelRequestStore().clear() }
 }
 
@@ -1054,11 +1164,11 @@ function listTestCallRecords(runtime: SandboxMcpToolRuntime, args: Record<string
   return runtime.listCallRecords({
     tool: typeof args.tool === 'string' ? args.tool : undefined,
     credentialName: typeof args.credentialName === 'string' ? args.credentialName : undefined,
-    transport: args.transport === 'mcp' || args.transport === 'http' ? args.transport : undefined,
+    transport: optionalEnum(args.transport, 'transport', TEST_CALL_TRANSPORTS),
     spaceId: typeof args.spaceId === 'string' ? args.spaceId : undefined,
     testRunId: typeof args.testRunId === 'string' ? args.testRunId : undefined,
-    errorsOnly: args.errorsOnly === true,
-    order: args.order === 'asc' ? 'asc' : args.order === 'desc' ? 'desc' : undefined,
+    status: optionalEnum(args.status, 'status', TEST_CALL_STATUSES),
+    order: optionalEnum(args.order, 'order', RECORD_ORDERS),
   })
 }
 
@@ -1148,10 +1258,12 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
       properties: {
         spaceId: SPACE_OPTIONAL,
         operatorId: OPERATOR_ID,
-        forwardId: { type: 'string', description: '合并转发资源 ID；与 messageId 至少提供一项' },
-        messageId: { type: 'string', description: '外层合并转发消息 ID；与 forwardId 至少提供一项' },
+        forwardId: { type: 'string', description: '合并转发资源 ID' },
+        messageId: { type: 'string', description: '外层合并转发消息 ID' },
       },
       required: ['operatorId'],
+      // 「至少提供一项」此前只写在描述里，由执行体判定；anyOf 让它成为声明本身的一部分。
+      anyOf: [{ required: ['forwardId'] }, { required: ['messageId'] }],
     },
     quota: 'read', spaceResolution: 'read', idempotent: false, requiresConfirmation: false,
     run: getForwardMessage,
@@ -1286,7 +1398,12 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
         idempotencyKey: IDEMPOTENCY_KEY,
       },
       required: ['spaceId', 'operatorId', 'conversationId', 'idempotencyKey'],
-      description: 'messageIds 与 nodes 必须且只能提供一项。等待机器人回复时应先记录发送前 cursor，再用 wait_for_message 等待。',
+      // 「必须且只能提供一项」由 oneOf 表达，不再只靠描述与执行体判定。
+      oneOf: [
+        { title: '引用已有消息', required: ['messageIds'] },
+        { title: '显式节点', required: ['nodes'] },
+      ],
+      description: '等待机器人回复时应先记录发送前 cursor，再用 wait_for_message 等待。',
     },
     quota: 'mutation', spaceResolution: 'mutation', idempotent: true, requiresConfirmation: false,
     run: sendForwardMessage,
@@ -1300,16 +1417,17 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
       properties: {
         spaceId: SPACE_REQUIRED,
         operatorId: OPERATOR_ID,
-        action: { type: 'string', enum: ['request', 'handle-request', 'delete', 'set-remark', 'poke'] },
-        targetId: { type: 'string', description: 'request/delete/set-remark/poke 的目标参与者 ID' },
-        requestId: { type: 'string', description: 'handle-request 的申请 ID' },
-        approve: { type: 'boolean', description: 'handle-request 是否批准' },
-        comment: { type: 'string', description: 'request 附言' },
-        remark: { type: 'string', description: 'set-remark 的备注' },
-        conversationId: { type: 'string', description: 'poke 可选会话' },
+        action: { type: 'string', enum: Object.keys(FRIEND_ACTION_VARIANTS) },
+        targetId: { type: 'string', description: '目标参与者 ID' },
+        requestId: { type: 'string', description: '好友申请 ID' },
+        approve: { type: 'boolean', description: '是否批准该申请' },
+        comment: { type: 'string', description: '申请附言' },
+        remark: { type: 'string', description: '给对方设置的好友备注；空字符串表示清除' },
+        conversationId: { type: 'string', description: '戳一戳发生在哪条会话；省略时不绑定会话' },
         idempotencyKey: IDEMPOTENCY_KEY,
       },
       required: ['spaceId', 'operatorId', 'action', 'idempotencyKey'],
+      oneOf: actionVariants(FRIEND_ACTION_VARIANTS),
     },
     quota: 'mutation', spaceResolution: 'mutation', idempotent: true, requiresConfirmation: false,
     run: performFriendAction,
@@ -1323,20 +1441,21 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
       properties: {
         spaceId: SPACE_REQUIRED,
         operatorId: OPERATOR_ID,
-        action: { type: 'string', enum: ['request-join', 'invite', 'handle-request', 'leave', 'kick', 'set-admin', 'transfer-owner', 'set-card', 'set-title', 'set-name', 'poke'] },
-        groupId: { type: 'string' },
-        targetId: { type: 'string' },
-        requestId: { type: 'string', description: 'handle-request 的申请 ID' },
-        approve: { type: 'boolean' },
-        comment: { type: 'string' },
-        enabled: { type: 'boolean', description: 'set-admin 是否授予' },
-        card: { type: 'string', description: 'set-card 的群名片' },
-        title: { type: 'string', description: 'set-title 的专属头衔，仅群主可设置；传空字符串清除' },
-        name: { type: 'string', description: 'set-name 的群名' },
-        conversationId: { type: 'string' },
+        action: { type: 'string', enum: Object.keys(GROUP_ACTION_VARIANTS) },
+        groupId: { type: 'string', description: '群号' },
+        targetId: { type: 'string', description: '目标参与者 ID' },
+        requestId: { type: 'string', description: '入群申请或群邀请的 ID' },
+        approve: { type: 'boolean', description: '是否批准该申请' },
+        comment: { type: 'string', description: '申请或邀请附言' },
+        enabled: { type: 'boolean', description: '是否授予管理员' },
+        card: { type: 'string', description: '群名片；传空字符串清除' },
+        title: { type: 'string', description: '专属头衔，仅群主可设置；传空字符串清除' },
+        name: { type: 'string', description: '群名' },
+        conversationId: { type: 'string', description: '戳一戳发生在哪条会话；省略时不绑定会话' },
         idempotencyKey: IDEMPOTENCY_KEY,
       },
       required: ['spaceId', 'operatorId', 'action', 'idempotencyKey'],
+      oneOf: actionVariants(GROUP_ACTION_VARIANTS),
     },
     quota: 'mutation', spaceResolution: 'mutation', idempotent: true, requiresConfirmation: false,
     run: performGroupAction,
@@ -1368,7 +1487,7 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
       properties: {
         spaceId: SPACE_REQUIRED,
         cursor: CURSOR,
-        type: { type: 'string', description: '事件类型过滤，如 message.created、scene.changed、friend.action' },
+        type: { type: 'string', enum: [...SANDBOX_MCP_EVENT_TYPES], description: '事件类型过滤；省略时匹配任意类型。取值集合之外的名字直接报错，不会静默等到超时' },
         timeoutSeconds: TIMEOUT_SECONDS,
       },
       required: ['spaceId', 'cursor'],
@@ -1594,11 +1713,11 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
       properties: {
         spaceId: SPACE_OPTIONAL,
         botId: { type: 'string' },
-        direction: { type: 'string', enum: ['event', 'action'] },
+        direction: { type: 'string', enum: [...ONEBOT_DEBUG_DIRECTIONS] },
         action: { type: 'string', description: '匹配规范 action，并覆盖能力矩阵声明的全部别名' },
         requestedAction: { type: 'string', description: '仅精确匹配插件实际请求名' },
-        errorsOnly: { type: 'boolean' },
-        order: { type: 'string', enum: ['asc', 'desc'], description: '按创建时间正序或倒序，默认倒序' },
+        status: { type: 'string', enum: [...ONEBOT_DEBUG_STATUSES], description: '按调用结果筛选；省略时两种结果都返回' },
+        order: { type: 'string', enum: [...RECORD_ORDERS], description: '按创建时间正序或倒序，默认倒序' },
         limit: { type: 'number', description: '每页条数，默认 50，最大 200' },
         beforeSequence: { type: 'number', description: '分页游标：倒序仅返回 sequence 更小的记录，正序仅返回 sequence 更大的记录' },
       },
@@ -1640,20 +1759,21 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        scope: { type: 'string', enum: ['all', 'main', 'space', 'unattributed'], description: 'all 读取全部已归属空间，main 读取主环境，space 读取指定 AI 测试空间，unattributed 读取无法安全归属的记录' },
-        spaceId: { type: 'string', description: 'AI 测试空间 ID；scope=space 且省略时读取主环境' },
+        scope: RECORD_SCOPE,
+        spaceId: RECORD_SCOPE_SPACE,
         botId: { type: 'string' },
         conversationId: { type: 'string' },
         interactionId: { type: 'string' },
         model: { type: 'string' },
-        errorsOnly: { type: 'boolean' },
-        order: { type: 'string', enum: ['asc', 'desc'], description: '按创建时间正序或倒序，默认倒序' },
+        status: { type: 'string', enum: [...MODEL_REQUEST_STATUSES], description: '按请求结果筛选；省略时全部返回。pending 是还没收到响应的请求' },
+        order: { type: 'string', enum: [...RECORD_ORDERS], description: '按创建时间正序或倒序，默认倒序' },
         limit: { type: 'number', description: '每页条数，默认 50，最大 200' },
         beforeSequence: { type: 'number', description: '新到旧分页游标：仅返回 sequence 更小的记录' },
         beforeCreatedAt: { type: 'string', description: '全部空间视图的时间游标：仅返回更早的记录' },
         beforeId: { type: 'string', description: '与 beforeCreatedAt 一起用于稳定分页' },
       },
       required: ['scope'],
+      oneOf: RECORD_SCOPE_VARIANTS,
     },
     quota: 'read', spaceResolution: 'none', idempotent: false, requiresConfirmation: false,
     run: listModelRequestRecords,
@@ -1666,11 +1786,12 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
       type: 'object',
       description: '按记录 ID 读取完整模型请求与原始响应体；流式响应以 SSE 原文返回。',
       properties: {
-        scope: { type: 'string', enum: ['all', 'main', 'space', 'unattributed'], description: 'all 按记录 ID 跨全部已归属空间查找并在结果里标注来源，main 读取主环境，space 读取指定 AI 测试空间，unattributed 读取无法安全归属的记录' },
-        spaceId: { type: 'string', description: 'AI 测试空间 ID；scope=space 且省略时读取主环境' },
+        scope: { ...RECORD_SCOPE, description: 'all 按记录 ID 跨全部已归属记录域查找并在结果里标注来源，main 读取主环境，space 读取指定 AI 测试空间，unattributed 读取无法安全归属的记录' },
+        spaceId: RECORD_SCOPE_SPACE,
         recordId: { type: 'string' },
       },
       required: ['scope', 'recordId'],
+      oneOf: RECORD_SCOPE_VARIANTS,
     },
     quota: 'read', spaceResolution: 'none', idempotent: false, requiresConfirmation: false,
     run: getModelRequestRecord,
@@ -1681,10 +1802,8 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
     description: '清理指定 AI 测试空间的模型请求记录',
     inputSchema: {
       type: 'object',
-      properties: {
-        scope: { type: 'string', enum: ['space'], description: '仅允许清理已归属到 AI 测试空间的记录；未归属分类只能在 WebQQ 清理' },
-        spaceId: SPACE_REQUIRED,
-      },
+      description: '清理目标只由 spaceId 决定，本工具不接受 scope：三个记录域里只有 AI 测试空间允许经本端点清理，未归属模型请求记录只能在 WebQQ 清理。',
+      properties: { spaceId: SPACE_REQUIRED },
       required: ['spaceId'],
     },
     quota: 'read', spaceResolution: 'none', idempotent: false, requiresConfirmation: false,
@@ -1699,11 +1818,11 @@ const TOOL_ENTRIES: SandboxMcpToolEntry[] = [
       properties: {
         tool: { type: 'string' },
         credentialName: { type: 'string' },
-        transport: { type: 'string', enum: ['mcp', 'http'], description: '按承载调用的协议表述筛选；省略时同时返回 MCP 与 HTTP 两种来路的记录' },
+        transport: { type: 'string', enum: [...TEST_CALL_TRANSPORTS], description: '按承载调用的协议表述筛选；省略时同时返回 MCP 与 HTTP 两种来路的记录' },
         spaceId: { type: 'string', description: '按测试调用记录中的空间筛选；省略时返回全部记录' },
         testRunId: { type: 'string' },
-        errorsOnly: { type: 'boolean' },
-        order: { type: 'string', enum: ['asc', 'desc'], description: '按创建时间正序或倒序，默认倒序' },
+        status: { type: 'string', enum: [...TEST_CALL_STATUSES], description: '按调用结果筛选；省略时两种结果都返回' },
+        order: { type: 'string', enum: [...RECORD_ORDERS], description: '按创建时间正序或倒序，默认倒序' },
       },
     },
     quota: 'read', spaceResolution: 'none', idempotent: false, requiresConfirmation: false,

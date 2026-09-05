@@ -67,8 +67,11 @@ describe('模型请求 MCP 工具', () => {
       attribution: 'unattributed', entities: {}, requestBodyAvailable: false,
     })
 
-    const mainPage = await service.callTool(credential.token, 'list_model_request_records', { scope: 'space' }) as { records: Array<{ model: string }> }
+    const mainPage = await service.callTool(credential.token, 'list_model_request_records', { scope: 'main' }) as { records: Array<{ model: string }> }
     expect(mainPage.records.map(({ model }) => model)).toEqual(['main-model'])
+    // scope=space 缺 spaceId 此前静默读主环境；那会让消费者拿着主环境的记录断言某个空间。
+    await expect(service.callTool(credential.token, 'list_model_request_records', { scope: 'space' }))
+      .rejects.toMatchObject({ code: 'invalid_arguments' })
     const allPage = await service.callTool(credential.token, 'list_model_request_records', { scope: 'all' }) as { records: Array<{ model: string }> }
     expect(allPage.records.map(({ model }) => model).sort()).toEqual(['main-model', 'space-model'])
     expect(allPage.records.some(({ model }) => model === 'lost-model')).toBe(false)
@@ -95,7 +98,11 @@ describe('模型请求 MCP 工具', () => {
       records: [expect.objectContaining({ id: lost.id, model: 'lost-model' })],
     })
 
+    // 清理工具不再接受 scope：目标由 spaceId 决定，显式传了要拒绝而不是无声忽略。
     await expect(service.callTool(credential.token, 'clear_model_request_records', { scope: 'unattributed' })).rejects.toMatchObject({
+      code: 'invalid_arguments',
+    })
+    await expect(service.callTool(credential.token, 'clear_model_request_records', { scope: 'space', spaceId: created.spaceId })).rejects.toMatchObject({
       code: 'invalid_arguments',
     })
     expect(await service.callTool(credential.token, 'clear_model_request_records', { spaceId: created.spaceId })).toEqual({ cleared: 1 })
@@ -178,10 +185,13 @@ describe('模型请求 MCP 工具', () => {
     })
 
     // 联邦清理意味着一个测试凭证一次抹掉主环境与全部空间的证据，这个能力不给外部测试控制器。
+    // 两个清理工具缺 spaceId 时报同一个错误码；模型请求那个另外不接受 scope，因此它照着读取工具的
+    // 形状被调用时报的是参数错误，而不是把 scope 无声忽略后按 spaceId 清理。
+    await expect(call(harness, 'clear_model_request_records', { scope: 'all' })).rejects.toMatchObject({ code: 'invalid_arguments' })
     for (const args of [{ scope: 'all' }, {}]) {
-      await expect(call(harness, 'clear_model_request_records', args)).rejects.toMatchObject({ code: 'space_id_required' })
       await expect(call(harness, 'clear_onebot_debug_records', args)).rejects.toMatchObject({ code: 'space_id_required' })
     }
+    await expect(call(harness, 'clear_model_request_records', {})).rejects.toMatchObject({ code: 'space_id_required' })
     // 调试记录的联邦列表同样不补：省略 spaceId 仍然只读主环境。
     expect(await call(harness, 'list_onebot_debug_records', {})).toMatchObject({
       records: [expect.objectContaining({ requestedAction: 'main-action' })],

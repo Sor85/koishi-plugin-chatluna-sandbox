@@ -37,7 +37,7 @@ export interface SandboxModelRequestPersistenceQuery {
   conversationId?: string
   interactionId?: string
   model?: string
-  errorsOnly?: boolean
+  status?: SandboxModelRequestStatus
   order: 'asc' | 'desc'
   beforeSequence?: number
   beforeCreatedAt?: string
@@ -91,7 +91,7 @@ export function matchesModelRequestQuery(
   if (query.conversationId && record.entities.conversationId !== query.conversationId) return false
   if (query.interactionId && record.interactionId !== query.interactionId) return false
   if (query.model && record.model !== query.model) return false
-  if (query.errorsOnly && record.status !== 'error') return false
+  if (query.status && record.status !== query.status) return false
   if (query.beforeSequence !== undefined) {
     return query.order === 'asc' ? record.sequence > query.beforeSequence : record.sequence < query.beforeSequence
   }
@@ -441,7 +441,7 @@ export class SandboxModelRequestStore {
       ...(input.conversationId ? { conversationId: input.conversationId } : {}),
       ...(input.interactionId ? { interactionId: input.interactionId } : {}),
       ...(input.model ? { model: input.model } : {}),
-      ...(input.errorsOnly ? { errorsOnly: true } : {}),
+      ...(input.status ? { status: input.status } : {}),
     }
   }
 

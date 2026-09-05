@@ -424,7 +424,7 @@ export function registerConsole(
     conversationId: input.conversationId,
     interactionId: input.interactionId,
     model: input.model,
-    errorsOnly: input.errorsOnly,
+    status: input.status,
     order: input.order,
     limit: input.limit,
     beforeCreatedAt: input.beforeCreatedAt,

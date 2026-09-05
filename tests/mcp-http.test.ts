@@ -10,7 +10,7 @@ import { SandboxTestEndpointServer, sourceMatches } from '../src/mcp/server'
 import { SandboxMcpService } from '../src/mcp/service'
 import type { SandboxMcpScope } from '../src/mcp/types'
 import { SandboxTestSpaceService } from '../src/test-spaces'
-import { MCP_TOOL_NAMES } from './helpers/mcp-tool-catalogue'
+import { MCP_RESOURCE_URIS, MCP_TOOL_NAMES } from './helpers/mcp-tool-catalogue'
 
 const cleanups: Array<() => Promise<void>> = []
 afterEach(async () => {
@@ -77,7 +77,7 @@ describe('MCP Streamable HTTP', () => {
     const client = await connectClient(url, credential.token, 'https://allowed.example')
     // tools/list 不携带能力范围，因此在传输层按名字与顺序整体比对完整清单；能力范围由服务层断言覆盖。
     expect((await client.listTools()).tools.map(({ name }) => name)).toEqual(MCP_TOOL_NAMES)
-    expect((await client.listResources()).resources).toHaveLength(6)
+    expect((await client.listResources()).resources.map(({ uri }) => uri)).toEqual(MCP_RESOURCE_URIS)
     await client.close()
   })
 

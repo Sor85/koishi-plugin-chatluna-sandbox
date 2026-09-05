@@ -9,7 +9,7 @@ import { SandboxControlService, SandboxRuntimeBotRegistry } from '../src/control
 import { SandboxMcpService } from '../src/mcp/service'
 import { SandboxTestSpaceService } from '../src/test-spaces'
 import type { SandboxAppearance } from '../src/types'
-import { MCP_TOOL_CATALOGUE, toMcpToolCatalogue } from './helpers/mcp-tool-catalogue'
+import { MCP_RESOURCE_URIS, MCP_TOOL_CATALOGUE, toMcpToolCatalogue } from './helpers/mcp-tool-catalogue'
 
 const appearance: SandboxAppearance = {
   enableSandboxFrostedGlass: true,
@@ -58,9 +58,9 @@ describe('测试调用记录 Console 协议', () => {
       throw new Error('MCP Console 监听器未注册')
     }
 
-    const catalog = Reflect.apply(getCapabilities, undefined, []) as { tools: Array<{ name: string; scope: string }>; resources: unknown[] }
+    const catalog = Reflect.apply(getCapabilities, undefined, []) as { tools: Array<{ name: string; scope: string }>; resources: Array<{ uri: string }> }
     expect(toMcpToolCatalogue(catalog.tools)).toEqual(MCP_TOOL_CATALOGUE)
-    expect(catalog.resources).toHaveLength(6)
+    expect(catalog.resources.map(({ uri }) => uri)).toEqual(MCP_RESOURCE_URIS)
 
     const page = Reflect.apply(listRecords, undefined, [{ tool: 'get_server_info' }]) as {
       records: Array<{ id: string, tool: string, arguments?: unknown }>

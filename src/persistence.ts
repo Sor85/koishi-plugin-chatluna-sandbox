@@ -369,7 +369,7 @@ export class KoishiDatabaseOneBotDebugPersistence implements SandboxOneBotDebugP
     if (query.botId) rowQuery.botId = query.botId
     if (query.direction) rowQuery.direction = query.direction
     if (query.requestedAction) rowQuery.requestedAction = query.requestedAction
-    if (query.errorsOnly) rowQuery.status = 'error'
+    if (query.status) rowQuery.status = query.status
     if (query.beforeSequence !== undefined) rowQuery.sequence = sequenceCursorCondition(query.order, query.beforeSequence)
     if (query.action) {
       rowQuery.$or = [
@@ -510,7 +510,7 @@ export class KoishiDatabaseModelRequestPersistence implements SandboxModelReques
     if (query.conversationId) rowQuery.conversationId = query.conversationId
     if (query.interactionId) rowQuery.interactionId = query.interactionId
     if (query.model) rowQuery.model = query.model
-    if (query.errorsOnly) rowQuery.status = 'error'
+    if (query.status) rowQuery.status = query.status
     if (query.beforeSequence !== undefined) {
       rowQuery.sequence = sequenceCursorCondition(query.order, query.beforeSequence)
     } else if (query.beforeCreatedAt) {

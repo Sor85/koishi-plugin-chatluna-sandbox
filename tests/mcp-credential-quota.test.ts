@@ -47,7 +47,9 @@ function callSettledWait(service: SandboxMcpService, token: string, cursor: unkn
 function callBlockingWait(service: SandboxMcpService, token: string) {
   return service.callTool(token, 'wait_for_event', {
     cursor: service.currentCursor(),
-    type: 'never.happens',
+    // 事件类型是封闭词汇，因此「等不到」要靠挑一个本用例里不会发生的合法类型，
+    // 而不是编一个不存在的名字——后者现在会被判成参数错误。
+    type: 'test-space.deleted',
     timeoutSeconds: 1,
   })
 }

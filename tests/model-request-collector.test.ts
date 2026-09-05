@@ -148,7 +148,7 @@ describe('模型请求采集', () => {
       method: 'POST',
       body: chatBody('gpt-4.1'),
     })).rejects.toThrow('upstream timeout')
-    expect((await unattributed.getRecords({ errorsOnly: true })).records[0]).toMatchObject({
+    expect((await unattributed.getRecords({ status: 'error' })).records[0]).toMatchObject({
       status: 'error',
       model: 'gpt-4.1',
       error: { retryable: true, message: 'upstream timeout' },

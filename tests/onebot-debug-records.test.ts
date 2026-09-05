@@ -100,7 +100,7 @@ describe('OneBot 调试记录', () => {
       botId: '20001',
       direction: 'action',
       requestedAction: 'host_only_action',
-      errorsOnly: true,
+      status: 'error',
     })).records
     expect(record.error).toEqual({
       code: 'action_unsupported',

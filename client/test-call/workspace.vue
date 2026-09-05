@@ -335,7 +335,7 @@ function applyFilters() {
     transport: transport.value === 'all' ? undefined : transport.value,
     spaceId: spaceId.value.trim() || undefined,
     testRunId: testRunId.value.trim() || undefined,
-    errorsOnly: errorsOnly.value || undefined,
+    status: errorsOnly.value ? 'error' : undefined,
     order: sortOrder.value,
   })
 }

@@ -388,7 +388,7 @@ function applyFilters() {
     direction: direction.value === 'action' || direction.value === 'event' ? direction.value : undefined,
     action: action.value.trim() || undefined,
     requestedAction: requestedAction.value.trim() || undefined,
-    errorsOnly: errorsOnly.value || undefined,
+    status: errorsOnly.value ? 'error' : undefined,
     order: sortOrder.value,
   })
 }

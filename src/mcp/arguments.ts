@@ -53,6 +53,29 @@ export function optionalNumber(value: unknown, name: string, range: SandboxNumbe
   return value === undefined ? undefined : requireNumber(value, name, range)
 }
 
+/**
+ * 可选枚举参数：省略即 undefined，取值集合之外的值显式失败。
+ *
+ * 此前每处枚举参数各写一句「是这个值就用它、否则 undefined」，于是拼错的取值静默变成「不筛选」
+ * 或「用默认排序」。筛选参数被无声忽略最坏：`status: 'faild'` 会返回全部记录，而消费者以为自己
+ * 拿到的只有失败记录，据此得出的是错的结论。失败消息里带上取值集合，因此错误本身就是文档。
+ */
+export function optionalEnum<T extends string>(value: unknown, name: string, allowed: readonly T[]): T | undefined {
+  if (value === undefined) return undefined
+  const text = requireString(value, name)
+  if (!(allowed as readonly string[]).includes(text)) {
+    throw new SandboxMcpError('invalid_arguments', `${name} 只能取 ${allowed.join('、')}：${text}`)
+  }
+  return text as T
+}
+
+/** 可选布尔参数：省略即 undefined，出现但不是布尔值显式失败。 */
+export function optionalBoolean(value: unknown, name: string): boolean | undefined {
+  if (value === undefined) return undefined
+  if (typeof value !== 'boolean') throw new SandboxMcpError('invalid_arguments', `${name} 必须是布尔值：${JSON.stringify(value)}`)
+  return value
+}
+
 export function asRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new SandboxMcpError('invalid_arguments', '工具参数必须是对象')
   return value as Record<string, unknown>

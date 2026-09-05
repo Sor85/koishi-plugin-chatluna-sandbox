@@ -424,7 +424,13 @@ export interface GetSandboxOneBotDebugRecordsInput {
   action?: string
   /** 仅精确匹配插件实际请求名。 */
   requestedAction?: string
-  errorsOnly?: boolean
+  /**
+   * 按调用结果筛选；省略时两种结果都返回。
+   *
+   * 取值集合就是记录自己的状态词汇，因此「只看成功的」与「只看失败的」是对称的两种筛选。
+   * 此前这里是 `errorsOnly` 布尔，只能表达其中一半。
+   */
+  status?: SandboxOneBotDebugStatus
   /** 按创建时间正序或倒序，默认倒序。 */
   order?: 'asc' | 'desc'
   /** 每页条数，默认 50，最大 200。 */
@@ -644,7 +650,13 @@ export interface GetSandboxModelRequestRecordsInput {
   conversationId?: string
   interactionId?: string
   model?: string
-  errorsOnly?: boolean
+  /**
+   * 按请求结果筛选；省略时全部返回。
+   *
+   * 取值集合就是记录自己的状态词汇，因此「还在飞的请求」也能筛出来——它是模型请求真实存在的第三
+   * 种状态，而此前这里的 `errorsOnly` 布尔连「只看成功的」都表达不了。
+   */
+  status?: SandboxModelRequestStatus
   order?: 'asc' | 'desc'
   limit?: number
   beforeSequence?: number

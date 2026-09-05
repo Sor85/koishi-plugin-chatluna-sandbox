@@ -942,7 +942,7 @@ function completeNavigationLocate(result: { seq: number, located: boolean }) {
 function emitQuery(limit = MODEL_REQUEST_PAGE_SIZE) {
   emit('query', createModelRequestRecordsQuery(currentScope(), {
     model: model.value.trim() || undefined,
-    errorsOnly: errorsOnly.value || undefined,
+    status: errorsOnly.value ? 'error' : undefined,
     order: sortOrder.value,
     limit,
   }))
@@ -964,7 +964,7 @@ function loadMore() {
   if (props.nextCursor === undefined && !canPageByTime) return
   emit('loadMore', createModelRequestRecordsQuery(currentScope(), {
     model: model.value.trim() || undefined,
-    errorsOnly: errorsOnly.value || undefined,
+    status: errorsOnly.value ? 'error' : undefined,
     order: sortOrder.value,
     ...(category.value === 'all'
       ? { beforeCreatedAt: props.nextCreatedAt, beforeId: props.nextId }

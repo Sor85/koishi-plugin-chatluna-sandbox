@@ -12,7 +12,8 @@ export interface ListSandboxTestCallRecordsInput {
   transport?: SandboxTestCallTransport
   spaceId?: string
   testRunId?: string
-  errorsOnly?: boolean
+  /** 按调用结果筛选；省略时两种结果都返回。 */
+  status?: SandboxTestCallRecordListItem['status']
   /** 按创建时间正序或倒序，默认倒序。 */
   order?: 'asc' | 'desc'
 }
@@ -73,7 +74,7 @@ export function matchesTestCallRecordFilter(record: SandboxTestCallRecord, input
   if (input.transport && record.transport !== input.transport) return false
   if (input.spaceId && record.spaceId !== input.spaceId) return false
   if (input.testRunId && record.testRunId !== input.testRunId) return false
-  if (input.errorsOnly && record.status !== 'error') return false
+  if (input.status && record.status !== input.status) return false
   return true
 }
 

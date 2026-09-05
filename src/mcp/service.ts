@@ -36,6 +36,7 @@ import {
 } from './tool-registry'
 import {
   SandboxMcpError,
+  SANDBOX_MCP_EVENT_TYPES,
   type SandboxTestCallRecord,
   type SandboxTestCallTransport,
   type SandboxTestCreatedCredential,
@@ -43,6 +44,7 @@ import {
   type SandboxMcpCapabilityCatalog,
   type SandboxMcpEvent,
   type SandboxMcpEventCursor,
+  type SandboxMcpEventType,
   type SandboxMcpScope,
   type SandboxMcpToolCapability,
 } from './types'
@@ -86,6 +88,8 @@ const READ_RESOURCES = [
   { uri: 'chatluna-sandbox://capabilities/napcat', name: 'NapCat 能力基线' },
   { uri: 'chatluna-sandbox://capabilities/llbot', name: 'LLBot 能力基线' },
   { uri: 'chatluna-sandbox://errors', name: '稳定错误码' },
+  // 事件类型与错误码对称：两者都是封闭词汇，消费者都只能从对外声明学到全集。
+  { uri: 'chatluna-sandbox://events', name: '事件类型' },
   { uri: 'chatluna-sandbox://examples', name: '工具调用示例' },
 ].map((resource) => ({
   ...resource,
@@ -452,6 +456,7 @@ export class SandboxMcpService {
     if (uri === 'chatluna-sandbox://capabilities/napcat') return readCapabilityMatrix(this.control, 'napcat')
     if (uri === 'chatluna-sandbox://capabilities/llbot') return readCapabilityMatrix(this.control, 'llbot')
     if (uri === 'chatluna-sandbox://errors') return [...STABLE_ERROR_CODES]
+    if (uri === 'chatluna-sandbox://events') return [...SANDBOX_MCP_EVENT_TYPES]
     if (uri === 'chatluna-sandbox://examples') return {
       create_test_space: {
         name: '退群公告测试',
@@ -841,7 +846,7 @@ export class SandboxMcpService {
     }
   }
 
-  private appendEvent(type: string, data: unknown, spaceId?: string): SandboxMcpEventCursor {
+  private appendEvent(type: SandboxMcpEventType, data: unknown, spaceId?: string): SandboxMcpEventCursor {
     const cursor = { epoch: this.epoch, sequence: ++this.sequence }
     this.events.push({ cursor, spaceId, type, data: structuredClone(data), createdAt: new Date().toISOString() })
     if (this.events.length > this.eventLimit) this.events.splice(0, this.events.length - this.eventLimit)

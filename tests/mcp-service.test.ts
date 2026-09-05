@@ -11,7 +11,7 @@ import {
   registerMcpTestApp,
   stopMcpTestApps,
 } from './helpers/mcp-service-harness'
-import { MCP_TOOL_CATALOGUE, mcpToolCatalogueForScopes, toMcpToolCatalogue } from './helpers/mcp-tool-catalogue'
+import { MCP_RESOURCE_URIS, MCP_TOOL_CATALOGUE, mcpToolCatalogueForScopes, toMcpToolCatalogue } from './helpers/mcp-tool-catalogue'
 
 afterEach(async () => {
   await stopMcpTestApps()
@@ -38,7 +38,7 @@ describe('SandboxMcpService', () => {
     expect(catalog.scopes).toEqual(['read', 'interact', 'manage', 'debug'])
     // 完整清单断言取代数量断言：工具被误删、误加、改名或能力范围写错都会变红，数量由清单长度隐含。
     expect(toMcpToolCatalogue(catalog.tools)).toEqual(MCP_TOOL_CATALOGUE)
-    expect(catalog.resources).toHaveLength(6)
+    expect(catalog.resources.map(({ uri }) => uri)).toEqual(MCP_RESOURCE_URIS)
     expect(catalog.tools).toContainEqual(expect.objectContaining({
       name: 'get_server_info',
       scope: 'read',
