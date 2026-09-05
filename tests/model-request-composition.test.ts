@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   MODEL_REQUEST_COMPOSITION_KINDS,
+  MODEL_REQUEST_COMPOSITION_MIN_SEGMENT_PIXELS,
   MODEL_REQUEST_COMPOSITION_MIN_SEGMENT_WIDTH,
   MODEL_REQUEST_COMPOSITION_MIN_SLOT_WIDTH,
+  MODEL_REQUEST_COMPOSITION_SEGMENT_GAP,
   MODEL_REQUEST_COMPOSITION_ZOOM_MAX,
   aggregateModelRequestComposition,
+  groupModelRequestCompositionSegments,
+  layoutModelRequestCompositionSegment,
   layoutModelRequestCompositionSlots,
   modelRequestCompositionKindOf,
   resolveModelRequestCompositionGranularity,
@@ -220,5 +224,153 @@ describe('请求时间槽铺位', () => {
   it('没有请求或全部进行中时不产出任何宽度', () => {
     expect(layoutModelRequestCompositionSlots([])).toEqual([])
     expect(layoutModelRequestCompositionSlots([{ start: 0, span: 0 }])).toEqual([{ left: 0, width: 0 }])
+  })
+})
+
+describe('分段在格里的铺位', () => {
+  /** 单请求视图的那一格：整条轴。 */
+  const FULL_SLOT = { left: 0, width: 100 }
+  /** 一条五等分的请求：每档各占自己那一格的两成。 */
+  const EVEN_SHARES = [0, 20, 40, 60, 80].map((start, index, list) => ({
+    start,
+    span: 20,
+    gapAfter: index < list.length - 1,
+  }))
+
+  /** 相邻两段之间露出的缝有多宽。 */
+  function gaps(boxes: readonly { left: number, width: number }[]) {
+    return boxes.slice(1).map(({ left }, index) => left - (boxes[index]!.left + boxes[index]!.width))
+  }
+
+  it('相邻分段各自让出一份间隙，最后一段贴住格的右边界', () => {
+    const boxes = EVEN_SHARES.map(share => layoutModelRequestCompositionSegment(FULL_SLOT, share))
+
+    for (const { width } of boxes.slice(0, -1)) {
+      expect(width).toBeCloseTo(20 - MODEL_REQUEST_COMPOSITION_SEGMENT_GAP, 9)
+    }
+    expect(boxes.at(-1)).toEqual({ left: 80, width: 20 })
+    // 间隙只从分段自己的宽度里扣，不推开后面的分段：每一段的起点仍是它的真实占比位置。
+    expect(boxes.map(({ left }) => left)).toEqual([0, 20, 40, 60, 80])
+    for (const gap of gaps(boxes)) {
+      expect(gap).toBeCloseTo(MODEL_REQUEST_COMPOSITION_SEGMENT_GAP, 9)
+    }
+  })
+
+  it('会话里一格只占整条轴的一小段，把这一格拉到全宽后与单请求视图逐像素一致', () => {
+    const slot = { left: 37.5, width: 5 }
+    const scale = 100 / slot.width
+    const projected = EVEN_SHARES
+      .map(share => layoutModelRequestCompositionSegment(slot, share))
+      .map(({ left, width }) => ({ left: (left - slot.left) * scale, width: width * scale }))
+
+    projected.forEach((box, index) => {
+      const full = layoutModelRequestCompositionSegment(FULL_SLOT, EVEN_SHARES[index]!)
+      expect(box.left).toBeCloseTo(full.left, 9)
+      expect(box.width).toBeCloseTo(full.width, 9)
+    })
+  })
+  it('薄于最小宽度的分段同样留缝：下限不再把间隙填回去', () => {
+    // 一条请求只占到时间槽下限那么宽，五档各占它的两成——每段都远薄于分段下限。
+    const slot = { left: 0, width: MODEL_REQUEST_COMPOSITION_MIN_SLOT_WIDTH }
+    const boxes = EVEN_SHARES.map(share => layoutModelRequestCompositionSegment(slot, share))
+
+    expect(boxes.every(({ width }) => width > 0 && width < MODEL_REQUEST_COMPOSITION_MIN_SEGMENT_WIDTH)).toBe(true)
+    expect(gaps(boxes).every(gap => gap > 0)).toBe(true)
+    // 下限兜的是「扣完间隙还是薄到看不见」，绝不把分段撑得比真实占比宽：末段仍然正好贴住格的右边界。
+    expect(boxes.at(-1)!.left + boxes.at(-1)!.width).toBeCloseTo(slot.width, 9)
+  })
+
+  it('间隙最多吃掉四分之一宽度，密集分段不会被扣成零宽', () => {
+    const slot = { left: 0, width: 1 }
+    // 一格里塞进一百段：按格宽算出的间隙比每一段本身还宽。
+    const boxes = Array.from({ length: 100 }, (_, index) => layoutModelRequestCompositionSegment(slot, {
+      start: index,
+      span: 1,
+      gapAfter: index < 99,
+    }))
+
+    expect(boxes.every(({ width }) => width > 0)).toBe(true)
+    expect(boxes[0]!.width).toBeCloseTo(0.01 * 0.75, 12)
+  })
+
+  it('铺到格右边界的分段不越界，也不为不存在的下一段留缝', () => {
+    const slot = { left: 90, width: 10 }
+
+    expect(layoutModelRequestCompositionSegment(slot, { start: 0, span: 100, gapAfter: false }))
+      .toEqual({ left: 90, width: 10 })
+  })
+})
+
+describe('挤不开的分段合成一块', () => {
+  /** 一条请求里等宽铺开的几条证据。 */
+  function evenSegments(requestId: string, left: number, width: number, count: number) {
+    return Array.from({ length: count }, (_, index) => ({
+      requestId,
+      left: left + (index * width) / count,
+      width: width / count,
+    }))
+  }
+
+  it('相邻分段一路并到够宽为止，够宽的分段自己独占一块', () => {
+    const groups = groupModelRequestCompositionSegments([
+      { left: 0, width: 0.1 },
+      { left: 0.1, width: 0.1 },
+      { left: 0.2, width: 0.1 },
+      { left: 0.3, width: 5 },
+      { left: 5.3, width: 0.1 },
+    ], 0.25)
+
+    expect(groups.map(({ from, to, left }) => ({ from, to, left }))).toEqual([
+      { from: 0, to: 3, left: 0 },
+      { from: 3, to: 4, left: 0.3 },
+      { from: 4, to: 5, left: 5.3 },
+    ])
+    expect(groups[0]!.width).toBeCloseTo(0.3, 9)
+  })
+
+  it('合成块覆盖首段左边界到末段右边界，占比读数因此不变', () => {
+    const segments = evenSegments('r1', 10, 4, 40)
+    const groups = groupModelRequestCompositionSegments(segments, 1)
+
+    expect(groups.every(({ width }) => width >= 1 || width === segments[0]!.width)).toBe(true)
+    expect(groups[0]!.left).toBe(10)
+    expect(groups.at(-1)!.left + groups.at(-1)!.width).toBeCloseTo(14, 9)
+  })
+
+  it('跨请求不合并：请求边界是这张图的横轴刻度', () => {
+    const groups = groupModelRequestCompositionSegments([
+      ...evenSegments('r1', 0, 0.2, 2),
+      ...evenSegments('r2', 0.2, 0.2, 2),
+    ], 5)
+
+    expect(groups).toHaveLength(2)
+    expect(groups.map(({ from, to }) => [from, to])).toEqual([[0, 2], [2, 4]])
+  })
+
+  it('不跨变量档的边界合并，相邻的不同变量照旧并成一块', () => {
+    // 一条请求里普通 User 内容与变量片段交替，每段都薄到挤不开。
+    const groups = groupModelRequestCompositionSegments([
+      { requestId: 'r1', left: 0, width: 0.05 },
+      { requestId: 'r1', left: 0.05, width: 0.05 },
+      { requestId: 'r1', left: 0.1, width: 0.05, variableId: 'v1' },
+      { requestId: 'r1', left: 0.15, width: 0.05, variableId: 'v1' },
+      { requestId: 'r1', left: 0.2, width: 0.05, variableId: 'v2' },
+      { requestId: 'r1', left: 0.25, width: 0.05 },
+    ], 5)
+
+    // 前两段是非变量档，中间三段都在变量档（v1 v1 v2 并成一块），末段又回到非变量档。
+    expect(groups.map(({ from, to }) => [from, to])).toEqual([[0, 2], [2, 5], [5, 6]])
+  })
+
+  it('阈值为零时逐段保留：放大到分段自己就够宽的倍率后不再合并', () => {
+    const segments = evenSegments('r1', 0, 100, 12)
+
+    expect(groupModelRequestCompositionSegments(segments, 0)).toHaveLength(12)
+    expect(groupModelRequestCompositionSegments(segments, MODEL_REQUEST_COMPOSITION_MIN_SEGMENT_PIXELS / 1400 * 100))
+      .toHaveLength(12)
+  })
+
+  it('没有分段时不产出任何一块', () => {
+    expect(groupModelRequestCompositionSegments([], 1)).toEqual([])
   })
 })

@@ -41,6 +41,86 @@ export const MODEL_REQUEST_COMPOSITION_KINDS: readonly SandboxModelRequestPrompt
 export const MODEL_REQUEST_COMPOSITION_MIN_SEGMENT_WIDTH = 0.35
 
 /**
+ * 相邻两条分段之间留出的间隙，单位是占**所在那一格**的百分比。
+ *
+ * 口径必须相对那一格而不是整条轴：单请求视图里一条请求铺满全轴，会话视图里同一条请求只占
+ * 一格，写成占整条轴的绝对值会让会话轨道的间隙随请求数一起缩到看不见，而轨道放大到单条请求时
+ * 又要与单请求视图逐像素一致（焦点窗口的整段设计就建立在这条承诺上）。
+ *
+ * 间隙从分段自己的宽度里扣，绝不推开后面的分段：占比是从左边界读出来的，推开会让整格的读数
+ * 一路右移。
+ */
+export const MODEL_REQUEST_COMPOSITION_SEGMENT_GAP = 0.35
+
+/**
+ * 间隙最多吃掉一条分段的几成宽度。
+ *
+ * 一格里塞进几十条分段时，按格宽算出的间隙会比分段本身还宽，扣完只剩零宽。按分段自身宽度
+ * 设上限之后，薄分段留下的是一条更细的实体加一条更细的缝，而不是彻底消失。
+ */
+const SEGMENT_GAP_MAX_SHARE = 0.25
+
+/**
+ * 一条分段仍然能与邻段分辨开所需的像素宽：一格实体加一条缝。
+ *
+ * 这是唯一一处以像素为单位的口径。分段宽度是占比的函数，而「看不看得清」是像素的函数：会话
+ * 轨道把整段会话铺在一屏里时，一条请求只分到几十个像素，它内部的几十条证据无论怎么算占比都
+ * 落不到一个像素上。视图给每条分段兜的那个像素级最小宽度会把它们全部撑到同一个厚度，于是相邻
+ * 分段互相压住，整条请求糊成一根实心条——读出来的既不是占比也不是条数。
+ */
+export const MODEL_REQUEST_COMPOSITION_MIN_SEGMENT_PIXELS = 4
+
+/** 一组挤不开、要合成一块来画的相邻分段：覆盖输入的哪几条，以及合成后的几何。 */
+export interface ModelRequestCompositionSegmentGroup {
+  /** 覆盖输入里的 `[from, to)` 这几条分段。 */
+  from: number
+  to: number
+  left: number
+  width: number
+}
+
+/**
+ * 把一条轨道上挤不开的相邻分段并成一块。
+ *
+ * 合成块的宽度取首段左边界到末段右边界，因此它等于这几段连同中间的缝所占的那一段横轴——占比
+ * 读数不会因为合并而变化，变化的只是「这一块里有几条证据」这一层细节。它是服务端聚合粒度的
+ * 几何版本：粒度判据按最大缩放倍率一次性判定整份投影，而这里按当前实际画出来的像素判定，因此
+ * 放大到一条请求时同一批分段会自动散开，不必重新取一份投影。
+ *
+ * 只合并相邻、同属一条请求且同在变量档或同在非变量档的分段。请求边界是这张图的横轴刻度，
+ * 跨请求合并会把两次请求的内容画成一块；变量片段在 User 轨道上自带一档颜色，把它与前后的普通
+ * User 内容并成一块会让那一档颜色整块消失——读图的人看到的是「这条请求没有变量」，而不是
+ * 「变量太薄」。相邻的不同变量之间照旧合并：它们本来就是同一档颜色，硬按具体变量身份分开只会
+ * 让每一个都薄到看不见，而丢掉的「这一块里是哪几个变量」与丢掉「有几条证据」是同一层细节。
+ * 输入按左边界升序、同一条请求的分段相邻给出。
+ */
+export function groupModelRequestCompositionSegments(
+  segments: readonly {
+    readonly left: number
+    readonly width: number
+    readonly requestId?: string
+    readonly variableId?: string
+  }[],
+  minWidth: number,
+): ModelRequestCompositionSegmentGroup[] {
+  const groups: ModelRequestCompositionSegmentGroup[] = []
+  for (const [index, segment] of segments.entries()) {
+    const open = groups.at(-1)
+    const head = open ? segments[open.from]! : undefined
+    // 只要当前这一块还没够宽就继续吞下一段；够宽之后另起一块，宽分段因此不会被并进来。
+    if (open && head && open.to === index && open.width < minWidth
+      && head.requestId === segment.requestId
+      && Boolean(head.variableId) === Boolean(segment.variableId)) {
+      open.to = index + 1
+      open.width = Math.max(segment.left + segment.width - open.left, open.width)
+      continue
+    }
+    groups.push({ from: index, to: index + 1, left: segment.left, width: segment.width })
+  }
+  return groups
+}
+
+/**
  * 一条请求的时间槽至少多宽，单位同样是占整条轴的百分比。
  *
  * 只按真实耗时铺开时，一次十秒的请求在跨越二十小时的会话里不到千分之一，连一个像素都画不出，
@@ -108,6 +188,41 @@ export function layoutModelRequestCompositionSlots(
     cursor = left + width
     return { left, width }
   })
+}
+
+/** 一条分段在自己那一格里占的位置，三项都相对那一格。 */
+export interface ModelRequestCompositionSegmentShare {
+  /** 格内起点，占该格的百分比。 */
+  start: number
+  /** 格内宽度，占该格的百分比。 */
+  span: number
+  /** 右侧还有分段时留间隙；一格的最后一段贴住格的右边界。 */
+  gapAfter: boolean
+}
+
+/**
+ * 把一条分段铺进它所在的那一格。
+ *
+ * 单请求视图传入整条轴那一格，会话视图传入这条请求的时间槽，因此两种模式的间隙与下限完全同源。
+ * 除了扣间隙，这里只做一次线性映射：同一份格内占比换算到任意一格，得到的都是同一份几何按格宽
+ * 缩放的结果，焦点窗口把一格拉到全宽后读出来的正是单请求视图里的那条轨道。
+ */
+export function layoutModelRequestCompositionSegment(
+  slot: ModelRequestCompositionSlotBox,
+  share: ModelRequestCompositionSegmentShare,
+): ModelRequestCompositionSlotBox {
+  const left = slot.left + (share.start / 100) * slot.width
+  const rawWidth = (share.span / 100) * slot.width
+  const gap = share.gapAfter
+    ? Math.min((MODEL_REQUEST_COMPOSITION_SEGMENT_GAP / 100) * slot.width, rawWidth * SEGMENT_GAP_MAX_SHARE)
+    : 0
+  const target = Math.max(rawWidth - gap, 0)
+  // 下限只兜「扣完间隙仍然薄到看不见」，绝不把刚扣出来的间隙填回去：一格里的分段绝大多数都薄于
+  // 下限，按未扣的占比兜下限等于让间隙在会话轨道上全程失效，同一条请求的几档因此糊成一条实心条。
+  // 真实占比本来就低于下限时按真实占比画成发丝线——看不清是事实本身，粒度判据会在挤不开时聚合。
+  const floor = Math.min(target, MODEL_REQUEST_COMPOSITION_MIN_SEGMENT_WIDTH)
+  const available = Math.max(slot.left + slot.width - left, 0)
+  return { left, width: Math.min(target, Math.max(available, floor)) }
 }
 
 /**

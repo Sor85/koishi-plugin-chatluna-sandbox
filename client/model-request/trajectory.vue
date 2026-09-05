@@ -200,7 +200,7 @@
                     :style="{ left: `${boundary.left}%` }"
                     aria-hidden="true"
                   />
-                  <div v-for="track in focusedCompositionTracks" :key="track.kind" class="webqq-model-trajectory-composition-track">
+                  <div v-for="track in drawnCompositionTracks" :key="track.kind" class="webqq-model-trajectory-composition-track">
                     <!-- 整条轨道共用一个浮层：每段各挂一个 Tooltip 组件时，一次会话的上千条分段
                          会让每次重新取回轨迹都重渲染上千个组件，点击展开的延迟绝大部分花在那里。 -->
                     <button
@@ -234,7 +234,7 @@
             role="tooltip"
             :style="{ left: `${compositionTooltipPosition.left}px`, top: `${compositionTooltipPosition.top}px` }"
           >
-            <strong>{{ hoveredSegment.variableName ? `${evidenceTitleLabel('variable')} · ${hoveredSegment.variableName}` : evidenceTitleLabel(hoveredSegment.kind) }} · {{ formatPercentage(hoveredSegment.percentage) }}</strong>
+            <strong>{{ compositionSegmentTitle(hoveredSegment) }} · {{ formatPercentage(hoveredSegment.percentage) }}</strong>
             <span>{{ hoveredSegment.characters.toLocaleString('zh-CN') }} 个字符</span>
             <span v-if="hoveredSegment.segmentCount">{{ compositionSegmentScope(hoveredSegment) }}</span>
           </div>
@@ -379,7 +379,9 @@ import {
 } from './composition-focus'
 import {
   MODEL_REQUEST_COMPOSITION_KINDS,
-  MODEL_REQUEST_COMPOSITION_MIN_SEGMENT_WIDTH,
+  MODEL_REQUEST_COMPOSITION_MIN_SEGMENT_PIXELS,
+  groupModelRequestCompositionSegments,
+  layoutModelRequestCompositionSegment,
   layoutModelRequestCompositionSlots,
   modelRequestCompositionKindOf,
 } from '../../src/model-request-composition'
@@ -462,6 +464,9 @@ const ledgerScrollRestore = createScrollRestore({
 const selectedRowId = ref('')
 const actualDuration = ref(true)
 const compositionViewport = ref<HTMLElement>()
+/** 轨道视图口的像素宽。分段挤不挤得开只能按像素判，而它随窗口与侧栏一起变。 */
+const compositionViewportWidth = ref(0)
+let compositionViewportResizeObserver: ResizeObserver | undefined
 const compositionShell = ref<HTMLElement>()
 const compositionFocusLayer = ref<HTMLElement>()
 let compositionFocusAnimation: ReturnType<typeof animate> | undefined
@@ -587,6 +592,55 @@ const focusedCompositionTracks = computed(() => {
     }),
   }))
 })
+/**
+ * 轨道最终画出来的那几块。
+ *
+ * 会话轨道要多走一步按像素合并：整段会话铺在一屏里时一条请求只分到几十个像素，它内部的几十条
+ * 证据落不到一个像素上，各自兜住像素级最小宽度之后就互相压住，整条请求糊成一根实心条。合并只
+ * 改「这一块里有几条证据」，不改占比；放大到一条请求后每段自己就够宽，同一批分段随之散开。
+ * 单请求模式一条请求独占整条轴，它的分段本来就够宽，不需要这一步。
+ */
+const drawnCompositionTracks = computed(() => {
+  const minWidth = compositionMinSegmentWidth.value
+  if (props.mode !== 'conversation' || !minWidth) return focusedCompositionTracks.value
+  return focusedCompositionTracks.value.map(({ kind, segments }) => ({
+    kind,
+    segments: mergeCompositionSegments(segments, minWidth),
+  }))
+})
+/** 一条分段至少要占轨道的百分之多少才与邻段分得开；轨道宽度随视图口与缩放倍率变化。 */
+const compositionMinSegmentWidth = computed(() => {
+  const pixels = compositionViewportWidth.value * compositionZoom.value
+  return pixels > 0 ? (MODEL_REQUEST_COMPOSITION_MIN_SEGMENT_PIXELS / pixels) * 100 : 0
+})
+
+function mergeCompositionSegments(segments: readonly CompositionSegment[], minWidth: number) {
+  const groups = groupModelRequestCompositionSegments(segments, minWidth)
+  if (groups.length === segments.length) return segments
+  return groups.map(({ from, to, left, width }): CompositionSegment => {
+    const first = segments[from]!
+    if (to - from === 1) return { ...first, left, width }
+    const merged = segments.slice(from, to)
+    // 变量身份要留住：合并不跨变量档的边界，整块因此同在变量档或同在非变量档，丢掉它会让
+    // User 轨道上那一档颜色凭空消失。具体是哪个变量只有整块同名时才成立——相邻的不同变量会
+    // 并成一块，那一块属于变量档但没有单一变量身份。
+    const named = merged.every(segment => segment.variableId === first.variableId)
+    return {
+      // 合成块没有单一证据身份，这一点与服务端聚合粒度下的分段一致，因此选中判定、点击落点
+      // 与浮层文案都不需要第二套分支。
+      id: `${first.id}+${to - from}`,
+      kind: first.kind,
+      characters: merged.reduce((sum, segment) => sum + segment.characters, 0),
+      percentage: merged.reduce((sum, segment) => sum + segment.percentage, 0),
+      segmentCount: merged.reduce((sum, segment) => sum + (segment.segmentCount ?? 1), 0),
+      left,
+      width,
+      ...(first.requestId ? { requestId: first.requestId } : {}),
+      ...(first.variableId ? { variableId: first.variableId } : {}),
+      ...(named && first.variableName ? { variableName: first.variableName } : {}),
+    }
+  })
+}
 const compositionScopeLabel = computed(() => {
   const focusedCount = props.mode === 'conversation' && compositionFocusWindow.value
     ? (props.trajectory?.records ?? []).filter(({ id }) => expandedRequestIds.value.has(id)).length
@@ -596,11 +650,12 @@ const compositionScopeLabel = computed(() => {
     : '请求体提示词内容占比'
 })
 const requestCompositionTracks = computed(() => {
+  // 单请求模式的那一格就是整条轴；间隙与下限因此与会话模式共用同一份换算。
+  const slot = { left: 0, width: 100 }
   let offset = 0
   const segments = promptComposition.value.map((item, index): CompositionSegment => {
-    const left = offset
+    const start = offset
     offset += item.percentage
-    const gap = index < promptComposition.value.length - 1 ? 0.35 : 0
     return {
       id: `${index}:${item.evidenceId ?? item.kind}`,
       ...(item.evidenceId ? { evidenceId: item.evidenceId } : {}),
@@ -610,8 +665,11 @@ const requestCompositionTracks = computed(() => {
       ...(item.segmentCount ? { segmentCount: item.segmentCount } : {}),
       ...(item.variableId ? { variableId: item.variableId } : {}),
       ...(item.variableName ? { variableName: item.variableName } : {}),
-      left,
-      width: clampSegmentWidth(item.percentage, gap, Math.max(100 - left, 0)),
+      ...layoutModelRequestCompositionSegment(slot, {
+        start,
+        span: item.percentage,
+        gapAfter: index < promptComposition.value.length - 1,
+      }),
     }
   })
   return groupCompositionTracks(COMPOSITION_KINDS, segments)
@@ -635,9 +693,11 @@ const conversationCompositionTracks = computed(() => {
     let used = 0
     items.forEach((item, index) => {
       const percentage = (item.characters / total) * 100
-      const left = slot.left + (used / 100) * slot.width
-      const rawWidth = (percentage / 100) * slot.width
-      const gap = index < items.length - 1 ? Math.min(0.25, rawWidth / 4) : 0
+      const span = layoutModelRequestCompositionSegment(slot, {
+        start: used,
+        span: percentage,
+        gapAfter: index < items.length - 1,
+      })
       used += percentage
       segments.push({
         id: `${slot.id}:${index}:${item.evidenceId ?? item.kind}`,
@@ -648,26 +708,13 @@ const conversationCompositionTracks = computed(() => {
         ...(item.segmentCount ? { segmentCount: item.segmentCount } : {}),
         ...(item.variableId ? { variableId: item.variableId } : {}),
         ...(item.variableName ? { variableName: item.variableName } : {}),
-        left,
-        width: clampSegmentWidth(rawWidth, gap, Math.max(slot.left + slot.width - left, 0)),
+        ...span,
         requestId: slot.id,
       })
     })
   }
   return groupCompositionTracks(COMPOSITION_KINDS, segments)
 })
-
-/**
- * 分段实际画多宽。
- *
- * 最小宽度只用来兜住「有内容却薄到看不见」，绝不把分段撑得比真实占比还宽：撑宽会让同一条
- * 时间槽里的分段互相压住，读出来的厚度比真实占比大出好几倍。真实占比已经低于最小宽度时
- * 按真实占比画成发丝线——看不清是事实本身，粒度判据会在挤不开时改成聚合粒度。
- */
-function clampSegmentWidth(rawWidth: number, gap: number, available: number) {
-  const floor = Math.min(rawWidth, MODEL_REQUEST_COMPOSITION_MIN_SEGMENT_WIDTH)
-  return Math.min(Math.max(rawWidth - gap, floor), Math.max(available, floor))
-}
 
 /** 一趟分桶而不是每档筛一遍：聚合前的会话分段可以有上万条，逐档 filter 等于把它们扫五遍。 */
 function groupCompositionTracks(
@@ -741,8 +788,20 @@ watch(stickyHeaderElement, (header) => {
   stickyHeaderResizeObserver.observe(header)
 }, { flush: 'post' })
 
+watch(compositionViewport, (viewport) => {
+  compositionViewportResizeObserver?.disconnect()
+  compositionViewportResizeObserver = undefined
+  compositionViewportWidth.value = viewport?.clientWidth ?? 0
+  if (!viewport || typeof ResizeObserver === 'undefined') return
+  compositionViewportResizeObserver = new ResizeObserver(() => {
+    compositionViewportWidth.value = viewport.clientWidth
+  })
+  compositionViewportResizeObserver.observe(viewport)
+}, { flush: 'post' })
+
 onBeforeUnmount(() => {
   stickyHeaderResizeObserver?.disconnect()
+  compositionViewportResizeObserver?.disconnect()
   compositionHover.dispose()
   compositionFocusAnimation?.complete()
   compositionFocusAnimation = undefined
@@ -939,13 +998,26 @@ function isCompositionSegmentSelected(segment: CompositionSegment) {
     && (!segment.requestId || selected.requestId === segment.requestId)
 }
 
+/**
+ * 一条分段属于哪一档。
+ *
+ * 变量档按变量身份报而不是按轨道报：变量片段落在 User 轨道上，却自带一档颜色，只按轨道报会让
+ * 紫红色的那一块在浮层里自称 User。合成块可能并了相邻的几个不同变量，那时它仍然是变量档，
+ * 只是没有单一变量名可报。
+ */
+function compositionSegmentTitle(segment: CompositionSegment) {
+  if (!segment.variableId) return evidenceTitleLabel(segment.kind)
+  const variable = evidenceTitleLabel('variable')
+  return segment.variableName ? `${variable} · ${segment.variableName}` : variable
+}
+
 function compositionSegmentLabel(segment: CompositionSegment) {
   const share = `占请求体提示内容的 ${formatPercentage(segment.percentage)}`
-  if (segment.variableName) return `变量 ${segment.variableName} ${share}`
+  const title = compositionSegmentTitle(segment)
   if (!segment.evidenceId && segment.requestId) {
-    return `${requestOrdinal(segment.requestId)} 的 ${evidenceTitleLabel(segment.kind)} ${share}，点击展开这条请求`
+    return `${requestOrdinal(segment.requestId)} 的 ${title} ${share}，点击展开这条请求`
   }
-  return `${evidenceTitleLabel(segment.kind)} ${share}`
+  return `${title} ${share}`
 }
 
 /** 聚合分段的补充说明：它把这条请求里多少条证据合成了一段。 */

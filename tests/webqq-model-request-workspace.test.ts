@@ -231,7 +231,8 @@ describe('WebQQ 模型请求工作台', () => {
     expect(trajectorySource).toContain('id: `${index}:${item.evidenceId ?? item.kind}`')
     expect(trajectorySource).toContain('id: `${slot.id}:${index}:${item.evidenceId ?? item.kind}`')
     // 变量分段的标题标签同样来自证据种类 module，不在视图里硬编码一份。
-    expect(trajectorySource).toContain("`${evidenceTitleLabel('variable')} · ${hoveredSegment.variableName}`")
+    expect(trajectorySource).toContain("const variable = evidenceTitleLabel('variable')")
+    expect(trajectorySource).toContain('`${variable} · ${segment.variableName}`')
     // 整条轨道共用一个浮层：逐段各挂一个 Tooltip 组件时，一次会话的上千条分段会让每次重新
     // 取回轨迹都重渲染上千个组件，实测点击展开的 269 ms 延迟里有 224 ms 花在那里。
     expect(trajectorySource).not.toContain('<Tooltip v-for')
@@ -280,6 +281,32 @@ describe('WebQQ 模型请求工作台', () => {
     expect(styles).toMatch(/\.webqq-model-trajectory-composition-bar\.is-variable\s*\{[^}]*background:\s*var\(--webqq-role-variable\)/s)
     expect(styles).toMatch(/\.webqq-model-trajectory-composition-bar\.is-selected\s*\{[^}]*z-index:\s*1[^}]*0 0 0 1px var\(--webqq-trajectory-layer\)[^}]*0 0 0 2px var\(--webqq-accent\)/s)
     expect(styles).not.toMatch(/\.webqq-model-trajectory-composition-bar\.is-selected\s*\{[^}]*outline:/s)
+    // 分段之间的间隙与下限只在请求组成 module 里换算一次，两种模式共用：视图各留一份会让
+    // 会话轨道放大到单条请求后与单请求视图读法分叉（会话那边的间隙曾被下限整段填回去）。
+    expect(trajectorySource).toContain('layoutModelRequestCompositionSegment(slot, {')
+    expect(trajectorySource.match(/layoutModelRequestCompositionSegment\(slot, \{/g)).toHaveLength(2)
+    expect(trajectorySource).not.toContain('function clampSegmentWidth')
+    expect(trajectorySource).not.toMatch(/const gap = index </)
+    // 缝要从分段自己的宽度里让出来：落到 content-box 上会把每段各撑宽 1px，同一格里的分段又互相压住。
+    expect(styles).toMatch(/\.webqq-model-trajectory-composition-bar\s*\{[^}]*box-sizing:\s*border-box[^}]*border-right:\s*1px solid transparent/s)
+    expect(styles).toMatch(/\.webqq-model-trajectory-composition-bar\s*\{[^}]*background-clip:\s*padding-box/s)
+    // 画出来的是按像素合并过的那几块，不是投影后的逐段清单：会话轨道里一条请求只有几十个像素，
+    // 直接铺逐段会让每段都兜住像素级最小宽度并互相压住，整条请求糊成一根实心条。
+    expect(trajectorySource).toContain('v-for="track in drawnCompositionTracks"')
+    expect(trajectorySource).toContain('groupModelRequestCompositionSegments(segments, minWidth)')
+    expect(trajectorySource).toMatch(/MODEL_REQUEST_COMPOSITION_MIN_SEGMENT_PIXELS \/ pixels/)
+    // 合并只对会话轨道生效：单请求模式一条请求独占整条轴，分段本来就够宽。
+    expect(trajectorySource).toMatch(/if \(props\.mode !== 'conversation' \|\| !minWidth\) return focusedCompositionTracks\.value/)
+    // 合成块必须留住变量档身份：合并不跨变量档边界，丢掉它会让 User 轨道上那一档颜色整块消失。
+    expect(trajectorySource).toMatch(/id: `\$\{first\.id\}\+\$\{to - from\}`[\s\S]{0,700}?first\.variableId \? \{ variableId: first\.variableId \}/)
+    expect(trajectorySource).toContain('const named = merged.every(segment => segment.variableId === first.variableId)')
+    expect(styles).toMatch(/\.webqq-model-trajectory-composition-bar\.is-variable\s*\{/)
+    // 浮层与无障碍名按变量档报，而不是按它落在哪条轨道报：紫红色那一块不能自称 User。
+    expect(trajectorySource).toContain('compositionSegmentTitle(hoveredSegment)')
+    expect(trajectorySource).toMatch(/function compositionSegmentTitle[\s\S]{0,300}?if \(!segment\.variableId\) return evidenceTitleLabel\(segment\.kind\)/)
+    // 视图口宽度必须跟着窗口与侧栏变；量一次就存下来会让缩放后的判定停在旧宽度上。
+    expect(trajectorySource).toMatch(/watch\(compositionViewport,[\s\S]{0,400}?new ResizeObserver/)
+    expect(trajectorySource).toContain('compositionViewportResizeObserver?.disconnect()')
   })
 
   it('轨迹账本与检查器：模式切换、账本列与种类标签、请求折叠、检查器容器与工具栏折叠', () => {

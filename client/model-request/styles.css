@@ -1067,15 +1067,25 @@
   min-width: 0;
 }
 
+/* 分段右侧那条 1px 的缝。
+   按占比算的间隙（请求组成 module 的那个常量）在放大后与单请求视图逐像素一致，但默认倍率下
+   一条请求只占几十个像素宽，那份间隙折算下来不到半个像素——同一条请求里的几档因此糊成一条
+   实心条。这条缝是几何之外的补充，不随倍率与格宽变化，两种模式共用同一份声明因此不会让两边的
+   读法分叉。background-clip 是必要的：透明边框区域默认仍然画元素自己的背景色，缝会看不出来。
+   box-sizing 必须显式声明：缝要从分段自己的宽度里让出来，落到 content-box 上会把每一段
+   各撑宽 1px，同一格里的分段又互相压住。 */
 .webqq-model-trajectory-composition-bar {
   position: absolute;
   top: 3px;
-  min-width: 2px;
+  box-sizing: border-box;
+  min-width: 3px;
   height: 8px;
   padding: 0;
   border: 0;
+  border-right: 1px solid transparent;
   border-radius: 1px;
   background: var(--webqq-role-system);
+  background-clip: padding-box;
 }
 
 .webqq-model-trajectory-composition-bar.is-user {
