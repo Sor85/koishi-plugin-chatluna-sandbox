@@ -11,8 +11,12 @@ node_modules
 !.yarn/sdks/**
 !.yarn/versions
 !.yarn/versions/**
-lib
-dist
-data
+# 构建产物与运行时数据只在仓库根目录，必须锚定成 /lib 这种形式：
+# 不带斜杠的 lib 会匹配任意层级的同名目录，把 client/lib/utils.ts 这类源文件
+# 一起忽略掉。这种漏文件在本地看不出来（文件就在磁盘上，测试和构建都过），
+# 只有干净 checkout 才会暴露。
+/lib
+/dist
+/data
 *.tsbuildinfo
 client/styles/tailwind.generated.css
