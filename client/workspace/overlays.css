@@ -755,26 +755,60 @@ body[data-sandbox-color-scheme="dark"] .chatluna-sandbox-forward-modal-header bu
   background: rgb(113 113 122 / 20%);
 }
 
-/* 图片全屏预览：teleport 到 body，与工作区令牌隔离，遮罩固定深色（亮暗通用）。 */
+/*
+ * 图片全屏预览：teleport 到 body，与工作区令牌隔离，遮罩固定深色（亮暗通用）。
+ * `overflow: hidden` 是必需的：滚轮放大后图片按 transform 溢出遮罩，不裁掉会撑出滚动条。
+ */
 .chatluna-sandbox-image-preview {
   position: fixed;
   inset: 0;
   z-index: 10002;
   display: flex;
+  overflow: hidden;
   align-items: center;
   justify-content: center;
   background: rgb(15 23 42 / 78%);
 }
 
+/*
+ * 倍率 1 就是这里的贴合尺寸，缩放模块的锚点算术以它为基准。
+ * `transform` 由脚本逐帧写入，因此不能声明 transition——否则每一格滚轮都要补一段动画，
+ * 连续滚动时倍率追不上指针，观感是「滚完还在慢慢长」。
+ */
 .chatluna-sandbox-image-preview img {
   max-width: min(92vw, 1080px);
   max-height: 88vh;
   border-radius: 12px;
   object-fit: contain;
+  transform-origin: center;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.chatluna-sandbox-image-preview.is-zoomed img {
+  /* 放大态才提升合成层：常态挂着会让静止的预览也占一层。 */
+  will-change: transform;
+}
+
+/* 当前倍率读数：放大态才出现，位置避开右上角的关闭按钮。 */
+.chatluna-sandbox-image-preview-scale {
+  position: absolute;
+  z-index: 1;
+  bottom: 22px;
+  left: 50%;
+  padding: 5px 12px;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 999px;
+  color: #fff;
+  background: rgb(15 23 42 / 62%);
+  font-size: var(--webqq-font-xs, 12px);
+  font-variant-numeric: tabular-nums;
+  transform: translateX(-50%);
 }
 
 .chatluna-sandbox-image-preview-close {
   position: absolute;
+  z-index: 1;
   top: 18px;
   right: 18px;
   display: inline-flex;

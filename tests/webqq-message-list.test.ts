@@ -35,6 +35,64 @@ describe('WebQQ 消息列表', () => {
     expect(source).toContain('<ContextMenuTrigger as-child :disabled="preview || model.selectionMode || !model.currentConversation">')
   })
 
+  it('气泡里的图片是放大入口，事件通向聊天区域的预览层', () => {
+    const source = readSource('client/webqq/message-list.vue')
+    const chatPane = readSource('client/webqq/chat-pane.vue')
+    const styles = readSource('client/webqq/messages.css')
+
+    /**
+     * 类别：DOM 结构与元素顺序（ADR 0073 第 3 类）。
+     * 依据：放大只有「点得到」才成立。图片必须是 button 而不是裸 img，否则键盘到不了、
+     * 也没有点击目标；退回裸 img 的表现是「图片点不开」，不会有任何断言天然变红。
+     */
+    expect(source).toContain('class="chatluna-sandbox-message-image"')
+    expect(source).toContain('aria-label="查看大图"')
+    expect(source).toContain("@click.stop=\"emit('openImage', getMediaSource(media.id))\"")
+    expect(source).toContain('openImage: [url: string]')
+
+    // 列表只报出这次放大意图，预览层属于聊天区域——少接这根线的表现同样是「点了没反应」。
+    expect(chatPane).toContain('@open-image="previewImageUrl = $event"')
+    expect(chatPane).toContain('<WebqqImagePreview')
+
+    /**
+     * 类别：样式文本（ADR 0073 第一类例外）。
+     * 父级是列方向 flex，按钮默认 `min-width: auto` 会以图片固有宽度撑破窄气泡。
+     */
+    const imageRule = styles.slice(styles.indexOf('.chatluna-sandbox-message-image {')).split('}')[0]
+    expect(imageRule).toContain('min-width: 0')
+  })
+
+  it('预览层的滚轮缩放与拖动平移接到判定模块', () => {
+    const preview = readSource('client/webqq/image-preview.vue')
+    const overlays = readSource('client/workspace/overlays.css')
+
+    /**
+     * 类别：实现细节契约（肯定式）。
+     * 依据：倍率、锚点补偿、位移夹取与拖动后吃 click 住在 image-preview-zoom，
+     * 由它的行为断言逐条执行。这里保留的是接线：滚轮必须 preventDefault（否则页面跟着滚）、
+     * 遮罩点击必须先问模块再关（否则拖一下图片就把预览关了）、倍率必须写在 transform 上
+     * 而不是改布局盒（否则贴合尺寸跟着变，锚点算术失效）。
+     */
+    expect(preview).toContain("from './image-preview-zoom'")
+    expect(preview).toContain('@wheel.prevent="zoom.handleWheel($event)"')
+    expect(preview).toContain('if (zoom.consumeSuppressedClick()) return')
+    expect(preview).toContain('transform: `translate(${zoom.offset.value.x}px, ${zoom.offset.value.y}px) scale(${zoom.scale.value})`')
+    expect(preview).toContain('captureTarget: () => imageRef.value')
+    expect(preview).toContain("watch(() => props.url, () => zoom.reset())")
+
+    /**
+     * 类别：样式文本。
+     * overflow:hidden 不裁掉放大后的溢出，遮罩会撑出滚动条；
+     * 关闭按钮和倍率读数不加 z-index，放大后图片会盖住它们。
+     */
+    const overlayRule = overlays.slice(overlays.indexOf('.chatluna-sandbox-image-preview {')).split('}')[0]
+    expect(overlayRule).toContain('overflow: hidden')
+    const closeRule = overlays.slice(overlays.indexOf('.chatluna-sandbox-image-preview-close {')).split('}')[0]
+    expect(closeRule).toContain('z-index: 1')
+    const scaleRule = overlays.slice(overlays.indexOf('.chatluna-sandbox-image-preview-scale {')).split('}')[0]
+    expect(scaleRule).toContain('z-index: 1')
+  })
+
   it('滚动追踪、位置恢复与加载更早历史的接线', () => {
     const source = readSource('client/webqq/message-list.vue')
     const styles = readSource('client/webqq/messages.css')

@@ -83,6 +83,7 @@
       @enter-selection="enterSelection"
       @toggle-selection="toggleSelection"
       @open-forward="openForwardDialog"
+      @open-image="previewImageUrl = $event"
       @set-message-reaction="forwardSetMessageReaction"
       @open-reaction-picker="openReactionPicker"
       @open-model-request="emit('openModelRequest', $event)"

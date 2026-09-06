@@ -151,7 +151,15 @@
                       </button>
                       <template v-else>
                         <div v-for="media in message.media" :key="media.id" class="chatluna-sandbox-message-media">
-                          <img v-if="media.type === 'image' && getMediaSource(media.id)" :src="getMediaSource(media.id)" :alt="media.name">
+                          <button
+                            v-if="media.type === 'image' && getMediaSource(media.id)"
+                            class="chatluna-sandbox-message-image"
+                            type="button"
+                            aria-label="查看大图"
+                            @click.stop="emit('openImage', getMediaSource(media.id))"
+                          >
+                            <img :src="getMediaSource(media.id)" :alt="media.name">
+                          </button>
                           <audio v-else-if="media.type === 'audio' && getMediaSource(media.id)" :src="getMediaSource(media.id)" controls preload="metadata" />
                           <video v-else-if="media.type === 'video' && getMediaSource(media.id)" :src="getMediaSource(media.id)" controls preload="metadata" />
                           <a v-else-if="media.type === 'file' && getMediaSource(media.id)" :href="getMediaSource(media.id)" :download="media.name" class="chatluna-sandbox-message-file">
@@ -452,6 +460,7 @@ const emit = defineEmits<{
   enterSelection: [messageId: string]
   toggleSelection: [messageId: string]
   openForward: [input: { messageId: string; forwardId: string }]
+  openImage: [url: string]
   setMessageReaction: [messageId: string, emojiId: string, enabled: boolean]
   openReactionPicker: [messageId: string]
   openModelRequest: [reference: SandboxMessageModelRequestReference]

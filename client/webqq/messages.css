@@ -604,11 +604,22 @@
   flex-direction: column;
 }
 
+/*
+ * 图片放大的点击区。`min-width: 0` 是必需的：父级 `-message-media` 是列方向 flex，
+ * 按钮默认 `min-width: auto` 会以图片固有宽度撑破窄气泡。
+ */
 .chatluna-sandbox-message-image {
   display: block;
+  min-width: 0;
   padding: 0;
   border: 0;
+  border-radius: 7px;
   background: transparent;
+}
+
+.chatluna-sandbox-message-image:focus-visible {
+  outline: 2px solid var(--webqq-accent);
+  outline-offset: 2px;
 }
 
 .chatluna-sandbox-message-image img,
