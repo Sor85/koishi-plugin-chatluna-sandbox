@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, readdir, rename, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, readdir, rename, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -162,8 +162,13 @@ describe('文件系统预设仓库', () => {
       confirmed: true,
     })
     await atCommit
-    await rm(join(coreRoot, 'demo.yml'))
+    // 替换文件必须在原文件还占着 inode 时就建好，再用 rename 原子覆盖过去。
+    // 先 rm 释放 inode 再创建，会让文件系统把同一个 inode 号分配回来（ext4 会，APFS 不会），
+    // dev+ino 判定就看不出替换，这条断言会只在 Linux 上失败。
+    const before = await stat(join(coreRoot, 'demo.yml'))
     await writeFile(join(coreRoot, 'replacement.yml'), source)
+    // 守住上面那件事：inode 号真的换了，这条用例才在检验 dev+ino 判定。
+    expect((await stat(join(coreRoot, 'replacement.yml'))).ino).not.toBe(before.ino)
     await rename(join(coreRoot, 'replacement.yml'), join(coreRoot, 'demo.yml'))
     releaseCommit()
 
