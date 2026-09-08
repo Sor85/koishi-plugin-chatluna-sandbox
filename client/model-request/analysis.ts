@@ -4,27 +4,20 @@ import type {
   SandboxModelRequestVariable,
 } from '../../src/types'
 import {
-  isSandboxEvidenceAggregateMember,
   sandboxEvidenceLabels,
   type SandboxEvidenceKind,
-  type SandboxEvidenceAggregateMemberKind,
 } from '../../src/evidence-kind'
+import {
+  SANDBOX_EVIDENCE_READING_ORDER,
+  sandboxEvidenceReadingGroup,
+  type SandboxEvidenceReadingGroup,
+} from '../../src/evidence-reading-order'
 import { normalizeEvidencePreviewText } from '../../src/evidence-preview-text'
 import { modelRequestVariableStatusLabel } from '../../src/model-request-variables'
 import type {
   ModelConversationMessage,
   ModelRequestConversation,
 } from './conversation'
-
-/**
- * 分析导航的分组键：五种基础证据种类加工具分组聚合。
- *
- * 三种工具证据收在一个分组标题下，因此工具用聚合键；其余基础种类各自成组。
- * 取哪几档是视图决策，粒度差异因此是显式选择而不是又一套分类词汇。
- */
-export type ModelRequestAnalysisGroupKey =
-  | Exclude<SandboxEvidenceKind, SandboxEvidenceAggregateMemberKind<'tool'>>
-  | 'tool'
 
 export interface ModelRequestAnalysisNavigationItem {
   id: string
@@ -39,7 +32,7 @@ export interface ModelRequestAnalysisNavigationItem {
 }
 
 export interface ModelRequestAnalysisNavigationGroup {
-  key: ModelRequestAnalysisGroupKey
+  key: SandboxEvidenceReadingGroup
   label: string
   count: number
   items: ModelRequestAnalysisNavigationItem[]
@@ -107,10 +100,10 @@ export function buildModelRequestAnalysisNavigation(
   conversation: ModelRequestConversation,
   detail: Pick<SandboxModelRequestDetail, 'sequence' | 'status' | 'model' | 'provider' | 'durationMs' | 'variables'>,
 ): ModelRequestAnalysisNavigation {
-  const grouped = new Map<ModelRequestAnalysisGroupKey, ModelRequestAnalysisNavigationItem[]>()
+  const grouped = new Map<SandboxEvidenceReadingGroup, ModelRequestAnalysisNavigationItem[]>()
   const targets: Record<string, string> = {}
   const searchTexts: Record<string, string> = {}
-  const add = (key: ModelRequestAnalysisGroupKey, item: ModelRequestAnalysisNavigationItem) => {
+  const add = (key: SandboxEvidenceReadingGroup, item: ModelRequestAnalysisNavigationItem) => {
     const items = grouped.get(key) ?? []
     const searchText = normalizeAnalysisQuery(item.searchText)
     items.push({ ...item, searchText })
@@ -120,7 +113,7 @@ export function buildModelRequestAnalysisNavigation(
   }
 
   for (const message of conversation.messages) {
-    const group = analysisGroupKey(message.kind)
+    const group = sandboxEvidenceReadingGroup({ kind: message.kind })
     add(group, messageNavigationItem(message))
     for (const call of message.toolCalls) {
       add(group, {
@@ -187,8 +180,7 @@ export function buildModelRequestAnalysisNavigation(
     }
   }
 
-  const order: ModelRequestAnalysisGroupKey[] = ['system', 'user', 'variable', 'response', 'assistant', 'tool']
-  const groups = order.flatMap((key) => {
+  const groups = SANDBOX_EVIDENCE_READING_ORDER.flatMap((key) => {
     const items = grouped.get(key) ?? []
     return items.length ? [{ key, label: sandboxEvidenceLabels(key).title, count: items.length, items }] : []
   })
@@ -206,11 +198,6 @@ export function buildModelRequestAnalysisNavigation(
     searchTexts,
     searchText: normalizeAnalysisQuery(conversation.searchText),
   }
-}
-
-/** 三种工具证据收在工具分组下；聚合成员由证据种类 module 声明，这里不重列一遍。 */
-function analysisGroupKey(kind: SandboxEvidenceKind): ModelRequestAnalysisGroupKey {
-  return isSandboxEvidenceAggregateMember('tool', kind) ? 'tool' : kind
 }
 
 /**

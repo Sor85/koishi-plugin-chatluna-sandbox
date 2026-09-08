@@ -60,8 +60,8 @@ describe('模型请求分析展示模型', () => {
     expect(navigation.groups.map(({ key, count }) => ({ key, count }))).toEqual([
       { key: 'system', count: 1 },
       { key: 'user', count: 1 },
-      { key: 'response', count: 1 },
       { key: 'assistant', count: 2 },
+      { key: 'response', count: 1 },
       { key: 'tool', count: 2 },
     ])
 
@@ -79,7 +79,7 @@ describe('模型请求分析展示模型', () => {
     }]
     const navigationWithVariables = buildModelRequestAnalysisNavigation(parseModelRequestConversationDetail(request), request)
     expect(navigationWithVariables.groups.map(({ key }) => key)).toEqual([
-      'system', 'user', 'variable', 'response', 'assistant', 'tool',
+      'system', 'user', 'variable', 'assistant', 'response', 'tool',
     ])
 
     expect(navigation.groups.find(({ key }) => key === 'assistant')?.items[1]).toMatchObject({
@@ -191,7 +191,7 @@ describe('模型请求分析展示模型', () => {
     const navigation = buildModelRequestAnalysisNavigation(parseModelRequestConversationDetail(request), request)
 
     const weather = navigation.groups.flatMap(({ items }) => items).filter(({ searchText }) => searchText.includes(normalizeAnalysisQuery('北京')))
-    expect(weather.map(({ label }) => label)).toEqual(['RESPONSE', 'ASSISTANT', 'TOOL CALL'])
+    expect(weather.map(({ label }) => label)).toEqual(['ASSISTANT', 'TOOL CALL', 'RESPONSE'])
     expect(navigation.searchText).toContain('查询天气')
     expect(navigation.searchText).toContain('北京晴朗')
     expect(navigation.searchText).toContain('weather')
@@ -553,6 +553,26 @@ describe('模型请求分析展示模型', () => {
     expect(view).toContain("cachedJsonTree(`parameters:${tool.evidenceId}`, 'parameters', () => tool.parameters || {})")
     expect(view).not.toContain('formatJson(tool.parameters')
     expect(styles).toMatch(/\.webqq-model-analysis-tool-schema\.webqq-model-request-json-viewer \{[^}]*min-height: 0;[^}]*padding: 12px;/s)
+  })
+
+  /**
+   * 右侧卡片分区与左侧导航读同一份阅读顺序声明。
+   *
+   * 两侧各自决定顺序时的错位完全无声：点导航里的 Assistant 会跳到卡片列表中段，Variable 明明
+   * 排在 User 之后、卡片里却要翻过整段对话才见到。档位先后本身由 evidence-reading-order 的行为
+   * 断言执行，这里只守「视图真的从那份声明铺开」这一根接线。
+   */
+  it('分析视图右侧卡片分区从同一份阅读顺序声明铺开', () => {
+    const view = readFileSync(resolve('client/model-request/analysis-view.vue'), 'utf8')
+
+    expect(view).toContain('SANDBOX_EVIDENCE_READING_ORDER.flatMap')
+    expect(view).toContain('v-for="block in analysisBlocks"')
+    expect(view).toContain('v-for="message in block.messages"')
+    // 三块非消息分区各归自己那一档，不再固定接在消息列表末尾。
+    expect(view).toContain('v-if="block.variables"')
+    expect(view).toContain('v-if="block.response"')
+    expect(view).toContain('v-if="block.tools"')
+    expect(view).not.toContain('v-for="message in visibleMessages"')
   })
 
   /**
