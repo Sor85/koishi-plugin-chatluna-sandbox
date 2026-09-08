@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-chatluna-sandbox",
   "description": "在 Koishi 控制台中提供可验证 OneBot 插件行为的模拟 QQ 环境",
-  "version": "1.1.1",
+  "version": "1.1.4",
   "type": "commonjs",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
