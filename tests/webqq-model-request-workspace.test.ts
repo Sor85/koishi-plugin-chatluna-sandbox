@@ -462,6 +462,9 @@ describe('WebQQ 模型请求工作台', () => {
     expect(styles).toMatch(/\.webqq-model-request-split\s*\{[^}]*grid-row:\s*3/s)
     expect(styles).toMatch(/\.webqq-model-request-list-pane\s*\{[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\)/s)
     expect(styles).toMatch(/\.webqq-model-request-list-toolbar\s*\{[^}]*border-bottom:\s*1px solid var\(--webqq-border\)/s)
+    // 列表滚动视口用负 margin 顶进工具栏背后；一旦写死 height: 100%，视口底缘会整体上移
+    // 一个工具栏高度，面板底部空出等高死区。
+    expect(styles).toMatch(/\.webqq-model-request-list\s*\{[^}]*height:\s*auto;[^}]*margin-top:\s*-56px;/s)
     expect(styles).not.toContain('.webqq-model-request-filters {')
     expect(styles).toContain('--webqq-trajectory-request: #2f76c9')
     expect(styles).toContain('--webqq-trajectory-request: #4d8ed3')
