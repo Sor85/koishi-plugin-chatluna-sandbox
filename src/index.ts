@@ -23,7 +23,7 @@ import type { SandboxOneBotDebugPersistence } from './onebot-debug'
 import { linkChatLunaUsageRequest, type ChatLunaUsageLookup } from './chatluna/usage'
 import { installModelRequestCollector, resolveChatLunaPluginClass } from './model-request-collector'
 import { seedDevelopmentModelRequestErrors } from './model-request-error-preview'
-import { MAIN_MODEL_REQUEST_SCOPE_ID, SandboxModelRequestStore, UNATTRIBUTED_MODEL_REQUEST_SCOPE_ID, type SandboxModelRequestPersistence } from './model-request'
+import { DEFAULT_MODEL_REQUEST_RECORD_MAX_BYTES, MAIN_MODEL_REQUEST_SCOPE_ID, SandboxModelRequestStore, UNATTRIBUTED_MODEL_REQUEST_SCOPE_ID, type SandboxModelRequestPersistence } from './model-request'
 import { SandboxTestEndpointServer, type SandboxTestEndpointProtocolConfig, type SandboxTestEndpointServerConfig } from './mcp/server'
 import { describeHttpApiCapabilities, type SandboxHttpApiCapabilityCatalog } from './mcp/http-api'
 import { SandboxMcpService, type SandboxMcpQuotaConfig } from './mcp/service'
@@ -93,8 +93,13 @@ export interface Config extends SandboxAppearance {
   sceneMessageLimit: number
   sceneMessageMaxBytes: number
   modelRequestRecordLimit: number
+  modelRequestRecordMaxMegabytes: number
   testEndpoint: SandboxTestEndpointConfig
 }
+
+/** 字节上限以 MB 暴露给配置页；内部仍按字节比较，换算只发生在这一处。 */
+const MEGABYTE = 1024 * 1024
+const DEFAULT_MODEL_REQUEST_RECORD_MAX_MEGABYTES = DEFAULT_MODEL_REQUEST_RECORD_MAX_BYTES / MEGABYTE
 
 /**
  * 两个端点的配置形状相同，只有默认路径与文案不同；分组标题由调用方补上。
@@ -121,7 +126,10 @@ export const Config: Schema<Config> = Schema.object({
   ]).default('auto').role('radio').description('Sandbox 颜色模式'),
   sandboxAccentColor: Schema.string().default('#2563eb').role('color').description('Sandbox 强调色'),
   sandboxMarkRecalledMessages: Schema.boolean().default(true).description('仅影响 Sandbox 展示：开启时保留撤回气泡并显示撤回线，关闭时只显示撤回事件'),
-  modelRequestRecordLimit: Schema.number().min(1).default(500).description('每个空间保留的模型请求记录上限'),
+  modelRequestRecordLimit: Schema.number().min(1).step(1).default(500)
+    .description('每个空间保留的模型请求记录条数上限。超出后从最旧记录开始丢弃，与体积上限同时生效'),
+  modelRequestRecordMaxMegabytes: Schema.number().min(1).step(1).default(DEFAULT_MODEL_REQUEST_RECORD_MAX_MEGABYTES)
+    .description('每个空间模型请求记录的体积上限（MB）。超出后从最旧记录开始丢弃，与条数上限同时生效。单条记录含完整请求体与响应原文，长上下文请求可达数百 KB'),
   sceneMessageLimit: Schema.number().min(1).default(DEFAULT_SCENE_MESSAGE_LIMIT)
     .description('每个空间保留的场景消息条数上限；主环境与每个 AI 测试空间各自独立，超出后从最旧消息开始丢弃，被丢弃的历史消息不可恢复'),
   sceneMessageMaxBytes: Schema.number().min(64 * 1024).default(DEFAULT_SCENE_MESSAGE_MAX_BYTES)
@@ -212,9 +220,11 @@ export function apply(ctx: Context, config: Config) {
       }
     }
     const runtimeBots = new SandboxRuntimeBotRegistry()
+    const modelRequestRecordMaxBytes = config.modelRequestRecordMaxMegabytes * MEGABYTE
     const unattributedModelRequests = new SandboxModelRequestStore({
       persistence: createModelRequestPersistence(UNATTRIBUTED_MODEL_REQUEST_SCOPE_ID),
       maxRecords: config.modelRequestRecordLimit,
+      maxBytes: modelRequestRecordMaxBytes,
     })
     const control = new SandboxControlService(inner, {
       persistence,
@@ -222,6 +232,7 @@ export function apply(ctx: Context, config: Config) {
       debugPersistence: createDebugPersistence('main'),
       modelRequestPersistence: createModelRequestPersistence(MAIN_MODEL_REQUEST_SCOPE_ID),
       modelRequestRecordLimit: config.modelRequestRecordLimit,
+      modelRequestRecordMaxBytes,
       sceneMessageLimit: config.sceneMessageLimit,
       sceneMessageMaxBytes: config.sceneMessageMaxBytes,
     })
@@ -232,6 +243,7 @@ export function apply(ctx: Context, config: Config) {
       createDebugPersistence,
       createModelRequestPersistence,
       config.modelRequestRecordLimit,
+      modelRequestRecordMaxBytes,
       {
         sceneMessageLimit: config.sceneMessageLimit,
         sceneMessageMaxBytes: config.sceneMessageMaxBytes,

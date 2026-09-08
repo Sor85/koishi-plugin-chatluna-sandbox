@@ -65,6 +65,7 @@ export class SandboxTestSpaceService {
     private createDebugPersistence?: (scopeId: string) => SandboxOneBotDebugPersistence,
     private createModelRequestPersistence?: (scopeId: string) => SandboxModelRequestPersistence,
     private modelRequestRecordLimit?: number,
+    private modelRequestRecordMaxBytes?: number,
     private retention: SandboxTestSpaceRetention = {},
   ) {
     ctx.on('ready', async () => {
@@ -261,6 +262,7 @@ export class SandboxTestSpaceService {
       debugPersistence: this.createDebugPersistence?.(id),
       modelRequestPersistence: this.createModelRequestPersistence?.(id),
       modelRequestRecordLimit: this.modelRequestRecordLimit,
+      modelRequestRecordMaxBytes: this.modelRequestRecordMaxBytes,
       // 每个空间独立持有场景消息配额，与主环境和其他空间互不共享。
       sceneMessageLimit: this.retention.sceneMessageLimit,
       sceneMessageMaxBytes: this.retention.sceneMessageMaxBytes,

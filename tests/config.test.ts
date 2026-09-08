@@ -18,7 +18,11 @@ describe('插件持久化配置', () => {
     expect(Config.dict.sandboxMarkRecalledMessages.meta.default).toBe(true)
     expect(Config.dict.sandboxMarkRecalledMessages.meta.description).toBe('仅影响 Sandbox 展示：开启时保留撤回气泡并显示撤回线，关闭时只显示撤回事件')
     expect(Config.dict.modelRequestRecordLimit.meta.default).toBe(500)
-    expect(Config.dict.modelRequestRecordLimit.meta.description).toBe('每个空间保留的模型请求记录上限')
+    expect(Config.dict.modelRequestRecordLimit.meta.description).toBe('每个空间保留的模型请求记录条数上限。超出后从最旧记录开始丢弃，与体积上限同时生效')
+    // 条数与体积是两道各自独立的上限，任一超出即从最旧记录开始丢弃。体积上限原先 50MB 硬编码
+    // 且不可见，长上下文记录会在远未到条数上限时被回收；两项文案都必须说清「同时生效」。
+    expect(Config.dict.modelRequestRecordMaxMegabytes.meta.default).toBe(50)
+    expect(Config.dict.modelRequestRecordMaxMegabytes.meta.description).toBe('每个空间模型请求记录的体积上限（MB）。超出后从最旧记录开始丢弃，与条数上限同时生效。单条记录含完整请求体与响应原文，长上下文请求可达数百 KB')
     expect(Config.dict.webQQChatStyle).toBeUndefined()
   })
 

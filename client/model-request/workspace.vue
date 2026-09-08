@@ -47,7 +47,55 @@
     <div class="webqq-model-request-split">
       <section class="webqq-model-request-list-pane" aria-label="模型请求列表">
         <header class="webqq-model-request-list-toolbar webqq-overlay-header">
-          <h2>请求列表</h2>
+          <div class="webqq-model-request-list-heading">
+            <h2>请求列表</h2>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <span
+                    class="webqq-model-request-capacity"
+                    :class="{ 'is-near-limit': capacityGauge.nearLimit }"
+                    tabindex="0"
+                    role="img"
+                    :aria-label="capacityGauge.ariaLabel"
+                  >
+                    <svg viewBox="0 0 32 32" aria-hidden="true">
+                      <circle class="webqq-model-request-capacity-track" cx="16" cy="16" r="13" />
+                      <circle class="webqq-model-request-capacity-track" cx="16" cy="16" r="9" />
+                      <!-- 两道上限各占一环：外环体积、内环条数。stroke-dasharray 的第一段是已用弧长，
+                           周长按 2πr 求出后写死在 dasharray 里，避免每帧再算一次。 -->
+                      <circle
+                        class="webqq-model-request-capacity-arc is-bytes"
+                        cx="16"
+                        cy="16"
+                        r="13"
+                        :stroke-dasharray="`${capacityGauge.byteArc} ${capacityGauge.byteCircumference}`"
+                      />
+                      <circle
+                        class="webqq-model-request-capacity-arc is-records"
+                        cx="16"
+                        cy="16"
+                        r="9"
+                        :stroke-dasharray="`${capacityGauge.recordArc} ${capacityGauge.recordCircumference}`"
+                      />
+                    </svg>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent class="webqq-model-request-capacity-tip">
+                  <div class="webqq-model-request-capacity-metrics">
+                    <span class="webqq-model-request-capacity-swatch is-bytes" aria-hidden="true" />
+                    <span>体积</span>
+                    <strong :class="{ 'is-near-limit': capacityGauge.byteNearLimit }">{{ capacityGauge.byteUsed }}</strong>
+                    <span class="webqq-model-request-capacity-max">/ {{ capacityGauge.byteMax }}</span>
+                    <span class="webqq-model-request-capacity-swatch is-records" aria-hidden="true" />
+                    <span>条数</span>
+                    <strong :class="{ 'is-near-limit': capacityGauge.recordNearLimit }">{{ capacityGauge.recordUsed }}</strong>
+                    <span class="webqq-model-request-capacity-max">/ {{ capacityGauge.recordMax }}</span>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
           <div class="webqq-model-request-list-tools">
             <button
               type="button"
@@ -609,11 +657,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '#client/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '#client/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#client/components/ui/select'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#client/components/ui/tooltip'
 import ModelRequestJsonTree from './json-tree.vue'
 import ModelRequestTrajectory from './trajectory.vue'
 import ModelResponseContentPreview from './response-content-preview.vue'
 import ModelRequestAvatar from './request-avatar.vue'
 import { CHATLUNA_ERROR_CODE_DOCUMENTATION_URL, getChatLunaErrorPossibleCauses } from '../../src/chatluna/error'
+import { formatBytes } from '#client/shared/format-bytes'
 import { formatDuration } from '#client/shared/format-duration'
 import { formatSandboxDateTime } from '#client/shared/format-time'
 import {
@@ -666,6 +716,7 @@ import {
 } from './query'
 import { vWebqqScrollbar } from '#client/shared/scrollbar'
 import type {
+  SandboxModelRequestCapacity,
   SandboxModelRequestDetail,
   SandboxModelRequestScope,
   SandboxModelRequestListItem,
@@ -686,6 +737,7 @@ const props = defineProps<{
   nextCursor?: number
   nextCreatedAt?: string
   nextId?: string
+  capacity: SandboxModelRequestCapacity
   loading: boolean
   detailLoading: boolean
   error: string
@@ -758,6 +810,39 @@ const botsByScope = computed(() => new Map(props.bots.map(bot => [
   `${bot.source.type === 'main' ? MAIN_MODEL_REQUEST_SPACE_ID : bot.source.spaceId}\u0000${bot.id}`,
   bot,
 ])))
+/**
+ * 容量水位。条数与体积是两道各自独立的上限，任一超出即从最旧记录开始丢弃，
+ * 因此两道各占一环：只看条数会把「体积先到上限」误判成条数上限失效。
+ */
+const capacityGauge = computed(() => {
+  const { recordCount, totalBytes, maxRecords, maxBytes } = props.capacity
+  // 满环封顶：超出上限的瞬间就会触发回收，画超过一整圈只会让弧长绕回去。
+  const recordRatio = maxRecords > 0 ? Math.min(1, recordCount / maxRecords) : 0
+  const byteRatio = maxBytes > 0 ? Math.min(1, totalBytes / maxBytes) : 0
+  const recordCircumference = 2 * Math.PI * 9
+  const byteCircumference = 2 * Math.PI * 13
+  // 达到九成即视为逼近上限：回收发生在超出的那一刻，等到 100% 再提示就已经丢过记录了。
+  const recordNearLimit = recordRatio >= 0.9
+  const byteNearLimit = byteRatio >= 0.9
+  const byteUsed = formatBytes(totalBytes)
+  const byteMax = formatBytes(maxBytes)
+  const recordUsed = formatModelRequestCount(recordCount)
+  const recordMax = formatModelRequestCount(maxRecords)
+  return {
+    byteUsed,
+    byteMax,
+    recordUsed,
+    recordMax,
+    recordNearLimit,
+    byteNearLimit,
+    nearLimit: recordNearLimit || byteNearLimit,
+    recordCircumference: recordCircumference.toFixed(2),
+    byteCircumference: byteCircumference.toFixed(2),
+    recordArc: (recordCircumference * recordRatio).toFixed(2),
+    byteArc: (byteCircumference * byteRatio).toFixed(2),
+    ariaLabel: `记录容量：体积 ${byteUsed} / ${byteMax}，条数 ${recordUsed} / ${recordMax}`,
+  }
+})
 const { state: copyState, copy: copyBody, reset: resetCopyState } = createModelRequestBodyCopy({
   clipboardWriter: () => {
     const clipboard = navigator.clipboard

@@ -168,6 +168,13 @@
   border-radius: 15px 15px 0 0;
 }
 
+.webqq-model-request-list-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .webqq-model-request-list-toolbar h2 {
   margin: 0;
   color: var(--webqq-text);
@@ -1514,6 +1521,122 @@
   .webqq-model-trajectory-kind {
     min-width: 54px;
   }
+}
+
+/* 容量水位环。条数与体积各自是一道独立上限，任一超出即从最旧记录开始丢弃；
+   两道各占一环（外环体积、内环条数），「条数远未到上限却已在丢弃」才有据可查。
+   尺寸对齐顶栏 16px 图标，颜色走正文/次要文字，不占用强调色。 */
+.webqq-model-request-capacity {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+}
+
+.webqq-model-request-capacity:focus-visible {
+  outline: 2px solid var(--webqq-text);
+  outline-offset: 2px;
+}
+
+.webqq-model-request-capacity svg {
+  width: 16px;
+  height: 16px;
+  /* 弧从十二点方向起画；SVG 的 0 度在三点方向。 */
+  transform: rotate(-90deg);
+}
+
+.webqq-model-request-capacity circle {
+  fill: none;
+  stroke-width: 3.5;
+}
+
+.webqq-model-request-capacity-track {
+  stroke: var(--webqq-border);
+}
+
+.webqq-model-request-capacity-arc {
+  stroke: var(--webqq-text);
+  stroke-linecap: round;
+  transition: stroke-dasharray 240ms ease;
+}
+
+.webqq-model-request-capacity-arc.is-records {
+  stroke: var(--webqq-muted);
+}
+
+.webqq-model-request-capacity.is-near-limit .webqq-model-request-capacity-arc {
+  stroke: #b91c1c;
+}
+
+.webqq-model-request-capacity.is-near-limit .webqq-model-request-capacity-arc.is-records {
+  stroke: color-mix(in srgb, #b91c1c 58%, var(--webqq-muted));
+}
+
+.webqq-model-request-capacity-tip {
+  width: max-content;
+  padding: 8px 12px;
+}
+
+.webqq-model-request-capacity-metrics {
+  display: grid;
+  grid-template-columns: 8px auto auto auto;
+  column-gap: 8px;
+  row-gap: 4px;
+  align-items: baseline;
+}
+
+.webqq-model-request-capacity-metrics strong {
+  justify-self: end;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.webqq-model-request-capacity-metrics strong.is-near-limit {
+  color: #b91c1c;
+}
+
+.webqq-model-request-capacity-max {
+  color: var(--webqq-muted, #7a8494);
+  font-variant-numeric: tabular-nums;
+}
+
+.webqq-model-request-capacity-swatch {
+  width: 8px;
+  height: 8px;
+  align-self: center;
+  border-radius: 999px;
+  background: var(--webqq-text, #202938);
+}
+
+.webqq-model-request-capacity-swatch.is-records {
+  background: var(--webqq-muted, #7a8494);
+}
+
+.webqq-workspace[data-color-mode="dark"] .webqq-model-request-capacity.is-near-limit .webqq-model-request-capacity-arc {
+  stroke: #fca5a5;
+}
+
+.webqq-workspace[data-color-mode="dark"] .webqq-model-request-capacity.is-near-limit .webqq-model-request-capacity-arc.is-records {
+  stroke: color-mix(in srgb, #fca5a5 58%, var(--webqq-muted));
+}
+
+/* Tooltip 经 portal 挂到 body，工作区的颜色令牌传不进去；暗色跟随 body 上的配色属性。 */
+body[data-sandbox-color-scheme="dark"] .webqq-model-request-capacity-swatch {
+  background: #edf2f7;
+}
+
+body[data-sandbox-color-scheme="dark"] .webqq-model-request-capacity-max {
+  color: #a1a1aa;
+}
+
+body[data-sandbox-color-scheme="dark"] .webqq-model-request-capacity-swatch.is-records {
+  background: #a1a1aa;
+}
+
+body[data-sandbox-color-scheme="dark"] .webqq-model-request-capacity-metrics strong.is-near-limit {
+  color: #fca5a5;
 }
 
 .webqq-model-request-more {

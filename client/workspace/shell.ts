@@ -329,6 +329,7 @@ export function createWebqqWorkspaceShell(
     nextCursor: workspaceController.modelRequestRecordsPage.value.nextCursor,
     nextCreatedAt: workspaceController.modelRequestRecordsPage.value.nextCreatedAt,
     nextId: workspaceController.modelRequestRecordsPage.value.nextId,
+    capacity: workspaceController.modelRequestRecordsPage.value.capacity,
     trajectory: workspaceController.modelRequestTrajectory.value,
     loading: modelRequestGate.loading.list.value,
     detailLoading: modelRequestGate.loading.detail.value,

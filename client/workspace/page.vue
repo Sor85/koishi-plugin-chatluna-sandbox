@@ -111,6 +111,7 @@
           :next-cursor="modelRequestWorkspaceModel.nextCursor"
           :next-created-at="modelRequestWorkspaceModel.nextCreatedAt"
           :next-id="modelRequestWorkspaceModel.nextId"
+          :capacity="modelRequestWorkspaceModel.capacity"
           :loading="modelRequestWorkspaceModel.loading"
           :detail-loading="modelRequestWorkspaceModel.detailLoading"
           :error="modelRequestWorkspaceModel.error"
