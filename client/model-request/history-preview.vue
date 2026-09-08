@@ -56,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { IconChevronDown } from '@tabler/icons-vue'
+import { IconChevronDown, IconCornerUpLeft } from '@tabler/icons-vue'
 import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref, watch, type PropType, type VNode } from 'vue'
 import { Badge } from '#client/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#client/components/ui/tooltip'
@@ -248,14 +248,23 @@ const HistoryQuote = defineComponent({
   },
 })
 
-function renderHistoryQuote(message: ModelRequestHistoryMessage): VNode {
-  return h('blockquote', { class: 'chatluna-sandbox-message-quote webqq-model-history-quote' }, [
-    h('strong', { class: 'chatluna-sandbox-message-quote-title' }, [
-      message.name || '引用消息',
-      message.id ? h('span', { class: 'webqq-model-history-quote-id' }, ` · ${message.id}`) : undefined,
+/**
+ * 被引用的那条消息。
+ *
+ * 不再复用聊天气泡的引用类：那一份是紧凑单行摘要（标题与正文都按省略号裁切），而模型请求历史
+ * 承担证据阅读，被引正文必须完整铺开。共用同一个类时，两处只能靠一层层覆盖互相让位，
+ * 而聊天那一侧的任何调整都会无声地改到证据阅读面上。
+ * 嵌套引用逐层递归，深度写进 data 属性供样式逐层减弱。
+ */
+function renderHistoryQuote(message: ModelRequestHistoryMessage, depth = 0): VNode {
+  return h('blockquote', { class: 'webqq-model-history-quote', 'data-quote-depth': depth }, [
+    h('span', { class: 'webqq-model-history-quote-head' }, [
+      h(IconCornerUpLeft, { size: 12, class: 'webqq-model-history-quote-icon', 'aria-hidden': 'true' }),
+      h('strong', { class: 'webqq-model-history-quote-title' }, message.name || '引用消息'),
+      message.id ? h('span', { class: 'webqq-model-history-quote-id' }, message.id) : undefined,
     ]),
-    message.quote ? renderHistoryQuote(message.quote) : undefined,
-    h('span', message.content || '（空消息）'),
+    message.quote ? renderHistoryQuote(message.quote, depth + 1) : undefined,
+    h('span', { class: 'webqq-model-history-quote-content' }, message.content || '（空消息）'),
   ])
 }
 </script>

@@ -362,7 +362,14 @@ describe('模型请求分析展示模型', () => {
     expect(preview).toContain('message.id === props.botId')
     expect(preview).toContain('metadata: isBot ? items.reverse() : items')
     expect(preview).toContain("entry.isBot ? 'is-name is-bot' : 'is-name is-user'")
-    expect(preview).toContain('class: \'chatluna-sandbox-message-quote webqq-model-history-quote\'')
+    // 引用块自带结构：标题与被引正文是两个块级兄弟节点，各有专属类，不再复用聊天气泡的引用类
+    // ——那一份按省略号裁切单行摘要，共用会让证据阅读面继承裁切。
+    expect(preview).toContain('class: \'webqq-model-history-quote\'')
+    expect(preview).toContain("class: 'webqq-model-history-quote-head'")
+    expect(preview).toContain("class: 'webqq-model-history-quote-title'")
+    expect(preview).toContain("class: 'webqq-model-history-quote-content'")
+    expect(preview).toContain('h(IconCornerUpLeft,')
+    expect(preview).not.toContain('chatluna-sandbox-message-quote')
     expect(styles).toMatch(/\.webqq-model-history-preview \{[^}]*container-type: inline-size;/s)
     expect(styles).toMatch(/\.webqq-model-history-preview-wrap\.is-collapsed \.webqq-model-history-preview \{[^}]*max-height: var\(--webqq-model-history-collapse-height\);[^}]*overflow: hidden;/s)
     expect(styles).toContain('.webqq-model-history-preview-wrap:not(.is-collapsed) .webqq-model-history-expand svg')
@@ -370,7 +377,8 @@ describe('模型请求分析展示模型', () => {
     expect(styles).toContain('.webqq-model-history-meta .sandbox-badge.is-name.is-bot')
     expect(styles).toContain('.webqq-model-history-meta .sandbox-badge.is-id')
     expect(styles).not.toContain('.sandbox-badge.is-timestamp')
-    expect(styles).toMatch(/\.webqq-model-history-line \{[^}]*flex-direction: column;[^}]*width: min\(78%, 760px\);/s)
+    expect(styles).toMatch(/\.webqq-model-history-line \{[^}]*flex-direction: column;[^}]*width: var\(--webqq-model-history-line-width\);/s)
+    expect(styles).toMatch(/\.webqq-model-history-message \{[^}]*--webqq-model-history-line-width: min\(78%, 760px\);/s)
     expect(styles).toContain('.webqq-model-history-message.is-bot { justify-items: end; }')
     expect(styles).toContain('.webqq-model-history-message.is-bot .webqq-model-history-line { align-items: flex-end; }')
     expect(styles).toContain('.webqq-model-history-message.is-bot .webqq-model-history-content { text-align: right; }')
@@ -381,8 +389,15 @@ describe('模型请求分析展示模型', () => {
     expect(styles).not.toContain('.webqq-model-history-jump')
     expect(styles).toMatch(/\.webqq-model-history-message\.is-bot > \.webqq-model-history-quote \{[^}]*border-right: 3px[^}]*border-left: 0;[^}]*text-align: right;/s)
     expect(styles).not.toMatch(/\.webqq-model-history-message \{[^}]*border-top:/s)
-    expect(styles).toContain('.webqq-model-history-quote.chatluna-sandbox-message-quote')
-    expect(styles).toMatch(/\.webqq-model-history-quote\.chatluna-sandbox-message-quote > span \{[^}]*overflow: visible;[^}]*text-overflow: clip;[^}]*white-space: pre-wrap;[^}]*overflow-wrap: anywhere;/s)
+    // 引用块自己要有强调条、独立底色和内边距，否则和所属消息的正文糊在一起。
+    expect(styles).toMatch(/\n\.webqq-model-history-quote \{[^}]*display: grid;[^}]*max-width: var\(--webqq-model-history-line-width\);[^}]*padding: [^}]*border-left: 3px solid var\(--webqq-model-history-quote-accent\);[^}]*background: color-mix\(in srgb, var\(--webqq-model-history-quote-accent\) \d+%, var\(--webqq-surface\)\);/s)
+    expect(styles).toMatch(/\.webqq-model-history-quote-head \{[^}]*display: flex;/s)
+    expect(styles).toMatch(/\.webqq-model-history-message\.is-bot \.webqq-model-history-quote-head \{[^}]*flex-direction: row-reverse;/s)
+    expect(styles).toMatch(/\.webqq-model-history-quote-content \{[^}]*overflow: visible;[^}]*overflow-wrap: anywhere;[^}]*text-overflow: clip;[^}]*white-space: pre-wrap;/s)
+    // 嵌套引用只保留强调条：层层叠底色会糊成一片。
+    expect(styles).toMatch(/\.webqq-model-history-quote \.webqq-model-history-quote \{[^}]*background: transparent;/s)
+    // 证据阅读面与聊天气泡的引用类彻底解耦，聊天侧的调整不会再改到这里。
+    expect(styles).not.toContain('chatluna-sandbox-message-quote')
 
     const trajectory = readFileSync(resolve('client/model-request/trajectory.vue'), 'utf8')
     const workspace = readFileSync(resolve('client/model-request/workspace.vue'), 'utf8')

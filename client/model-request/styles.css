@@ -7,6 +7,9 @@
   --webqq-role-response: #0f766e;
   --webqq-role-tool: #c46b00;
   --webqq-role-tool-interaction: #8f5aa8;
+  /* 历史引用块的强调条与底色。中性灰蓝，避免和上面这套角色色抢读者注意力：
+     引用是被回复的上下文，不是一条独立证据。 */
+  --webqq-model-history-quote-accent: #94a3b8;
   grid-template-rows: auto auto minmax(0, 1fr);
   gap: 16px;
   min-width: 0;
@@ -23,6 +26,7 @@
   --webqq-role-response: #5eead4;
   --webqq-role-tool: #bf812f;
   --webqq-role-tool-interaction: #a87bb8;
+  --webqq-model-history-quote-accent: #8b98ad;
 }
 
 .webqq-model-request-header,
@@ -2516,6 +2520,8 @@ body[data-sandbox-color-scheme="dark"] .webqq-model-request-capacity-metrics str
   transform: rotate(180deg);
 }
 .webqq-model-history-message {
+  /* 正文与引用块共用同一条列宽：引用块属于这条消息，宽出去就会读成独立的一段。 */
+  --webqq-model-history-line-width: min(78%, 760px);
   display: grid;
   gap: 7px;
   min-width: 0;
@@ -2527,7 +2533,7 @@ body[data-sandbox-color-scheme="dark"] .webqq-model-request-capacity-metrics str
   align-items: flex-start;
   flex-direction: column;
   gap: 6px;
-  width: min(78%, 760px);
+  width: var(--webqq-model-history-line-width);
   min-width: 0;
 }
 .webqq-model-history-message.is-bot { justify-items: end; }
@@ -2535,8 +2541,9 @@ body[data-sandbox-color-scheme="dark"] .webqq-model-request-capacity-metrics str
 .webqq-model-history-message.is-bot .webqq-model-history-meta { justify-content: flex-end; }
 .webqq-model-history-message.is-bot .webqq-model-history-content { text-align: right; }
 .webqq-model-history-message.is-bot > .webqq-model-history-quote {
-  border-right: 3px solid rgb(148 163 184 / 70%);
+  border-right: 3px solid var(--webqq-model-history-quote-accent);
   border-left: 0;
+  border-radius: 8px 3px 3px 8px;
   text-align: right;
 }
 .webqq-model-history-meta {
@@ -2600,30 +2607,83 @@ body[data-sandbox-color-scheme="dark"] .webqq-model-request-capacity-metrics str
 .webqq-model-history-message.is-bot .webqq-model-history-content-line.is-single-visual-line {
   text-align: right;
 }
-.webqq-model-history-quote.chatluna-sandbox-message-quote {
-  width: min(100%, 620px);
+/* 引用块承载「这条消息在回复谁」。它不再复用聊天气泡的引用类：那一份是紧凑单行摘要，
+   两处共用会让证据阅读面被迫继承省略号裁切，而聊天侧的任何调整都会无声地改到这里。
+   下面这组规则自带三件事——侧边强调条、独立底色、标题与被引正文分行。 */
+.webqq-model-history-quote {
+  display: grid;
+  justify-items: start;
+  gap: 3px;
+  width: fit-content;
+  max-width: var(--webqq-model-history-line-width);
   margin: 0;
+  padding: 7px 11px;
+  border-left: 3px solid var(--webqq-model-history-quote-accent);
+  border-radius: 3px 8px 8px 3px;
   color: var(--webqq-muted);
-  background: var(--webqq-surface-muted);
+  background: color-mix(in srgb, var(--webqq-model-history-quote-accent) 15%, var(--webqq-surface));
+  font-size: var(--webqq-font-sm);
+  line-height: 1.5;
+  text-align: left;
 }
-/* 聊天消息中的引用为紧凑单行摘要；模型请求历史承担证据阅读，正文不能继承省略号裁切。 */
-.webqq-model-history-quote.chatluna-sandbox-message-quote > span {
-  overflow: visible;
-  text-overflow: clip;
-  white-space: pre-wrap;
+.webqq-model-history-quote-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  min-width: 0;
   overflow-wrap: anywhere;
 }
-.webqq-model-history-quote .chatluna-sandbox-message-quote-title { color: var(--webqq-text); }
-.webqq-model-history-quote .webqq-model-history-quote {
-  width: 100%;
-  margin: 3px 0;
+.webqq-model-history-quote-icon {
+  flex: 0 0 auto;
+  color: var(--webqq-model-history-quote-accent);
+}
+.webqq-model-history-quote-title {
+  color: var(--webqq-text);
+  font-size: var(--webqq-font-xs);
+  font-weight: 600;
 }
 .webqq-model-history-quote-id {
   color: var(--webqq-muted);
+  font-family: var(--webqq-font-mono);
+  font-size: var(--webqq-font-2xs);
   font-weight: 400;
 }
+/* 聊天消息中的引用为紧凑单行摘要；模型请求历史承担证据阅读，正文不能按省略号裁切。 */
+.webqq-model-history-quote-content {
+  max-width: 100%;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: pre-wrap;
+}
+/* 嵌套引用不再叠一层底色：同色块层层套会糊成一片，只留强调条表示层级。 */
+.webqq-model-history-quote .webqq-model-history-quote {
+  width: 100%;
+  max-width: 100%;
+  margin: 2px 0;
+  padding: 3px 0 3px 9px;
+  border-radius: 0;
+  background: transparent;
+}
+.webqq-model-history-message.is-bot .webqq-model-history-quote-head {
+  flex-direction: row-reverse;
+}
+/* 图标是「回复」指向标：右侧气泡里必须朝向消息本体，否则箭头指向卡片外。 */
+.webqq-model-history-message.is-bot .webqq-model-history-quote-icon {
+  transform: scaleX(-1);
+}
+.webqq-model-history-message.is-bot .webqq-model-history-quote {
+  justify-items: end;
+  text-align: right;
+}
+.webqq-model-history-message.is-bot .webqq-model-history-quote .webqq-model-history-quote {
+  padding: 3px 9px 3px 0;
+  border-right: 3px solid var(--webqq-model-history-quote-accent);
+  border-left: 0;
+}
 @container (max-width: 680px) {
-  .webqq-model-history-line { width: min(100%, 560px); }
+  .webqq-model-history-message { --webqq-model-history-line-width: min(100%, 560px); }
 }
 @container (max-width: 520px) {
   .webqq-model-history-meta .sandbox-badge { max-width: min(100%, 72vw); }
