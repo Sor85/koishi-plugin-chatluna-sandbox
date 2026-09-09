@@ -670,9 +670,12 @@ describe('模型请求分析展示模型', () => {
     expect(toolCard).toContain('v-show="!isCollapsed"')
     expect(styles).toContain('.webqq-model-analysis-tool-card-name')
     expect(styles).toContain('.webqq-model-analysis-tool-card-name,')
-    expect(styles).not.toContain('.webqq-model-analysis-tool-call-header,')
-    expect(styles).not.toContain('.webqq-model-analysis-tool-call > div')
-    expect(styles).not.toContain('.webqq-model-analysis-tool-call span')
+    // 工具调用改成独立卡片后，`.webqq-model-analysis-tool-call` 这一族选择器再无元素命中。
+    // 整族一起断言，避免旧的内嵌工具块样式随着复制粘贴悄悄回流。
+    // 注意与 `.webqq-model-analysis-card.is-tool-call` 不冲突：后者的类名段是
+    // `-card.is-tool-call`，不含 `-analysis-tool-call`。
+    expect(styles).not.toContain('.webqq-model-analysis-tool-call')
+    expect(styles).not.toContain('.webqq-model-analysis-link')
   })
 
   it('工具卡片头部优先保留角色与工具名，调用 ID 仅占剩余空间', () => {
