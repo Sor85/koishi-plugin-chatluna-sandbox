@@ -6,7 +6,7 @@
 .webqq-space-toolbar h1, .webqq-space-toolbar p { margin: 0; }
 .webqq-space-toolbar h1 { margin-bottom: 8px; font-size: var(--webqq-font-3xl); font-weight: 700; }
 .webqq-space-toolbar p { color: var(--webqq-muted); }
-.webqq-space-filter { width: 144px; }
+.webqq-space-toolbar .webqq-space-filter { width: 144px; }
 .webqq-space-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; }
 .webqq-space-card { position: relative; display: grid; min-height: 250px; overflow: hidden; border: 1px solid var(--webqq-border); border-radius: 18px; background: var(--webqq-bg); color: inherit; text-align: left; box-shadow: 0 12px 30px rgb(15 23 42 / 8%); transition: transform 180ms ease, box-shadow 180ms ease; content-visibility: auto; contain-intrinsic-size: 250px; }
 .webqq-space-card:hover { transform: translateY(-2px); box-shadow: 0 16px 36px rgb(15 23 42 / 12%); }

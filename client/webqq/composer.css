@@ -343,7 +343,7 @@
   outline-offset: 3px;
 }
 
-.webqq-composer-user-menu {
+[data-slot="chatluna-sandbox-context-menu-content"].webqq-composer-user-menu {
   translate: 0 calc(-100% - 16px);
 }
 

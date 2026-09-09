@@ -102,7 +102,7 @@
   border-radius: 999px;
 }
 
-.chatluna-sandbox-forward-target-dialog {
+.sandbox-dialog-content.chatluna-sandbox-forward-target-dialog {
   display: grid;
   gap: 12px;
 }

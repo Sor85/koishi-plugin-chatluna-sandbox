@@ -117,7 +117,7 @@
   font-size: var(--webqq-font-md);
 }
 
-.webqq-debug-filter-trigger {
+.webqq-debug-list-tools .webqq-debug-filter-trigger {
   border-radius: 8px;
 }
 
@@ -127,7 +127,7 @@
   background: color-mix(in srgb, var(--webqq-accent) 10%, var(--webqq-surface));
 }
 
-.webqq-debug-filter-popover {
+.sandbox-popover-content.webqq-debug-filter-popover {
   display: grid;
   gap: 12px;
   width: 280px;
@@ -139,7 +139,7 @@
   font-weight: 600;
 }
 
-.webqq-debug-control {
+.webqq-debug-filter-popover .webqq-debug-control {
   width: 100%;
 }
 

@@ -117,7 +117,7 @@
   font-size: var(--webqq-font-md);
 }
 
-.webqq-test-call-filter-trigger {
+.webqq-test-call-list-tools .webqq-test-call-filter-trigger {
   border-radius: 8px;
 }
 
@@ -127,7 +127,7 @@
   background: color-mix(in srgb, var(--webqq-accent) 10%, var(--webqq-surface));
 }
 
-.webqq-test-call-filter-popover {
+.sandbox-popover-content.webqq-test-call-filter-popover {
   display: grid;
   gap: 12px;
   width: 280px;
@@ -139,7 +139,7 @@
   font-weight: 600;
 }
 
-.webqq-test-call-control {
+.webqq-test-call-filter-popover .webqq-test-call-control {
   width: 100%;
 }
 

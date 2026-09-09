@@ -145,7 +145,7 @@
 }
 
 .chatluna-sandbox-message-search-clear,
-.chatluna-sandbox-message-search-date-trigger {
+.chatluna-sandbox-message-search-field .chatluna-sandbox-message-search-date-trigger {
   display: inline-flex;
   width: 28px;
   height: 28px;
@@ -182,7 +182,7 @@
    （含暗色，--webqq-* 会随 body[data-sandbox-color-scheme] 翻转）。
    尺寸/间距/圆角一律交给 registry 自带的 Tailwind 工具类，不在这里复刻——
    本文件不在 @layer 内，任何复刻声明都会永远压过工具类，反而破坏 1:1 还原。 */
-.chatluna-sandbox-message-search-date-popover {
+.sandbox-popover-content.chatluna-sandbox-message-search-date-popover {
   --background: var(--webqq-bg);
   --foreground: var(--webqq-text);
   --popover: var(--webqq-bg);
