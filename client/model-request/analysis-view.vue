@@ -80,10 +80,9 @@
             <h3>{{ block.label }} <span>({{ block.messages.length }})</span></h3>
           </header>
 
+          <template v-for="message in block.messages" :key="message.evidenceId">
           <article
-            v-for="message in block.messages"
             :id="modelAnalysisTargetId(message.evidenceId)"
-            :key="message.evidenceId"
             class="webqq-model-analysis-card"
             :class="[
               `is-${message.kind}`,
@@ -148,7 +147,7 @@
               />
             </div>
             <div v-show="!isCardCollapsed(modelAnalysisTargetId(message.evidenceId)) && !isMessageRaw(message.evidenceId)" class="webqq-model-analysis-formatted">
-              <AnalysisTextBlock
+              <AnalysisContentBlock
                 v-if="occurrenceForMessage(message.evidenceId)"
                 :value="message.content"
                 :search-query="normalizedSearch"
@@ -157,62 +156,57 @@
               />
               <!-- 精确 occurrence 优先：它的范围是按正文的 UTF-16 偏移量算的，只有原文那一棵
                    pre 能标出来，结构视图里没有对应位置。 -->
-              <section v-else-if="messagePayloadTree(message)" class="webqq-model-analysis-section">
-                <div class="webqq-model-analysis-tool-payload webqq-model-request-json-viewer">
+              <AnalysisContentBlock
+                v-else-if="messagePayloadTree(message)"
+                :value="message.content"
+                :force-expanded="isTextForceExpanded(modelAnalysisTargetId(message.evidenceId))"
+              >
+                <div class="webqq-model-analysis-tool-payload">
                   <ModelRequestJsonTree :node="messagePayloadTree(message)!" :open="true" :root="true" />
                 </div>
-              </section>
+              </AnalysisContentBlock>
               <AnalysisContentParts
                 v-else-if="message.contentParts.length"
                 :parts="message.contentParts"
                 :search-query="normalizedSearch"
                 :force-expanded="isTextForceExpanded(modelAnalysisTargetId(message.evidenceId))"
               />
-              <AnalysisTextBlock
+              <AnalysisContentBlock
                 v-else-if="message.content"
                 :value="message.content"
                 :search-query="normalizedSearch"
                 :force-expanded="isTextForceExpanded(modelAnalysisTargetId(message.evidenceId))"
               />
-              <AnalysisTextBlock
+              <AnalysisContentBlock
                 v-if="message.reasoning"
                 label="思考"
                 :value="message.reasoning"
                 :search-query="normalizedSearch"
                 :force-expanded="isTextForceExpanded(modelAnalysisTargetId(message.evidenceId))"
               />
-              <section v-if="message.toolCalls.length && requestToolCallsVisible" class="webqq-model-analysis-section">
-                <strong>工具调用</strong>
-                <article
-                  v-for="(call, callIndex) in message.toolCalls"
-                  :id="modelAnalysisTargetId(call.evidenceId)"
-                  :key="`${call.id || callIndex}-${call.name}`"
-                  class="webqq-model-analysis-tool-call is-call"
-                  :class="{ 'is-located': highlightedTarget === modelAnalysisTargetId(call.evidenceId) }"
-                >
-                  <div><strong><AnalysisHighlightedText :value="call.name" :query="normalizedSearch" /></strong><span><AnalysisHighlightedText :value="call.id || '无调用 ID'" :query="normalizedSearch" /></span></div>
-                  <div v-if="callArgumentsTree(call)" class="webqq-model-analysis-tool-payload webqq-model-request-json-viewer">
-                    <ModelRequestJsonTree :node="callArgumentsTree(call)!" :open="true" :root="true" :strings-expanded="true" />
-                  </div>
-                  <AnalysisTextBlock
-                    v-else
-                    :value="call.arguments || '{}'"
-                    :search-query="normalizedSearch"
-                    :force-expanded="isTextForceExpanded(modelAnalysisTargetId(call.evidenceId))"
-                    compact
-                  />
-                  <button
-                    v-if="hasTool(call.name)"
-                    type="button"
-                    class="webqq-model-analysis-link"
-                    @click="locateTool(call.name)"
-                  >
-                    查看工具定义
-                  </button>
-                </article>
-              </section>
             </div>
           </article>
+          <template v-for="(call, callIndex) in message.toolCalls" :key="`${call.id || callIndex}-${call.name}`">
+            <AnalysisToolCard
+              v-if="requestToolCallsVisible"
+              :id="modelAnalysisTargetId(call.evidenceId)"
+              :title="call.name"
+              :call-id="call.id"
+              :characters="call.characters"
+              :text="call.arguments || '{}'"
+              :query="normalizedSearch"
+              :payload="callArgumentsTree(call)"
+              :tree-strings-expanded="true"
+              :force-expanded="isTextForceExpanded(modelAnalysisTargetId(call.evidenceId))"
+              :is-located="highlightedTarget === modelAnalysisTargetId(call.evidenceId)"
+              :is-collapsed="isCardCollapsed(modelAnalysisTargetId(call.evidenceId))"
+              :show-locate-tool="hasTool(call.name)"
+              :is-muted="Boolean(normalizedSearch) && !toolCallMatches(call)"
+              @toggle="toggleCard(modelAnalysisTargetId(call.evidenceId))"
+              @locate-tool="locateTool(call.name)"
+            />
+          </template>
+          </template>
 
           <section v-if="block.variables" class="webqq-model-analysis-variables">
             <h3>Variables <span>({{ detail.variables.length }})</span></h3>
@@ -274,7 +268,7 @@
                     :bot-id="detail.entities.botId"
                     :characters="variable.value?.length"
                   />
-                  <AnalysisTextBlock
+                  <AnalysisContentBlock
                     v-else-if="variable.status === 'observed'"
                     :value="variable.value ?? ''"
                     :search-query="normalizedSearch"
@@ -356,73 +350,19 @@
               <p v-if="response.status !== 'complete'" class="webqq-model-analysis-empty">
                 {{ response.statusMessage || '响应没有可展示内容' }}
               </p>
-              <AnalysisTextBlock
+              <AnalysisContentBlock
                 v-if="response.reasoning.length && responseContentVisible"
                 label="思考"
                 :value="response.reasoning.join('\n')"
                 :search-query="normalizedSearch"
                 :force-expanded="isTextForceExpanded(MODEL_ANALYSIS_RESPONSE_TARGET)"
               />
-              <AnalysisTextBlock
+              <AnalysisContentBlock
                 v-if="response.content.length && responseContentVisible"
                 :value="response.content.join('\n')"
                 :search-query="normalizedSearch"
                 :force-expanded="isTextForceExpanded(MODEL_ANALYSIS_RESPONSE_TARGET)"
               />
-              <section v-if="response.toolCalls.length && responseToolCallsVisible" class="webqq-model-analysis-section">
-                <strong>工具调用</strong>
-                <article
-                  v-for="(call, callIndex) in response.toolCalls"
-                  :id="modelAnalysisTargetId(call.evidenceId)"
-                  :key="`${call.id || callIndex}-${call.name}`"
-                  class="webqq-model-analysis-tool-call is-call"
-                  :class="{ 'is-located': highlightedTarget === modelAnalysisTargetId(call.evidenceId) }"
-                >
-                  <div><strong><AnalysisHighlightedText :value="call.name" :query="normalizedSearch" /></strong><span><AnalysisHighlightedText :value="call.id || '无调用 ID'" :query="normalizedSearch" /></span></div>
-                  <!-- 参数解析不出结构时退回原文：模型流式吐出的参数可能被截断，硬套 JSON 树只会
-                       画出一棵空树，把「参数不完整」这条事实藏掉。 -->
-                  <div v-if="callArgumentsTree(call)" class="webqq-model-analysis-tool-payload webqq-model-request-json-viewer">
-                    <ModelRequestJsonTree
-                      :node="callArgumentsTree(call)!"
-                      :open="true"
-                      :root="true"
-                      :strings-expanded="true"
-                    />
-                  </div>
-                  <AnalysisTextBlock
-                    v-else
-                    :value="call.arguments || '{}'"
-                    :search-query="normalizedSearch"
-                    :force-expanded="isTextForceExpanded(modelAnalysisTargetId(call.evidenceId))"
-                    compact
-                  />
-                  <button v-if="hasTool(call.name)" type="button" class="webqq-model-analysis-link" @click="locateTool(call.name)">
-                    查看工具定义
-                  </button>
-                </article>
-              </section>
-              <section v-if="response.toolResults.length && responseToolResultsVisible" class="webqq-model-analysis-section">
-                <strong>工具结果</strong>
-                <article
-                  v-for="(result, resultIndex) in response.toolResults"
-                  :id="modelAnalysisTargetId(result.evidenceId)"
-                  :key="`${result.id || resultIndex}-${result.name || ''}`"
-                  class="webqq-model-analysis-tool-call is-result"
-                  :class="{ 'is-located': highlightedTarget === modelAnalysisTargetId(result.evidenceId) }"
-                >
-                  <div><strong><AnalysisHighlightedText :value="result.name || '工具结果'" :query="normalizedSearch" /></strong><span><AnalysisHighlightedText :value="result.id || '无调用 ID'" :query="normalizedSearch" /></span></div>
-                  <div v-if="toolResultTree(result)" class="webqq-model-analysis-tool-payload webqq-model-request-json-viewer">
-                    <ModelRequestJsonTree :node="toolResultTree(result)!" :open="true" :root="true" />
-                  </div>
-                  <AnalysisTextBlock
-                    v-else
-                    :value="result.content"
-                    :search-query="normalizedSearch"
-                    :force-expanded="isTextForceExpanded(modelAnalysisTargetId(result.evidenceId))"
-                    compact
-                  />
-                </article>
-              </section>
               <div v-if="response.finishReasons.length || response.usage" class="webqq-model-analysis-response-meta">
                 <span v-if="response.finishReasons.length">结束原因：{{ response.finishReasons.join('、') }}</span>
                 <span v-if="response.usage?.inputTokens !== undefined">输入：{{ response.usage.inputTokens }}</span>
@@ -432,6 +372,43 @@
               </div>
             </div>
           </article>
+          <AnalysisToolCard
+            v-for="(call, callIndex) in response.toolCalls"
+            v-show="responseToolCallsVisible"
+            :key="`${call.id || callIndex}-${call.name}`"
+            :id="modelAnalysisTargetId(call.evidenceId)"
+            :title="call.name"
+            :call-id="call.id"
+            :characters="call.characters"
+            :text="call.arguments || '{}'"
+            :query="normalizedSearch"
+            :payload="callArgumentsTree(call)"
+            :tree-strings-expanded="true"
+            :force-expanded="isTextForceExpanded(modelAnalysisTargetId(call.evidenceId))"
+            :is-located="highlightedTarget === modelAnalysisTargetId(call.evidenceId)"
+            :is-collapsed="isCardCollapsed(modelAnalysisTargetId(call.evidenceId))"
+            :show-locate-tool="hasTool(call.name)"
+            :is-muted="Boolean(normalizedSearch) && !toolCallMatches(call)"
+            @toggle="toggleCard(modelAnalysisTargetId(call.evidenceId))"
+            @locate-tool="locateTool(call.name)"
+          />
+          <AnalysisToolCard
+            v-for="(result, resultIndex) in response.toolResults"
+            v-show="responseToolResultsVisible"
+            :key="`${result.id || resultIndex}-${result.name || ''}`"
+            :id="modelAnalysisTargetId(result.evidenceId)"
+            :title="result.name || '工具结果'"
+            :call-id="result.id"
+            :characters="result.characters"
+            :text="result.content"
+            :query="normalizedSearch"
+            :payload="toolResultTree(result)"
+            :force-expanded="isTextForceExpanded(modelAnalysisTargetId(result.evidenceId))"
+            :is-located="highlightedTarget === modelAnalysisTargetId(result.evidenceId)"
+            :is-collapsed="isCardCollapsed(modelAnalysisTargetId(result.evidenceId))"
+            :is-muted="Boolean(normalizedSearch) && !toolResultMatches(result)"
+            @toggle="toggleCard(modelAnalysisTargetId(result.evidenceId))"
+          />
           </template>
 
           <section v-if="block.tools" :id="MODEL_ANALYSIS_TOOLS_TARGET" class="webqq-model-analysis-tools" :class="{ 'is-located': highlightedTarget === MODEL_ANALYSIS_TOOLS_TARGET }">
@@ -490,7 +467,6 @@
     </div>
   </section>
 </template>
-
 <script setup lang="ts">
 import {
   IconBraces,
@@ -507,6 +483,8 @@ import { Button } from '#client/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#client/components/ui/tooltip'
 import ModelRequestHistoryPreview from './history-preview.vue'
 import ModelRequestJsonTree from './json-tree.vue'
+import AnalysisToolCard from './analysis-tool-card.vue'
+import { AnalysisContentBlock, AnalysisHighlightedText } from './analysis-content-block'
 import { formatDuration } from '#client/shared/format-duration'
 import {
   buildModelRequestAnalysisNavigation,
@@ -755,7 +733,13 @@ watch(normalizedSearch, async (query) => {
       ...conversation.value.messages
         .filter(messageMatches)
         .map(message => modelAnalysisTargetId(message.evidenceId)),
+      ...conversation.value.messages
+        .flatMap(message => message.toolCalls)
+        .filter(callMatchesSearch)
+        .map(call => modelAnalysisTargetId(call.evidenceId)),
       ...(responseSearchText.value.includes(query) ? [MODEL_ANALYSIS_RESPONSE_TARGET] : []),
+      ...response.value.toolCalls.filter(callMatchesSearch).map(call => modelAnalysisTargetId(call.evidenceId)),
+      ...response.value.toolResults.filter(resultMatchesSearch).map(result => modelAnalysisTargetId(result.evidenceId)),
       ...props.detail.variables
         .filter(variableMatches)
         .map(variable => modelAnalysisVariableTargetId(variable.id)),
@@ -910,6 +894,15 @@ function toolMatches(tool: ModelConversationTool) {
   return !normalizedSearch.value || Boolean(toolSearchTexts.value.get(tool.evidenceId)?.includes(normalizedSearch.value))
 }
 
+/** 工具调用卡片与左侧导航项读同一张搜索文本表，命中时同时命中、置灰时同时置灰。 */
+function toolCallMatches(call: ModelConversationToolCall) {
+  return matchesAnalysisSearch(navigation.value, call.evidenceId, normalizedSearch.value)
+}
+
+function toolResultMatches(result: ModelConversationToolResult) {
+  return matchesAnalysisSearch(navigation.value, result.evidenceId, normalizedSearch.value)
+}
+
 function historyPreview(variable: SandboxModelRequestVariable): readonly ModelRequestHistoryMessage[] | undefined {
   if (variable.status !== 'observed' || !variable.value || !isHistoryVariableName(variable.name)) return undefined
   const cacheKey = `${variable.id}\u0000${variable.value}`
@@ -979,6 +972,15 @@ function payloadMatchesSearch(value: string | undefined) {
   const query = normalizedSearch.value
   if (!query || !value) return false
   return value.toLocaleLowerCase('zh-CN').includes(query)
+}
+
+/** 工具调用卡片与左侧导航项共用同一份搜索文本，但折叠展开只关心载荷是否命中。 */
+function callMatchesSearch(call: ModelConversationToolCall) {
+  return payloadMatchesSearch(call.arguments) || payloadMatchesSearch(call.name)
+}
+
+function resultMatchesSearch(result: ModelConversationToolResult) {
+  return payloadMatchesSearch(result.content)
 }
 
 /**
@@ -1106,92 +1108,6 @@ function statusLabel(status: SandboxModelRequestStatus) {
 
 const responseFormatLabel = computed(() => response.value.format?.toUpperCase() || response.value.status.toUpperCase())
 
-const AnalysisHighlightedText = defineComponent({
-  props: {
-    value: { type: String, default: '' },
-    query: { type: String, default: '' },
-  },
-  setup(highlightProps) {
-    return () => h('span', highlightText(highlightProps.value, highlightProps.query))
-  },
-})
-
-const AnalysisTextBlock = defineComponent({
-  props: {
-    label: String,
-    value: { type: String, default: '' },
-    searchQuery: { type: String, default: '' },
-    maxLines: { type: Number, default: 12 },
-    forceExpanded: Boolean,
-    occurrence: Object as () => ModelRequestOccurrence | undefined,
-    compact: Boolean,
-  },
-  setup(blockProps) {
-    const expanded = ref(false)
-    const collapsible = ref(false)
-    const collapsedHeight = ref('')
-    const textElement = ref<HTMLElement>()
-    let resizeObserver: ResizeObserver | undefined
-
-    function measureLines() {
-      const element = textElement.value
-      if (!element) return
-      const lineHeight = Number.parseFloat(getComputedStyle(element).lineHeight)
-      if (!Number.isFinite(lineHeight) || lineHeight <= 0) {
-        collapsible.value = false
-        return
-      }
-      collapsedHeight.value = `${lineHeight * blockProps.maxLines}px`
-      collapsible.value = exceedsAnalysisLineLimit(element.scrollHeight, lineHeight, blockProps.maxLines)
-    }
-
-    watch(
-      [() => blockProps.value, () => blockProps.maxLines],
-      async () => {
-        await nextTick()
-        measureLines()
-      },
-    )
-    watch(
-      [() => blockProps.searchQuery, () => blockProps.forceExpanded],
-      ([query, forceExpanded]) => {
-        if (shouldExpandAnalysisText(expanded.value, forceExpanded, query, blockProps.value)) expanded.value = true
-      },
-      { immediate: true },
-    )
-    onMounted(async () => {
-      await nextTick()
-      measureLines()
-      if (typeof ResizeObserver === 'undefined' || !textElement.value) return
-      resizeObserver = new ResizeObserver(measureLines)
-      resizeObserver.observe(textElement.value)
-    })
-    onBeforeUnmount(() => resizeObserver?.disconnect())
-
-    return () => h('section', {
-      class: ['webqq-model-analysis-section', { 'is-collapsed': collapsible.value && !expanded.value, 'is-compact': blockProps.compact }],
-    }, [
-      blockProps.label && h('strong', blockProps.label),
-      h('div', { class: 'webqq-model-analysis-text-wrap' }, [
-        h('pre', {
-          ref: textElement,
-          style: { '--webqq-model-analysis-collapse-height': collapsedHeight.value },
-        }, blockProps.occurrence
-          ? renderModelRequestOccurrence(blockProps.value, blockProps.occurrence)
-          : highlightText(blockProps.value, blockProps.searchQuery)),
-        collapsible.value && h('button', {
-          type: 'button',
-          class: 'webqq-model-analysis-expand',
-          onClick: () => { expanded.value = !expanded.value },
-        }, [
-          expanded.value ? '收起' : `展开全部（${blockProps.value.length} 字符）`,
-          h(IconChevronDown, { size: 12, 'aria-hidden': 'true' }),
-        ]),
-      ]),
-    ])
-  },
-})
-
 const AnalysisContentParts = defineComponent({
   props: {
     parts: { type: Array as () => readonly ModelConversationContentPart[], required: true },
@@ -1215,7 +1131,7 @@ const AnalysisContentParts = defineComponent({
         ])
       }
       const label = part.kind === 'text' ? undefined : part.kind === 'image' ? '图片加载失败' : part.kind
-      return h(AnalysisTextBlock, {
+      return h(AnalysisContentBlock, {
         key: index,
         label,
         value: part.value,
@@ -1225,22 +1141,4 @@ const AnalysisContentParts = defineComponent({
     }))
   },
 })
-
-function highlightText(value: string, query: string) {
-  if (!query) return value
-  const lower = value.toLocaleLowerCase('zh-CN')
-  const nodes: Array<string | ReturnType<typeof h>> = []
-  let offset = 0
-  while (offset < value.length) {
-    const index = lower.indexOf(query, offset)
-    if (index < 0) {
-      nodes.push(value.slice(offset))
-      break
-    }
-    if (index > offset) nodes.push(value.slice(offset, index))
-    nodes.push(h('mark', value.slice(index, index + query.length)))
-    offset = index + query.length
-  }
-  return nodes
-}
 </script>
