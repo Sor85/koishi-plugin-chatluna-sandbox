@@ -1,4 +1,5 @@
 import type { Context } from 'koishi'
+import { identifyCharacterTurnSession } from './character-turn-session'
 import { parseThinkContent, readChatLunaResponseText } from './thinking'
 import type {
   SandboxChatLunaState,
@@ -38,6 +39,10 @@ interface ChatLunaCharacterPayload {
   text?: unknown
 }
 
+interface FinishStateOptions {
+  allowReplyFallback: boolean
+}
+
 interface ChatLunaEventRegistrar {
   (event: 'chatluna/before-chat', listener: (
     conversationId: string,
@@ -59,7 +64,7 @@ interface ChatLunaEventRegistrar {
     conversationId: string,
   ) => void): () => void
   (event: 'chatluna/model-usage', listener: (payload: ChatLunaModelUsagePayload) => void): () => void
-  (event: 'chatluna_character/message_collect', listener: (session: unknown) => void): () => void
+  (event: 'chatluna_character/message_collect', listener: (session: unknown) => void, options?: { prepend?: boolean }): () => void
   (event: 'chatluna_character/after-chat', listener: (payload: ChatLunaCharacterPayload) => void): () => void
 }
 
@@ -95,6 +100,9 @@ export class SandboxChatLunaStateStore {
   private thinkingStartedAt = new Map<string, number>()
   private modelRequests = new Map<string, SandboxMessageModelRequestReference[]>()
   private replyMessageIds = new Map<string, string[]>()
+  private characterSessionStateKeys = new WeakMap<object, string>()
+  private activeCharacterSessions = new Map<string, object>()
+  private activeCoreSessions = new Map<string, object>()
   private disposers: Array<() => void> = []
 
   constructor(
@@ -120,15 +128,34 @@ export class SandboxChatLunaStateStore {
       this.recordUsage(payload)
     }))
     this.disposers.push(on('chatluna_character/message_collect', (session) => {
-      this.begin(session)
-    }))
+      this.beginCharacterTurn(session)
+    }, { prepend: true }))
     this.disposers.push(on('chatluna_character/after-chat', (payload) => {
-      this.finish(undefined, payload?.session, payload)
+      if (this.finishCharacterTurn(payload?.session, payload)) this.onChange()
     }))
   }
 
   getStates(): SandboxChatLunaState[] {
     return structuredClone([...this.states.values()])
+  }
+
+  /**
+   * 结束由同一个 Character Session 启动的当前轮。
+   *
+   * 成功路径的 after-chat 与最外层 finally 的 release 会先后到达；Session 代次映射让第二次调用成为
+   * no-op，也阻止过期 Session 按相同 bot/conversation 误删后继轮。
+   */
+  finishCharacterTurn(session: unknown, payload?: ChatLunaCharacterPayload): boolean {
+    const identity = identifyCharacterTurnSession(session)
+    if (!identity) return false
+    const key = this.characterSessionStateKeys.get(identity)
+    if (!key) return false
+    this.characterSessionStateKeys.delete(identity)
+    if (this.activeCharacterSessions.get(key) !== identity) return false
+    this.activeCharacterSessions.delete(key)
+    const state = this.states.get(key)
+    if (!state?.thinking) return false
+    return this.finishState(key, payload, { allowReplyFallback: payload !== undefined })
   }
 
   recordModelRequest(
@@ -166,6 +193,9 @@ export class SandboxChatLunaStateStore {
     this.thinkingStartedAt.clear()
     this.modelRequests.clear()
     this.replyMessageIds.clear()
+    this.characterSessionStateKeys = new WeakMap()
+    this.activeCharacterSessions.clear()
+    this.activeCoreSessions.clear()
   }
 
   dispose(): void {
@@ -181,19 +211,37 @@ export class SandboxChatLunaStateStore {
     this.deleteWhere(({ conversationId }) => conversationIds.has(conversationId))
   }
 
-  private begin(session: unknown, chatLunaConversationId?: string): void {
+  private beginCharacterTurn(session: unknown): void {
+    const identity = identifyCharacterTurnSession(session)
+    if (!identity) return
+    const key = this.begin(session, undefined, identity)
+    if (!key) return
+    this.characterSessionStateKeys.set(identity, key)
+    this.activeCharacterSessions.set(key, identity)
+  }
+
+  private begin(
+    session: unknown,
+    chatLunaConversationId?: string,
+    characterIdentity?: object,
+  ): string | undefined {
     const target = readSessionTarget(session)
     if (!target || !this.validateTarget(target.botParticipantId, target.conversationId)) return
     const key = createStateKey(target.botParticipantId, target.conversationId)
     const current = this.states.get(key)
-    // chatluna-character 可能在核心 before-chat 前后重复报告同一次思考；
-    // 无内部会话 ID 的补充事件不能清掉核心事件已经建立的 Token 归属映射。
-    if (!chatLunaConversationId && current?.thinking) {
+    const coreIdentity = chatLunaConversationId
+      ? identifyCharacterTurnSession(session)
+      : undefined
+    // Character collect 既可能重复报告自己的同一轮，也可能补充同一 Session 已由 Core before-chat
+    // 建立的轮次。两种情况都保留 Core 会话映射、usage 与请求引用；不同 Character Session 仍重建。
+    if (!chatLunaConversationId && characterIdentity && current?.thinking
+      && (
+        this.activeCharacterSessions.get(key) === characterIdentity
+        || this.activeCoreSessions.get(key) === characterIdentity
+      )) {
       current.updatedAt = new Date().toISOString()
-      // 上一轮如果因为上游报错没收到结束事件，thinking 会一直挂着，
-      // 此时不刷新起点会把上一轮的等待时间算进这一轮的思考时长。
       this.thinkingStartedAt.set(key, Date.now())
-      return
+      return key
     }
     this.detachStateKey(key)
     this.modelRequests.delete(key)
@@ -209,9 +257,11 @@ export class SandboxChatLunaStateStore {
       const keys = this.activeStateKeys.get(chatLunaConversationId) ?? new Set<string>()
       keys.add(key)
       this.activeStateKeys.set(chatLunaConversationId, keys)
+      if (coreIdentity) this.activeCoreSessions.set(key, coreIdentity)
     }
     // 等待态是不落场景快照的瞬时状态，必须单独广播，否则聊天页面要等下一条消息才刷新，届时思考早已结束。
     this.onChange()
+    return key
   }
 
   private resolveErrorTargets(chatLunaConversationId: string): SandboxChatLunaErrorTarget[] {
@@ -272,7 +322,11 @@ export class SandboxChatLunaStateStore {
     return thinkingKeys.length === 1 ? thinkingKeys[0] : undefined
   }
 
-  private finishState(key: string, payload?: ChatLunaCharacterPayload): boolean {
+  private finishState(
+    key: string,
+    payload?: ChatLunaCharacterPayload,
+    options: FinishStateOptions = { allowReplyFallback: true },
+  ): boolean {
     const state = this.states.get(key)
     const startedAt = this.thinkingStartedAt.get(key)
     this.thinkingStartedAt.delete(key)
@@ -281,8 +335,11 @@ export class SandboxChatLunaStateStore {
     state.updatedAt = new Date().toISOString()
     const thought = payload ? parseThinkContent(readChatLunaResponseText(payload)) : ''
     const modelRequests = this.modelRequests.get(key)
-    // 思考内容、用量和本轮权威请求引用一起归档，避免前端按时间猜测对应请求。
-    if (thought || state.usage || modelRequests?.length) {
+    const replyMessageIds = this.replyMessageIds.get(key) ?? []
+    // release 没有权威响应载荷；若本轮也没有明确捕获回复 ID，调用兼容 fallback 会把失败请求贴到
+    // 上一轮最后一条机器人消息。成功 after-chat 仍保留该 fallback，部分回复后失败则只归档明确 ID。
+    const hasResult = Boolean(thought || state.usage || modelRequests?.length)
+    if (hasResult && (options.allowReplyFallback || replyMessageIds.length > 0)) {
       this.archiveResult(
         state.botParticipantId,
         state.conversationId,
@@ -292,7 +349,7 @@ export class SandboxChatLunaStateStore {
           ...(state.usage ? { usage: { ...state.usage } } : {}),
           ...(modelRequests?.length ? { modelRequests: modelRequests.map((reference) => ({ ...reference })) } : {}),
         },
-        this.replyMessageIds.get(key) ?? [],
+        replyMessageIds,
       )
     }
     this.modelRequests.delete(key)
@@ -302,6 +359,8 @@ export class SandboxChatLunaStateStore {
   }
 
   private detachStateKey(key: string): void {
+    this.activeCharacterSessions.delete(key)
+    this.activeCoreSessions.delete(key)
     for (const [conversationId, keys] of this.activeStateKeys) {
       keys.delete(key)
       if (!keys.size) this.activeStateKeys.delete(conversationId)

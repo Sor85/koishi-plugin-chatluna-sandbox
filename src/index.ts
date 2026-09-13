@@ -20,6 +20,7 @@ import {
   registerSandboxTestSpaceModel,
 } from './persistence'
 import type { SandboxOneBotDebugPersistence } from './onebot-debug'
+import { observeCharacterTurnCompletion } from './chatluna/character-turn-completion'
 import { linkChatLunaUsageRequest, type ChatLunaUsageLookup } from './chatluna/usage'
 import { installModelRequestCollector, resolveChatLunaPluginClass } from './model-request-collector'
 import { seedDevelopmentModelRequestErrors } from './model-request-error-preview'
@@ -40,6 +41,7 @@ export * from './onebot-debug'
 export * from './model-request'
 export * from './model-request-collector'
 export * from './model-request-error-preview'
+export * from './chatluna/character-turn-completion'
 export * from './chatluna/error'
 export * from './types'
 export * from './mcp/server'
@@ -266,6 +268,14 @@ export function apply(ctx: Context, config: Config) {
       return matches.length === 1 ? matches[0] : undefined
     }
     const presetSnapshots = new PresetRuntimeSnapshotTracker(inner, resolvePresetRuntimeTarget)
+    const disposeCharacterTurnCompletion = observeCharacterTurnCompletion(inner, (session) => {
+      // 每个 state store 都只认自己在 message_collect 登记的原 Session；遍历实际场景记录域即可精确收尾，
+      // 不另建一份 scope 枚举，也不改变模型请求的保守归属规则。
+      for (const { control: scopeControl } of scopes.listScenes()) {
+        scopeControl.finishChatLunaCharacterTurn(session)
+      }
+      presetSnapshots.finishCharacterTurn(session)
+    })
     const getActivePresetSnapshots = (entities: SandboxModelRequestEntities) => {
       if (!entities.scopeId || !entities.botId || !entities.conversationId) return []
       return presetSnapshots.getActiveSnapshots({
@@ -383,6 +393,7 @@ export function apply(ctx: Context, config: Config) {
     })
     inner.on('dispose', () => {
       disposeModelRequestCollector()
+      disposeCharacterTurnCompletion()
       presetSnapshots.dispose()
       // Koishi 的 dispose 不可等待（cordis scope.reset 不 await disposer），
       // 这里只保证收尾写入的失败进日志，而不是被静默丢弃。
