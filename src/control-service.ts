@@ -781,6 +781,11 @@ export class SandboxControlService {
       .map(({ botParticipantId, conversationId }) => ({ botId: botParticipantId, conversationId }))
   }
 
+  finishChatLunaCharacterTurn(session: unknown): void {
+    if (!this.chatLunaState.finishCharacterTurn(session)) return
+    this.notifySceneMutation()
+  }
+
   recordChatLunaModelRequest(scopeId: string, recordId: string, botParticipantId: string, conversationId: string): void {
     this.chatLunaState.recordModelRequest(botParticipantId, conversationId, { scopeId, recordId })
   }

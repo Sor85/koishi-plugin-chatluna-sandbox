@@ -105,9 +105,42 @@ describe('运行时预设快照关联', () => {
     }])
     expect(tracker.getActiveSnapshots(second)).toMatchObject([{ presetName: 'bob' }])
 
-    await emit(app, 'chatluna_character/after-chat', { ...firstPayload, session: session(first.botId, first.conversationId) })
+    await emit(app, 'chatluna_character/after-chat', firstPayload)
     expect(tracker.getActiveSnapshots(first)).toEqual([])
     expect(tracker.getActiveSnapshots(second)).toHaveLength(1)
+    tracker.dispose()
+  })
+
+  it('Character 按原 Session 精确收尾，克隆或过期 Session 不删除同目标后继轮', async () => {
+    const app = new App()
+    runningApps.push(app)
+    const target = { scopeId: 'main', botId: '20001', conversationId: 'group:30001' }
+    const tracker = createTracker(app, { '20001:group:30001': target })
+    await app.start()
+
+    const stale = {
+      session: session(target.botId, target.conversationId),
+      presetName: 'stale',
+      preset: { name: 'stale', system: { rawString: 'Stale system' } },
+    }
+    const current = {
+      session: session(target.botId, target.conversationId),
+      presetName: 'current',
+      preset: { name: 'current', system: { rawString: 'Current system' } },
+    }
+    await emit(app, 'chatluna_character/before-chat', stale)
+    await emit(app, 'chatluna_character/before-chat', current)
+
+    tracker.finishCharacterTurn({ ...current.session })
+    tracker.finishCharacterTurn(stale.session)
+    expect(tracker.getActiveSnapshots(target)).toMatchObject([{
+      kind: 'character',
+      presetName: 'current',
+      templates: [{ template: 'Current system' }],
+    }])
+
+    tracker.finishCharacterTurn(current.session)
+    expect(tracker.getActiveSnapshots(target)).toEqual([])
     tracker.dispose()
   })
 

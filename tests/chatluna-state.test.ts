@@ -102,6 +102,73 @@ describe('ChatLuna 多机器人对话状态', () => {
     ]))
   })
 
+  it('Character collect 补充已开始的 Core 同轮时保留会话映射、用量与请求引用', async () => {
+    const { app, control } = await createControl()
+    const firstSession = createGroupSession(control, '20001')
+    const secondSession = createGroupSession(control, '20002')
+
+    await emitChatLunaEvent(app, 'chatluna/before-chat', 'chatluna:core-a', {}, {}, {}, firstSession)
+    await emitChatLunaEvent(app, 'chatluna/model-usage', {
+      context: { conversationId: 'chatluna:core-a' },
+      usageMetadata: { input_tokens: 3, output_tokens: 1, total_tokens: 4 },
+    })
+    control.recordChatLunaModelRequest('main', 'request:core-a', '20001', 'group:30001')
+
+    // 同一 Session 的 Character 开始只是补充同一轮，不能拆掉 Core 已建立的内部会话映射和证据。
+    await emitChatLunaEvent(app, 'chatluna_character/message_collect', firstSession, [])
+    await emitChatLunaEvent(app, 'chatluna/before-chat', 'chatluna:core-b', {}, {}, {}, secondSession)
+    await emitChatLunaEvent(app, 'chatluna/model-usage', {
+      context: { conversationId: 'chatluna:core-a' },
+      usageMetadata: { input_tokens: 5, output_tokens: 2, total_tokens: 7 },
+    })
+
+    expect(control.getChatLunaStates()).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        botParticipantId: '20001',
+        conversationId: 'group:30001',
+        thinking: true,
+        usage: { inputTokens: 8, outputTokens: 3, totalTokens: 11 },
+      }),
+      expect.objectContaining({
+        botParticipantId: '20002',
+        conversationId: 'group:30001',
+        thinking: true,
+      }),
+    ]))
+
+    await control.sendMessage({ operatorId: '20001', conversationId: 'group:30001', content: 'A 回复' })
+    await emitChatLunaEvent(app, 'chatluna/after-chat', 'chatluna:core-a', {}, { content: 'A 回复' }, {}, {}, firstSession)
+    expect(control.getSnapshot().messages.at(-1)?.chatLuna).toMatchObject({
+      usage: { inputTokens: 8, outputTokens: 3, totalTokens: 11 },
+      modelRequests: [{ scopeId: 'main', recordId: 'request:core-a' }],
+    })
+  })
+
+  it('不同 Character Session 接管同目标时重建 Core 遗留状态', async () => {
+    const { app, control } = await createControl()
+    const coreSession = createGroupSession(control, '20001')
+    const nextCharacterSession = createGroupSession(control, '20001')
+
+    await emitChatLunaEvent(app, 'chatluna/before-chat', 'chatluna:stale-core', {}, {}, {}, coreSession)
+    await emitChatLunaEvent(app, 'chatluna/model-usage', {
+      context: { conversationId: 'chatluna:stale-core' },
+      usageMetadata: { input_tokens: 20, output_tokens: 5, total_tokens: 25 },
+    })
+    control.recordChatLunaModelRequest('main', 'request:stale-core', '20001', 'group:30001')
+
+    await emitChatLunaEvent(app, 'chatluna_character/message_collect', nextCharacterSession, [])
+    expect(control.getChatLunaStates()).toEqual([
+      expect.not.objectContaining({ usage: expect.anything() }),
+    ])
+
+    control.recordChatLunaModelRequest('main', 'request:next-character', '20001', 'group:30001')
+    await control.sendMessage({ operatorId: '20001', conversationId: 'group:30001', content: '新 Character 回复' })
+    control.finishChatLunaCharacterTurn(nextCharacterSession)
+    expect(control.getSnapshot().messages.at(-1)?.chatLuna?.modelRequests).toEqual([
+      { scopeId: 'main', recordId: 'request:next-character' },
+    ])
+  })
+
   it('无法唯一确定机器人或逻辑会话时不记录或串联状态', async () => {
     const { app, control } = await createControl()
     const firstSession = createGroupSession(control, '20001')
@@ -268,6 +335,109 @@ describe('ChatLuna 多机器人对话状态', () => {
     expect(message?.chatLuna?.thoughtDurationMs).toBeGreaterThanOrEqual(0)
     expect(control.getChatLunaStates()).toEqual([
       expect.objectContaining({ botParticipantId: '20001', thinking: false }),
+    ])
+  })
+
+  it('成功 after-chat 后的 release 收尾幂等保留思考、用量与请求引用', async () => {
+    const { app, control } = await createControl()
+    const session = createGroupSession(control, '20001')
+
+    await emitChatLunaEvent(app, 'chatluna_character/message_collect', session, [])
+    await emitChatLunaEvent(app, 'chatluna/model-usage', {
+      context: { conversationId: 'chatluna:character-success' },
+      usageMetadata: { input_tokens: 9, output_tokens: 4, total_tokens: 13 },
+    })
+    control.recordChatLunaModelRequest('main', 'request:success', '20001', 'group:30001')
+    await control.sendMessage({ operatorId: '20001', conversationId: 'group:30001', content: '成功回复' })
+    await emitChatLunaEvent(app, 'chatluna_character/after-chat', {
+      session,
+      lastResponseMessage: { content: '<think>成功思考</think>成功回复' },
+    })
+    const completedMessage = structuredClone(control.getSnapshot().messages.at(-1))
+    const completedState = structuredClone(control.getChatLunaStates())
+
+    control.finishChatLunaCharacterTurn(session)
+
+    expect(control.getSnapshot().messages.at(-1)).toEqual(completedMessage)
+    expect(control.getChatLunaStates()).toEqual(completedState)
+    expect(completedMessage?.chatLuna).toMatchObject({
+      thought: '成功思考',
+      usage: { inputTokens: 9, outputTokens: 4, totalTokens: 13 },
+      modelRequests: [{ scopeId: 'main', recordId: 'request:success' }],
+    })
+  })
+
+  it('失败 release 无明确本轮回复时不把证据回填到上一条机器人消息', async () => {
+    const { app, control } = await createControl()
+    const session = createGroupSession(control, '20001')
+    await control.sendMessage({ operatorId: '20001', conversationId: 'group:30001', content: '上一轮回复' })
+
+    await emitChatLunaEvent(app, 'chatluna_character/message_collect', session, [])
+    await emitChatLunaEvent(app, 'chatluna/model-usage', {
+      context: { conversationId: 'chatluna:character-failed' },
+      usageMetadata: { input_tokens: 7, output_tokens: 0, total_tokens: 7 },
+    })
+    control.recordChatLunaModelRequest('main', 'request:failed', '20001', 'group:30001')
+    control.finishChatLunaCharacterTurn(session)
+
+    expect(control.getSnapshot().messages.at(-1)).toMatchObject({ content: '上一轮回复' })
+    expect(control.getSnapshot().messages.at(-1)?.chatLuna).toBeUndefined()
+    expect(control.getChatLunaStates()).toEqual([
+      expect.objectContaining({
+        thinking: false,
+        usage: { inputTokens: 7, outputTokens: 0, totalTokens: 7 },
+      }),
+    ])
+  })
+
+  it('失败前已有部分回复时只把证据归档到本轮明确捕获的回复', async () => {
+    const { app, control } = await createControl()
+    const session = createGroupSession(control, '20001')
+    await control.sendMessage({ operatorId: '20001', conversationId: 'group:30001', content: '上一轮回复' })
+
+    await emitChatLunaEvent(app, 'chatluna_character/message_collect', session, [])
+    await emitChatLunaEvent(app, 'chatluna/model-usage', {
+      context: { conversationId: 'chatluna:character-partial' },
+      usageMetadata: { input_tokens: 11, output_tokens: 2, total_tokens: 13 },
+    })
+    control.recordChatLunaModelRequest('main', 'request:partial', '20001', 'group:30001')
+    await control.sendMessage({ operatorId: '20001', conversationId: 'group:30001', content: '本轮部分回复' })
+    control.finishChatLunaCharacterTurn(session)
+
+    const [previous, partial] = control.getSnapshot().messages
+    expect(previous?.chatLuna).toBeUndefined()
+    expect(partial).toMatchObject({
+      content: '本轮部分回复',
+      chatLuna: {
+        thought: '',
+        usage: { inputTokens: 11, outputTokens: 2, totalTokens: 13 },
+        modelRequests: [{ scopeId: 'main', recordId: 'request:partial' }],
+      },
+    })
+  })
+
+  it('克隆或过期 Session 不能结束同目标后继轮', async () => {
+    const { app, control } = await createControl()
+    const stale = createGroupSession(control, '20001')
+    const current = createGroupSession(control, '20001')
+
+    await emitChatLunaEvent(app, 'chatluna_character/message_collect', stale, [])
+    await emitChatLunaEvent(app, 'chatluna_character/message_collect', current, [])
+    control.recordChatLunaModelRequest('main', 'request:current', '20001', 'group:30001')
+
+    control.finishChatLunaCharacterTurn(stale)
+    control.finishChatLunaCharacterTurn({ ...current })
+    expect(control.getChatLunaStates()).toEqual([
+      expect.objectContaining({ conversationId: 'group:30001', thinking: true }),
+    ])
+
+    await control.sendMessage({ operatorId: '20001', conversationId: 'group:30001', content: '后继轮回复' })
+    control.finishChatLunaCharacterTurn(current)
+    expect(control.getSnapshot().messages.at(-1)?.chatLuna?.modelRequests).toEqual([
+      { scopeId: 'main', recordId: 'request:current' },
+    ])
+    expect(control.getChatLunaStates()).toEqual([
+      expect.objectContaining({ conversationId: 'group:30001', thinking: false }),
     ])
   })
 

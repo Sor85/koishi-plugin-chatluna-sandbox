@@ -1,4 +1,5 @@
 import type { Context } from 'koishi'
+import { identifyCharacterTurnSession } from '../chatluna/character-turn-session'
 import { parsePresetSourceDocument } from './source-document'
 import type {
   PresetRuntimeResolvedTarget,
@@ -90,28 +91,27 @@ export class PresetRuntimeSnapshotTracker {
       const turnId = `character:${this.nextCharacterTurn++}`
       const key = activeKey(target, turnId)
       this.active.set(key, { target, turnId, snapshot })
-      const session = record?.session
-      if (session && typeof session === 'object') {
-        const keys = this.characterSessionTurnKeys.get(session) ?? new Set<string>()
+      const identity = identifyCharacterTurnSession(record?.session)
+      if (identity) {
+        const keys = this.characterSessionTurnKeys.get(identity) ?? new Set<string>()
         keys.add(key)
-        this.characterSessionTurnKeys.set(session, keys)
+        this.characterSessionTurnKeys.set(identity, keys)
       }
     }))
     this.disposers.push(on('chatluna_character/after-chat', (payload) => {
-      const record = readRecord(payload)
-      const target = this.resolveSession(record?.session)
-      if (!target) return
-      const session = record?.session
-      const sessionKeys = session && typeof session === 'object' ? this.characterSessionTurnKeys.get(session) : undefined
-      if (session && typeof session === 'object' && sessionKeys?.size === 1) {
-        const [directKey] = sessionKeys
-        if (directKey) this.active.delete(directKey)
-        this.characterSessionTurnKeys.delete(session)
-        return
-      }
-      const matches = [...this.active].filter(([, turn]) => turn.snapshot.kind === 'character' && sameTarget(turn.target, target))
-      if (matches.length === 1) this.active.delete(matches[0]![0])
+      this.finishCharacterTurn(readRecord(payload)?.session)
     }))
+  }
+
+  finishCharacterTurn(session: unknown): void {
+    const identity = identifyCharacterTurnSession(session)
+    if (!identity) return
+    const sessionKeys = this.characterSessionTurnKeys.get(identity)
+    // 同一 Session 出现多个并发 before-chat 时无法证明 release 对应哪一轮，继续保守保留而不是猜测。
+    if (sessionKeys?.size !== 1) return
+    const [key] = sessionKeys
+    if (key) this.active.delete(key)
+    this.characterSessionTurnKeys.delete(identity)
   }
 
   getActiveSnapshots(target: PresetRuntimeResolvedTarget): PresetRuntimeSnapshot[] {
